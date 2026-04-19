@@ -1,0 +1,9 @@
+{
+  "$schema": "./design-system.schema.md",
+  "version": 1,
+  "notes": "LeadSource v2-stripe extraction. Phase 1 skeleton — tokens.css, base-styles.css, components/, and templates/ will be populated in Phase 2 of M1c from the live v2-stripe.html.",
+  "tokens_css_file": "tokens.css",
+  "base_styles_file": "base-styles.css",
+  "components_dir": "components",
+  "templates_dir": "templates"
+}

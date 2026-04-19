@@ -17,3 +17,8 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 *.tsbuildinfo
+
+# M1c extraction sources are one-time artefacts — don't commit them. The
+# extracted components/templates under seed/leadsource/ ARE committed; only
+# the raw live-site HTML we extract from is excluded.
+seed/leadsource/source/

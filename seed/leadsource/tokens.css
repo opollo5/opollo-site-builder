@@ -1,0 +1,16 @@
+/*
+ * LeadSource design tokens — scoped to .ls-scope.
+ *
+ * TODO(M1c-phase2): replace this placeholder with the :root { --ls-* }
+ * block extracted from v2-stripe.html. Every custom property must be
+ * prefixed --ls-* per the scope-prefix convention (§3.6 of the M1 brief).
+ *
+ * Until Phase 2 lands, the seed script will insert this file's literal
+ * contents (including the TODO comment) as the design system's tokens_css.
+ * That's fine — the design system is created as DRAFT, not activated, so
+ * no generated pages reference these tokens yet.
+ */
+
+.ls-scope {
+  /* tokens go here */
+}
