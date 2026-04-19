@@ -1,9 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PreviewPane } from "@/components/PreviewPane";
+import {
+  ACTIVE_SITE_EVENT,
+  SiteSwitcher,
+  readStoredActiveSiteId,
+  type ActiveSiteEventDetail,
+} from "@/components/SiteSwitcher";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,8 +36,19 @@ export default function HomePage() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [previewPageId, setPreviewPageId] = useState<number | null>(null);
+  const [activeSiteId, setActiveSiteId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const toolUseNamesRef = useRef<Record<string, string>>({});
+
+  useEffect(() => {
+    setActiveSiteId(readStoredActiveSiteId());
+    const onChange = (e: Event) => {
+      const detail = (e as CustomEvent<ActiveSiteEventDetail>).detail;
+      setActiveSiteId(detail?.activeSiteId ?? null);
+    };
+    window.addEventListener(ACTIVE_SITE_EVENT, onChange);
+    return () => window.removeEventListener(ACTIVE_SITE_EVENT, onChange);
+  }, []);
 
   const appendDeltaToLastAssistant = useCallback((delta: string) => {
     setMessages((prev) => {
@@ -47,6 +63,7 @@ export default function HomePage() {
   const handleSend = useCallback(async () => {
     const trimmed = input.trim();
     if (!trimmed || streaming) return;
+    if (!activeSiteId) return;
 
     const userMsg: ChatMessage = { role: "user", text: trimmed };
     const apiMessages: ApiMessage[] = [...messages, userMsg].map((m) => ({
@@ -69,7 +86,7 @@ export default function HomePage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: apiMessages }),
+        body: JSON.stringify({ messages: apiMessages, activeSiteId }),
         signal: ctrl.signal,
       });
 
@@ -145,23 +162,25 @@ export default function HomePage() {
       setStreaming(false);
       abortRef.current = null;
     }
-  }, [appendDeltaToLastAssistant, input, messages, streaming]);
+  }, [
+    activeSiteId,
+    appendDeltaToLastAssistant,
+    input,
+    messages,
+    streaming,
+  ]);
+
+  const sendDisabled = streaming || !input.trim() || !activeSiteId;
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex h-12 flex-none items-center justify-between border-b px-4">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold">LeadSource</span>
+          <SiteSwitcher />
           <span className="text-xs text-muted-foreground">
             Opollo Site Builder
           </span>
         </div>
-        <Link
-          href="/admin/sites"
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          Manage sites →
-        </Link>
       </header>
       <div className="flex flex-1 overflow-hidden">
         <section className="flex w-2/5 flex-col border-r">
@@ -169,7 +188,9 @@ export default function HomePage() {
             <div className="space-y-3 p-4">
               {messages.length === 0 && (
                 <p className="text-sm text-muted-foreground">
-                  Describe the page you want to create.
+                  {activeSiteId
+                    ? "Describe the page you want to create."
+                    : "Select a site from the dropdown above to start."}
                 </p>
               )}
               {messages.map((m, i) => (
@@ -204,8 +225,12 @@ export default function HomePage() {
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Describe the page you want…"
-              disabled={streaming}
+              placeholder={
+                activeSiteId
+                  ? "Describe the page you want…"
+                  : "Select a site first…"
+              }
+              disabled={streaming || !activeSiteId}
               className="min-h-[60px] flex-1 resize-none"
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
@@ -216,7 +241,7 @@ export default function HomePage() {
             />
             <Button
               type="submit"
-              disabled={streaming || !input.trim()}
+              disabled={sendDisabled}
               className="self-end"
             >
               {streaming ? "…" : "Send"}

@@ -15,10 +15,12 @@ import { executeGetPage } from "@/lib/get-page";
 import { executeListPages } from "@/lib/list-pages";
 import { executePublishPage } from "@/lib/publish-page";
 import { executeUpdatePage } from "@/lib/update-page";
+import { buildSystemPromptForSite } from "@/lib/system-prompt";
+import { getSite } from "@/lib/sites";
 import {
-  buildSystemPrompt,
-  type SystemPromptContext,
-} from "@/lib/system-prompt";
+  runWithWpCredentials,
+  type WpCredentialsOverride,
+} from "@/lib/wordpress";
 
 type ToolExecutor = (input: unknown) => Promise<ToolResponse<any>>;
 
@@ -56,45 +58,15 @@ const MODEL = "claude-opus-4-7";
 const MAX_TOKENS = 4096;
 const MAX_ITERATIONS = 5;
 
-const LEADSOURCE_BRAND_VOICE = `Outcome-led. Bold statements. No hedging. Lead with what the product does, not what's broken in the world. Say the thing everyone's thinking but nobody writes on their website. Keep it short. Make it sound like a real person said it. If it sounds like an AI or a committee wrote it, rewrite it.
-
-Six voice rules:
-1. Outcomes first — lead with the result, not the problem
-2. Bold statements — "We tell you exactly." Full stop.
-3. Short sentences
-4. Say the real thing — if everyone's thinking it, say it
-5. Honest about limits — "Works with most forms" not "every form"
-6. Never salesy — no exclamation marks, no "Amazing!", no pressure
-
-Power phrases to use: "Stop guessing. Start knowing.", "We tell you exactly.", "Where your best clients are coming from.", "Add the code. We do the rest.", "No BS."
-
-Never say: "Every form", "100% accurate", "Leverage/Utilise/Seamlessly", "Powerful/Robust/Comprehensive", passive voice like "data is captured"`;
-
-const LEADSOURCE_CONTEXT: SystemPromptContext = {
+const LEADSOURCE_FALLBACK_PROMPT = buildSystemPromptForSite({
   site_name: "LeadSource",
   prefix: "ls",
   design_system_version: "1.0.0",
-  design_system_updated: "n/a (Week 2)",
-  design_system_html_full_file: "",
-  brand_voice_content: LEADSOURCE_BRAND_VOICE,
-  site_pages_tree: "[]",
-  site_menus_current: "{}",
-  homepage_id: "null",
-  templates_list: "[]",
-  session_recent_pages: "[]",
-};
+});
 
-const SYSTEM_PROMPT = buildSystemPrompt(LEADSOURCE_CONTEXT);
-
-// System prompt as a cached text block. cache_control on the last system block
-// marks the entire system prompt as a cacheable prefix.
-const CACHED_SYSTEM: Anthropic.TextBlockParam[] = [
-  {
-    type: "text",
-    text: SYSTEM_PROMPT,
-    cache_control: EPHEMERAL,
-  },
-];
+function cachedSystemBlocks(prompt: string): Anthropic.TextBlockParam[] {
+  return [{ type: "text", text: prompt, cache_control: EPHEMERAL }];
+}
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -111,7 +83,9 @@ function errorResponse(code: string, message: string, status: number) {
         suggested_action:
           code === "VALIDATION_FAILED"
             ? "Send a JSON body with { messages: [...] }."
-            : "Check server configuration.",
+            : code === "NOT_FOUND"
+              ? "Pick a site that still exists from /api/sites/list."
+              : "Check server configuration.",
       },
       timestamp: new Date().toISOString(),
     }),
@@ -136,6 +110,55 @@ export async function POST(req: Request) {
     );
   }
 
+  const activeSiteIdRaw = body?.activeSiteId;
+  const hasActiveSiteId =
+    typeof activeSiteIdRaw === "string" && activeSiteIdRaw.trim().length > 0;
+
+  // Resolve per-site context: explicit activeSiteId wins. A non-existent or
+  // credential-less site returns a 4xx — we do not fall back silently, so the
+  // caller sees exactly which site failed.
+  let systemPrompt: string;
+  let wpCreds: WpCredentialsOverride | undefined;
+  let siteLogId: string | null = null;
+  let siteLogName: string | null = null;
+
+  if (hasActiveSiteId) {
+    const siteId = activeSiteIdRaw.trim();
+    const siteResult = await getSite(siteId, { includeCredentials: true });
+    if (!siteResult.ok) {
+      const code = siteResult.error.code;
+      const status =
+        code === "NOT_FOUND" ? 404 : code === "INTERNAL_ERROR" ? 500 : 400;
+      return new Response(JSON.stringify(siteResult), {
+        status,
+        headers: { "content-type": "application/json" },
+      });
+    }
+    const { site, credentials } = siteResult.data;
+    if (!credentials) {
+      return errorResponse(
+        "INTERNAL_ERROR",
+        `Site ${site.id} has no credentials — re-register or restore the credentials row.`,
+        500,
+      );
+    }
+    wpCreds = {
+      wp_url: site.wp_url,
+      wp_user: credentials.wp_user,
+      wp_app_password: credentials.wp_app_password,
+    };
+    systemPrompt = buildSystemPromptForSite({
+      site_name: site.name,
+      prefix: site.prefix,
+      design_system_version: site.design_system_version,
+    });
+    siteLogId = site.id;
+    siteLogName = site.name;
+  } else {
+    systemPrompt = LEADSOURCE_FALLBACK_PROMPT;
+    wpCreds = undefined;
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     return errorResponse(
@@ -147,6 +170,7 @@ export async function POST(req: Request) {
 
   const client = new Anthropic({ apiKey });
   const encoder = new TextEncoder();
+  const cachedSystem = cachedSystemBlocks(systemPrompt);
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -165,14 +189,17 @@ export async function POST(req: Request) {
         console.log("[api/chat] starting stream", {
           model: MODEL,
           msg_count: convo.length,
-          system_prompt_chars: SYSTEM_PROMPT.length,
+          system_prompt_chars: systemPrompt.length,
+          site_id: siteLogId,
+          site_name: siteLogName,
+          using_env_fallback: !hasActiveSiteId,
         });
 
         for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
           const streamed = client.messages.stream({
             model: MODEL,
             max_tokens: MAX_TOKENS,
-            system: CACHED_SYSTEM,
+            system: cachedSystem,
             tools: CACHED_TOOLS,
             messages: convo,
           });
@@ -198,6 +225,7 @@ export async function POST(req: Request) {
               finalMsg.usage.cache_creation_input_tokens ?? 0,
             cache_read_input_tokens:
               finalMsg.usage.cache_read_input_tokens ?? 0,
+            site_id: siteLogId,
           });
 
           const toolUseBlocks = finalMsg.content.filter(
@@ -216,7 +244,9 @@ export async function POST(req: Request) {
             let isError = false;
             const executor = TOOL_EXECUTORS[tu.name];
             if (executor) {
-              const r = await executor(tu.input);
+              const r = await runWithWpCredentials(wpCreds, () =>
+                executor(tu.input),
+              );
               result = r;
               if (!r.ok) isError = true;
             } else {
