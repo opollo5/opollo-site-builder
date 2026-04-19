@@ -27,6 +27,7 @@ export const ERROR_CODES = [
   "NETWORK_ERROR",
   "INTERNAL_ERROR",
   "NOT_FOUND",
+  "PREFIX_TAKEN",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -53,6 +54,16 @@ export type ToolError = {
 
 export type ToolResponse<T> = ToolSuccess<T> | ToolError;
 
+// Simpler envelope for system-level APIs (site registration, etc.) that
+// don't produce design-system-versioned output.
+export type ApiSuccess<T> = {
+  ok: true;
+  data: T;
+  timestamp: string;
+};
+
+export type ApiResponse<T> = ApiSuccess<T> | ToolError;
+
 export function errorCodeToStatus(code: ErrorCode): number {
   switch (code) {
     case "VALIDATION_FAILED":
@@ -63,6 +74,8 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 403;
     case "NOT_FOUND":
       return 404;
+    case "PREFIX_TAKEN":
+      return 409;
     case "RATE_LIMIT":
       return 429;
     case "UPSTREAM_BLOCKED":
@@ -73,6 +86,42 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 500;
   }
 }
+
+// ---------- site registration ----------
+
+export const SitePrefixPattern = /^[a-z0-9]{2,4}$/;
+
+export const RegisterSiteInputSchema = z.object({
+  name: z.string().min(1).max(100),
+  wp_url: z.string().url(),
+  prefix: z.string().regex(SitePrefixPattern),
+  wp_user: z.string().min(1).max(100),
+  wp_app_password: z.string().min(8),
+});
+export type RegisterSiteInput = z.infer<typeof RegisterSiteInputSchema>;
+
+export type SiteRecord = {
+  id: string;
+  name: string;
+  wp_url: string;
+  prefix: string;
+  design_system_version: string;
+  status: string;
+  last_successful_operation_at: string | null;
+  plugin_version: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SiteListItem = {
+  id: string;
+  name: string;
+  wp_url: string;
+  prefix: string;
+  status: string;
+  last_successful_operation_at: string | null;
+  updated_at: string;
+};
 
 // ---------- create_page ----------
 
