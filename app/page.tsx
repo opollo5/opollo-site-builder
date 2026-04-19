@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import { PreviewPane } from "@/components/PreviewPane";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,11 +18,20 @@ type ApiMessage = {
   content: string;
 };
 
+const PREVIEW_TOOLS = new Set([
+  "create_page",
+  "update_page",
+  "get_page",
+  "publish_page",
+]);
+
 export default function HomePage() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
+  const [previewPageId, setPreviewPageId] = useState<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const toolUseNamesRef = useRef<Record<string, string>>({});
 
   const appendDeltaToLastAssistant = useCallback((delta: string) => {
     setMessages((prev) => {
@@ -96,11 +106,24 @@ export default function HomePage() {
           if (type === "text" && typeof payload?.delta === "string") {
             appendDeltaToLastAssistant(payload.delta);
           } else if (type === "tool_use") {
+            if (typeof payload?.id === "string" && typeof payload?.name === "string") {
+              toolUseNamesRef.current[payload.id] = payload.name;
+            }
             appendDeltaToLastAssistant(
               `\n[tool: ${payload.name}]`,
             );
           } else if (type === "tool_result") {
             const ok = payload?.result?.ok;
+            const toolName = toolUseNamesRef.current[payload?.tool_use_id];
+            const pageId = payload?.result?.data?.page_id;
+            if (
+              ok &&
+              typeof toolName === "string" &&
+              PREVIEW_TOOLS.has(toolName) &&
+              typeof pageId === "number"
+            ) {
+              setPreviewPageId(pageId);
+            }
             appendDeltaToLastAssistant(
               `\n[tool_result: ${ok ? "ok" : payload?.result?.error?.code ?? "error"}]`,
             );
@@ -191,14 +214,12 @@ export default function HomePage() {
             </Button>
           </form>
         </section>
-        <section className="flex w-3/5 flex-col bg-muted/30">
+        <section className="flex w-3/5 flex-col border-l bg-muted/30">
           <div className="flex h-10 flex-none items-center border-b bg-background px-4 text-xs text-muted-foreground">
             Preview
           </div>
-          <div className="flex flex-1 items-center justify-center">
-            <p className="text-sm text-muted-foreground">
-              Preview will appear here once a page is drafted.
-            </p>
+          <div className="flex flex-1 overflow-hidden">
+            <PreviewPane pageId={previewPageId} />
           </div>
         </section>
       </div>
