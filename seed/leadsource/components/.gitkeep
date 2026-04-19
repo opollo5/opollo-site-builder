@@ -1,0 +1,4 @@
+# Phase 2 of M1c will populate this directory with one triplet per component:
+#   {name}.html          — HTML template with {{field}} placeholders
+#   {name}.css           — scoped CSS (all selectors prefixed .ls-)
+#   {name}.schema.json   — category, variant, content_schema, image_slots, usage_notes
