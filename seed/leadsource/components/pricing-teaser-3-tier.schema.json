@@ -1,0 +1,71 @@
+{
+  "category": "pricing",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["section_header", "tiers", "footnote"],
+    "additionalProperties": false,
+    "properties": {
+      "section_header": {
+        "type": "object",
+        "required": ["eyebrow", "heading"],
+        "additionalProperties": false,
+        "properties": {
+          "eyebrow": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "heading": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "sub": { "type": "string", "maxLength": 400 }
+        }
+      },
+      "tiers": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": {
+          "type": "object",
+          "required": ["name", "amount", "period", "tag", "features", "cta", "featured"],
+          "additionalProperties": false,
+          "properties": {
+            "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+            "amount": { "type": "string", "minLength": 1, "maxLength": 20 },
+            "period": { "type": "string", "minLength": 1, "maxLength": 20 },
+            "tag": { "type": "string", "minLength": 1, "maxLength": 120 },
+            "features": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+            },
+            "cta": {
+              "type": "object",
+              "required": ["label", "href"],
+              "additionalProperties": false,
+              "properties": {
+                "label": { "type": "string", "minLength": 1, "maxLength": 32 },
+                "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+              }
+            },
+            "featured": {
+              "type": "boolean",
+              "description": "Exactly one tier per pricing component should be featured. The featured tier renders dark with a gradient glow and inverted button."
+            },
+            "featured_badge": {
+              "type": "string",
+              "maxLength": 32,
+              "description": "Small label above the tier name on the featured tier only (e.g. 'Most businesses'). Omit on non-featured tiers."
+            }
+          }
+        }
+      },
+      "footnote": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160,
+        "description": "Small grey note centered under the pricing grid."
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Three-tier pricing teaser with the middle tier featured (dark card with gradient glow). Source-of-truth is site_context.pricing — pricing is site-wide, not per-page. Exactly 3 tiers; exactly one featured.",
+  "preview_html": null
+}

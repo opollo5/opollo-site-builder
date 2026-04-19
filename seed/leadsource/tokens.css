@@ -1,16 +1,36 @@
 /*
- * LeadSource design tokens — scoped to .ls-scope.
+ * LeadSource design tokens.
  *
- * TODO(M1c-phase2): replace this placeholder with the :root { --ls-* }
- * block extracted from v2-stripe.html. Every custom property must be
- * prefixed --ls-* per the scope-prefix convention (§3.6 of the M1 brief).
- *
- * Until Phase 2 lands, the seed script will insert this file's literal
- * contents (including the TODO comment) as the design system's tokens_css.
- * That's fine — the design system is created as DRAFT, not activated, so
- * no generated pages reference these tokens yet.
+ * Scoped to .ls-scope per §3.6 of the M1 brief — every generated page wraps
+ * content in <div class="ls-scope"> so these custom properties only apply
+ * inside that wrapper, keeping multi-client CSS coexistence safe.
  */
 
 .ls-scope {
-  /* tokens go here */
+  /* Brand palette — from strategy doc §10, slightly tuned */
+  --ls-blue:          #185FA5;
+  --ls-blue-dark:     #0C447C;
+  --ls-blue-light:    #E6F1FB;
+  --ls-teal:          #1D9E75;
+  --ls-amber:         #BA7517;
+
+  /* Neutrals */
+  --ls-ink:           #1A1A1A;
+  --ls-text:          #2C2C2A;
+  --ls-muted:         #6B6B66;
+  --ls-dim:           #9A9A94;
+  --ls-surface:       #FAFAF6;
+  --ls-surface-2:     #F1EFE8;
+  --ls-border:        #E8E6DE;
+  --ls-border-strong: #D3D1C7;
+  --ls-white:         #FFFFFF;
+
+  /* Signature LeadSource gradient — blue → teal → amber arc */
+  --ls-arc:           linear-gradient(135deg, #185FA5 0%, #1D9E75 50%, #BA7517 100%);
+  --ls-arc-soft:      linear-gradient(135deg, #E6F1FB 0%, #E1F5EE 50%, #FAEEDA 100%);
+
+  /* Type stack */
+  --ls-font-sans:     'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --ls-font-display:  'Inter Tight', 'Inter', -apple-system, sans-serif;
+  --ls-font-mono:     'JetBrains Mono', ui-monospace, Menlo, monospace;
 }

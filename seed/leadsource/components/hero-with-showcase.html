@@ -1,0 +1,109 @@
+<section class="ls-hero">
+  <div class="ls-container ls-hero__inner">
+    <div class="ls-hero__eyebrow">{{eyebrow_label}}</div>
+    <h1>{{headline_prefix}} <em>{{headline_accent}}</em>{{headline_suffix}}</h1>
+    <p class="ls-hero__sub">{{sub}}</p>
+    <div class="ls-hero__actions">
+      <a href="{{primary_cta.href}}" class="ls-btn ls-btn--primary ls-btn--lg">{{primary_cta.label}}</a>
+      <a href="{{secondary_cta.href}}" class="ls-btn ls-btn--outline ls-btn--lg">{{secondary_cta.label}}</a>
+    </div>
+    <div class="ls-hero__friction">
+      {{#each friction_items}}
+      <span>{{this}}</span>
+      {{/each}}
+    </div>
+
+    <div class="ls-hero__showcase">
+      <div class="ls-dashboard">
+        <div class="ls-dashboard__bar">
+          <div class="ls-dashboard__dots">
+            <span class="ls-dashboard__dot"></span>
+            <span class="ls-dashboard__dot"></span>
+            <span class="ls-dashboard__dot"></span>
+          </div>
+          <span class="ls-dashboard__url">{{dashboard.url_label}}</span>
+          <span class="ls-dashboard__live">Live</span>
+        </div>
+        <div class="ls-dashboard__body">
+          <div class="ls-dashboard__title">{{dashboard.title}}</div>
+          <div class="ls-metrics">
+            {{#each dashboard.metrics}}
+            <div class="ls-metric">
+              <div class="ls-metric__label">{{label}}</div>
+              <div class="ls-metric__num">{{value}}</div>
+              <div class="ls-metric__delta">{{delta}}</div>
+            </div>
+            {{/each}}
+          </div>
+
+          <div class="ls-chart">
+            <div class="ls-chart__header">
+              <div class="ls-chart__title">{{dashboard.chart_title}}</div>
+              <div class="ls-chart__period">{{dashboard.chart_period}}</div>
+            </div>
+            <svg width="100%" height="64" viewBox="0 0 400 64" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="ls-area" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#185FA5" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#185FA5" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,50 L30,45 L60,48 L90,38 L120,42 L150,30 L180,32 L210,22 L240,26 L270,18 L300,14 L330,20 L360,10 L400,12 L400,64 L0,64 Z" fill="url(#ls-area)"/>
+              <path d="M0,50 L30,45 L60,48 L90,38 L120,42 L150,30 L180,32 L210,22 L240,26 L270,18 L300,14 L330,20 L360,10 L400,12" fill="none" stroke="#185FA5" stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="360" cy="10" r="4" fill="#185FA5"/>
+              <circle cx="360" cy="10" r="8" fill="#185FA5" opacity="0.2"/>
+            </svg>
+          </div>
+
+          <div class="ls-lead-list">
+            {{#each dashboard.lead_rows}}
+            <div class="ls-lead-row">
+              <div class="ls-lead-row__name">
+                <div class="ls-lead-row__avatar ls-lead-row__avatar--{{avatar_tone}}">{{initials}}</div>
+                <span class="ls-lead-row__label">{{name}}</span>
+              </div>
+              <span class="ls-source-badge{{#if source_tone_class}} {{source_tone_class}}{{/if}}">{{source}}</span>
+              <span class="ls-lead-row__time">{{time}}</span>
+            </div>
+            {{/each}}
+          </div>
+        </div>
+      </div>
+
+      <div class="ls-email">
+        <div class="ls-email__bar">
+          <div class="ls-email__logo">{{email.logo_char}}</div>
+          <div class="ls-email__from">{{email.from_name}}</div>
+          <span class="ls-email__time">{{email.from_time}}</span>
+        </div>
+        <div class="ls-email__body">
+          <div class="ls-email__subject">{{email.subject}}</div>
+          <div class="ls-email__badges">
+            <span class="ls-source-badge{{#if email.source_badge.tone_class}} {{email.source_badge.tone_class}}{{/if}}">{{email.source_badge.label}}</span>
+          </div>
+          <div class="ls-email__lead">
+            <div class="ls-email__avatar">{{email.lead.initials}}</div>
+            <div class="ls-email__lead-info">
+              <div class="ls-email__lead-name">{{email.lead.name}}</div>
+              <div class="ls-email__lead-email">{{email.lead.email}}</div>
+            </div>
+          </div>
+          <div class="ls-email__journey">
+            <div class="ls-email__journey-label">{{email.journey_label}}</div>
+            {{#each email.journey_items}}
+            <div class="ls-email__journey-item">
+              <span class="ls-email__journey-num">{{index}}</span>
+              <span>{{label}}</span>
+              <span class="ls-email__journey-url">{{url}}</span>
+            </div>
+            {{/each}}
+          </div>
+          <div class="ls-email__footer">
+            <span>{{email.footer_left}}</span>
+            <span>{{email.footer_right}}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

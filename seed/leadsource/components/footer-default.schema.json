@@ -1,0 +1,55 @@
+{
+  "category": "footer",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["brand", "columns", "bottom_left", "bottom_right"],
+    "additionalProperties": false,
+    "properties": {
+      "brand": {
+        "type": "object",
+        "required": ["logo_label", "logo_mark_char", "tagline"],
+        "additionalProperties": false,
+        "properties": {
+          "logo_label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "logo_mark_char": { "type": "string", "minLength": 1, "maxLength": 2 },
+          "tagline": { "type": "string", "minLength": 1, "maxLength": 160 }
+        }
+      },
+      "columns": {
+        "type": "array",
+        "minItems": 4,
+        "maxItems": 4,
+        "items": {
+          "type": "object",
+          "required": ["heading", "links"],
+          "additionalProperties": false,
+          "properties": {
+            "heading": { "type": "string", "minLength": 1, "maxLength": 24 },
+            "links": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 10,
+              "items": {
+                "type": "object",
+                "required": ["label", "href"],
+                "additionalProperties": false,
+                "properties": {
+                  "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+                  "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+                }
+              }
+            }
+          }
+        },
+        "description": "Exactly 4 link columns to match the 2fr+4*1fr grid."
+      },
+      "bottom_left": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "bottom_right": { "type": "string", "minLength": 1, "maxLength": 80 }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "5-col footer: brand+tagline followed by 4 link columns. Source-of-truth is site_context.footer — same on every page.",
+  "preview_html": null
+}

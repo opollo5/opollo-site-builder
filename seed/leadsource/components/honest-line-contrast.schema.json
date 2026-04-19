@@ -1,0 +1,58 @@
+{
+  "category": "quote",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+      "eyebrow",
+      "quote_prefix",
+      "quote_accent",
+      "quote_suffix",
+      "left_card",
+      "right_card"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "eyebrow": { "type": "string", "minLength": 1, "maxLength": 40 },
+      "quote_prefix": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 240,
+        "description": "Leading text before the gradient accent."
+      },
+      "quote_accent": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "description": "Gradient-arc-emphasized phrase. Rendered in a <span class='arc'>."
+      },
+      "quote_suffix": {
+        "type": "string",
+        "maxLength": 120,
+        "description": "Trailing text after the gradient accent. May be empty."
+      },
+      "left_card": {
+        "type": "object",
+        "required": ["label", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "text": { "type": "string", "minLength": 1, "maxLength": 120 }
+        }
+      },
+      "right_card": {
+        "type": "object",
+        "required": ["label", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "text": { "type": "string", "minLength": 1, "maxLength": 120 }
+        }
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Large centered quote with a two-card contrast beneath (white 'before' → dark 'after'). Use once per page, as a philosophical anchor.",
+  "preview_html": null
+}

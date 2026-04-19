@@ -1,0 +1,59 @@
+{
+  "category": "nav",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["logo_label", "logo_mark_char", "links", "primary_cta", "ghost_cta"],
+    "additionalProperties": false,
+    "properties": {
+      "logo_label": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "description": "Wordmark text rendered next to the gradient logo mark."
+      },
+      "logo_mark_char": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 2,
+        "description": "Single character (or 2-char initial) shown inside the gradient logo mark."
+      },
+      "links": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 8,
+        "items": {
+          "type": "object",
+          "required": ["label", "href"],
+          "additionalProperties": false,
+          "properties": {
+            "label": { "type": "string", "minLength": 1, "maxLength": 32 },
+            "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+          }
+        }
+      },
+      "primary_cta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+        }
+      },
+      "ghost_cta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 32 },
+          "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+        }
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Top-level site nav. Source-of-truth for menu structure is site_context.nav — not per-page. Keep the ghost CTA for sign-in or secondary destinations, and the primary CTA for the main conversion action.",
+  "preview_html": null
+}

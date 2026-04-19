@@ -1,7 +1,236 @@
 /*
- * LeadSource base styles — typography, spacing, primitives.
+ * LeadSource base styles — primitives shared across every component.
  *
- * TODO(M1c-phase2): replace with the typography/reset/primitives extracted
- * from v2-stripe.html. Every selector must use the .ls- prefix per the
- * scope-prefix convention (§3.6 of the M1 brief).
+ * Everything here is either:
+ *   (a) a global reset / typography rule scoped to .ls-scope, or
+ *   (b) a .ls-* class used by more than one component (buttons, containers,
+ *       section wrappers, eyebrow, section-header, source-badge, logo,
+ *       @keyframes pulse).
+ *
+ * Component-specific styles live in each component's {name}.css. The
+ * Layer-2 scope-prefix validator accepts any selector registered in the
+ * design system — base-styles is one of the registration points.
+ *
+ * Design note: page-level selectors (body, html, typography element
+ * selectors) are scoped to .ls-scope rather than applied to the document
+ * root, so two clients' design systems can coexist on the same DOM
+ * without bleeding into each other.
  */
+
+/* ---------------------------------------------------------------------- */
+/*  Reset + root body typography                                          */
+/* ---------------------------------------------------------------------- */
+
+.ls-scope,
+.ls-scope * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.ls-scope {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-family: var(--ls-font-sans);
+  font-weight: 400;
+  font-size: 17px;
+  line-height: 1.6;
+  color: var(--ls-text);
+  background: var(--ls-white);
+  letter-spacing: -0.003em;
+}
+
+.ls-scope h1,
+.ls-scope h2,
+.ls-scope h3,
+.ls-scope h4 {
+  font-family: var(--ls-font-display);
+  font-weight: 500;
+  color: var(--ls-ink);
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+.ls-scope a {
+  color: var(--ls-blue);
+  text-decoration: none;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Layout containers                                                     */
+/* ---------------------------------------------------------------------- */
+
+.ls-container {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+.ls-container--narrow { max-width: 960px; }
+
+/* ---------------------------------------------------------------------- */
+/*  Section wrappers                                                      */
+/* ---------------------------------------------------------------------- */
+
+.ls-section { padding: 120px 0; }
+.ls-section--compact { padding: 80px 0; }
+.ls-section--surface { background: var(--ls-surface); }
+
+/* ---------------------------------------------------------------------- */
+/*  Eyebrow (small mono label above a heading)                            */
+/* ---------------------------------------------------------------------- */
+
+.ls-eyebrow {
+  display: inline-block;
+  font-family: var(--ls-font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ls-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 16px;
+}
+.ls-eyebrow::before {
+  content: '⎯ ';
+  color: var(--ls-blue);
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Section header (eyebrow + h2 + optional lede)                         */
+/* ---------------------------------------------------------------------- */
+
+.ls-head {
+  max-width: 800px;
+  margin-bottom: 64px;
+}
+.ls-head--center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+.ls-head h2 {
+  font-size: 56px;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  margin-bottom: 20px;
+}
+.ls-head p {
+  font-size: 19px;
+  line-height: 1.5;
+  color: var(--ls-muted);
+  max-width: 640px;
+}
+.ls-head--center p {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Buttons                                                               */
+/* ---------------------------------------------------------------------- */
+
+.ls-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px 20px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.ls-btn--primary {
+  background: var(--ls-ink);
+  color: var(--ls-white);
+}
+.ls-btn--primary:hover { background: var(--ls-blue-dark); }
+
+.ls-btn--ghost {
+  background: transparent;
+  color: var(--ls-text);
+}
+.ls-btn--ghost:hover { color: var(--ls-blue); }
+
+.ls-btn--outline {
+  background: var(--ls-white);
+  color: var(--ls-ink);
+  border-color: var(--ls-border-strong);
+}
+.ls-btn--outline:hover { border-color: var(--ls-muted); }
+
+.ls-btn--lg {
+  padding: 14px 24px;
+  font-size: 16px;
+  border-radius: 10px;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Logo primitive (used in nav and footer)                               */
+/* ---------------------------------------------------------------------- */
+
+.ls-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--ls-font-display);
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--ls-ink);
+  letter-spacing: -0.02em;
+}
+.ls-logo__mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--ls-arc);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Source badge (pill with source label; used in hero dashboard + email) */
+/* ---------------------------------------------------------------------- */
+
+.ls-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: var(--ls-blue-light);
+  color: var(--ls-blue-dark);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--ls-font-mono);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ls-source-badge--teal {
+  background: #E1F5EE;
+  color: #085041;
+}
+.ls-source-badge--amber {
+  background: #FAEEDA;
+  color: #633806;
+}
+
+/* ---------------------------------------------------------------------- */
+/*  Pulse keyframe (hero "live" eyebrow, dashboard "Live" indicator)       */
+/* ---------------------------------------------------------------------- */
+
+@keyframes ls-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}

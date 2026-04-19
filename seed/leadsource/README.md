@@ -103,5 +103,47 @@ the end of a successful run.
 
 - [x] **Phase 1 (M1c-skeleton)** — directory structure, placeholder
       `tokens.css` / `base-styles.css`, script with zero-component run.
-- [ ] **Phase 2 (M1c-components)** — extract components from `source/v2-stripe.html`,
-      produce every triplet + homepage template.
+- [x] **Phase 2 (M1c-components)** — 12 component triplets +
+      `homepage-default` template + populated `tokens.css` (scoped to
+      `.ls-scope`) + `base-styles.css` (primitives) extracted from
+      `source/v2-stripe.html`.
+
+## Components (12)
+
+| Name                       | Category      | Purpose                                           |
+|----------------------------|---------------|---------------------------------------------------|
+| `nav-default`              | `nav`         | Sticky top nav with logo + links + 2 CTAs.        |
+| `hero-with-showcase`       | `hero`        | Homepage hero + dashboard/email product showcase. |
+| `trust-logo-strip`         | `trust`       | Text-only logo row ("works with the tools you…"). |
+| `value-columns-3`          | `value`       | Three numbered value columns, left-aligned head.  |
+| `honest-line-contrast`     | `quote`       | Huge centered quote + dual contrast cards.        |
+| `how-it-works-3-steps`     | `process`     | Tokenised code snippet + 3 step cards.            |
+| `before-after-compare`     | `compare`     | Side-by-side empty CRM vs populated source.       |
+| `urgency-band`             | `urgency`     | Amber band with inline-HTML body copy.            |
+| `wordpress-install-block`  | `integration` | Install-guide block with dark code mockup.        |
+| `pricing-teaser-3-tier`    | `pricing`     | Three tiers, middle featured (dark).              |
+| `final-cta-dark`           | `cta`         | Full-bleed dark CTA with gradient arc.            |
+| `footer-default`           | `footer`      | 5-col footer (brand + 4 link columns + bar).      |
+
+## Template
+
+- `homepage-default.json` — default `homepage` template. Composition lists
+  all 12 components in order. `content_source` points per entry to either
+  `site_context.*` (chrome: nav, trust, pricing, footer) or `brief.*`
+  (per-page content).
+
+## Scope wrapper
+
+The M3 renderer is responsible for wrapping every rendered page in
+`<div class="ls-scope">...</div>`. Tokens in `tokens.css` are declared on
+`.ls-scope` (not `:root`); body-level resets in `base-styles.css` are
+scoped to `.ls-scope` (not `body`). This keeps multiple clients' design
+systems safe to coexist on the same DOM. The seed script itself does not
+emit the wrapper — it's a render-time concern.
+
+## Inline HTML
+
+The `urgency-band.body_html` field accepts inline emphasis via a
+whitelisted set of tags: `<br>`, `<strong>`, `<em>`. Validation lives in
+`lib/content-schemas.ts` as `InlineHtmlSchema` — a reusable Zod schema
+available for any future component field that needs the same.

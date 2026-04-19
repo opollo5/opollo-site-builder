@@ -1,0 +1,32 @@
+{
+  "category": "trust",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["label", "logos"],
+    "additionalProperties": false,
+    "properties": {
+      "label": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "Uppercase tracking label above the logo row (e.g. 'Works with the form tools you already use')."
+      },
+      "logos": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 12,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "description": "Text labels rendered in mono type. No image assets — LeadSource intentionally uses typographic trust logos."
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Text-only trust strip. Source-of-truth is site_context.trust — maintains the list across every page that uses this component.",
+  "preview_html": null
+}

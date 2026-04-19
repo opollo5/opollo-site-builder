@@ -1,0 +1,40 @@
+{
+  "category": "value",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["section_header", "columns"],
+    "additionalProperties": false,
+    "properties": {
+      "section_header": {
+        "type": "object",
+        "required": ["eyebrow", "heading"],
+        "additionalProperties": false,
+        "properties": {
+          "eyebrow": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "heading": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "sub": { "type": "string", "maxLength": 400 }
+        }
+      },
+      "columns": {
+        "type": "array",
+        "minItems": 3,
+        "maxItems": 3,
+        "items": {
+          "type": "object",
+          "required": ["number", "heading", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "number": { "type": "string", "minLength": 1, "maxLength": 4, "description": "Typically '01', '02', '03'." },
+            "heading": { "type": "string", "minLength": 1, "maxLength": 80 },
+            "body": { "type": "string", "minLength": 1, "maxLength": 400 }
+          }
+        }
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Three left-aligned numbered value columns. Section header is left-aligned (not centered). Use for the 'what you get' slot on a homepage.",
+  "preview_html": null
+}

@@ -1,0 +1,27 @@
+.ls-trust {
+  padding: 64px 0;
+  text-align: center;
+}
+.ls-trust__label {
+  font-size: 12px;
+  color: var(--ls-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  margin-bottom: 36px;
+  font-weight: 500;
+}
+.ls-trust__logos {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 56px;
+  align-items: center;
+}
+.ls-trust__logo {
+  font-family: var(--ls-font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ls-dim);
+  transition: color 0.2s ease;
+}
+.ls-trust__logo:hover { color: var(--ls-text); }

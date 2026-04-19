@@ -1,0 +1,49 @@
+{
+  "category": "cta",
+  "variant": "dark",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+      "headline_line1",
+      "headline_line2_accent",
+      "sub",
+      "primary_cta",
+      "friction_text"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "headline_line1": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "description": "First line of the two-line headline."
+      },
+      "headline_line2_accent": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "description": "Second line, rendered with the gradient arc treatment. The <br> between lines is provided by the template — do not include it here."
+      },
+      "sub": { "type": "string", "minLength": 1, "maxLength": 300 },
+      "primary_cta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+        }
+      },
+      "friction_text": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160,
+        "description": "Small muted friction-busting line below the CTA (e.g. '2-minute setup · works with your existing forms · remove anytime')."
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Dark full-bleed final CTA with gradient arc atmosphere and a two-line headline (second line gradient). Use once per page, at the bottom before the footer.",
+  "preview_html": null
+}

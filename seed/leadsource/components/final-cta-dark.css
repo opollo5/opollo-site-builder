@@ -1,0 +1,66 @@
+.ls-final {
+  padding: 160px 32px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: var(--ls-ink);
+  color: var(--ls-white);
+}
+.ls-final::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1000px;
+  height: 1000px;
+  background: var(--ls-arc);
+  border-radius: 50%;
+  filter: blur(180px);
+  opacity: 0.25;
+  transform: translate(-50%, -50%);
+}
+.ls-final__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 880px;
+  margin: 0 auto;
+}
+.ls-final h2 {
+  font-size: 96px;
+  line-height: 0.96;
+  letter-spacing: -0.04em;
+  margin-bottom: 24px;
+  color: var(--ls-white);
+  font-weight: 500;
+}
+.ls-final h2 .arc {
+  background: var(--ls-arc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.ls-final p {
+  font-size: 20px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+  margin-bottom: 40px;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.ls-final .ls-btn--primary {
+  background: var(--ls-white);
+  color: var(--ls-ink);
+}
+.ls-final .ls-btn--primary:hover {
+  background: var(--ls-blue-light);
+}
+.ls-final__friction {
+  margin-top: 20px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 980px) {
+  .ls-final h2 { font-size: 56px; }
+}

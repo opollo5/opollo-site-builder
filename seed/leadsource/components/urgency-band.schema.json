@@ -1,0 +1,28 @@
+{
+  "category": "urgency",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["label", "heading", "body_html"],
+    "additionalProperties": false,
+    "properties": {
+      "label": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "description": "Amber uppercase micro-label above the heading (e.g. 'Before it's gone')."
+      },
+      "heading": { "type": "string", "minLength": 1, "maxLength": 120 },
+      "body_html": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 800,
+        "description": "Plain text with optional inline emphasis. Only <br>, <strong>, and <em> tags are allowed. All other HTML will be rejected by the InlineHtmlSchema Zod validator in lib/content-schemas.ts."
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Amber-background 2-col band. Left cell: short amber label + big heading. Right cell: a paragraph with inline emphasis. This is the only component in the LeadSource design system that accepts inline HTML in body copy — use the reusable InlineHtmlSchema for any future field that needs the same.",
+  "preview_html": null
+}
