@@ -84,6 +84,11 @@ export async function POST(req: Request) {
 
         let stopReason: string | null = null;
 
+        console.log("[api/chat] starting stream", {
+          model: MODEL,
+          msg_count: convo.length,
+        });
+
         for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
           const streamed = client.messages.stream({
             model: MODEL,
@@ -160,9 +165,28 @@ export async function POST(req: Request) {
 
         send("done", { stop_reason: stopReason ?? "unknown" });
       } catch (err) {
+        const apiErr = err instanceof Anthropic.APIError ? err : null;
+
+        const diagnostic = {
+          model: MODEL,
+          message: err instanceof Error ? err.message : String(err),
+          name: err instanceof Error ? err.name : undefined,
+          status: apiErr?.status,
+          request_id: apiErr?.request_id,
+          body: apiErr?.error,
+          stack: err instanceof Error ? err.stack : undefined,
+        };
+        console.error("[api/chat] streaming error:", diagnostic);
+
         send("error", {
           code: "INTERNAL_ERROR",
-          message: err instanceof Error ? err.message : String(err),
+          message: diagnostic.message,
+          details: {
+            name: diagnostic.name,
+            status: diagnostic.status,
+            request_id: diagnostic.request_id,
+            body: diagnostic.body,
+          },
         });
       } finally {
         controller.close();
