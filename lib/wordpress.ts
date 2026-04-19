@@ -1,4 +1,10 @@
-import type { CreatePageInput, CreatePageData } from "./tool-schemas";
+import type {
+  CreatePageData,
+  CreatePageInput,
+  GetPageData,
+  ListPagesInput,
+  PageListItem,
+} from "./tool-schemas";
 
 export type WpConfig = {
   baseUrl: string;
@@ -6,11 +12,31 @@ export type WpConfig = {
   appPassword: string;
 };
 
+export type WpConfigResult =
+  | { ok: true; value: WpConfig }
+  | { ok: false; missing: string[] };
+
+export function readWpConfig(): WpConfigResult {
+  const baseUrl = process.env.LEADSOURCE_WP_URL;
+  const user = process.env.LEADSOURCE_WP_USER;
+  const appPassword = process.env.LEADSOURCE_WP_APP_PASSWORD;
+  const missing: string[] = [];
+  if (!baseUrl) missing.push("LEADSOURCE_WP_URL");
+  if (!user) missing.push("LEADSOURCE_WP_USER");
+  if (!appPassword) missing.push("LEADSOURCE_WP_APP_PASSWORD");
+  if (missing.length > 0) return { ok: false, missing };
+  return {
+    ok: true,
+    value: { baseUrl: baseUrl!, user: user!, appPassword: appPassword! },
+  };
+}
+
 type WpErrorCode =
   | "AUTH_FAILED"
   | "UPSTREAM_BLOCKED"
   | "WP_API_ERROR"
   | "NETWORK_ERROR"
+  | "NOT_FOUND"
   | "RATE_LIMIT";
 
 export type WpError = {
@@ -22,9 +48,11 @@ export type WpError = {
   suggested_action: string;
 };
 
-export type WpCreatePageResult =
-  | ({ ok: true } & CreatePageData)
-  | WpError;
+export type WpResult<T> = ({ ok: true } & T) | WpError;
+
+export type WpCreatePageResult = WpResult<CreatePageData>;
+export type WpListPagesResult = WpResult<{ pages: PageListItem[] }>;
+export type WpGetPageResult = WpResult<GetPageData>;
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 250;
@@ -75,32 +103,7 @@ async function wpFetch(
   throw lastErr ?? new Error("WordPress fetch failed after retries");
 }
 
-export async function wpCreatePage(
-  cfg: WpConfig,
-  input: CreatePageInput,
-): Promise<WpCreatePageResult> {
-  let res: Response;
-  try {
-    res = await wpFetch(cfg, "/wp-json/wp/v2/pages", {
-      method: "POST",
-      body: JSON.stringify({
-        title: input.title,
-        slug: input.slug,
-        content: input.content,
-        status: "draft",
-        excerpt: input.meta_description,
-      }),
-    });
-  } catch (err) {
-    return {
-      ok: false,
-      code: "NETWORK_ERROR",
-      message: err instanceof Error ? err.message : String(err),
-      retryable: true,
-      suggested_action: "Check network connectivity to the WordPress host.",
-    };
-  }
-
+async function mapHttpErrorToWpError(res: Response): Promise<WpError | null> {
   const contentType = res.headers.get("content-type") ?? "";
   const isJson = contentType.toLowerCase().includes("application/json");
 
@@ -136,6 +139,23 @@ export async function wpCreatePage(
     };
   }
 
+  if (res.status === 404) {
+    let wpBody: unknown = undefined;
+    try {
+      wpBody = await res.json();
+    } catch {
+      /* swallow */
+    }
+    return {
+      ok: false,
+      code: "NOT_FOUND",
+      message: "WordPress resource not found.",
+      details: { status: 404, wp_response: wpBody },
+      retryable: false,
+      suggested_action: "Verify the page_id or slug exists.",
+    };
+  }
+
   if (res.status === 429) {
     return {
       ok: false,
@@ -167,9 +187,25 @@ export async function wpCreatePage(
     };
   }
 
-  let body: any;
+  return null;
+}
+
+function networkError(err: unknown): WpError {
+  return {
+    ok: false,
+    code: "NETWORK_ERROR",
+    message: err instanceof Error ? err.message : String(err),
+    retryable: true,
+    suggested_action: "Check network connectivity to the WordPress host.",
+  };
+}
+
+async function parseJsonOrError<T>(
+  res: Response,
+): Promise<{ ok: true; body: T } | WpError> {
   try {
-    body = await res.json();
+    const body = (await res.json()) as T;
+    return { ok: true, body };
   } catch (err) {
     return {
       ok: false,
@@ -177,9 +213,76 @@ export async function wpCreatePage(
       message: "WordPress returned a success status but invalid JSON.",
       details: { parse_error: err instanceof Error ? err.message : String(err) },
       retryable: false,
-      suggested_action: "Inspect the WordPress host for proxy/cache misconfiguration.",
+      suggested_action:
+        "Inspect the WordPress host for proxy/cache misconfiguration.",
     };
   }
+}
+
+function renderedString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "rendered" in (value as any)) {
+    const rendered = (value as { rendered?: unknown }).rendered;
+    return typeof rendered === "string" ? rendered : "";
+  }
+  return "";
+}
+
+function rawString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object") {
+    const obj = value as { raw?: unknown; rendered?: unknown };
+    if (typeof obj.raw === "string") return obj.raw;
+    if (typeof obj.rendered === "string") return obj.rendered;
+  }
+  return "";
+}
+
+function toPageListItem(raw: any): PageListItem {
+  return {
+    page_id: Number(raw.id),
+    title: renderedString(raw.title),
+    slug: typeof raw.slug === "string" ? raw.slug : "",
+    status: typeof raw.status === "string" ? raw.status : "",
+    parent_id:
+      typeof raw.parent === "number" && raw.parent > 0 ? raw.parent : null,
+    modified_date:
+      typeof raw.modified_gmt === "string"
+        ? raw.modified_gmt
+        : typeof raw.modified === "string"
+          ? raw.modified
+          : "",
+  };
+}
+
+// ---------- wpCreatePage ----------
+
+export async function wpCreatePage(
+  cfg: WpConfig,
+  input: CreatePageInput,
+): Promise<WpCreatePageResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/pages", {
+      method: "POST",
+      body: JSON.stringify({
+        title: input.title,
+        slug: input.slug,
+        content: input.content,
+        status: "draft",
+        excerpt: input.meta_description,
+      }),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
 
   const base = trimTrailingSlash(cfg.baseUrl);
   return {
@@ -189,5 +292,120 @@ export async function wpCreatePage(
     admin_url: `${base}/wp-admin/post.php?post=${body.id}&action=edit`,
     slug: typeof body.slug === "string" ? body.slug : input.slug,
     status: typeof body.status === "string" ? body.status : "draft",
+  };
+}
+
+// ---------- wpListPages ----------
+
+async function resolveSlugToId(
+  cfg: WpConfig,
+  slug: string,
+): Promise<{ ok: true; id: number | null } | WpError> {
+  let res: Response;
+  try {
+    res = await wpFetch(
+      cfg,
+      `/wp-json/wp/v2/pages?slug=${encodeURIComponent(slug)}&status=any&per_page=1&_fields=id`,
+      { method: "GET" },
+    );
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<any[]>(res);
+  if (!parsed.ok) return parsed;
+  const id = parsed.body[0]?.id;
+  return { ok: true, id: typeof id === "number" ? id : null };
+}
+
+export async function wpListPages(
+  cfg: WpConfig,
+  input: ListPagesInput,
+): Promise<WpListPagesResult> {
+  let parentId: number | null | undefined = undefined;
+  if (input.parent_slug) {
+    const resolved = await resolveSlugToId(cfg, input.parent_slug);
+    if (!("ok" in resolved) || !resolved.ok) return resolved;
+    if (resolved.id === null) {
+      return { ok: true, pages: [] };
+    }
+    parentId = resolved.id;
+  }
+
+  const qs = new URLSearchParams();
+  qs.set("per_page", "100");
+  qs.set(
+    "_fields",
+    "id,title,slug,status,parent,modified,modified_gmt",
+  );
+  const status = input.status ?? "any";
+  qs.set("status", status);
+  if (parentId !== undefined && parentId !== null) {
+    qs.set("parent", String(parentId));
+  }
+  if (input.search) qs.set("search", input.search);
+
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, `/wp-json/wp/v2/pages?${qs.toString()}`, {
+      method: "GET",
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any[]>(res);
+  if (!parsed.ok) return parsed;
+
+  const pages = Array.isArray(parsed.body)
+    ? parsed.body.map(toPageListItem)
+    : [];
+  return { ok: true, pages };
+}
+
+// ---------- wpGetPage ----------
+
+export async function wpGetPage(
+  cfg: WpConfig,
+  pageId: number,
+): Promise<WpGetPageResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(
+      cfg,
+      `/wp-json/wp/v2/pages/${pageId}?context=edit`,
+      { method: "GET" },
+    );
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  return {
+    ok: true,
+    page_id: Number(body.id),
+    title: rawString(body.title),
+    slug: typeof body.slug === "string" ? body.slug : "",
+    content: rawString(body.content),
+    meta_description: rawString(body.excerpt),
+    status: typeof body.status === "string" ? body.status : "",
+    parent_id:
+      typeof body.parent === "number" && body.parent > 0 ? body.parent : null,
+    modified_date:
+      typeof body.modified_gmt === "string"
+        ? body.modified_gmt
+        : typeof body.modified === "string"
+          ? body.modified
+          : "",
   };
 }

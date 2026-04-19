@@ -1,16 +1,18 @@
 import {
-  CreatePageInputSchema,
-  type CreatePageData,
+  GetPageInputSchema,
+  type GetPageData,
   type ToolResponse,
 } from "@/lib/tool-schemas";
-import { readWpConfig, wpCreatePage } from "@/lib/wordpress";
+import { readWpConfig, wpGetPage } from "@/lib/wordpress";
 
-export async function executeCreatePage(
+const DS_VERSION = "1.0.0";
+
+export async function executeGetPage(
   rawInput: unknown,
-): Promise<ToolResponse<CreatePageData>> {
+): Promise<ToolResponse<GetPageData>> {
   const timestamp = new Date().toISOString();
 
-  const parsed = CreatePageInputSchema.safeParse(rawInput);
+  const parsed = GetPageInputSchema.safeParse(rawInput);
   if (!parsed.success) {
     return {
       ok: false,
@@ -42,7 +44,7 @@ export async function executeCreatePage(
     };
   }
 
-  const wp = await wpCreatePage(cfg.value, parsed.data);
+  const wp = await wpGetPage(cfg.value, parsed.data.page_id);
   if (!wp.ok) {
     return {
       ok: false,
@@ -62,7 +64,7 @@ export async function executeCreatePage(
     ok: true,
     data,
     validation: { passed: true, checks: ["schema"] },
-    ds_version: parsed.data.ds_version,
+    ds_version: DS_VERSION,
     timestamp,
   };
 }

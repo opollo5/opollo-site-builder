@@ -17,26 +17,16 @@ export type TemplateType = (typeof TEMPLATE_TYPES)[number];
 const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const semverPattern = /^\d+\.\d+\.\d+$/;
 
-export const CreatePageInputSchema = z.object({
-  title: z.string().min(3).max(160),
-  slug: z.string().regex(slugPattern).max(100),
-  content: z.string().min(200),
-  meta_description: z.string().min(50).max(160),
-  parent_slug: z.string().regex(slugPattern).optional(),
-  template_type: z.enum(TEMPLATE_TYPES),
-  ds_version: z.string().regex(semverPattern),
-});
-
-export type CreatePageInput = z.infer<typeof CreatePageInputSchema>;
-
 export const ERROR_CODES = [
   "VALIDATION_FAILED",
+  "CONFIRMATION_REQUIRED",
   "WP_API_ERROR",
   "AUTH_FAILED",
   "UPSTREAM_BLOCKED",
   "RATE_LIMIT",
   "NETWORK_ERROR",
   "INTERNAL_ERROR",
+  "NOT_FOUND",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -62,6 +52,40 @@ export type ToolError = {
 };
 
 export type ToolResponse<T> = ToolSuccess<T> | ToolError;
+
+export function errorCodeToStatus(code: ErrorCode): number {
+  switch (code) {
+    case "VALIDATION_FAILED":
+      return 400;
+    case "AUTH_FAILED":
+      return 401;
+    case "CONFIRMATION_REQUIRED":
+      return 403;
+    case "NOT_FOUND":
+      return 404;
+    case "RATE_LIMIT":
+      return 429;
+    case "UPSTREAM_BLOCKED":
+    case "WP_API_ERROR":
+    case "NETWORK_ERROR":
+      return 502;
+    case "INTERNAL_ERROR":
+      return 500;
+  }
+}
+
+// ---------- create_page ----------
+
+export const CreatePageInputSchema = z.object({
+  title: z.string().min(3).max(160),
+  slug: z.string().regex(slugPattern).max(100),
+  content: z.string().min(200),
+  meta_description: z.string().min(50).max(160),
+  parent_slug: z.string().regex(slugPattern).optional(),
+  template_type: z.enum(TEMPLATE_TYPES),
+  ds_version: z.string().regex(semverPattern),
+});
+export type CreatePageInput = z.infer<typeof CreatePageInputSchema>;
 
 export type CreatePageData = {
   page_id: number;
@@ -117,19 +141,206 @@ export const createPageJsonSchema = {
   },
 };
 
-export function errorCodeToStatus(code: ErrorCode): number {
-  switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "AUTH_FAILED":
-      return 401;
-    case "RATE_LIMIT":
-      return 429;
-    case "UPSTREAM_BLOCKED":
-    case "WP_API_ERROR":
-    case "NETWORK_ERROR":
-      return 502;
-    case "INTERNAL_ERROR":
-      return 500;
-  }
-}
+// ---------- list_pages ----------
+
+export const PAGE_STATUSES = ["draft", "publish", "any"] as const;
+export type PageStatusFilter = (typeof PAGE_STATUSES)[number];
+
+export const ListPagesInputSchema = z.object({
+  status: z.enum(PAGE_STATUSES).optional(),
+  parent_slug: z.string().regex(slugPattern).optional(),
+  search: z.string().max(200).optional(),
+});
+export type ListPagesInput = z.infer<typeof ListPagesInputSchema>;
+
+export type PageListItem = {
+  page_id: number;
+  title: string;
+  slug: string;
+  status: string;
+  parent_id: number | null;
+  modified_date: string;
+};
+
+export type ListPagesData = {
+  pages: PageListItem[];
+};
+
+export const listPagesJsonSchema = {
+  name: "list_pages",
+  description:
+    "List WordPress pages. Optional filters: status, parent_slug, search query. Returns summary metadata per page (id, title, slug, status, parent, modified date).",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      status: {
+        type: "string",
+        enum: [...PAGE_STATUSES],
+        description: "Filter by status. Default returns all statuses.",
+      },
+      parent_slug: {
+        type: "string",
+        pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+        description: "Filter to direct children of a parent page slug.",
+      },
+      search: {
+        type: "string",
+        maxLength: 200,
+        description: "Free-text search across title and content.",
+      },
+    },
+    required: [],
+  },
+};
+
+// ---------- get_page ----------
+
+export const GetPageInputSchema = z.object({
+  page_id: z.number().int().positive(),
+});
+export type GetPageInput = z.infer<typeof GetPageInputSchema>;
+
+export type GetPageData = {
+  page_id: number;
+  title: string;
+  slug: string;
+  content: string;
+  meta_description: string;
+  status: string;
+  parent_id: number | null;
+  modified_date: string;
+};
+
+export const getPageJsonSchema = {
+  name: "get_page",
+  description:
+    "Retrieve a single WordPress page by ID, including full HTML content and metadata.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      page_id: { type: "integer", minimum: 1 },
+    },
+    required: ["page_id"],
+  },
+};
+
+// ---------- update_page ----------
+
+export const CHANGE_SCOPES = [
+  "minor_edit",
+  "section_replacement",
+  "major_rewrite",
+] as const;
+export type ChangeScope = (typeof CHANGE_SCOPES)[number];
+
+export const UpdatePageInputSchema = z
+  .object({
+    page_id: z.number().int().positive(),
+    title: z.string().min(3).max(160).optional(),
+    content: z.string().min(200).optional(),
+    meta_description: z.string().min(50).max(160).optional(),
+    change_scope: z.enum(CHANGE_SCOPES),
+    user_confirmed: z.boolean().optional(),
+  })
+  .refine(
+    (v) =>
+      v.title !== undefined ||
+      v.content !== undefined ||
+      v.meta_description !== undefined,
+    {
+      message:
+        "At least one of title, content, meta_description must be provided.",
+      path: ["_"],
+    },
+  );
+export type UpdatePageInput = z.infer<typeof UpdatePageInputSchema>;
+
+export type UpdatePageData = {
+  page_id: number;
+  status: string;
+  modified_date: string;
+};
+
+export const updatePageJsonSchema = {
+  name: "update_page",
+  description:
+    "Update an existing WordPress page. change_scope is required. For change_scope=major_rewrite on a published page, user_confirmed must be true (HC-5).",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      page_id: { type: "integer", minimum: 1 },
+      title: { type: "string", minLength: 3, maxLength: 160 },
+      content: { type: "string", minLength: 200 },
+      meta_description: { type: "string", minLength: 50, maxLength: 160 },
+      change_scope: {
+        type: "string",
+        enum: [...CHANGE_SCOPES],
+        description:
+          "Declared scope of change. major_rewrite on published pages requires user_confirmed=true.",
+      },
+      user_confirmed: {
+        type: "boolean",
+        description:
+          "Set true only when the user has explicitly confirmed a destructive update this turn.",
+      },
+    },
+    required: ["page_id", "change_scope"],
+  },
+};
+
+// ---------- publish_page ----------
+
+export const PublishPageInputSchema = z.object({
+  page_id: z.number().int().positive(),
+});
+export type PublishPageInput = z.infer<typeof PublishPageInputSchema>;
+
+export type PublishPageData = {
+  page_id: number;
+  status: string;
+  published_url: string;
+};
+
+export const publishPageJsonSchema = {
+  name: "publish_page",
+  description:
+    "Change a page's status from draft to publish. Returns the live URL.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      page_id: { type: "integer", minimum: 1 },
+    },
+    required: ["page_id"],
+  },
+};
+
+// ---------- delete_page ----------
+
+export const DeletePageInputSchema = z.object({
+  page_id: z.number().int().positive(),
+  user_confirmed: z.literal(true),
+});
+export type DeletePageInput = z.infer<typeof DeletePageInputSchema>;
+
+export type DeletePageData = {
+  page_id: number;
+  status: "trash";
+};
+
+export const deletePageJsonSchema = {
+  name: "delete_page",
+  description:
+    "Move a WordPress page to trash (soft delete). Requires user_confirmed=true per HC-5. Recoverable via the WP admin trash.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      page_id: { type: "integer", minimum: 1 },
+      user_confirmed: {
+        type: "boolean",
+        const: true,
+        description: "Must be true — deletion requires explicit confirmation.",
+      },
+    },
+    required: ["page_id", "user_confirmed"],
+  },
+};

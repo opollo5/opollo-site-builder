@@ -1,11 +1,32 @@
 import Anthropic from "@anthropic-ai/sdk";
 
-import { createPageJsonSchema } from "@/lib/tool-schemas";
+import {
+  createPageJsonSchema,
+  getPageJsonSchema,
+  listPagesJsonSchema,
+  type ToolResponse,
+} from "@/lib/tool-schemas";
 import { executeCreatePage } from "@/lib/create-page";
+import { executeGetPage } from "@/lib/get-page";
+import { executeListPages } from "@/lib/list-pages";
 import {
   buildSystemPrompt,
   type SystemPromptContext,
 } from "@/lib/system-prompt";
+
+type ToolExecutor = (input: unknown) => Promise<ToolResponse<any>>;
+
+const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
+  create_page: executeCreatePage,
+  list_pages: executeListPages,
+  get_page: executeGetPage,
+};
+
+const ALL_TOOLS = [
+  createPageJsonSchema,
+  listPagesJsonSchema,
+  getPageJsonSchema,
+];
 
 export const runtime = "nodejs";
 
@@ -120,7 +141,7 @@ export async function POST(req: Request) {
             model: MODEL,
             max_tokens: MAX_TOKENS,
             system: SYSTEM_PROMPT,
-            tools: [createPageJsonSchema],
+            tools: ALL_TOOLS,
             messages: convo,
           });
 
@@ -150,8 +171,9 @@ export async function POST(req: Request) {
 
             let result: unknown;
             let isError = false;
-            if (tu.name === "create_page") {
-              const r = await executeCreatePage(tu.input);
+            const executor = TOOL_EXECUTORS[tu.name];
+            if (executor) {
+              const r = await executor(tu.input);
               result = r;
               if (!r.ok) isError = true;
             } else {
@@ -161,7 +183,7 @@ export async function POST(req: Request) {
                   code: "VALIDATION_FAILED",
                   message: `Unknown tool: ${tu.name}`,
                   retryable: false,
-                  suggested_action: "Only create_page is available in Day 1.",
+                  suggested_action: `Available tools: ${Object.keys(TOOL_EXECUTORS).join(", ")}.`,
                 },
                 timestamp: new Date().toISOString(),
               };
