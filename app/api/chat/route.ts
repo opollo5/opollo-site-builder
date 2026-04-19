@@ -2,13 +2,19 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import {
   createPageJsonSchema,
+  deletePageJsonSchema,
   getPageJsonSchema,
   listPagesJsonSchema,
+  publishPageJsonSchema,
+  updatePageJsonSchema,
   type ToolResponse,
 } from "@/lib/tool-schemas";
 import { executeCreatePage } from "@/lib/create-page";
+import { executeDeletePage } from "@/lib/delete-page";
 import { executeGetPage } from "@/lib/get-page";
 import { executeListPages } from "@/lib/list-pages";
+import { executePublishPage } from "@/lib/publish-page";
+import { executeUpdatePage } from "@/lib/update-page";
 import {
   buildSystemPrompt,
   type SystemPromptContext,
@@ -20,12 +26,18 @@ const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   create_page: executeCreatePage,
   list_pages: executeListPages,
   get_page: executeGetPage,
+  update_page: executeUpdatePage,
+  publish_page: executePublishPage,
+  delete_page: executeDeletePage,
 };
 
 const ALL_TOOLS = [
   createPageJsonSchema,
   listPagesJsonSchema,
   getPageJsonSchema,
+  updatePageJsonSchema,
+  publishPageJsonSchema,
+  deletePageJsonSchema,
 ];
 
 export const runtime = "nodejs";

@@ -1,9 +1,12 @@
 import type {
   CreatePageData,
   CreatePageInput,
+  DeletePageData,
   GetPageData,
   ListPagesInput,
   PageListItem,
+  PublishPageData,
+  UpdatePageData,
 } from "./tool-schemas";
 
 export type WpConfig = {
@@ -53,6 +56,16 @@ export type WpResult<T> = ({ ok: true } & T) | WpError;
 export type WpCreatePageResult = WpResult<CreatePageData>;
 export type WpListPagesResult = WpResult<{ pages: PageListItem[] }>;
 export type WpGetPageResult = WpResult<GetPageData>;
+export type WpUpdatePageResult = WpResult<UpdatePageData & { status: string }>;
+export type WpPublishPageResult = WpResult<PublishPageData>;
+export type WpDeletePageResult = WpResult<DeletePageData>;
+
+export type WpUpdateFields = {
+  title?: string;
+  content?: string;
+  meta_description?: string;
+  status?: string;
+};
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 250;
@@ -407,5 +420,117 @@ export async function wpGetPage(
         : typeof body.modified === "string"
           ? body.modified
           : "",
+  };
+}
+
+// ---------- wpUpdatePage ----------
+
+export async function wpUpdatePage(
+  cfg: WpConfig,
+  pageId: number,
+  fields: WpUpdateFields,
+): Promise<WpUpdatePageResult> {
+  const wpBody: Record<string, unknown> = {};
+  if (fields.title !== undefined) wpBody.title = fields.title;
+  if (fields.content !== undefined) wpBody.content = fields.content;
+  if (fields.meta_description !== undefined) {
+    wpBody.excerpt = fields.meta_description;
+  }
+  if (fields.status !== undefined) wpBody.status = fields.status;
+
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, `/wp-json/wp/v2/pages/${pageId}`, {
+      method: "POST",
+      body: JSON.stringify(wpBody),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  return {
+    ok: true,
+    page_id: Number(body.id),
+    status: typeof body.status === "string" ? body.status : "",
+    modified_date:
+      typeof body.modified_gmt === "string"
+        ? body.modified_gmt
+        : typeof body.modified === "string"
+          ? body.modified
+          : "",
+  };
+}
+
+// ---------- wpPublishPage ----------
+
+export async function wpPublishPage(
+  cfg: WpConfig,
+  pageId: number,
+): Promise<WpPublishPageResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, `/wp-json/wp/v2/pages/${pageId}`, {
+      method: "POST",
+      body: JSON.stringify({ status: "publish" }),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  const base = trimTrailingSlash(cfg.baseUrl);
+  const publishedUrl =
+    typeof body.link === "string" && body.link.length > 0
+      ? body.link
+      : `${base}/?page_id=${body.id}`;
+
+  return {
+    ok: true,
+    page_id: Number(body.id),
+    status: typeof body.status === "string" ? body.status : "",
+    published_url: publishedUrl,
+  };
+}
+
+// ---------- wpDeletePage ----------
+
+export async function wpDeletePage(
+  cfg: WpConfig,
+  pageId: number,
+): Promise<WpDeletePageResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, `/wp-json/wp/v2/pages/${pageId}`, {
+      method: "DELETE",
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  const id = Number(body?.id ?? body?.previous?.id ?? pageId);
+  return {
+    ok: true,
+    page_id: id,
+    status: "trash",
   };
 }
