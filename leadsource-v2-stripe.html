@@ -1,0 +1,1545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadSource — Stop guessing where your best clients are coming from.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Inter+Tight:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* Tokens from strategy doc §10 — slightly tuned */
+    --ls-blue: #185FA5;
+    --ls-blue-dark: #0C447C;
+    --ls-blue-light: #E6F1FB;
+    --ls-teal: #1D9E75;
+    --ls-amber: #BA7517;
+    --ls-ink: #1A1A1A;
+    --ls-text: #2C2C2A;
+    --ls-muted: #6B6B66;
+    --ls-dim: #9A9A94;
+    --ls-surface: #FAFAF6;
+    --ls-surface-2: #F1EFE8;
+    --ls-border: #E8E6DE;
+    --ls-border-strong: #D3D1C7;
+    --ls-white: #FFFFFF;
+
+    /* Signature "LeadSource gradient" — blue → teal → amber arc */
+    --ls-arc: linear-gradient(135deg, #185FA5 0%, #1D9E75 50%, #BA7517 100%);
+    --ls-arc-soft: linear-gradient(135deg, #E6F1FB 0%, #E1F5EE 50%, #FAEEDA 100%);
+
+    --ls-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --ls-font-display: 'Inter Tight', 'Inter', -apple-system, sans-serif;
+    --ls-font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+  body {
+    font-family: var(--ls-font-sans);
+    font-weight: 400;
+    font-size: 17px;
+    line-height: 1.6;
+    color: var(--ls-text);
+    background: var(--ls-white);
+    letter-spacing: -0.003em;
+  }
+
+  .ls-container { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+  .ls-container--narrow { max-width: 960px; }
+
+  h1, h2, h3, h4 {
+    font-family: var(--ls-font-display);
+    font-weight: 500;
+    color: var(--ls-ink);
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+  }
+
+  a { color: var(--ls-blue); text-decoration: none; }
+
+  /* === NAV === */
+  .ls-nav {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(14px) saturate(1.1);
+    border-bottom: 1px solid var(--ls-border);
+  }
+  .ls-nav__inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 0;
+  }
+  .ls-logo {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: var(--ls-font-display);
+    font-size: 18px; font-weight: 500;
+    color: var(--ls-ink);
+    letter-spacing: -0.02em;
+  }
+  .ls-logo__mark {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: var(--ls-arc);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 14px; font-weight: 500;
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+  }
+  .ls-nav__links { display: flex; gap: 32px; list-style: none; }
+  .ls-nav__links a {
+    color: var(--ls-text); font-size: 15px;
+    font-weight: 400;
+    transition: color .15s ease;
+  }
+  .ls-nav__links a:hover { color: var(--ls-blue); }
+  .ls-nav__cta { display: flex; align-items: center; gap: 8px; }
+
+  /* === BUTTONS === */
+  .ls-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 11px 20px;
+    font-family: inherit; font-size: 15px; font-weight: 500;
+    border-radius: 8px; border: 1px solid transparent;
+    cursor: pointer; white-space: nowrap;
+    transition: all .15s ease;
+  }
+  .ls-btn--primary {
+    background: var(--ls-ink); color: var(--ls-white);
+  }
+  .ls-btn--primary:hover { background: var(--ls-blue-dark); }
+
+  .ls-btn--ghost { background: transparent; color: var(--ls-text); }
+  .ls-btn--ghost:hover { color: var(--ls-blue); }
+
+  .ls-btn--outline {
+    background: var(--ls-white);
+    color: var(--ls-ink);
+    border-color: var(--ls-border-strong);
+  }
+  .ls-btn--outline:hover { border-color: var(--ls-muted); }
+
+  .ls-btn--lg { padding: 14px 24px; font-size: 16px; border-radius: 10px; }
+
+  /* === HERO === */
+  .ls-hero {
+    padding: 80px 0 40px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Signature gradient arc background — subtle, top-right */
+  .ls-hero::before {
+    content: '';
+    position: absolute;
+    top: -400px; right: -300px;
+    width: 900px; height: 900px;
+    background: var(--ls-arc);
+    border-radius: 50%;
+    filter: blur(180px);
+    opacity: 0.12;
+    pointer-events: none;
+  }
+  .ls-hero__inner { position: relative; }
+
+  .ls-hero__eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 5px 12px;
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    border-radius: 999px;
+    font-size: 13px; font-weight: 500;
+    color: var(--ls-text);
+    margin-bottom: 32px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+  }
+  .ls-hero__eyebrow::before {
+    content: ''; width: 6px; height: 6px;
+    background: var(--ls-teal); border-radius: 50%;
+    box-shadow: 0 0 8px var(--ls-teal);
+    animation: pulse 2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .ls-hero h1 {
+    font-size: 88px; line-height: 0.96;
+    letter-spacing: -0.04em;
+    margin-bottom: 28px;
+    max-width: 980px;
+    font-weight: 500;
+  }
+  .ls-hero h1 em {
+    font-style: normal;
+    background: var(--ls-arc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .ls-hero__sub {
+    font-size: 21px; line-height: 1.45;
+    color: var(--ls-muted);
+    max-width: 720px;
+    margin-bottom: 40px;
+  }
+
+  .ls-hero__actions {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+  .ls-hero__friction {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    font-size: 13px; color: var(--ls-muted);
+  }
+  .ls-hero__friction span {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .ls-hero__friction span::before {
+    content: ''; width: 14px; height: 14px;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 10.5l3 3 8-8' stroke='%231D9E75' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size: contain;
+  }
+
+  /* === HERO VISUAL: side-by-side dashboard + email === */
+  .ls-hero__showcase {
+    margin-top: 88px;
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+
+  /* Dashboard */
+  .ls-dashboard {
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(12, 68, 124, 0.08), 0 2px 6px rgba(12, 68, 124, 0.04);
+  }
+  .ls-dashboard__bar {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--ls-border);
+    display: flex; align-items: center; gap: 12px;
+    background: var(--ls-surface);
+  }
+  .ls-dashboard__dots { display: flex; gap: 5px; }
+  .ls-dashboard__dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ls-border-strong); }
+  .ls-dashboard__url {
+    font-family: var(--ls-font-mono); font-size: 12px;
+    color: var(--ls-muted);
+    flex: 1; text-align: center;
+  }
+  .ls-dashboard__live {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--ls-teal);
+    font-weight: 500;
+  }
+  .ls-dashboard__live::before {
+    content: ''; width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ls-teal);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .ls-dashboard__body { padding: 24px; }
+
+  .ls-dashboard__title {
+    font-size: 15px; font-weight: 500;
+    color: var(--ls-ink);
+    margin-bottom: 18px;
+  }
+
+  .ls-metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; margin-bottom: 22px;
+  }
+  .ls-metric {
+    padding: 14px; background: var(--ls-surface);
+    border-radius: 10px;
+    border: 1px solid var(--ls-border);
+  }
+  .ls-metric__label {
+    font-size: 11px; color: var(--ls-muted);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin-bottom: 6px; font-weight: 500;
+  }
+  .ls-metric__num {
+    font-family: var(--ls-font-display);
+    font-size: 22px; font-weight: 500;
+    color: var(--ls-ink);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .ls-metric__delta {
+    font-size: 11px; color: var(--ls-teal); font-weight: 500;
+  }
+
+  /* Mini chart */
+  .ls-chart {
+    padding: 16px;
+    background: var(--ls-surface);
+    border-radius: 10px;
+    border: 1px solid var(--ls-border);
+    margin-bottom: 16px;
+  }
+  .ls-chart__header {
+    display: flex; justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .ls-chart__title {
+    font-size: 13px; font-weight: 500; color: var(--ls-ink);
+  }
+  .ls-chart__period {
+    font-size: 11px; color: var(--ls-muted);
+    font-family: var(--ls-font-mono);
+  }
+
+  /* Leads table */
+  .ls-lead-list {
+    border: 1px solid var(--ls-border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .ls-lead-row {
+    display: grid;
+    grid-template-columns: 1.5fr 2fr 0.8fr;
+    gap: 12px; padding: 10px 14px;
+    border-bottom: 1px solid var(--ls-border);
+    align-items: center;
+    font-size: 13px;
+  }
+  .ls-lead-row:last-child { border-bottom: 0; }
+  .ls-lead-row__name {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ls-lead-row__avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 500; color: #fff;
+    flex-shrink: 0;
+  }
+  .ls-lead-row__avatar--1 { background: var(--ls-blue); }
+  .ls-lead-row__avatar--2 { background: var(--ls-teal); }
+  .ls-lead-row__avatar--3 { background: var(--ls-amber); }
+  .ls-lead-row__label { font-weight: 500; color: var(--ls-ink); font-size: 13px; }
+  .ls-lead-row__time {
+    font-family: var(--ls-font-mono);
+    font-size: 11px; color: var(--ls-muted);
+    text-align: right;
+  }
+
+  .ls-source-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px;
+    background: var(--ls-blue-light);
+    color: var(--ls-blue-dark);
+    border-radius: 999px;
+    font-size: 11px; font-weight: 500;
+    font-family: var(--ls-font-mono);
+    white-space: nowrap;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .ls-source-badge--teal {
+    background: #E1F5EE; color: #085041;
+  }
+  .ls-source-badge--amber {
+    background: #FAEEDA; color: #633806;
+  }
+
+  /* Email notification */
+  .ls-email {
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(12, 68, 124, 0.08), 0 2px 6px rgba(12, 68, 124, 0.04);
+  }
+  .ls-email__bar {
+    padding: 14px 18px;
+    background: var(--ls-surface);
+    border-bottom: 1px solid var(--ls-border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .ls-email__logo {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: var(--ls-arc);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 12px; font-weight: 500;
+  }
+  .ls-email__from {
+    font-size: 12px; font-weight: 500; color: var(--ls-ink);
+  }
+  .ls-email__time {
+    margin-left: auto; font-size: 11px;
+    color: var(--ls-muted); font-family: var(--ls-font-mono);
+  }
+  .ls-email__body { padding: 22px; }
+  .ls-email__subject {
+    font-size: 15px; font-weight: 500;
+    color: var(--ls-ink);
+    margin-bottom: 14px;
+    line-height: 1.4;
+  }
+  .ls-email__badges {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--ls-border);
+  }
+  .ls-email__lead {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 18px;
+  }
+  .ls-email__avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--ls-blue);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px; font-weight: 500;
+  }
+  .ls-email__lead-info { font-size: 13px; }
+  .ls-email__lead-name { font-weight: 500; color: var(--ls-ink); }
+  .ls-email__lead-email { color: var(--ls-muted); font-size: 12px; }
+
+  .ls-email__journey-label {
+    font-size: 10px; font-weight: 500;
+    color: var(--ls-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 10px;
+  }
+  .ls-email__journey { margin-bottom: 18px; }
+  .ls-email__journey-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 10px;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 12px;
+  }
+  .ls-email__journey-num {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--ls-blue-light); color: var(--ls-blue-dark);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 500;
+    font-family: var(--ls-font-mono);
+  }
+  .ls-email__journey-url {
+    font-family: var(--ls-font-mono);
+    font-size: 11px; color: var(--ls-muted);
+  }
+  .ls-email__footer {
+    display: flex; justify-content: space-between;
+    padding-top: 14px;
+    border-top: 1px solid var(--ls-border);
+    font-size: 11px;
+    color: var(--ls-muted);
+  }
+
+  /* === TRUST === */
+  .ls-trust {
+    padding: 64px 0;
+    text-align: center;
+  }
+  .ls-trust__label {
+    font-size: 12px; color: var(--ls-muted);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-bottom: 36px;
+    font-weight: 500;
+  }
+  .ls-trust__logos {
+    display: flex; justify-content: center; flex-wrap: wrap;
+    gap: 56px; align-items: center;
+  }
+  .ls-trust__logo {
+    font-family: var(--ls-font-mono);
+    font-size: 15px; font-weight: 500;
+    color: var(--ls-dim);
+    transition: color 0.2s ease;
+  }
+  .ls-trust__logo:hover { color: var(--ls-text); }
+
+  /* === SECTIONS === */
+  .ls-section { padding: 120px 0; }
+  .ls-section--compact { padding: 80px 0; }
+  .ls-section--surface { background: var(--ls-surface); }
+
+  .ls-eyebrow {
+    display: inline-block;
+    font-family: var(--ls-font-mono);
+    font-size: 12px; font-weight: 500;
+    color: var(--ls-blue);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+  .ls-eyebrow::before {
+    content: '⎯ '; color: var(--ls-blue);
+  }
+
+  .ls-head { max-width: 800px; margin-bottom: 64px; }
+  .ls-head--center { margin-left: auto; margin-right: auto; text-align: center; }
+  .ls-head h2 {
+    font-size: 56px; line-height: 1.02;
+    letter-spacing: -0.035em;
+    margin-bottom: 20px;
+  }
+  .ls-head p {
+    font-size: 19px; line-height: 1.5;
+    color: var(--ls-muted);
+    max-width: 640px;
+  }
+  .ls-head--center p { margin-left: auto; margin-right: auto; }
+
+  /* === VALUE COLUMNS === */
+  .ls-columns {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+  }
+  .ls-col__num {
+    font-family: var(--ls-font-mono);
+    font-size: 13px; font-weight: 500;
+    color: var(--ls-muted);
+    margin-bottom: 16px;
+    display: block;
+  }
+  .ls-col__num::before { content: '— '; }
+  .ls-col h3 {
+    font-size: 26px; margin-bottom: 14px;
+    letter-spacing: -0.02em; line-height: 1.2;
+  }
+  .ls-col p {
+    color: var(--ls-muted);
+    font-size: 16px; line-height: 1.6;
+  }
+
+  /* === HONEST LINE — huge typography === */
+  .ls-honest {
+    padding: 160px 0;
+    background: var(--ls-surface);
+    position: relative;
+    overflow: hidden;
+  }
+  .ls-honest::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: -100px;
+    width: 800px; height: 800px;
+    background: var(--ls-arc);
+    border-radius: 50%;
+    filter: blur(200px);
+    opacity: 0.05;
+    transform: translateY(-50%);
+  }
+  .ls-honest__inner { position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; text-align: center; }
+  .ls-honest__quote {
+    font-family: var(--ls-font-display);
+    font-size: 64px; line-height: 1.08;
+    font-weight: 500;
+    letter-spacing: -0.035em;
+    margin-bottom: 56px;
+    color: var(--ls-ink);
+  }
+  .ls-honest__quote .arc {
+    background: var(--ls-arc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .ls-honest__contrast {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    gap: 20px; align-items: stretch;
+    max-width: 800px; margin: 0 auto;
+  }
+  .ls-honest-card {
+    padding: 32px;
+    border-radius: 16px;
+    text-align: left;
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+  }
+  .ls-honest-card--right {
+    background: var(--ls-ink);
+    color: var(--ls-white);
+    border-color: var(--ls-ink);
+    position: relative;
+    overflow: hidden;
+  }
+  .ls-honest-card--right::before {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 80px; height: 80px;
+    background: var(--ls-arc);
+    border-radius: 50%;
+    filter: blur(40px);
+    opacity: 0.4;
+  }
+  .ls-honest-card__label {
+    font-family: var(--ls-font-mono);
+    font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ls-muted);
+    margin-bottom: 16px;
+  }
+  .ls-honest-card--right .ls-honest-card__label { color: rgba(255,255,255,0.6); }
+  .ls-honest-card__text {
+    font-family: var(--ls-font-display);
+    font-size: 26px; font-weight: 500;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    color: var(--ls-ink);
+  }
+  .ls-honest-card--right .ls-honest-card__text { color: var(--ls-white); }
+  .ls-honest-arrow {
+    display: flex; align-items: center; justify-content: center;
+    color: var(--ls-dim);
+    font-size: 24px;
+    font-family: var(--ls-font-mono);
+  }
+
+  /* === HOW IT WORKS === */
+  .ls-howitworks__code-wrap {
+    display: flex; justify-content: center;
+    margin-bottom: 72px;
+  }
+  .ls-code {
+    background: var(--ls-ink);
+    color: var(--ls-white);
+    border-radius: 12px;
+    padding: 20px 24px;
+    font-family: var(--ls-font-mono);
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 100%;
+    position: relative;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08), 0 0 0 1px var(--ls-border-strong);
+    overflow-x: auto;
+  }
+  .ls-code .tag { color: #F4C0D1; }
+  .ls-code .attr { color: #85B7EB; }
+  .ls-code .str { color: #9FE1CB; }
+  .ls-code__copy {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: var(--ls-white);
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-family: var(--ls-font-sans);
+    cursor: pointer;
+  }
+  .ls-code__copy:hover { background: rgba(255,255,255,0.18); }
+
+  .ls-steps {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 32px;
+    position: relative;
+  }
+  .ls-step {
+    padding: 32px;
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    border-radius: 16px;
+    position: relative;
+  }
+  .ls-step__num {
+    font-family: var(--ls-font-mono);
+    font-size: 13px; font-weight: 500;
+    color: var(--ls-muted);
+    margin-bottom: 14px;
+    display: inline-block;
+  }
+  .ls-step__num::before { content: '— '; color: var(--ls-blue); }
+  .ls-step h3 {
+    font-size: 20px; margin-bottom: 10px;
+    letter-spacing: -0.02em;
+  }
+  .ls-step p {
+    color: var(--ls-muted);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  /* === BEFORE/AFTER === */
+  .ls-compare {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+    max-width: 1080px; margin: 0 auto;
+    align-items: stretch;
+  }
+  .ls-compare__card {
+    padding: 36px;
+    border-radius: 16px;
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    display: flex; flex-direction: column;
+  }
+  .ls-compare__card--after {
+    background: var(--ls-ink);
+    border-color: var(--ls-ink);
+    color: var(--ls-white);
+    position: relative;
+    overflow: hidden;
+  }
+  .ls-compare__card--after::before {
+    content: '';
+    position: absolute;
+    bottom: -80px; right: -80px;
+    width: 300px; height: 300px;
+    background: var(--ls-arc);
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.4;
+  }
+  .ls-compare__label {
+    font-family: var(--ls-font-mono);
+    font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--ls-muted);
+    margin-bottom: 16px;
+  }
+  .ls-compare__card--after .ls-compare__label { color: rgba(255,255,255,0.5); }
+
+  .ls-crm-mockup {
+    background: var(--ls-surface);
+    border: 1px solid var(--ls-border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 24px;
+    position: relative;
+  }
+  .ls-crm-mockup__title {
+    font-size: 11px; color: var(--ls-muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 12px; font-weight: 500;
+  }
+  .ls-crm-mockup__field {
+    padding: 12px 14px;
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--ls-dim);
+    font-style: italic;
+  }
+  .ls-compare__card--after .ls-crm-mockup {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.1);
+    position: relative; z-index: 1;
+  }
+  .ls-compare__card--after .ls-crm-mockup__title { color: rgba(255,255,255,0.6); }
+  .ls-ls-mockup {
+    padding: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    margin-bottom: 24px;
+    position: relative; z-index: 1;
+  }
+  .ls-ls-mockup__header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+  }
+  .ls-ls-mockup__title {
+    font-size: 11px; color: rgba(255,255,255,0.7);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+  .ls-ls-mockup__time {
+    font-family: var(--ls-font-mono);
+    font-size: 10px; color: rgba(255,255,255,0.5);
+  }
+  .ls-ls-mockup__row {
+    display: flex; justify-content: space-between;
+    padding: 7px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .ls-ls-mockup__row:last-child { border-bottom: 0; }
+  .ls-ls-mockup__key {
+    color: rgba(255,255,255,0.5);
+    font-family: var(--ls-font-mono); font-size: 11px;
+  }
+  .ls-ls-mockup__val {
+    font-family: var(--ls-font-mono);
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .ls-ls-mockup__val .pill {
+    display: inline-block;
+    background: rgba(133, 183, 235, 0.2);
+    color: #B5D4F4;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  .ls-compare__headline {
+    font-family: var(--ls-font-display);
+    font-size: 26px; line-height: 1.2;
+    letter-spacing: -0.02em;
+    margin-bottom: 10px;
+    font-weight: 500;
+  }
+  .ls-compare__body {
+    font-size: 15px; line-height: 1.6;
+    color: var(--ls-muted);
+    position: relative; z-index: 1;
+  }
+  .ls-compare__card--after .ls-compare__body { color: rgba(255,255,255,0.7); }
+  .ls-compare__card--after .ls-compare__headline { color: var(--ls-white); }
+
+  /* === URGENCY === */
+  .ls-urgency {
+    padding: 80px 0;
+    background: #FAEEDA;
+    border-top: 1px solid var(--ls-border);
+    border-bottom: 1px solid var(--ls-border);
+  }
+  .ls-urgency__inner {
+    max-width: 880px; margin: 0 auto;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 56px; align-items: center;
+  }
+  .ls-urgency__label {
+    font-family: var(--ls-font-mono);
+    font-size: 12px; font-weight: 500;
+    color: var(--ls-amber);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 16px;
+  }
+  .ls-urgency__label::before { content: '⎯ '; }
+  .ls-urgency__head {
+    font-family: var(--ls-font-display);
+    font-size: 42px; line-height: 1.05;
+    font-weight: 500; letter-spacing: -0.025em;
+    color: var(--ls-ink);
+  }
+  .ls-urgency__body {
+    font-size: 16px; line-height: 1.6;
+    color: var(--ls-text);
+  }
+  .ls-urgency__body strong {
+    color: var(--ls-ink); font-weight: 500;
+  }
+
+  /* === WORDPRESS === */
+  .ls-wp {
+    padding: 120px 0;
+  }
+  .ls-wp__inner {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 64px; align-items: center;
+  }
+  .ls-wp__badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 5px 12px;
+    background: var(--ls-blue-light);
+    color: var(--ls-blue-dark);
+    border-radius: 999px;
+    font-size: 12px; font-weight: 500;
+    margin-bottom: 20px;
+  }
+  .ls-wp__badge::before {
+    content: ''; width: 14px; height: 14px; border-radius: 3px;
+    background: var(--ls-blue-dark);
+  }
+  .ls-wp h2 {
+    font-size: 44px; line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 18px;
+  }
+  .ls-wp p {
+    font-size: 17px; line-height: 1.55;
+    color: var(--ls-muted);
+    margin-bottom: 28px;
+  }
+  .ls-wp__link {
+    font-weight: 500; font-size: 15px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .ls-wp__code {
+    background: var(--ls-ink);
+    border-radius: 12px;
+    padding: 24px;
+    font-family: var(--ls-font-mono); font-size: 13px;
+    line-height: 1.9;
+    color: var(--ls-white);
+    box-shadow: 0 20px 40px rgba(0,0,0,0.08);
+  }
+  .ls-wp__code .comment { color: var(--ls-dim); }
+  .ls-wp__code .tag { color: #F4C0D1; }
+  .ls-wp__code .attr { color: #85B7EB; }
+  .ls-wp__code .str { color: #9FE1CB; }
+  .ls-wp__code .highlight {
+    background: rgba(133, 183, 235, 0.15);
+    border-left: 2px solid #85B7EB;
+    padding: 2px 4px;
+    display: inline-block;
+  }
+
+  /* === PRICING === */
+  .ls-pricing {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 20px; max-width: 1080px; margin: 0 auto;
+  }
+  .ls-price {
+    padding: 36px 28px;
+    background: var(--ls-white);
+    border: 1px solid var(--ls-border);
+    border-radius: 16px;
+    display: flex; flex-direction: column;
+  }
+  .ls-price--featured {
+    background: var(--ls-ink);
+    border-color: var(--ls-ink);
+    color: var(--ls-white);
+    position: relative;
+    overflow: hidden;
+  }
+  .ls-price--featured::before {
+    content: '';
+    position: absolute;
+    top: -40px; right: -40px;
+    width: 200px; height: 200px;
+    background: var(--ls-arc);
+    border-radius: 50%;
+    filter: blur(60px);
+    opacity: 0.5;
+  }
+  .ls-price--featured > * { position: relative; z-index: 1; }
+  .ls-price__badge {
+    font-family: var(--ls-font-mono);
+    font-size: 11px; font-weight: 500;
+    color: #85B7EB;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+  .ls-price__badge::before { content: '⎯ '; }
+  .ls-price__name {
+    font-family: var(--ls-font-display);
+    font-size: 18px; font-weight: 500;
+    color: var(--ls-ink);
+    margin-bottom: 16px;
+  }
+  .ls-price--featured .ls-price__name { color: var(--ls-white); }
+  .ls-price__amt {
+    display: flex; align-items: baseline; gap: 4px;
+    margin-bottom: 14px;
+  }
+  .ls-price__amt-val {
+    font-family: var(--ls-font-display);
+    font-size: 48px; font-weight: 500;
+    letter-spacing: -0.03em;
+    color: var(--ls-ink);
+    line-height: 1;
+  }
+  .ls-price--featured .ls-price__amt-val { color: var(--ls-white); }
+  .ls-price__amt-per {
+    font-size: 15px; color: var(--ls-muted);
+  }
+  .ls-price--featured .ls-price__amt-per { color: rgba(255,255,255,0.55); }
+  .ls-price__tag {
+    font-size: 14px; color: var(--ls-muted);
+    margin-bottom: 28px; line-height: 1.5;
+  }
+  .ls-price--featured .ls-price__tag { color: rgba(255,255,255,0.7); }
+  .ls-price__features {
+    list-style: none; margin-bottom: 28px;
+    flex: 1;
+  }
+  .ls-price__features li {
+    display: flex; gap: 10px;
+    padding: 7px 0;
+    font-size: 14px;
+    color: var(--ls-text);
+  }
+  .ls-price--featured .ls-price__features li { color: rgba(255,255,255,0.85); }
+  .ls-price__features li::before {
+    content: ''; width: 14px; height: 14px; flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 10.5l3 3 8-8' stroke='%231D9E75' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-size: contain;
+    margin-top: 2px;
+  }
+  .ls-price--featured .ls-price__features li::before {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M4 10.5l3 3 8-8' stroke='%235DCAA5' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  }
+  .ls-price--featured .ls-btn--primary { background: var(--ls-white); color: var(--ls-ink); }
+  .ls-price--featured .ls-btn--primary:hover { background: var(--ls-blue-light); }
+
+  /* === FINAL === */
+  .ls-final {
+    padding: 160px 32px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    background: var(--ls-ink);
+    color: var(--ls-white);
+  }
+  .ls-final::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 1000px; height: 1000px;
+    background: var(--ls-arc);
+    border-radius: 50%;
+    filter: blur(180px);
+    opacity: 0.25;
+    transform: translate(-50%, -50%);
+  }
+  .ls-final__inner { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; }
+  .ls-final h2 {
+    font-size: 96px; line-height: 0.96;
+    letter-spacing: -0.04em;
+    margin-bottom: 24px;
+    color: var(--ls-white);
+    font-weight: 500;
+  }
+  .ls-final h2 .arc {
+    background: var(--ls-arc);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .ls-final p {
+    font-size: 20px; line-height: 1.5;
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 40px;
+    max-width: 640px; margin-left: auto; margin-right: auto;
+  }
+  .ls-final .ls-btn--primary {
+    background: var(--ls-white); color: var(--ls-ink);
+  }
+  .ls-final .ls-btn--primary:hover {
+    background: var(--ls-blue-light);
+  }
+  .ls-final__friction {
+    margin-top: 20px;
+    font-size: 13px; color: rgba(255,255,255,0.5);
+  }
+
+  /* === FOOTER === */
+  .ls-footer {
+    padding: 80px 0 36px;
+    background: var(--ls-white);
+  }
+  .ls-footer__grid {
+    display: grid; grid-template-columns: 2fr repeat(4, 1fr);
+    gap: 56px; margin-bottom: 48px;
+  }
+  .ls-footer__brand p {
+    font-size: 14px; color: var(--ls-muted);
+    margin-top: 14px; max-width: 260px; line-height: 1.6;
+  }
+  .ls-footer__col h4 {
+    font-size: 13px; font-weight: 500;
+    color: var(--ls-ink);
+    margin-bottom: 16px;
+  }
+  .ls-footer__col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .ls-footer__col a {
+    font-size: 14px; color: var(--ls-muted);
+    transition: color 0.15s ease;
+  }
+  .ls-footer__col a:hover { color: var(--ls-ink); }
+  .ls-footer__bar {
+    padding-top: 32px;
+    border-top: 1px solid var(--ls-border);
+    display: flex; justify-content: space-between;
+    font-size: 13px; color: var(--ls-muted);
+  }
+
+  /* Responsive */
+  @media (max-width: 980px) {
+    .ls-hero h1 { font-size: 52px; }
+    .ls-hero__sub { font-size: 18px; }
+    .ls-head h2 { font-size: 36px; }
+    .ls-honest__quote { font-size: 40px; }
+    .ls-final h2 { font-size: 56px; }
+    .ls-hero__showcase { grid-template-columns: 1fr; }
+    .ls-columns { grid-template-columns: 1fr; }
+    .ls-steps { grid-template-columns: 1fr; }
+    .ls-pricing { grid-template-columns: 1fr; }
+    .ls-compare { grid-template-columns: 1fr; }
+    .ls-urgency__inner { grid-template-columns: 1fr; gap: 32px; }
+    .ls-wp__inner { grid-template-columns: 1fr; gap: 40px; }
+    .ls-honest__contrast { grid-template-columns: 1fr; }
+    .ls-honest-arrow { display: none; }
+    .ls-footer__grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    .ls-nav__links { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="ls-nav">
+  <div class="ls-container ls-nav__inner">
+    <a href="/" class="ls-logo"><span class="ls-logo__mark">L</span>LeadSource</a>
+    <ul class="ls-nav__links">
+      <li><a href="/how-it-works">How it works</a></li>
+      <li><a href="/pricing">Pricing</a></li>
+      <li><a href="/integrations">Integrations</a></li>
+      <li><a href="/blog">Blog</a></li>
+    </ul>
+    <div class="ls-nav__cta">
+      <a href="/login" class="ls-btn ls-btn--ghost">Log in</a>
+      <a href="/signup" class="ls-btn ls-btn--primary">Start free</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="ls-hero">
+  <div class="ls-container ls-hero__inner">
+    <div class="ls-hero__eyebrow">Live · 2,841 leads tracked today</div>
+    <h1>Stop guessing where your best <em>clients</em> are coming from.</h1>
+    <p class="ls-hero__sub">Add one line of code to your site. We track every form submission and tell you the source, the campaign, and every page that person visited before they got in touch. No BS. No broken promises.</p>
+    <div class="ls-hero__actions">
+      <a href="/signup" class="ls-btn ls-btn--primary ls-btn--lg">See your lead sources free →</a>
+      <a href="/how-it-works" class="ls-btn ls-btn--outline ls-btn--lg">See how it works</a>
+    </div>
+    <div class="ls-hero__friction">
+      <span>2-minute setup</span>
+      <span>Works with your existing forms</span>
+      <span>No credit card</span>
+    </div>
+
+    <!-- Showcase: dashboard + email -->
+    <div class="ls-hero__showcase">
+      <div class="ls-dashboard">
+        <div class="ls-dashboard__bar">
+          <div class="ls-dashboard__dots">
+            <span class="ls-dashboard__dot"></span>
+            <span class="ls-dashboard__dot"></span>
+            <span class="ls-dashboard__dot"></span>
+          </div>
+          <span class="ls-dashboard__url">app.leadsource.co</span>
+          <span class="ls-dashboard__live">Live</span>
+        </div>
+        <div class="ls-dashboard__body">
+          <div class="ls-dashboard__title">This month at a glance</div>
+          <div class="ls-metrics">
+            <div class="ls-metric">
+              <div class="ls-metric__label">Leads</div>
+              <div class="ls-metric__num">847</div>
+              <div class="ls-metric__delta">↑ 23%</div>
+            </div>
+            <div class="ls-metric">
+              <div class="ls-metric__label">Top source</div>
+              <div class="ls-metric__num">Google Ads</div>
+              <div class="ls-metric__delta">312 leads</div>
+            </div>
+            <div class="ls-metric">
+              <div class="ls-metric__label">Cost / lead</div>
+              <div class="ls-metric__num">$42</div>
+              <div class="ls-metric__delta">↓ 12%</div>
+            </div>
+          </div>
+
+          <div class="ls-chart">
+            <div class="ls-chart__header">
+              <div class="ls-chart__title">Leads by source</div>
+              <div class="ls-chart__period">Last 30 days</div>
+            </div>
+            <svg width="100%" height="64" viewBox="0 0 400 64" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="ls-area" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stop-color="#185FA5" stop-opacity="0.2"/>
+                  <stop offset="100%" stop-color="#185FA5" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <path d="M0,50 L30,45 L60,48 L90,38 L120,42 L150,30 L180,32 L210,22 L240,26 L270,18 L300,14 L330,20 L360,10 L400,12 L400,64 L0,64 Z" fill="url(#ls-area)"/>
+              <path d="M0,50 L30,45 L60,48 L90,38 L120,42 L150,30 L180,32 L210,22 L240,26 L270,18 L300,14 L330,20 L360,10 L400,12" fill="none" stroke="#185FA5" stroke-width="2" stroke-linejoin="round"/>
+              <circle cx="360" cy="10" r="4" fill="#185FA5"/>
+              <circle cx="360" cy="10" r="8" fill="#185FA5" opacity="0.2"/>
+            </svg>
+          </div>
+
+          <div class="ls-lead-list">
+            <div class="ls-lead-row">
+              <div class="ls-lead-row__name">
+                <div class="ls-lead-row__avatar ls-lead-row__avatar--1">SC</div>
+                <span class="ls-lead-row__label">Sarah Chen</span>
+              </div>
+              <span class="ls-source-badge">Google Ads · Brand AU</span>
+              <span class="ls-lead-row__time">2m ago</span>
+            </div>
+            <div class="ls-lead-row">
+              <div class="ls-lead-row__name">
+                <div class="ls-lead-row__avatar ls-lead-row__avatar--2">RO</div>
+                <span class="ls-lead-row__label">Rachel Okonkwo</span>
+              </div>
+              <span class="ls-source-badge ls-source-badge--teal">Organic · Google</span>
+              <span class="ls-lead-row__time">14m ago</span>
+            </div>
+            <div class="ls-lead-row">
+              <div class="ls-lead-row__name">
+                <div class="ls-lead-row__avatar ls-lead-row__avatar--3">JT</div>
+                <span class="ls-lead-row__label">James Takahashi</span>
+              </div>
+              <span class="ls-source-badge ls-source-badge--amber">Email · Newsletter</span>
+              <span class="ls-lead-row__time">32m ago</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Email -->
+      <div class="ls-email">
+        <div class="ls-email__bar">
+          <div class="ls-email__logo">L</div>
+          <div class="ls-email__from">LeadSource</div>
+          <span class="ls-email__time">2m</span>
+        </div>
+        <div class="ls-email__body">
+          <div class="ls-email__subject">New lead — Sarah Chen</div>
+          <div class="ls-email__badges">
+            <span class="ls-source-badge">Google Ads · Brand Campaign AU</span>
+          </div>
+          <div class="ls-email__lead">
+            <div class="ls-email__avatar">SC</div>
+            <div class="ls-email__lead-info">
+              <div class="ls-email__lead-name">Sarah Chen</div>
+              <div class="ls-email__lead-email">sarah@acmeco.com.au</div>
+            </div>
+          </div>
+          <div class="ls-email__journey">
+            <div class="ls-email__journey-label">Pages visited</div>
+            <div class="ls-email__journey-item">
+              <span class="ls-email__journey-num">1</span>
+              <span>Homepage</span>
+              <span class="ls-email__journey-url">/</span>
+            </div>
+            <div class="ls-email__journey-item">
+              <span class="ls-email__journey-num">2</span>
+              <span>Pricing</span>
+              <span class="ls-email__journey-url">/pricing</span>
+            </div>
+            <div class="ls-email__journey-item">
+              <span class="ls-email__journey-num">3</span>
+              <span>Contact</span>
+              <span class="ls-email__journey-url">/contact</span>
+            </div>
+          </div>
+          <div class="ls-email__footer">
+            <span>Captured at submission</span>
+            <span>Independent record</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Trust -->
+<section class="ls-trust">
+  <div class="ls-container">
+    <div class="ls-trust__label">Works with the form tools you already use</div>
+    <div class="ls-trust__logos">
+      <span class="ls-trust__logo">Gravity Forms</span>
+      <span class="ls-trust__logo">Contact Form 7</span>
+      <span class="ls-trust__logo">HubSpot</span>
+      <span class="ls-trust__logo">Jotform</span>
+      <span class="ls-trust__logo">Typeform</span>
+      <span class="ls-trust__logo">Webflow</span>
+      <span class="ls-trust__logo">Wix</span>
+      <span class="ls-trust__logo">Squarespace</span>
+    </div>
+  </div>
+</section>
+
+<!-- Core value -->
+<section class="ls-section">
+  <div class="ls-container">
+    <div class="ls-head">
+      <div class="ls-eyebrow">What you get</div>
+      <h2>Know which campaigns are delivering. Know where your best clients come from. Know now.</h2>
+    </div>
+    <div class="ls-columns">
+      <div class="ls-col">
+        <span class="ls-col__num">01</span>
+        <h3>Which campaigns are working</h3>
+        <p>Stop funding campaigns on gut feeling. LeadSource shows you exactly which campaigns are sending real enquiries — not clicks, not impressions. Actual form submissions from actual people.</p>
+      </div>
+      <div class="ls-col">
+        <span class="ls-col__num">02</span>
+        <h3>Where your best clients come from</h3>
+        <p>Not just where leads come from — where your best leads come from. See which sources send high-intent enquiries and which ones send noise.</p>
+      </div>
+      <div class="ls-col">
+        <span class="ls-col__num">03</span>
+        <h3>Right now. Not next month.</h3>
+        <p>Your marketing team sends a report at the end of the month. By then, you've already spent the budget. LeadSource sends you the source within minutes of every enquiry.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Honest line -->
+<section class="ls-honest">
+  <div class="ls-container ls-honest__inner">
+    <div class="ls-eyebrow">The honest line</div>
+    <div class="ls-honest__quote">
+      Whether it's your agency, your in-house team, or your own campaigns — <span class="arc">you should know what's working.</span>
+    </div>
+    <div class="ls-honest__contrast">
+      <div class="ls-honest-card">
+        <div class="ls-honest-card__label">Your CRM field</div>
+        <div class="ls-honest-card__text">What someone thinks happened.</div>
+      </div>
+      <div class="ls-honest-arrow">→</div>
+      <div class="ls-honest-card ls-honest-card--right">
+        <div class="ls-honest-card__label">LeadSource</div>
+        <div class="ls-honest-card__text">What actually did.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="ls-section">
+  <div class="ls-container">
+    <div class="ls-head ls-head--center">
+      <div class="ls-eyebrow">How it works</div>
+      <h2>Add the code. We do the rest.</h2>
+      <p>One line of code on your website. No form changes. No CRM setup. No configuration.</p>
+    </div>
+    <div class="ls-howitworks__code-wrap">
+      <div class="ls-code">
+        <button class="ls-code__copy">Copy</button>
+        <span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"cdn.leadsource.co/ls.js?site=XXXX"</span> <span class="attr">async</span><span class="tag">&gt;&lt;/script&gt;</span>
+      </div>
+    </div>
+    <div class="ls-steps">
+      <div class="ls-step">
+        <span class="ls-step__num">01</span>
+        <h3>Add one line of code</h3>
+        <p>Paste the snippet into your website header. Takes about 2 minutes. Your developer can do this before their coffee gets cold.</p>
+      </div>
+      <div class="ls-step">
+        <span class="ls-step__num">02</span>
+        <h3>Keep every form you already have</h3>
+        <p>Gravity Forms, Contact Form 7, HubSpot, Jotform — we find them automatically. No form changes. No hidden fields. Nothing to configure.</p>
+      </div>
+      <div class="ls-step">
+        <span class="ls-step__num">03</span>
+        <h3>See where your clients came from</h3>
+        <p>Within minutes of every enquiry: who it was, which campaign brought them, and every page they visited. In plain English. Every time.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Before/after -->
+<section class="ls-section ls-section--surface">
+  <div class="ls-container">
+    <div class="ls-head ls-head--center">
+      <div class="ls-eyebrow">Before &amp; after</div>
+      <h2>Your CRM doesn't know. We do.</h2>
+      <p>The difference between "lead source: unknown" and a full source record — in the same second a form submits.</p>
+    </div>
+    <div class="ls-compare">
+      <div class="ls-compare__card">
+        <div class="ls-compare__label">Without LeadSource</div>
+        <div class="ls-crm-mockup">
+          <div class="ls-crm-mockup__title">CRM — Lead Source field</div>
+          <div class="ls-crm-mockup__field">— empty —</div>
+        </div>
+        <div class="ls-compare__headline">Blank. Or worse — wrong.</div>
+        <p class="ls-compare__body">Your team tries to remember. Your agency gives you a summary. Someone guesses. Nothing adds up to the same number twice.</p>
+      </div>
+      <div class="ls-compare__card ls-compare__card--after">
+        <div class="ls-compare__label">With LeadSource</div>
+        <div class="ls-ls-mockup">
+          <div class="ls-ls-mockup__header">
+            <span class="ls-ls-mockup__title">Source captured</span>
+            <span class="ls-ls-mockup__time">0.3s after submit</span>
+          </div>
+          <div class="ls-ls-mockup__row">
+            <span class="ls-ls-mockup__key">source</span>
+            <span class="ls-ls-mockup__val"><span class="pill">Google Ads</span></span>
+          </div>
+          <div class="ls-ls-mockup__row">
+            <span class="ls-ls-mockup__key">campaign</span>
+            <span class="ls-ls-mockup__val">Brand-AU-2026</span>
+          </div>
+          <div class="ls-ls-mockup__row">
+            <span class="ls-ls-mockup__key">keyword</span>
+            <span class="ls-ls-mockup__val">"opollo marketing"</span>
+          </div>
+          <div class="ls-ls-mockup__row">
+            <span class="ls-ls-mockup__key">landing</span>
+            <span class="ls-ls-mockup__val">/gravity-forms</span>
+          </div>
+        </div>
+        <div class="ls-compare__headline">Full source. Every lead.</div>
+        <p class="ls-compare__body">Captured at submission. Delivered to your inbox. In plain English. Independent of your CRM, your agency, and your analytics platform.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Urgency -->
+<section class="ls-urgency">
+  <div class="ls-container ls-urgency__inner">
+    <div>
+      <div class="ls-urgency__label">Before it's gone</div>
+      <div class="ls-urgency__head">Know before your next invoice.</div>
+    </div>
+    <p class="ls-urgency__body">
+      Your campaigns are running right now. Your budget is being spent right now. LeadSource tells you what's working right now — not at the end of the month, not in a quarterly review.
+      <br><br>
+      <strong>You're already losing this data on every form submission.</strong> Once the form redirects, it's often gone. You can't recover it later.
+    </p>
+  </div>
+</section>
+
+<!-- WordPress -->
+<section class="ls-wp">
+  <div class="ls-container ls-wp__inner">
+    <div>
+      <span class="ls-wp__badge">For WordPress sites</span>
+      <h2>On WordPress? You're going to love how easy this is.</h2>
+      <p>LeadSource works automatically with Gravity Forms, Contact Form 7, WPForms, and most WordPress form plugins. No plugin to install. No form changes. Add the script to your WordPress header and you're tracking in minutes.</p>
+      <a href="/wordpress-lead-tracking" class="ls-wp__link">See the WordPress install guide →</a>
+    </div>
+    <div class="ls-wp__code">
+      <span class="comment">// your WordPress theme · header.php</span><br>
+      <span class="tag">&lt;head&gt;</span><br>
+      &nbsp;&nbsp;...<br>
+      &nbsp;&nbsp;<span class="highlight"><span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="str">"cdn.leadsource.co/ls.js"</span> <span class="attr">async</span><span class="tag">&gt;&lt;/script&gt;</span></span><br>
+      <span class="tag">&lt;/head&gt;</span>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section class="ls-section ls-section--surface">
+  <div class="ls-container">
+    <div class="ls-head ls-head--center">
+      <div class="ls-eyebrow">Pricing</div>
+      <h2>Simple pricing. No spreadsheet required.</h2>
+      <p>$20 a month. You'll spend more on the coffee you drink worrying about whether your marketing is working.</p>
+    </div>
+    <div class="ls-pricing">
+      <div class="ls-price">
+        <div class="ls-price__name">Free</div>
+        <div class="ls-price__amt">
+          <span class="ls-price__amt-val">$0</span>
+          <span class="ls-price__amt-per">/month</span>
+        </div>
+        <p class="ls-price__tag">Test it. See if it works. No card required.</p>
+        <ul class="ls-price__features">
+          <li>50 leads per month</li>
+          <li>1 site</li>
+          <li>Email notifications</li>
+          <li>Basic dashboard</li>
+        </ul>
+        <a href="/signup" class="ls-btn ls-btn--outline">Start free</a>
+      </div>
+      <div class="ls-price ls-price--featured">
+        <span class="ls-price__badge">Most businesses</span>
+        <div class="ls-price__name">Starter</div>
+        <div class="ls-price__amt">
+          <span class="ls-price__amt-val">$20</span>
+          <span class="ls-price__amt-per">/month</span>
+        </div>
+        <p class="ls-price__tag">For most businesses. Tells you everything you need.</p>
+        <ul class="ls-price__features">
+          <li>500 leads per month</li>
+          <li>Up to 3 sites</li>
+          <li>Full page journey tracking</li>
+          <li>CSV export</li>
+          <li>Monthly summary reports</li>
+        </ul>
+        <a href="/signup" class="ls-btn ls-btn--primary">Start 14-day trial</a>
+      </div>
+      <div class="ls-price">
+        <div class="ls-price__name">Growth</div>
+        <div class="ls-price__amt">
+          <span class="ls-price__amt-val">$50</span>
+          <span class="ls-price__amt-per">/month</span>
+        </div>
+        <p class="ls-price__tag">When things get busier.</p>
+        <ul class="ls-price__features">
+          <li>2,000 leads per month</li>
+          <li>Up to 10 sites</li>
+          <li>Everything in Starter</li>
+          <li>Priority support</li>
+        </ul>
+        <a href="/signup" class="ls-btn ls-btn--outline">Start 14-day trial</a>
+      </div>
+    </div>
+    <p style="text-align: center; margin-top: 36px; font-size: 13px; color: var(--ls-muted);">
+      No contracts. Cancel any time. CRM integrations coming soon.
+    </p>
+  </div>
+</section>
+
+<!-- Final -->
+<section class="ls-final">
+  <div class="ls-final__inner">
+    <h2>Stop guessing.<br><span class="arc">Start knowing.</span></h2>
+    <p>Add the code. We tell you exactly where your best clients are coming from. First lead tracked in under 5 minutes.</p>
+    <a href="/signup" class="ls-btn ls-btn--primary ls-btn--lg">Start free — no credit card →</a>
+    <div class="ls-final__friction">2-minute setup · works with your existing forms · remove anytime</div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="ls-footer">
+  <div class="ls-container">
+    <div class="ls-footer__grid">
+      <div class="ls-footer__brand">
+        <a href="/" class="ls-logo"><span class="ls-logo__mark">L</span>LeadSource</a>
+        <p>Stop guessing where your best clients are coming from. We tell you exactly.</p>
+      </div>
+      <div class="ls-footer__col">
+        <h4>Product</h4>
+        <ul>
+          <li><a href="/how-it-works">How it works</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li><a href="/changelog">Changelog</a></li>
+          <li><a href="/roadmap">Roadmap</a></li>
+        </ul>
+      </div>
+      <div class="ls-footer__col">
+        <h4>Integrations</h4>
+        <ul>
+          <li><a href="/gravity-forms-lead-tracking">Gravity Forms</a></li>
+          <li><a href="/contact-form-7-lead-tracking">Contact Form 7</a></li>
+          <li><a href="/hubspot-form-tracking">HubSpot</a></li>
+          <li><a href="/jotform-lead-tracking">Jotform</a></li>
+        </ul>
+      </div>
+      <div class="ls-footer__col">
+        <h4>Company</h4>
+        <ul>
+          <li><a href="/blog">Blog</a></li>
+          <li><a href="/contact">Contact</a></li>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/terms">Terms</a></li>
+        </ul>
+      </div>
+      <div class="ls-footer__col">
+        <h4>Resources</h4>
+        <ul>
+          <li><a href="/docs">Docs</a></li>
+          <li><a href="/comparisons">Comparisons</a></li>
+          <li><a href="/help">Help centre</a></li>
+          <li><a href="/status">Status</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="ls-footer__bar">
+      <span>© 2026 LeadSource. Built by Opollo, Melbourne.</span>
+      <span>Real data. Right now.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
