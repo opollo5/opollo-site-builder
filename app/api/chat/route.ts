@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
 import { createPageJsonSchema } from "@/lib/tool-schemas";
-import { executeCreatePage } from "@/app/api/tools/create_page/route";
+import { executeCreatePage } from "@/lib/create-page";
 
 export const runtime = "nodejs";
 
