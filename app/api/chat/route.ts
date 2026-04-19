@@ -40,6 +40,16 @@ const ALL_TOOLS = [
   deletePageJsonSchema,
 ];
 
+const EPHEMERAL = { type: "ephemeral" as const };
+
+// Cache-marked tools: adding cache_control to the last tool marks the entire
+// tools array as a cacheable prefix for Anthropic's prompt caching.
+const CACHED_TOOLS = ALL_TOOLS.map((tool, idx) =>
+  idx === ALL_TOOLS.length - 1
+    ? { ...tool, cache_control: EPHEMERAL }
+    : tool,
+);
+
 export const runtime = "nodejs";
 
 const MODEL = "claude-opus-4-7";
@@ -75,6 +85,16 @@ const LEADSOURCE_CONTEXT: SystemPromptContext = {
 };
 
 const SYSTEM_PROMPT = buildSystemPrompt(LEADSOURCE_CONTEXT);
+
+// System prompt as a cached text block. cache_control on the last system block
+// marks the entire system prompt as a cacheable prefix.
+const CACHED_SYSTEM: Anthropic.TextBlockParam[] = [
+  {
+    type: "text",
+    text: SYSTEM_PROMPT,
+    cache_control: EPHEMERAL,
+  },
+];
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -152,8 +172,8 @@ export async function POST(req: Request) {
           const streamed = client.messages.stream({
             model: MODEL,
             max_tokens: MAX_TOKENS,
-            system: SYSTEM_PROMPT,
-            tools: ALL_TOOLS,
+            system: CACHED_SYSTEM,
+            tools: CACHED_TOOLS,
             messages: convo,
           });
 
@@ -168,6 +188,17 @@ export async function POST(req: Request) {
 
           const finalMsg = await streamed.finalMessage();
           stopReason = finalMsg.stop_reason;
+
+          console.log("[api/chat] iteration complete", {
+            iter,
+            stop_reason: finalMsg.stop_reason,
+            input_tokens: finalMsg.usage.input_tokens,
+            output_tokens: finalMsg.usage.output_tokens,
+            cache_creation_input_tokens:
+              finalMsg.usage.cache_creation_input_tokens ?? 0,
+            cache_read_input_tokens:
+              finalMsg.usage.cache_read_input_tokens ?? 0,
+          });
 
           const toolUseBlocks = finalMsg.content.filter(
             (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
@@ -232,7 +263,7 @@ export async function POST(req: Request) {
           message: err instanceof Error ? err.message : String(err),
           name: err instanceof Error ? err.name : undefined,
           status: apiErr?.status,
-          request_id: apiErr?.request_id,
+          request_id: apiErr?.requestID,
           body: apiErr?.error,
           stack: err instanceof Error ? err.stack : undefined,
         };
