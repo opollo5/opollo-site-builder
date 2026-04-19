@@ -1,0 +1,193 @@
+{
+  "category": "hero",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+      "eyebrow_label",
+      "headline_prefix",
+      "headline_accent",
+      "headline_suffix",
+      "sub",
+      "primary_cta",
+      "secondary_cta",
+      "friction_items",
+      "dashboard",
+      "email"
+    ],
+    "additionalProperties": false,
+    "properties": {
+      "eyebrow_label": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 80,
+        "description": "Small pill above the headline (e.g. 'Live · 2,841 leads tracked today'). A pulsing teal dot is rendered by CSS."
+      },
+      "headline_prefix": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120,
+        "description": "Text before the gradient accent phrase."
+      },
+      "headline_accent": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "description": "The gradient-arc-emphasized phrase. Rendered in an <em> with the ls-arc gradient applied. Keep short — one or two words."
+      },
+      "headline_suffix": {
+        "type": "string",
+        "maxLength": 120,
+        "description": "Text after the gradient accent. May be empty string when the accent closes the line."
+      },
+      "sub": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 400
+      },
+      "primary_cta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+        }
+      },
+      "secondary_cta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+        }
+      },
+      "friction_items": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 4,
+        "items": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "description": "Short friction-busting phrases rendered with a teal tick. Typically 3 items."
+      },
+      "dashboard": {
+        "type": "object",
+        "required": ["url_label", "title", "metrics", "chart_title", "chart_period", "lead_rows"],
+        "additionalProperties": false,
+        "properties": {
+          "url_label": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "title": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "metrics": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "required": ["label", "value", "delta"],
+              "additionalProperties": false,
+              "properties": {
+                "label": { "type": "string", "minLength": 1, "maxLength": 20 },
+                "value": { "type": "string", "minLength": 1, "maxLength": 20 },
+                "delta": { "type": "string", "minLength": 1, "maxLength": 20 }
+              }
+            }
+          },
+          "chart_title": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "chart_period": { "type": "string", "minLength": 1, "maxLength": 20 },
+          "lead_rows": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+              "type": "object",
+              "required": ["initials", "name", "source", "time", "avatar_tone"],
+              "additionalProperties": false,
+              "properties": {
+                "initials": { "type": "string", "minLength": 1, "maxLength": 3 },
+                "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "source": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "source_tone_class": {
+                  "type": "string",
+                  "enum": ["ls-source-badge--teal", "ls-source-badge--amber"],
+                  "description": "Optional tonal variant class. Omit for the default blue badge."
+                },
+                "time": { "type": "string", "minLength": 1, "maxLength": 16 },
+                "avatar_tone": {
+                  "type": "string",
+                  "enum": ["1", "2", "3"],
+                  "description": "Numbered tonal variant for the avatar background (1 = blue, 2 = teal, 3 = amber)."
+                }
+              }
+            }
+          }
+        }
+      },
+      "email": {
+        "type": "object",
+        "required": [
+          "logo_char",
+          "from_name",
+          "from_time",
+          "subject",
+          "source_badge",
+          "lead",
+          "journey_label",
+          "journey_items",
+          "footer_left",
+          "footer_right"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "logo_char": { "type": "string", "minLength": 1, "maxLength": 2 },
+          "from_name": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "from_time": { "type": "string", "minLength": 1, "maxLength": 10 },
+          "subject": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "source_badge": {
+            "type": "object",
+            "required": ["label"],
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+              "tone_class": {
+                "type": "string",
+                "enum": ["ls-source-badge--teal", "ls-source-badge--amber"]
+              }
+            }
+          },
+          "lead": {
+            "type": "object",
+            "required": ["initials", "name", "email"],
+            "additionalProperties": false,
+            "properties": {
+              "initials": { "type": "string", "minLength": 1, "maxLength": 3 },
+              "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+              "email": { "type": "string", "format": "email", "maxLength": 120 }
+            }
+          },
+          "journey_label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "journey_items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 5,
+            "items": {
+              "type": "object",
+              "required": ["index", "label", "url"],
+              "additionalProperties": false,
+              "properties": {
+                "index": { "type": "integer", "minimum": 1, "maximum": 9 },
+                "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+                "url": { "type": "string", "maxLength": 200 }
+              }
+            }
+          },
+          "footer_left": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "footer_right": { "type": "string", "minLength": 1, "maxLength": 40 }
+        }
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Homepage hero with the dashboard + email showcase. Only suitable for pages where the product visualisation is the point — landing pages and integration pages should use a simpler hero variant (not yet extracted).",
+  "preview_html": null
+}

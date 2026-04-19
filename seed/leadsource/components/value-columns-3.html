@@ -1,0 +1,20 @@
+<section class="ls-section">
+  <div class="ls-container">
+    <div class="ls-head">
+      <div class="ls-eyebrow">{{section_header.eyebrow}}</div>
+      <h2>{{section_header.heading}}</h2>
+      {{#if section_header.sub}}
+      <p>{{section_header.sub}}</p>
+      {{/if}}
+    </div>
+    <div class="ls-columns">
+      {{#each columns}}
+      <div class="ls-col">
+        <span class="ls-col__num">{{number}}</span>
+        <h3>{{heading}}</h3>
+        <p>{{body}}</p>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</section>

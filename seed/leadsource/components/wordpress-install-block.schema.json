@@ -1,0 +1,62 @@
+{
+  "category": "integration",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["badge_label", "heading", "body", "link", "code_snippet"],
+    "additionalProperties": false,
+    "properties": {
+      "badge_label": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 40,
+        "description": "Pill label at the top (e.g. 'For WordPress sites'). A small blue square is rendered by CSS."
+      },
+      "heading": { "type": "string", "minLength": 1, "maxLength": 160 },
+      "body": { "type": "string", "minLength": 1, "maxLength": 600 },
+      "link": {
+        "type": "object",
+        "required": ["label", "href"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "href": { "type": "string", "format": "uri-reference", "maxLength": 200 }
+        }
+      },
+      "code_snippet": {
+        "type": "object",
+        "required": ["tokens"],
+        "additionalProperties": false,
+        "properties": {
+          "tokens": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 128,
+            "items": {
+              "type": "object",
+              "required": ["kind"],
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["comment", "tag", "attr", "str", "plain", "break", "highlight_open", "highlight_close"],
+                  "description": "Syntax-highlight class. 'break' renders a <br>. 'highlight_open' / 'highlight_close' bracket a highlighted span (typically around the <script> line). 'comment' renders in dim for code comments."
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 0,
+                  "maxLength": 240,
+                  "description": "Text content for the token. Omit for 'break', 'highlight_open', 'highlight_close' kinds."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "2-col integration block: left column is copy + link, right column is a dark multi-line code mockup. Use for WordPress, Gravity Forms, etc. Each integration gets a dedicated instance with its own code snippet.",
+  "preview_html": null
+}

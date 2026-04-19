@@ -1,0 +1,39 @@
+<section class="ls-section ls-section--surface">
+  <div class="ls-container">
+    <div class="ls-head ls-head--center">
+      <div class="ls-eyebrow">{{section_header.eyebrow}}</div>
+      <h2>{{section_header.heading}}</h2>
+      {{#if section_header.sub}}
+      <p>{{section_header.sub}}</p>
+      {{/if}}
+    </div>
+    <div class="ls-compare">
+      <div class="ls-compare__card">
+        <div class="ls-compare__label">{{before.label}}</div>
+        <div class="ls-crm-mockup">
+          <div class="ls-crm-mockup__title">{{before.mockup_title}}</div>
+          <div class="ls-crm-mockup__field">{{before.mockup_body_text}}</div>
+        </div>
+        <div class="ls-compare__headline">{{before.headline}}</div>
+        <p class="ls-compare__body">{{before.body}}</p>
+      </div>
+      <div class="ls-compare__card ls-compare__card--after">
+        <div class="ls-compare__label">{{after.label}}</div>
+        <div class="ls-ls-mockup">
+          <div class="ls-ls-mockup__header">
+            <span class="ls-ls-mockup__title">{{after.mockup_title}}</span>
+            <span class="ls-ls-mockup__time">{{after.mockup_time}}</span>
+          </div>
+          {{#each after.mockup_rows}}
+          <div class="ls-ls-mockup__row">
+            <span class="ls-ls-mockup__key">{{key}}</span>
+            <span class="ls-ls-mockup__val">{{#if (eq value_style "pill")}}<span class="pill">{{value}}</span>{{else}}{{value}}{{/if}}</span>
+          </div>
+          {{/each}}
+        </div>
+        <div class="ls-compare__headline">{{after.headline}}</div>
+        <p class="ls-compare__body">{{after.body}}</p>
+      </div>
+    </div>
+  </div>
+</section>

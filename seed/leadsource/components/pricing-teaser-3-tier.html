@@ -1,0 +1,33 @@
+<section class="ls-section ls-section--surface">
+  <div class="ls-container">
+    <div class="ls-head ls-head--center">
+      <div class="ls-eyebrow">{{section_header.eyebrow}}</div>
+      <h2>{{section_header.heading}}</h2>
+      {{#if section_header.sub}}
+      <p>{{section_header.sub}}</p>
+      {{/if}}
+    </div>
+    <div class="ls-pricing">
+      {{#each tiers}}
+      <div class="ls-price{{#if featured}} ls-price--featured{{/if}}">
+        {{#if featured_badge}}
+        <span class="ls-price__badge">{{featured_badge}}</span>
+        {{/if}}
+        <div class="ls-price__name">{{name}}</div>
+        <div class="ls-price__amt">
+          <span class="ls-price__amt-val">{{amount}}</span>
+          <span class="ls-price__amt-per">{{period}}</span>
+        </div>
+        <p class="ls-price__tag">{{tag}}</p>
+        <ul class="ls-price__features">
+          {{#each features}}
+          <li>{{this}}</li>
+          {{/each}}
+        </ul>
+        <a href="{{cta.href}}" class="ls-btn {{#if featured}}ls-btn--primary{{else}}ls-btn--outline{{/if}}">{{cta.label}}</a>
+      </div>
+      {{/each}}
+    </div>
+    <p class="ls-pricing__footnote">{{footnote}}</p>
+  </div>
+</section>

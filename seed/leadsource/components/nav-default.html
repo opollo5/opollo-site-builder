@@ -1,0 +1,14 @@
+<nav class="ls-nav">
+  <div class="ls-container ls-nav__inner">
+    <a href="/" class="ls-logo"><span class="ls-logo__mark">{{logo_mark_char}}</span>{{logo_label}}</a>
+    <ul class="ls-nav__links">
+      {{#each links}}
+      <li><a href="{{href}}">{{label}}</a></li>
+      {{/each}}
+    </ul>
+    <div class="ls-nav__cta">
+      <a href="{{ghost_cta.href}}" class="ls-btn ls-btn--ghost">{{ghost_cta.label}}</a>
+      <a href="{{primary_cta.href}}" class="ls-btn ls-btn--primary">{{primary_cta.label}}</a>
+    </div>
+  </div>
+</nav>

@@ -68,11 +68,54 @@ Options:
 
 ### Phase 1 vs Phase 2 (M1c)
 
-- **Phase 1 (this PR)**: script + skeleton seed directory with empty
-  `components/` and `templates/`. Running the script creates a design
-  system row with placeholder `tokens.css` / `base-styles.css` and zero
-  components. Useful as a smoke test that the full M1b data-layer code
-  path is wired end-to-end.
-- **Phase 2 (next PR)**: `v2-stripe.html` extracted into real component
-  triplets and a `homepage-default` template. Running the script then
-  seeds the real LeadSource design system.
+- **Phase 1** (merged): script + skeleton seed directory with empty
+  `components/` and `templates/`.
+- **Phase 2** (this PR): 12 component triplets + `homepage-default`
+  template + populated `tokens.css` / `base-styles.css` extracted from
+  `seed/leadsource/source/v2-stripe.html`. Running the script now seeds
+  the real LeadSource design system as a DRAFT, pending activation after
+  M1d ships `FEATURE_DESIGN_SYSTEM_V2`.
+
+## Component naming convention
+
+Component names are lowercase kebab-case, enforced by the Zod regex
+`^[a-z0-9-]+$` in `lib/components.ts`. The first segment is usually
+(but not strictly required to be) the category — component names are
+meant to read like a one-line outline of what the thing is, so the
+category hint up front is pragmatic.
+
+### Examples
+
+| Name                       | Category      | Why                                       |
+|----------------------------|---------------|-------------------------------------------|
+| `nav-default`              | `nav`         | Default top nav. Variant suffix.          |
+| `hero-with-showcase`       | `hero`        | Hero that includes a product showcase.    |
+| `trust-logo-strip`         | `trust`       | Logo strip → obvious atom.                |
+| `value-columns-3`          | `value`       | 3 = column count baked into the name.     |
+| `honest-line-contrast`     | `quote`       | Category is `quote`; name reads its role. |
+| `how-it-works-3-steps`     | `process`     | Canonical "how it works" with 3 steps.    |
+| `before-after-compare`     | `compare`     | Side-by-side comparison.                  |
+| `urgency-band`             | `urgency`     | Amber band shape.                         |
+| `wordpress-install-block`  | `integration` | Integration block for a specific tool.    |
+| `pricing-teaser-3-tier`    | `pricing`     | 3 = tier count.                           |
+| `final-cta-dark`           | `cta`         | Dark variant of the final CTA.            |
+| `footer-default`           | `footer`      | Default footer shape.                     |
+
+### Good patterns
+
+- `hero-centered` · `hero-with-showcase` · `hero-split-form` — shape or contents in the name, not a variant suffix
+- `pricing-teaser-3-tier` · `pricing-teaser-4-tier` — count in the name when it changes the structural invariants
+- `nav-default` · `nav-dark` — variant only in the name when the layout is identical and only tonal/treatment differs
+
+### Avoid
+
+- `HeroBanner` / `nav_primary` — wrong case
+- `hero-1` / `value-v2` — numeric versioning belongs in the design system `version`, not the component name
+- `main-navigation` — verbose synonym; `nav-default` is the convention
+- Prefixes with the site scope like `ls-hero-centered` — scoping is enforced by CSS class prefixes, not component names
+
+### Categories in use (M1c)
+
+`nav`, `hero`, `trust`, `value`, `quote`, `process`, `compare`, `urgency`,
+`integration`, `pricing`, `cta`, `footer`. New categories should be added
+deliberately — prefer reusing an existing one where the shape matches.

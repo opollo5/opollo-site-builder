@@ -1,4 +1,0 @@
-# Phase 2 of M1c will populate this directory with one JSON file per
-# page-type template. Each file contains:
-#   { page_type, name, is_default, composition, required_fields, seo_defaults }
-# The `composition` array references component names from ../components/.

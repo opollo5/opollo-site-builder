@@ -1,0 +1,26 @@
+<section class="ls-section">
+  <div class="ls-container">
+    <div class="ls-head ls-head--center">
+      <div class="ls-eyebrow">{{section_header.eyebrow}}</div>
+      <h2>{{section_header.heading}}</h2>
+      {{#if section_header.sub}}
+      <p>{{section_header.sub}}</p>
+      {{/if}}
+    </div>
+    <div class="ls-howitworks__code-wrap">
+      <div class="ls-code">
+        <button class="ls-code__copy">{{code_snippet.copy_label}}</button>
+        {{#each code_snippet.tokens}}{{#if (eq kind "tag")}}<span class="tag">{{text}}</span>{{/if}}{{#if (eq kind "attr")}}<span class="attr">{{text}}</span>{{/if}}{{#if (eq kind "str")}}<span class="str">{{text}}</span>{{/if}}{{#if (eq kind "plain")}}{{text}}{{/if}}{{/each}}
+      </div>
+    </div>
+    <div class="ls-steps">
+      {{#each steps}}
+      <div class="ls-step">
+        <span class="ls-step__num">{{number}}</span>
+        <h3>{{heading}}</h3>
+        <p>{{body}}</p>
+      </div>
+      {{/each}}
+    </div>
+  </div>
+</section>

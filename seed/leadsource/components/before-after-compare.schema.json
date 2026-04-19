@@ -1,0 +1,90 @@
+{
+  "category": "compare",
+  "variant": "default",
+  "content_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["section_header", "before", "after"],
+    "additionalProperties": false,
+    "properties": {
+      "section_header": {
+        "type": "object",
+        "required": ["eyebrow", "heading"],
+        "additionalProperties": false,
+        "properties": {
+          "eyebrow": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "heading": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "sub": { "type": "string", "maxLength": 400 }
+        }
+      },
+      "before": {
+        "type": "object",
+        "required": ["label", "mockup_title", "mockup_body_text", "headline", "body"],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "mockup_title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Header of the grey CRM mockup card (e.g. 'CRM — Lead Source field')."
+          },
+          "mockup_body_text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "Placeholder text in italic inside the mockup (e.g. '— empty —')."
+          },
+          "headline": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "body": { "type": "string", "minLength": 1, "maxLength": 400 }
+        }
+      },
+      "after": {
+        "type": "object",
+        "required": [
+          "label",
+          "mockup_title",
+          "mockup_time",
+          "mockup_rows",
+          "headline",
+          "body"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "label": { "type": "string", "minLength": 1, "maxLength": 40 },
+          "mockup_title": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "mockup_time": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Right-aligned timestamp or status label in the dark mockup header (e.g. '0.3s after submit')."
+          },
+          "mockup_rows": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "required": ["key", "value", "value_style"],
+              "additionalProperties": false,
+              "properties": {
+                "key": { "type": "string", "minLength": 1, "maxLength": 24 },
+                "value": { "type": "string", "minLength": 1, "maxLength": 60 },
+                "value_style": {
+                  "type": "string",
+                  "enum": ["plain", "pill"],
+                  "description": "'pill' renders the value inside a blue badge. 'plain' leaves it as mono text."
+                }
+              }
+            }
+          },
+          "headline": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "body": { "type": "string", "minLength": 1, "maxLength": 400 }
+        }
+      }
+    }
+  },
+  "image_slots": null,
+  "usage_notes": "Side-by-side comparison: white 'before' card with empty CRM field mockup, dark 'after' card with full source-record mockup. Use once per page for the philosophical punchline.",
+  "preview_html": null
+}

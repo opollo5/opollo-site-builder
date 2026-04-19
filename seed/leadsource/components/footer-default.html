@@ -1,0 +1,24 @@
+<footer class="ls-footer">
+  <div class="ls-container">
+    <div class="ls-footer__grid">
+      <div class="ls-footer__brand">
+        <a href="/" class="ls-logo"><span class="ls-logo__mark">{{brand.logo_mark_char}}</span>{{brand.logo_label}}</a>
+        <p>{{brand.tagline}}</p>
+      </div>
+      {{#each columns}}
+      <div class="ls-footer__col">
+        <h4>{{heading}}</h4>
+        <ul>
+          {{#each links}}
+          <li><a href="{{href}}">{{label}}</a></li>
+          {{/each}}
+        </ul>
+      </div>
+      {{/each}}
+    </div>
+    <div class="ls-footer__bar">
+      <span>{{bottom_left}}</span>
+      <span>{{bottom_right}}</span>
+    </div>
+  </div>
+</footer>

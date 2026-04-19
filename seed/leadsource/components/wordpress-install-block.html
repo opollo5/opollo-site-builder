@@ -1,0 +1,13 @@
+<section class="ls-wp">
+  <div class="ls-container ls-wp__inner">
+    <div>
+      <span class="ls-wp__badge">{{badge_label}}</span>
+      <h2>{{heading}}</h2>
+      <p>{{body}}</p>
+      <a href="{{link.href}}" class="ls-wp__link">{{link.label}} →</a>
+    </div>
+    <div class="ls-wp__code">
+      {{#each code_snippet.tokens}}{{#if (eq kind "comment")}}<span class="comment">{{text}}</span>{{/if}}{{#if (eq kind "tag")}}<span class="tag">{{text}}</span>{{/if}}{{#if (eq kind "attr")}}<span class="attr">{{text}}</span>{{/if}}{{#if (eq kind "str")}}<span class="str">{{text}}</span>{{/if}}{{#if (eq kind "plain")}}{{text}}{{/if}}{{#if (eq kind "break")}}<br>{{/if}}{{#if (eq kind "highlight_open")}}<span class="highlight">{{/if}}{{#if (eq kind "highlight_close")}}</span>{{/if}}{{/each}}
+    </div>
+  </div>
+</section>
