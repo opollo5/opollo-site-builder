@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 
 import { PreviewPane } from "@/components/PreviewPane";
@@ -148,11 +149,19 @@ export default function HomePage() {
 
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
-      <header className="flex h-12 flex-none items-center border-b px-4">
-        <span className="text-sm font-semibold">LeadSource</span>
-        <span className="ml-3 text-xs text-muted-foreground">
-          Opollo Site Builder · Day 1
-        </span>
+      <header className="flex h-12 flex-none items-center justify-between border-b px-4">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold">LeadSource</span>
+          <span className="text-xs text-muted-foreground">
+            Opollo Site Builder
+          </span>
+        </div>
+        <Link
+          href="/admin/sites"
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Manage sites →
+        </Link>
       </header>
       <div className="flex flex-1 overflow-hidden">
         <section className="flex w-2/5 flex-col border-r">
