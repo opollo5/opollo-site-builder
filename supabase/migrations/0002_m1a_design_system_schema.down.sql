@@ -1,0 +1,66 @@
+-- M1a — Rollback for 0002_m1a_design_system_schema.sql
+--
+-- Supabase CLI does not auto-run "down" migrations. This file is hand-run to
+-- verify clean tear-down on a fresh project (see §Verification below) and to
+-- roll the schema back locally if a forward migration went wrong before any
+-- production data landed.
+--
+-- DO NOT run this against a database that contains real design systems,
+-- components, templates, or pages. CASCADE deletion takes everything with it.
+--
+-- Drop order is the reverse of creation — leaves of the FK graph first, so no
+-- constraint ever blocks a DROP. RLS policies and indexes are dropped
+-- implicitly with the tables that own them; no explicit DROP POLICY / DROP
+-- INDEX is required.
+--
+-- ----------------------------------------------------------------------------
+-- Verification steps (AC §4 #2 — "tested rollback migration"):
+-- ----------------------------------------------------------------------------
+-- Run these against a fresh Supabase project (no existing data):
+--
+--   1. Apply 0001_initial_schema.sql, then 0002_m1a_design_system_schema.sql.
+--
+--   2. Confirm the 5 new tables exist:
+--        SELECT table_name FROM information_schema.tables
+--          WHERE table_schema = 'public'
+--            AND table_name IN (
+--              'opollo_users', 'design_systems', 'design_components',
+--              'design_templates', 'pages'
+--            )
+--          ORDER BY table_name;
+--      Expected: 5 rows.
+--
+--   3. Insert a smoke-test row chain to exercise every FK + partial unique:
+--        INSERT INTO sites (name, wp_url, prefix)
+--          VALUES ('Smoke', 'https://smoke.test', 'sm') RETURNING id;
+--        -- then with $site_id:
+--        INSERT INTO design_systems (site_id, version, tokens_css, base_styles, status)
+--          VALUES ($site_id, 1, ':root{}', '', 'active') RETURNING id;
+--        -- attempt a second active row — should FAIL on one_active_design_system:
+--        INSERT INTO design_systems (site_id, version, tokens_css, base_styles, status)
+--          VALUES ($site_id, 2, ':root{}', '', 'active');
+--
+--   4. Run this file.
+--
+--   5. Confirm all 5 new tables are gone:
+--        SELECT table_name FROM information_schema.tables
+--          WHERE table_schema = 'public'
+--            AND table_name IN (
+--              'opollo_users', 'design_systems', 'design_components',
+--              'design_templates', 'pages'
+--            );
+--      Expected: 0 rows.
+--
+--   6. Confirm the pre-existing tables are untouched:
+--        SELECT count(*) FROM sites;               -- row from step 3 still there
+--        SELECT count(*) FROM site_credentials;    -- 0, unchanged
+--
+--   7. Re-apply 0002_m1a_design_system_schema.sql. Should succeed with no
+--      residue from the rollback.
+-- ----------------------------------------------------------------------------
+
+DROP TABLE IF EXISTS pages;
+DROP TABLE IF EXISTS design_templates;
+DROP TABLE IF EXISTS design_components;
+DROP TABLE IF EXISTS design_systems;
+DROP TABLE IF EXISTS opollo_users;
