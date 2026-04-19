@@ -2,6 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 
 import { createPageJsonSchema } from "@/lib/tool-schemas";
 import { executeCreatePage } from "@/lib/create-page";
+import {
+  buildSystemPrompt,
+  type SystemPromptContext,
+} from "@/lib/system-prompt";
 
 export const runtime = "nodejs";
 
@@ -9,14 +13,35 @@ const MODEL = "claude-opus-4-7";
 const MAX_TOKENS = 4096;
 const MAX_ITERATIONS = 5;
 
-const PLACEHOLDER_SYSTEM_PROMPT = `You are the LeadSource site builder. For Day 1 you can create WordPress pages via the create_page tool.
+const LEADSOURCE_BRAND_VOICE = `Outcome-led. Bold statements. No hedging. Lead with what the product does, not what's broken in the world. Say the thing everyone's thinking but nobody writes on their website. Keep it short. Make it sound like a real person said it. If it sounds like an AI or a committee wrote it, rewrite it.
 
-Wrap every page body in this scoped container:
-<div class="ls-page ls-page-{template_type}" data-ds-version="1.0.0">
-  ...content...
-</div>
+Six voice rules:
+1. Outcomes first — lead with the result, not the problem
+2. Bold statements — "We tell you exactly." Full stop.
+3. Short sentences
+4. Say the real thing — if everyone's thinking it, say it
+5. Honest about limits — "Works with most forms" not "every form"
+6. Never salesy — no exclamation marks, no "Amazing!", no pressure
 
-Use only classes beginning with "ls-". Call create_page with a valid draft once you have enough information. Be terse; no preambles, no postambles.`;
+Power phrases to use: "Stop guessing. Start knowing.", "We tell you exactly.", "Where your best clients are coming from.", "Add the code. We do the rest.", "No BS."
+
+Never say: "Every form", "100% accurate", "Leverage/Utilise/Seamlessly", "Powerful/Robust/Comprehensive", passive voice like "data is captured"`;
+
+const LEADSOURCE_CONTEXT: SystemPromptContext = {
+  site_name: "LeadSource",
+  prefix: "ls",
+  design_system_version: "1.0.0",
+  design_system_updated: "n/a (Week 2)",
+  design_system_html_full_file: "",
+  brand_voice_content: LEADSOURCE_BRAND_VOICE,
+  site_pages_tree: "[]",
+  site_menus_current: "{}",
+  homepage_id: "null",
+  templates_list: "[]",
+  session_recent_pages: "[]",
+};
+
+const SYSTEM_PROMPT = buildSystemPrompt(LEADSOURCE_CONTEXT);
 
 function sseEvent(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -87,13 +112,14 @@ export async function POST(req: Request) {
         console.log("[api/chat] starting stream", {
           model: MODEL,
           msg_count: convo.length,
+          system_prompt_chars: SYSTEM_PROMPT.length,
         });
 
         for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
           const streamed = client.messages.stream({
             model: MODEL,
             max_tokens: MAX_TOKENS,
-            system: PLACEHOLDER_SYSTEM_PROMPT,
+            system: SYSTEM_PROMPT,
             tools: [createPageJsonSchema],
             messages: convo,
           });
