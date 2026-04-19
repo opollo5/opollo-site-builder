@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import type {
   CreatePageData,
   CreatePageInput,
@@ -15,11 +17,44 @@ export type WpConfig = {
   appPassword: string;
 };
 
+export type WpCredentialsOverride = {
+  wp_url: string;
+  wp_user: string;
+  wp_app_password: string;
+};
+
 export type WpConfigResult =
   | { ok: true; value: WpConfig }
   | { ok: false; missing: string[] };
 
+// Per-invocation credentials override. The chat route wraps each tool call
+// in runWithWpCredentials(creds, …) so readWpConfig(), which still lives in
+// the existing tool executors, picks the site's credentials up without any
+// signature change. When no override is set, readWpConfig() falls back to
+// the LEADSOURCE_* env vars (backward compatibility during Week 2).
+const credentialsContext = new AsyncLocalStorage<WpCredentialsOverride>();
+
+export function runWithWpCredentials<T>(
+  creds: WpCredentialsOverride | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (!creds) return fn();
+  return credentialsContext.run(creds, fn);
+}
+
 export function readWpConfig(): WpConfigResult {
+  const override = credentialsContext.getStore();
+  if (override) {
+    return {
+      ok: true,
+      value: {
+        baseUrl: override.wp_url,
+        user: override.wp_user,
+        appPassword: override.wp_app_password,
+      },
+    };
+  }
+
   const baseUrl = process.env.LEADSOURCE_WP_URL;
   const user = process.env.LEADSOURCE_WP_USER;
   const appPassword = process.env.LEADSOURCE_WP_APP_PASSWORD;
@@ -148,7 +183,7 @@ async function mapHttpErrorToWpError(res: Response): Promise<WpError | null> {
       details: { status: res.status, wp_response: wpBody },
       retryable: false,
       suggested_action:
-        "Verify LEADSOURCE_WP_USER and LEADSOURCE_WP_APP_PASSWORD, and that Application Passwords are enabled.",
+        "Verify the site's WordPress user and application password, and that Application Passwords are enabled on the host.",
     };
   }
 
