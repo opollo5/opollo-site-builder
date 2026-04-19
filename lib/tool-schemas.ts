@@ -28,6 +28,9 @@ export const ERROR_CODES = [
   "INTERNAL_ERROR",
   "NOT_FOUND",
   "PREFIX_TAKEN",
+  "VERSION_CONFLICT",
+  "UNIQUE_VIOLATION",
+  "FK_VIOLATION",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -67,6 +70,7 @@ export type ApiResponse<T> = ApiSuccess<T> | ToolError;
 export function errorCodeToStatus(code: ErrorCode): number {
   switch (code) {
     case "VALIDATION_FAILED":
+    case "FK_VIOLATION":
       return 400;
     case "AUTH_FAILED":
       return 401;
@@ -75,6 +79,8 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "NOT_FOUND":
       return 404;
     case "PREFIX_TAKEN":
+    case "VERSION_CONFLICT":
+    case "UNIQUE_VIOLATION":
       return 409;
     case "RATE_LIMIT":
       return 429;
