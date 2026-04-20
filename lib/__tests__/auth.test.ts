@@ -1,11 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import {
-  AuthError,
-  getCurrentUser,
-  requireRole,
-  signOutAuthUser,
-} from "@/lib/auth";
+import { AuthError, getCurrentUser, requireRole } from "@/lib/auth";
+import { signOutAuthUser } from "@/lib/auth-revoke";
 import { seedAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------

@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { middleware } from "@/middleware";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -235,9 +234,13 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, binary failure", () => {
 // Flag on + valid session → pass through.
 // ---------------------------------------------------------------------------
 
+// Build the Supabase auth cookies for `email` by running a real
+// signInWithPassword through an SSR client. The SSR client's setAll
+// callback captures the cookies that getUser() will later read back.
+// We use the SSR client directly (not the vanilla supabase-js anon
+// client) so the cookie shape matches exactly what middleware expects.
 async function buildSessionCookies(
-  accessToken: string,
-  refreshToken: string,
+  email: string,
 ): Promise<{ name: string; value: string }[]> {
   const captured: { name: string; value: string }[] = [];
   const client = createServerClient(
@@ -254,34 +257,12 @@ async function buildSessionCookies(
       },
     },
   );
-  const { error } = await client.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-  if (error) throw new Error(`buildSessionCookies: ${error.message}`);
-  return captured;
-}
-
-async function signInAndGetTokens(email: string): Promise<{
-  accessToken: string;
-  refreshToken: string;
-}> {
-  const url = process.env.SUPABASE_URL!;
-  const anonKey = process.env.SUPABASE_ANON_KEY!;
-  const client = createClient(url, anonKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
-  const { data, error } = await client.auth.signInWithPassword({
+  const { error } = await client.auth.signInWithPassword({
     email,
     password: "test-password-1234",
   });
-  if (error || !data.session) {
-    throw new Error(`signIn: ${error?.message ?? "no session"}`);
-  }
-  return {
-    accessToken: data.session.access_token,
-    refreshToken: data.session.refresh_token,
-  };
+  if (error) throw new Error(`buildSessionCookies: ${error.message}`);
+  return captured;
 }
 
 describe("middleware: FEATURE_SUPABASE_AUTH on, valid session", () => {
@@ -291,8 +272,7 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, valid session", () => {
     __resetAuthKillSwitchCacheForTests();
 
     const user = await seedAuthUser({ role: "viewer" });
-    const { accessToken, refreshToken } = await signInAndGetTokens(user.email);
-    const cookies = await buildSessionCookies(accessToken, refreshToken);
+    const cookies = await buildSessionCookies(user.email);
 
     const res = await middleware(makeRequest("/admin/sites", { cookies }));
     expect(res.status).toBe(200);

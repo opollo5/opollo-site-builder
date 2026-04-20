@@ -216,40 +216,6 @@ export async function requireRole(
   return user;
 }
 
-// ---------------------------------------------------------------------------
-// Revocation
-// ---------------------------------------------------------------------------
-
-/**
- * Revoke every session for a user, by user_id. Called by M2d on role
- * promotion/demotion and by M2c-3's emergency reset-role route.
- *
- * Uses GoTrue's admin logout endpoint
- * (`POST /auth/v1/admin/users/:id/logout`) because the JS SDK's
- * `auth.admin.signOut(jwt, scope)` requires a JWT and we only have the
- * user_id at role-change time. The endpoint is service-role-gated and
- * returns 204 on success.
- *
- * Post-condition (pinned by auth.test.ts): any JWT previously issued
- * for this user fails `supabase.auth.getUser()` on the NEXT request —
- * not after the JWT's natural TTL.
- */
-export async function signOutAuthUser(userId: string): Promise<void> {
-  const url = requireEnv("SUPABASE_URL").replace(/\/+$/, "");
-  const serviceKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
-
-  const res = await fetch(`${url}/auth/v1/admin/users/${userId}/logout`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
-    },
-  });
-
-  if (!res.ok && res.status !== 204) {
-    const body = await res.text().catch(() => "");
-    throw new Error(
-      `signOutAuthUser(${userId}): HTTP ${res.status}${body ? ` — ${body}` : ""}`,
-    );
-  }
-}
+// Revocation lives in lib/auth-revoke.ts — it uses a direct Postgres
+// connection (pg) and must never be reachable from the Edge middleware
+// bundle. Import `signOutAuthUser` from "@/lib/auth-revoke" instead.
