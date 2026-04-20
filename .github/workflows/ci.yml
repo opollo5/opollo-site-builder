@@ -72,9 +72,15 @@ jobs:
         with:
           version: latest
       - name: Start Supabase local stack
-        run: supabase start
+        # Only Postgres + PostgREST + Studio are needed by the Vitest
+        # suite. Excluding auth/realtime/storage/imgproxy/inbucket/
+        # edge-runtime/pooler both speeds up boot and sidesteps
+        # per-version config schema drift in those sections.
+        run: |
+          supabase start \
+            --exclude auth,realtime,storage,imgproxy,inbucket,edge-runtime,pooler,logflare,vector,studio
       - name: Run Vitest suite
         run: npm test
       - name: Stop Supabase local stack
         if: always()
-        run: supabase stop --no-backup
+        run: supabase stop --no-backup || true

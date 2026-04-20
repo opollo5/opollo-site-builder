@@ -1,46 +1,15 @@
-# Supabase CLI local config. Required for `supabase start` — matches
-# what `supabase init` would produce on first setup. Kept minimal: only
-# the services we actually need on local dev + CI (Postgres, PostgREST,
-# Studio). Auth / storage / realtime disabled until M2.
+# Minimal Supabase CLI local config. Matches the bare schema every CLI
+# version has accepted: project_id at root + [api] + [db]. We exclude all
+# other services at `supabase start` time in the workflow rather than
+# trying to disable them via config (section schema has changed across
+# CLI versions; `--exclude` is stable).
 
 project_id = "opollo-site-builder"
 
 [api]
-enabled = true
 port = 54321
-schemas = ["public", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
 
 [db]
 port = 54322
 shadow_port = 54320
-# Postgres 15 matches the supabase/migrations/0001_initial_schema.sql
-# targets (Sydney prod Postgres is 15).
 major_version = 15
-
-[db.pooler]
-enabled = false
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://127.0.0.1"
-
-[inbucket]
-enabled = false
-
-[storage]
-enabled = false
-
-[auth]
-enabled = false
-
-[analytics]
-enabled = false
-
-[functions]
-enabled = false
-
-[experimental.orioledb]
-enabled = false
