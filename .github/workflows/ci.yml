@@ -76,12 +76,32 @@ jobs:
       - name: Start Supabase local stack (with debug output)
         run: supabase start --debug
       - name: Show Supabase stack status (for CI debugging)
+        id: supabase_status
         run: |
-          supabase status
-          echo "---- JSON ----"
-          supabase status --output json || true
+          supabase status | tee /tmp/supabase-status.txt
+          echo "---- JSON ----" | tee -a /tmp/supabase-status.txt
+          supabase status --output json | tee -a /tmp/supabase-status.txt || true
       - name: Run Vitest suite
-        run: npm test -- --reporter=verbose
+        id: vitest
+        run: |
+          set -o pipefail
+          npm test -- --reporter=verbose 2>&1 | tee /tmp/vitest.out
+      - name: Publish test diagnostics to job summary
+        if: always()
+        run: |
+          {
+            echo '## Supabase status'
+            echo
+            echo '```'
+            cat /tmp/supabase-status.txt 2>/dev/null || echo '(missing)'
+            echo '```'
+            echo
+            echo '## Vitest output'
+            echo
+            echo '```'
+            tail -c 60000 /tmp/vitest.out 2>/dev/null || echo '(missing)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Stop Supabase local stack
         if: always()
         run: supabase stop --no-backup || true
