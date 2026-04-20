@@ -26,6 +26,12 @@ export default async function AdminUsersPage() {
   });
   if (access.kind === "redirect") redirect(access.to);
 
+  // Under flag-off / kill-switch, `access.user` is null — the role
+  // action cell treats null as "no self to compare against" and
+  // enables every row. The server route still enforces the
+  // last-admin guard.
+  const currentUserId = access.user?.id ?? null;
+
   const svc = getServiceRoleClient();
   const { data, error } = await svc
     .from("opollo_users")
@@ -38,8 +44,8 @@ export default async function AdminUsersPage() {
         <div>
           <h1 className="text-xl font-semibold">Users</h1>
           <p className="text-sm text-muted-foreground">
-            Everyone with access to this builder. Role changes ship in the next
-            sub-slice.
+            Everyone with access to this builder. Change a role inline; the
+            server blocks self-modification and last-admin demotions.
           </p>
         </div>
       </div>
@@ -53,7 +59,10 @@ export default async function AdminUsersPage() {
             Failed to load users: {error.message}
           </div>
         ) : (
-          <UsersTable users={(data ?? []) as AdminUserRow[]} />
+          <UsersTable
+            users={(data ?? []) as AdminUserRow[]}
+            currentUserId={currentUserId}
+          />
         )}
       </div>
     </>

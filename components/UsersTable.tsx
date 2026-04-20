@@ -1,7 +1,9 @@
 import type { AdminUserRow } from "@/app/api/admin/users/list/route";
+import { UserRoleActionCell } from "@/components/UserRoleActionCell";
 
-// Read-only users table. Server component: data is pre-fetched in the
-// parent page. Action buttons (promote/demote/revoke) land in M2d-2+.
+// Users table for /admin/users. Server component for the shell + static
+// cells; the role <select> is a client island so the action stays
+// interactive without forcing the whole table client-side.
 
 function formatDate(iso: string): string {
   try {
@@ -15,22 +17,19 @@ function formatDate(iso: string): string {
   }
 }
 
-function RoleBadge({ role }: { role: AdminUserRow["role"] }) {
-  const palette: Record<AdminUserRow["role"], string> = {
-    admin: "bg-primary/10 text-primary",
-    operator: "bg-secondary text-secondary-foreground",
-    viewer: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${palette[role]}`}
-    >
-      {role}
-    </span>
-  );
-}
-
-export function UsersTable({ users }: { users: AdminUserRow[] }) {
+export function UsersTable({
+  users,
+  currentUserId,
+}: {
+  users: AdminUserRow[];
+  /**
+   * ID of the currently-signed-in admin, when known. Used by the role
+   * action cell to disable self-modification. `null` under flag-off /
+   * kill-switch (no Supabase identity); the server-side guard still
+   * enforces the rest.
+   */
+  currentUserId: string | null;
+}) {
   if (users.length === 0) {
     return (
       <div className="rounded-md border p-8 text-center">
@@ -55,7 +54,7 @@ export function UsersTable({ users }: { users: AdminUserRow[] }) {
         </thead>
         <tbody>
           {users.map((u) => (
-            <tr key={u.id} className="border-b last:border-b-0">
+            <tr key={u.id} className="border-b last:border-b-0 align-top">
               <td className="px-3 py-2">
                 <div className="flex flex-col">
                   <span>{u.email}</span>
@@ -67,7 +66,11 @@ export function UsersTable({ users }: { users: AdminUserRow[] }) {
                 </div>
               </td>
               <td className="px-3 py-2">
-                <RoleBadge role={u.role} />
+                <UserRoleActionCell
+                  userId={u.id}
+                  currentRole={u.role}
+                  selfUserId={currentUserId}
+                />
               </td>
               <td className="px-3 py-2 text-muted-foreground">
                 {formatDate(u.created_at)}
