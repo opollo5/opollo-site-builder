@@ -13,8 +13,13 @@ A chat interface that generates WordPress pages for Opollo's clients.
 
 ## Self-test loop
 - Retry ceiling is 10 attempts per PR, not 3. Retry count alone is no longer the escalation trigger — "not converging" is.
-- Escalate to Steven only when: (a) you see the same failure twice in a row (the fix isn't landing), or (b) you hit a genuine architectural question requiring his input — spec deviation, security tradeoff, schema decision.
+- Escalate to Steven only when: (a) you see the same CI failure twice in a row (the fix isn't landing), (b) you hit a code bug you can't diagnose, or (c) a genuine architectural question requiring his input — spec deviation, security tradeoff, schema decision.
 - CI failure logs are auto-posted as PR comments by `.github/workflows/ci.yml` (added in PR #18). Read those comments directly instead of asking Steven to paste logs.
+
+## Operational / infrastructure issues — just act
+- Stuck CI jobs, flaky runners, transient network blips, log-posting hiccups: decide and act without asking. Examples: push an empty commit to retrigger a hung job, retry a flaky test, re-trigger a workflow.
+- Note the decision in your next status update, but don't gate on approval.
+- This rule only covers infra/ops. Code bugs you can't diagnose, spec deviations, architectural / security / schema tradeoffs, or the same CI failure twice in a row still escalate per "Self-test loop".
 
 ## Commands
 - `npm run dev` — local dev
