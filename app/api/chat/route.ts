@@ -58,11 +58,21 @@ const MODEL = "claude-opus-4-7";
 const MAX_TOKENS = 4096;
 const MAX_ITERATIONS = 5;
 
-const LEADSOURCE_FALLBACK_PROMPT = buildSystemPromptForSite({
-  site_name: "LeadSource",
-  prefix: "ls",
-  design_system_version: "1.0.0",
-});
+// The memoised prompt captures DS state at first-request time within each
+// Vercel function instance. Activations propagate lazily as instances recycle.
+// This is intentional for M1d; explicit invalidation comes in a later milestone
+// alongside per-page iteration (M6 in the roadmap).
+let leadsourceFallbackPromptPromise: Promise<string> | null = null;
+function getLeadsourceFallbackPrompt(): Promise<string> {
+  if (leadsourceFallbackPromptPromise === null) {
+    leadsourceFallbackPromptPromise = buildSystemPromptForSite({
+      site_name: "LeadSource",
+      prefix: "ls",
+      design_system_version: "1.0.0",
+    });
+  }
+  return leadsourceFallbackPromptPromise;
+}
 
 function cachedSystemBlocks(prompt: string): Anthropic.TextBlockParam[] {
   return [{ type: "text", text: prompt, cache_control: EPHEMERAL }];
@@ -147,7 +157,8 @@ export async function POST(req: Request) {
       wp_user: credentials.wp_user,
       wp_app_password: credentials.wp_app_password,
     };
-    systemPrompt = buildSystemPromptForSite({
+    systemPrompt = await buildSystemPromptForSite({
+      id: site.id,
       site_name: site.name,
       prefix: site.prefix,
       design_system_version: site.design_system_version,
@@ -155,7 +166,7 @@ export async function POST(req: Request) {
     siteLogId = site.id;
     siteLogName = site.name;
   } else {
-    systemPrompt = LEADSOURCE_FALLBACK_PROMPT;
+    systemPrompt = await getLeadsourceFallbackPrompt();
     wpCreds = undefined;
   }
 
