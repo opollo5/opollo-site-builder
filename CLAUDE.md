@@ -9,6 +9,9 @@ A chat interface that generates WordPress pages for Opollo's clients.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - Only stop and ask me if: you hit an architectural decision, a secret/credential issue, or you've tried twice and can't fix a failure.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
+- After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
+- Only report back when CI is green, or after two failed fix attempts on the same issue, or if you hit an architectural/scope question.
+- Your "done" state is: PR open, CI green, summary posted. Not: PR open, CI running, waiting for input.
 
 ## Commands
 - `npm run dev` — local dev
