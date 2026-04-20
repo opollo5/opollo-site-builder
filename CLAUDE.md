@@ -9,7 +9,18 @@ A chat interface that generates WordPress pages for Opollo's clients.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
-- "Done" means: PR open, CI green, summary posted. Not: PR open, CI running, waiting for input.
+- "Done" means: PR merged (or handed to Steven for merge, where required) and summary posted. Not: PR open, CI running, waiting for input.
+
+## Merging
+- Auto-merge your own PRs when ALL of these are true:
+  - CI is fully green (all required checks pass)
+  - No review requested and no pending review comments
+  - The PR was opened by Claude Code (not by Steven)
+  - The PR is not write-safety-critical (see below)
+- Human merge still required for:
+  - Any PR Claude Code escalates to Steven for a decision
+  - M3, M4, M7 milestone PRs (concurrency / transactional / circuit breaker code)
+  - Any PR Steven explicitly flags for review
 
 ## Self-test loop
 - Retry ceiling is 10 attempts per PR, not 3. Retry count alone is no longer the escalation trigger — "not converging" is.
