@@ -70,9 +70,11 @@ jobs:
         run: npm ci
       - uses: supabase/setup-cli@v1
         with:
-          version: 1.226.4
-      - name: Start Supabase local stack
-        run: supabase start
+          version: latest
+      - name: Show Supabase CLI version
+        run: supabase --version
+      - name: Start Supabase local stack (with debug output)
+        run: supabase start --debug
       - name: Run Vitest suite
         run: npm test
       - name: Stop Supabase local stack
