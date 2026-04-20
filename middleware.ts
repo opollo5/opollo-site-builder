@@ -227,5 +227,18 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Two patterns instead of one. The single `/((?!...).*)` pattern the
+  // initial M2c middleware shipped does NOT match the bare root path
+  // `/` in Next.js 14 — the `.*` is zero-or-more but path-to-regexp
+  // compiles the resulting group to require at least one character
+  // after the leading slash. In production that left `/` (the chat
+  // builder) completely ungated under FEATURE_SUPABASE_AUTH=true:
+  // unauthenticated sessions could reach the whole app root while
+  // `/admin/*` correctly redirected. Splitting into an explicit `/`
+  // entry plus a `.+` pattern for everything else closes the gap
+  // without regressing the static-asset exclusions.
+  matcher: [
+    "/",
+    "/((?!_next/static|_next/image|favicon.ico).+)",
+  ],
 };

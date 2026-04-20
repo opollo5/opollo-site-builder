@@ -147,6 +147,21 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, no session", () => {
     expect(location).toContain("next=%2Fadmin%2Fsites");
   });
 
+  it("redirects the bare root / to /login", async () => {
+    // Production bug caught by Steven after M2d-4 shipped: the chat
+    // builder root was reachable unauthenticated because the original
+    // matcher `/((?!...).*)` didn't match `/` (the `.*` group requires
+    // at least one captured character in path-to-regexp's output).
+    // The matcher now carries an explicit `/` entry alongside the
+    // wildcard for everything else; this test pins the behaviour so a
+    // future matcher tweak can't regress it.
+    const res = await middleware(makeRequest("/"));
+    expect(res.status).toBe(307);
+    const location = res.headers.get("location") ?? "";
+    expect(location).toContain("/login");
+    expect(location).toContain("next=%2F");
+  });
+
   it("returns 401 JSON on /api routes", async () => {
     const res = await middleware(makeRequest("/api/sites"));
     expect(res.status).toBe(401);
