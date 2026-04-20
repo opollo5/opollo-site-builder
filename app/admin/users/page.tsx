@@ -1,0 +1,61 @@
+import { redirect } from "next/navigation";
+
+import { UsersTable } from "@/components/UsersTable";
+import { checkAdminAccess } from "@/lib/admin-gate";
+import { getServiceRoleClient } from "@/lib/supabase";
+import type { AdminUserRow } from "@/app/api/admin/users/list/route";
+
+// ---------------------------------------------------------------------------
+// /admin/users — M2d-1.
+//
+// Admin-only page listing every opollo_users row. Operators who follow
+// a stale link are sent back to /admin/sites rather than all the way
+// out to the chat builder; viewers never reach /admin/* at all because
+// the layout gate filters them first.
+//
+// Reads via the service-role client — RLS is belt-and-braces here, the
+// admin gate above is the actual access control.
+// ---------------------------------------------------------------------------
+
+export const dynamic = "force-dynamic";
+
+export default async function AdminUsersPage() {
+  const access = await checkAdminAccess({
+    requiredRoles: ["admin"],
+    insufficientRoleRedirectTo: "/admin/sites",
+  });
+  if (access.kind === "redirect") redirect(access.to);
+
+  const svc = getServiceRoleClient();
+  const { data, error } = await svc
+    .from("opollo_users")
+    .select("id, email, display_name, role, created_at, revoked_at")
+    .order("created_at", { ascending: false });
+
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Users</h1>
+          <p className="text-sm text-muted-foreground">
+            Everyone with access to this builder. Role changes ship in the next
+            sub-slice.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-6">
+        {error ? (
+          <div
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+            role="alert"
+          >
+            Failed to load users: {error.message}
+          </div>
+        ) : (
+          <UsersTable users={(data ?? []) as AdminUserRow[]} />
+        )}
+      </div>
+    </>
+  );
+}

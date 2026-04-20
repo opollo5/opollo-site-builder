@@ -28,6 +28,24 @@ For sub-slices of a parent milestone whose plan Steven has already approved (M2a
 
 Escalate only for: architectural decisions not in the parent plan, spec deviations, security tradeoffs, or same-failure-twice CI loops. Do NOT escalate for: sub-slice planning, operational/infra issues, routine tradeoffs already covered in the parent plan.
 
+## Auto-continue between sub-slices
+After an auto-merged sub-slice PR, automatically proceed to the next sub-slice in the same approved parent milestone without waiting for a prompt. Rule chain:
+
+- `M2c-1 merged → start M2c-2`
+- `M2c-2 merged → start M2c-3`
+- `M2c-3 merged → start M2d-1` (next slice of parent M2)
+- `M2d-N merged → either start M2d-(N+1) or, if M2d was the last slice, status update "M2 complete, ready for Steven's sign-off before M3" and stop`
+
+Stop and wait for Steven only when:
+- A parent milestone fully completes (M2 done → wait, do NOT start M3 on your own).
+- An architectural escalation surfaces.
+- The same CI failure lands twice in a row.
+
+Also: post a one-line status ping per merge so Steven has visibility without needing to prompt — e.g. "M2c-2 merged, starting M2c-3."
+
+## Enabling auto-merge on every PR
+Every PR must have GitHub auto-merge armed at creation time. Call `mcp__github__enable_pr_auto_merge` (with `mergeMethod: "SQUASH"`) immediately after `create_pull_request` — it is not enabled implicitly. Without that call, the PR sits in the mergeable state until someone clicks the button in the UI, breaking the self-driving loop.
+
 ## Commands
 - `npm run dev` — local dev
 - `npm run lint` — ESLint
