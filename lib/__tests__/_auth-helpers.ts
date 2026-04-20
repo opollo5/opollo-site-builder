@@ -50,11 +50,17 @@ export async function cleanupTrackedAuthUsers(): Promise<void> {
  *
  * `email_confirm: true` skips Supabase Auth's confirmation flow — we
  * don't want the test harness dealing with inbucket / email links.
+ *
+ * `overrides.persistent = true` skips the module-level cleanup tracker.
+ * Use this for describe-scope fixtures seeded in beforeAll that should
+ * survive per-test cleanupTrackedAuthUsers() calls. Caller is
+ * responsible for deleting persistent users in afterAll.
  */
 export async function seedAuthUser(overrides?: {
   email?: string;
   password?: string;
   role?: TestRole;
+  persistent?: boolean;
 }): Promise<SeededAuthUser> {
   const supabase = getServiceRoleClient();
   const email = overrides?.email ?? `test-user-${++emailCounter}@opollo.test`;
@@ -71,7 +77,9 @@ export async function seedAuthUser(overrides?: {
     );
   }
   const userId = data.user.id;
-  createdAuthUserIds.add(userId);
+  if (!overrides?.persistent) {
+    createdAuthUserIds.add(userId);
+  }
 
   // If a role was requested, reconcile. Default case (viewer) is fine.
   if (overrides?.role && overrides.role !== "viewer") {
