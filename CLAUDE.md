@@ -7,11 +7,14 @@ A chat interface that generates WordPress pages for Opollo's clients.
 ## How to work
 - Work autonomously. Don't ask for permission for normal coding tasks.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
-- Only stop and ask me if: you hit an architectural decision, a secret/credential issue, or you've tried twice and can't fix a failure.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
 - "Done" means: PR open, CI green, summary posted. Not: PR open, CI running, waiting for input.
-- Only report back when CI is green, or after two failed fix attempts on the same issue, or if you hit an architectural/scope question.
+
+## Self-test loop
+- Retry ceiling is 10 attempts per PR, not 3. Retry count alone is no longer the escalation trigger — "not converging" is.
+- Escalate to Steven only when: (a) you see the same failure twice in a row (the fix isn't landing), or (b) you hit a genuine architectural question requiring his input — spec deviation, security tradeoff, schema decision.
+- CI failure logs are auto-posted as PR comments by `.github/workflows/ci.yml` (added in PR #18). Read those comments directly instead of asking Steven to paste logs.
 
 ## Commands
 - `npm run dev` — local dev
