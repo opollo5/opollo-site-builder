@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // Test-only factories for M2+ auth scenarios. Every caller uses the
@@ -33,10 +34,16 @@ export async function cleanupTrackedAuthUsers(): Promise<void> {
   createdAuthUserIds.clear();
   for (const id of ids) {
     const { error } = await supabase.auth.admin.deleteUser(id);
-    if (error) {
-      // eslint-disable-next-line no-console
-      console.warn(`cleanupTrackedAuthUsers: deleteUser(${id}) — ${error.message}`);
-    }
+    if (!error) continue;
+    // Swallow "User not found" (HTTP 404). A test may have cleaned the
+    // user itself (e.g. admin.deleteUser cascade test) — the tracker
+    // doesn't know, and the log noise hides real failures.
+    const status = (error as { status?: number }).status;
+    if (status === 404 || /user not found/i.test(error.message)) continue;
+    // eslint-disable-next-line no-console
+    console.warn(
+      `cleanupTrackedAuthUsers: deleteUser(${id}) — ${error.message}`,
+    );
   }
 }
 
@@ -50,11 +57,17 @@ export async function cleanupTrackedAuthUsers(): Promise<void> {
  *
  * `email_confirm: true` skips Supabase Auth's confirmation flow — we
  * don't want the test harness dealing with inbucket / email links.
+ *
+ * `overrides.persistent = true` skips the module-level cleanup tracker.
+ * Use this for describe-scope fixtures seeded in beforeAll that should
+ * survive per-test cleanupTrackedAuthUsers() calls. Caller is
+ * responsible for deleting persistent users in afterAll.
  */
 export async function seedAuthUser(overrides?: {
   email?: string;
   password?: string;
   role?: TestRole;
+  persistent?: boolean;
 }): Promise<SeededAuthUser> {
   const supabase = getServiceRoleClient();
   const email = overrides?.email ?? `test-user-${++emailCounter}@opollo.test`;
@@ -71,7 +84,9 @@ export async function seedAuthUser(overrides?: {
     );
   }
   const userId = data.user.id;
-  createdAuthUserIds.add(userId);
+  if (!overrides?.persistent) {
+    createdAuthUserIds.add(userId);
+  }
 
   // If a role was requested, reconcile. Default case (viewer) is fine.
   if (overrides?.role && overrides.role !== "viewer") {
@@ -121,14 +136,31 @@ export async function setFirstAdminEmail(email: string | null): Promise<void> {
 /**
  * Sign a user in and return the session's access-token JWT. Callers use
  * this as a Bearer token when hitting route handlers that gate on
- * authenticated requests (M2c+). For M2a itself the tests don't exercise
- * session flow, so this is here for M2b/M2c to consume.
+ * authenticated requests (M2c+).
+ *
+ * Uses a *throwaway* supabase-js client — not getServiceRoleClient() —
+ * because supabase-js stores the session on the client instance after
+ * signInWithPassword() succeeds. Calling signInWithPassword() on the
+ * module-level service-role singleton would mutate it to act as the
+ * signed-in user for every downstream getServiceRoleClient() caller.
+ * Fixture seeders (seedSite, beforeEach opollo_users re-insert, etc.)
+ * would then run under RLS and silently fail or produce wrong data.
  */
 export async function signInAs(
   user: { email: string; password?: string },
 ): Promise<string> {
-  const supabase = getServiceRoleClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const url = process.env.SUPABASE_URL;
+  const anonKey =
+    process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !anonKey) {
+    throw new Error(
+      "signInAs: SUPABASE_URL and SUPABASE_ANON_KEY (or SERVICE_ROLE_KEY) must be set",
+    );
+  }
+  const throwaway = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await throwaway.auth.signInWithPassword({
     email: user.email,
     password: user.password ?? "test-password-1234",
   });
