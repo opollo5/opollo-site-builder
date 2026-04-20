@@ -33,10 +33,16 @@ export async function cleanupTrackedAuthUsers(): Promise<void> {
   createdAuthUserIds.clear();
   for (const id of ids) {
     const { error } = await supabase.auth.admin.deleteUser(id);
-    if (error) {
-      // eslint-disable-next-line no-console
-      console.warn(`cleanupTrackedAuthUsers: deleteUser(${id}) — ${error.message}`);
-    }
+    if (!error) continue;
+    // Swallow "User not found" (HTTP 404). A test may have cleaned the
+    // user itself (e.g. admin.deleteUser cascade test) — the tracker
+    // doesn't know, and the log noise hides real failures.
+    const status = (error as { status?: number }).status;
+    if (status === 404 || /user not found/i.test(error.message)) continue;
+    // eslint-disable-next-line no-console
+    console.warn(
+      `cleanupTrackedAuthUsers: deleteUser(${id}) — ${error.message}`,
+    );
   }
 }
 
