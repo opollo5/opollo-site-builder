@@ -10,7 +10,7 @@
     <div class="ls-howitworks__code-wrap">
       <div class="ls-code">
         <button class="ls-code__copy">{{code_snippet.copy_label}}</button>
-        {{#each code_snippet.tokens}}{{#if (eq kind "tag")}}<span class="tag">{{text}}</span>{{/if}}{{#if (eq kind "attr")}}<span class="attr">{{text}}</span>{{/if}}{{#if (eq kind "str")}}<span class="str">{{text}}</span>{{/if}}{{#if (eq kind "plain")}}{{text}}{{/if}}{{/each}}
+        {{#each code_snippet.tokens}}{{#if (eq kind "tag")}}<span class="ls-syntax-tag">{{text}}</span>{{/if}}{{#if (eq kind "attr")}}<span class="ls-syntax-attr">{{text}}</span>{{/if}}{{#if (eq kind "str")}}<span class="ls-syntax-str">{{text}}</span>{{/if}}{{#if (eq kind "plain")}}{{text}}{{/if}}{{/each}}
       </div>
     </div>
     <div class="ls-steps">

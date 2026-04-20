@@ -7,7 +7,7 @@
       <a href="{{link.href}}" class="ls-wp__link">{{link.label}} →</a>
     </div>
     <div class="ls-wp__code">
-      {{#each code_snippet.tokens}}{{#if (eq kind "comment")}}<span class="comment">{{text}}</span>{{/if}}{{#if (eq kind "tag")}}<span class="tag">{{text}}</span>{{/if}}{{#if (eq kind "attr")}}<span class="attr">{{text}}</span>{{/if}}{{#if (eq kind "str")}}<span class="str">{{text}}</span>{{/if}}{{#if (eq kind "plain")}}{{text}}{{/if}}{{#if (eq kind "break")}}<br>{{/if}}{{#if (eq kind "highlight_open")}}<span class="highlight">{{/if}}{{#if (eq kind "highlight_close")}}</span>{{/if}}{{/each}}
+      {{#each code_snippet.tokens}}{{#if (eq kind "comment")}}<span class="ls-syntax-comment">{{text}}</span>{{/if}}{{#if (eq kind "tag")}}<span class="ls-syntax-tag">{{text}}</span>{{/if}}{{#if (eq kind "attr")}}<span class="ls-syntax-attr">{{text}}</span>{{/if}}{{#if (eq kind "str")}}<span class="ls-syntax-str">{{text}}</span>{{/if}}{{#if (eq kind "plain")}}{{text}}{{/if}}{{#if (eq kind "break")}}<br>{{/if}}{{#if (eq kind "highlight_open")}}<span class="ls-syntax-highlight">{{/if}}{{#if (eq kind "highlight_close")}}</span>{{/if}}{{/each}}
     </div>
   </div>
 </section>

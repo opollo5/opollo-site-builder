@@ -17,9 +17,9 @@
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--ls-border-strong);
   overflow-x: auto;
 }
-.ls-code .tag { color: #F4C0D1; }
-.ls-code .attr { color: #85B7EB; }
-.ls-code .str { color: #9FE1CB; }
+.ls-code .ls-syntax-tag { color: #F4C0D1; }
+.ls-code .ls-syntax-attr { color: #85B7EB; }
+.ls-code .ls-syntax-str { color: #9FE1CB; }
 .ls-code__copy {
   position: absolute;
   top: 10px;

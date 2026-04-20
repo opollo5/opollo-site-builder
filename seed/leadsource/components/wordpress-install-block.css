@@ -56,11 +56,11 @@
   color: var(--ls-white);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
 }
-.ls-wp__code .comment { color: var(--ls-dim); }
-.ls-wp__code .tag { color: #F4C0D1; }
-.ls-wp__code .attr { color: #85B7EB; }
-.ls-wp__code .str { color: #9FE1CB; }
-.ls-wp__code .highlight {
+.ls-wp__code .ls-syntax-comment { color: var(--ls-dim); }
+.ls-wp__code .ls-syntax-tag { color: #F4C0D1; }
+.ls-wp__code .ls-syntax-attr { color: #85B7EB; }
+.ls-wp__code .ls-syntax-str { color: #9FE1CB; }
+.ls-wp__code .ls-syntax-highlight {
   background: rgba(133, 183, 235, 0.15);
   border-left: 2px solid #85B7EB;
   padding: 2px 4px;

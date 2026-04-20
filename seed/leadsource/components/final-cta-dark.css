@@ -33,7 +33,7 @@
   color: var(--ls-white);
   font-weight: 500;
 }
-.ls-final h2 .arc {
+.ls-final h2 .ls-arc {
   background: var(--ls-arc);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

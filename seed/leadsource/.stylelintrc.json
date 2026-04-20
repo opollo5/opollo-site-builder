@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json.schemastore.org/stylelintrc",
+  "rules": {
+    "selector-class-pattern": [
+      "^ls(-[a-z0-9]+)+(__[a-z0-9-]+)?(--[a-z0-9-]+)?$",
+      {
+        "message": "Class selectors must start with 'ls-' (LeadSource scope prefix). See §3.6 of docs/m1-claude-code-brief.md.",
+        "severity": "error"
+      }
+    ]
+  }
+}
