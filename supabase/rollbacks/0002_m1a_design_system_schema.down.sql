@@ -1,9 +1,12 @@
 -- M1a — Rollback for 0002_m1a_design_system_schema.sql
 --
--- Supabase CLI does not auto-run "down" migrations. This file is hand-run to
--- verify clean tear-down on a fresh project (see §Verification below) and to
--- roll the schema back locally if a forward migration went wrong before any
--- production data landed.
+-- Hand-run rollback. Moved out of supabase/migrations/ to supabase/rollbacks/
+-- so the Supabase CLI doesn't pick it up alphabetically-before the forward
+-- migration and double-register version 0002 in schema_migrations
+-- (see supabase/rollbacks/README.md for the full story).
+--
+-- Path to run this file:
+--   psql "$SUPABASE_DB_URL" -f supabase/rollbacks/0002_m1a_design_system_schema.down.sql
 --
 -- DO NOT run this against a database that contains real design systems,
 -- components, templates, or pages. CASCADE deletion takes everything with it.
