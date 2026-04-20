@@ -1,8 +1,15 @@
 -- M1b — Rollback for 0003_m1b_rpcs.sql
 --
+-- Hand-run. Lives in supabase/rollbacks/ (not supabase/migrations/) so the
+-- Supabase CLI does not apply it as part of the forward boot —
+-- see supabase/rollbacks/README.md for why.
+--
 -- Drops activate_design_system. Run before 0002's rollback if tearing down
 -- the M1 schema completely. Safe to run on its own — does not affect tables
 -- or data.
+--
+-- Path to run this file:
+--   psql "$SUPABASE_DB_URL" -f supabase/rollbacks/0003_m1b_rpcs.down.sql
 --
 -- Verification steps:
 --   1. With the forward migration applied, confirm the function exists:

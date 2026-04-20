@@ -1,0 +1,107 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+# All jobs gate on: not a forked-repo PR. Forks can't run the Supabase stack
+# safely (secrets would leak via workflow logs) and we have no integration
+# path for them yet.
+env:
+  RUN_CI: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+jobs:
+  typecheck:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - run: npm run typecheck
+
+  lint:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - run: npm run lint
+
+  test:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Show Supabase CLI version
+        run: supabase --version
+      - name: Start Supabase local stack (with debug output)
+        run: supabase start --debug
+      - name: Show Supabase stack status (for CI debugging)
+        id: supabase_status
+        run: |
+          supabase status | tee /tmp/supabase-status.txt
+          echo "---- JSON ----" | tee -a /tmp/supabase-status.txt
+          supabase status --output json | tee -a /tmp/supabase-status.txt || true
+      - name: Run Vitest suite
+        id: vitest
+        run: |
+          set -o pipefail
+          npm test -- --reporter=verbose 2>&1 | tee /tmp/vitest.out
+      - name: Publish test diagnostics to job summary
+        if: always()
+        run: |
+          {
+            echo '## Supabase status'
+            echo
+            echo '```'
+            cat /tmp/supabase-status.txt 2>/dev/null || echo '(missing)'
+            echo '```'
+            echo
+            echo '## Vitest output'
+            echo
+            echo '```'
+            tail -c 60000 /tmp/vitest.out 2>/dev/null || echo '(missing)'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Stop Supabase local stack
+        if: always()
+        run: supabase stop --no-backup || true

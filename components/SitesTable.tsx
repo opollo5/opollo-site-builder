@@ -33,7 +33,7 @@ export function SitesTable({ sites }: { sites: SiteListItem[] }) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No sites yet. Click "Add new site" to get started.
+          No sites yet. Click &ldquo;Add new site&rdquo; to get started.
         </p>
       </div>
     );

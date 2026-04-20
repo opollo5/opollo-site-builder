@@ -65,14 +65,18 @@ describe("GET /api/design-systems/[id]/components", () => {
 
 describe("POST /api/design-systems/[id]/components", () => {
   it("creates a component and passes the scope-prefix check", async () => {
-    const { ds } = await seedSiteWithDS();
+    // seedSite gives us a random 4-char prefix; the scope-prefix check
+    // requires every class selector in the CSS to start with that prefix,
+    // so we build the selector from the seeded site's prefix rather than
+    // hardcoding ".ls-hero".
+    const { site, ds } = await seedSiteWithDS();
     const res = await createComponentRoute(
       jsonReq(`http://t/api/design-systems/${ds.id}/components`, {
         name: "hero-centered",
         variant: "default",
         category: "hero",
         html_template: "<section>{{headline}}</section>",
-        css: ".ls-hero { padding: 2rem; }",
+        css: `.${site.prefix}-hero { padding: 2rem; }`,
         content_schema: minimalComponentContentSchema(),
       }),
       { params: { id: ds.id } },

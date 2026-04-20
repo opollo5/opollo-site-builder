@@ -225,7 +225,9 @@ export async function updateDesignSystem(
 
 // Atomic. Delegates to the activate_design_system RPC (0003 migration) which
 // archives the current active DS and promotes the target in a single SQL
-// body. Version-lock mismatch surfaces as SQLSTATE 40001 → VERSION_CONFLICT.
+// body. Version-lock mismatch surfaces as SQLSTATE 'PT409' → VERSION_CONFLICT.
+// (Originally '40001' but supabase-js auto-retries that class; see RPC
+// source for the full story.)
 export async function activateDesignSystem(
   id: string,
   expected_version_lock: number,
@@ -240,9 +242,9 @@ export async function activateDesignSystem(
       .single();
 
     if (error) {
-      // 40001 from the RPC means optimistic-lock mismatch; we know the
-      // expected value, so surface it in the response.
-      if (error.code === "40001") {
+      // PT409 from the RPC means optimistic-lock mismatch; we know the
+      // expected value, so surface it in the response with that context.
+      if (error.code === "PT409" || error.code === "40001") {
         return versionConflict(RESOURCE, id, expected_version_lock);
       }
       return mapPgError(RESOURCE, error);
@@ -264,6 +266,18 @@ export async function archiveDesignSystem(
 > {
   return guardImpl(RESOURCE, async () => {
     const supabase = getServiceRoleClient();
+
+    // Capture the row's status BEFORE the UPDATE so we can tell whether we
+    // just archived the site's active DS (→ warning) or merely archived a
+    // draft that never made it to active (→ no warning).
+    const prev = await supabase
+      .from("design_systems")
+      .select("status")
+      .eq("id", id)
+      .maybeSingle();
+    if (prev.error) return mapPgError(RESOURCE, prev.error);
+    const wasActive = prev.data?.status === "active";
+
     const { data, error } = await supabase
       .from("design_systems")
       .update({
@@ -292,21 +306,24 @@ export async function archiveDesignSystem(
     const ds = data as DesignSystem;
     const warnings: string[] = [];
 
-    // If the archived row was the previously-active one, check whether the
-    // site now has any active design system. Read-after-write is safe here:
-    // RLS service-role bypass + partial unique index guarantee at most one.
-    const { data: stillActive, error: checkErr } = await supabase
-      .from("design_systems")
-      .select("id")
-      .eq("site_id", ds.site_id)
-      .eq("status", "active")
-      .maybeSingle();
+    // Warning only fires when we archived the site's current-active DS AND
+    // there's no other active DS for that site. Archiving a draft or an
+    // already-archived row produces no warning — the "no active DS" state
+    // was already true before this call.
+    if (wasActive) {
+      const { data: stillActive, error: checkErr } = await supabase
+        .from("design_systems")
+        .select("id")
+        .eq("site_id", ds.site_id)
+        .eq("status", "active")
+        .maybeSingle();
 
-    if (checkErr) return mapPgError(RESOURCE, checkErr);
-    if (!stillActive) {
-      warnings.push(
-        `Site ${ds.site_id} has no active design system after this archive. Activate another version before generating new pages.`,
-      );
+      if (checkErr) return mapPgError(RESOURCE, checkErr);
+      if (!stillActive) {
+        warnings.push(
+          `Site ${ds.site_id} has no active design system after this archive. Activate another version before generating new pages.`,
+        );
+      }
     }
 
     return {

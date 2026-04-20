@@ -1,13 +1,20 @@
-import { execSync } from "node:child_process";
+import { diagnosticDump, readSupabaseCreds, runCmd } from "./_supabase-status";
 
 // Vitest globalSetup. Runs once per test invocation, before workers fork.
 //
 // Responsibilities:
-//   1. Ensure a local Supabase stack is running. If `supabase status` succeeds
-//      we assume it's already up (common dev loop). Otherwise `supabase start`
-//      boots it (CI cold start).
-//   2. Emit the API URL + service-role key into process.env so the lib code's
-//      getServiceRoleClient() finds them at first-call time in workers.
+//   1. Ensure a local Supabase stack is running. If credential extraction
+//      from a live stack succeeds we skip `supabase start`. Otherwise the
+//      CI cold-start path boots one.
+//   2. Emit the API URL + service-role key into process.env so the lib
+//      code's getServiceRoleClient() finds them at first-call time in
+//      workers.
+//
+// Credential reading goes through _supabase-status.ts which handles
+// JSON schema drift across CLI versions + falls back to plain-text
+// output when JSON doesn't parse. The CI environment runs a different
+// CLI version than any dev machine will, so defensive parsing is worth
+// the ~100 lines.
 //
 // Between-test TRUNCATEs are handled per-worker in _setup.ts — they don't
 // need the Supabase CLI, only a direct Postgres connection on port 54322
@@ -15,57 +22,34 @@ import { execSync } from "node:child_process";
 //
 // Prerequisites (see CONTRIBUTING.md):
 //   - Docker daemon running
-//   - Supabase CLI installed (`brew install supabase/tap/supabase` or equivalent)
-
-type SupabaseStatus = {
-  API_URL?: string;
-  DB_URL?: string;
-  SERVICE_ROLE_KEY?: string;
-  ANON_KEY?: string;
-};
-
-function runCmd(cmd: string, opts?: { allowFailure?: boolean }): string {
-  try {
-    return execSync(cmd, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  } catch (err) {
-    if (opts?.allowFailure) return "";
-    throw err;
-  }
-}
-
-function parseStatus(): SupabaseStatus | null {
-  const raw = runCmd("supabase status --output json", { allowFailure: true });
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as SupabaseStatus;
-  } catch {
-    return null;
-  }
-}
+//   - Supabase CLI installed
 
 export async function setup() {
-  let status = parseStatus();
+  let creds = readSupabaseCreds();
 
-  if (!status || !status.API_URL || !status.SERVICE_ROLE_KEY) {
+  if (!creds) {
     // eslint-disable-next-line no-console
     console.log(
       "[vitest] Supabase stack not running — calling `supabase start` (may take 15–30s)...",
     );
     runCmd("supabase start");
-    status = parseStatus();
+    creds = readSupabaseCreds();
   }
 
-  if (!status || !status.API_URL || !status.SERVICE_ROLE_KEY) {
+  if (!creds) {
     throw new Error(
-      "Unable to fetch Supabase stack credentials after `supabase start`. " +
-        "Check `supabase status` manually and ensure Docker is running.",
+      "Unable to fetch Supabase stack credentials after `supabase start`.\n" +
+        "Raw CLI output follows — expected an API URL and a service-role key " +
+        "from either JSON (`--output json`) or plain-text `supabase status`, " +
+        "neither parse returned one.\n\n" +
+        diagnosticDump(),
     );
   }
 
-  process.env.SUPABASE_URL = status.API_URL;
-  process.env.SUPABASE_SERVICE_ROLE_KEY = status.SERVICE_ROLE_KEY;
-  if (status.ANON_KEY) process.env.SUPABASE_ANON_KEY = status.ANON_KEY;
-  if (status.DB_URL) process.env.SUPABASE_DB_URL = status.DB_URL;
+  process.env.SUPABASE_URL = creds.apiUrl;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = creds.serviceRoleKey;
+  if (creds.anonKey) process.env.SUPABASE_ANON_KEY = creds.anonKey;
+  if (creds.dbUrl) process.env.SUPABASE_DB_URL = creds.dbUrl;
 }
 
 export async function teardown() {
