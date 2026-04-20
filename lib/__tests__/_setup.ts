@@ -1,6 +1,7 @@
 import { afterAll, beforeEach } from "vitest";
 import { Client } from "pg";
 import { readSupabaseCreds } from "./_supabase-status";
+import { cleanupTrackedAuthUsers } from "./_auth-helpers";
 
 // Per-worker setup. Runs before every test file in this worker.
 //
@@ -44,16 +45,22 @@ async function getPg(): Promise<Client> {
 }
 
 export async function truncateAll(): Promise<void> {
-  const pg = await getPg();
-  // Order matters when referential actions other than CASCADE apply. We use
-  // CASCADE to sidestep FK ordering between sites / design_systems etc.
+  // M2a+: we can't TRUNCATE auth.users CASCADE from the test role — the
+  // CASCADE sweeps auth.refresh_tokens and its id sequence, which the
+  // test role doesn't own (Postgres error 42501: must be owner of
+  // sequence refresh_tokens_id_seq).
   //
-  // auth.users (M2a+) is TRUNCATEd too because opollo_users has a FK to it
-  // — wiping opollo_users without also wiping auth.users leaves orphaned
-  // auth rows that would re-trigger handle_new_auth_user's opollo_users
-  // INSERT on the next test's createUser call (returning 'viewer' state
-  // silently instead of the requested role). CASCADE sweeps auth.sessions
-  // / auth.refresh_tokens / auth.identities at the same time.
+  // Instead, we delete every auth user this test file created via the
+  // service-role admin API — it has the right privileges and cleans up
+  // downstream auth state (sessions, refresh_tokens, identities) for
+  // free. Users that a test forgot to track (e.g. created via raw SQL)
+  // would leak; every test path should go through seedAuthUser().
+  await cleanupTrackedAuthUsers();
+
+  const pg = await getPg();
+  // Order matters when referential actions other than CASCADE apply. We
+  // use CASCADE to sidestep FK ordering between sites / design_systems.
+  // Scoped to public-schema tables only.
   await pg.query(`
     TRUNCATE TABLE
       pages,
@@ -62,8 +69,7 @@ export async function truncateAll(): Promise<void> {
       design_systems,
       opollo_users,
       opollo_config,
-      sites,
-      auth.users
+      sites
     RESTART IDENTITY CASCADE;
   `);
 }

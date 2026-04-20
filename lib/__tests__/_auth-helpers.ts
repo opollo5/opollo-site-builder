@@ -14,6 +14,32 @@ export type SeededAuthUser = {
 
 let emailCounter = 0;
 
+// Module-level tracker of every auth user seedAuthUser has created.
+// truncateAll() (from _setup.ts) calls cleanupTrackedAuthUsers() between
+// tests — see the comment there for why we can't just TRUNCATE auth.users.
+const createdAuthUserIds = new Set<string>();
+
+/**
+ * Delete every auth user this test run created via seedAuthUser(). Uses
+ * the service-role admin API, which has the privileges to sweep
+ * downstream auth state (sessions, refresh_tokens, identities) via its
+ * normal cascade path. Errors are logged but not thrown — cleanup is
+ * best-effort to avoid cascading failures from a single dead user.
+ */
+export async function cleanupTrackedAuthUsers(): Promise<void> {
+  if (createdAuthUserIds.size === 0) return;
+  const supabase = getServiceRoleClient();
+  const ids = Array.from(createdAuthUserIds);
+  createdAuthUserIds.clear();
+  for (const id of ids) {
+    const { error } = await supabase.auth.admin.deleteUser(id);
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.warn(`cleanupTrackedAuthUsers: deleteUser(${id}) — ${error.message}`);
+    }
+  }
+}
+
 /**
  * Creates an auth.users row via the admin API. The
  * handle_new_auth_user trigger (0004 migration) inserts the matching
@@ -45,6 +71,7 @@ export async function seedAuthUser(overrides?: {
     );
   }
   const userId = data.user.id;
+  createdAuthUserIds.add(userId);
 
   // If a role was requested, reconcile. Default case (viewer) is fine.
   if (overrides?.role && overrides.role !== "viewer") {

@@ -42,30 +42,17 @@ describe("M2a: handle_new_auth_user trigger", () => {
 
   it("promotes to 'admin' when email matches opollo_config.first_admin_email", async () => {
     await setFirstAdminEmail("boss@opollo.test");
-    // seedAuthUser's internal UPDATE path would override, so test the
-    // trigger directly by passing the matching email with no role override.
-    const supabase = getServiceRoleClient();
-    const { data, error } = await supabase.auth.admin.createUser({
-      email: "boss@opollo.test",
-      password: "test-password-1234",
-      email_confirm: true,
-    });
-    if (error || !data?.user) throw new Error(error?.message ?? "no user");
-
-    const row = await readOpolloUser(data.user.id);
+    // seedAuthUser with no role= override lets the trigger's decision stand.
+    // Tracked for cleanup via the helper's internal Set.
+    const user = await seedAuthUser({ email: "boss@opollo.test" });
+    const row = await readOpolloUser(user.id);
     expect(row?.role).toBe("admin");
   });
 
   it("leaves non-matching emails as 'viewer' even when first_admin_email is set", async () => {
     await setFirstAdminEmail("boss@opollo.test");
-    const supabase = getServiceRoleClient();
-    const { data } = await supabase.auth.admin.createUser({
-      email: "intern@opollo.test",
-      password: "test-password-1234",
-      email_confirm: true,
-    });
-    if (!data?.user) throw new Error("no user");
-    const row = await readOpolloUser(data.user.id);
+    const user = await seedAuthUser({ email: "intern@opollo.test" });
+    const row = await readOpolloUser(user.id);
     expect(row?.role).toBe("viewer");
   });
 });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   renderComponentSummary,
   renderRegistryBlock,
@@ -298,15 +298,27 @@ describe("loadActiveRegistry", () => {
 
 describe("buildSystemPromptForSite", () => {
   const originalFlag = process.env.FEATURE_DESIGN_SYSTEM_V2;
-  let errorSpy: ReturnType<typeof vi.spyOn>;
+  // Spy hoisted to describe scope + eagerly initialised so afterEach can
+  // always call mockRestore(), including when an upstream beforeEach (e.g.
+  // the global truncate in _setup.ts) throws and skips the inner
+  // beforeEach. Previously the spy was created in beforeEach; an upstream
+  // failure left it undefined and afterEach cascaded into a second error.
+  const errorSpy = vi
+    .spyOn(console, "error")
+    .mockImplementation(() => {});
 
   beforeEach(() => {
-    errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Reset call history between tests. The spy itself outlives the
+    // describe and is restored once in afterAll.
+    errorSpy.mockClear();
   });
 
   afterEach(() => {
     if (originalFlag === undefined) delete process.env.FEATURE_DESIGN_SYSTEM_V2;
     else process.env.FEATURE_DESIGN_SYSTEM_V2 = originalFlag;
+  });
+
+  afterAll(() => {
     errorSpy.mockRestore();
   });
 
