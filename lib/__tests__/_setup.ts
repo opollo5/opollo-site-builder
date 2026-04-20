@@ -47,6 +47,13 @@ export async function truncateAll(): Promise<void> {
   const pg = await getPg();
   // Order matters when referential actions other than CASCADE apply. We use
   // CASCADE to sidestep FK ordering between sites / design_systems etc.
+  //
+  // auth.users (M2a+) is TRUNCATEd too because opollo_users has a FK to it
+  // — wiping opollo_users without also wiping auth.users leaves orphaned
+  // auth rows that would re-trigger handle_new_auth_user's opollo_users
+  // INSERT on the next test's createUser call (returning 'viewer' state
+  // silently instead of the requested role). CASCADE sweeps auth.sessions
+  // / auth.refresh_tokens / auth.identities at the same time.
   await pg.query(`
     TRUNCATE TABLE
       pages,
@@ -54,7 +61,9 @@ export async function truncateAll(): Promise<void> {
       design_components,
       design_systems,
       opollo_users,
-      sites
+      opollo_config,
+      sites,
+      auth.users
     RESTART IDENTITY CASCADE;
   `);
 }

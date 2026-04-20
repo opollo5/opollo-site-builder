@@ -3,6 +3,30 @@
 Operator scripts that run outside the Next.js request path. Executed via
 `npx tsx <script>` against a live Supabase.
 
+## sync-first-admin.ts
+
+Seeds the `opollo_config.first_admin_email` row so the next Supabase Auth
+signup with that email is auto-promoted to `role = 'admin'`. Run once per
+deploy (or whenever the target changes).
+
+### Prerequisites
+
+- M2a migration applied (creates `opollo_config` + the signup trigger).
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` exported.
+
+### Usage
+
+```bash
+OPOLLO_FIRST_ADMIN_EMAIL=you@example.com \
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  npx tsx scripts/sync-first-admin.ts
+```
+
+Idempotent — re-running with the same value is a no-op. Re-running with a
+different value moves the bootstrap target but doesn't retroactively
+demote any user who already signed up under the old value; the trigger
+only fires on new signups.
+
 ## seed-leadsource.ts
 
 Inserts the LeadSource design system (tokens, components, templates) out
