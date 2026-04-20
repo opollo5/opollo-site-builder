@@ -180,3 +180,40 @@ describe("checkAdminAccess: FEATURE_SUPABASE_AUTH on, kill switch off", () => {
     }
   });
 });
+
+describe("checkAdminAccess: custom options (M2d-1)", () => {
+  beforeEach(async () => {
+    process.env.FEATURE_SUPABASE_AUTH = "true";
+    await setKillSwitchRow(null);
+  });
+
+  it("redirects an operator to the insufficientRoleRedirectTo target when admin is required", async () => {
+    const operator = await seedAuthUser({ role: "operator" });
+    mockState.client = await signedInClient(operator.email);
+
+    const result = await checkAdminAccess({
+      requiredRoles: ["admin"],
+      insufficientRoleRedirectTo: "/admin/sites",
+    });
+    expect(result).toEqual({ kind: "redirect", to: "/admin/sites" });
+  });
+
+  it("allows an admin when requiredRoles is ['admin']", async () => {
+    const admin = await seedAuthUser({ role: "admin" });
+    mockState.client = await signedInClient(admin.email);
+
+    const result = await checkAdminAccess({ requiredRoles: ["admin"] });
+    expect(result.kind).toBe("allow");
+    if (result.kind === "allow") {
+      expect(result.user?.role).toBe("admin");
+    }
+  });
+
+  it("falls back to the default '/' redirect when no target is supplied", async () => {
+    const operator = await seedAuthUser({ role: "operator" });
+    mockState.client = await signedInClient(operator.email);
+
+    const result = await checkAdminAccess({ requiredRoles: ["admin"] });
+    expect(result).toEqual({ kind: "redirect", to: "/" });
+  });
+});

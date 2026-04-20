@@ -23,14 +23,36 @@ export default async function AdminLayout({
 
   const user = access.user;
 
+  // The Users link is admin-only when the flag is on. Under flag-off /
+  // kill-switch, `user` is null and the Basic Auth operator has root-
+  // level trust already — show the link rather than break the admin
+  // surface during a break-glass outage.
+  const showUsersLink = !user || user.role === "admin";
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="flex h-12 flex-none items-center justify-between border-b px-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           <Link href="/admin/sites" className="text-sm font-semibold">
             Opollo Site Builder
           </Link>
           <span className="text-xs text-muted-foreground">· Admin</span>
+          <nav className="flex items-center gap-3 text-xs">
+            <Link
+              href="/admin/sites"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Sites
+            </Link>
+            {showUsersLink && (
+              <Link
+                href="/admin/users"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Users
+              </Link>
+            )}
+          </nav>
         </div>
         <div className="flex items-center gap-4">
           {user && (

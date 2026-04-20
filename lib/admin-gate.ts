@@ -31,30 +31,53 @@ import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
 //                                             cache refresh edge case
 //                                             shouldn't leak /admin.
 //
-//   FEATURE_SUPABASE_AUTH on + viewer role  → redirect /. The admin
-//                                             surface is ops-level (site
-//                                             management, DS edits);
-//                                             viewers belong on the
-//                                             chat builder.
+//   FEATURE_SUPABASE_AUTH on + wrong role   → redirect (default /).
+//                                             Admin surface is ops-level
+//                                             (site management, DS
+//                                             edits); viewers belong on
+//                                             the chat builder.
 //
-//   FEATURE_SUPABASE_AUTH on + admin/op     → allow, with the user
+//   FEATURE_SUPABASE_AUTH on + allowed role → allow, with the user
 //                                             threaded through so the
 //                                             layout can render the
 //                                             email + sign-out.
+//
+// M2d-1 extended the helper with `opts.requiredRoles` and
+// `opts.insufficientRoleRedirectTo` so admin-only pages (e.g.
+// /admin/users) can narrow the allowed role set and send mismatched
+// roles somewhere more useful than the top-level `/` — typically
+// back to /admin/sites.
 // ---------------------------------------------------------------------------
 
 export const ADMIN_ROLES: readonly Role[] = ["admin", "operator"];
 
+export type AdminAccessOptions = {
+  /** Which roles are allowed. Defaults to ADMIN_ROLES (admin + operator). */
+  requiredRoles?: readonly Role[];
+  /**
+   * Where to redirect users whose role is not in `requiredRoles`. Defaults
+   * to "/" (the chat builder). Admin-only pages nested inside the admin
+   * surface typically pass "/admin/sites" so an operator who lands on a
+   * /admin/users link is sent to a page they can actually use.
+   */
+  insufficientRoleRedirectTo?: string;
+};
+
 export type AdminAccessResult =
   | { kind: "allow"; user: SessionUser | null }
-  | { kind: "redirect"; to: "/login" | "/" };
+  | { kind: "redirect"; to: string };
 
 function isSupabaseAuthOn(): boolean {
   const v = process.env.FEATURE_SUPABASE_AUTH;
   return v === "true" || v === "1";
 }
 
-export async function checkAdminAccess(): Promise<AdminAccessResult> {
+export async function checkAdminAccess(
+  opts: AdminAccessOptions = {},
+): Promise<AdminAccessResult> {
+  const requiredRoles = opts.requiredRoles ?? ADMIN_ROLES;
+  const insufficientRedirect = opts.insufficientRoleRedirectTo ?? "/";
+
   if (!isSupabaseAuthOn()) return { kind: "allow", user: null };
 
   let killSwitch = false;
@@ -68,6 +91,8 @@ export async function checkAdminAccess(): Promise<AdminAccessResult> {
   const supabase = createRouteAuthClient();
   const user = await getCurrentUser(supabase);
   if (!user) return { kind: "redirect", to: "/login" };
-  if (!ADMIN_ROLES.includes(user.role)) return { kind: "redirect", to: "/" };
+  if (!requiredRoles.includes(user.role)) {
+    return { kind: "redirect", to: insufficientRedirect };
+  }
   return { kind: "allow", user };
 }
