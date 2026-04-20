@@ -43,8 +43,8 @@ export function DesignSystemsTable({
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No design system versions yet. Click "New draft" to create the first
-          one.
+          No design system versions yet. Click &ldquo;New draft&rdquo; to create the
+          first one.
         </p>
       </div>
     );
