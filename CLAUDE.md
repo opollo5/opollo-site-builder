@@ -9,13 +9,16 @@ A chat interface that generates WordPress pages for Opollo's clients.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - Only stop and ask me if: you hit an architectural decision, a secret/credential issue, or you've tried twice and can't fix a failure.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
+- After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
+- "Done" means: PR open, CI green, summary posted. Not: PR open, CI running, waiting for input.
+- Only report back when CI is green, or after two failed fix attempts on the same issue, or if you hit an architectural/scope question.
 
 ## Commands
 - `npm run dev` — local dev
 - `npm run lint` — ESLint
 - `npm run typecheck` — tsc --noEmit
 - `npm run build` — production build
-- `npm run test` — (add when tests exist)
+- `npm run test` — Vitest
 
 ## Standards
 - Server Components by default; Client Components only when required
