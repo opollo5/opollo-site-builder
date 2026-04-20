@@ -75,8 +75,13 @@ jobs:
         run: supabase --version
       - name: Start Supabase local stack (with debug output)
         run: supabase start --debug
+      - name: Show Supabase stack status (for CI debugging)
+        run: |
+          supabase status
+          echo "---- JSON ----"
+          supabase status --output json || true
       - name: Run Vitest suite
-        run: npm test
+        run: npm test -- --reporter=verbose
       - name: Stop Supabase local stack
         if: always()
         run: supabase stop --no-backup || true
