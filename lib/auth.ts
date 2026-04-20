@@ -158,34 +158,74 @@ export function copyAuthCookies(
 }
 
 // ---------------------------------------------------------------------------
-// Identity readers — ALWAYS server-verified via getUser().
+// Identity readers.
+//
+// getUser() is the server-verified path — it contacts GoTrue on every
+// call to check JWT signature, expiry, and user existence. We never
+// use getSession() for authZ decisions (it only decodes the cookie
+// locally and trusts what's there).
+//
+// Role + app-layer revocation both live on opollo_users:
+//   - role is looked up fresh per request. M2d role changes take
+//     effect on the very next request with no JWT invalidation
+//     needed — there is no role claim embedded in the JWT.
+//   - revoked_at is the "kick this user out right now" marker. Any
+//     access token whose iat claim predates revoked_at is rejected
+//     here. This is the app-layer revocation that stock supabase/auth
+//     cannot do on its own (its /user endpoint only checks
+//     signature/expiry, not session existence). The emergency route
+//     (M2c-3) and lib/auth-revoke.ts revokeUserSessions() set this.
 // ---------------------------------------------------------------------------
 
-/**
- * Server-verify the caller's JWT with GoTrue and look up their
- * opollo_users role. Returns null when there's no authenticated user or
- * when the JWT is invalid / revoked. Never uses getSession() — that
- * variant decodes the cookie locally and would keep accepting revoked
- * tokens until they expire naturally.
- */
+// Decode the iat (issued-at) claim from an access-token JWT. We don't
+// verify the signature here — getUser() already did that server-side.
+// This only extracts a claim we trust. Returns null on malformed input.
+function decodeJwtIat(jwt: string): number | null {
+  const parts = jwt.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    // atob is available in both Edge and Node 16+ runtimes.
+    const payload = JSON.parse(atob(padded)) as { iat?: number };
+    return typeof payload.iat === "number" ? payload.iat : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentUser(
   supabase: SupabaseClient,
 ): Promise<SessionUser | null> {
   const { data, error } = await supabase.auth.getUser();
   if (error || !data.user) return null;
 
-  // Role lookup goes through service-role — RLS would otherwise filter
-  // the row to auth.uid() OR admin, which is fine for self-read but
-  // brittle across runtimes. Service-role is identical to what the
-  // M2a trigger uses when promoting the first admin.
+  // Role + revocation lookup via service-role to bypass RLS. Service-role
+  // is what the M2a trigger uses and what every existing route handler
+  // uses — consistent path across the app.
   const svc = getServiceRoleClient();
   const { data: profile, error: profileErr } = await svc
     .from("opollo_users")
-    .select("role,email")
+    .select("role,email,revoked_at")
     .eq("id", data.user.id)
     .maybeSingle();
 
   if (profileErr || !profile) return null;
+
+  // App-layer revocation check. iat is in seconds since epoch; compare
+  // against revoked_at in the same units. A session issued before the
+  // revocation stamp is treated as unauthenticated.
+  if (profile.revoked_at) {
+    const revokedAtMs = new Date(profile.revoked_at as string).getTime();
+    if (Number.isFinite(revokedAtMs)) {
+      const { data: sess } = await supabase.auth.getSession();
+      const accessToken = sess.session?.access_token;
+      const iat = accessToken ? decodeJwtIat(accessToken) : null;
+      if (iat == null || iat * 1000 < revokedAtMs) {
+        return null;
+      }
+    }
+  }
 
   return {
     id: data.user.id,
