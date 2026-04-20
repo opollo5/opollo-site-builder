@@ -83,7 +83,13 @@ token_verifications = 30
 web3 = 30
 
 [auth.email]
-enable_signup = false
+# Enable password-based email login/signup for local dev and CI. M2b's
+# RLS matrix tests call signInWithPassword() to mint per-role JWTs;
+# gotrue refuses the method unless enable_signup is true. M2c's
+# /login route will need this live in every dev environment anyway.
+# enable_confirmations = false lets admin.createUser return
+# immediately-usable accounts (no inbucket hop).
+enable_signup = true
 double_confirm_changes = false
 enable_confirmations = false
 secure_password_change = false
