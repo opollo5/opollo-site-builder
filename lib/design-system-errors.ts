@@ -158,10 +158,14 @@ export function mapPgError(
       return fkViolation(resource, err);
     case "23514":
       return checkViolation(resource, err);
+    case "PT409":
     case "40001":
-      // RPC's version_lock mismatch. The RPC doesn't know the expected
-      // value, so we can't surface it here — callers should use
-      // versionConflict() directly when they hold that context.
+      // PT409 is the code our activate RPC raises on version_lock mismatch.
+      // 40001 is kept as a legacy alias — supabase-js retries 40001
+      // aggressively, so we moved off it, but leaving the case in protects
+      // any forgotten caller. The RPC doesn't know the expected value, so
+      // we can't surface it in details — callers that hold that context
+      // should use versionConflict() directly.
       return {
         ok: false,
         error: {

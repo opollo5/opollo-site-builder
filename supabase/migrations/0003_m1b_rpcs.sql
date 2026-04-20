@@ -51,7 +51,13 @@ BEGIN
     RAISE EXCEPTION
       'version_lock mismatch for design_system %: expected %, actual %',
       p_ds_id, p_expected_version_lock, v_current_lock
-      USING ERRCODE = '40001';
+      USING ERRCODE = 'PT409';
+    -- NOTE: using 'PT409' rather than '40001' (serialization_failure).
+    -- supabase-js auto-retries 40001 under the postgres driver's
+    -- serialization-failure contract, which turns a deterministic
+    -- version-lock mismatch into a silent timeout. PT409 is recognised by
+    -- PostgREST as a custom "HTTP 409 Conflict" signal — no retry, and
+    -- the data layer's mapPgError() routes it straight to VERSION_CONFLICT.
   END IF;
 
   -- Archive any currently-active DS for this site (may be zero rows — the
