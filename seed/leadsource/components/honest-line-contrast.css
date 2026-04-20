@@ -33,7 +33,7 @@
   margin-bottom: 56px;
   color: var(--ls-ink);
 }
-.ls-honest__quote .arc {
+.ls-honest__quote .ls-arc {
   background: var(--ls-arc);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;

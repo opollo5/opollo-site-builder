@@ -50,6 +50,7 @@ jobs:
       - if: steps.cache-node-modules.outputs.cache-hit != 'true'
         run: npm ci
       - run: npm run lint
+      - run: npm run lint:css
 
   test:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository

@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:css": "stylelint 'seed/**/*.css'",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
@@ -36,6 +37,7 @@
     "eslint-config-next": "^14.2.35",
     "pg": "^8.20.0",
     "postcss": "^8.4.47",
+    "stylelint": "^17.8.0",
     "tailwindcss": "^3.4.13",
     "tsx": "^4.21.0",
     "typescript": "^5.6.2",

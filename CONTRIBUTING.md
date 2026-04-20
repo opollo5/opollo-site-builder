@@ -34,6 +34,21 @@ npm test            # run once
 npm run test:watch  # watch mode
 ```
 
+### Linting
+
+```bash
+npm run lint        # next lint — TypeScript / JSX
+npm run lint:css    # stylelint — enforces Layer-1 scope-prefix rule
+                    # on all seed/*/*.css. Regex rejects malformed
+                    # double-hyphen blocks deliberately (see the
+                    # inner [a-z0-9]+ in seed/leadsource/.stylelintrc.json).
+```
+
+Both run in the single `lint` job in CI. A failing `lint:css` means one
+or more class selectors in the seed CSS don't match the site's scope
+prefix — either the class needs renaming (preferred) or it's legit and
+should be added to the per-site `.stylelintrc.json` allowlist.
+
 Vitest's `globalSetup` calls `supabase status --output json` to find the
 local API URL and service-role key. If the stack isn't running, it'll run
 `supabase start` for you. Between tests, a `TRUNCATE ... CASCADE` clears
