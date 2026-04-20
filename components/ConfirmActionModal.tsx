@@ -1,0 +1,178 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { Button } from "@/components/ui/button";
+
+// Generic confirmation modal for mutating actions that need a
+// server round-trip. Used by the version manager for activate and
+// archive — both are structurally identical (POST a body, refetch on
+// success, surface envelope errors inline, show warnings[] if present).
+//
+// Design note: intentionally untied from any specific API shape. The caller
+// supplies the URL + body + success/error messages; this component only
+// orchestrates open state, submission state, and error display.
+
+export type ConfirmActionSuccess = {
+  ok: true;
+  data: unknown;
+};
+
+export type ConfirmActionModalProps = {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  confirmVariant?: "default" | "destructive";
+  endpoint: string;
+  body: Record<string, unknown>;
+  // When the API envelope's data.warnings is a string[], surface them here.
+  // (Used by archive when the site had the target as its active DS.)
+  warningsAccessor?: (data: unknown) => string[] | undefined;
+  onClose: () => void;
+  onSuccess: (payload: ConfirmActionSuccess) => void;
+};
+
+export function ConfirmActionModal({
+  open,
+  title,
+  description,
+  confirmLabel,
+  confirmVariant = "default",
+  endpoint,
+  body,
+  warningsAccessor,
+  onClose,
+  onSuccess,
+}: ConfirmActionModalProps) {
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSubmitting(false);
+      setFormError(null);
+      setWarnings(null);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !submitting) onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, submitting, onClose]);
+
+  if (!open) return null;
+
+  async function handleConfirm() {
+    setSubmitting(true);
+    setFormError(null);
+    setWarnings(null);
+    try {
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      let payload: any = null;
+      try {
+        payload = await res.json();
+      } catch {
+        /* ignore */
+      }
+
+      if (res.ok && payload?.ok) {
+        const derived = warningsAccessor?.(payload.data) ?? null;
+        if (derived && derived.length > 0) {
+          // Surface warnings in-modal, give operator a chance to read them
+          // before the modal closes. Still call onSuccess so the parent
+          // refetches.
+          setWarnings(derived);
+          onSuccess({ ok: true, data: payload.data });
+          return;
+        }
+        onSuccess({ ok: true, data: payload.data });
+        onClose();
+        return;
+      }
+
+      setFormError(
+        payload?.error?.message ??
+          `Request failed (HTTP ${res.status}). Please try again.`,
+      );
+    } catch (err) {
+      setFormError(
+        `Network error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !submitting) onClose();
+      }}
+    >
+      <div className="w-full max-w-md rounded-lg border bg-background p-6 shadow-lg">
+        <h2 id="confirm-title" className="text-lg font-semibold">
+          {title}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+
+        {warnings && warnings.length > 0 && (
+          <div
+            className="mt-4 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-900 dark:text-yellow-200"
+            role="status"
+          >
+            <p className="font-medium">Completed with warnings:</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {warnings.map((w, i) => (
+                <li key={i}>{w}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {formError && (
+          <div
+            className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            role="alert"
+          >
+            {formError}
+          </div>
+        )}
+
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onClose}
+            disabled={submitting}
+          >
+            {warnings ? "Close" : "Cancel"}
+          </Button>
+          {!warnings && (
+            <Button
+              type="button"
+              variant={confirmVariant === "destructive" ? "destructive" : "default"}
+              onClick={handleConfirm}
+              disabled={submitting}
+            >
+              {submitting ? "Working…" : confirmLabel}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
