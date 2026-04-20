@@ -1,15 +1,46 @@
-# Minimal Supabase CLI local config. Matches the bare schema every CLI
-# version has accepted: project_id at root + [api] + [db]. We exclude all
-# other services at `supabase start` time in the workflow rather than
-# trying to disable them via config (section schema has changed across
-# CLI versions; `--exclude` is stable).
+# Supabase CLI local config. Pinned alongside a pinned CLI version in
+# .github/workflows/ci.yml so schema surprises don't break CI on upstream
+# releases. Matches what `supabase init` produces on CLI 1.226.x.
 
 project_id = "opollo-site-builder"
 
 [api]
+enabled = true
 port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
 shadow_port = 54320
 major_version = 15
+
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[inbucket]
+enabled = false
+
+[storage]
+enabled = false
+
+[auth]
+enabled = false
+
+[auth.email]
+enable_signup = false
+
+[analytics]
+enabled = false
+
+[functions]

@@ -70,15 +70,9 @@ jobs:
         run: npm ci
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 1.226.4
       - name: Start Supabase local stack
-        # Only Postgres + PostgREST + Studio are needed by the Vitest
-        # suite. Excluding auth/realtime/storage/imgproxy/inbucket/
-        # edge-runtime/pooler both speeds up boot and sidesteps
-        # per-version config schema drift in those sections.
-        run: |
-          supabase start \
-            --exclude auth,realtime,storage,imgproxy,inbucket,edge-runtime,pooler,logflare,vector,studio
+        run: supabase start
       - name: Run Vitest suite
         run: npm test
       - name: Stop Supabase local stack
