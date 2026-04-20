@@ -212,16 +212,30 @@ export async function getCurrentUser(
 
   if (profileErr || !profile) return null;
 
-  // App-layer revocation check. iat is in seconds since epoch; compare
-  // against revoked_at in the same units. A session issued before the
-  // revocation stamp is treated as unauthenticated.
+  // App-layer revocation check.
+  //
+  // JWT.iat is second-precision; revoked_at is ms-precision. We MUST
+  // floor revoked_at to the same second before comparing — otherwise a
+  // fresh sign-in whose iat rounds down to the same wall-clock second
+  // as the revocation stamp is wrongly rejected. Concretely:
+  //   iat           = floor(signInMs / 1000) = T_sec
+  //   revoked_at_ms = T_sec * 1000 + 200 (stamp 200 ms after T_sec)
+  //   naive: iat * 1000 < revoked_at_ms → T_sec*1000 < T_sec*1000+200 → TRUE → REJECTED (wrong)
+  //   fixed: iat < floor(revoked_at_ms / 1000) → T_sec < T_sec → FALSE → allowed
+  //
+  // Bias at the same-second boundary is toward the caller. That's safe
+  // because revokeUserSessions() stamps revoked_at AND immediately calls
+  // signOutAuthUser() (delete refresh_tokens/sessions); any pre-stamp
+  // JWT whose cookie is still present has already lost its refresh-side
+  // anchor. Pinned by lib/__tests__/auth.test.ts.
   if (profile.revoked_at) {
     const revokedAtMs = new Date(profile.revoked_at as string).getTime();
     if (Number.isFinite(revokedAtMs)) {
       const { data: sess } = await supabase.auth.getSession();
       const accessToken = sess.session?.access_token;
       const iat = accessToken ? decodeJwtIat(accessToken) : null;
-      if (iat == null || iat * 1000 < revokedAtMs) {
+      const revokedAtSec = Math.floor(revokedAtMs / 1000);
+      if (iat == null || iat < revokedAtSec) {
         return null;
       }
     }

@@ -79,6 +79,18 @@ beforeEach(async () => {
 });
 
 afterAll(async () => {
+  // Sweep this file's tracked auth users before the worker process
+  // dies. Without this, the LAST test's seeded user leaks into the
+  // shared Supabase stack because cleanupTrackedAuthUsers only runs
+  // in beforeEach — there's no more beforeEach after the last test,
+  // so it never fires. The next test file (in its own worker process
+  // with a fresh emailCounter starting at 0) then collides on
+  // `test-user-1@opollo.test`. Caught by PR #17 CI: both
+  // auth.test.ts and m2a-auth-link.test.ts failed their first
+  // `seedAuthUser()` call with "already registered" when those files
+  // happened to follow another file that also seeded a user-1.
+  await cleanupTrackedAuthUsers();
+
   if (pgClient) {
     await pgClient.end();
     pgClient = null;
