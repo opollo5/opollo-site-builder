@@ -1,0 +1,153 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { z } from "zod";
+
+import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { getServiceRoleClient } from "@/lib/supabase";
+
+// ---------------------------------------------------------------------------
+// POST /api/admin/users/invite — M2d-3.
+//
+// Admin-only. Creates an invite for `email` via Supabase Auth's admin
+// generateLink (type: 'invite') and returns the action URL. Using
+// generateLink rather than inviteUserByEmail means:
+//
+//   - The call is deterministic in tests — no SMTP configuration
+//     required for the request to succeed.
+//   - Prod ops can copy-paste the action_link to the invitee if email
+//     delivery is broken or the invite expires.
+//   - When SMTP is configured on the Supabase project, the same link
+//     is also delivered by email (generateLink triggers the standard
+//     invite template when `options.redirectTo` is passed and the
+//     project has mail enabled).
+//
+// Side effects: the call creates an auth.users row (email_confirmed_at
+// still null). The handle_new_auth_user trigger from migration 0004
+// fires immediately and inserts the matching opollo_users row with
+// role='viewer', so the invitee shows up in /admin/users as pending
+// before they click the link. After acceptance, the callback exchanges
+// the code for a session and lands them on `next` (default `/`).
+//
+// Errors:
+//   400 VALIDATION_FAILED   — bad email / missing body.
+//   401 UNAUTHORIZED        — flag on + no session.
+//   403 FORBIDDEN           — non-admin caller.
+//   409 ALREADY_EXISTS      — the email already maps to an auth user.
+//                             Demote/revoke / reinvite separately;
+//                             magic-link re-send is a separate route.
+//   500 INTERNAL_ERROR      — everything else (Supabase admin API
+//                             failure, DB failure).
+// ---------------------------------------------------------------------------
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const InviteSchema = z.object({
+  email: z.string().email().max(254),
+  next: z.string().optional(),
+});
+
+function safeNext(raw: string | undefined): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
+  return raw;
+}
+
+function errorJson(
+  code: string,
+  message: string,
+  status: number,
+  extra?: Record<string, unknown>,
+): NextResponse {
+  return NextResponse.json(
+    {
+      ok: false,
+      error: { code, message, retryable: false, ...(extra ?? {}) },
+      timestamp: new Date().toISOString(),
+    },
+    { status },
+  );
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const gate = await requireAdminForApi();
+  if (gate.kind === "deny") return gate.response;
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    body = {};
+  }
+  const parsed = InviteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "VALIDATION_FAILED",
+          message: "Body must be { email: string; next?: string }.",
+          details: { issues: parsed.error.issues },
+          retryable: true,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 400 },
+    );
+  }
+
+  const email = parsed.data.email.trim().toLowerCase();
+  const next = safeNext(parsed.data.next);
+
+  // Build the redirect target from the current request origin so
+  // invite links work across dev / preview / prod without wiring a
+  // separate SITE_URL env var. Supabase's magic-link flow tacks
+  // `?code=<uuid>` onto redirect_to when the invitee clicks it; our
+  // /api/auth/callback handler does the PKCE exchange.
+  const origin = req.nextUrl.origin;
+  const redirectTo = `${origin}/api/auth/callback?next=${encodeURIComponent(next)}`;
+
+  const svc = getServiceRoleClient();
+
+  const { data, error } = await svc.auth.admin.generateLink({
+    type: "invite",
+    email,
+    options: { redirectTo },
+  });
+
+  if (error) {
+    // Supabase returns 422 for "User already registered" (email
+    // collision). Translate that to a dedicated 409 so the UI can
+    // distinguish a duplicate invite from any other failure.
+    const status = (error as { status?: number }).status;
+    if (
+      status === 422 ||
+      /already (registered|exists)/i.test(error.message)
+    ) {
+      return errorJson(
+        "ALREADY_EXISTS",
+        "A user with that email already exists. Promote or revoke them from the users list instead.",
+        409,
+      );
+    }
+    return errorJson(
+      "INTERNAL_ERROR",
+      `Failed to generate invite: ${error.message}`,
+      500,
+    );
+  }
+
+  const actionLink = data?.properties?.action_link ?? null;
+  const userId = data?.user?.id ?? null;
+
+  return NextResponse.json(
+    {
+      ok: true,
+      data: {
+        email,
+        user_id: userId,
+        action_link: actionLink,
+      },
+      timestamp: new Date().toISOString(),
+    },
+    { status: 200 },
+  );
+}
