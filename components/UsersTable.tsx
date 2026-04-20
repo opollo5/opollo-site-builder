@@ -1,5 +1,6 @@
 import type { AdminUserRow } from "@/app/api/admin/users/list/route";
 import { UserRoleActionCell } from "@/components/UserRoleActionCell";
+import { UserStatusActionCell } from "@/components/UserStatusActionCell";
 
 // Users table for /admin/users. Server component for the shell + static
 // cells; the role <select> is a client island so the action stays
@@ -76,11 +77,11 @@ export function UsersTable({
                 {formatDate(u.created_at)}
               </td>
               <td className="px-3 py-2">
-                {u.revoked_at ? (
-                  <span className="text-xs text-destructive">revoked</span>
-                ) : (
-                  <span className="text-xs text-muted-foreground">active</span>
-                )}
+                <UserStatusActionCell
+                  userId={u.id}
+                  revoked={u.revoked_at !== null}
+                  selfUserId={currentUserId}
+                />
               </td>
             </tr>
           ))}
