@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { DesignSystem } from "@/lib/design-systems";
 import { Button } from "@/components/ui/button";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -32,10 +33,12 @@ function StatusCell({ status }: { status: DesignSystem["status"] }) {
 
 export function DesignSystemsTable({
   designSystems,
+  siteId,
   onActivate,
   onArchive,
 }: {
   designSystems: DesignSystem[];
+  siteId: string;
   onActivate: (ds: DesignSystem) => void;
   onArchive: (ds: DesignSystem) => void;
 }) {
@@ -83,7 +86,25 @@ export function DesignSystemsTable({
                 {ds.created_by ? ds.created_by : "—"}
               </td>
               <td className="px-4 py-3">
-                <div className="flex justify-end gap-2">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <Link
+                    href={`/admin/sites/${siteId}/design-system/components?ds=${ds.id}`}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    Components →
+                  </Link>
+                  <Link
+                    href={`/admin/sites/${siteId}/design-system/templates?ds=${ds.id}`}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    Templates →
+                  </Link>
+                  <Link
+                    href={`/admin/sites/${siteId}/design-system/preview?ds=${ds.id}`}
+                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                  >
+                    Preview →
+                  </Link>
                   {ds.status === "draft" && (
                     <Button
                       size="sm"

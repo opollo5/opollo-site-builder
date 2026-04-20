@@ -4,19 +4,22 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-// Generic confirmation modal for mutating actions that need a
-// server round-trip. Used by the version manager for activate and
-// archive — both are structurally identical (POST a body, refetch on
-// success, surface envelope errors inline, show warnings[] if present).
+// Generic confirmation modal for mutating actions that need a server
+// round-trip. Used by the version manager (POST activate / POST archive)
+// and the components/templates editors (DELETE with a query param).
 //
-// Design note: intentionally untied from any specific API shape. The caller
-// supplies the URL + body + success/error messages; this component only
-// orchestrates open state, submission state, and error display.
+// Two request shapes via a discriminated union so DELETE endpoints can
+// pass expected_version_lock as ?query param rather than a body — DELETE
+// bodies are unreliable across proxies and we took that choice at M1e-1.
 
 export type ConfirmActionSuccess = {
   ok: true;
   data: unknown;
 };
+
+export type ConfirmActionRequest =
+  | { method: "POST"; body: Record<string, unknown> }
+  | { method: "DELETE"; searchParams: Record<string, string | number> };
 
 export type ConfirmActionModalProps = {
   open: boolean;
@@ -25,13 +28,28 @@ export type ConfirmActionModalProps = {
   confirmLabel: string;
   confirmVariant?: "default" | "destructive";
   endpoint: string;
-  body: Record<string, unknown>;
-  // When the API envelope's data.warnings is a string[], surface them here.
-  // (Used by archive when the site had the target as its active DS.)
+  request: ConfirmActionRequest;
+  // When the API envelope's data contains a warnings[] string array, surface
+  // them here so operators notice (archive returns warnings when the site
+  // would end up with no active DS; delete-component warns about orphaned
+  // template refs).
   warningsAccessor?: (data: unknown) => string[] | undefined;
+  // Optional block of additional content rendered inside the modal body —
+  // used for pre-confirm orphan warnings, sample previews, etc.
+  extraContent?: React.ReactNode;
   onClose: () => void;
   onSuccess: (payload: ConfirmActionSuccess) => void;
 };
+
+function buildUrl(
+  endpoint: string,
+  searchParams: Record<string, string | number>,
+): string {
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams)) qs.set(k, String(v));
+  const sep = endpoint.includes("?") ? "&" : "?";
+  return qs.toString().length === 0 ? endpoint : `${endpoint}${sep}${qs}`;
+}
 
 export function ConfirmActionModal({
   open,
@@ -40,8 +58,9 @@ export function ConfirmActionModal({
   confirmLabel,
   confirmVariant = "default",
   endpoint,
-  body,
+  request,
   warningsAccessor,
+  extraContent,
   onClose,
   onSuccess,
 }: ConfirmActionModalProps) {
@@ -73,11 +92,19 @@ export function ConfirmActionModal({
     setFormError(null);
     setWarnings(null);
     try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      let res: Response;
+      if (request.method === "POST") {
+        res = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(request.body),
+        });
+      } else {
+        res = await fetch(buildUrl(endpoint, request.searchParams), {
+          method: "DELETE",
+        });
+      }
+
       let payload: any = null;
       try {
         payload = await res.json();
@@ -88,9 +115,6 @@ export function ConfirmActionModal({
       if (res.ok && payload?.ok) {
         const derived = warningsAccessor?.(payload.data) ?? null;
         if (derived && derived.length > 0) {
-          // Surface warnings in-modal, give operator a chance to read them
-          // before the modal closes. Still call onSuccess so the parent
-          // refetches.
           setWarnings(derived);
           onSuccess({ ok: true, data: payload.data });
           return;
@@ -128,6 +152,8 @@ export function ConfirmActionModal({
           {title}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+
+        {extraContent && <div className="mt-4">{extraContent}</div>}
 
         {warnings && warnings.length > 0 && (
           <div
