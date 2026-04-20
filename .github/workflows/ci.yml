@@ -75,6 +75,14 @@ jobs:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # pull-requests: write is required by the "Post vitest output on
+    # failure" step below. It lets the step upsert a comment on the PR
+    # with the tail of /tmp/vitest.out so the failing assertion is
+    # readable without downloading the full job-log zip (which requires
+    # repo-admin rights and blocks operators + the CI-assist bot).
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -122,6 +130,83 @@ jobs:
             tail -c 60000 /tmp/vitest.out 2>/dev/null || echo '(missing)'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Post vitest output as PR comment on failure
+        # Only on PR runs (push-to-main has no PR to comment on) and only
+        # when a prior step in this job failed (typically "Run Vitest
+        # suite"). Upserts one comment per PR, keyed by the marker in the
+        # body, so rerunning doesn't spam the PR.
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          VITEST_LOG_PATH: /tmp/vitest.out
+          SUPABASE_LOG_PATH: /tmp/supabase-status.txt
+        with:
+          script: |
+            const fs = require('fs');
+            function safeRead(p) {
+              try { return fs.readFileSync(p, 'utf8'); } catch { return ''; }
+            }
+            // Strip ANSI color / cursor escape sequences so the comment
+            // renders cleanly in GitHub's markdown.
+            function stripAnsi(s) {
+              return s.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+            }
+            const MAX = 55000; // Stay well under GitHub's 65 kB comment cap.
+            function tail(s) {
+              if (s.length <= MAX) return s;
+              return '...[truncated; last ' + MAX + ' bytes shown]...\n\n' + s.slice(-MAX);
+            }
+            const vitestRaw = safeRead(process.env.VITEST_LOG_PATH);
+            const vitest = tail(stripAnsi(vitestRaw)) || '(vitest output file empty or missing)';
+            const supabase = stripAnsi(safeRead(process.env.SUPABASE_LOG_PATH)) || '(supabase status not captured)';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const marker = '<!-- ci-vitest-failure-comment -->';
+            const body = [
+              marker,
+              `## CI test job failed on \`${context.sha.slice(0, 7)}\``,
+              '',
+              `[Full job log](${runUrl}) — below is the tail of vitest output.`,
+              '',
+              '<details open><summary>Vitest output (tail)</summary>',
+              '',
+              '```',
+              vitest,
+              '```',
+              '',
+              '</details>',
+              '',
+              '<details><summary>Supabase stack status</summary>',
+              '',
+              '```',
+              supabase,
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100,
+            });
+            const existing = comments.find(
+              (c) => typeof c.body === 'string' && c.body.startsWith(marker),
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
       - name: Stop Supabase local stack
         if: always()
         run: supabase stop --no-backup || true
