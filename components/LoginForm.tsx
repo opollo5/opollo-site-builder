@@ -1,90 +1,78 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useFormState, useFormStatus } from "react-dom";
 
+import { loginAction, type LoginState } from "@/app/login/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+const INITIAL_STATE: LoginState = {};
+
+function SubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <Button type="submit" disabled={pending}>
+      {pending ? "Signing in…" : "Sign in"}
+    </Button>
+  );
+}
+
 export function LoginForm({ next }: { next: string }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, next }),
-      });
-      const payload = (await res.json().catch(() => null)) as
-        | { ok: true; data: { next: string } }
-        | { ok: false; error: { message?: string } }
-        | null;
-
-      if (!res.ok || !payload || payload.ok !== true) {
-        const message =
-          payload && payload.ok === false
-            ? payload.error?.message ?? "Sign-in failed."
-            : `Sign-in failed (HTTP ${res.status}).`;
-        setError(message);
-        setSubmitting(false);
-        return;
-      }
-
-      // Hard navigation: the freshly-set session cookie must ride with
-      // the next request. router.push would re-use the same fetch
-      // context and the destination would see no session.
-      window.location.assign(payload.data.next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setSubmitting(false);
-    }
-  }
+  // Server Action wiring: <form action={formAction}> becomes a real
+  // URL-backed form in the rendered HTML, so submission works even if
+  // client hydration never completes (browser extensions like
+  // Grammarly are a known cause of silent hydration failure). useFormState
+  // surfaces the returned error without a full page reload when JS is
+  // available, and falls back to a normal server-rendered response
+  // otherwise.
+  //
+  // suppressHydrationWarning on each input: Grammarly injects
+  // data-gramm_* attributes between SSR output and hydration, which
+  // React flags as a hydration mismatch. Suppressing the warning keeps
+  // React's later updates clean — the form still works without this,
+  // but the console stays readable.
+  const [state, formAction] = useFormState(loginAction, INITIAL_STATE);
 
   return (
-    <form className="flex w-full flex-col gap-4" onSubmit={onSubmit}>
+    <form action={formAction} className="flex w-full flex-col gap-4">
+      <input type="hidden" name="next" value={next} />
+
       <div className="flex flex-col gap-1">
         <label htmlFor="login-email" className="text-sm font-medium">
           Email
         </label>
         <Input
           id="login-email"
+          name="email"
           type="email"
           required
           autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={submitting}
           autoFocus
+          suppressHydrationWarning
         />
       </div>
+
       <div className="flex flex-col gap-1">
         <label htmlFor="login-password" className="text-sm font-medium">
           Password
         </label>
         <Input
           id="login-password"
+          name="password"
           type="password"
           required
           autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={submitting}
+          suppressHydrationWarning
         />
       </div>
-      {error && (
+
+      {state.error && (
         <p role="alert" className="text-sm text-destructive">
-          {error}
+          {state.error}
         </p>
       )}
-      <Button type="submit" disabled={submitting}>
-        {submitting ? "Signing in…" : "Sign in"}
-      </Button>
+
+      <SubmitButton />
     </form>
   );
 }

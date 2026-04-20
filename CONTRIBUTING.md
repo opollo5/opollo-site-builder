@@ -66,14 +66,33 @@ start` is slow, `supabase status` is instant.
 ### CI workflow
 
 The `.github/workflows/ci.yml` workflow runs on every pull request (from
-same-repo branches) and every push to `main`. Three jobs:
+same-repo branches) and every push to `main`. Four jobs:
 
 - `typecheck` — `tsc --noEmit`
 - `lint` — `npm run lint`
+- `build` — `next build`
 - `test` — `supabase start` → `npm test` → `supabase stop`
 
 See `docs/branch-protection-setup.md` for the one-time operator setup that
-makes these three jobs a hard gate on merging to `main`.
+makes these jobs a hard gate on merging to `main`.
+
+### Production migration deploys
+
+`.github/workflows/deploy-migrations.yml` runs `supabase db push` against
+the production Supabase project whenever `supabase/migrations/**` changes
+on `main`, and on-demand via the workflow-dispatch button. It requires
+three repository secrets:
+
+| Secret                 | Where to find it                                                                                         |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_PROJECT_REF` | Project Settings → General → Reference ID.                                                               |
+| `SUPABASE_ACCESS_TOKEN`| [Account → Access Tokens](https://supabase.com/dashboard/account/tokens). Scope: link + API access.      |
+| `SUPABASE_DB_PASSWORD` | Project Settings → Database → Connection string (the `password` component of the direct-connection URI). |
+
+Without these secrets the workflow fails at the "Verify required
+secrets" step. The production Environment (Settings → Environments →
+`production`) can be configured to require a reviewer before the job
+runs — recommended once more than one operator has merge rights.
 
 ### Instructions for Claude Code: CI self-test loop
 

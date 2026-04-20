@@ -1,0 +1,96 @@
+name: Deploy Supabase migrations
+
+# Applies pending `supabase/migrations/*.sql` to the production Supabase
+# project. Triggered automatically on merges to main that touched the
+# migrations directory, and on-demand via workflow_dispatch so operators
+# can re-run after fixing a failure without needing a code-level push.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_PROJECT_REF  — the project's ref from Project Settings →
+#                           General (looks like "abcdefghijklmno").
+#   SUPABASE_ACCESS_TOKEN — personal access token from
+#                           https://supabase.com/dashboard/account/tokens
+#                           (scope: "Link a project" + "Access the API").
+#   SUPABASE_DB_PASSWORD  — direct-connection Postgres password from
+#                           Project Settings → Database → Connection
+#                           string. Required by `supabase db push` to
+#                           open the management tunnel.
+#
+# Without these three secrets the job fails at the first `supabase`
+# command — that is intentional. Production migrations are a privileged
+# operation and should never run against a misconfigured target.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/deploy-migrations.yml"
+  workflow_dispatch:
+
+concurrency:
+  # Serialise runs against the same project — two concurrent
+  # `db push`es would race on the migrations table.
+  group: deploy-migrations
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: supabase db push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # GitHub Environments let Steven gate production runs behind a
+    # required-reviewer if desired. If the "production" environment
+    # doesn't exist yet the job still runs; Settings → Environments
+    # can tighten later without a code change.
+    environment: production
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify required secrets are set
+        run: |
+          missing=0
+          for var in SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Required secret $var is not set."
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "See .github/workflows/deploy-migrations.yml header for setup."
+            exit 1
+          fi
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Link to production project
+        run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Show pending migrations (diagnostic)
+        run: supabase migration list --linked || true
+
+      - name: Push pending migrations
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        # --include-all ensures no migrations are skipped when the
+        # production schema has drifted from the linked state (e.g. a
+        # row was manually inserted but the migration files themselves
+        # were never applied). supabase db push is idempotent — already-
+        # applied migrations are no-ops.
+        run: supabase db push --linked --include-all
+
+      - name: Summarise on success
+        if: success()
+        run: |
+          {
+            echo '## Migrations pushed'
+            echo
+            supabase migration list --linked 2>&1 | sed -e 's/\x1b\[[0-9;]*m//g'
+          } >> "$GITHUB_STEP_SUMMARY"
