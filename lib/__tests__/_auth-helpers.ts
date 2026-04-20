@@ -1,3 +1,4 @@
+import { createClient } from "@supabase/supabase-js";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // Test-only factories for M2+ auth scenarios. Every caller uses the
@@ -135,14 +136,31 @@ export async function setFirstAdminEmail(email: string | null): Promise<void> {
 /**
  * Sign a user in and return the session's access-token JWT. Callers use
  * this as a Bearer token when hitting route handlers that gate on
- * authenticated requests (M2c+). For M2a itself the tests don't exercise
- * session flow, so this is here for M2b/M2c to consume.
+ * authenticated requests (M2c+).
+ *
+ * Uses a *throwaway* supabase-js client — not getServiceRoleClient() —
+ * because supabase-js stores the session on the client instance after
+ * signInWithPassword() succeeds. Calling signInWithPassword() on the
+ * module-level service-role singleton would mutate it to act as the
+ * signed-in user for every downstream getServiceRoleClient() caller.
+ * Fixture seeders (seedSite, beforeEach opollo_users re-insert, etc.)
+ * would then run under RLS and silently fail or produce wrong data.
  */
 export async function signInAs(
   user: { email: string; password?: string },
 ): Promise<string> {
-  const supabase = getServiceRoleClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const url = process.env.SUPABASE_URL;
+  const anonKey =
+    process.env.SUPABASE_ANON_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !anonKey) {
+    throw new Error(
+      "signInAs: SUPABASE_URL and SUPABASE_ANON_KEY (or SERVICE_ROLE_KEY) must be set",
+    );
+  }
+  const throwaway = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await throwaway.auth.signInWithPassword({
     email: user.email,
     password: user.password ?? "test-password-1234",
   });
