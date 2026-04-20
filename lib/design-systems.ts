@@ -126,6 +126,40 @@ export async function getActiveDesignSystem(
   });
 }
 
+// Convenience: resolve a design-system id to its site's scope prefix.
+// Needed by the component POST/PATCH routes for Layer-2 CSS validation.
+// Two sequential reads — acceptable at admin-UI write frequency.
+export async function getDesignSystemSitePrefix(
+  ds_id: string,
+): Promise<ApiResponse<string>> {
+  return guardImpl(RESOURCE, async () => {
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase
+      .from("design_systems")
+      .select("site_id")
+      .eq("id", ds_id)
+      .maybeSingle();
+
+    if (error) return mapPgError(RESOURCE, error);
+    if (!data) return notFound(RESOURCE, ds_id);
+
+    const siteRes = await supabase
+      .from("sites")
+      .select("prefix")
+      .eq("id", data.site_id)
+      .maybeSingle();
+
+    if (siteRes.error) return mapPgError(RESOURCE, siteRes.error);
+    if (!siteRes.data) return notFound("site", data.site_id as string);
+
+    return {
+      ok: true,
+      data: siteRes.data.prefix as string,
+      timestamp: now(),
+    };
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Writes
 // ---------------------------------------------------------------------------
