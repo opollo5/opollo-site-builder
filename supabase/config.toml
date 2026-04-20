@@ -57,7 +57,11 @@ enabled = false
 file_size_limit = "50MiB"
 
 [auth]
-enabled = false
+# Must be enabled so the CLI generates + prints SERVICE_ROLE_KEY and
+# ANON_KEY to `supabase status` output. The gotrue container booting is
+# the signal that those keys exist; CLI 2.9x omits them from status
+# entirely when auth is disabled.
+enabled = true
 site_url = "http://127.0.0.1:3000"
 additional_redirect_urls = []
 jwt_expiry = 3600
