@@ -155,16 +155,20 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, no session", () => {
     expect(body.error.code).toBe("UNAUTHORIZED");
   });
 
-  it("lets /login, /logout, /auth-error, /api/auth/* through unauthenticated", async () => {
+  it("lets /login, /logout, /auth-error, /api/auth/*, /api/emergency through unauthenticated", async () => {
     // /api/auth/login was added in M2c-2 — the public-path guard moved
     // to a /api/auth/* prefix match so future auth routes (invite,
-    // password reset) inherit the bypass without re-listing.
+    // password reset) inherit the bypass without re-listing. M2c-3
+    // added /api/emergency: it must be reachable without a Supabase
+    // session because its purpose is to recover when Supabase Auth is
+    // down (its own OPOLLO_EMERGENCY_KEY check is the authentication).
     for (const p of [
       "/login",
       "/logout",
       "/auth-error",
       "/api/auth/callback",
       "/api/auth/login",
+      "/api/emergency",
     ]) {
       const res = await middleware(makeRequest(p));
       expect(res.status).toBe(200);

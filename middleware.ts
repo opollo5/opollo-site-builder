@@ -46,10 +46,16 @@ function decodeBase64(value: string): string {
 // /api/auth/* is a prefix — every auth endpoint (login, callback, and
 // anything M2d adds) has to be callable pre-session. The explicit set
 // below covers the top-level HTML pages that aren't under /api/auth/.
+//
+// /api/emergency bypasses the gate entirely: it's the break-glass hatch
+// for when Supabase Auth itself is down, and its own OPOLLO_EMERGENCY_KEY
+// check is the authentication for that route. See
+// app/api/emergency/route.ts for the rationale.
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/logout",
   "/auth-error",
+  "/api/emergency",
 ]);
 
 function isPublicPath(pathname: string): boolean {
