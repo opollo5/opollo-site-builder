@@ -155,8 +155,17 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, no session", () => {
     expect(body.error.code).toBe("UNAUTHORIZED");
   });
 
-  it("lets /login, /logout, /auth-error, /api/auth/callback through unauthenticated", async () => {
-    for (const p of ["/login", "/logout", "/auth-error", "/api/auth/callback"]) {
+  it("lets /login, /logout, /auth-error, /api/auth/* through unauthenticated", async () => {
+    // /api/auth/login was added in M2c-2 — the public-path guard moved
+    // to a /api/auth/* prefix match so future auth routes (invite,
+    // password reset) inherit the bypass without re-listing.
+    for (const p of [
+      "/login",
+      "/logout",
+      "/auth-error",
+      "/api/auth/callback",
+      "/api/auth/login",
+    ]) {
       const res = await middleware(makeRequest(p));
       expect(res.status).toBe(200);
     }

@@ -42,15 +42,21 @@ function decodeBase64(value: string): string {
 
 // Paths that must remain reachable without a Supabase session under the
 // flag-on mode. Anything not matched here needs an authenticated user.
+//
+// /api/auth/* is a prefix — every auth endpoint (login, callback, and
+// anything M2d adds) has to be callable pre-session. The explicit set
+// below covers the top-level HTML pages that aren't under /api/auth/.
 const PUBLIC_PATHS = new Set<string>([
   "/login",
   "/logout",
   "/auth-error",
-  "/api/auth/callback",
 ]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // All /api/auth/* endpoints (login, logout-not-applicable-here,
+  // callback, future invite/reset routes) are by definition pre-session.
+  if (pathname.startsWith("/api/auth/")) return true;
   // Static-asset guards come from the matcher below, but we keep this
   // belt-and-suspenders so a future matcher change doesn't accidentally
   // gate /_next.
