@@ -36,14 +36,27 @@ export function extractHtmlClasses(html: string): Set<string> {
   let match: RegExpExecArray | null;
   while ((match = HTML_CLASS_ATTR_RE.exec(html)) !== null) {
     const raw = match[1] ?? match[2] ?? match[3] ?? "";
-    for (const token of raw.split(/\s+/)) {
+    // Strip Handlebars-style template holes inside the class-attribute value
+    // before tokenising. `{{x}}`-style and `{var}`-style both go. This lets
+    // us validate raw templates directly — any class literals sandwiching
+    // the holes are kept; fragments that were composed with the hole
+    // (e.g. `ls-avatar--{{tone}}` → `ls-avatar--`) are filtered out below
+    // because a valid class never ends with `-`. The M3 renderer calls
+    // this helper with fully-substituted HTML and never sees these cases
+    // in practice.
+    const stripped = raw
+      .replace(/\{\{[\s\S]*?\}\}/g, " ")
+      .replace(/\{[^{}]*\}/g, " ");
+    for (const token of stripped.split(/\s+/)) {
       const trimmed = token.trim();
       if (trimmed.length === 0) continue;
-      // Skip Handlebars-style template holes — {{x}} / {dynamic}. The M3
-      // generator swaps them with real values before validation runs, but
-      // a defensive skip here makes the helper safe to call during
-      // preview-time too.
-      if (/^[{}]/.test(trimmed)) continue;
+      // Any brace left behind is a malformed fragment.
+      if (/[{}]/.test(trimmed)) continue;
+      // Trailing hyphen(s) = incomplete class left over from a stripped
+      // template interpolation. `ls-avatar--{{tone}}` would leave
+      // `ls-avatar--` after stripping — skip it; the rendered form gets
+      // validated at M3 generation time.
+      if (/-$/.test(trimmed)) continue;
       out.add(trimmed);
     }
   }

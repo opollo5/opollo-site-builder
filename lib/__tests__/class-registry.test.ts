@@ -123,6 +123,34 @@ describe("extractHtmlClasses", () => {
     expect([...s].sort()).toEqual(["ls-btn", "ls-hero"]);
   });
 
+  it("handles mid-token template interpolation (ls-avatar--{{tone}})", () => {
+    // Concatenated form leaves `ls-avatar--` after stripping — skipped as
+    // an incomplete fragment. Rendered form (e.g. `ls-avatar--1`) gets
+    // validated separately at M3 generation time.
+    const s = extractHtmlClasses(
+      `<div class="ls-avatar ls-avatar--{{tone}}">x</div>`,
+    );
+    expect([...s].sort()).toEqual(["ls-avatar"]);
+  });
+
+  it("handles Handlebars if/else inside class attribute", () => {
+    const s = extractHtmlClasses(
+      `<a class="ls-btn {{#if featured}}ls-btn--primary{{else}}ls-btn--outline{{/if}}">x</a>`,
+    );
+    expect([...s].sort()).toEqual([
+      "ls-btn",
+      "ls-btn--outline",
+      "ls-btn--primary",
+    ]);
+  });
+
+  it("handles conditional className append — ls-price{{#if featured}} ls-price--featured{{/if}}", () => {
+    const s = extractHtmlClasses(
+      `<div class="ls-price{{#if featured}} ls-price--featured{{/if}}">x</div>`,
+    );
+    expect([...s].sort()).toEqual(["ls-price", "ls-price--featured"]);
+  });
+
   it("returns empty Set when element has no class attribute", () => {
     const s = extractHtmlClasses(`<div>hi</div>`);
     expect([...s]).toEqual([]);
