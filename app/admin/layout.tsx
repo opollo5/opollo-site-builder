@@ -1,15 +1,28 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
+
+import { checkAdminAccess } from "@/lib/admin-gate";
 
 // Shared shell for every page under /admin.
 //
-// Matches the h-12 border-b header + max-w-5xl p-6 container pattern that
-// /admin/sites/page.tsx pioneered. Introduced as part of M1e-1 because the
-// admin surface area is about to quadruple (design-system versions,
-// components, templates, preview) and duplicating the header in every page
-// was headed toward drift.
+// M2c-2 added the auth gate: when FEATURE_SUPABASE_AUTH is on (and the
+// kill switch is off), only admin/operator roles reach here; viewers
+// get bounced to the chat builder, no-session callers to /login. The
+// gate is defence-in-depth — middleware is the primary redirect path —
+// but the layout is also where we need the user to render the header
+// strip, so we call the same helper in one place.
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export default async function AdminLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const access = await checkAdminAccess();
+  if (access.kind === "redirect") redirect(access.to);
+
+  const user = access.user;
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="flex h-12 flex-none items-center justify-between border-b px-4">
@@ -19,12 +32,32 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </Link>
           <span className="text-xs text-muted-foreground">· Admin</span>
         </div>
-        <Link
-          href="/"
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          ← Back to builder
-        </Link>
+        <div className="flex items-center gap-4">
+          {user && (
+            <span
+              className="text-xs text-muted-foreground"
+              data-testid="admin-user-email"
+            >
+              {user.email}
+            </span>
+          )}
+          <Link
+            href="/"
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            ← Back to builder
+          </Link>
+          {user && (
+            <form action="/logout" method="POST">
+              <button
+                type="submit"
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Sign out
+              </button>
+            </form>
+          )}
+        </div>
       </header>
       <main className="mx-auto max-w-5xl p-6">{children}</main>
     </div>
