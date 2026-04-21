@@ -92,6 +92,16 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
 
+## E2E coverage is a hard requirement for admin UI changes
+Every PR that adds or substantially changes an admin-facing route, form, or action MUST include a Playwright spec for its happy path. Specs live in `e2e/*.spec.ts`; run locally with `npm run test:e2e` (requires `supabase start`).
+
+- A new page → a new spec OR a new test in the closest topical file (sites / users / batches / auth).
+- A new form or modal → at least one test that opens it, submits it, and verifies the after-state.
+- A new API mutation that has a UI surface → covered by the UI spec that drives it (the API itself is covered at the unit layer).
+- Every spec navigates to every page it touches and runs `auditA11y(page, testInfo)` — axe findings are non-blocking today but the history is building for the Level-3 upgrade.
+
+If a change is tested only at the unit layer and not in E2E, state why in the PR description ("purely a lib/ change", "admin-facing but flagged off for this slice", etc.). Silent omissions are a review-blocker.
+
 ## Backlog — UX debt
 
 Operator-facing jargon that leaks DB column names or internal implementation

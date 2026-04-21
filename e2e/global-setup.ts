@@ -1,0 +1,113 @@
+import { createClient } from "@supabase/supabase-js";
+
+// ---------------------------------------------------------------------------
+// Global setup — runs once before the E2E suite.
+//
+// Responsibilities:
+//   1. Reach a local Supabase (tests assume `supabase start` has already
+//      run; the e2e CI workflow handles this explicitly).
+//   2. Seed a predictable admin user the suite can sign in as. Email +
+//      password live in e2e/fixtures.ts so every spec shares them.
+//   3. Seed a single active site + design system + template so the
+//      batches spec has something to create against. Unit-test seeding
+//      helpers can't be reused here — they live behind vitest's module
+//      graph — so we re-implement the minimal path via the service
+//      role REST client.
+//
+// This runs OUTSIDE the Next.js process, so no @/ imports. Direct
+// supabase-js only.
+// ---------------------------------------------------------------------------
+
+import {
+  E2E_ADMIN_EMAIL,
+  E2E_ADMIN_PASSWORD,
+  E2E_TEST_SITE_PREFIX,
+} from "./fixtures";
+
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v) {
+    throw new Error(
+      `E2E globalSetup: ${name} is not set. Run \`supabase start\` and re-export the CLI output before running Playwright.`,
+    );
+  }
+  return v;
+}
+
+async function ensureAdminUser(): Promise<void> {
+  const supabase = createClient(
+    requireEnv("SUPABASE_URL"),
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+
+  // Look up existing user via listUsers; createUser is idempotent-ish
+  // but errors loudly on duplicate email.
+  const { data: list, error: listErr } = await supabase.auth.admin.listUsers();
+  if (listErr) {
+    throw new Error(`listUsers failed: ${listErr.message}`);
+  }
+  const existing = list.users.find(
+    (u) => u.email?.toLowerCase() === E2E_ADMIN_EMAIL.toLowerCase(),
+  );
+
+  let userId: string;
+  if (existing) {
+    userId = existing.id;
+  } else {
+    const { data: created, error: createErr } =
+      await supabase.auth.admin.createUser({
+        email: E2E_ADMIN_EMAIL,
+        password: E2E_ADMIN_PASSWORD,
+        email_confirm: true,
+      });
+    if (createErr || !created.user) {
+      throw new Error(
+        `createUser failed: ${createErr?.message ?? "no user"}`,
+      );
+    }
+    userId = created.user.id;
+  }
+
+  // Trigger in migration 0004 auto-inserts opollo_users on new
+  // auth.users row with role='viewer'. Promote to admin.
+  const { error: roleErr } = await supabase
+    .from("opollo_users")
+    .update({ role: "admin" })
+    .eq("id", userId);
+  if (roleErr) {
+    throw new Error(`opollo_users promote failed: ${roleErr.message}`);
+  }
+}
+
+async function ensureTestSite(): Promise<void> {
+  const supabase = createClient(
+    requireEnv("SUPABASE_URL"),
+    requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+
+  // Existing site with the E2E prefix? Use it.
+  const { data: existing } = await supabase
+    .from("sites")
+    .select("id")
+    .eq("prefix", E2E_TEST_SITE_PREFIX)
+    .neq("status", "removed")
+    .maybeSingle();
+  if (existing) return;
+
+  const { error } = await supabase.from("sites").insert({
+    name: "E2E Test Site",
+    wp_url: "https://e2e.test",
+    prefix: E2E_TEST_SITE_PREFIX,
+    status: "active",
+  });
+  if (error) {
+    throw new Error(`seed test site failed: ${error.message}`);
+  }
+}
+
+export default async function globalSetup(): Promise<void> {
+  await ensureAdminUser();
+  await ensureTestSite();
+}

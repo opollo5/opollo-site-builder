@@ -10,7 +10,9 @@
     "lint:css": "stylelint 'seed/**/*.css'",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:update-snapshots": "playwright test --update-snapshots"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",
@@ -27,6 +29,8 @@
     "zod": "^4.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.2",
+    "@playwright/test": "^1.59.1",
     "@supabase/ssr": "^0.10.2",
     "@types/node": "^20.16.11",
     "@types/pg": "^8.20.0",
