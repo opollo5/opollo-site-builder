@@ -13,9 +13,9 @@ Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
 | Slice | Status | Notes |
 | --- | --- | --- |
 | M4-1 | merged (#57) | Schema: 6 tables + constraints + RLS + FTS trigger. |
-| M4-2 | in flight | Worker core (lease / heartbeat / reaper over `transfer_job_items` + dummy processor + cron entrypoint). |
+| M4-2 | merged (#58) | Worker core (lease / heartbeat / reaper over `transfer_job_items` + dummy processor). |
 | M4-3 | **blocked on env** | Cloudflare upload. Needs `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_IMAGES_API_TOKEN` + `CLOUDFLARE_IMAGES_HASH` in Vercel. |
-| M4-4 | planned | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
+| M4-4 | in flight | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
 | M4-5 | **blocked on M4-3** | iStock 9k seed script. |
 | M4-6 | planned | `search_images` chat tool. Can ship without env vars. |
 | M4-7 | **blocked on M4-3** | WP media transfer + HTML URL rewrite on publish. |
