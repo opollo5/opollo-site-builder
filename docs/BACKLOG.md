@@ -16,9 +16,9 @@ Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
 | M4-2 | merged (#58) | Worker core (lease / heartbeat / reaper over `transfer_job_items` + dummy processor). |
 | M4-3 | merged (#61) | Cloudflare upload worker stage + orchestrator. |
 | M4-4 | merged (#59) | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
-| M4-5 | in flight | iStock seed script: CSV ingest + dry-run + budget cap. |
+| M4-5 | merged (#62) | iStock seed script: CSV ingest + dry-run + budget cap. |
 | M4-6 | merged (#60) | `search_images` chat tool. |
-| M4-7 | planned | WP media transfer + HTML URL rewrite on publish. |
+| M4-7 | in flight | WP media transfer + HTML URL rewrite on publish. |
 
 Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IMAGES_HASH` all provisioned in Vercel Production + Preview as of 2026-04-21.
 
