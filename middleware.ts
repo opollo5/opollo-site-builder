@@ -63,6 +63,10 @@ function isPublicPath(pathname: string): boolean {
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
+  // /api/cron/* carries its own CRON_SECRET check; Supabase Auth isn't
+  // involved. Required so the Vercel cron tick can reach the worker
+  // endpoint without a session.
+  if (pathname.startsWith("/api/cron/")) return true;
   // Static-asset guards come from the matcher below, but we keep this
   // belt-and-suspenders so a future matcher change doesn't accidentally
   // gate /_next.
