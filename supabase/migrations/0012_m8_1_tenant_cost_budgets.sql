@@ -101,9 +101,17 @@ CREATE POLICY tenant_cost_budgets_read ON tenant_cost_budgets
 -- Backfill trigger: auto-create a budget row when a new site is inserted.
 -- ---------------------------------------------------------------------------
 
+-- SECURITY DEFINER so the trigger can insert into tenant_cost_budgets
+-- regardless of the caller's role. Without this, an authenticated
+-- INSERT on sites fires the trigger but hits 42501 on the nested
+-- INSERT because the authenticated role has no INSERT policy on
+-- tenant_cost_budgets. search_path pinned per Supabase's standard
+-- pattern to avoid object-resolution shenanigans.
 CREATE OR REPLACE FUNCTION create_tenant_budget_for_site()
 RETURNS trigger
 LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
 AS $$
 BEGIN
   INSERT INTO tenant_cost_budgets (site_id)
