@@ -163,6 +163,204 @@ Middleware now runs HTTP Basic Auth (set `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWOR
 
 ---
 
+## Apply pending migrations to production
+
+**Symptom:** `/api/health` reports `supabase_error` mentioning a missing column / table / policy, OR a freshly-deployed code path throws `column "X" does not exist`.
+
+**Impact:** routes that touch the new schema are broken. Other routes keep working.
+
+**Diagnose:**
+1. `supabase migration list --db-url "$DATABASE_URL"` against the production DB URL. Compare the applied list to `supabase/migrations/`.
+2. The set of pending migrations is what needs to be applied.
+3. Check `.github/workflows/deploy-migrations.yml` run history — if the workflow failed silently on the merge commit, that's the gap.
+
+**Mitigate:** fall back to Basic Auth via the kill switch if the missing migration is auth-related:
+
+```bash
+curl -X POST "$APP_URL/api/emergency" \
+  -H "Authorization: Bearer $OPOLLO_EMERGENCY_KEY" \
+  -H "content-type: application/json" \
+  -d '{"action":"kill_switch_on"}'
+```
+
+For a missing feature-path migration: disable the relevant `FEATURE_X` in Vercel env and redeploy.
+
+**Resolve:**
+1. Pull the production `DATABASE_URL` from Supabase dashboard → Connect → Direct Connection.
+2. `supabase db push --db-url "$DATABASE_URL" --include-all` applies every pending migration in order.
+3. Confirm: `supabase migration list --db-url "$DATABASE_URL"` shows all local migrations as applied remote.
+4. Re-enable the flag + flip the kill switch off.
+5. Re-check `/api/health` → 200 ok.
+
+**Post-mortem:**
+- Why did the automated workflow miss it? Failing silently is the real bug — fix the workflow, not just the database.
+- If the migration contained a destructive step (`DROP COLUMN`, `DROP CONSTRAINT`), confirm no data loss against a recent Supabase backup.
+
+---
+
+## Rotate a secret
+
+**Symptom:** scheduled rotation, suspected leak, or compliance requirement. Known secrets in play: `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_ANON_KEY`, `OPOLLO_MASTER_KEY`, `OPOLLO_EMERGENCY_KEY`, `CRON_SECRET`, `ANTHROPIC_API_KEY`, each site's `wp_app_password`.
+
+**Impact:** during the rotation window, any service using the old value fails. Most rotations can be staged to avoid downtime.
+
+### SUPABASE_SERVICE_ROLE_KEY
+
+1. Supabase dashboard → Settings → API → "Reset service role key." This invalidates the old key immediately.
+2. Copy the new key into Vercel env (all environments).
+3. `vercel redeploy --prod` — or wait for the next merge.
+4. Confirm `/api/health` → 200. If 503 with `supabase_error` mentioning auth, the new key didn't propagate; re-check Vercel env.
+
+**Downtime window:** ~30s between reset and Vercel redeploy. Schedule outside peak.
+
+### OPOLLO_MASTER_KEY (encrypts `sites.wp_app_password`)
+
+Zero-downtime rotation:
+
+1. `openssl rand -base64 32` → new key.
+2. Set `OPOLLO_MASTER_KEY_NEXT` in Vercel env to the new key; leave `OPOLLO_MASTER_KEY` as the old key. Redeploy.
+3. Run the rotation script (follow-up slice — for now, re-register each site through the Edit Site modal: the app encrypts with the new key on save).
+4. When every site row has been re-encrypted: set `OPOLLO_MASTER_KEY` to the new key, remove `OPOLLO_MASTER_KEY_NEXT`. Redeploy.
+5. Confirm: for every site, `editSiteModal → Save` round-trips successfully.
+
+**Downtime window:** none if staged. If the rotation script lands, this becomes a single-step rotation.
+
+### OPOLLO_EMERGENCY_KEY
+
+1. `openssl rand -base64 48` — new key.
+2. Update Vercel env `OPOLLO_EMERGENCY_KEY`. Redeploy.
+3. Update the operator's password manager + `docs/RUNBOOK.md` break-glass commands with the new key.
+4. Test: call `POST /api/emergency` with the new key + a no-op body (`{"action":"kill_switch_off"}` when it's already off). Expect 200.
+
+**Downtime window:** 30s. The break-glass path is unusable during the window; avoid rotating during an active incident.
+
+### CRON_SECRET
+
+1. `openssl rand -base64 32` — new value.
+2. Update Vercel env `CRON_SECRET`.
+3. Vercel dashboard → Project → Cron Jobs → update the `Authorization: Bearer` header (if stored there; otherwise the cron sends `CRON_SECRET` automatically).
+4. Redeploy.
+5. Wait one tick (60s). Confirm `/api/cron/process-batch` run fires successfully. Cron log should show 200.
+
+**Downtime window:** one cron tick (60s). During the window the worker doesn't advance.
+
+### ANTHROPIC_API_KEY
+
+1. Anthropic console → API keys → Rotate.
+2. Update Vercel env. Redeploy.
+3. Check a batch: create a dummy 1-slot batch + watch it reach `state='succeeded'` in `generation_job_pages`.
+
+**Downtime window:** in-flight Anthropic calls keyed to the old key fail once. The retry loop picks them up automatically on the next tick.
+
+### WP app password (per site)
+
+1. WP admin → Users → Profile → Application Passwords → generate new.
+2. In the admin UI, Edit Site → update password. The app re-encrypts with `OPOLLO_MASTER_KEY`.
+3. Test: trigger a small batch or a manual WP publish on that site. Expect 200 from WP.
+
+**Downtime window:** any in-flight publish to that site fails once. Retries use the new password.
+
+**Always:**
+
+- After any rotation, grep git history for the old value (`git log -S '<prefix>'`) to confirm it was never committed.
+- Update `.gitleaks.toml` if the new value happens to match any false-positive rule.
+- Log the rotation in a lightweight log (spreadsheet / ops channel) so the next rotation cadence is tracked.
+
+---
+
+## Provision env vars for a new observability tool
+
+**Context.** Scaffolded vendors that need env vars to activate: Sentry, Axiom, Langfuse, Upstash Redis. Each is a graceful no-op without its envs; provisioning "flips" the tool on.
+
+### One-time provisioning playbook
+
+For each tool (Sentry / Axiom / Langfuse / Upstash):
+
+1. **Create the account / project** in the vendor's dashboard. Pick the free tier where available.
+2. **Copy the required env vars** from the vendor dashboard:
+   - Sentry: `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` (for source-map upload).
+   - Axiom: `AXIOM_TOKEN`, `AXIOM_DATASET`.
+   - Langfuse: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, optionally `LANGFUSE_BASEURL` if self-hosted.
+   - Upstash: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
+3. **Add them to Vercel** — Settings → Environment Variables. Set all three environments (Production, Preview, Development) unless the vendor is production-only.
+4. **Add to `.env.local.example`** with a comment explaining the default-off behaviour.
+5. **Redeploy production** — `vercel redeploy --prod` or an empty commit on main.
+6. **Verify**: the scaffold's `isXEnabled()` check (or equivalent) now returns true. For Sentry, generate a test exception in a dev route and confirm it lands in the dashboard. For Axiom, tail the dataset for a fresh log line with the expected request_id shape. For Langfuse, run one eval and confirm the trace appears. For Upstash, confirm `/api/health` reports `redis: "ok"`.
+
+### Batch provisioning
+
+All four can be done in one session:
+
+1. Create four accounts (15 min total).
+2. Copy 8 env vars into Vercel.
+3. Redeploy once.
+4. Verify each per the above.
+
+Log the provisioning date + vendor account IDs somewhere persistent; each rotation relies on it.
+
+**If a vendor's quota is hit** (Axiom ingest, Sentry event cap): the logger / transport falls back gracefully per the scaffold. The app does not fail; the tool just goes quiet. Check the vendor's usage dashboard if observability signal drops unexpectedly.
+
+---
+
+## Diagnose a missing-migration incident
+
+**Symptom:** typically a 500 on a specific route with a Postgres error like `column "<name>" does not exist` / `relation "<table>" does not exist` / `policy "<p>" does not exist`. `/api/health` may also go 503.
+
+**Impact:** scope depends on which migration is missing. Auth migrations → everyone affected. Feature-path migrations → that feature only.
+
+**Diagnose:**
+
+1. **Confirm which migration.** The error message names the column / table / policy. Grep `supabase/migrations/` for the first place it was introduced. That's the one missing in production.
+2. **Confirm the production state.**
+   ```bash
+   supabase migration list --db-url "$DATABASE_URL"
+   ```
+   This lists `Applied` + `Local`. Any migration present in `Local` but not `Applied` is pending.
+3. **Check the deploy workflow.** `.github/workflows/deploy-migrations.yml` runs on merge to main. Look at the run for the merge commit that introduced the new migration. A failure there is the root cause (not the missing migration itself — the workflow is the gap).
+
+**Mitigate:**
+
+- If the missing migration affects auth: break-glass via kill switch (see "Auth is broken" above).
+- If it affects a feature path: disable the relevant `FEATURE_X` in Vercel env and redeploy. User-facing error vanishes; the feature goes dark until the migration lands.
+- If the missing migration is behind a soft rollout (e.g. Supabase Auth migration but HTTP Basic still works), no operator action needed beyond the resolve step.
+
+**Resolve:**
+
+1. **Fix the workflow first, migration second.** A failed run in `deploy-migrations.yml` should re-trigger on the next push. If it keeps failing, fix the workflow (env var, secret, permissions).
+2. Apply the pending migrations directly (see "Apply pending migrations to production" above).
+3. Verify `/api/health` 200 + the previously-broken route works.
+4. Re-enable the feature flag / kill switch.
+
+**Post-mortem:**
+
+- Why did `deploy-migrations.yml` fail silently? Add a notification step (Slack / email) for workflow failures on main.
+- Was the migration tested locally against a fresh DB before merging? `npm run test` + `supabase db reset && supabase db push` locally catches most of these.
+
+---
+
+## Production incident recovery
+
+**Context.** A general-purpose entry for when production is in a bad state that doesn't match any specific entry above. Follow the sequence; escalate only when the sequence doesn't clear.
+
+**Order of operations:**
+
+1. **Stop the bleeding.** Decide: is this a rollback (deploy regression) or a runtime flip (feature-flag kill switch)? If both are plausible, start with the kill switch — it's reversible in 30 seconds. Rollback is reversible in five minutes.
+2. **Confirm health.** `/api/health` 200 = runtime alive. 503 = infrastructure. If health is 200 and users still see errors, look at the `x-request-id` in the browser's failing response + grep the logs (Axiom once provisioned; stdout in Vercel runtime logs today).
+3. **Isolate the blast radius.** Is this everyone, one customer, one route? Production bugs narrow the scope faster than general triage does.
+4. **Capture state.** Screenshot the error, note the request_id, capture the affected row id(s). The post-mortem needs this; the fix probably does too.
+5. **Apply the smallest fix that clears the symptom.** A one-line revert. A flag flip. A single row UPDATE (only with a peer reviewing the SQL — even in an incident).
+6. **Confirm clear.** Test the affected path manually — don't trust "logs look clean." If there's an E2E spec for the path, run it locally against production.
+7. **Post-mortem same day.** New entry in this RUNBOOK + new rule in `docs/RULES.md` if the incident's cause is procedural. Don't let the learning rot.
+
+**Never do during an incident:**
+
+- `git push --force` to main.
+- `DROP TABLE`, `TRUNCATE` on a production table.
+- Rotate a secret while the break-glass is active — the rotation lock-out compounds the outage.
+- Fix the root cause and the symptom in the same commit. Ship the symptom fix, confirm clear, then open a separate PR for root cause.
+
+---
+
 ## Adding a new runbook entry
 
 When a live incident surfaces a gap, write it up here the same day. Template:
