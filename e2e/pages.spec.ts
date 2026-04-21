@@ -213,6 +213,13 @@ test.describe("pages admin surface", () => {
     page,
   }) => {
     const targetPageId = pageIds["e2e-homepage"];
+    // Clear any prior regen rows for this page so the test is
+    // order-independent with the second regen test below.
+    await serviceRoleClient()
+      .from("regeneration_jobs")
+      .delete()
+      .eq("page_id", targetPageId);
+
     await page.goto(`/admin/sites/${siteId}/pages/${targetPageId}`);
 
     // History panel starts empty.
@@ -225,12 +232,14 @@ test.describe("pages admin surface", () => {
     await page.getByTestId("regenerate-button").click();
 
     // After router.refresh the history panel shows the new row as
-    // pending (the cron-driven worker doesn't run in the E2E stack,
-    // so the job stays pending; M7-5 will wire the cron).
+    // pending. M7-5 wires the cron; E2E runs don't include a cron
+    // tick, so the job stays pending.
     await expect(page.getByTestId("regen-history-panel")).toBeVisible();
-    const pendingRow = page
-      .getByTestId("regen-history-row")
-      .filter({ has: page.locator('[data-status="pending"]') });
+    // data-status is on the <tr> itself (not a descendant), so an
+    // attribute selector works directly.
+    const pendingRow = page.locator(
+      '[data-testid="regen-history-row"][data-status="pending"]',
+    );
     await expect(pendingRow).toHaveCount(1);
 
     // The button swaps to "Queued…" and is disabled while in-flight.
@@ -242,13 +251,7 @@ test.describe("pages admin surface", () => {
   }) => {
     const targetPageId = pageIds["e2e-homepage"];
 
-    // Seed an already-pending regen job directly so we don't fight
-    // the button's disabled state for the second enqueue attempt.
-    const svc = (await import("@supabase/supabase-js")).createClient(
-      process.env.SUPABASE_URL as string,
-      process.env.SUPABASE_SERVICE_ROLE_KEY as string,
-      { auth: { persistSession: false, autoRefreshToken: false } },
-    );
+    const svc = serviceRoleClient();
     // Clear any prior regen jobs on this page (other tests may seed).
     await svc
       .from("regeneration_jobs")

@@ -546,10 +546,32 @@ export type EnqueueRegenJobResult =
   | { ok: true; job_id: string }
   | {
       ok: false;
-      code: "NOT_FOUND" | "REGEN_ALREADY_IN_FLIGHT" | "INTERNAL_ERROR";
+      code:
+        | "NOT_FOUND"
+        | "REGEN_ALREADY_IN_FLIGHT"
+        | "BUDGET_EXCEEDED"
+        | "INTERNAL_ERROR";
       message: string;
       details?: Record<string, unknown>;
     };
+
+/**
+ * Daily budget cap (cents) for the sum of all regen jobs created
+ * today. Reads from REGEN_DAILY_BUDGET_CENTS at call time. Defaults
+ * to 10000 cents ($100/day) when unset — keep the knob in env so a
+ * runaway regen loop on a new feature can't drain an operator's
+ * Anthropic budget before they notice.
+ *
+ * Tenant-aware caps live in BACKLOG ("Per-tenant cost budgets");
+ * this is the tenant-wide guard.
+ */
+export function readRegenDailyBudgetCents(): number {
+  const raw = process.env.REGEN_DAILY_BUDGET_CENTS;
+  if (!raw) return 10000;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return 10000;
+  return Math.floor(parsed);
+}
 
 /**
  * Insert a new regeneration_jobs row for a page. Snapshots the page's
@@ -586,6 +608,40 @@ export async function enqueueRegenJob(
       ok: false,
       code: "NOT_FOUND",
       message: `No page found with id ${input.page_id} under site ${input.site_id}.`,
+    };
+  }
+
+  // Daily budget guard. Sum cost_usd_cents for regen jobs created
+  // today (UTC day boundary). Refuse to enqueue if we'd exceed the
+  // cap. Tenant-wide — per-tenant caps are deferred to the
+  // tenant_cost_budgets backlog entry.
+  const cap = readRegenDailyBudgetCents();
+  const startOfDay = new Date();
+  startOfDay.setUTCHours(0, 0, 0, 0);
+  const budgetRes = await supabase
+    .from("regeneration_jobs")
+    .select("cost_usd_cents")
+    .gte("created_at", startOfDay.toISOString());
+  if (budgetRes.error) {
+    return {
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: `budget lookup failed: ${budgetRes.error.message}`,
+    };
+  }
+  const todaySoFar = (budgetRes.data ?? []).reduce(
+    (sum, row) => sum + Number(row.cost_usd_cents ?? 0),
+    0,
+  );
+  if (todaySoFar >= cap) {
+    return {
+      ok: false,
+      code: "BUDGET_EXCEEDED",
+      message: `Daily regen budget of ${cap} cents is exhausted (${todaySoFar} spent today). Retry tomorrow or raise REGEN_DAILY_BUDGET_CENTS.`,
+      details: {
+        cap_cents: cap,
+        spent_today_cents: todaySoFar,
+      },
     };
   }
 
