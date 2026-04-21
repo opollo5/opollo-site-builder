@@ -71,6 +71,7 @@ export async function truncateAll(): Promise<void> {
   // Scoped to public-schema tables only.
   await pg.query(`
     TRUNCATE TABLE
+      tenant_cost_budgets,
       regeneration_events,
       regeneration_jobs,
       transfer_events,
