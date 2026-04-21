@@ -168,6 +168,10 @@ export function CreateDesignSystemModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>
             <Label htmlFor="ds-tokens">tokens.css</Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Design tokens (colours, spacing, typography) as CSS custom
+              properties on the scope wrapper.
+            </p>
             <textarea
               id="ds-tokens"
               className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
@@ -183,6 +187,10 @@ export function CreateDesignSystemModal({
 
           <div>
             <Label htmlFor="ds-base-styles">base-styles.css</Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Baseline component styles (containers, typography reset,
+              primitives) that every page inherits.
+            </p>
             <textarea
               id="ds-base-styles"
               className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"

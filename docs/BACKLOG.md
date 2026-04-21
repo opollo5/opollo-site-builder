@@ -14,8 +14,8 @@ Parent plan: `docs/plans/m6-parent.md`. Sub-slice status tracker:
 | --- | --- | --- |
 | M6-1 | merged (#68) | `/admin/sites/[id]/pages` list + `lib/pages.ts` data layer + Pages link on site detail. |
 | M6-2 | merged (#69) | `/admin/sites/[id]/pages/[pageId]` detail + Tier-2 static preview + Tier-3 WP admin link. |
-| M6-3 | in flight | Metadata edit modal (title + slug) + `PATCH /api/admin/sites/[id]/pages/[pageId]` with version_lock + UNIQUE_VIOLATION. |
-| M6-4 | planned | UX-debt cleanup: de-jargon the design-system authoring forms per CLAUDE.md backlog. |
+| M6-3 | merged (#70) | Metadata edit modal (title + slug) + `PATCH /api/admin/sites/[id]/pages/[pageId]` with version_lock + UNIQUE_VIOLATION. |
+| M6-4 | in flight | UX-debt cleanup: de-jargon the design-system authoring forms per CLAUDE.md backlog. |
 
 No new env vars.
 

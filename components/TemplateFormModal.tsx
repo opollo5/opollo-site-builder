@@ -392,7 +392,7 @@ export function TemplateFormModal({
           </div>
 
           <div>
-            <Label htmlFor="tf-composition">Composition (JSON array)</Label>
+            <Label htmlFor="tf-composition">Template composition</Label>
             <textarea
               id="tf-composition"
               className="mt-1 h-48 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
@@ -411,7 +411,7 @@ export function TemplateFormModal({
           </div>
 
           <div>
-            <Label htmlFor="tf-required">required_fields (JSON)</Label>
+            <Label htmlFor="tf-required">Required fields per component</Label>
             <textarea
               id="tf-required"
               className="mt-1 h-24 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
@@ -424,7 +424,7 @@ export function TemplateFormModal({
           </div>
 
           <div>
-            <Label htmlFor="tf-seo">seo_defaults JSON (optional)</Label>
+            <Label htmlFor="tf-seo">SEO defaults (optional)</Label>
             <textarea
               id="tf-seo"
               className="mt-1 h-20 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
