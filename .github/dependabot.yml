@@ -1,0 +1,36 @@
+version: 2
+# Weekly dependency refresh for npm + GitHub Actions. Security updates
+# land ASAP (dependabot opens those off-schedule); everything else
+# batches into a Monday PR so the maintainer has one weekly review
+# surface instead of a drip feed.
+#
+# Grouping: patches/minors ride together, majors separate. Major
+# bumps often require code changes and get their own PR + CI run.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+      # Radix UI is a family — one version-sync PR for the whole stack.
+      radix:
+        patterns:
+          - "@radix-ui/*"
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci

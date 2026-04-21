@@ -1,0 +1,52 @@
+name: CodeQL
+
+# Static analysis for security regressions. Runs on every PR that
+# touches JavaScript/TypeScript, on pushes to main, and once a week
+# so we catch newly-added queries against code that hasn't changed.
+#
+# Findings surface as Security alerts in the GitHub UI and as PR
+# annotations when introduced in a diff. No secret provisioning
+# required — CodeQL runs inside the GitHub-provided environment.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.ts"
+      - "**/*.tsx"
+      - "**/*.js"
+      - "**/*.jsx"
+      - "package.json"
+      - "package-lock.json"
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"

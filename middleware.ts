@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createMiddlewareAuthClient } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
+import {
+  applySecurityHeaders,
+  ensureRequestId,
+} from "@/lib/security-headers";
 
 // ---------------------------------------------------------------------------
 // Edge-runtime middleware.
@@ -56,6 +60,11 @@ const PUBLIC_PATHS = new Set<string>([
   "/logout",
   "/auth-error",
   "/api/emergency",
+  // Health endpoint: must be reachable without a session so external
+  // monitors (Uptime Robot, Vercel, etc.) can probe it. The endpoint
+  // itself doesn't expose sensitive data — just connectivity + build
+  // info. See app/api/health/route.ts.
+  "/api/health",
 ]);
 
 function isPublicPath(pathname: string): boolean {
@@ -87,6 +96,13 @@ function basicAuthGate(req: NextRequest): NextResponse {
   const pass = process.env.BASIC_AUTH_PASSWORD;
 
   if (!user || !pass) {
+    return NextResponse.next();
+  }
+
+  // Health endpoint must reach monitors without a password. The endpoint
+  // itself exposes only connectivity + build info. Mirrors the
+  // isPublicPath check in the Supabase Auth gate.
+  if (req.nextUrl.pathname === "/api/health") {
     return NextResponse.next();
   }
 
@@ -210,24 +226,27 @@ async function supabaseAuthGate(req: NextRequest): Promise<NextResponse> {
 // ---------------------------------------------------------------------------
 
 export async function middleware(req: NextRequest): Promise<NextResponse> {
+  const requestId = ensureRequestId(req);
+
+  let response: NextResponse;
   if (!isFeatureOn()) {
-    return basicAuthGate(req);
+    response = basicAuthGate(req);
+  } else {
+    // Flag is on — check kill switch. If ON, break-glass to legacy Basic
+    // Auth path. The 5s cache in isAuthKillSwitchOn absorbs the per-
+    // request cost.
+    let killSwitch = false;
+    try {
+      killSwitch = await isAuthKillSwitchOn();
+    } catch {
+      killSwitch = false;
+    }
+    response = killSwitch
+      ? basicAuthGate(req)
+      : await supabaseAuthGate(req);
   }
 
-  // Flag is on — check kill switch. If ON, break-glass to legacy Basic
-  // Auth path. The 5s cache in isAuthKillSwitchOn absorbs the per-
-  // request cost.
-  let killSwitch = false;
-  try {
-    killSwitch = await isAuthKillSwitchOn();
-  } catch {
-    killSwitch = false;
-  }
-  if (killSwitch) {
-    return basicAuthGate(req);
-  }
-
-  return supabaseAuthGate(req);
+  return applySecurityHeaders(response, requestId);
 }
 
 export const config = {
