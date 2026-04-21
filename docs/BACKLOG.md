@@ -14,13 +14,13 @@ Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
 | --- | --- | --- |
 | M4-1 | merged (#57) | Schema: 6 tables + constraints + RLS + FTS trigger. |
 | M4-2 | merged (#58) | Worker core (lease / heartbeat / reaper over `transfer_job_items` + dummy processor). |
-| M4-3 | **blocked on env** | Cloudflare upload. Needs `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_IMAGES_API_TOKEN` + `CLOUDFLARE_IMAGES_HASH` in Vercel. |
+| M4-3 | in flight | Cloudflare upload worker stage + orchestrator. |
 | M4-4 | merged (#59) | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
-| M4-5 | **blocked on M4-3** | iStock 9k seed script. |
-| M4-6 | in flight | `search_images` chat tool. Can ship without env vars. |
-| M4-7 | **blocked on M4-3** | WP media transfer + HTML URL rewrite on publish. |
+| M4-5 | planned | iStock 9k seed script. Unblocks once M4-3 merges. |
+| M4-6 | merged (#60) | `search_images` chat tool. |
+| M4-7 | planned | WP media transfer + HTML URL rewrite on publish. Unblocks once M4-3 merges. |
 
-Env-var unblock path: Steven provisions the three `CLOUDFLARE_*` vars → auto-continue resumes through M4-3 / M4-5 / M4-7 in order.
+Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IMAGES_HASH` all provisioned in Vercel Production + Preview as of 2026-04-21.
 
 ---
 

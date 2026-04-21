@@ -4,7 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import {
   DEFAULT_LEASE_MS,
   leaseNextTransferItem,
-  processTransferItemDummy,
+  processTransferItemByJobType,
   reapExpiredLeases,
 } from "@/lib/transfer-worker";
 
@@ -73,9 +73,9 @@ async function runTick(): Promise<{
     return { reapedCount, processedItemId: null };
   }
 
-  // M4-2 ships dummy only. M4-3 adds the Cloudflare path + fan-out by
-  // job type (cloudflare_ingest vs wp_media_transfer).
-  await processTransferItemDummy(item.id, workerId);
+  // Dispatch by parent job type. cloudflare_ingest walks upload +
+  // caption (M4-3 + M4-4); wp_media_transfer lands in M4-7.
+  await processTransferItemByJobType(item.id, workerId);
   return { reapedCount, processedItemId: item.id };
 }
 

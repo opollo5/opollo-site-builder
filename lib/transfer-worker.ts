@@ -10,6 +10,13 @@ import {
   CAPTION_MAX_TOKENS,
 } from "@/lib/anthropic-caption";
 import { computeCostCents, PRICING_VERSION } from "@/lib/anthropic-pricing";
+import {
+  CloudflareCallError,
+  uploadImage as cloudflareUploadImage,
+  type CloudflareFetchFn,
+  type CloudflareImageRecord,
+  type UploadOptions as CloudflareUploadOptions,
+} from "@/lib/cloudflare-images";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -570,7 +577,7 @@ export async function processTransferItemCaption(
              updated_at = now()
        WHERE id = $1
          AND worker_id = $2
-         AND state = 'leased'
+         AND state IN ('leased', 'uploading')
       `,
       [itemId, workerId],
     );
@@ -950,3 +957,397 @@ async function aggregateJobProgress(
     [itemId, costDeltaCents],
   );
 }
+
+// ---------------------------------------------------------------------------
+// M4-3 — Cloudflare Images upload stage.
+//
+// Advances a leased cloudflare_ingest item through:
+//   leased → uploading → (Cloudflare POST) → image_library.cloudflare_id
+//   set, item.resulting_cloudflare_id set, state STAYS 'uploading'
+//   with lease retained so the next stage (M4-4 captioning) can pick up.
+//
+// Contract with the orchestrator: if this returns normally and the
+// item is in state 'uploading', the lease is still held and the caller
+// must invoke processTransferItemCaption (or short-circuit if the item
+// doesn't need captioning). Retryable failures reset to 'pending' +
+// retry_after; non-retryable failures go terminal with failure_code.
+// The orchestrator inspects state post-call and stops chaining when
+// it's no longer 'uploading'.
+//
+// Write-safety contract:
+//
+//   1. Idempotency. `cloudflare_idempotency_key` (migration 0010) is
+//      passed as Cloudflare's `id`. A reaped + reprocessed item reuses
+//      the same key; Cloudflare returns the original record without
+//      re-billing.
+//
+//   2. Adoption. If a worker crashed after Cloudflare accepted but
+//      before our image_library UPDATE landed, the retry's POST returns
+//      409; lib/cloudflare-images switches to GET-by-id and returns
+//      the existing record. Our DB write then adopts it.
+//
+//   3. Event-log first. `cloudflare_upload_started` is written before
+//      the state flip; `cloudflare_upload_succeeded` is written before
+//      the image_library UPDATE. Reconciliation can rebuild from
+//      transfer_events alone.
+//
+//   4. Lease coherence. Every UPDATE to transfer_job_items filters on
+//      worker_id + valid-intermediate state. A reaped-and-relet item
+//      rejects this worker's late writes.
+//
+//   5. Image dimensions. Cloudflare's upload response doesn't include
+//      width/height/bytes — those come from seed metadata (iStock
+//      feed in M4-5 populates them at image_library insert time).
+//      M4-3 only writes cloudflare_id; it doesn't touch dimensions.
+// ---------------------------------------------------------------------------
+
+export type UploadProcessorOptions = {
+  client?: Client | null;
+  /** Override the upload fn. Production uses the Cloudflare default. */
+  uploadFn?: (
+    req: { id: string; url: string; metadata?: Record<string, string> },
+    opts: CloudflareUploadOptions,
+  ) => Promise<CloudflareImageRecord>;
+  fetchImpl?: CloudflareFetchFn;
+};
+
+/**
+ * Run the Cloudflare upload stage against a leased cloudflare_ingest
+ * item. Caller holds the lease; this function advances state machine
+ * and persists cloudflare_id on success.
+ *
+ * Returns nothing — caller inspects the item's state afterwards:
+ *   - state='uploading' (+ resulting_cloudflare_id not null) → success,
+ *     lease retained, continue to caption.
+ *   - state='pending' with retry_after set → retryable failure.
+ *   - state='failed' → terminal failure.
+ */
+export async function processTransferItemUpload(
+  itemId: string,
+  workerId: string,
+  opts: UploadProcessorOptions = {},
+): Promise<void> {
+  const uploadFn = opts.uploadFn ?? cloudflareUploadImage;
+
+  const svc = getServiceRoleClient();
+  const itemRes = await svc
+    .from("transfer_job_items")
+    .select(
+      "id, transfer_job_id, image_id, source_url, cloudflare_idempotency_key, retry_count",
+    )
+    .eq("id", itemId)
+    .single();
+  if (itemRes.error || !itemRes.data) {
+    throw new Error(
+      `processTransferItemUpload: load item: ${itemRes.error?.message ?? "no row"} for ${itemId}`,
+    );
+  }
+  const itemRow = itemRes.data as {
+    id: string;
+    transfer_job_id: string;
+    image_id: string | null;
+    source_url: string | null;
+    cloudflare_idempotency_key: string;
+    retry_count: number;
+  };
+
+  if (!itemRow.image_id) {
+    throw new Error(
+      `processTransferItemUpload: item ${itemId} has no image_id (pre-insert an image_library row with source/source_ref before uploading)`,
+    );
+  }
+  if (!itemRow.source_url) {
+    throw new Error(
+      `processTransferItemUpload: item ${itemId} has no source_url`,
+    );
+  }
+
+  // leased → uploading. Event log first, then the state flip. If the
+  // item's already in 'uploading' (resume after partial commit) the
+  // UPDATE filter's IN-clause accepts it for the event-log emission
+  // path too.
+  await withClient(opts.client ?? null, async (c) => {
+    await c.query(
+      `
+      INSERT INTO transfer_events (
+        transfer_job_id, transfer_job_item_id, event_type, payload_jsonb
+      )
+      VALUES ($1, $2, 'cloudflare_upload_started',
+              jsonb_build_object('worker_id', $3::text,
+                                 'image_id', $4::text,
+                                 'source_url', $5::text,
+                                 'idempotency_key', $6::text))
+      `,
+      [
+        itemRow.transfer_job_id,
+        itemId,
+        workerId,
+        itemRow.image_id,
+        itemRow.source_url,
+        itemRow.cloudflare_idempotency_key,
+      ],
+    );
+    const advance = await c.query(
+      `
+      UPDATE transfer_job_items
+         SET state = 'uploading',
+             updated_at = now()
+       WHERE id = $1
+         AND worker_id = $2
+         AND state IN ('leased', 'uploading')
+      `,
+      [itemId, workerId],
+    );
+    if ((advance.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processTransferItemUpload: lease stolen from worker ${workerId} before Cloudflare call`,
+      );
+    }
+  });
+
+  // Cloudflare call. Released from the pg client.
+  let record: CloudflareImageRecord;
+  try {
+    record = await uploadFn(
+      {
+        id: itemRow.cloudflare_idempotency_key,
+        url: itemRow.source_url,
+      },
+      opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {},
+    );
+  } catch (err) {
+    await handleUploadError(itemRow, workerId, err, opts.client ?? null);
+    return;
+  }
+
+  // Success path: persist cloudflare_id + emit success event. Lease
+  // retained — caller continues to caption stage.
+  await withClient(opts.client ?? null, async (c) => {
+    await c.query(
+      `
+      INSERT INTO transfer_events (
+        transfer_job_id, transfer_job_item_id, event_type, payload_jsonb
+      )
+      VALUES ($1, $2, 'cloudflare_upload_succeeded',
+              jsonb_build_object('worker_id', $3::text,
+                                 'cloudflare_id', $4::text,
+                                 'variants', $5::jsonb,
+                                 'uploaded', $6::text))
+      `,
+      [
+        itemRow.transfer_job_id,
+        itemId,
+        workerId,
+        record.id,
+        JSON.stringify(record.variants),
+        record.uploaded,
+      ],
+    );
+
+    // Idempotent image_library UPDATE. A reaped retry that adopts via
+    // 409 writes the same cloudflare_id — safe to re-run.
+    const updateImage = await c.query(
+      `
+      UPDATE image_library
+         SET cloudflare_id = $2,
+             updated_at = now()
+       WHERE id = $1
+         AND (cloudflare_id IS NULL OR cloudflare_id = $2)
+      `,
+      [itemRow.image_id, record.id],
+    );
+    if ((updateImage.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processTransferItemUpload: image_library ${itemRow.image_id} has conflicting cloudflare_id (expected null or ${record.id})`,
+      );
+    }
+
+    // Record the uploaded id on the item. Keep state='uploading' and
+    // retain the lease — caption stage runs next.
+    const stamp = await c.query(
+      `
+      UPDATE transfer_job_items
+         SET resulting_cloudflare_id = $3,
+             updated_at = now()
+       WHERE id = $1
+         AND worker_id = $2
+         AND state = 'uploading'
+      `,
+      [itemId, workerId, record.id],
+    );
+    if ((stamp.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processTransferItemUpload: lease stolen from worker ${workerId} before stamping cloudflare_id`,
+      );
+    }
+  });
+}
+
+async function handleUploadError(
+  itemRow: { id: string; transfer_job_id: string; retry_count: number },
+  workerId: string,
+  err: unknown,
+  client: Client | null,
+): Promise<void> {
+  const isCfErr = err instanceof CloudflareCallError;
+  const retryable = isCfErr ? err.retryable : true;
+  const code = isCfErr ? err.code : "CLOUDFLARE_NETWORK_ERROR";
+  const detail = err instanceof Error ? err.message : String(err);
+  const httpStatus = isCfErr ? err.httpStatus : null;
+
+  await withClient(client, async (c) => {
+    await c.query(
+      `
+      INSERT INTO transfer_events (
+        transfer_job_id, transfer_job_item_id, event_type, payload_jsonb
+      )
+      VALUES ($1, $2, 'cloudflare_upload_failed',
+              jsonb_build_object('worker_id', $3::text,
+                                 'failure_code', $4::text,
+                                 'failure_detail', $5::text,
+                                 'http_status', $6::int,
+                                 'retryable', $7::boolean,
+                                 'retry_count', $8::int))
+      `,
+      [
+        itemRow.transfer_job_id,
+        itemRow.id,
+        workerId,
+        code,
+        detail,
+        httpStatus,
+        retryable,
+        itemRow.retry_count,
+      ],
+    );
+
+    if (retryable) {
+      const retryAfter = retryAfterForCount(itemRow.retry_count);
+      if (retryAfter) {
+        const reset = await c.query(
+          `
+          UPDATE transfer_job_items
+             SET state = 'pending',
+                 worker_id = NULL,
+                 lease_expires_at = NULL,
+                 retry_after = $3::timestamptz,
+                 failure_code = NULL,
+                 failure_detail = NULL,
+                 updated_at = now()
+           WHERE id = $1
+             AND worker_id = $2
+             AND state IN ('leased', 'uploading')
+          `,
+          [itemRow.id, workerId, retryAfter.toISOString()],
+        );
+        if ((reset.rowCount ?? 0) === 0) {
+          throw new Error(
+            `processTransferItemUpload: lease stolen while deferring item ${itemRow.id}`,
+          );
+        }
+        return;
+      }
+      // Retry budget exhausted — fall through to terminal failure below.
+    }
+
+    const fail = await c.query(
+      `
+      UPDATE transfer_job_items
+         SET state = 'failed',
+             failure_code = $3,
+             failure_detail = $4,
+             worker_id = NULL,
+             lease_expires_at = NULL,
+             updated_at = now()
+       WHERE id = $1
+         AND worker_id = $2
+         AND state IN ('leased', 'uploading')
+      `,
+      [itemRow.id, workerId, code, detail],
+    );
+    if ((fail.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processTransferItemUpload: lease stolen while marking item ${itemRow.id} failed`,
+      );
+    }
+
+    await aggregateJobProgress(c, itemRow.id, 0);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Orchestrator — cloudflare_ingest end-to-end.
+//
+// Drives a single leased item through upload (M4-3) then caption (M4-4)
+// in one worker tick. Stops chaining if upload deferred or failed —
+// the reaper / next lease picks up retries.
+// ---------------------------------------------------------------------------
+
+export type IngestProcessorOptions = UploadProcessorOptions &
+  CaptionProcessorOptions;
+
+export async function processTransferItemIngest(
+  itemId: string,
+  workerId: string,
+  opts: IngestProcessorOptions = {},
+): Promise<void> {
+  await processTransferItemUpload(itemId, workerId, {
+    client: opts.client ?? null,
+    uploadFn: opts.uploadFn,
+    fetchImpl: opts.fetchImpl,
+  });
+
+  // Inspect state post-upload. Only continue to caption if the upload
+  // stage is still holding the lease with state='uploading'.
+  const svc = getServiceRoleClient();
+  const after = await svc
+    .from("transfer_job_items")
+    .select("state, worker_id")
+    .eq("id", itemId)
+    .single();
+  if (
+    after.data?.state === "uploading" &&
+    after.data?.worker_id === workerId
+  ) {
+    await processTransferItemCaption(itemId, workerId, {
+      client: opts.client ?? null,
+      captionCall: opts.captionCall,
+      model: opts.model,
+      maxTokens: opts.maxTokens,
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Job-type dispatcher for the cron tick.
+// ---------------------------------------------------------------------------
+
+export async function processTransferItemByJobType(
+  itemId: string,
+  workerId: string,
+  opts: IngestProcessorOptions = {},
+): Promise<void> {
+  const svc = getServiceRoleClient();
+  const ctx = await svc
+    .from("transfer_job_items")
+    .select("transfer_jobs!inner(type)")
+    .eq("id", itemId)
+    .single();
+  const jobType =
+    ((ctx.data as { transfer_jobs?: { type?: string } } | null)?.transfer_jobs
+      ?.type as string | undefined) ?? null;
+
+  if (jobType === "cloudflare_ingest") {
+    await processTransferItemIngest(itemId, workerId, opts);
+    return;
+  }
+  if (jobType === "wp_media_transfer") {
+    throw new Error(
+      "processTransferItemByJobType: wp_media_transfer not implemented until M4-7",
+    );
+  }
+  throw new Error(
+    `processTransferItemByJobType: unknown job type '${jobType ?? "null"}' for item ${itemId}`,
+  );
+}
+
