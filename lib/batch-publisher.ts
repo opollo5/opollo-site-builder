@@ -182,9 +182,27 @@ export async function publishSlot(
         };
       }
 
-      if (!pagesId) {
+      if (pagesId) {
+        // Slot already links to a pages row (previous attempt, reaped).
+        // Pick up whatever wp_page_id that prior attempt stored so we
+        // can skip a redundant WP create when it's already non-zero.
+        const existing = await c.query<{ wp_page_id: number }>(
+          `SELECT wp_page_id FROM pages WHERE id = $1`,
+          [pagesId],
+        );
+        const existingWpId = existing.rows[0]?.wp_page_id ?? 0;
+        if (existingWpId > 0) {
+          wpPageId = existingWpId;
+        }
+      } else {
         // Attempt the pre-commit INSERT. UNIQUE (site_id, slug) on
-        // `pages` (M3-1) is the durable concurrency guard.
+        // `pages` (M3-1) is the durable concurrency guard. We wrap the
+        // INSERT in a SAVEPOINT so we can recover from a 23505
+        // unique_violation without aborting the outer transaction —
+        // Postgres marks the whole tx aborted (25P02) on an unhandled
+        // error, which blocks the follow-up SELECTs we need for the
+        // adoption decision.
+        await c.query("SAVEPOINT pages_insert");
         try {
           const insertRes = await c.query<{ id: string }>(
             `
@@ -201,10 +219,17 @@ export async function publishSlot(
               publishCtx.design_system_version,
             ],
           );
+          await c.query("RELEASE SAVEPOINT pages_insert");
           pagesId = insertRes.rows[0]!.id;
         } catch (err) {
           const pgErr = err as { code?: string };
-          if (pgErr.code !== "23505") throw err;
+          if (pgErr.code !== "23505") {
+            await c.query("ROLLBACK TO SAVEPOINT pages_insert");
+            await c.query("RELEASE SAVEPOINT pages_insert");
+            throw err;
+          }
+          await c.query("ROLLBACK TO SAVEPOINT pages_insert");
+          await c.query("RELEASE SAVEPOINT pages_insert");
 
           // UNIQUE violation. Determine whether to adopt.
           const existing = await c.query<{
