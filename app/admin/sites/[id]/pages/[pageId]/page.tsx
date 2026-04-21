@@ -4,8 +4,11 @@ import { notFound, redirect } from "next/navigation";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
+import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
+import { RegenerateButton } from "@/components/RegenerateButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getPage } from "@/lib/pages";
+import { listRegenJobsForPage } from "@/lib/regeneration-publisher";
 import { formatRelativeTime } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -106,6 +109,15 @@ export default async function PageDetail({
   const page = result.data;
   const backHref = resolveBackHref(params.id, searchParams);
 
+  // Regen history + in-flight detection. Service-role query behind the
+  // admin gate; RLS isn't a factor here. Top row is the most recent;
+  // `in-flight` is whichever row is pending or running (at most one
+  // per page per the partial UNIQUE in migration 0011).
+  const regenJobs = await listRegenJobsForPage(page.id, { limit: 10 });
+  const inFlightJob = regenJobs.find(
+    (j) => j.status === "pending" || j.status === "running",
+  );
+
   return (
     <>
       <Breadcrumbs
@@ -130,6 +142,15 @@ export default async function PageDetail({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <RegenerateButton
+            siteId={params.id}
+            pageId={page.id}
+            inFlightJobStatus={
+              inFlightJob
+                ? (inFlightJob.status as "pending" | "running")
+                : null
+            }
+          />
           <EditPageMetadataButton
             siteId={params.id}
             page={{
@@ -205,6 +226,24 @@ export default async function PageDetail({
           <dt className="text-muted-foreground">Updated</dt>
           <dd className="text-xs">{formatRelativeTime(page.updated_at)}</dd>
         </dl>
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-sm font-semibold">
+          Re-generation history{" "}
+          <span className="text-xs text-muted-foreground">
+            ({regenJobs.length})
+          </span>
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Each row is one operator-triggered re-run against the current design
+          system. Cost + tokens come from Anthropic; failures carry their
+          terminal code. In-flight jobs auto-refresh while the Re-generate
+          button polls.
+        </p>
+        <div className="mt-3">
+          <RegenHistoryPanel jobs={regenJobs} />
+        </div>
       </section>
     </>
   );

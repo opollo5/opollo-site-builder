@@ -466,3 +466,163 @@ async function finaliseRegenJob(
     })
     .eq("id", jobId);
 }
+
+// ---------------------------------------------------------------------------
+// History reader (M7-4)
+// ---------------------------------------------------------------------------
+
+export type RegenJobRow = {
+  id: string;
+  status:
+    | "pending"
+    | "running"
+    | "succeeded"
+    | "failed"
+    | "failed_gates"
+    | "cancelled";
+  cost_usd_cents: number;
+  input_tokens: number;
+  output_tokens: number;
+  failure_code: string | null;
+  failure_detail: string | null;
+  quality_gate_failures: unknown;
+  attempts: number;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  cancel_requested_at: string | null;
+};
+
+/**
+ * List recent regen jobs for a page, newest first. Caller (the detail
+ * page Server Component) decides the cap; default 10. The set is
+ * always bounded — one page accumulates roughly one regen per
+ * operator-triggered refresh.
+ */
+export async function listRegenJobsForPage(
+  pageId: string,
+  opts: { limit?: number } = {},
+): Promise<RegenJobRow[]> {
+  const svc = getServiceRoleClient();
+  const { data, error } = await svc
+    .from("regeneration_jobs")
+    .select(
+      "id, status, cost_usd_cents, input_tokens, output_tokens, failure_code, failure_detail, quality_gate_failures, attempts, created_at, started_at, finished_at, cancel_requested_at",
+    )
+    .eq("page_id", pageId)
+    .order("created_at", { ascending: false })
+    .limit(opts.limit ?? 10);
+  if (error) {
+    throw new Error(`listRegenJobsForPage failed: ${error.message}`);
+  }
+  return ((data ?? []) as Record<string, unknown>[]).map((row) => ({
+    id: row.id as string,
+    status: row.status as RegenJobRow["status"],
+    cost_usd_cents: Number(row.cost_usd_cents ?? 0),
+    input_tokens: Number(row.input_tokens ?? 0),
+    output_tokens: Number(row.output_tokens ?? 0),
+    failure_code: (row.failure_code as string | null) ?? null,
+    failure_detail: (row.failure_detail as string | null) ?? null,
+    quality_gate_failures: row.quality_gate_failures ?? null,
+    attempts: Number(row.attempts ?? 0),
+    created_at: row.created_at as string,
+    started_at: (row.started_at as string | null) ?? null,
+    finished_at: (row.finished_at as string | null) ?? null,
+    cancel_requested_at: (row.cancel_requested_at as string | null) ?? null,
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Enqueue helper (M7-4)
+// ---------------------------------------------------------------------------
+
+export type EnqueueRegenJobInput = {
+  site_id: string;
+  page_id: string;
+  created_by?: string | null;
+};
+
+export type EnqueueRegenJobResult =
+  | { ok: true; job_id: string }
+  | {
+      ok: false;
+      code: "NOT_FOUND" | "REGEN_ALREADY_IN_FLIGHT" | "INTERNAL_ERROR";
+      message: string;
+      details?: Record<string, unknown>;
+    };
+
+/**
+ * Insert a new regeneration_jobs row for a page. Snapshots the page's
+ * current version_lock into expected_page_version so the worker's
+ * final commit can detect concurrent M6-3 edits. The partial UNIQUE on
+ * (page_id) WHERE status IN ('pending','running') catches the double-
+ * enqueue race: second attempt hits 23505 → REGEN_ALREADY_IN_FLIGHT.
+ *
+ * Caller (the POST route) is responsible for the admin gate and UUID
+ * validation. This helper assumes well-formed ids.
+ */
+export async function enqueueRegenJob(
+  input: EnqueueRegenJobInput,
+): Promise<EnqueueRegenJobResult> {
+  const supabase = getServiceRoleClient();
+
+  // Guard: page must belong to the site. Surfaces NOT_FOUND rather
+  // than relying on the FK to fail later with a less friendly error.
+  const pageRes = await supabase
+    .from("pages")
+    .select("id, site_id, version_lock")
+    .eq("id", input.page_id)
+    .eq("site_id", input.site_id)
+    .maybeSingle();
+  if (pageRes.error) {
+    return {
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: `page lookup failed: ${pageRes.error.message}`,
+    };
+  }
+  if (!pageRes.data) {
+    return {
+      ok: false,
+      code: "NOT_FOUND",
+      message: `No page found with id ${input.page_id} under site ${input.site_id}.`,
+    };
+  }
+
+  // Deterministic idempotency keys from the (to-be-minted) job id.
+  // Server-side generated so clients can't influence them.
+  const jobId = crypto.randomUUID();
+  const insertRes = await supabase
+    .from("regeneration_jobs")
+    .insert({
+      id: jobId,
+      site_id: input.site_id,
+      page_id: input.page_id,
+      status: "pending",
+      expected_page_version: pageRes.data.version_lock as number,
+      anthropic_idempotency_key: `ant-regen-${jobId}`,
+      wp_idempotency_key: `wp-regen-${jobId}`,
+      created_by: input.created_by ?? null,
+    })
+    .select("id")
+    .single();
+
+  if (insertRes.error) {
+    if (insertRes.error.code === "23505") {
+      return {
+        ok: false,
+        code: "REGEN_ALREADY_IN_FLIGHT",
+        message:
+          "A regen is already pending or running for this page. Wait for it to finish before enqueuing another.",
+        details: { page_id: input.page_id },
+      };
+    }
+    return {
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: `regeneration_jobs insert failed: ${insertRes.error.message}`,
+    };
+  }
+
+  return { ok: true, job_id: insertRes.data.id as string };
+}
