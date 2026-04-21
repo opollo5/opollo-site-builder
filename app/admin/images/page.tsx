@@ -267,7 +267,7 @@ export default async function AdminImagesPage({
       </div>
 
       <div className="mt-3">
-        <ImagesTable items={items} />
+        <ImagesTable items={items} backHref={buildHref(parsed, {})} />
       </div>
     </>
   );

@@ -150,4 +150,43 @@ test.describe("images admin surface", () => {
       page.getByRole("heading", { name: /image library/i }),
     ).toBeVisible();
   });
+
+  test("list → detail round-trip preserves filter state on back-nav", async ({
+    page,
+  }, testInfo) => {
+    // Start on a filtered list.
+    await page.goto("/admin/images?source=upload");
+    await expect(
+      page.getByText(/operator-uploaded product hero shot/i),
+    ).toBeVisible();
+
+    // Click the caption link to open the detail page.
+    await page
+      .getByTestId("image-row-link")
+      .filter({ hasText: /operator-uploaded product hero shot/i })
+      .click();
+    await page.waitForURL(/\/admin\/images\/[0-9a-f-]{36}/);
+    await expect(
+      page.getByTestId("image-detail-fields"),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /e2e-img-upload\.jpg/ }),
+    ).toBeVisible();
+    await auditA11y(page, testInfo);
+
+    // Back link returns to /admin/images?source=upload (via the
+    // ?from= query param the list writes into each row).
+    await page.getByRole("link", { name: /back to library/i }).click();
+    await page.waitForURL(/\/admin\/images\?source=upload/);
+    await expect(
+      page.getByText(/operator-uploaded product hero shot/i),
+    ).toBeVisible();
+  });
+
+  test("detail page 404s on an unknown UUID", async ({ page }) => {
+    const response = await page.goto(
+      "/admin/images/00000000-0000-0000-0000-000000000000",
+    );
+    expect(response?.status()).toBe(404);
+  });
 });
