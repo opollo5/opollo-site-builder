@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getPage } from "@/lib/pages";
@@ -129,6 +130,15 @@ export default async function PageDetail({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <EditPageMetadataButton
+            siteId={params.id}
+            page={{
+              id: page.id,
+              title: page.title,
+              slug: page.slug,
+              version_lock: page.version_lock,
+            }}
+          />
           {page.site_wp_url && (
             <>
               <a
@@ -156,6 +166,7 @@ export default async function PageDetail({
           <Link
             href={backHref}
             className="text-xs text-muted-foreground hover:text-foreground"
+            data-testid="page-back-to-list"
           >
             ← Back to pages
           </Link>

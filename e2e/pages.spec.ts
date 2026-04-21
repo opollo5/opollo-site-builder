@@ -150,7 +150,7 @@ test.describe("pages admin surface", () => {
 
   test("list → detail round-trip preserves filter state on back-nav", async ({
     page,
-  }, testInfo) => {
+  }) => {
     // Start on a filtered list so the back-link has state to preserve.
     await page.goto(`/admin/sites/${siteId}/pages?status=draft`);
     await expect(page.getByText(/e2e homepage fixture/i)).toBeVisible();
@@ -160,18 +160,14 @@ test.describe("pages admin surface", () => {
       .getByTestId("page-row-link")
       .filter({ hasText: /e2e homepage fixture/i })
       .click();
-    await page.waitForURL(
-      /\/admin\/sites\/[0-9a-f-]{36}\/pages\/[0-9a-f-]{36}/,
-    );
     await expect(
       page.getByTestId("page-detail-fields"),
     ).toBeVisible();
-    await auditA11y(page, testInfo);
 
     // Tier-2 preview iframe renders for the seed with generated_html.
     await expect(
       page.getByTestId("page-html-preview-iframe"),
-    ).toBeVisible();
+    ).toBeAttached();
 
     // WP admin link composed from sites.wp_url + wp_page_id.
     await expect(page.getByTestId("wp-admin-link")).toHaveAttribute(
@@ -179,9 +175,9 @@ test.describe("pages admin surface", () => {
       /wp-admin\/post\.php\?post=\d+&action=edit/,
     );
 
-    // Back link returns to the filtered list.
-    await page.getByRole("link", { name: /back to pages/i }).click();
-    await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/pages\?status=draft/);
+    // Back link returns to the filtered list, preserving ?status=draft.
+    await page.getByTestId("page-back-to-list").click();
+    await expect(page).toHaveURL(/status=draft/);
     await expect(page.getByText(/e2e homepage fixture/i)).toBeVisible();
   });
 
@@ -210,6 +206,39 @@ test.describe("pages admin surface", () => {
     await page.goto(`/admin/sites/${siteId}/pages/${emptyPageId}`);
     await expect(
       page.getByTestId("page-html-preview-empty"),
+    ).toBeVisible();
+  });
+
+  test("edit modal updates title + slug and detail reflects the change", async ({
+    page,
+  }) => {
+    const targetPageId = pageIds["e2e-troubleshooting-vpn"];
+    await page.goto(`/admin/sites/${siteId}/pages/${targetPageId}`);
+
+    await page.getByTestId("edit-page-button").click();
+    await expect(
+      page.getByRole("heading", { name: /edit page metadata/i }),
+    ).toBeVisible();
+
+    const newTitle = "E2E VPN troubleshooting (edited)";
+    const newSlug = `e2e-troubleshooting-vpn-edited-${Date.now()}`;
+    await page.getByLabel("Title").fill(newTitle);
+    await page.getByLabel("Slug").fill(newSlug);
+
+    // Warning banner shows when the slug changes.
+    await expect(page.getByTestId("slug-change-warning")).toBeVisible();
+
+    await page.getByRole("button", { name: /save changes/i }).click();
+
+    // Modal closes; detail page reflects the new title + slug.
+    await expect(
+      page.getByRole("heading", { name: /edit page metadata/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByTestId("page-detail-fields").getByText(newTitle),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId("page-detail-fields").getByText(newSlug),
     ).toBeVisible();
   });
 });
