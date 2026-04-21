@@ -8,6 +8,7 @@ import {
   updateImageMetadata,
 } from "@/lib/image-library";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { seedAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // M5-1 — listImages unit tests.
@@ -569,16 +570,11 @@ describe("updateImageMetadata — error paths", () => {
   });
 
   it("stamps updated_by when supplied", async () => {
-    // Seed an opollo_users row so the FK resolves; the actual user
-    // does not need an auth record for this test path.
-    const svc = getServiceRoleClient();
-    const userId = "11111111-2222-3333-4444-555555555555";
-    const insertRes = await svc.from("opollo_users").insert({
-      id: userId,
-      email: "edit-attribution@opollo.test",
-      role: "admin",
-    });
-    expect(insertRes.error).toBeNull();
+    // Go through the real auth-provisioning path. opollo_users.id FKs
+    // to auth.users(id), so a raw INSERT with a made-up UUID fails
+    // with 23503. seedAuthUser creates the auth.users row + trigger
+    // then bumps the opollo_users role.
+    const user = await seedAuthUser({ role: "admin" });
 
     const id = await seedImage({
       source_ref: "s-upd-attribution",
@@ -586,16 +582,17 @@ describe("updateImageMetadata — error paths", () => {
     });
     const res = await updateImageMetadata(id, {
       expected_version: 1,
-      updated_by: userId,
+      updated_by: user.id,
       patch: { caption: "Edited by a real operator." },
     });
     expect(res.ok).toBe(true);
 
+    const svc = getServiceRoleClient();
     const readBack = await svc
       .from("image_library")
       .select("updated_by")
       .eq("id", id)
       .maybeSingle();
-    expect(readBack.data?.updated_by).toBe(userId);
+    expect(readBack.data?.updated_by).toBe(user.id);
   });
 });
