@@ -100,11 +100,22 @@ export const SitePrefixPattern = /^[a-z0-9]{2,4}$/;
 export const RegisterSiteInputSchema = z.object({
   name: z.string().min(1).max(100),
   wp_url: z.string().url(),
-  prefix: z.string().regex(SitePrefixPattern),
+  // Optional at the API boundary. lib/sites.createSite generates one
+  // server-side from the site name when absent (M2d UX cleanup:
+  // operators should not have to reason about CSS scoping prefixes).
+  prefix: z.string().regex(SitePrefixPattern).optional(),
   wp_user: z.string().min(1).max(100),
   wp_app_password: z.string().min(8),
 });
 export type RegisterSiteInput = z.infer<typeof RegisterSiteInputSchema>;
+
+export const UpdateSiteBasicsSchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  wp_url: z.string().url().optional(),
+}).refine((p) => Object.keys(p).length > 0, {
+  message: "At least one field must be provided.",
+});
+export type UpdateSiteBasicsInput = z.infer<typeof UpdateSiteBasicsSchema>;
 
 export type SiteRecord = {
   id: string;

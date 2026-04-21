@@ -36,7 +36,6 @@ export default async function AdminLayout({
           <Link href="/admin/sites" className="text-sm font-semibold">
             Opollo Site Builder
           </Link>
-          <span className="text-xs text-muted-foreground">· Admin</span>
           <nav className="flex items-center gap-3 text-xs">
             <Link
               href="/admin/sites"

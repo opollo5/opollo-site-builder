@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { NewBatchButton } from "@/components/NewBatchButton";
+import type { BatchTemplateOption } from "@/components/NewBatchModal";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -65,7 +67,11 @@ function formatCostCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export default async function AdminBatchesPage() {
+export default async function AdminBatchesPage({
+  searchParams,
+}: {
+  searchParams: { site_id?: string };
+}) {
   const access = await checkAdminAccess({
     requiredRoles: ["admin", "operator"],
     insufficientRoleRedirectTo: "/admin/sites",
@@ -73,6 +79,11 @@ export default async function AdminBatchesPage() {
   if (access.kind === "redirect") redirect(access.to);
 
   const svc = getServiceRoleClient();
+  const siteFilter =
+    typeof searchParams.site_id === "string" &&
+    /^[0-9a-f-]{36}$/i.test(searchParams.site_id)
+      ? searchParams.site_id
+      : null;
 
   // Join jobs with their site + template names + creator email. The
   // RLS policy scopes the rows for operators via EXISTS on
@@ -89,6 +100,9 @@ export default async function AdminBatchesPage() {
     .limit(100);
   if (callerFilter) {
     query = query.eq("created_by", callerFilter);
+  }
+  if (siteFilter) {
+    query = query.eq("site_id", siteFilter);
   }
   const { data: jobs, error } = await query;
 
@@ -138,16 +152,70 @@ export default async function AdminBatchesPage() {
     };
   });
 
+  // Resolve "Run batch" context: only when a site_id filter is
+  // active do we have a target to point the modal at. On the
+  // unfiltered view the button is disabled with a tooltip; the
+  // per-site detail page is the primary entry-point for running
+  // batches.
+  let siteForButton: { id: string; name: string } | null = null;
+  let templateOptions: BatchTemplateOption[] = [];
+  if (siteFilter) {
+    const siteRes = await svc
+      .from("sites")
+      .select("id, name")
+      .eq("id", siteFilter)
+      .neq("status", "removed")
+      .maybeSingle();
+    if (siteRes.data) {
+      siteForButton = {
+        id: siteRes.data.id as string,
+        name: siteRes.data.name as string,
+      };
+      const { data: dsRow } = await svc
+        .from("design_systems")
+        .select("id")
+        .eq("site_id", siteForButton.id)
+        .eq("status", "active")
+        .maybeSingle();
+      if (dsRow) {
+        const { data: tmpls } = await svc
+          .from("design_templates")
+          .select("id, name, page_type")
+          .eq("design_system_id", dsRow.id as string)
+          .order("page_type", { ascending: true });
+        templateOptions = (tmpls ?? []).map((t) => ({
+          id: t.id as string,
+          name: t.name as string,
+          page_type: t.page_type as string,
+        }));
+      }
+    }
+  }
+
   return (
     <>
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold">Batches</h1>
           <p className="text-sm text-muted-foreground">
-            Every batch-generation run. Click a row for slot-level detail
-            and cancellation.
+            {siteForButton
+              ? `Batches for ${siteForButton.name}.`
+              : "Every batch-generation run. Click a row for slot-level detail and cancellation."}
           </p>
+          {siteForButton && (
+            <Link
+              href="/admin/batches"
+              className="mt-1 inline-block text-xs text-muted-foreground hover:text-foreground"
+            >
+              ← All batches
+            </Link>
+          )}
         </div>
+        <NewBatchButton
+          site={siteForButton}
+          templates={templateOptions}
+          label="New batch"
+        />
       </div>
 
       <div className="mt-6">

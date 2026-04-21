@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 type FormState = {
   name: string;
   wp_url: string;
-  prefix: string;
   wp_user: string;
   wp_app_password: string;
 };
@@ -17,7 +16,6 @@ type FormState = {
 const INITIAL_STATE: FormState = {
   name: "",
   wp_url: "",
-  prefix: "",
   wp_user: "",
   wp_app_password: "",
 };
@@ -95,9 +93,6 @@ export function AddSiteModal({
     } catch {
       errs.wp_url = "Must be a valid URL (e.g. https://example.com).";
     }
-    if (!/^[a-z0-9]{2,4}$/.test(form.prefix)) {
-      errs.prefix = "2–4 characters, lowercase letters or digits only.";
-    }
     if (form.wp_user.trim().length < 1 || form.wp_user.length > 100) {
       errs.wp_user = "Required (1–100 characters).";
     }
@@ -135,7 +130,11 @@ export function AddSiteModal({
 
       const code = payload?.error?.code;
       if (code === "PREFIX_TAKEN") {
-        setFieldErrors({ prefix: payload.error.message });
+        // Auto-generated prefix collided after exhausting every
+        // candidate. Extremely rare but surfaces here as a top-level
+        // form error rather than a field error — the operator has no
+        // prefix field to correct.
+        setFormError(payload.error.message);
       } else if (code === "VALIDATION_FAILED" && payload?.error?.details?.issues) {
         const errs: Partial<Record<keyof FormState, string>> = {};
         for (const issue of payload.error.details.issues) {
@@ -205,28 +204,6 @@ export function AddSiteModal({
               disabled={submitting}
             />
             <FieldError message={fieldErrors.wp_url} />
-          </div>
-
-          <div>
-            <Label htmlFor="site-prefix">Scope prefix</Label>
-            <Input
-              id="site-prefix"
-              value={form.prefix}
-              onChange={(e) =>
-                setField(
-                  "prefix",
-                  e.target.value.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 4),
-                )
-              }
-              maxLength={4}
-              placeholder="ls"
-              className="font-mono"
-              disabled={submitting}
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              2–4 characters, lowercase letters or digits. Must be unique.
-            </p>
-            <FieldError message={fieldErrors.prefix} />
           </div>
 
           <div>
