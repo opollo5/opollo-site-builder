@@ -74,12 +74,15 @@ CREATE TABLE tenant_cost_budgets (
   CONSTRAINT tenant_cost_budgets_site_unique UNIQUE (site_id)
 );
 
+-- Plain b-tree indexes on the reset timestamps. Partial predicates
+-- using now() + interval are rejected because now() is STABLE, not
+-- IMMUTABLE. The full index is still cheap at tenant-scale (one row
+-- per site) and the reset cron's WHERE now() > reset_at predicate
+-- uses the ordering directly.
 CREATE INDEX idx_tenant_budgets_daily_reset
-  ON tenant_cost_budgets (daily_reset_at)
-  WHERE daily_reset_at <= now() + interval '1 day';
+  ON tenant_cost_budgets (daily_reset_at);
 CREATE INDEX idx_tenant_budgets_monthly_reset
-  ON tenant_cost_budgets (monthly_reset_at)
-  WHERE monthly_reset_at <= now() + interval '32 days';
+  ON tenant_cost_budgets (monthly_reset_at);
 
 ALTER TABLE tenant_cost_budgets ENABLE ROW LEVEL SECURITY;
 
