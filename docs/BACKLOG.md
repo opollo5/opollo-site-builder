@@ -6,9 +6,24 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M4 — image library (in flight)
+## M5 — image library admin UI (in flight)
 
-Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
+Parent plan: `docs/plans/m5-parent.md`. Sub-slice status tracker:
+
+| Slice | Status | Notes |
+| --- | --- | --- |
+| M5-1 | in flight | `/admin/images` list page + `lib/image-library.ts` data layer + nav link. |
+| M5-2 | planned | `/admin/images/[id]` detail page with `image_usage` + `image_metadata` panes. |
+| M5-3 | planned | Metadata edit modal + `PATCH /api/admin/images/[id]` with `version_lock`. |
+| M5-4 | planned | Soft-delete + restore with `IMAGE_IN_USE` guard. |
+
+No new env vars — every Cloudflare secret needed for thumbnails is already provisioned from M4.
+
+---
+
+## M4 — image library (shipped)
+
+Parent plan: `docs/plans/m4.md`. All seven sub-slices merged.
 
 | Slice | Status | Notes |
 | --- | --- | --- |
@@ -18,7 +33,7 @@ Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
 | M4-4 | merged (#59) | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
 | M4-5 | merged (#62) | iStock seed script: CSV ingest + dry-run + budget cap. |
 | M4-6 | merged (#60) | `search_images` chat tool. |
-| M4-7 | in flight | WP media transfer + HTML URL rewrite on publish. |
+| M4-7 | merged (#63) | WP media transfer + HTML URL rewrite on publish. |
 
 Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IMAGES_HASH` all provisioned in Vercel Production + Preview as of 2026-04-21.
 
