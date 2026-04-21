@@ -29,8 +29,17 @@ jobs:
     env:
       # Legacy Basic Auth path — matches the default when
       # FEATURE_SUPABASE_AUTH isn't set. /login renders without an
-      # upstream Supabase.
+      # upstream Supabase in this mode. Leave BASIC_AUTH_USER /
+      # BASIC_AUTH_PASSWORD unset so middleware falls through to
+      # NextResponse.next().
       FEATURE_SUPABASE_AUTH: "false"
+      # Placeholders so any lazy env reads during module init don't
+      # crash the boot. The routes that actually call Supabase aren't
+      # hit by Lighthouse (only /login).
+      SUPABASE_URL: "http://127.0.0.1:54321"
+      SUPABASE_ANON_KEY: "placeholder-anon"
+      SUPABASE_SERVICE_ROLE_KEY: "placeholder-service"
+      OPOLLO_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     steps:
       - uses: actions/checkout@v4
 
@@ -51,7 +60,7 @@ jobs:
         run: npm run build
 
       - name: Install Lighthouse CI
-        run: npm install --no-save @lhci/cli@0.14.x
+        run: npm install --no-save @lhci/cli@0.13.x
 
       - name: Run Lighthouse
         run: npx lhci autorun
