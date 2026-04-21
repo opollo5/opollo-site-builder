@@ -1,0 +1,31 @@
+# gitleaks configuration — extends the default rule set with
+# allow-list entries for known-safe test fixtures that would
+# otherwise trigger on real production secrets.
+#
+# Rule of thumb: if you add an entry here, leave a comment
+# justifying *why* the string is safe to ignore.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known-safe test fixtures and public local-dev secrets"
+
+# Paths that contain deterministic test data only.
+paths = [
+  '''lib/__tests__/''',
+  '''e2e/''',
+]
+
+regexes = [
+  # Deterministic zero-filled base64 key used by the vitest + E2E test
+  # setup (lib/__tests__/_setup.ts, .github/workflows/e2e.yml). It's
+  # 32 bytes of zeros — NOT a live credential. Real production loads
+  # from the OPOLLO_MASTER_KEY env var.
+  '''AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=''',
+  # `supabase start` prints its ANON + SERVICE_ROLE keys to stdout.
+  # Those are the *local* Supabase stack's JWTs — documented publicly
+  # by Supabase, identical on every developer machine, useless outside
+  # localhost. The M2 test comments reference them.
+  '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9''',
+]

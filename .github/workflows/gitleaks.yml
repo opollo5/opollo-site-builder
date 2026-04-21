@@ -1,0 +1,41 @@
+name: Secret scan
+
+# Scan every PR and push for leaked secrets (API keys, tokens,
+# private keys, etc.) via gitleaks. Fails the build if anything
+# matches the rule set.
+#
+# This is the CI-side safety net. The pre-commit hook (added with
+# the DX sub-PR's Husky config) is the first line; this workflow
+# catches anything that slipped past the local hook — including
+# contributions that don't run pre-commit at all.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so gitleaks can walk commits on a PR branch.
+          fetch-depth: 0
+
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # No GITLEAKS_LICENSE set — the action's free tier covers
+          # public + single-org-private repos under 25 committers.
