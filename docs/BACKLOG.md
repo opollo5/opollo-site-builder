@@ -6,9 +6,25 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M7 — single-page re-generation (in flight)
+## M8 — per-tenant cost budgets (in flight)
 
-Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone — every sub-slice plan carries the full risks audit. Sub-slice status tracker:
+Parent plan: `docs/plans/m8-parent.md`. Sub-slice status tracker:
+
+| Slice | Status | Notes |
+| --- | --- | --- |
+| M8-1 | in flight | `tenant_cost_budgets` schema + auto-create trigger + backfill of existing sites. UNIQUE on site_id. |
+| M8-2 | planned | Enforcement in `createBatchJob` + `enqueueRegenJob`. `SELECT … FOR UPDATE` + atomic usage increment. BUDGET_EXCEEDED on overdraw. |
+| M8-3 | planned | iStock seed (M4-5) integration — pre-flight per-tenant cap check. |
+| M8-4 | planned | `/api/cron/budget-reset` hourly reset cron. Daily + monthly rollover. |
+| M8-5 | planned | Admin UI budget badge on `/admin/sites/[id]` + PATCH endpoint with version_lock. |
+
+New env vars (both optional, code-side defaults apply): `DEFAULT_TENANT_DAILY_BUDGET_CENTS` (default 500 = $5/day), `DEFAULT_TENANT_MONTHLY_BUDGET_CENTS` (default 10000 = $100/month).
+
+---
+
+## M7 — single-page re-generation (shipped)
+
+Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone; all five sub-slices merged.
 
 | Slice | Status | Notes |
 | --- | --- | --- |
@@ -16,7 +32,7 @@ Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone — ever
 | M7-2 | merged (#73) | Worker core (lease / heartbeat / reaper) + Anthropic integration + event-log-first billing + VERSION_CONFLICT short-circuit. |
 | M7-3 | merged (#75) | WP update stage with drift reconciliation + M4-7 image transfer + `pages.version_lock` bump. |
 | M7-4 | merged (#77) | Admin UI: "Re-generate" button + status polling panel + enqueue endpoint with REGEN_ALREADY_IN_FLIGHT guard. |
-| M7-5 | in flight | Cron wiring (`/api/cron/process-regenerations`) + daily budget cap (`REGEN_DAILY_BUDGET_CENTS` → `BUDGET_EXCEEDED`) + retry/backoff via `retry_after` + REGEN_RETRY_BACKOFF_MS. |
+| M7-5 | merged (#78) | Cron wiring (`/api/cron/process-regenerations`) + daily budget cap (`REGEN_DAILY_BUDGET_CENTS` → `BUDGET_EXCEEDED`) + retry/backoff via `retry_after` + REGEN_RETRY_BACKOFF_MS. |
 
 No new env vars — every external dependency (`ANTHROPIC_API_KEY`, `CLOUDFLARE_*`, `OPOLLO_MASTER_KEY`, `CRON_SECRET`) is already provisioned from M3 + M4.
 
