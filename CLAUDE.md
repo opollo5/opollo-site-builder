@@ -6,6 +6,12 @@ A chat interface that generates WordPress pages for Opollo's clients.
 
 ## How to work
 - Work autonomously. Don't ask for permission for normal coding tasks.
+- **Read `docs/patterns/<pattern-name>.md` before starting any task that matches
+  a documented pattern.** The patterns folder is the playbook for recurring
+  shapes (new admin page, new API route, new migration, ship a sub-slice,
+  extract a design system). If a task matches, follow the pattern — files,
+  tests, PR structure, pitfalls. If no pattern matches, proceed from first
+  principles and note whether the task is a candidate for a new pattern.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.

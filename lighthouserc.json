@@ -2,13 +2,18 @@
   "ci": {
     "collect": {
       "url": ["http://127.0.0.1:3000/login"],
-      "startServerCommand": "npm run start",
-      "startServerReadyPattern": "Ready|ready on",
-      "startServerReadyTimeout": 60000,
+      "startServerCommand": "npx next start -H 127.0.0.1 -p 3000",
+      "startServerReadyPattern": "Ready",
+      "startServerReadyTimeout": 120000,
       "numberOfRuns": 3,
       "settings": {
         "preset": "desktop",
-        "chromeFlags": "--no-sandbox --disable-setuid-sandbox --headless=new"
+        "chromeFlags": [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--headless=new"
+        ]
       }
     },
     "assert": {
