@@ -183,7 +183,7 @@ describe("processTransferItemUpload — happy path", () => {
 
 describe("processTransferItemUpload — idempotency + adoption", () => {
   it("re-processing the same item reuses the cloudflare idempotency key", async () => {
-    const { itemIds } = await seedIngestJob(1);
+    const { imageIds } = await seedIngestJob(1);
     const leased = await leaseNextTransferItem("w-a");
     if (!leased) return;
 
@@ -209,13 +209,14 @@ describe("processTransferItemUpload — idempotency + adoption", () => {
       leased.cloudflare_idempotency_key,
     );
 
-    // image_library carries exactly the idempotency id.
-    const { data: images } = await svc
+    // image_library carries exactly the idempotency id — one row, cloudflare_id
+    // equal to the (stable) idempotency key.
+    const { data: image } = await svc
       .from("image_library")
       .select("cloudflare_id")
-      .eq("id", itemIds[0]);
-    // Some items may have id null (not all seed rows are the tracked one); assert count 1
-    expect(images).toHaveLength(1);
+      .eq("id", imageIds[0])
+      .single();
+    expect(image?.cloudflare_id).toBe(leased.cloudflare_idempotency_key);
   });
 
   it("adoption path: second call returns an identical record; UPDATE stays idempotent", async () => {
