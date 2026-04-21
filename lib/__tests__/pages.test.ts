@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { getPage, LIST_PAGES_DEFAULT_LIMIT, listPagesForSite } from "@/lib/pages";
+import {
+  getPage,
+  LIST_PAGES_DEFAULT_LIMIT,
+  listPagesForSite,
+  updatePageMetadata,
+} from "@/lib/pages";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { seedAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // M6-1 — listPagesForSite + getPage unit tests.
@@ -313,6 +319,148 @@ describe("getPage — site scope guard", () => {
   it("returns NOT_FOUND for an unknown page id", async () => {
     const siteId = await seedSite({ name: "S", prefix: "sn" });
     const res = await getPage(siteId, "00000000-0000-0000-0000-000000000000");
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("NOT_FOUND");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updatePageMetadata — optimistic-locked edits (M6-3)
+// ---------------------------------------------------------------------------
+
+describe("updatePageMetadata — happy path", () => {
+  it("updates title + slug and bumps version_lock", async () => {
+    const siteId = await seedSite({ name: "S", prefix: "u1" });
+    const pageId = await seedPage(siteId, {
+      slug: "original-slug",
+      title: "Original title",
+    });
+    const res = await updatePageMetadata(siteId, pageId, {
+      expected_version: 1,
+      patch: { title: "New title", slug: "new-slug" },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.title).toBe("New title");
+    expect(res.data.slug).toBe("new-slug");
+    expect(res.data.version_lock).toBe(2);
+  });
+
+  it("applies a title-only patch without touching slug", async () => {
+    const siteId = await seedSite({ name: "S", prefix: "u2" });
+    const pageId = await seedPage(siteId, {
+      slug: "keep-me",
+      title: "Old",
+    });
+    const res = await updatePageMetadata(siteId, pageId, {
+      expected_version: 1,
+      patch: { title: "New only" },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.title).toBe("New only");
+    expect(res.data.slug).toBe("keep-me");
+  });
+
+  it("stamps last_edited_by when updated_by is supplied", async () => {
+    const siteId = await seedSite({ name: "S", prefix: "u3" });
+    const pageId = await seedPage(siteId, {
+      slug: "attributed",
+      title: "Attributed",
+    });
+    const user = await seedAuthUser({ role: "admin" });
+    const res = await updatePageMetadata(siteId, pageId, {
+      expected_version: 1,
+      updated_by: user.id,
+      patch: { title: "Edited by operator" },
+    });
+    expect(res.ok).toBe(true);
+
+    const svc = getServiceRoleClient();
+    const readBack = await svc
+      .from("pages")
+      .select("last_edited_by")
+      .eq("id", pageId)
+      .maybeSingle();
+    expect(readBack.data?.last_edited_by).toBe(user.id);
+  });
+});
+
+describe("updatePageMetadata — error paths", () => {
+  it("returns VERSION_CONFLICT when expected_version is stale", async () => {
+    const siteId = await seedSite({ name: "S", prefix: "u4" });
+    const pageId = await seedPage(siteId, {
+      slug: "conflict",
+      title: "Original",
+    });
+    // First edit bumps version_lock to 2.
+    await updatePageMetadata(siteId, pageId, {
+      expected_version: 1,
+      patch: { title: "Round one" },
+    });
+    // Stale edit must fail.
+    const res = await updatePageMetadata(siteId, pageId, {
+      expected_version: 1,
+      patch: { title: "Stale clobber" },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("VERSION_CONFLICT");
+    expect(res.error.details?.current_version).toBe(2);
+  });
+
+  it("returns UNIQUE_VIOLATION when slug collides with another page on the same site", async () => {
+    const siteId = await seedSite({ name: "S", prefix: "u5" });
+    await seedPage(siteId, { slug: "taken", title: "First" });
+    const secondId = await seedPage(siteId, {
+      slug: "free",
+      title: "Second",
+    });
+    const res = await updatePageMetadata(siteId, secondId, {
+      expected_version: 1,
+      patch: { slug: "taken" },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("UNIQUE_VIOLATION");
+    expect(res.error.details?.attempted_slug).toBe("taken");
+  });
+
+  it("allows the same slug to exist on a different site", async () => {
+    const siteA = await seedSite({ name: "A", prefix: "u6a" });
+    const siteB = await seedSite({ name: "B", prefix: "u6b" });
+    await seedPage(siteA, { slug: "shared", title: "A home" });
+    const bPage = await seedPage(siteB, { slug: "original", title: "B home" });
+    const res = await updatePageMetadata(siteB, bPage, {
+      expected_version: 1,
+      patch: { slug: "shared" },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.slug).toBe("shared");
+  });
+
+  it("returns NOT_FOUND when the page doesn't exist under the given site", async () => {
+    const siteId = await seedSite({ name: "S", prefix: "u7" });
+    const res = await updatePageMetadata(
+      siteId,
+      "00000000-0000-0000-0000-000000000000",
+      { expected_version: 1, patch: { title: "whatever" } },
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("NOT_FOUND");
+  });
+
+  it("returns NOT_FOUND when the page belongs to another site (cross-site guard)", async () => {
+    const siteA = await seedSite({ name: "A", prefix: "u8a" });
+    const siteB = await seedSite({ name: "B", prefix: "u8b" });
+    const pageB = await seedPage(siteB, { slug: "b-page", title: "B" });
+    const res = await updatePageMetadata(siteA, pageB, {
+      expected_version: 1,
+      patch: { title: "hijack attempt" },
+    });
     expect(res.ok).toBe(false);
     if (res.ok) return;
     expect(res.error.code).toBe("NOT_FOUND");

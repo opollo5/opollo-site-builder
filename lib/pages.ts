@@ -231,6 +231,153 @@ export async function getPage(
   }
 }
 
+// ---------------------------------------------------------------------------
+// updatePageMetadata — optimistic-locked title / slug edits (M6-3)
+// ---------------------------------------------------------------------------
+
+export const PAGE_TITLE_MIN = 3;
+export const PAGE_TITLE_MAX = 160;
+export const PAGE_SLUG_MAX = 100;
+export const PAGE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+export type UpdatePageMetadataPatch = {
+  title?: string;
+  slug?: string;
+};
+
+export type UpdatePageMetadataInput = {
+  expected_version: number;
+  updated_by?: string | null;
+  patch: UpdatePageMetadataPatch;
+};
+
+export async function updatePageMetadata(
+  siteId: string,
+  pageId: string,
+  input: UpdatePageMetadataInput,
+): Promise<ApiResponse<PageListItem & { version_lock: number }>> {
+  try {
+    return await updatePageMetadataImpl(siteId, pageId, input);
+  } catch (err) {
+    return internalError(
+      `Unhandled error in updatePageMetadata: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+async function updatePageMetadataImpl(
+  siteId: string,
+  pageId: string,
+  input: UpdatePageMetadataInput,
+): Promise<ApiResponse<PageListItem & { version_lock: number }>> {
+  const supabase = getServiceRoleClient();
+
+  const updateRow: Record<string, unknown> = {
+    updated_at: now(),
+    version_lock: input.expected_version + 1,
+  };
+  if (input.updated_by !== undefined) {
+    updateRow.last_edited_by = input.updated_by;
+  }
+  if ("title" in input.patch) updateRow.title = input.patch.title;
+  if ("slug" in input.patch) updateRow.slug = input.patch.slug;
+
+  const res = await supabase
+    .from("pages")
+    .update(updateRow)
+    .eq("id", pageId)
+    .eq("site_id", siteId)
+    .eq("version_lock", input.expected_version)
+    .select(
+      "id, site_id, wp_page_id, slug, title, page_type, template_id, design_system_version, status, updated_at, created_at, version_lock",
+    )
+    .maybeSingle();
+
+  if (res.error) {
+    // Unique-violation on pages_site_slug_unique (migration 0007) —
+    // operator edited the slug to one already used on this site.
+    if (res.error.code === "23505") {
+      return {
+        ok: false,
+        error: {
+          code: "UNIQUE_VIOLATION",
+          message: `Slug "${input.patch.slug}" is already used by another page on this site.`,
+          details: {
+            site_id: siteId,
+            attempted_slug: input.patch.slug ?? null,
+            postgres_code: "23505",
+          },
+          retryable: true,
+          suggested_action:
+            "Pick a different slug, or archive the conflicting page first.",
+        },
+        timestamp: now(),
+      };
+    }
+    return internalError("Failed to update page metadata.", {
+      supabase_error: res.error,
+    });
+  }
+
+  if (!res.data) {
+    // Zero rows returned: disambiguate NOT_FOUND vs VERSION_CONFLICT
+    // with a follow-up SELECT scoped to the site.
+    const existsRes = await supabase
+      .from("pages")
+      .select("id, version_lock")
+      .eq("id", pageId)
+      .eq("site_id", siteId)
+      .maybeSingle();
+    if (existsRes.error) {
+      return internalError("Failed to re-check page after update.", {
+        supabase_error: existsRes.error,
+      });
+    }
+    if (!existsRes.data) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No page found with id ${pageId} under site ${siteId}.`,
+          details: { site_id: siteId, page_id: pageId },
+          retryable: false,
+          suggested_action: "Verify both ids.",
+        },
+        timestamp: now(),
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: "VERSION_CONFLICT",
+        message:
+          "Another operator changed this page since you opened the editor. Reload to see the latest.",
+        details: {
+          page_id: pageId,
+          current_version: existsRes.data.version_lock,
+          expected_version: input.expected_version,
+        },
+        retryable: true,
+        suggested_action:
+          "Reload the page to pick up the latest metadata and redo your changes.",
+      },
+      timestamp: now(),
+    };
+  }
+
+  const row = res.data as Record<string, unknown>;
+  const base = bytesToRow(row);
+  return {
+    ok: true,
+    data: {
+      ...base,
+      version_lock:
+        typeof row.version_lock === "number" ? row.version_lock : 1,
+    },
+    timestamp: now(),
+  };
+}
+
 async function getPageImpl(
   siteId: string,
   pageId: string,
