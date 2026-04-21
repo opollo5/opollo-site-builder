@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 
 import { createSite } from "@/lib/sites";
 import {
@@ -36,6 +37,12 @@ export async function POST(req: Request) {
   }
 
   const result = await createSite(parsed.data);
+  if (result.ok) {
+    // Bust the cached server-component render of /admin/sites so the
+    // list reflects the new row on the next navigation — without this
+    // the client had to full-reload (reported during M3 sign-off).
+    revalidatePath("/admin/sites");
+  }
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
   return NextResponse.json(result, { status });
 }
