@@ -6,6 +6,7 @@ import {
   getPageJsonSchema,
   listPagesJsonSchema,
   publishPageJsonSchema,
+  searchImagesJsonSchema,
   updatePageJsonSchema,
   type ToolResponse,
 } from "@/lib/tool-schemas";
@@ -14,6 +15,7 @@ import { executeDeletePage } from "@/lib/delete-page";
 import { executeGetPage } from "@/lib/get-page";
 import { executeListPages } from "@/lib/list-pages";
 import { executePublishPage } from "@/lib/publish-page";
+import { executeSearchImages } from "@/lib/search-images";
 import { executeUpdatePage } from "@/lib/update-page";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getSite } from "@/lib/sites";
@@ -31,6 +33,7 @@ const TOOL_EXECUTORS: Record<string, ToolExecutor> = {
   update_page: executeUpdatePage,
   publish_page: executePublishPage,
   delete_page: executeDeletePage,
+  search_images: executeSearchImages,
 };
 
 const ALL_TOOLS = [
@@ -40,6 +43,7 @@ const ALL_TOOLS = [
   updatePageJsonSchema,
   publishPageJsonSchema,
   deletePageJsonSchema,
+  searchImagesJsonSchema,
 ];
 
 const EPHEMERAL = { type: "ephemeral" as const };
