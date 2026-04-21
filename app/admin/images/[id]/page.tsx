@@ -4,6 +4,7 @@ import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
+import { ImageArchiveButton } from "@/components/ImageArchiveButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { deliveryUrl } from "@/lib/cloudflare-images";
 import { getImage } from "@/lib/image-library";
@@ -156,14 +157,19 @@ export default async function AdminImageDetailPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <EditImageMetadataButton
-            image={{
-              id: image.id,
-              caption: image.caption,
-              alt_text: image.alt_text,
-              tags: image.tags,
-              version_lock: image.version_lock,
-            }}
+          {!image.deleted_at && (
+            <EditImageMetadataButton
+              image={{
+                id: image.id,
+                caption: image.caption,
+                alt_text: image.alt_text,
+                tags: image.tags,
+                version_lock: image.version_lock,
+              }}
+            />
+          )}
+          <ImageArchiveButton
+            image={{ id: image.id, deleted_at: image.deleted_at }}
           />
           <Link
             href={backHref}

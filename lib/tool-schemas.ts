@@ -31,6 +31,7 @@ export const ERROR_CODES = [
   "VERSION_CONFLICT",
   "UNIQUE_VIOLATION",
   "FK_VIOLATION",
+  "IMAGE_IN_USE",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -81,6 +82,7 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "PREFIX_TAKEN":
     case "VERSION_CONFLICT":
     case "UNIQUE_VIOLATION":
+    case "IMAGE_IN_USE":
       return 409;
     case "RATE_LIMIT":
       return 429;

@@ -406,6 +406,220 @@ async function updateImageMetadataImpl(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Soft-delete + restore (M5-4)
+// ---------------------------------------------------------------------------
+
+export type SoftDeleteInput = {
+  deleted_by?: string | null;
+};
+
+export type SoftDeleteResult = {
+  id: string;
+  deleted_at: string;
+};
+
+export async function softDeleteImage(
+  id: string,
+  input: SoftDeleteInput = {},
+): Promise<ApiResponse<SoftDeleteResult>> {
+  try {
+    return await softDeleteImageImpl(id, input);
+  } catch (err) {
+    return internalError(
+      `Unhandled error in softDeleteImage: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+async function softDeleteImageImpl(
+  id: string,
+  input: SoftDeleteInput,
+): Promise<ApiResponse<SoftDeleteResult>> {
+  const supabase = getServiceRoleClient();
+
+  // Existence check first so we can distinguish NOT_FOUND from
+  // IMAGE_IN_USE / already-deleted.
+  const existsRes = await supabase
+    .from("image_library")
+    .select("id, deleted_at")
+    .eq("id", id)
+    .maybeSingle();
+  if (existsRes.error) {
+    return internalError("Failed to look up image.", {
+      supabase_error: existsRes.error,
+    });
+  }
+  if (!existsRes.data) {
+    return {
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `No image found with id ${id}.`,
+        details: { id },
+        retryable: false,
+        suggested_action: "Verify the image id.",
+      },
+      timestamp: now(),
+    };
+  }
+  if (existsRes.data.deleted_at) {
+    return {
+      ok: true,
+      data: {
+        id: existsRes.data.id as string,
+        deleted_at: existsRes.data.deleted_at as string,
+      },
+      timestamp: now(),
+    };
+  }
+
+  // Guard: any image_usage row (regardless of state) blocks soft-delete.
+  // The FK ON DELETE NO ACTION already prevents a hard delete; this
+  // check gives the operator a friendly pre-UPDATE failure with the
+  // list of sites that still reference the image.
+  const usageRes = await supabase
+    .from("image_usage")
+    .select("id, site_id, site:sites!inner(name)")
+    .eq("image_id", id);
+  if (usageRes.error) {
+    return internalError("Failed to check image_usage.", {
+      supabase_error: usageRes.error,
+    });
+  }
+  const usageRows = (usageRes.data ?? []) as Record<string, unknown>[];
+  if (usageRows.length > 0) {
+    const siteNames = usageRows
+      .map((u) => {
+        const site = u.site as { name: string } | null;
+        return site?.name ?? "—";
+      })
+      .filter((n) => n && n !== "—");
+    return {
+      ok: false,
+      error: {
+        code: "IMAGE_IN_USE",
+        message: `Cannot archive — image is in use on ${usageRows.length} site${
+          usageRows.length === 1 ? "" : "s"
+        }.`,
+        details: {
+          id,
+          site_count: usageRows.length,
+          site_names: siteNames,
+        },
+        retryable: false,
+        suggested_action:
+          "Remove the image from each referencing site's pages first, then archive.",
+      },
+      timestamp: now(),
+    };
+  }
+
+  const nowIso = now();
+  const updateRow: Record<string, unknown> = {
+    deleted_at: nowIso,
+    updated_at: nowIso,
+  };
+  if (input.deleted_by !== undefined) {
+    updateRow.deleted_by = input.deleted_by;
+    updateRow.updated_by = input.deleted_by;
+  }
+
+  const res = await supabase
+    .from("image_library")
+    .update(updateRow)
+    .eq("id", id)
+    .is("deleted_at", null)
+    .select("id, deleted_at")
+    .maybeSingle();
+
+  if (res.error) {
+    return internalError("Failed to soft-delete image.", {
+      supabase_error: res.error,
+    });
+  }
+  if (!res.data) {
+    // Raced — another operator archived between our existence check
+    // and the UPDATE. Treat as idempotent success (the end state is
+    // what the caller asked for).
+    const readBack = await supabase
+      .from("image_library")
+      .select("id, deleted_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (readBack.error || !readBack.data?.deleted_at) {
+      return internalError("Soft-delete race left image in unexpected state.");
+    }
+    return {
+      ok: true,
+      data: {
+        id: readBack.data.id as string,
+        deleted_at: readBack.data.deleted_at as string,
+      },
+      timestamp: now(),
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      id: res.data.id as string,
+      deleted_at: res.data.deleted_at as string,
+    },
+    timestamp: now(),
+  };
+}
+
+export async function restoreImage(
+  id: string,
+  input: { restored_by?: string | null } = {},
+): Promise<ApiResponse<{ id: string }>> {
+  try {
+    const supabase = getServiceRoleClient();
+    const updateRow: Record<string, unknown> = {
+      deleted_at: null,
+      deleted_by: null,
+      updated_at: now(),
+    };
+    if (input.restored_by !== undefined) {
+      updateRow.updated_by = input.restored_by;
+    }
+    const res = await supabase
+      .from("image_library")
+      .update(updateRow)
+      .eq("id", id)
+      .select("id")
+      .maybeSingle();
+    if (res.error) {
+      return internalError("Failed to restore image.", {
+        supabase_error: res.error,
+      });
+    }
+    if (!res.data) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No image found with id ${id}.`,
+          details: { id },
+          retryable: false,
+          suggested_action: "Verify the image id.",
+        },
+        timestamp: now(),
+      };
+    }
+    return {
+      ok: true,
+      data: { id: res.data.id as string },
+      timestamp: now(),
+    };
+  } catch (err) {
+    return internalError(
+      `Unhandled error in restoreImage: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 export async function listImages(
   params: ListImagesParams = {},
 ): Promise<ApiResponse<ListImagesResult>> {

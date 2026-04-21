@@ -190,6 +190,56 @@ test.describe("images admin surface", () => {
     expect(response?.status()).toBe(404);
   });
 
+  test("archive flow removes image from active list; restore returns it", async ({
+    page,
+  }) => {
+    await page.goto("/admin/images");
+
+    // Pick the river fixture — deterministic caption.
+    await page
+      .getByTestId("image-row-link")
+      .filter({ hasText: /wide river cutting a forest valley/i })
+      .click();
+    await page.waitForURL(/\/admin\/images\/[0-9a-f-]{36}/);
+
+    // Auto-accept the confirm() dialog the archive button fires.
+    page.once("dialog", (dialog) => {
+      void dialog.accept();
+    });
+    await page.getByTestId("archive-image-button").click();
+
+    // After router.refresh, the detail page shows the archived banner
+    // + the Restore button replaces Archive.
+    await expect(page.getByTestId("restore-image-button")).toBeVisible();
+
+    // Active list no longer includes it.
+    await page.goto("/admin/images");
+    await expect(
+      page.getByText(/wide river cutting a forest valley/i),
+    ).toHaveCount(0);
+
+    // Archived view does.
+    await page.goto("/admin/images?deleted=1");
+    await expect(
+      page.getByText(/wide river cutting a forest valley/i),
+    ).toBeVisible();
+
+    // Restore from the detail page.
+    await page
+      .getByTestId("image-row-link")
+      .filter({ hasText: /wide river cutting a forest valley/i })
+      .click();
+    await page.waitForURL(/\/admin\/images\/[0-9a-f-]{36}/);
+    await page.getByTestId("restore-image-button").click();
+    await expect(page.getByTestId("archive-image-button")).toBeVisible();
+
+    // Active list shows it again.
+    await page.goto("/admin/images");
+    await expect(
+      page.getByText(/wide river cutting a forest valley/i),
+    ).toBeVisible();
+  });
+
   test("edit modal updates caption + tags and the list reflects the change", async ({
     page,
   }) => {

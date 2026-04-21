@@ -14,8 +14,8 @@ Parent plan: `docs/plans/m5-parent.md`. Sub-slice status tracker:
 | --- | --- | --- |
 | M5-1 | merged (#64) | `/admin/images` list page + `lib/image-library.ts` data layer + nav link. |
 | M5-2 | merged (#65) | `/admin/images/[id]` detail page with `image_usage` + `image_metadata` panes. |
-| M5-3 | in flight | Metadata edit modal + `PATCH /api/admin/images/[id]` with `version_lock`. |
-| M5-4 | planned | Soft-delete + restore with `IMAGE_IN_USE` guard. |
+| M5-3 | merged (#66) | Metadata edit modal + `PATCH /api/admin/images/[id]` with `version_lock`. |
+| M5-4 | in flight | Soft-delete + restore with `IMAGE_IN_USE` guard. |
 
 No new env vars — every Cloudflare secret needed for thumbnails is already provisioned from M4.
 
