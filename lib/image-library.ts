@@ -125,6 +125,151 @@ function rowToItem(row: Record<string, unknown>): ImageListItem {
   };
 }
 
+export type ImageUsageSiteRow = {
+  id: string;
+  site_id: string;
+  site_name: string;
+  wp_url: string;
+  wp_media_id: number | null;
+  wp_source_url: string | null;
+  state: "pending_transfer" | "transferred" | "failed";
+  transferred_at: string | null;
+  failure_code: string | null;
+  failure_detail: string | null;
+  created_at: string;
+};
+
+export type ImageMetadataRow = {
+  key: string;
+  value_jsonb: unknown;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ImageDetail = {
+  image: ImageListItem & { version_lock: number };
+  usage: ImageUsageSiteRow[];
+  metadata: ImageMetadataRow[];
+};
+
+const DETAIL_IMAGE_FIELDS =
+  "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at, version_lock";
+
+export async function getImage(
+  id: string,
+): Promise<ApiResponse<ImageDetail>> {
+  try {
+    return await getImageImpl(id);
+  } catch (err) {
+    return internalError(
+      `Unhandled error in getImage: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+async function getImageImpl(
+  id: string,
+): Promise<ApiResponse<ImageDetail>> {
+  const supabase = getServiceRoleClient();
+
+  const imageRes = await supabase
+    .from("image_library")
+    .select(DETAIL_IMAGE_FIELDS)
+    .eq("id", id)
+    .maybeSingle();
+
+  if (imageRes.error) {
+    return internalError("Failed to fetch image.", {
+      supabase_error: imageRes.error,
+    });
+  }
+  if (!imageRes.data) {
+    return {
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `No image found with id ${id}.`,
+        details: { id },
+        retryable: false,
+        suggested_action:
+          "Verify the image id. Soft-deleted images are still fetchable; hard-removed ids are not.",
+      },
+      timestamp: now(),
+    };
+  }
+
+  const row = imageRes.data as Record<string, unknown>;
+  const base = rowToItem(row);
+  const image = {
+    ...base,
+    version_lock: typeof row.version_lock === "number" ? row.version_lock : 1,
+  };
+
+  // Usage rows joined to sites so the UI can render the site name
+  // rather than a bare UUID. Service-role query; RLS is not a factor
+  // here since admin-gate has already authorised the caller.
+  const usageRes = await supabase
+    .from("image_usage")
+    .select(
+      "id, site_id, wp_media_id, wp_source_url, state, transferred_at, failure_code, failure_detail, created_at, site:sites!inner(name, wp_url)",
+    )
+    .eq("image_id", id)
+    .order("created_at", { ascending: false });
+
+  if (usageRes.error) {
+    return internalError("Failed to fetch image_usage.", {
+      supabase_error: usageRes.error,
+    });
+  }
+
+  const usage: ImageUsageSiteRow[] = (
+    (usageRes.data ?? []) as Record<string, unknown>[]
+  ).map((u) => {
+    const site = u.site as { name: string; wp_url: string } | null;
+    return {
+      id: u.id as string,
+      site_id: u.site_id as string,
+      site_name: site?.name ?? "—",
+      wp_url: site?.wp_url ?? "",
+      wp_media_id:
+        typeof u.wp_media_id === "number" ? u.wp_media_id : null,
+      wp_source_url: (u.wp_source_url as string | null) ?? null,
+      state: u.state as ImageUsageSiteRow["state"],
+      transferred_at: (u.transferred_at as string | null) ?? null,
+      failure_code: (u.failure_code as string | null) ?? null,
+      failure_detail: (u.failure_detail as string | null) ?? null,
+      created_at: u.created_at as string,
+    };
+  });
+
+  const metaRes = await supabase
+    .from("image_metadata")
+    .select("key, value_jsonb, created_at, updated_at")
+    .eq("image_id", id)
+    .order("key", { ascending: true });
+
+  if (metaRes.error) {
+    return internalError("Failed to fetch image_metadata.", {
+      supabase_error: metaRes.error,
+    });
+  }
+
+  const metadata: ImageMetadataRow[] = (
+    (metaRes.data ?? []) as Record<string, unknown>[]
+  ).map((m) => ({
+    key: m.key as string,
+    value_jsonb: m.value_jsonb,
+    created_at: m.created_at as string,
+    updated_at: m.updated_at as string,
+  }));
+
+  return {
+    ok: true,
+    data: { image, usage, metadata },
+    timestamp: now(),
+  };
+}
+
 export async function listImages(
   params: ListImagesParams = {},
 ): Promise<ApiResponse<ListImagesResult>> {

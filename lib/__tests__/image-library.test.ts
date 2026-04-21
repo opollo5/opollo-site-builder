@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
   LIST_IMAGES_MAX_LIMIT,
+  getImage,
   listImages,
 } from "@/lib/image-library";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -304,5 +305,152 @@ describe("listImages — row shape", () => {
     expect(item?.width_px).toBe(1024);
     expect(item?.height_px).toBe(768);
     expect(item?.deleted_at).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getImage — detail fetch with usage + metadata joins
+// ---------------------------------------------------------------------------
+
+async function seedSite(opts: { name: string; prefix: string; wp_url?: string }): Promise<string> {
+  const svc = getServiceRoleClient();
+  const { data, error } = await svc
+    .from("sites")
+    .insert({
+      name: opts.name,
+      prefix: opts.prefix,
+      wp_url: opts.wp_url ?? `https://${opts.prefix}.example`,
+      status: "active",
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    throw new Error(`seedSite: ${error?.message ?? "no row"}`);
+  }
+  return data.id as string;
+}
+
+async function seedUsage(opts: {
+  image_id: string;
+  site_id: string;
+  state?: "pending_transfer" | "transferred" | "failed";
+  wp_media_id?: number | null;
+}): Promise<void> {
+  const svc = getServiceRoleClient();
+  const { error } = await svc.from("image_usage").insert({
+    image_id: opts.image_id,
+    site_id: opts.site_id,
+    state: opts.state ?? "transferred",
+    wp_media_id: opts.wp_media_id ?? 4242,
+    wp_source_url: "https://example.test/wp-content/uploads/x.jpg",
+    wp_idempotency_marker: `m-${opts.site_id}-${opts.image_id}`,
+    transferred_at: new Date().toISOString(),
+  });
+  if (error) throw new Error(`seedUsage: ${error.message}`);
+}
+
+async function seedMetadata(opts: {
+  image_id: string;
+  key: string;
+  value: unknown;
+}): Promise<void> {
+  const svc = getServiceRoleClient();
+  const { error } = await svc.from("image_metadata").insert({
+    image_id: opts.image_id,
+    key: opts.key,
+    value_jsonb: opts.value,
+  });
+  if (error) throw new Error(`seedMetadata: ${error.message}`);
+}
+
+describe("getImage — detail fetch", () => {
+  it("returns NOT_FOUND for an unknown id", async () => {
+    const res = await getImage("00000000-0000-0000-0000-000000000000");
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("NOT_FOUND");
+  });
+
+  it("joins image_usage rows with site name + wp_url", async () => {
+    const imageId = await seedImage({
+      source_ref: "s-join",
+      caption: "Join test image.",
+      tags: ["join"],
+    });
+    const siteA = await seedSite({ name: "Site Alpha", prefix: "a1" });
+    const siteB = await seedSite({ name: "Site Bravo", prefix: "b1" });
+    await seedUsage({ image_id: imageId, site_id: siteA, wp_media_id: 101 });
+    await seedUsage({
+      image_id: imageId,
+      site_id: siteB,
+      wp_media_id: 202,
+      state: "pending_transfer",
+    });
+
+    const res = await getImage(imageId);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.usage).toHaveLength(2);
+    const names = res.data.usage.map((u) => u.site_name).sort();
+    expect(names).toEqual(["Site Alpha", "Site Bravo"]);
+    const alphaRow = res.data.usage.find((u) => u.site_name === "Site Alpha");
+    expect(alphaRow?.wp_media_id).toBe(101);
+    expect(alphaRow?.state).toBe("transferred");
+    expect(alphaRow?.wp_url).toBe("https://a1.example");
+  });
+
+  it("returns metadata rows sorted by key", async () => {
+    const imageId = await seedImage({
+      source_ref: "s-meta",
+      caption: "Metadata test.",
+    });
+    await seedMetadata({ image_id: imageId, key: "zebra", value: "last" });
+    await seedMetadata({
+      image_id: imageId,
+      key: "alpha",
+      value: { nested: true },
+    });
+
+    const res = await getImage(imageId);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.metadata.map((m) => m.key)).toEqual(["alpha", "zebra"]);
+    expect(res.data.metadata[0]?.value_jsonb).toEqual({ nested: true });
+  });
+
+  it("returns empty arrays when no usage / metadata rows exist", async () => {
+    const imageId = await seedImage({
+      source_ref: "s-lonely",
+      caption: "Lonely image.",
+    });
+    const res = await getImage(imageId);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.usage).toEqual([]);
+    expect(res.data.metadata).toEqual([]);
+  });
+
+  it("surfaces version_lock for optimistic-concurrency wiring (M5-3)", async () => {
+    const imageId = await seedImage({
+      source_ref: "s-version",
+      caption: "Versioned image.",
+    });
+    const res = await getImage(imageId);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.image.version_lock).toBe(1);
+  });
+
+  it("still fetches soft-deleted images (admin surface)", async () => {
+    const imageId = await seedImage({
+      source_ref: "s-soft-del",
+      caption: "Soft-deleted.",
+      deleted: true,
+    });
+    const res = await getImage(imageId);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.image.id).toBe(imageId);
+    expect(res.data.image.deleted_at).not.toBeNull();
   });
 });

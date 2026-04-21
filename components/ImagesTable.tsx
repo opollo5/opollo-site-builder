@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { deliveryUrl } from "@/lib/cloudflare-images";
 import type { ImageListItem } from "@/lib/image-library";
 import { formatRelativeTime } from "@/lib/utils";
@@ -63,7 +65,23 @@ function Thumbnail({ item }: { item: ImageListItem }) {
   );
 }
 
-export function ImagesTable({ items }: { items: ImageListItem[] }) {
+type ImagesTableProps = {
+  items: ImageListItem[];
+  /**
+   * Serialised list state for the back-nav (e.g. "/admin/images?q=cat&page=2").
+   * The detail page uses this as its "← Back to library" href so filters
+   * survive a round-trip.
+   */
+  backHref?: string;
+};
+
+function buildDetailHref(id: string, backHref: string | undefined): string {
+  if (!backHref || backHref === "/admin/images") return `/admin/images/${id}`;
+  const params = new URLSearchParams({ from: backHref });
+  return `/admin/images/${id}?${params.toString()}`;
+}
+
+export function ImagesTable({ items, backHref }: ImagesTableProps) {
   if (items.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
@@ -99,13 +117,17 @@ export function ImagesTable({ items }: { items: ImageListItem[] }) {
                 <Thumbnail item={item} />
               </td>
               <td className="px-4 py-3 align-top">
-                <div className="line-clamp-2 max-w-md text-sm">
+                <Link
+                  href={buildDetailHref(item.id, backHref)}
+                  className="line-clamp-2 block max-w-md text-sm hover:underline"
+                  data-testid="image-row-link"
+                >
                   {item.caption ?? (
                     <span className="text-muted-foreground">
                       (no caption yet)
                     </span>
                   )}
-                </div>
+                </Link>
                 {item.filename && (
                   <div className="mt-1 text-xs text-muted-foreground">
                     {item.filename}
