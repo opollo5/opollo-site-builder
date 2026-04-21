@@ -55,7 +55,12 @@ describe("parseCaptionPayload", () => {
 
   it("throws CAPTION_VALIDATION_FAILED for tags count below 3", () => {
     const bad = JSON.stringify({ ...VALID, tags: ["one", "two"] });
-    expect(() => parseCaptionPayload(bad)).toThrow(/VALIDATION/);
+    try {
+      parseCaptionPayload(bad);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as CaptionCallError).code).toBe("CAPTION_VALIDATION_FAILED");
+    }
   });
 
   it("throws CAPTION_VALIDATION_FAILED for tags count above 10", () => {
@@ -63,12 +68,22 @@ describe("parseCaptionPayload", () => {
       ...VALID,
       tags: Array.from({ length: 11 }, (_, i) => `t${i}`),
     });
-    expect(() => parseCaptionPayload(bad)).toThrow(/VALIDATION/);
+    try {
+      parseCaptionPayload(bad);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as CaptionCallError).code).toBe("CAPTION_VALIDATION_FAILED");
+    }
   });
 
   it("throws CAPTION_VALIDATION_FAILED for missing alt_text", () => {
     const bad = JSON.stringify({ caption: VALID.caption, tags: VALID.tags });
-    expect(() => parseCaptionPayload(bad)).toThrow(/VALIDATION/);
+    try {
+      parseCaptionPayload(bad);
+      throw new Error("should have thrown");
+    } catch (err) {
+      expect((err as CaptionCallError).code).toBe("CAPTION_VALIDATION_FAILED");
+    }
   });
 });
 
