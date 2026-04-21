@@ -1,0 +1,102 @@
+name: E2E
+
+# Level-1 (happy-path) + axe-core a11y audit, running against a
+# built Next.js server backed by ephemeral local Supabase. Visual
+# regression is a follow-up — baselines need to be captured in
+# this exact CI image first, reviewed, and committed.
+#
+# Runs on every PR + push to main. Separate workflow from ci.yml
+# so vitest + E2E run in parallel and each is independently
+# reportable.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # Force the admin gate ON so E2E exercises the real Supabase
+      # Auth flow (matches the webServer config in playwright.config).
+      FEATURE_SUPABASE_AUTH: "true"
+      # Deterministic key — matches what lib/__tests__/_setup.ts seeds
+      # for the vitest suite. Never used for production-grade
+      # encryption; this stack is ephemeral.
+      OPOLLO_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Read Supabase credentials into env
+        id: supa
+        run: |
+          URL=$(supabase status --output json | jq -r '.API_URL')
+          SVC=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')
+          ANON=$(supabase status --output json | jq -r '.ANON_KEY')
+          DB=$(supabase status --output json | jq -r '.DB_URL')
+          echo "SUPABASE_URL=$URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SVC" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$ANON" >> "$GITHUB_ENV"
+          echo "SUPABASE_DB_URL=$DB" >> "$GITHUB_ENV"
+
+      - name: Run Playwright suite
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+      - name: Upload test artifacts (traces + axe findings)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results
+          retention-days: 7
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup || true
