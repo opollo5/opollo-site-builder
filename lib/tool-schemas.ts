@@ -33,6 +33,7 @@ export const ERROR_CODES = [
   "FK_VIOLATION",
   "IMAGE_IN_USE",
   "REGEN_ALREADY_IN_FLIGHT",
+  "BUDGET_EXCEEDED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -87,6 +88,7 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "REGEN_ALREADY_IN_FLIGHT":
       return 409;
     case "RATE_LIMIT":
+    case "BUDGET_EXCEEDED":
       return 429;
     case "UPSTREAM_BLOCKED":
     case "WP_API_ERROR":

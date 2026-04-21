@@ -34,8 +34,16 @@ export const DEFAULT_REGEN_LEASE_MS = 180_000;
 export const DEFAULT_REGEN_HEARTBEAT_MS = 30_000;
 
 // The same retry budget the batch worker uses. A 3rd failure exits
-// terminal. M7-5 will layer retry_after backoff on top.
+// terminal. M7-5 layers retry_after backoff on top.
 export const REGEN_RETRY_MAX_ATTEMPTS = 3;
+
+// Indexed by the `attempts` value AT THE TIME OF FAILURE. 1st attempt
+// failed → wait 1s before re-lease; 2nd → wait 5s. A 3rd failure exits
+// terminal per the cap above. Matches the batch worker's RETRY_BACKOFF_MS.
+export const REGEN_RETRY_BACKOFF_MS: Record<number, number> = {
+  1: 1_000,
+  2: 5_000,
+};
 
 export type LeasedRegenJob = {
   id: string;
@@ -509,10 +517,15 @@ export type ProcessRegenJobResult =
 
 /**
  * Full pipeline for a leased regen job. Runs the Anthropic stage,
- * then hands the generated HTML to the M7-3 publisher. On any failure
- * the job is left in whatever terminal state the failing stage set
- * (failed / failed_gates / cancelled / succeeded) — the return value
- * tells the worker driver whether the failure was retryable.
+ * then hands the generated HTML to the M7-3 publisher.
+ *
+ * On retryable failures where attempts < REGEN_RETRY_MAX_ATTEMPTS,
+ * the job is reset to 'pending' with retry_after set to the backoff
+ * window. leaseNextRegenJob's candidate query excludes pending rows
+ * with retry_after in the future, so the job sits idle until its
+ * backoff expires. When attempts hits the cap OR the failure is
+ * non-retryable, the job is already in a terminal state (the inner
+ * stage records it) or gets terminal-failed here as a safety net.
  */
 export async function processRegenJob(
   jobId: string,
@@ -525,6 +538,11 @@ export async function processRegenJob(
     anthropicCall: opts.anthropicCall,
   });
   if (!anthropic.ok) {
+    await handleRetryOrTerminal(jobId, {
+      code: anthropic.code,
+      message: anthropic.message,
+      retryable: anthropic.retryable,
+    });
     return {
       ok: false,
       stage: "anthropic",
@@ -535,6 +553,11 @@ export async function processRegenJob(
   }
   const publish = await publishRegenJob(jobId, anthropic.generated_html, opts.wp);
   if (!publish.ok) {
+    await handleRetryOrTerminal(jobId, {
+      code: publish.code,
+      message: publish.message,
+      retryable: publish.retryable,
+    });
     return {
       ok: false,
       stage: "publish",
@@ -548,6 +571,89 @@ export async function processRegenJob(
     generated_html: anthropic.generated_html,
     publish,
   };
+}
+
+/**
+ * Shared retry / terminal-fail handler. Called after either stage
+ * returns a non-ok result. Reads the job's current state:
+ *   - If the inner stage already set a terminal status
+ *     (failed / failed_gates / cancelled), we do nothing — the
+ *     inner stage already recorded the reason.
+ *   - If the job is still 'running' AND the failure is retryable
+ *     AND attempts < cap, defer to pending with retry_after.
+ *   - Otherwise, terminal-fail + release the lease.
+ */
+async function handleRetryOrTerminal(
+  jobId: string,
+  failure: { code: string; message: string; retryable: boolean },
+): Promise<void> {
+  const supabase = getServiceRoleClient();
+  const { data, error } = await supabase
+    .from("regeneration_jobs")
+    .select("status, attempts")
+    .eq("id", jobId)
+    .maybeSingle();
+  if (error || !data) return;
+  if (data.status !== "running") {
+    // Inner stage already terminalled (or the job was cancelled /
+    // completed). Nothing to do.
+    return;
+  }
+
+  const attempts = Number(data.attempts ?? 0);
+  const shouldRetry =
+    failure.retryable && attempts < REGEN_RETRY_MAX_ATTEMPTS;
+
+  if (shouldRetry) {
+    const backoffMs = REGEN_RETRY_BACKOFF_MS[attempts] ?? 30_000;
+    await supabase
+      .from("regeneration_jobs")
+      .update({
+        status: "pending",
+        worker_id: null,
+        lease_expires_at: null,
+        retry_after: new Date(Date.now() + backoffMs).toISOString(),
+        failure_code: failure.code,
+        failure_detail: failure.message,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+    await supabase.from("regeneration_events").insert({
+      regeneration_job_id: jobId,
+      type: "retry_scheduled",
+      payload: {
+        attempts,
+        backoff_ms: backoffMs,
+        code: failure.code,
+        message: failure.message,
+      },
+    });
+    return;
+  }
+
+  // Terminal: cap reached or non-retryable. Keep whatever status the
+  // inner stage may have set; otherwise mark failed.
+  await supabase
+    .from("regeneration_jobs")
+    .update({
+      status: "failed",
+      worker_id: null,
+      lease_expires_at: null,
+      failure_code: failure.code,
+      failure_detail: failure.message,
+      finished_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", jobId);
+  await supabase.from("regeneration_events").insert({
+    regeneration_job_id: jobId,
+    type: "terminal_failure",
+    payload: {
+      attempts,
+      code: failure.code,
+      message: failure.message,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
