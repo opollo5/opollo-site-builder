@@ -5,6 +5,11 @@ import {
   type AnthropicCallFn,
 } from "@/lib/anthropic-call";
 import { computeCostCents, PRICING_VERSION } from "@/lib/anthropic-pricing";
+import {
+  publishRegenJob,
+  type PublishRegenResult,
+  type WpRegenCallBundle,
+} from "@/lib/regeneration-publisher";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -475,35 +480,74 @@ export async function processRegenJobAnthropic(
     };
   }
 
-  // M7-2 stub: store the HTML in the event log and mark succeeded.
-  // M7-3 will replace this with: run quality gates → WP PUT →
-  // image transfer → commit to pages.generated_html.
-  await supabase.from("regeneration_events").insert({
-    regeneration_job_id: jobId,
-    type: "m7_2_stub_succeeded",
-    payload: { generated_html_bytes: html.length },
-  });
+  // M7-2 left the job in 'running' here and the M7-3 publisher takes
+  // over from this point: quality gates → image transfer → WP PUT →
+  // commit to pages.generated_html → terminal 'succeeded'. Tests that
+  // want to exercise only the Anthropic stage call processRegenJobAnthropic
+  // directly; production runs go through processRegenJob which chains
+  // both halves.
+  return { ok: true, generated_html: html };
+}
 
-  const terminal = await supabase
-    .from("regeneration_jobs")
-    .update({
-      status: "succeeded",
-      finished_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      worker_id: null,
-      lease_expires_at: null,
-    })
-    .eq("id", jobId);
-  if (terminal.error) {
+// ---------------------------------------------------------------------------
+// Orchestrator — chains Anthropic + Publisher (M7-2 + M7-3)
+// ---------------------------------------------------------------------------
+
+export type ProcessRegenJobResult =
+  | {
+      ok: true;
+      generated_html: string;
+      publish: PublishRegenResult;
+    }
+  | {
+      ok: false;
+      stage: "anthropic" | "publish";
+      code: string;
+      message: string;
+      retryable: boolean;
+    };
+
+/**
+ * Full pipeline for a leased regen job. Runs the Anthropic stage,
+ * then hands the generated HTML to the M7-3 publisher. On any failure
+ * the job is left in whatever terminal state the failing stage set
+ * (failed / failed_gates / cancelled / succeeded) — the return value
+ * tells the worker driver whether the failure was retryable.
+ */
+export async function processRegenJob(
+  jobId: string,
+  opts: {
+    anthropicCall?: AnthropicCallFn;
+    wp: WpRegenCallBundle;
+  },
+): Promise<ProcessRegenJobResult> {
+  const anthropic = await processRegenJobAnthropic(jobId, {
+    anthropicCall: opts.anthropicCall,
+  });
+  if (!anthropic.ok) {
     return {
       ok: false,
-      code: "INTERNAL_ERROR",
-      message: `terminal state update failed: ${terminal.error.message}`,
-      retryable: true,
+      stage: "anthropic",
+      code: anthropic.code,
+      message: anthropic.message,
+      retryable: anthropic.retryable,
     };
   }
-
-  return { ok: true, generated_html: html };
+  const publish = await publishRegenJob(jobId, anthropic.generated_html, opts.wp);
+  if (!publish.ok) {
+    return {
+      ok: false,
+      stage: "publish",
+      code: publish.code,
+      message: publish.message,
+      retryable: publish.retryable,
+    };
+  }
+  return {
+    ok: true,
+    generated_html: anthropic.generated_html,
+    publish,
+  };
 }
 
 // ---------------------------------------------------------------------------
