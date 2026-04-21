@@ -75,6 +75,31 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - `npm run typecheck` — tsc --noEmit
 - `npm run build` — production build
 - `npm run test` — Vitest
+- `npm run test:coverage` — Vitest with V8 coverage (60% line / 55% branch baseline)
+- `npm run test:e2e` — Playwright (requires `supabase start`)
+- `npm run analyze` — production build with @next/bundle-analyzer reports
+
+## DX hygiene
+Pre-commit and commit-message hygiene is enforced via Husky. Hooks install on
+`npm install` via the `prepare` script.
+
+- **pre-commit:** `lint-staged` runs ESLint (auto-fix) on staged JS/TS and
+  stylelint on CSS. Any remaining warning fails the commit — `--max-warnings=0`.
+- **commit-msg:** `commitlint` enforces Conventional Commits
+  (feat / fix / chore / refactor / docs / test / perf / build / ci / revert).
+  Milestone scopes like `feat(m3-6):` or `feat(infra):` pass the default rule
+  set; header length cap is 100 chars.
+
+Supply-chain scanning runs server-side:
+- **CodeQL** (`.github/workflows/codeql.yml`) — SAST on every PR + weekly cron.
+- **Dependabot** (`.github/dependabot.yml`) — weekly npm + actions refresh,
+  Radix grouped, minors/patches grouped, majors separate.
+- **gitleaks** (`.github/workflows/gitleaks.yml`) — secret scan with
+  `.gitleaks.toml` allow-list for the deterministic test master key + local
+  Supabase JWTs.
+- **npm audit** (`.github/workflows/audit.yml`) — blocks on critical CVEs in
+  prod deps, informational at high. Threshold will tighten to `high` once the
+  pending Next.js framework upgrade lands.
 
 ## Standards
 - Server Components by default; Client Components only when required
