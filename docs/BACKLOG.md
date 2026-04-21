@@ -6,16 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M6 — per-page admin surface (in flight)
+## M7 — single-page re-generation (in flight)
 
-Parent plan: `docs/plans/m6-parent.md`. Sub-slice status tracker:
+Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone — every sub-slice plan carries the full risks audit. Sub-slice status tracker:
+
+| Slice | Status | Notes |
+| --- | --- | --- |
+| M7-1 | in flight | `regeneration_jobs` + `regeneration_events` schema with partial UNIQUE + lease-coherence CHECK + RLS. |
+| M7-2 | planned | Worker core with Anthropic integration, event-log-first billing, idempotency reuse. |
+| M7-3 | planned | WP update stage with drift reconciliation + M4-7 image transfer + `pages.version_lock` bump. |
+| M7-4 | planned | Admin UI: "Re-generate" button + polling status panel. |
+| M7-5 | planned | Cron wiring + budget cap + retry machinery. |
+
+No new env vars — every external dependency (`ANTHROPIC_API_KEY`, `CLOUDFLARE_*`, `OPOLLO_MASTER_KEY`, `CRON_SECRET`) is already provisioned from M3 + M4.
+
+---
+
+## M6 — per-page admin surface (shipped)
+
+Parent plan: `docs/plans/m6-parent.md`. All four sub-slices merged.
 
 | Slice | Status | Notes |
 | --- | --- | --- |
 | M6-1 | merged (#68) | `/admin/sites/[id]/pages` list + `lib/pages.ts` data layer + Pages link on site detail. |
 | M6-2 | merged (#69) | `/admin/sites/[id]/pages/[pageId]` detail + Tier-2 static preview + Tier-3 WP admin link. |
 | M6-3 | merged (#70) | Metadata edit modal (title + slug) + `PATCH /api/admin/sites/[id]/pages/[pageId]` with version_lock + UNIQUE_VIOLATION. |
-| M6-4 | in flight | UX-debt cleanup: de-jargon the design-system authoring forms per CLAUDE.md backlog. |
+| M6-4 | merged (#71) | UX-debt cleanup: de-jargon the design-system authoring forms per CLAUDE.md backlog. |
 
 No new env vars.
 
