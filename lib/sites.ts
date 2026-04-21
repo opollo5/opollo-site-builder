@@ -420,7 +420,7 @@ export async function updateSiteBasics(
       .eq("id", id)
       .neq("status", "removed")
       .select()
-      .single();
+      .maybeSingle();
     if (error) {
       return internalError("Failed to update site.", {
         supabase_error: error,
