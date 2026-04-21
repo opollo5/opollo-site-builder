@@ -14,11 +14,11 @@ Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
 | --- | --- | --- |
 | M4-1 | merged (#57) | Schema: 6 tables + constraints + RLS + FTS trigger. |
 | M4-2 | merged (#58) | Worker core (lease / heartbeat / reaper over `transfer_job_items` + dummy processor). |
-| M4-3 | in flight | Cloudflare upload worker stage + orchestrator. |
+| M4-3 | merged (#61) | Cloudflare upload worker stage + orchestrator. |
 | M4-4 | merged (#59) | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
-| M4-5 | planned | iStock 9k seed script. Unblocks once M4-3 merges. |
+| M4-5 | in flight | iStock seed script: CSV ingest + dry-run + budget cap. |
 | M4-6 | merged (#60) | `search_images` chat tool. |
-| M4-7 | planned | WP media transfer + HTML URL rewrite on publish. Unblocks once M4-3 merges. |
+| M4-7 | planned | WP media transfer + HTML URL rewrite on publish. |
 
 Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IMAGES_HASH` all provisioned in Vercel Production + Preview as of 2026-04-21.
 
@@ -84,6 +84,23 @@ Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IM
 **Why deferred:** scope belongs with M4 (cost-control surface). Global Anthropic project cap in the dashboard is the stopgap.
 **Trigger:** start of M4.
 **Scope:** one migration + `createBatchJob` check + end-of-month reset cron + tests.
+
+### Anthropic pricing-table scale audit
+**What:** reconcile `lib/anthropic-pricing.ts`'s rate table with the scale implied
+by its own doc-comment. The table entries (e.g. Sonnet 4.6 input=3.0) don't match
+the "$3/M input, micro-cents per token" convention stated in the file header —
+depending on which line is authoritative, absolute cost reporting is off by ~100×.
+**Why deferred:** existing M3 + M4-4 tests only assert "cost > 0" and
+sum-equals-sum reconciliation, so the miscalibration never fails a test. M4-5
+explicitly uses a direct per-image constant for its pre-flight estimate rather
+than routing through `computeCostCents`, which keeps the seed's operator-facing
+numbers matching the plan's published $63 figure for 9k images.
+**Trigger:** any slice that surfaces per-$ cost to a human (admin UI cost column,
+monthly-budget alert, tenant-cost dashboard). Once there's a consumer of absolute
+cost, rate calibration matters.
+**Scope:** decide the units convention, rewrite the table accordingly, update
+the comment, add a fixture test that asserts "1M Opus tokens at 15 USD" produces
+1500 cents.
 
 ---
 
