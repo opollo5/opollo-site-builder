@@ -5,6 +5,10 @@ import {
   type AnthropicCallFn,
 } from "@/lib/anthropic-call";
 import { computeCostCents, PRICING_VERSION } from "@/lib/anthropic-pricing";
+import {
+  publishSlot,
+  type WpCallBundle,
+} from "@/lib/batch-publisher";
 import { runGates } from "@/lib/quality-gates";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -472,6 +476,7 @@ export async function processSlotAnthropic(
     anthropicCall?: AnthropicCallFn;
     model?: string;
     maxTokens?: number;
+    wp?: WpCallBundle;
   } = {},
 ): Promise<void> {
   const call = opts.anthropicCall ?? defaultAnthropicCall;
@@ -734,24 +739,27 @@ export async function processSlotAnthropic(
       return;
     }
 
-    // Gates passed: advance validating → succeeded, same as M3-4's
-    // final UPDATE but guarded by state = 'validating' now.
-    const finalise = await c.query(
+    // Gates passed. Save cost/tokens/html on the slot FIRST (state
+    // stays 'validating'), THEN branch:
+    //   - opts.wp present → publishSlot advances validating →
+    //     publishing → succeeded (or marks 'failed' on WP error).
+    //   - opts.wp absent   → advance directly to 'succeeded' (the
+    //     M3-4/M3-5 path; keeps dummy / test paths working without
+    //     WP credentials).
+    // Cost is recorded regardless of what happens after — we paid
+    // Anthropic, that's the billing truth.
+    const saveCost = await c.query(
       `
       UPDATE generation_job_pages
-         SET state = 'succeeded',
-             generated_html = $4,
+         SET generated_html = $4,
              anthropic_raw_response_id = $3,
              cost_usd_cents = $5,
              input_tokens = $6,
              output_tokens = $7,
              cached_tokens = $8,
-             finished_at = now(),
-             lease_expires_at = NULL,
-             worker_id = NULL,
+             last_heartbeat_at = now(),
              updated_at = now()
-       WHERE id = $1 AND worker_id = $2
-         AND state = 'validating'
+       WHERE id = $1 AND worker_id = $2 AND state = 'validating'
       `,
       [
         slotId,
@@ -765,37 +773,21 @@ export async function processSlotAnthropic(
           (response.usage.cache_read_input_tokens ?? 0),
       ],
     );
-    if ((finalise.rowCount ?? 0) === 0) {
+    if ((saveCost.rowCount ?? 0) === 0) {
       throw new Error(
-        `processSlotAnthropic: lease stolen or state changed before finalising slot ${slotId}`,
+        `processSlotAnthropic: lease stolen or state changed before cost save for slot ${slotId}`,
       );
     }
 
-    // Roll the parent job's aggregates.
+    // Roll the parent job's cost aggregates immediately. succeeded_count
+    // is advanced later by whichever branch closes the slot.
     await c.query(
       `
       UPDATE generation_jobs j
-         SET succeeded_count = succeeded_count + 1,
-             total_cost_usd_cents = total_cost_usd_cents + $2,
+         SET total_cost_usd_cents = total_cost_usd_cents + $2,
              total_input_tokens   = total_input_tokens + $3,
              total_output_tokens  = total_output_tokens + $4,
              total_cached_tokens  = total_cached_tokens + $5,
-             status = CASE
-                        WHEN j.succeeded_count + 1 + j.failed_count
-                             >= j.requested_count
-                          THEN CASE
-                                 WHEN j.failed_count = 0
-                                   THEN 'succeeded'
-                                 ELSE 'partial'
-                               END
-                        ELSE 'running'
-                      END,
-             finished_at = CASE
-                             WHEN j.succeeded_count + 1 + j.failed_count
-                                  >= j.requested_count
-                               THEN now()
-                             ELSE j.finished_at
-                           END,
              updated_at = now()
        WHERE id = $1
       `,
@@ -809,13 +801,167 @@ export async function processSlotAnthropic(
       ],
     );
 
-    await c.query(
-      `
-      INSERT INTO generation_events (job_id, page_slot_id, event, details)
-      VALUES ($1, $2, 'state_advanced',
-              jsonb_build_object('to', 'succeeded', 'worker_id', $3::text))
-      `,
-      [ctx.job_id, slotId, workerId],
-    );
+    if (!opts.wp) {
+      // No WP bundle → skip publish; close the slot.
+      const finalise = await c.query(
+        `
+        UPDATE generation_job_pages
+           SET state = 'succeeded',
+               finished_at = now(),
+               lease_expires_at = NULL,
+               worker_id = NULL,
+               updated_at = now()
+         WHERE id = $1 AND worker_id = $2 AND state = 'validating'
+        `,
+        [slotId, workerId],
+      );
+      if ((finalise.rowCount ?? 0) === 0) {
+        throw new Error(
+          `processSlotAnthropic: lease stolen or state changed before finalising slot ${slotId}`,
+        );
+      }
+      await c.query(
+        `
+        UPDATE generation_jobs j
+           SET succeeded_count = succeeded_count + 1,
+               status = CASE
+                          WHEN j.succeeded_count + 1 + j.failed_count
+                               >= j.requested_count
+                            THEN CASE
+                                   WHEN j.failed_count = 0 THEN 'succeeded'
+                                   ELSE 'partial'
+                                 END
+                          ELSE 'running'
+                        END,
+               finished_at = CASE
+                               WHEN j.succeeded_count + 1 + j.failed_count
+                                    >= j.requested_count
+                                 THEN now()
+                               ELSE j.finished_at
+                             END,
+               updated_at = now()
+         WHERE id = $1
+        `,
+        [ctx.job_id],
+      );
+      await c.query(
+        `
+        INSERT INTO generation_events (job_id, page_slot_id, event, details)
+        VALUES ($1, $2, 'state_advanced',
+                jsonb_build_object('to', 'succeeded', 'worker_id', $3::text))
+        `,
+        [ctx.job_id, slotId, workerId],
+      );
+    }
   });
+
+  // -----------------------------------------------------------------------
+  // WP publish (M3-6). Only runs when the caller supplied a WpCallBundle.
+  // -----------------------------------------------------------------------
+  if (opts.wp) {
+    const slug =
+      typeof (ctx.inputs as { slug?: unknown }).slug === "string"
+        ? ((ctx.inputs as { slug: string }).slug as string)
+        : `slot-${ctx.job_id.slice(0, 8)}-${Date.now()}`;
+    const title =
+      typeof (ctx.inputs as { title?: unknown }).title === "string"
+        ? ((ctx.inputs as { title: string }).title as string)
+        : slug;
+
+    const result = await publishSlot(
+      slotId,
+      workerId,
+      {
+        job_id: ctx.job_id,
+        site_id: ctx.site.id,
+        slug,
+        title,
+        generated_html: generatedHtml,
+        design_system_version: ctx.design_system_version,
+      },
+      opts.wp,
+      { client: opts.client ?? null },
+    );
+
+    if (!result.ok) {
+      // Record the publish failure: slot → 'failed', parent job
+      // failed_count++. Cost was already accumulated above, so the
+      // billing side of the audit stays intact.
+      await withClient(opts.client ?? null, async (c) => {
+        await c.query(
+          `
+          INSERT INTO generation_events (job_id, page_slot_id, event, details)
+          VALUES ($1, $2, 'publish_failed',
+                  jsonb_build_object('code', $3::text,
+                                     'message', $4::text,
+                                     'retryable', $5::boolean,
+                                     'worker_id', $6::text))
+          `,
+          [
+            ctx.job_id,
+            slotId,
+            result.code,
+            result.message,
+            result.retryable,
+            workerId,
+          ],
+        );
+        const markFailed = await c.query(
+          `
+          UPDATE generation_job_pages
+             SET state = 'failed',
+                 last_error_code = $3,
+                 last_error_message = $4,
+                 finished_at = now(),
+                 lease_expires_at = NULL,
+                 worker_id = NULL,
+                 updated_at = now()
+           WHERE id = $1 AND worker_id = $2 AND state = 'publishing'
+          `,
+          [slotId, workerId, result.code, result.message],
+        );
+        if ((markFailed.rowCount ?? 0) === 0) {
+          throw new Error(
+            `processSlotAnthropic: lease stolen while marking slot ${slotId} publish_failed`,
+          );
+        }
+        await c.query(
+          `
+          UPDATE generation_jobs j
+             SET failed_count = failed_count + 1,
+                 status = CASE
+                            WHEN j.succeeded_count + j.failed_count + 1
+                                 >= j.requested_count
+                              THEN CASE
+                                     WHEN j.succeeded_count = 0
+                                       THEN 'failed'
+                                     ELSE 'partial'
+                                   END
+                            ELSE 'running'
+                          END,
+                 finished_at = CASE
+                                 WHEN j.succeeded_count + j.failed_count + 1
+                                      >= j.requested_count
+                                   THEN now()
+                                 ELSE j.finished_at
+                               END,
+                 updated_at = now()
+           WHERE id = $1
+          `,
+          [ctx.job_id],
+        );
+        await c.query(
+          `
+          INSERT INTO generation_events (job_id, page_slot_id, event, details)
+          VALUES ($1, $2, 'state_advanced',
+                  jsonb_build_object('to', 'failed', 'worker_id', $3::text,
+                                     'reason', 'publish_failed'))
+          `,
+          [ctx.job_id, slotId, workerId],
+        );
+      });
+    }
+    // Success: publishSlot has already advanced slot → succeeded and
+    // ticked the parent job's succeeded_count. Nothing further to do.
+  }
 }
