@@ -269,9 +269,20 @@ test.describe("images admin surface", () => {
     await expect(
       page.getByRole("heading", { name: /edit image metadata/i }),
     ).toHaveCount(0);
-    await expect(page.getByText(newCaption)).toBeVisible();
+    // Scope to the detail-fields dd. M5-2 added a Breadcrumbs row that
+    // also renders the caption (truncated to 60 chars), so a naked
+    // getByText is a strict-mode violation.
     await expect(
-      page.getByTestId("image-detail-fields").getByText("edited"),
+      page.getByTestId("image-detail-fields").getByText(newCaption),
+    ).toBeVisible();
+    // exact: true so we match the "edited" tag <span> specifically;
+    // the capitalised "Edited:" at the start of the caption dd is a
+    // substring hit that caused a strict-mode violation on the first
+    // rebased-on-main run.
+    await expect(
+      page.getByTestId("image-detail-fields").getByText("edited", {
+        exact: true,
+      }),
     ).toBeVisible();
   });
 });

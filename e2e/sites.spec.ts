@@ -66,21 +66,25 @@ test.describe("sites CRUD", () => {
     await page.getByLabel("WordPress app password").fill("password-1234");
     await page.getByRole("button", { name: /register site/i }).click();
 
-    await expect(page.getByText(disposableName).first()).toBeVisible();
+    // The modal closes + router.refresh re-renders the list. Wait for
+    // the row to appear before hunting the actions menu — prior impl
+    // used `getByText().first()` which didn't wait on the row locator
+    // itself and raced the `<details>` mount.
+    const row = page.getByRole("row", { name: new RegExp(disposableName) });
+    await expect(row).toBeVisible();
 
     // Open the actions menu on the new row and archive.
-    const row = page.getByRole("row", { name: new RegExp(disposableName) });
-    await row.getByRole("button", { name: /actions for/i }).click();
+    // <summary> elements don't always resolve as role=button across
+    // Playwright versions; use the testid we added on the summary.
+    await row.getByTestId("site-actions-summary").click();
 
     // Browser confirm() auto-accept.
     page.once("dialog", (dialog) => {
       void dialog.accept();
     });
-    await row.getByRole("button", { name: /^archive$/i }).click();
+    await row.getByTestId("site-archive-action").click();
 
     // After router.refresh the row should be gone.
-    await expect(
-      page.getByRole("row", { name: new RegExp(disposableName) }),
-    ).toHaveCount(0);
+    await expect(row).toHaveCount(0);
   });
 });
