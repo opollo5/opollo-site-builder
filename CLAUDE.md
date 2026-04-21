@@ -117,6 +117,47 @@ Supply-chain scanning runs server-side:
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
 
+## Performance standards
+- **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`
+  against a production build of `/login` (session-gated admin surfaces
+  are out of scope — they'd need the full Supabase-in-CI flow to render).
+  Thresholds are `warn` for now; baseline ratchets to `error` once we
+  have a few runs of stable history.
+- **EXPLAIN ANALYZE for hot-path queries:** any new DB query in a code
+  path that runs per-request or per-slot (chat route, batch worker,
+  middleware, admin list pages) MUST be EXPLAIN ANALYZE'd against a
+  realistic-volume seed before merge. Paste the plan in the PR
+  description so the index decision is visible in history. Pointed-read
+  queries keyed by PK/UUID skip this; new JOINs, LIKE / ILIKE, ORDER BY,
+  and anything without an obvious index path do not.
+
+## Data + AI conventions
+Lives in dedicated docs so this file doesn't sprawl:
+
+- `docs/DATA_CONVENTIONS.md` — soft-delete (`deleted_at` + `deleted_by`),
+  audit columns (`created_at` / `updated_at` / `created_by` / `updated_by`),
+  `version_lock` for optimistic concurrency, `supabase/data-migrations/`
+  contract. Forward-facing; existing tables fold in on the next natural
+  migration.
+- `docs/PROMPT_VERSIONING.md` — `lib/prompts/vN/` layout, per-version
+  immutability, eval harness under `__evals__/`, prompt injection
+  defense via tagged inputs, per-tenant cost budgets spec, Langfuse
+  integration. Cutover is its own sub-slice (blocked on
+  `LANGFUSE_*` env provisioning for the shipping path).
+- `docs/RUNBOOK.md` — on-call playbook: deploy rollback, auth
+  break-glass, batch cancellation, WP publish failures, Supabase
+  quota, security incident response.
+
+## Release hygiene
+- `.github/workflows/release-please.yml` watches main; every merge
+  aggregates conventional commits into a Release PR that bumps
+  `package.json` + generates `CHANGELOG.md`. Merging that PR cuts
+  a GitHub Release + git tag.
+- No external secrets — default `GITHUB_TOKEN` is enough.
+- Commit discipline matters for the changelog: `feat:` → Features,
+  `fix:` → Bug Fixes, `perf:` → Performance, etc. `chore:` / `test:`
+  / `ci:` / `build:` are hidden from the user-facing changelog.
+
 ## Observability + security contract
 Every change has to honour the following invariants. They landed with the
 security-observability-baseline sub-PR and fail-fast CI is how they stay true.

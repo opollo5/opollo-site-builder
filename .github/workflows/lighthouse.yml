@@ -1,0 +1,59 @@
+name: Lighthouse
+
+# Core Web Vitals + accessibility audit against a production build of
+# the app. Runs against the login page only — the rest of the admin
+# surface is session-gated and testing it would require the full
+# Supabase-in-CI flow that e2e.yml already runs.
+#
+# Assertions are `warn`-only for now. Once we have a few runs of
+# baseline history we'll flip categories:performance to `error`.
+#
+# Reports upload to Google's temporary public storage (no API keys).
+# Links land as a PR comment via the LHCI GitHub App when installed,
+# otherwise they show up in the job logs.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lhci:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Legacy Basic Auth path — matches the default when
+      # FEATURE_SUPABASE_AUTH isn't set. /login renders without an
+      # upstream Supabase.
+      FEATURE_SUPABASE_AUTH: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Lighthouse CI
+        run: npm install --no-save @lhci/cli@0.14.x
+
+      - name: Run Lighthouse
+        run: npx lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
