@@ -31,6 +31,14 @@ function readStatusIfNeeded(): void {
 
 readStatusIfNeeded();
 
+// Tests that exercise the full createSite path (M2d UX cleanup) need
+// an OPOLLO_MASTER_KEY for credential encryption. Use a deterministic
+// 32-byte zero-filled key so CI and local share semantics without
+// relying on a secret. Production must supply a real key via env.
+if (!process.env.OPOLLO_MASTER_KEY) {
+  process.env.OPOLLO_MASTER_KEY = Buffer.alloc(32).toString("base64");
+}
+
 const DB_URL =
   process.env.SUPABASE_DB_URL ??
   "postgresql://postgres:postgres@127.0.0.1:54322/postgres";

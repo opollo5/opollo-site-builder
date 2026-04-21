@@ -1,3 +1,6 @@
+import Link from "next/link";
+
+import { SiteActionsMenu } from "@/components/SiteActionsMenu";
 import type { SiteListItem } from "@/lib/tool-schemas";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
@@ -28,6 +31,9 @@ function StatusCell({ status }: { status: string }) {
   );
 }
 
+// Sites table with row-level navigation + action menu. The row <a>
+// wrapper covers the primary cells; the actions column stops event
+// propagation so the menu doesn't double-fire with a row click.
 export function SitesTable({ sites }: { sites: SiteListItem[] }) {
   if (sites.length === 0) {
     return (
@@ -46,31 +52,51 @@ export function SitesTable({ sites }: { sites: SiteListItem[] }) {
           <tr>
             <th className="px-4 py-2 font-medium">Name</th>
             <th className="px-4 py-2 font-medium">WP URL</th>
-            <th className="px-4 py-2 font-medium">Prefix</th>
             <th className="px-4 py-2 font-medium">Status</th>
             <th className="px-4 py-2 font-medium">Updated</th>
+            <th className="w-10 px-2 py-2"></th>
           </tr>
         </thead>
         <tbody>
           {sites.map((s) => (
-            <tr key={s.id} className="border-b last:border-b-0">
-              <td className="px-4 py-3 font-medium">{s.name}</td>
+            <tr
+              key={s.id}
+              className="group border-b last:border-b-0 hover:bg-muted/40"
+            >
+              <td className="px-4 py-3 font-medium">
+                <Link
+                  href={`/admin/sites/${s.id}`}
+                  className="block hover:underline"
+                >
+                  {s.name}
+                </Link>
+              </td>
               <td className="px-4 py-3 text-muted-foreground">
                 <a
                   href={s.wp_url}
                   target="_blank"
                   rel="noreferrer"
                   className="hover:underline"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {s.wp_url}
                 </a>
               </td>
-              <td className="px-4 py-3 font-mono text-xs">{s.prefix}</td>
               <td className="px-4 py-3">
                 <StatusCell status={s.status} />
               </td>
               <td className="px-4 py-3 text-muted-foreground">
                 {formatRelativeTime(s.updated_at)}
+              </td>
+              <td
+                className="px-2 py-3 text-right"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <SiteActionsMenu
+                  siteId={s.id}
+                  name={s.name}
+                  wpUrl={s.wp_url}
+                />
               </td>
             </tr>
           ))}

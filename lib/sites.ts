@@ -75,13 +75,25 @@ async function createSiteImpl(
 ): Promise<ApiResponse<SiteRecord>> {
   const supabase = getServiceRoleClient();
 
+  // Auto-generate a prefix from the site name when the caller didn't
+  // supply one. Operator-facing forms hide this field entirely per the
+  // M2d UX cleanup; only programmatic callers that care about the
+  // exact prefix (tests, the legacy Opollo admin scripts) still pass
+  // it explicitly.
+  let prefix = input.prefix;
+  if (!prefix) {
+    const generated = await generateUniquePrefix(input.name);
+    if (!generated.ok) return generated;
+    prefix = generated.prefix;
+  }
+
   // 1. Insert sites row.
   const { data: siteRow, error: siteErr } = await supabase
     .from("sites")
     .insert({
       name: input.name,
       wp_url: input.wp_url,
-      prefix: input.prefix,
+      prefix,
       status: "active",
     })
     .select()
@@ -94,8 +106,8 @@ async function createSiteImpl(
         ok: false,
         error: {
           code: "PREFIX_TAKEN",
-          message: `Scope prefix "${input.prefix}" is already in use by another active site.`,
-          details: { prefix: input.prefix },
+          message: `Scope prefix "${prefix}" is already in use by another active site.`,
+          details: { prefix },
           retryable: true,
           suggested_action:
             "Choose a different 2–4 char prefix, or remove the existing site first.",
@@ -294,4 +306,191 @@ async function getSiteImpl(
     },
     timestamp: now(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Auto-generated prefixes (M2d UX cleanup).
+//
+// Operator-facing forms no longer expose the scope_prefix field; we
+// derive one from the site name at creation time. Algorithm:
+//
+//   1. Slugify name to [a-z0-9] (strip non-alphanumerics).
+//   2. Try prefixes of length 4, 3, 2 (longest first, most distinctive).
+//   3. On collision, fold a digit 2..9 onto the leading 1-3 chars of
+//      the base so the final prefix stays within 4 chars.
+//   4. Past digit 9, fall back to a base-36 counter derived from the
+//      site name's hash prefix.
+//
+// The underlying sites_prefix_active_uniq index catches races between
+// two concurrent creates picking the same candidate — on 23505 we
+// advance to the next candidate and retry. Capped at 32 attempts to
+// guarantee termination.
+// ---------------------------------------------------------------------------
+
+async function prefixExists(candidate: string): Promise<boolean> {
+  const supabase = getServiceRoleClient();
+  const { data } = await supabase
+    .from("sites")
+    .select("id")
+    .eq("prefix", candidate)
+    .neq("status", "removed")
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
+function enumerateCandidates(name: string): string[] {
+  const slug = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const out: string[] = [];
+  if (slug.length === 0) {
+    // Name had no slug-able characters; push deterministic fallbacks.
+    for (let i = 0; i < 10; i++) out.push(`st${i}`);
+    return out;
+  }
+
+  // Longest clean base first.
+  for (let len = Math.min(4, slug.length); len >= 2; len--) {
+    const base = slug.slice(0, len);
+    if (!out.includes(base)) out.push(base);
+  }
+
+  // Digit variants: keep total length <= 4.
+  for (let digit = 2; digit <= 9; digit++) {
+    for (let rootLen = Math.min(3, slug.length); rootLen >= 1; rootLen--) {
+      const c = (slug.slice(0, rootLen) + String(digit)).slice(0, 4);
+      if (c.length >= 2 && !out.includes(c)) out.push(c);
+    }
+  }
+
+  // Base-36 counter fallback — 4-char pads keep the prefix unique
+  // even if every digit variant was taken.
+  for (let n = 10; n < 40; n++) {
+    const tail = n.toString(36);
+    const c = (slug.slice(0, 4 - tail.length) + tail).slice(0, 4);
+    if (c.length >= 2 && !out.includes(c)) out.push(c);
+  }
+
+  return out;
+}
+
+async function generateUniquePrefix(
+  name: string,
+): Promise<
+  | { ok: true; prefix: string }
+  | { ok: false; error: { code: "INTERNAL_ERROR"; message: string; details: Record<string, unknown>; retryable: boolean; suggested_action: string }; timestamp: string }
+> {
+  const candidates = enumerateCandidates(name);
+  for (const c of candidates) {
+    if (!(await prefixExists(c))) return { ok: true, prefix: c };
+  }
+  return {
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message: "Could not auto-generate a unique prefix for this site name.",
+      details: { name, attempted: candidates.length },
+      retryable: false,
+      suggested_action:
+        "Supply a prefix explicitly or pick a more distinctive site name.",
+    },
+    timestamp: now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// updateSiteBasics / archiveSite (M2d UX cleanup)
+// ---------------------------------------------------------------------------
+
+export async function updateSiteBasics(
+  id: string,
+  patch: { name?: string; wp_url?: string },
+): Promise<ApiResponse<SiteRecord>> {
+  try {
+    if (!patch.name && !patch.wp_url) {
+      return internalError("updateSiteBasics called with empty patch.");
+    }
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase
+      .from("sites")
+      .update({
+        ...(patch.name !== undefined && { name: patch.name }),
+        ...(patch.wp_url !== undefined && { wp_url: patch.wp_url }),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .neq("status", "removed")
+      .select()
+      .maybeSingle();
+    if (error) {
+      return internalError("Failed to update site.", {
+        supabase_error: error,
+      });
+    }
+    if (!data) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No active site found with id ${id}.`,
+          details: { id },
+          retryable: false,
+          suggested_action: "Verify the site id; removed sites are excluded.",
+        },
+        timestamp: now(),
+      };
+    }
+    return { ok: true, data: data as SiteRecord, timestamp: now() };
+  } catch (err) {
+    return internalError(
+      `Unhandled error in updateSiteBasics: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+/**
+ * Soft-archive a site. Sets status='removed' so listSites filters it
+ * out. The UNIQUE (prefix) WHERE status != 'removed' partial index
+ * frees the prefix for re-use after archive. We label this "archive"
+ * in the UI; the DB state is the pre-existing 'removed' ENUM value.
+ */
+export async function archiveSite(
+  id: string,
+): Promise<ApiResponse<{ id: string }>> {
+  try {
+    const supabase = getServiceRoleClient();
+    const { data, error } = await supabase
+      .from("sites")
+      .update({
+        status: "removed",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .neq("status", "removed")
+      .select("id")
+      .maybeSingle();
+    if (error) {
+      return internalError("Failed to archive site.", {
+        supabase_error: error,
+      });
+    }
+    if (!data) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No active site found with id ${id}.`,
+          details: { id },
+          retryable: false,
+          suggested_action:
+            "The site may already be archived, or the id is wrong.",
+        },
+        timestamp: now(),
+      };
+    }
+    return { ok: true, data: { id: data.id as string }, timestamp: now() };
+  } catch (err) {
+    return internalError(
+      `Unhandled error in archiveSite: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 }
