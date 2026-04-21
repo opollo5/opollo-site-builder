@@ -384,7 +384,7 @@ describe("processTransferItemCaption — parse failure", () => {
 
 describe("processTransferItemCaption — validation failure", () => {
   it("marks the item failed with CAPTION_VALIDATION_FAILED when tags count is out of bounds", async () => {
-    const { itemIds } = await seedCaptionJobWithItems(1);
+    await seedCaptionJobWithItems(1);
     const leased = await leaseNextTransferItem("w-validate");
     if (!leased) throw new Error("lease failed");
 
