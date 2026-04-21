@@ -6,6 +6,24 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## M4 — image library (in flight)
+
+Parent plan: `docs/plans/m4.md`. Sub-slice status tracker:
+
+| Slice | Status | Notes |
+| --- | --- | --- |
+| M4-1 | in flight | Schema: 6 tables + constraints + RLS + FTS. This PR. |
+| M4-2 | planned | Worker core (lease / heartbeat / reaper over `transfer_job_items`). |
+| M4-3 | **blocked on env** | Cloudflare upload. Needs `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_IMAGES_API_TOKEN` + `CLOUDFLARE_IMAGES_HASH` in Vercel. |
+| M4-4 | planned | Anthropic vision captioning (reuses `ANTHROPIC_API_KEY`). |
+| M4-5 | **blocked on M4-3** | iStock 9k seed script. |
+| M4-6 | planned | `search_images` chat tool. Can ship without env vars. |
+| M4-7 | **blocked on M4-3** | WP media transfer + HTML URL rewrite on publish. |
+
+Env-var unblock path: Steven provisions the three `CLOUDFLARE_*` vars → auto-continue resumes through M4-3 / M4-5 / M4-7 in order.
+
+---
+
 ## Infra / observability
 
 ### ~~Fix Lighthouse CI first-run failure~~ (diagnosed + shipped in the patterns PR)
