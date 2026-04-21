@@ -46,6 +46,17 @@ Stop and wait for Steven only when:
 
 Also: post a one-line status ping per merge so Steven has visibility without needing to prompt — e.g. "M2c-2 merged, starting M2c-3."
 
+## Parallelism (multi-session coordination)
+Serial-single-session is the default. When Steven runs two browser tabs of Claude Code in parallel, coordinate via `docs/WORK_IN_FLIGHT.md` and follow `docs/PARALLELISM_PLAN.md`:
+
+- Read `docs/WORK_IN_FLIGHT.md` before editing any file. Respect the other session's claims + the "Hot-shared" list.
+- Append a claim block with your branch, slice, files claimed, and (if applicable) reserved migration number.
+- Prefix every status message to Steven with `[Session A]` / `[Session B]` so cross-session output stays legible.
+- On merge, remove your claim block in the next PR's first commit (or a one-line cleanup PR if nothing's queued).
+- Conflict with the other session's claims → stop and ask Steven; do NOT coordinate with the other session directly.
+
+The bootstrap prompt Steven pastes into a second tab lives in `docs/PARALLELISM_PLAN.md` → *The bootstrap prompt*.
+
 ## Enabling auto-merge on every PR
 Every PR must have GitHub auto-merge armed at creation time. Call `mcp__github__enable_pr_auto_merge` (with `mergeMethod: "SQUASH"`) immediately after `create_pull_request` — it is not enabled implicitly. Without that call, the PR sits in the mergeable state until someone clicks the button in the UI, breaking the self-driving loop.
 
