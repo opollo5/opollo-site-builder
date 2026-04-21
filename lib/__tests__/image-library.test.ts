@@ -5,6 +5,8 @@ import {
   LIST_IMAGES_MAX_LIMIT,
   getImage,
   listImages,
+  restoreImage,
+  softDeleteImage,
   updateImageMetadata,
 } from "@/lib/image-library";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -594,5 +596,163 @@ describe("updateImageMetadata — error paths", () => {
       .eq("id", id)
       .maybeSingle();
     expect(readBack.data?.updated_by).toBe(user.id);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// softDeleteImage + restoreImage (M5-4)
+// ---------------------------------------------------------------------------
+
+describe("softDeleteImage — happy path", () => {
+  it("stamps deleted_at on an active image with no usage", async () => {
+    const id = await seedImage({
+      source_ref: "s-del-happy",
+      caption: "Ready to archive.",
+    });
+    const res = await softDeleteImage(id);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.id).toBe(id);
+    expect(res.data.deleted_at).toBeTruthy();
+
+    // Active list no longer shows it; deleted view does.
+    const active = await listImages();
+    expect(active.ok).toBe(true);
+    if (active.ok) {
+      expect(active.data.items.map((i) => i.id)).not.toContain(id);
+    }
+    const deleted = await listImages({ deleted: true });
+    expect(deleted.ok).toBe(true);
+    if (deleted.ok) {
+      expect(deleted.data.items.map((i) => i.id)).toContain(id);
+    }
+  });
+
+  it("is idempotent — archiving an already-archived image returns the existing deleted_at", async () => {
+    const id = await seedImage({
+      source_ref: "s-del-idempotent",
+      caption: "Already archived.",
+    });
+    const first = await softDeleteImage(id);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const originalDeletedAt = first.data.deleted_at;
+
+    const second = await softDeleteImage(id);
+    expect(second.ok).toBe(true);
+    if (!second.ok) return;
+    expect(second.data.deleted_at).toBe(originalDeletedAt);
+  });
+
+  it("stamps deleted_by when supplied", async () => {
+    const user = await seedAuthUser({ role: "admin" });
+    const id = await seedImage({
+      source_ref: "s-del-by",
+      caption: "Archive with attribution.",
+    });
+    const res = await softDeleteImage(id, { deleted_by: user.id });
+    expect(res.ok).toBe(true);
+
+    const svc = getServiceRoleClient();
+    const readBack = await svc
+      .from("image_library")
+      .select("deleted_by")
+      .eq("id", id)
+      .maybeSingle();
+    expect(readBack.data?.deleted_by).toBe(user.id);
+  });
+});
+
+describe("softDeleteImage — guards", () => {
+  it("returns IMAGE_IN_USE when any image_usage row references the image", async () => {
+    const id = await seedImage({
+      source_ref: "s-del-in-use",
+      caption: "Used somewhere.",
+    });
+    const siteId = await seedSite({ name: "Gamma Corp", prefix: "g1" });
+    await seedUsage({ image_id: id, site_id: siteId });
+
+    const res = await softDeleteImage(id);
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("IMAGE_IN_USE");
+    expect(res.error.details?.site_count).toBe(1);
+    expect(res.error.details?.site_names).toEqual(["Gamma Corp"]);
+
+    // Row still active.
+    const readBack = await getImage(id);
+    expect(readBack.ok).toBe(true);
+    if (readBack.ok) {
+      expect(readBack.data.image.deleted_at).toBeNull();
+    }
+  });
+
+  it("lists every referencing site when multiple usage rows exist", async () => {
+    const id = await seedImage({
+      source_ref: "s-del-multi",
+      caption: "Many references.",
+    });
+    const siteA = await seedSite({ name: "Alpha Co", prefix: "a2" });
+    const siteB = await seedSite({ name: "Bravo Co", prefix: "b2" });
+    await seedUsage({ image_id: id, site_id: siteA });
+    await seedUsage({ image_id: id, site_id: siteB });
+
+    const res = await softDeleteImage(id);
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("IMAGE_IN_USE");
+    const names = (res.error.details?.site_names as string[]).slice().sort();
+    expect(names).toEqual(["Alpha Co", "Bravo Co"]);
+  });
+
+  it("returns NOT_FOUND for an unknown id", async () => {
+    const res = await softDeleteImage(
+      "00000000-0000-0000-0000-000000000000",
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("NOT_FOUND");
+  });
+});
+
+describe("restoreImage", () => {
+  it("clears deleted_at + deleted_by on a soft-deleted image", async () => {
+    const id = await seedImage({
+      source_ref: "s-restore",
+      caption: "Restore me.",
+      deleted: true,
+    });
+    const res = await restoreImage(id);
+    expect(res.ok).toBe(true);
+
+    const active = await listImages();
+    expect(active.ok).toBe(true);
+    if (active.ok) {
+      expect(active.data.items.map((i) => i.id)).toContain(id);
+    }
+
+    const detail = await getImage(id);
+    expect(detail.ok).toBe(true);
+    if (detail.ok) {
+      expect(detail.data.image.deleted_at).toBeNull();
+    }
+  });
+
+  it("is a no-op on an already-active image (returns ok)", async () => {
+    const id = await seedImage({
+      source_ref: "s-restore-noop",
+      caption: "Already active.",
+    });
+    const res = await restoreImage(id);
+    expect(res.ok).toBe(true);
+  });
+
+  it("returns NOT_FOUND for an unknown id", async () => {
+    const res = await restoreImage(
+      "00000000-0000-0000-0000-000000000000",
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("NOT_FOUND");
   });
 });

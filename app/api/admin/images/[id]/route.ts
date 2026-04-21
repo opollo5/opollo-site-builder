@@ -8,6 +8,7 @@ import {
   IMAGE_CAPTION_MAX,
   IMAGE_TAG_MAX_LEN,
   IMAGE_TAGS_MAX_COUNT,
+  softDeleteImage,
   updateImageMetadata,
 } from "@/lib/image-library";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
@@ -150,6 +151,55 @@ export async function PATCH(
 
   // Bust the list + detail caches so the server-rendered surfaces
   // reflect the edit on the next render.
+  revalidatePath("/admin/images");
+  revalidatePath(`/admin/images/${params.id}`);
+
+  return NextResponse.json(
+    { ...result, timestamp: result.timestamp },
+    { status: 200 },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DELETE /api/admin/images/[id] — M5-4.
+//
+// Soft-delete. The image row keeps existing; deleted_at + deleted_by
+// get stamped. Blocked (IMAGE_IN_USE, 409) when any image_usage row
+// references the image — operator must remove it from referencing
+// sites first. Idempotent: archiving an already-archived image
+// returns the existing deleted_at without error.
+//
+// Hard delete is intentionally NOT implemented; the image_usage FK
+// is ON DELETE NO ACTION, and operator-side we'd need a Cloudflare
+// cleanup plan. Parent plan defers to a future slice if it ever
+// becomes needed.
+// ---------------------------------------------------------------------------
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } },
+): Promise<NextResponse> {
+  const gate = await requireAdminForApi({
+    roles: ["admin", "operator"] as const,
+  });
+  if (gate.kind === "deny") return gate.response;
+
+  if (!UUID_RE.test(params.id)) {
+    return errorJson("VALIDATION_FAILED", "Image id must be a UUID.", 400);
+  }
+
+  const result = await softDeleteImage(params.id, {
+    deleted_by: gate.user?.id ?? null,
+  });
+
+  if (!result.ok) {
+    const status = errorCodeToStatus(result.error.code);
+    return NextResponse.json(
+      { ...result, timestamp: result.timestamp },
+      { status },
+    );
+  }
+
   revalidatePath("/admin/images");
   revalidatePath(`/admin/images/${params.id}`);
 
