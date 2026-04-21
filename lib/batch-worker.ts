@@ -5,6 +5,7 @@ import {
   type AnthropicCallFn,
 } from "@/lib/anthropic-call";
 import { computeCostCents, PRICING_VERSION } from "@/lib/anthropic-pricing";
+import { runGates } from "@/lib/quality-gates";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -533,6 +534,20 @@ export async function processSlotAnthropic(
     .join("")
     .trim();
 
+  // M3-5: gate check runs between Anthropic response and the final
+  // slot UPDATE. Compute it OUTSIDE the DB transaction — gates are
+  // pure functions over the HTML + slot inputs.
+  const slug =
+    typeof (ctx.inputs as { slug?: unknown }).slug === "string"
+      ? ((ctx.inputs as { slug: string }).slug as string)
+      : null;
+  const gateOutcome = runGates({
+    html: generatedHtml,
+    slug,
+    prefix: ctx.site.prefix,
+    design_system_version: ctx.design_system_version,
+  });
+
   await withClient(opts.client ?? null, async (c) => {
     // EVENT LOG FIRST. If the subsequent slot UPDATE fails (DB blip,
     // network hiccup), the billing facts still persist and a
@@ -571,8 +586,156 @@ export async function processSlotAnthropic(
       ],
     );
 
-    // Now the slot UPDATE. Also guarded by worker_id so a stolen lease
-    // doesn't clobber another worker's state.
+    // generating → validating: records the state transition even on
+    // gate failure so the audit log shows the slot entered the gate
+    // step. Guarded by worker_id.
+    const advanceValidating = await c.query(
+      `
+      UPDATE generation_job_pages
+         SET state = 'validating',
+             last_heartbeat_at = now(),
+             updated_at = now()
+       WHERE id = $1 AND worker_id = $2 AND state = 'generating'
+      `,
+      [slotId, workerId],
+    );
+    if ((advanceValidating.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processSlotAnthropic: lease stolen or state changed before validating slot ${slotId}`,
+      );
+    }
+    await c.query(
+      `
+      INSERT INTO generation_events (job_id, page_slot_id, event, details)
+      VALUES ($1, $2, 'state_advanced',
+              jsonb_build_object('to', 'validating', 'worker_id', $3::text,
+                                 'gates_run', $4::jsonb))
+      `,
+      [
+        ctx.job_id,
+        slotId,
+        workerId,
+        JSON.stringify(gateOutcome.gates_run),
+      ],
+    );
+
+    if (gateOutcome.kind === "failed") {
+      const fail = gateOutcome.first_failure;
+      await c.query(
+        `
+        INSERT INTO generation_events (job_id, page_slot_id, event, details)
+        VALUES ($1, $2, 'gate_failed',
+                jsonb_build_object(
+                  'gate', $3::text,
+                  'reason', $4::text,
+                  'details', $5::jsonb,
+                  'gates_run', $6::jsonb,
+                  'worker_id', $7::text
+                ))
+        `,
+        [
+          ctx.job_id,
+          slotId,
+          fail.gate,
+          fail.reason,
+          JSON.stringify(fail.details ?? {}),
+          JSON.stringify(gateOutcome.gates_run),
+          workerId,
+        ],
+      );
+
+      const markFailed = await c.query(
+        `
+        UPDATE generation_job_pages
+           SET state = 'failed',
+               generated_html = $4,
+               anthropic_raw_response_id = $3,
+               cost_usd_cents = $5,
+               input_tokens = $6,
+               output_tokens = $7,
+               cached_tokens = $8,
+               last_error_code = 'QUALITY_GATE_FAILED',
+               last_error_message = $9,
+               quality_gate_failures = $10::jsonb,
+               finished_at = now(),
+               lease_expires_at = NULL,
+               worker_id = NULL,
+               updated_at = now()
+         WHERE id = $1 AND worker_id = $2 AND state = 'validating'
+        `,
+        [
+          slotId,
+          workerId,
+          response.id,
+          generatedHtml,
+          cents,
+          response.usage.input_tokens,
+          response.usage.output_tokens,
+          (response.usage.cache_creation_input_tokens ?? 0) +
+            (response.usage.cache_read_input_tokens ?? 0),
+          `${fail.gate}: ${fail.reason}`,
+          JSON.stringify([fail]),
+        ],
+      );
+      if ((markFailed.rowCount ?? 0) === 0) {
+        throw new Error(
+          `processSlotAnthropic: lease stolen while marking slot ${slotId} failed`,
+        );
+      }
+
+      // Roll failed_count + cost on the parent job. Cost tokens still
+      // recorded because we paid Anthropic even when the gate says no.
+      await c.query(
+        `
+        UPDATE generation_jobs j
+           SET failed_count = failed_count + 1,
+               total_cost_usd_cents = total_cost_usd_cents + $2,
+               total_input_tokens   = total_input_tokens + $3,
+               total_output_tokens  = total_output_tokens + $4,
+               total_cached_tokens  = total_cached_tokens + $5,
+               status = CASE
+                          WHEN j.succeeded_count + j.failed_count + 1
+                               >= j.requested_count
+                            THEN CASE
+                                   WHEN j.succeeded_count = 0
+                                     THEN 'failed'
+                                   ELSE 'partial'
+                                 END
+                          ELSE 'running'
+                        END,
+               finished_at = CASE
+                               WHEN j.succeeded_count + j.failed_count + 1
+                                    >= j.requested_count
+                                 THEN now()
+                               ELSE j.finished_at
+                             END,
+               updated_at = now()
+         WHERE id = $1
+        `,
+        [
+          ctx.job_id,
+          cents,
+          response.usage.input_tokens,
+          response.usage.output_tokens,
+          (response.usage.cache_creation_input_tokens ?? 0) +
+            (response.usage.cache_read_input_tokens ?? 0),
+        ],
+      );
+
+      await c.query(
+        `
+        INSERT INTO generation_events (job_id, page_slot_id, event, details)
+        VALUES ($1, $2, 'state_advanced',
+                jsonb_build_object('to', 'failed', 'worker_id', $3::text,
+                                   'reason', 'quality_gate_failed'))
+        `,
+        [ctx.job_id, slotId, workerId],
+      );
+      return;
+    }
+
+    // Gates passed: advance validating → succeeded, same as M3-4's
+    // final UPDATE but guarded by state = 'validating' now.
     const finalise = await c.query(
       `
       UPDATE generation_job_pages
@@ -588,7 +751,7 @@ export async function processSlotAnthropic(
              worker_id = NULL,
              updated_at = now()
        WHERE id = $1 AND worker_id = $2
-         AND state = 'generating'
+         AND state = 'validating'
       `,
       [
         slotId,
@@ -608,9 +771,7 @@ export async function processSlotAnthropic(
       );
     }
 
-    // Roll the parent job's aggregates. cost + tokens accumulate via
-    // the event log (reconciliation truth), but we keep running
-    // totals on generation_jobs for cheap list-page reads.
+    // Roll the parent job's aggregates.
     await c.query(
       `
       UPDATE generation_jobs j
@@ -622,7 +783,11 @@ export async function processSlotAnthropic(
              status = CASE
                         WHEN j.succeeded_count + 1 + j.failed_count
                              >= j.requested_count
-                          THEN 'succeeded'
+                          THEN CASE
+                                 WHEN j.failed_count = 0
+                                   THEN 'succeeded'
+                                 ELSE 'partial'
+                               END
                         ELSE 'running'
                       END,
              finished_at = CASE

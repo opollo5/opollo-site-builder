@@ -75,7 +75,9 @@ async function seedActiveTemplateForSite(siteId: string): Promise<string> {
 }
 
 async function seedSmallBatch(slots: number): Promise<string> {
-  const site = await seedSite();
+  // Prefix pinned to 'ls' so the GATE_PASSING_HTML below matches the
+  // site's scope prefix when the M3-5 gate runner evaluates it.
+  const site = await seedSite({ prefix: "ls" });
   const templateId = await seedActiveTemplateForSite(site.id);
   const res = await createBatchJob({
     site_id: site.id,
@@ -94,6 +96,18 @@ type RecordedCall = {
   idempotency_key: string;
   model: string;
 };
+
+// HTML that passes the M3-5 quality gates (wrapper + scope_prefix +
+// html_basics + slug_kebab + meta_description). Batch test seeds use
+// prefix 'ls' via seedSite defaults, DS version 1.
+const GATE_PASSING_HTML = [
+  '<section class="ls-hero" data-ds-version="1">',
+  '  <h1 class="ls-hero-title">Hello</h1>',
+  '  <p class="ls-hero-body"><a href="/landing">link</a></p>',
+  '  <img src="/a.png" alt="descriptive" class="ls-hero-image"/>',
+  '  <meta name="description" content="A descriptive meta summary of the page that is comfortably between fifty and one hundred sixty characters."/>',
+  "</section>",
+].join("\n");
 
 function makeStubCall(opts: {
   model?: string;
@@ -118,7 +132,7 @@ function makeStubCall(opts: {
     return {
       id: `resp_${req.idempotency_key}_${counter}`,
       model: opts.model ?? "claude-opus-4-7",
-      content: [{ type: "text", text: opts.text ?? "<section>stub</section>" }],
+      content: [{ type: "text", text: opts.text ?? GATE_PASSING_HTML }],
       stop_reason: "end_turn",
       usage: opts.usage ?? {
         input_tokens: 1_000,
