@@ -189,4 +189,39 @@ test.describe("images admin surface", () => {
     );
     expect(response?.status()).toBe(404);
   });
+
+  test("edit modal updates caption + tags and the list reflects the change", async ({
+    page,
+  }) => {
+    await page.goto("/admin/images?source=upload");
+
+    // Navigate to the upload fixture's detail page.
+    await page
+      .getByTestId("image-row-link")
+      .filter({ hasText: /operator-uploaded product hero shot/i })
+      .click();
+    await page.waitForURL(/\/admin\/images\/[0-9a-f-]{36}/);
+
+    // Open edit modal.
+    await page.getByTestId("edit-image-button").click();
+    await expect(
+      page.getByRole("heading", { name: /edit image metadata/i }),
+    ).toBeVisible();
+
+    // Change caption + replace tags.
+    const newCaption =
+      "Edited: tabletop product hero shot, warm studio lighting.";
+    await page.getByLabel("Caption").fill(newCaption);
+    await page.getByLabel("Tags").fill("product, edited, hero-shot");
+    await page.getByRole("button", { name: /save changes/i }).click();
+
+    // Modal closes, caption reflects on the detail page after refresh.
+    await expect(
+      page.getByRole("heading", { name: /edit image metadata/i }),
+    ).toHaveCount(0);
+    await expect(page.getByText(newCaption)).toBeVisible();
+    await expect(
+      page.getByTestId("image-detail-fields").getByText("edited"),
+    ).toBeVisible();
+  });
 });

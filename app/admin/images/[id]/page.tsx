@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { deliveryUrl } from "@/lib/cloudflare-images";
 import { getImage } from "@/lib/image-library";
@@ -154,12 +155,23 @@ export default async function AdminImageDetailPage({
             )}
           </p>
         </div>
-        <Link
-          href={backHref}
-          className="text-xs text-muted-foreground hover:text-foreground"
-        >
-          ← Back to library
-        </Link>
+        <div className="flex items-center gap-3">
+          <EditImageMetadataButton
+            image={{
+              id: image.id,
+              caption: image.caption,
+              alt_text: image.alt_text,
+              tags: image.tags,
+              version_lock: image.version_lock,
+            }}
+          />
+          <Link
+            href={backHref}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            ← Back to library
+          </Link>
+        </div>
       </div>
 
       <section className="mt-6 grid gap-6 md:grid-cols-[1fr_2fr]">

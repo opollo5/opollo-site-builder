@@ -5,6 +5,7 @@ import {
   LIST_IMAGES_MAX_LIMIT,
   getImage,
   listImages,
+  updateImageMetadata,
 } from "@/lib/image-library";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -452,5 +453,149 @@ describe("getImage — detail fetch", () => {
     if (!res.ok) return;
     expect(res.data.image.id).toBe(imageId);
     expect(res.data.image.deleted_at).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// updateImageMetadata — optimistic-locked metadata edits (M5-3)
+// ---------------------------------------------------------------------------
+
+describe("updateImageMetadata — happy path", () => {
+  it("updates caption + alt + tags and bumps version_lock", async () => {
+    const id = await seedImage({
+      source_ref: "s-upd-happy",
+      caption: "Before.",
+      alt_text: "Before alt.",
+      tags: ["old"],
+    });
+    const res = await updateImageMetadata(id, {
+      expected_version: 1,
+      patch: {
+        caption: "After.",
+        alt_text: "After alt.",
+        tags: ["new", "updated"],
+      },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.caption).toBe("After.");
+    expect(res.data.alt_text).toBe("After alt.");
+    expect(res.data.tags).toEqual(["new", "updated"]);
+    expect(res.data.version_lock).toBe(2);
+  });
+
+  it("updates only the fields provided (partial patch)", async () => {
+    const id = await seedImage({
+      source_ref: "s-upd-partial",
+      caption: "Keep caption.",
+      alt_text: "Keep alt.",
+      tags: ["keep"],
+    });
+    const res = await updateImageMetadata(id, {
+      expected_version: 1,
+      patch: { caption: "Only caption changed." },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.caption).toBe("Only caption changed.");
+    expect(res.data.alt_text).toBe("Keep alt.");
+    expect(res.data.tags).toEqual(["keep"]);
+  });
+
+  it("accepts explicit null to clear caption / alt_text", async () => {
+    const id = await seedImage({
+      source_ref: "s-upd-clear",
+      caption: "Original caption.",
+      alt_text: "Original alt.",
+    });
+    const res = await updateImageMetadata(id, {
+      expected_version: 1,
+      patch: { caption: null, alt_text: null },
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.caption).toBeNull();
+    expect(res.data.alt_text).toBeNull();
+  });
+
+  it("refreshes search_tsv via the M4-1 trigger after a caption change", async () => {
+    const id = await seedImage({
+      source_ref: "s-upd-tsv",
+      caption: "Original caption words.",
+      tags: ["foo"],
+    });
+    await updateImageMetadata(id, {
+      expected_version: 1,
+      patch: { caption: "Updated helicopter words." },
+    });
+    // The search_tsv trigger should have picked up the new caption.
+    const res = await listImages({ query: "helicopter" });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(res.data.items.map((i) => i.id)).toContain(id);
+  });
+});
+
+describe("updateImageMetadata — error paths", () => {
+  it("returns VERSION_CONFLICT when expected_version is stale", async () => {
+    const id = await seedImage({
+      source_ref: "s-upd-conflict",
+      caption: "Before.",
+    });
+    // First edit succeeds, bumping version_lock to 2.
+    await updateImageMetadata(id, {
+      expected_version: 1,
+      patch: { caption: "After round one." },
+    });
+    // Second edit with the stale version_lock=1 must fail.
+    const res = await updateImageMetadata(id, {
+      expected_version: 1,
+      patch: { caption: "Trying to clobber round one." },
+    });
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("VERSION_CONFLICT");
+    expect(res.error.details?.current_version).toBe(2);
+  });
+
+  it("returns NOT_FOUND for an unknown id", async () => {
+    const res = await updateImageMetadata(
+      "00000000-0000-0000-0000-000000000000",
+      { expected_version: 1, patch: { caption: "whatever" } },
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) return;
+    expect(res.error.code).toBe("NOT_FOUND");
+  });
+
+  it("stamps updated_by when supplied", async () => {
+    // Seed an opollo_users row so the FK resolves; the actual user
+    // does not need an auth record for this test path.
+    const svc = getServiceRoleClient();
+    const userId = "11111111-2222-3333-4444-555555555555";
+    const insertRes = await svc.from("opollo_users").insert({
+      id: userId,
+      email: "edit-attribution@opollo.test",
+      role: "admin",
+    });
+    expect(insertRes.error).toBeNull();
+
+    const id = await seedImage({
+      source_ref: "s-upd-attribution",
+      caption: "Attributable edit.",
+    });
+    const res = await updateImageMetadata(id, {
+      expected_version: 1,
+      updated_by: userId,
+      patch: { caption: "Edited by a real operator." },
+    });
+    expect(res.ok).toBe(true);
+
+    const readBack = await svc
+      .from("image_library")
+      .select("updated_by")
+      .eq("id", id)
+      .maybeSingle();
+    expect(readBack.data?.updated_by).toBe(userId);
   });
 });

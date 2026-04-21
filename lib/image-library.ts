@@ -270,6 +270,142 @@ async function getImageImpl(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Metadata editing (M5-3)
+// ---------------------------------------------------------------------------
+
+export const IMAGE_CAPTION_MAX = 500;
+export const IMAGE_ALT_TEXT_MAX = 200;
+export const IMAGE_TAG_MAX_LEN = 40;
+export const IMAGE_TAGS_MAX_COUNT = 12;
+
+export type UpdateImageMetadataPatch = {
+  caption?: string | null;
+  alt_text?: string | null;
+  tags?: string[];
+};
+
+export type UpdateImageMetadataInput = {
+  expected_version: number;
+  updated_by?: string | null;
+  patch: UpdateImageMetadataPatch;
+};
+
+export async function updateImageMetadata(
+  id: string,
+  input: UpdateImageMetadataInput,
+): Promise<ApiResponse<ImageListItem & { version_lock: number }>> {
+  try {
+    return await updateImageMetadataImpl(id, input);
+  } catch (err) {
+    return internalError(
+      `Unhandled error in updateImageMetadata: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+async function updateImageMetadataImpl(
+  id: string,
+  input: UpdateImageMetadataInput,
+): Promise<ApiResponse<ImageListItem & { version_lock: number }>> {
+  const supabase = getServiceRoleClient();
+
+  // Build the UPDATE payload. Only touch fields the patch mentions so
+  // an unset tags array doesn't clobber an existing one.
+  const updateRow: Record<string, unknown> = {
+    updated_at: now(),
+  };
+  if (input.updated_by !== undefined) {
+    updateRow.updated_by = input.updated_by;
+  }
+  if ("caption" in input.patch) {
+    updateRow.caption = input.patch.caption;
+  }
+  if ("alt_text" in input.patch) {
+    updateRow.alt_text = input.patch.alt_text;
+  }
+  if ("tags" in input.patch) {
+    updateRow.tags = input.patch.tags ?? [];
+  }
+
+  // Increment version_lock atomically by writing the next value. The
+  // WHERE clause pins the CURRENT version; zero rows returned = the
+  // client's copy was stale.
+  updateRow.version_lock = input.expected_version + 1;
+
+  const res = await supabase
+    .from("image_library")
+    .update(updateRow)
+    .eq("id", id)
+    .eq("version_lock", input.expected_version)
+    .select(
+      "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at, version_lock",
+    )
+    .maybeSingle();
+
+  if (res.error) {
+    return internalError("Failed to update image metadata.", {
+      supabase_error: res.error,
+    });
+  }
+  if (!res.data) {
+    // Zero rows returned: either the id doesn't exist or the version_lock
+    // mismatched. Disambiguate with a follow-up SELECT so the UI can
+    // show the right message.
+    const existsRes = await supabase
+      .from("image_library")
+      .select("id, version_lock")
+      .eq("id", id)
+      .maybeSingle();
+    if (existsRes.error) {
+      return internalError("Failed to re-check image after update.", {
+        supabase_error: existsRes.error,
+      });
+    }
+    if (!existsRes.data) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No image found with id ${id}.`,
+          details: { id },
+          retryable: false,
+          suggested_action: "The image may have been removed.",
+        },
+        timestamp: now(),
+      };
+    }
+    return {
+      ok: false,
+      error: {
+        code: "VERSION_CONFLICT",
+        message: "Another operator changed this image since you opened the editor. Reload to see the latest.",
+        details: {
+          id,
+          current_version: existsRes.data.version_lock,
+          expected_version: input.expected_version,
+        },
+        retryable: true,
+        suggested_action:
+          "Reload the page to pick up the latest metadata and redo your changes.",
+      },
+      timestamp: now(),
+    };
+  }
+
+  const row = res.data as Record<string, unknown>;
+  const base = rowToItem(row);
+  return {
+    ok: true,
+    data: {
+      ...base,
+      version_lock:
+        typeof row.version_lock === "number" ? row.version_lock : 1,
+    },
+    timestamp: now(),
+  };
+}
+
 export async function listImages(
   params: ListImagesParams = {},
 ): Promise<ApiResponse<ListImagesResult>> {
