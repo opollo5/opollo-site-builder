@@ -32,6 +32,7 @@ export const ERROR_CODES = [
   "UNIQUE_VIOLATION",
   "FK_VIOLATION",
   "IMAGE_IN_USE",
+  "REGEN_ALREADY_IN_FLIGHT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -83,6 +84,7 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "VERSION_CONFLICT":
     case "UNIQUE_VIOLATION":
     case "IMAGE_IN_USE":
+    case "REGEN_ALREADY_IN_FLIGHT":
       return 409;
     case "RATE_LIMIT":
       return 429;

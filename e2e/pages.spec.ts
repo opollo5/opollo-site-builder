@@ -209,6 +209,68 @@ test.describe("pages admin surface", () => {
     ).toBeVisible();
   });
 
+  test("regenerate button enqueues a job + history panel surfaces it (M7-4)", async ({
+    page,
+  }) => {
+    const targetPageId = pageIds["e2e-homepage"];
+    await page.goto(`/admin/sites/${siteId}/pages/${targetPageId}`);
+
+    // History panel starts empty.
+    await expect(page.getByTestId("regen-history-empty")).toBeVisible();
+
+    // Auto-accept the confirm() dialog fired by the Re-generate button.
+    page.once("dialog", (dialog) => {
+      void dialog.accept();
+    });
+    await page.getByTestId("regenerate-button").click();
+
+    // After router.refresh the history panel shows the new row as
+    // pending (the cron-driven worker doesn't run in the E2E stack,
+    // so the job stays pending; M7-5 will wire the cron).
+    await expect(page.getByTestId("regen-history-panel")).toBeVisible();
+    const pendingRow = page
+      .getByTestId("regen-history-row")
+      .filter({ has: page.locator('[data-status="pending"]') });
+    await expect(pendingRow).toHaveCount(1);
+
+    // The button swaps to "Queued…" and is disabled while in-flight.
+    await expect(page.getByTestId("regenerate-button")).toBeDisabled();
+  });
+
+  test("second regenerate click while in-flight surfaces REGEN_ALREADY_IN_FLIGHT", async ({
+    page,
+  }) => {
+    const targetPageId = pageIds["e2e-homepage"];
+
+    // Seed an already-pending regen job directly so we don't fight
+    // the button's disabled state for the second enqueue attempt.
+    const svc = (await import("@supabase/supabase-js")).createClient(
+      process.env.SUPABASE_URL as string,
+      process.env.SUPABASE_SERVICE_ROLE_KEY as string,
+      { auth: { persistSession: false, autoRefreshToken: false } },
+    );
+    // Clear any prior regen jobs on this page (other tests may seed).
+    await svc
+      .from("regeneration_jobs")
+      .delete()
+      .eq("page_id", targetPageId);
+
+    // Now go to the detail page + hit the API directly to confirm
+    // the 409 shape the UI relies on.
+    await page.goto(`/admin/sites/${siteId}/pages/${targetPageId}`);
+    const first = await page.request.post(
+      `/api/admin/sites/${siteId}/pages/${targetPageId}/regenerate`,
+    );
+    expect(first.status()).toBe(202);
+
+    const second = await page.request.post(
+      `/api/admin/sites/${siteId}/pages/${targetPageId}/regenerate`,
+    );
+    expect(second.status()).toBe(409);
+    const body = await second.json();
+    expect(body?.error?.code).toBe("REGEN_ALREADY_IN_FLIGHT");
+  });
+
   test("edit modal updates title + slug and detail reflects the change", async ({
     page,
   }) => {

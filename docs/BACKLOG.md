@@ -14,8 +14,8 @@ Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone — ever
 | --- | --- | --- |
 | M7-1 | merged (#72) | `regeneration_jobs` + `regeneration_events` schema with partial UNIQUE + lease-coherence CHECK + RLS. |
 | M7-2 | merged (#73) | Worker core (lease / heartbeat / reaper) + Anthropic integration + event-log-first billing + VERSION_CONFLICT short-circuit. |
-| M7-3 | in flight | WP update stage with drift reconciliation + M4-7 image transfer + `pages.version_lock` bump. Replaces the M7-2 stub-success with the real publish pipeline. |
-| M7-4 | planned | Admin UI: "Re-generate" button + polling status panel. |
+| M7-3 | merged (#75) | WP update stage with drift reconciliation + M4-7 image transfer + `pages.version_lock` bump. |
+| M7-4 | in flight | Admin UI: "Re-generate" button + status polling panel + enqueue endpoint with REGEN_ALREADY_IN_FLIGHT guard. |
 | M7-5 | planned | Cron wiring + budget cap + retry machinery. |
 
 No new env vars — every external dependency (`ANTHROPIC_API_KEY`, `CLOUDFLARE_*`, `OPOLLO_MASTER_KEY`, `CRON_SECRET`) is already provisioned from M3 + M4.
