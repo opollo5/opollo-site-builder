@@ -6,16 +6,31 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M5 — image library admin UI (in flight)
+## M6 — per-page admin surface (in flight)
 
-Parent plan: `docs/plans/m5-parent.md`. Sub-slice status tracker:
+Parent plan: `docs/plans/m6-parent.md`. Sub-slice status tracker:
+
+| Slice | Status | Notes |
+| --- | --- | --- |
+| M6-1 | in flight | `/admin/sites/[id]/pages` list + `lib/pages.ts` data layer + Pages link on site detail. |
+| M6-2 | planned | `/admin/sites/[id]/pages/[pageId]` detail + Tier-2 static preview + Tier-3 WP admin link. |
+| M6-3 | planned | Metadata edit modal (title + slug) + `PATCH /api/admin/sites/[id]/pages/[pageId]` with version_lock + UNIQUE_VIOLATION. |
+| M6-4 | planned | UX-debt cleanup: de-jargon the design-system authoring forms per CLAUDE.md backlog. |
+
+No new env vars.
+
+---
+
+## M5 — image library admin UI (shipped)
+
+Parent plan: `docs/plans/m5-parent.md`. All four sub-slices merged.
 
 | Slice | Status | Notes |
 | --- | --- | --- |
 | M5-1 | merged (#64) | `/admin/images` list page + `lib/image-library.ts` data layer + nav link. |
 | M5-2 | merged (#65) | `/admin/images/[id]` detail page with `image_usage` + `image_metadata` panes. |
 | M5-3 | merged (#66) | Metadata edit modal + `PATCH /api/admin/images/[id]` with `version_lock`. |
-| M5-4 | in flight | Soft-delete + restore with `IMAGE_IN_USE` guard. |
+| M5-4 | merged (#67) | Soft-delete + restore with `IMAGE_IN_USE` guard. |
 
 No new env vars — every Cloudflare secret needed for thumbnails is already provisioned from M4.
 
@@ -120,6 +135,17 @@ the comment, add a fixture test that asserts "1M Opus tokens at 15 USD" produces
 ---
 
 ## Testing
+
+### Investigate pre-existing E2E failures on main (sites.spec.ts:73 + users.spec.ts:19)
+**What:** two E2E tests have been failing on main since M4-7 (#63). They didn't block that merge or any M5 merge because E2E is not a required check.
+- `e2e/sites.spec.ts:73` — `sites CRUD › archive flow removes the site from the default list`. Locator `getByRole('row', { name: /Archive Target <ts>/ }).getByRole('button', { name: /actions for/i })` never resolves — likely the row takes longer than 30s to appear post-create, OR the actions-button ARIA name drifted when `SiteActionsMenu` changed.
+- `e2e/users.spec.ts:19` — `users admin surface › /admin/users shows the seeded admin + invite modal opens`. Strict-mode violation: `getByText('playwright-admin@opollo.test')` matches both the header chrome's `admin-user-email` span and the users-table cell. Was already two-match before the failure started — something (env flag? session warmup?) flipped behaviour around M4-7.
+
+**Why deferred:** not regressions from any M5 PR; not worth blocking M5/M6 timelines. Both need a focused PR to repro locally + fix deliberately (likely `getByTestId` in users.spec to dodge strict mode, and waiting on `networkidle` after the site create before hunting the row).
+
+**Trigger:** pick up between M6 sub-slices if CI attention permits, or at the end of M6 as a standalone slice before M7 (M7 adds write-safety-critical E2E coverage; clean baseline matters).
+
+**Scope:** ~50 lines total across two specs + any axe-related polish. No lib/ or app/ changes expected.
 
 ### Load testing (k6 / Artillery)
 **What:** scripted soak tests against the batch worker + chat route.

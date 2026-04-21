@@ -154,6 +154,13 @@ export default async function SiteDetailPage({
             >
               {site.wp_url}
             </a>
+            <Link
+              href={`/admin/sites/${site.id}/pages`}
+              className="hover:text-foreground hover:underline"
+              data-testid="site-pages-link"
+            >
+              Pages →
+            </Link>
             <span>updated {formatDate(site.updated_at)}</span>
           </div>
         </div>
