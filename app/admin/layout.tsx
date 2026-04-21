@@ -44,6 +44,12 @@ export default async function AdminLayout({
             >
               Sites
             </Link>
+            <Link
+              href="/admin/batches"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Batches
+            </Link>
             {showUsersLink && (
               <Link
                 href="/admin/users"
