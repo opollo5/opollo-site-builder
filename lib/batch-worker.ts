@@ -374,6 +374,7 @@ export async function processSlotDummy(
       UPDATE generation_jobs j
          SET succeeded_count = succeeded_count + 1,
              status = CASE
+                        WHEN j.status = 'cancelled' THEN 'cancelled'
                         WHEN j.succeeded_count + 1 + j.failed_count
                              >= j.requested_count
                           THEN 'succeeded'
@@ -720,6 +721,7 @@ export async function processSlotAnthropic(
                total_output_tokens  = total_output_tokens + $4,
                total_cached_tokens  = total_cached_tokens + $5,
                status = CASE
+                          WHEN j.status = 'cancelled' THEN 'cancelled'
                           WHEN j.succeeded_count + j.failed_count + 1
                                >= j.requested_count
                             THEN CASE
@@ -846,6 +848,7 @@ export async function processSlotAnthropic(
         UPDATE generation_jobs j
            SET succeeded_count = succeeded_count + 1,
                status = CASE
+                          WHEN j.status = 'cancelled' THEN 'cancelled'
                           WHEN j.succeeded_count + 1 + j.failed_count
                                >= j.requested_count
                             THEN CASE
@@ -1012,6 +1015,7 @@ export async function processSlotAnthropic(
           UPDATE generation_jobs j
              SET failed_count = failed_count + 1,
                  status = CASE
+                            WHEN j.status = 'cancelled' THEN 'cancelled'
                             WHEN j.succeeded_count + j.failed_count + 1
                                  >= j.requested_count
                               THEN CASE
