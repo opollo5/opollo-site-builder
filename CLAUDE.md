@@ -46,6 +46,19 @@ Also: post a one-line status ping per merge so Steven has visibility without nee
 ## Enabling auto-merge on every PR
 Every PR must have GitHub auto-merge armed at creation time. Call `mcp__github__enable_pr_auto_merge` (with `mergeMethod: "SQUASH"`) immediately after `create_pull_request` — it is not enabled implicitly. Without that call, the PR sits in the mergeable state until someone clicks the button in the UI, breaking the self-driving loop.
 
+## Self-audit before any plan goes to review
+Before proposing any milestone or sub-slice plan to Steven (or Claude.ai acting as reviewer), self-audit the plan against the repo's write-safety patterns and the relevant technical design doc. Reviewers are the second layer — their job is catching edge cases you didn't anticipate, not basic write-safety gaps the plan should have addressed itself.
+
+Every plan proposal MUST include a **"Risks identified and mitigated"** section listing:
+
+- Each write-safety hotspot in the proposed design (billed external calls, concurrent writers, multi-row state transitions, triggers, race windows, schema-level uniqueness assumptions).
+- How the plan mitigates it (idempotency key, DB unique constraint, advisory lock, dedicated test case, etc.).
+- Any gaps you are deliberately deferring, with a reason and a follow-up slice / milestone pointer.
+
+If an obvious write-safety gap exists (missing idempotency key on a billed external call, missing constraint on a high-churn table, missing test assertion on a concurrency invariant, trigger that can deadlock with a worker), fix it in the plan *before* presenting it. Write-safety-critical milestones (M3 batch generator, anything that spends money or mutates client WP sites) get this audit applied to every sub-slice plan, not just the parent milestone plan.
+
+A plan without a populated "Risks identified and mitigated" section is not ready for review and should not be sent.
+
 ## Commands
 - `npm run dev` — local dev
 - `npm run lint` — ESLint
