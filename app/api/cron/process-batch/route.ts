@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import {
   DEFAULT_LEASE_MS,
   leaseNextPage,
+  processSlotAnthropic,
   processSlotDummy,
   reapExpiredLeases,
 } from "@/lib/batch-worker";
@@ -73,7 +74,17 @@ async function runTick(): Promise<{
   if (!slot) {
     return { reapedCount, processedSlotId: null };
   }
-  await processSlotDummy(slot.id, workerId);
+
+  // Route to the real Anthropic path when ANTHROPIC_API_KEY is set;
+  // otherwise run the M3-3 dummy processor. Tests + previews without
+  // an API key still exercise the full concurrency loop via dummy,
+  // which is what kept M3-3 from being a dead branch once real
+  // calls arrived.
+  if (process.env.ANTHROPIC_API_KEY) {
+    await processSlotAnthropic(slot.id, workerId);
+  } else {
+    await processSlotDummy(slot.id, workerId);
+  }
   return { reapedCount, processedSlotId: slot.id };
 }
 

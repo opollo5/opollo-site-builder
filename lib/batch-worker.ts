@@ -1,5 +1,13 @@
 import { Client, type QueryResult } from "pg";
 
+import {
+  defaultAnthropicCall,
+  type AnthropicCallFn,
+} from "@/lib/anthropic-call";
+import { computeCostCents, PRICING_VERSION } from "@/lib/anthropic-pricing";
+import { buildSystemPromptForSite } from "@/lib/system-prompt";
+import { getServiceRoleClient } from "@/lib/supabase";
+
 // ---------------------------------------------------------------------------
 // M3-3 — Worker core.
 //
@@ -356,6 +364,293 @@ export async function processSlotDummy(
        WHERE p.id = $1 AND p.job_id = j.id
       `,
       [slotId],
+    );
+  });
+}
+
+// ---------------------------------------------------------------------------
+// processSlotAnthropic — M3-4 real-call path
+// ---------------------------------------------------------------------------
+
+const DEFAULT_MODEL = "claude-opus-4-7";
+const DEFAULT_MAX_TOKENS = 8192;
+
+async function loadSlotContext(slotId: string): Promise<{
+  job_id: string;
+  site: { site_name: string; prefix: string; id: string };
+  design_system_version: string;
+  inputs: Record<string, unknown>;
+  anthropic_idempotency_key: string;
+}> {
+  const svc = getServiceRoleClient();
+  // Two-step: the PostgREST embed path confuses TS inference beyond
+  // the point of being worth it; a service-role JOIN gets the same
+  // rows with a type we can hand-annotate.
+  const slotRes = await svc
+    .from("generation_job_pages")
+    .select("job_id, inputs, anthropic_idempotency_key")
+    .eq("id", slotId)
+    .single();
+  if (slotRes.error || !slotRes.data) {
+    throw new Error(
+      `loadSlotContext slot: ${slotRes.error?.message ?? "no row"} for slot ${slotId}`,
+    );
+  }
+
+  const jobRes = await svc
+    .from("generation_jobs")
+    .select("site_id")
+    .eq("id", slotRes.data.job_id as string)
+    .single();
+  if (jobRes.error || !jobRes.data) {
+    throw new Error(
+      `loadSlotContext job: ${jobRes.error?.message ?? "no row"} for job ${slotRes.data.job_id}`,
+    );
+  }
+
+  const siteRes = await svc
+    .from("sites")
+    .select("id, name, prefix")
+    .eq("id", jobRes.data.site_id as string)
+    .single();
+  if (siteRes.error || !siteRes.data) {
+    throw new Error(
+      `loadSlotContext site: ${siteRes.error?.message ?? "no row"}`,
+    );
+  }
+
+  const dsRes = await svc
+    .from("design_systems")
+    .select("version")
+    .eq("site_id", siteRes.data.id as string)
+    .eq("status", "active")
+    .maybeSingle();
+  const dsVersion = (dsRes.data?.version as number | undefined) ?? 1;
+
+  return {
+    job_id: slotRes.data.job_id as string,
+    site: {
+      id: siteRes.data.id as string,
+      site_name: siteRes.data.name as string,
+      prefix: siteRes.data.prefix as string,
+    },
+    design_system_version: String(dsVersion),
+    inputs:
+      (slotRes.data.inputs as Record<string, unknown> | null) ?? {},
+    anthropic_idempotency_key:
+      slotRes.data.anthropic_idempotency_key as string,
+  };
+}
+
+function buildUserMessage(inputs: Record<string, unknown>): string {
+  return [
+    "Generate a page against the design system described in the system prompt.",
+    "Return only the HTML for the page body (no <html>, <head>, or surrounding markup).",
+    "Brief:",
+    "```json",
+    JSON.stringify(inputs, null, 2),
+    "```",
+  ].join("\n");
+}
+
+/**
+ * Production slot processor. Replaces processSlotDummy once ANTHROPIC_API_KEY
+ * is wired. Walks leased → generating → (Anthropic call) → succeeded,
+ * writing the anthropic_response_received event BEFORE the slot's cost
+ * columns update so billing facts are reconstructible from the event log
+ * even if the subsequent UPDATE fails.
+ *
+ * M3-5 will insert the validating state between generating and succeeded;
+ * M3-6 will insert publishing and defer succeeded until WP confirms.
+ */
+export async function processSlotAnthropic(
+  slotId: string,
+  workerId: string,
+  opts: {
+    client?: Client | null;
+    anthropicCall?: AnthropicCallFn;
+    model?: string;
+    maxTokens?: number;
+  } = {},
+): Promise<void> {
+  const call = opts.anthropicCall ?? defaultAnthropicCall;
+  const model = opts.model ?? DEFAULT_MODEL;
+  const maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+
+  const ctx = await loadSlotContext(slotId);
+  const systemPrompt = await buildSystemPromptForSite({
+    id: ctx.site.id,
+    site_name: ctx.site.site_name,
+    prefix: ctx.site.prefix,
+    design_system_version: ctx.design_system_version,
+  });
+  const userMessage = buildUserMessage(ctx.inputs);
+
+  await withClient(opts.client ?? null, async (c) => {
+    // leased → generating: stamps the state change on the slot + event log
+    // so the audit log shows exactly when we started talking to Anthropic.
+    const advance = await c.query(
+      `
+      UPDATE generation_job_pages
+         SET state = 'generating',
+             last_heartbeat_at = now(),
+             updated_at = now()
+       WHERE id = $1 AND worker_id = $2 AND state = 'leased'
+      `,
+      [slotId, workerId],
+    );
+    if ((advance.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processSlotAnthropic: lease stolen from worker ${workerId} before Anthropic call`,
+      );
+    }
+    await c.query(
+      `
+      INSERT INTO generation_events (job_id, page_slot_id, event, details)
+      VALUES ($1, $2, 'state_advanced',
+              jsonb_build_object('to', 'generating', 'worker_id', $3::text))
+      `,
+      [ctx.job_id, slotId, workerId],
+    );
+  });
+
+  // Anthropic call. Released from the pg client so Postgres doesn't hold
+  // a connection open for the duration of the API round-trip. If this
+  // throws, the slot stays in 'generating' and the reaper picks it up;
+  // the retry will reuse the same idempotency key so Anthropic returns
+  // the cached response without re-billing.
+  const response = await call({
+    model,
+    max_tokens: maxTokens,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+    idempotency_key: ctx.anthropic_idempotency_key,
+  });
+
+  const { cents, rateFound } = computeCostCents(response.model, response.usage);
+  const generatedHtml = response.content
+    .map((b) => b.text)
+    .join("")
+    .trim();
+
+  await withClient(opts.client ?? null, async (c) => {
+    // EVENT LOG FIRST. If the subsequent slot UPDATE fails (DB blip,
+    // network hiccup), the billing facts still persist and a
+    // reconciliation job can rebuild cost totals from the event log.
+    // This is the §10 row-3 mitigation from the M3 plan.
+    await c.query(
+      `
+      INSERT INTO generation_events (job_id, page_slot_id, event, details)
+      VALUES ($1, $2, 'anthropic_response_received',
+              jsonb_build_object(
+                'anthropic_response_id', $3::text,
+                'model', $4::text,
+                'input_tokens', $5::int,
+                'output_tokens', $6::int,
+                'cache_creation_input_tokens', $7::int,
+                'cache_read_input_tokens', $8::int,
+                'cost_usd_cents', $9::bigint,
+                'pricing_version', $10::text,
+                'rate_found', $11::boolean,
+                'worker_id', $12::text
+              ))
+      `,
+      [
+        ctx.job_id,
+        slotId,
+        response.id,
+        response.model,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        response.usage.cache_creation_input_tokens ?? 0,
+        response.usage.cache_read_input_tokens ?? 0,
+        cents,
+        PRICING_VERSION,
+        rateFound,
+        workerId,
+      ],
+    );
+
+    // Now the slot UPDATE. Also guarded by worker_id so a stolen lease
+    // doesn't clobber another worker's state.
+    const finalise = await c.query(
+      `
+      UPDATE generation_job_pages
+         SET state = 'succeeded',
+             generated_html = $4,
+             anthropic_raw_response_id = $3,
+             cost_usd_cents = $5,
+             input_tokens = $6,
+             output_tokens = $7,
+             cached_tokens = $8,
+             finished_at = now(),
+             lease_expires_at = NULL,
+             worker_id = NULL,
+             updated_at = now()
+       WHERE id = $1 AND worker_id = $2
+         AND state = 'generating'
+      `,
+      [
+        slotId,
+        workerId,
+        response.id,
+        generatedHtml,
+        cents,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        (response.usage.cache_creation_input_tokens ?? 0) +
+          (response.usage.cache_read_input_tokens ?? 0),
+      ],
+    );
+    if ((finalise.rowCount ?? 0) === 0) {
+      throw new Error(
+        `processSlotAnthropic: lease stolen or state changed before finalising slot ${slotId}`,
+      );
+    }
+
+    // Roll the parent job's aggregates. cost + tokens accumulate via
+    // the event log (reconciliation truth), but we keep running
+    // totals on generation_jobs for cheap list-page reads.
+    await c.query(
+      `
+      UPDATE generation_jobs j
+         SET succeeded_count = succeeded_count + 1,
+             total_cost_usd_cents = total_cost_usd_cents + $2,
+             total_input_tokens   = total_input_tokens + $3,
+             total_output_tokens  = total_output_tokens + $4,
+             total_cached_tokens  = total_cached_tokens + $5,
+             status = CASE
+                        WHEN j.succeeded_count + 1 + j.failed_count
+                             >= j.requested_count
+                          THEN 'succeeded'
+                        ELSE 'running'
+                      END,
+             finished_at = CASE
+                             WHEN j.succeeded_count + 1 + j.failed_count
+                                  >= j.requested_count
+                               THEN now()
+                             ELSE j.finished_at
+                           END,
+             updated_at = now()
+       WHERE id = $1
+      `,
+      [
+        ctx.job_id,
+        cents,
+        response.usage.input_tokens,
+        response.usage.output_tokens,
+        (response.usage.cache_creation_input_tokens ?? 0) +
+          (response.usage.cache_read_input_tokens ?? 0),
+      ],
+    );
+
+    await c.query(
+      `
+      INSERT INTO generation_events (job_id, page_slot_id, event, details)
+      VALUES ($1, $2, 'state_advanced',
+              jsonb_build_object('to', 'succeeded', 'worker_id', $3::text))
+      `,
+      [ctx.job_id, slotId, workerId],
     );
   });
 }
