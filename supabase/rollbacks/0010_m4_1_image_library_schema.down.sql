@@ -29,9 +29,13 @@ ALTER TABLE IF EXISTS image_usage         DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS image_metadata      DISABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS image_library       DISABLE ROW LEVEL SECURITY;
 
+DROP TRIGGER IF EXISTS image_library_search_tsv_trigger ON image_library;
+
 DROP TABLE IF EXISTS transfer_events;
 DROP TABLE IF EXISTS transfer_job_items;
 DROP TABLE IF EXISTS transfer_jobs;
 DROP TABLE IF EXISTS image_usage;
 DROP TABLE IF EXISTS image_metadata;
 DROP TABLE IF EXISTS image_library;
+
+DROP FUNCTION IF EXISTS image_library_search_tsv_refresh();

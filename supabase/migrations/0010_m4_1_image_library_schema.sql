@@ -90,13 +90,13 @@ CREATE TABLE image_library (
   bytes                 bigint
     CHECK (bytes IS NULL OR bytes >= 0),
 
-  -- Full-text search column. Generated from caption + tags; kept in
-  -- sync by the DB, not the app. Indexed via GIN below.
-  search_tsv            tsvector
-    GENERATED ALWAYS AS (
-      setweight(to_tsvector('english', coalesce(caption, '')), 'A')
-      || setweight(to_tsvector('english', coalesce(array_to_string(tags, ' '), '')), 'B')
-    ) STORED,
+  -- Full-text search column. Maintained by a BEFORE INSERT/UPDATE
+  -- trigger (see below) rather than a GENERATED expression — Postgres
+  -- requires generated columns to use IMMUTABLE functions only, and
+  -- to_tsvector(regconfig, text) is STABLE. The trigger achieves the
+  -- same "app never sets this directly" contract. Indexed via GIN
+  -- below.
+  search_tsv            tsvector,
 
   -- Audit + soft-delete per docs/DATA_CONVENTIONS.md.
   created_at            timestamptz NOT NULL DEFAULT now(),
@@ -112,6 +112,28 @@ CREATE TABLE image_library (
   CONSTRAINT image_library_source_ref_unique
     UNIQUE NULLS NOT DISTINCT (source, source_ref)
 );
+
+-- Maintain search_tsv in sync with caption + tags. Runs BEFORE the
+-- row is written so the indexed value matches what a SELECT would
+-- compute. Trigger function is plain SQL (STABLE default is OK for
+-- trigger bodies — IMMUTABLE is only required on expressions used
+-- in GENERATED columns / indexes).
+CREATE OR REPLACE FUNCTION image_library_search_tsv_refresh()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.search_tsv :=
+    setweight(to_tsvector('english', coalesce(NEW.caption, '')), 'A')
+    || setweight(to_tsvector('english', coalesce(array_to_string(NEW.tags, ' '), '')), 'B');
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER image_library_search_tsv_trigger
+  BEFORE INSERT OR UPDATE OF caption, tags ON image_library
+  FOR EACH ROW
+  EXECUTE FUNCTION image_library_search_tsv_refresh();
 
 CREATE INDEX idx_image_library_search_tsv
   ON image_library USING GIN (search_tsv);
