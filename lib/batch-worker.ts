@@ -66,6 +66,19 @@ import { getServiceRoleClient } from "@/lib/supabase";
 export const DEFAULT_LEASE_MS = 180_000; // 180s per M3 plan §2.
 export const DEFAULT_HEARTBEAT_MS = 30_000;
 
+// M3-7 retry budget. attempts is bumped on every lease; a slot that
+// fails on its 3rd attempt has no remaining budget and goes terminal.
+export const RETRY_MAX_ATTEMPTS = 3;
+
+// Indexed by the `attempts` value AT THE TIME OF FAILURE (i.e. 1 = first
+// attempt just failed, next retry waits 1s; 2 = second attempt just
+// failed, next retry waits 5s). A 3rd failure exits the table and goes
+// terminal per the cap above.
+export const RETRY_BACKOFF_MS: Record<number, number> = {
+  1: 1_000,
+  2: 5_000,
+};
+
 export type LeasedSlot = {
   id: string;
   job_id: string;
@@ -117,12 +130,20 @@ export async function leaseNextPage(
     try {
       await c.query("BEGIN");
 
+      // M3-7: pending slots with a retry_after in the future are
+      // deferred (waiting out their exponential-backoff window) and
+      // must be excluded. Expired leases on any non-terminal state
+      // are always eligible — the reaper path handles stuck workers
+      // regardless of retry_after.
       const candidate = await c.query<{ id: string }>(
         `
         SELECT id
           FROM generation_job_pages
          WHERE (
-                 state = 'pending'
+                 (
+                   state = 'pending'
+                   AND (retry_after IS NULL OR retry_after < now())
+                 )
                  OR (
                    state IN ('leased', 'generating', 'validating', 'publishing')
                    AND lease_expires_at IS NOT NULL
@@ -884,9 +905,9 @@ export async function processSlotAnthropic(
     );
 
     if (!result.ok) {
-      // Record the publish failure: slot → 'failed', parent job
-      // failed_count++. Cost was already accumulated above, so the
-      // billing side of the audit stays intact.
+      // M3-7: decide retry-defer vs. terminal-fail. Retry-defer when
+      // the error is retryable AND we still have budget
+      // (attempts < RETRY_MAX_ATTEMPTS). Anything else is terminal.
       await withClient(opts.client ?? null, async (c) => {
         await c.query(
           `
@@ -906,6 +927,67 @@ export async function processSlotAnthropic(
             workerId,
           ],
         );
+
+        // Fetch current attempts to decide. We bumped it on lease so
+        // this value is "attempts made including the one we just
+        // completed (failed)".
+        const attemptRow = await c.query<{ attempts: number }>(
+          `SELECT attempts FROM generation_job_pages WHERE id = $1`,
+          [slotId],
+        );
+        const attempts = attemptRow.rows[0]?.attempts ?? RETRY_MAX_ATTEMPTS;
+        const shouldRetry =
+          result.retryable && attempts < RETRY_MAX_ATTEMPTS;
+
+        if (shouldRetry) {
+          // Defer: slot → 'pending' with retry_after set to the
+          // backoff for this attempt count. The lease-candidate query
+          // excludes pending rows whose retry_after is in the future,
+          // so the reaper and other workers skip this slot until its
+          // backoff expires.
+          const backoffMs = RETRY_BACKOFF_MS[attempts] ?? 30_000;
+
+          const deferred = await c.query(
+            `
+            UPDATE generation_job_pages
+               SET state = 'pending',
+                   worker_id = NULL,
+                   lease_expires_at = NULL,
+                   retry_after = now() + ($3 || ' milliseconds')::interval,
+                   last_error_code = $4,
+                   last_error_message = $5,
+                   updated_at = now()
+             WHERE id = $1 AND worker_id = $2 AND state = 'publishing'
+            `,
+            [slotId, workerId, String(backoffMs), result.code, result.message],
+          );
+          if ((deferred.rowCount ?? 0) === 0) {
+            throw new Error(
+              `processSlotAnthropic: lease stolen while deferring slot ${slotId}`,
+            );
+          }
+          await c.query(
+            `
+            INSERT INTO generation_events (job_id, page_slot_id, event, details)
+            VALUES ($1, $2, 'retry_scheduled',
+                    jsonb_build_object('attempts', $3::int,
+                                       'backoff_ms', $4::int,
+                                       'code', $5::text,
+                                       'worker_id', $6::text))
+            `,
+            [
+              ctx.job_id,
+              slotId,
+              attempts,
+              backoffMs,
+              result.code,
+              workerId,
+            ],
+          );
+          return;
+        }
+
+        // Terminal failure path: cap reached OR non-retryable.
         const markFailed = await c.query(
           `
           UPDATE generation_job_pages
@@ -955,9 +1037,11 @@ export async function processSlotAnthropic(
           INSERT INTO generation_events (job_id, page_slot_id, event, details)
           VALUES ($1, $2, 'state_advanced',
                   jsonb_build_object('to', 'failed', 'worker_id', $3::text,
-                                     'reason', 'publish_failed'))
+                                     'reason', 'publish_failed',
+                                     'attempts', $4::int,
+                                     'retryable', $5::boolean))
           `,
-          [ctx.job_id, slotId, workerId],
+          [ctx.job_id, slotId, workerId, attempts, result.retryable],
         );
       });
     }

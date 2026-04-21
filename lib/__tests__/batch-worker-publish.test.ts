@@ -478,13 +478,18 @@ describe("WP failure path", () => {
     if (!leased) throw new Error("lease failed");
 
     const counters = { getBySlug: 0, create: 0, update: 0 };
+    // retryable=false so the M3-7 retry loop short-circuits to
+    // terminal-fail immediately. The retry-enabled behaviour is
+    // pinned by batch-worker-retry.test.ts; this test stays focused
+    // on the M3-6 cost-preservation + publish_failed-event
+    // invariant.
     const wp = makeWp({
       counters,
       createReturns: {
         ok: false,
-        code: "WP_API_ERROR",
-        message: "500 Server Error",
-        retryable: true,
+        code: "WP_API_NON_RETRYABLE",
+        message: "400 Bad Request",
+        retryable: false,
       },
     });
 
@@ -500,8 +505,8 @@ describe("WP failure path", () => {
       .eq("id", leased.id)
       .single();
     expect(slot?.state).toBe("failed");
-    expect(slot?.last_error_code).toBe("WP_API_ERROR");
-    expect(slot?.last_error_message).toContain("500");
+    expect(slot?.last_error_code).toBe("WP_API_NON_RETRYABLE");
+    expect(slot?.last_error_message).toContain("400");
     expect(Number(slot?.cost_usd_cents)).toBeGreaterThan(0);
 
     const { data: events } = await svc
