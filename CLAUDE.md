@@ -31,20 +31,27 @@ For sub-slices of a parent milestone whose plan Steven has already approved (M2a
 
 Escalate only for: architectural decisions not in the parent plan, spec deviations, security tradeoffs, or same-failure-twice CI loops. Do NOT escalate for: sub-slice planning, operational/infra issues, routine tradeoffs already covered in the parent plan.
 
-## Auto-continue between sub-slices
-After an auto-merged sub-slice PR, automatically proceed to the next sub-slice in the same approved parent milestone without waiting for a prompt. Rule chain:
+## Auto-continue — across sub-slices AND across milestones
+After an auto-merged PR, automatically proceed to the next PR per the roadmap. No stop-gates at sub-slice boundaries, no stop-gates at parent-milestone boundaries. Silence = keep going.
+
+Rule chain:
 
 - `M2c-1 merged → start M2c-2`
 - `M2c-2 merged → start M2c-3`
 - `M2c-3 merged → start M2d-1` (next slice of parent M2)
-- `M2d-N merged → either start M2d-(N+1) or, if M2d was the last slice, status update "M2 complete, ready for Steven's sign-off before M3" and stop`
+- `M2d-N (last) merged → start M3-1` (next milestone per the roadmap)
+- `M3-N (last) merged → start M4-1`
+- etc. through the roadmap in the technical design doc.
+
+Write-safety-critical milestones (M3 batch generator, M4 image library, M7 anything that spends money or mutates client WP sites) still require per-slice plans with the **"Risks identified and mitigated"** audit. That audit + the concurrency / E2E / migration / RLS test patterns are the safety net — not a wait for Steven at a milestone boundary.
 
 Stop and wait for Steven only when:
-- A parent milestone fully completes (M2 done → wait, do NOT start M3 on your own).
-- An architectural escalation surfaces.
-- The same CI failure lands twice in a row.
+- An architectural escalation surfaces (cost tradeoff, spec ambiguity, security decision — things the plan can't resolve).
+- The same CI failure lands twice in a row (same-failure-twice rule).
+- A required env var is missing (note what's needed, skip the affected sub-slice, continue with slices that don't depend on it).
+- Steven explicitly tells you to pause — e.g. "I want to test M4 before starting M5." Silence is NOT a pause signal; it's a proceed signal.
 
-Also: post a one-line status ping per merge so Steven has visibility without needing to prompt — e.g. "M2c-2 merged, starting M2c-3."
+Post a one-line status ping per merge: `"<slice> merged, starting <next>"`. That's the visibility channel — Steven reads the pings in his GitHub inbox.
 
 ## Parallelism (multi-session coordination)
 Serial-single-session is the default. When Steven runs two browser tabs of Claude Code in parallel, coordinate via `docs/WORK_IN_FLIGHT.md` and follow `docs/PARALLELISM_PLAN.md`:
