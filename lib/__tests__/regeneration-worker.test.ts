@@ -144,7 +144,7 @@ function buildStubResponse(overrides: Partial<AnthropicResponse> = {}): Anthropi
 // ---------------------------------------------------------------------------
 
 describe("processRegenJobAnthropic — happy path", () => {
-  it("writes event log, bumps cost columns, and lands terminal succeeded", async () => {
+  it("writes event log, bumps cost columns, and leaves job 'running' for the publisher to pick up", async () => {
     const { id: siteId } = await seedSite({ prefix: "m72a", name: "Regen Alpha" });
     await seedActiveDsForSite(siteId);
     const pageId = await seedPage(siteId);
@@ -170,7 +170,9 @@ describe("processRegenJobAnthropic — happy path", () => {
       )
       .eq("id", jobId)
       .maybeSingle();
-    expect(job?.status).toBe("succeeded");
+    // M7-3 refactor: Anthropic stage no longer terminal-succeeds.
+    // The publisher (separate stage) flips status after pages commits.
+    expect(job?.status).toBe("running");
     expect(Number(job?.input_tokens)).toBe(1000);
     expect(Number(job?.output_tokens)).toBe(500);
     expect(job?.anthropic_raw_response_id).toBe("resp-stub-1");
@@ -183,7 +185,8 @@ describe("processRegenJobAnthropic — happy path", () => {
       .order("created_at", { ascending: true });
     const types = (events ?? []).map((e) => e.type);
     expect(types).toContain("anthropic_response_received");
-    expect(types).toContain("m7_2_stub_succeeded");
+    // The M7-2 stub event is gone in M7-3.
+    expect(types).not.toContain("m7_2_stub_succeeded");
   });
 
   it("threads the stored idempotency key verbatim into the Anthropic call", async () => {
