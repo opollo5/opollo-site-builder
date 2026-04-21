@@ -227,39 +227,16 @@ detail. Pick up on a cleanup slice that naturally lives in M6 (Per-Page
 Iteration UI, where admin UX polish fits), or earlier if a sibling slice
 happens to be in the same file.
 
-### High — remove scope_prefix from the Add Site form
-**Surface:** `components/AddSiteModal.tsx` line ~211 "Scope prefix" field.
-**Problem:** A solo-dev operator adding a client site shouldn't have to
-understand CSS-scoping strategy. The field leaks `sites.prefix` into the UX.
-**Fix:** auto-generate server-side at site creation. Algorithm:
-1. Lower-case, ASCII-slugify the site name; keep only `[a-z0-9]`.
-2. Take the first 2–4 characters.
-3. If that prefix already exists in `sites.prefix`, append a single digit
-   (2, 3, …) until unique, capped at length 4.
-4. If still colliding past `<prefix>9`, fall back to `<prefix>` + base-36
-   counter.
+### ~~High — remove scope_prefix from the Add Site form~~ (shipped in M2d)
+M2d's UX cleanup removed the Scope prefix field from `AddSiteModal.tsx`;
+`lib/sites.createSite` now auto-generates via `generateUniquePrefix` when the
+caller doesn't supply one.
 
-Hide the field from the form entirely. `lib/sites.createSite` accepts
-`prefix` today; flip it to optional + server-compute when absent.
-
-### Medium — jargon in design-system authoring forms
-Audited 2026-04; current offenders:
-
-- `components/TemplateFormModal.tsx`:
-  - "Composition (JSON array)" → "Template composition"
-  - "required_fields (JSON)" → "Required fields per component"
-  - "seo_defaults JSON (optional)" → "SEO defaults (optional)"
-- `components/ComponentFormModal.tsx`:
-  - "content_schema (JSON)" → "Content shape (JSON Schema)"
-  - "image_slots JSON (optional)" → "Image slots (optional)"
-- `components/CreateDesignSystemModal.tsx`:
-  - "tokens.css" / "base-styles.css" — keep the filenames (designers write
-    CSS; the names are accurate), but add a one-line sub-label explaining
-    what each section controls.
-
-Design-system authoring is a developer surface, so full de-jargoning isn't
-the goal — just hide the raw column names. JSON editing UX itself
-(`<Textarea>` with JSON.parse in onBlur) can survive.
+### ~~Medium — jargon in design-system authoring forms~~ (shipped in M6-4)
+The three form labels listed here all shipped in M6-4 — see
+`components/TemplateFormModal.tsx`, `components/ComponentFormModal.tsx`, and
+`components/CreateDesignSystemModal.tsx` for the updated copy + the two
+sub-labels under `tokens.css` / `base-styles.css`.
 
 ### Low — admin-surface labels that expose IDs
 Scan done 2026-04, none found on the primary surfaces:
