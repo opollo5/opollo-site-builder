@@ -52,11 +52,14 @@ export type RewriteResult = {
   rewriteCount: number;
 };
 
+type Counter = { n: number };
+
 function rewriteOneUrl(
   url: string,
   mapping: RewriteMapping,
   usedIds: Set<string>,
   missedIds: Set<string>,
+  counter: Counter,
 ): string {
   CLOUDFLARE_URL_RE.lastIndex = 0;
   const match = CLOUDFLARE_URL_RE.exec(url);
@@ -68,6 +71,7 @@ function rewriteOneUrl(
     return url;
   }
   usedIds.add(cfId);
+  counter.n++;
   return wpUrl;
 }
 
@@ -76,6 +80,7 @@ function rewriteSrcsetValue(
   mapping: RewriteMapping,
   usedIds: Set<string>,
   missedIds: Set<string>,
+  counter: Counter,
 ): string {
   return value
     .split(",")
@@ -86,7 +91,13 @@ function rewriteSrcsetValue(
       const spaceIdx = trimmed.search(/\s/);
       const rawUrl = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
       const descriptor = spaceIdx === -1 ? "" : trimmed.slice(spaceIdx);
-      const rewritten = rewriteOneUrl(rawUrl, mapping, usedIds, missedIds);
+      const rewritten = rewriteOneUrl(
+        rawUrl,
+        mapping,
+        usedIds,
+        missedIds,
+        counter,
+      );
       return `${rewritten}${descriptor}`;
     })
     .filter((p) => p.length > 0)
@@ -113,7 +124,7 @@ export function rewriteImageUrls(
 ): RewriteResult {
   const usedIds = new Set<string>();
   const missedIds = new Set<string>();
-  let rewriteCount = 0;
+  const counter: Counter = { n: 0 };
 
   const step1 = html.replace(
     SRC_ATTR_RE,
@@ -121,13 +132,10 @@ export function rewriteImageUrls(
       const value = dq ?? sq ?? "";
       const quote = dq !== undefined ? '"' : "'";
       const lower = (attr as string).toLowerCase();
-      let next: string;
-      if (lower === "src") {
-        next = rewriteOneUrl(value, mapping, usedIds, missedIds);
-      } else {
-        next = rewriteSrcsetValue(value, mapping, usedIds, missedIds);
-      }
-      if (next !== value) rewriteCount++;
+      const next =
+        lower === "src"
+          ? rewriteOneUrl(value, mapping, usedIds, missedIds, counter)
+          : rewriteSrcsetValue(value, mapping, usedIds, missedIds, counter);
       return `${attr}=${quote}${next}${quote}`;
     },
   );
@@ -147,8 +155,13 @@ export function rewriteImageUrls(
           _innerQuoteClose: string,
           suffix: string,
         ) => {
-          const rewritten = rewriteOneUrl(urlBody, mapping, usedIds, missedIds);
-          if (rewritten !== urlBody) rewriteCount++;
+          const rewritten = rewriteOneUrl(
+            urlBody,
+            mapping,
+            usedIds,
+            missedIds,
+            counter,
+          );
           return `${prefix}${innerQuote}${rewritten}${innerQuote}${suffix}`;
         },
       );
@@ -160,7 +173,7 @@ export function rewriteImageUrls(
     rewrittenHtml: step2,
     usedIds,
     missedIds,
-    rewriteCount,
+    rewriteCount: counter.n,
   };
 }
 
