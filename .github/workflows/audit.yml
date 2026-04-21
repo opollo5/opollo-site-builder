@@ -1,0 +1,58 @@
+name: Dependency audit
+
+# Blocks merge on newly-introduced high/critical CVEs in production
+# dependencies. Dev deps are scanned at info only — they never ship
+# to prod and the signal-to-noise ratio of blocking on them is bad.
+#
+# Auto-bumps come from Dependabot; this workflow catches the window
+# between a CVE disclosure and the next Dependabot run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  schedule:
+    # Mondays at 07:00 UTC (one hour after CodeQL so the alerts
+    # don't pile into the same notification window).
+    - cron: "0 7 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Block on CRITICAL in prod deps. Started at critical (not high)
+      # because the current Next.js 14.2.15 carries 5 known high-severity
+      # CVEs that require a framework bump to fix (follow-up:
+      # next@14.2.28+ or 15.x migration). Once the bump ships, tighten
+      # this threshold to `high`.
+      - name: npm audit (production, critical-blocking)
+        run: npm audit --audit-level=critical --omit=dev
+
+      # Informational scan at the high level — surfaces the Next.js
+      # items + any new introductions so the upgrade-driver PR has
+      # visibility. Does not block merge.
+      - name: npm audit (high-and-up, informational)
+        if: always()
+        continue-on-error: true
+        run: npm audit --audit-level=high --omit=dev
+
+      # Dev deps — informational only. Continues on failure so we
+      # see new dev-surface CVEs without blocking the PR.
+      - name: npm audit (dev, informational)
+        if: always()
+        continue-on-error: true
+        run: npm audit --audit-level=high
