@@ -12,8 +12,8 @@ Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone — ever
 
 | Slice | Status | Notes |
 | --- | --- | --- |
-| M7-1 | in flight | `regeneration_jobs` + `regeneration_events` schema with partial UNIQUE + lease-coherence CHECK + RLS. |
-| M7-2 | planned | Worker core with Anthropic integration, event-log-first billing, idempotency reuse. |
+| M7-1 | merged (#72) | `regeneration_jobs` + `regeneration_events` schema with partial UNIQUE + lease-coherence CHECK + RLS. |
+| M7-2 | in flight | Worker core with Anthropic integration, event-log-first billing, idempotency reuse. |
 | M7-3 | planned | WP update stage with drift reconciliation + M4-7 image transfer + `pages.version_lock` bump. |
 | M7-4 | planned | Admin UI: "Re-generate" button + polling status panel. |
 | M7-5 | planned | Cron wiring + budget cap + retry machinery. |
