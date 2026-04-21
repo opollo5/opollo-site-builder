@@ -7,9 +7,10 @@ import { logger } from "@/lib/logger";
 // GET /api/health — lightweight liveness + readiness probe.
 //
 // Liveness  : the process is alive and the handler returned.
-// Readiness : Supabase is reachable (one-row SELECT against opollo_config,
-//             which always has exactly one row — covers both connectivity
-//             and the service-role key being valid).
+// Readiness : Supabase is reachable — SELECT key FROM opollo_config
+//             LIMIT 1 validates connectivity, service-role authz, and
+//             schema presence. A zero-row result is still "ok"; we don't
+//             depend on seeded data.
 //
 // The endpoint returns 200 when both pass, 503 when readiness fails, and
 // always includes:
@@ -33,7 +34,7 @@ async function checkSupabase(): Promise<{ result: CheckResult; latency_ms: numbe
     const supabase = getServiceRoleClient();
     const { error } = await supabase
       .from("opollo_config")
-      .select("id")
+      .select("key")
       .limit(1);
     if (error) {
       return { result: "fail", latency_ms: Date.now() - start, error: error.message };
