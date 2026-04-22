@@ -1,5 +1,7 @@
 import { Client } from "pg";
 
+import { getServiceRoleClient } from "@/lib/supabase";
+
 // ---------------------------------------------------------------------------
 // M8-2 — Per-tenant cost budget enforcement.
 //
@@ -254,3 +256,154 @@ export const PROJECTED_COST_PER_BATCH_SLOT_CENTS = 30;
  * same shape as one batch slot — same prompt, same token budget.
  */
 export const PROJECTED_COST_PER_REGEN_CENTS = 30;
+
+// ---------------------------------------------------------------------------
+// Read / update for the admin UI (M8-5)
+// ---------------------------------------------------------------------------
+
+export type TenantBudget = {
+  site_id: string;
+  daily_cap_cents: number;
+  monthly_cap_cents: number;
+  daily_usage_cents: number;
+  monthly_usage_cents: number;
+  daily_reset_at: string;
+  monthly_reset_at: string;
+  version_lock: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * Read the budget row for a site. Service-role — admin gate runs
+ * above the caller.
+ */
+export async function getTenantBudget(
+  siteId: string,
+): Promise<TenantBudget | null> {
+  const svc = getServiceRoleClient();
+  const { data, error } = await svc
+    .from("tenant_cost_budgets")
+    .select(
+      "site_id, daily_cap_cents, monthly_cap_cents, daily_usage_cents, monthly_usage_cents, daily_reset_at, monthly_reset_at, version_lock, created_at, updated_at",
+    )
+    .eq("site_id", siteId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`getTenantBudget: ${error.message}`);
+  }
+  if (!data) return null;
+  return {
+    site_id: data.site_id as string,
+    daily_cap_cents: Number(data.daily_cap_cents),
+    monthly_cap_cents: Number(data.monthly_cap_cents),
+    daily_usage_cents: Number(data.daily_usage_cents),
+    monthly_usage_cents: Number(data.monthly_usage_cents),
+    daily_reset_at: data.daily_reset_at as string,
+    monthly_reset_at: data.monthly_reset_at as string,
+    version_lock: Number(data.version_lock),
+    created_at: data.created_at as string,
+    updated_at: data.updated_at as string,
+  };
+}
+
+export type UpdateTenantBudgetPatch = {
+  daily_cap_cents?: number;
+  monthly_cap_cents?: number;
+};
+
+export type UpdateTenantBudgetResult =
+  | { ok: true; budget: TenantBudget }
+  | {
+      ok: false;
+      code: "NOT_FOUND" | "VERSION_CONFLICT" | "INTERNAL_ERROR";
+      message: string;
+      details?: Record<string, unknown>;
+    };
+
+/**
+ * Admin PATCH to update caps. Optimistic-locked on version_lock.
+ * Mismatch → VERSION_CONFLICT with the current server version in
+ * details. Zod validation (non-negative, integer, max 10M cents) is
+ * the caller's responsibility.
+ */
+export async function updateTenantBudget(
+  siteId: string,
+  expectedVersion: number,
+  patch: UpdateTenantBudgetPatch,
+  updatedBy: string | null,
+): Promise<UpdateTenantBudgetResult> {
+  const svc = getServiceRoleClient();
+
+  const updateRow: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+    version_lock: expectedVersion + 1,
+    updated_by: updatedBy,
+  };
+  if (patch.daily_cap_cents !== undefined) {
+    updateRow.daily_cap_cents = patch.daily_cap_cents;
+  }
+  if (patch.monthly_cap_cents !== undefined) {
+    updateRow.monthly_cap_cents = patch.monthly_cap_cents;
+  }
+
+  const res = await svc
+    .from("tenant_cost_budgets")
+    .update(updateRow)
+    .eq("site_id", siteId)
+    .eq("version_lock", expectedVersion)
+    .select(
+      "site_id, daily_cap_cents, monthly_cap_cents, daily_usage_cents, monthly_usage_cents, daily_reset_at, monthly_reset_at, version_lock, created_at, updated_at",
+    )
+    .maybeSingle();
+
+  if (res.error) {
+    return {
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: `updateTenantBudget: ${res.error.message}`,
+    };
+  }
+  if (!res.data) {
+    // Zero rows: disambiguate NOT_FOUND vs VERSION_CONFLICT.
+    const exists = await svc
+      .from("tenant_cost_budgets")
+      .select("version_lock")
+      .eq("site_id", siteId)
+      .maybeSingle();
+    if (!exists.data) {
+      return {
+        ok: false,
+        code: "NOT_FOUND",
+        message: `No budget row for site ${siteId}.`,
+      };
+    }
+    return {
+      ok: false,
+      code: "VERSION_CONFLICT",
+      message:
+        "Another operator changed this budget since you opened the editor. Reload to see the latest.",
+      details: {
+        current_version: Number(exists.data.version_lock),
+        expected_version: expectedVersion,
+      },
+    };
+  }
+
+  const row = res.data as Record<string, unknown>;
+  return {
+    ok: true,
+    budget: {
+      site_id: row.site_id as string,
+      daily_cap_cents: Number(row.daily_cap_cents),
+      monthly_cap_cents: Number(row.monthly_cap_cents),
+      daily_usage_cents: Number(row.daily_usage_cents),
+      monthly_usage_cents: Number(row.monthly_usage_cents),
+      daily_reset_at: row.daily_reset_at as string,
+      monthly_reset_at: row.monthly_reset_at as string,
+      version_lock: Number(row.version_lock),
+      created_at: row.created_at as string,
+      updated_at: row.updated_at as string,
+    },
+  };
+}
