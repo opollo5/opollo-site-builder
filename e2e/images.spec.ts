@@ -202,11 +202,13 @@ test.describe("images admin surface", () => {
       .click();
     await page.waitForURL(/\/admin\/images\/[0-9a-f-]{36}/);
 
-    // Auto-accept the confirm() dialog the archive button fires.
-    page.once("dialog", (dialog) => {
-      void dialog.accept();
-    });
+    // Post-audit-3: archive opens a ConfirmActionModal instead of
+    // firing window.confirm(). Click the button to open it, then the
+    // modal's destructive confirm.
     await page.getByTestId("archive-image-button").click();
+    const confirmDialog = page.getByRole("dialog", { name: /archive this image/i });
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole("button", { name: /^archive$/i }).click();
 
     // After router.refresh, the detail page shows the archived banner
     // + the Restore button replaces Archive.
