@@ -47,6 +47,13 @@ vi.mock("@/lib/auth", async () => {
   };
 });
 
+// sites/register calls revalidatePath("/admin/sites") on success, which
+// needs Next.js's static-generation store. Stubbing it out lets the
+// operator-allow test hit the lib layer without a Next.js runtime.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 import { POST as activateRoute } from "@/app/api/design-systems/[id]/activate/route";
 import { POST as archiveRoute } from "@/app/api/design-systems/[id]/archive/route";
 import { POST as createComponentRoute } from "@/app/api/design-systems/[id]/components/route";
@@ -368,9 +375,11 @@ describe("role gate — operator is allowed (representative routes)", () => {
 
     const res = await createTemplateRoute(
       jsonReq(`http://t/api/design-systems/${ds.data.id}/templates`, {
-        name: "home",
-        content_schema: minimalComponentContentSchema(),
+        page_type: "homepage",
+        name: "homepage-default",
         composition: minimalComposition(),
+        required_fields: { hero: ["headline"] },
+        is_default: true,
       }),
       { params: { id: ds.data.id } },
     );
