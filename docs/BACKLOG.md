@@ -6,9 +6,15 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M8 — per-tenant cost budgets (in flight)
+## M9 — Next.js 14.2.35 CVE mitigation (in flight)
 
-Parent plan: `docs/plans/m8-parent.md`. Sub-slice status tracker:
+Single-PR hybrid. See `docs/SECURITY_NEXTJS_CVES.md` for the full matrix. Config-level closure of the three unreachable CVEs (rewrites smuggling, Image Optimizer DoS, next/image disk cache) + documentation of the two partial RSC exposures that remain platform-mitigated on Vercel. Version stays at 14.2.35; the actual 14→16 jump is tracked under "M10-candidate: Next.js 14 → 16 migration" in Infra / observability below.
+
+---
+
+## M8 — per-tenant cost budgets (shipped)
+
+Parent plan: `docs/plans/m8-parent.md`. All five sub-slices merged.
 
 | Slice | Status | Notes |
 | --- | --- | --- |
@@ -16,7 +22,7 @@ Parent plan: `docs/plans/m8-parent.md`. Sub-slice status tracker:
 | M8-2 | merged (#80) | Enforcement in `createBatchJob` + `enqueueRegenJob`. `SELECT … FOR UPDATE` + atomic usage increment via `lib/tenant-budgets.ts`. BUDGET_EXCEEDED on overdraw. |
 | M8-3 | merged (#81) | iStock seed (M4-5) integration — `ISTOCK_SEED_CAP_CENTS` env ceiling; effective cap = min(caller, env); `capSource` threaded through result + error. |
 | M8-4 | merged (#82) | `/api/cron/budget-reset` hourly reset cron. Daily + monthly rollover via single UPDATE per period with `WHERE reset_at < now()` predicate. Idempotent under concurrent ticks. |
-| M8-5 | in flight | Admin UI budget badge on `/admin/sites/[id]` + PATCH endpoint with version_lock. |
+| M8-5 | merged (#83) | Admin UI budget badge on `/admin/sites/[id]` + PATCH endpoint with version_lock. |
 
 New env vars (both optional, code-side defaults apply): `DEFAULT_TENANT_DAILY_BUDGET_CENTS` (default 500 = $5/day), `DEFAULT_TENANT_MONTHLY_BUDGET_CENTS` (default 10000 = $100/month).
 
@@ -93,11 +99,20 @@ Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IM
 **Root cause:** `lighthouse:recommended` preset brings in many **error-level** assertions (render-blocking-resources, legacy-javascript, third-party-summary, etc.) that my explicit warn-level overrides didn't touch. Those error-level assertions fired on a minimal login page and caused `lhci autorun` to exit 1.
 **Fix shipped:** dropped the preset from `lighthouserc.json`; explicit assertions only, all warn-level. Also made the workflow step `continue-on-error: true` with artifact upload so future regressions preserve the reports without blocking merge. Kept the earlier fixes (relaxed ready pattern, placeholder envs, chromeFlags array, explicit server bind, 120s timeout).
 
-### Next.js framework upgrade (14.2.15 → patched release)
-**What:** current Next has 5 known high-severity CVEs (disclosed in GHSA-9g9p-9gw9-jx7f, GHSA-h25m-26qc-wcjf, GHSA-ggv3-7p47-pfv8, GHSA-3x4c-7xq6-9pq8, GHSA-q4gf-8mx6-v5v3). Most are self-hosted-only; Vercel patches some on the platform layer but not all.
-**Why deferred:** framework bump needs a focused PR with full regression sweep; bundled with security-observability baseline was too broad.
-**Trigger:** npm audit workflow keeps surfacing them at the informational step every PR. Land as soon as the current hardening pass stabilises.
-**Scope:** bump to `next@14.2.28+` (stays on 14.x, avoids the 15.x migration) or jump to 15.x if the timing is right. After merge, tighten `.github/workflows/audit.yml` threshold from `critical` back to `high`.
+### ~~Next.js framework upgrade (14.2.15 → patched release)~~ (partially shipped in M9; blocking fix deferred as M10-candidate)
+**Status:** the original plan ("bump to 14.2.28+, stay on 14.x") was incompatible with the actual npm advisory state — no 14.x patch release exists for the five CVEs, and they all ship fixed only in `next@16.2.4+`. M9 (#TBD) landed the hybrid mitigation: explicit config-level closure of the three unreachable CVE surfaces + documentation of the two partial (RSC) exposures which remain platform-mitigated on Vercel. See `docs/SECURITY_NEXTJS_CVES.md` for the full per-CVE matrix. Threshold in `.github/workflows/audit.yml` stays at `critical` until the actual version jump lands.
+
+### M10-candidate: Next.js 14 → 16 migration (multi-day effort)
+**What:** bump `next` from `14.2.35` to `16.2.4+` to apply fixes for GHSA-9g9p-9gw9-jx7f, GHSA-h25m-26qc-wcjf, GHSA-ggv3-7p47-pfv8, GHSA-3x4c-7xq6-9pq8, GHSA-q4gf-8mx6-v5v3 at the code layer rather than the config layer.
+**Why a separate milestone:** known breaking-change surfaces in our codebase require deliberate migration:
+  - `middleware.ts` — `@supabase/ssr` cookie-refresh pattern changed between Next 14 and 15; copyAuthCookies flow needs re-verification.
+  - `app/**/page.tsx` — `params` and `searchParams` became Promises in 15.x. 20+ admin pages need async-unwrap refactoring.
+  - `lib/security-headers.ts` — CSP-nonce injection API shifted (next/headers returns Promise in 15.x).
+  - `next/image` is unused today but the `images.unoptimized: true` + `remotePatterns: []` config added in M9 may need re-verification against the 16.x image config shape.
+  - ESLint / React / Radix dependency cascade — `eslint-config-next` pin follows `next` major; expect tool-config churn.
+**Trigger to pick up:** any of (a) we move off Vercel and lose the platform-layer RSC mitigations (M9's SECURITY_NEXTJS_CVES.md calls this a blocker), (b) a sixth Next.js CVE surfaces that we can't mitigate at config layer, (c) Steven batches a framework-upgrade window.
+**Scope:** ~3-5 focused sub-slices. Expected order: (1) dependency bump + eslint/typing fixes, (2) async params migration across admin pages, (3) middleware + CSP/nonce re-verification, (4) full E2E regression sweep, (5) tighten `audit.yml` threshold to `high`.
+**After it lands:** strike through SECURITY_NEXTJS_CVES.md + the M9 BACKLOG entry above.
 
 ### Schema hygiene pass: soft-delete + audit columns
 **What:** add `deleted_at` / `deleted_by` / `created_at` / `updated_at` / `created_by` / `updated_by` across mutable tables (`sites`, `design_systems`, `design_components`, `design_templates`, `pages`) per `docs/DATA_CONVENTIONS.md`.
