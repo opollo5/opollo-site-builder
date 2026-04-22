@@ -17,5 +17,35 @@ export default defineConfig({
     // run serially, which avoids cross-test TRUNCATE races when multiple
     // files hit the same database.
     fileParallelism: false,
+    coverage: {
+      // V8 over istanbul — faster, no source-map round-trip, supported
+      // directly by vitest 4.x.
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      // Only instrument what we write. Everything under node_modules,
+      // .next, app router client islands (mostly shadcn wrappers), and
+      // test helpers is excluded so the number reflects *our* code.
+      include: ["lib/**/*.ts", "app/**/*.ts"],
+      exclude: [
+        "lib/__tests__/**",
+        "lib/**/*.test.ts",
+        "app/**/loading.tsx",
+        "app/**/error.tsx",
+        "app/**/not-found.tsx",
+        "**/*.d.ts",
+      ],
+      // Soft thresholds for now — the codebase has well-covered hot
+      // paths (lib/batch-*, lib/sites, lib/auth*) plus lower-coverage
+      // thin API wrappers. 60% line / 55% branch is comfortably under
+      // current baseline so CI stays green; ratchet upward as the
+      // hot-path surface grows. A future follow-up will per-directory
+      // the thresholds once we have stable numbers.
+      thresholds: {
+        lines: 60,
+        branches: 55,
+        functions: 55,
+        statements: 60,
+      },
+    },
   },
 });

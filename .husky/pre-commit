@@ -1,0 +1,5 @@
+#!/usr/bin/env sh
+# Runs lint-staged on staged files. ESLint auto-fixes, then fails the
+# commit if anything is still broken. Scoped via .lintstagedrc so we
+# don't re-lint the whole repo on every commit.
+npx lint-staged

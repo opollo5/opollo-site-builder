@@ -67,6 +67,7 @@ export function SiteActionsMenu({
         <summary
           className="cursor-pointer list-none rounded px-2 py-1 text-muted-foreground hover:bg-muted"
           aria-label={`Actions for ${name}`}
+          data-testid="site-actions-summary"
         >
           ⋯
         </summary>
@@ -87,6 +88,7 @@ export function SiteActionsMenu({
             disabled={archiving}
             className="w-full px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
             onClick={handleArchive}
+            data-testid="site-archive-action"
           >
             {archiving ? "Archiving…" : "Archive"}
           </button>

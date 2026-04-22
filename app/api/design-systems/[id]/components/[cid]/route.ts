@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import {
   UpdateDesignComponentSchema,
   deleteComponent,
@@ -30,6 +31,9 @@ const PatchBodySchema = UpdateDesignComponentSchema.and(
 );
 
 export async function PATCH(req: Request, ctx: RouteContext) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const dsParam = validateUuidParam(ctx.params.id, "id");
   if (!dsParam.ok) return dsParam.response;
   const cidParam = validateUuidParam(ctx.params.cid, "cid");
@@ -62,6 +66,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 // expected_version_lock rides as a query param per the M1e plan (DELETE
 // with a body is unreliable across proxies).
 export async function DELETE(req: Request, ctx: RouteContext) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const dsParam = validateUuidParam(ctx.params.id, "id");
   if (!dsParam.ok) return dsParam.response;
   const cidParam = validateUuidParam(ctx.params.cid, "cid");

@@ -6,6 +6,9 @@ A chat interface that generates WordPress pages for Opollo's clients.
 
 ## How to work
 - Work autonomously. Don't ask for permission for normal coding tasks.
+- **Before starting a task that matches a pattern, read `docs/patterns/<pattern-name>.md` first.** The patterns folder is the playbook for recurring shapes — files, tests, PR structure, known pitfalls. If no pattern matches, proceed from first principles and note whether the task is a candidate for a new pattern.
+- **For operations tasks** (deploy rollback, key rotation, stuck incident, missing migration, env-var provisioning) — consult `docs/RUNBOOK.md` before acting. Do not freelance on destructive or irreversible operations.
+- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline) — see `docs/RULES.md`. Each rule has the incident that taught it.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
@@ -28,20 +31,38 @@ For sub-slices of a parent milestone whose plan Steven has already approved (M2a
 
 Escalate only for: architectural decisions not in the parent plan, spec deviations, security tradeoffs, or same-failure-twice CI loops. Do NOT escalate for: sub-slice planning, operational/infra issues, routine tradeoffs already covered in the parent plan.
 
-## Auto-continue between sub-slices
-After an auto-merged sub-slice PR, automatically proceed to the next sub-slice in the same approved parent milestone without waiting for a prompt. Rule chain:
+## Auto-continue — across sub-slices AND across milestones
+After an auto-merged PR, automatically proceed to the next PR per the roadmap. No stop-gates at sub-slice boundaries, no stop-gates at parent-milestone boundaries. Silence = keep going.
+
+Rule chain:
 
 - `M2c-1 merged → start M2c-2`
 - `M2c-2 merged → start M2c-3`
 - `M2c-3 merged → start M2d-1` (next slice of parent M2)
-- `M2d-N merged → either start M2d-(N+1) or, if M2d was the last slice, status update "M2 complete, ready for Steven's sign-off before M3" and stop`
+- `M2d-N (last) merged → start M3-1` (next milestone per the roadmap)
+- `M3-N (last) merged → start M4-1`
+- etc. through the roadmap in the technical design doc.
+
+Write-safety-critical milestones (M3 batch generator, M4 image library, M7 anything that spends money or mutates client WP sites) still require per-slice plans with the **"Risks identified and mitigated"** audit. That audit + the concurrency / E2E / migration / RLS test patterns are the safety net — not a wait for Steven at a milestone boundary.
 
 Stop and wait for Steven only when:
-- A parent milestone fully completes (M2 done → wait, do NOT start M3 on your own).
-- An architectural escalation surfaces.
-- The same CI failure lands twice in a row.
+- An architectural escalation surfaces (cost tradeoff, spec ambiguity, security decision — things the plan can't resolve).
+- The same CI failure lands twice in a row (same-failure-twice rule).
+- A required env var is missing (note what's needed, skip the affected sub-slice, continue with slices that don't depend on it).
+- Steven explicitly tells you to pause — e.g. "I want to test M4 before starting M5." Silence is NOT a pause signal; it's a proceed signal.
 
-Also: post a one-line status ping per merge so Steven has visibility without needing to prompt — e.g. "M2c-2 merged, starting M2c-3."
+Post a one-line status ping per merge: `"<slice> merged, starting <next>"`. That's the visibility channel — Steven reads the pings in his GitHub inbox.
+
+## Parallelism (multi-session coordination)
+Serial-single-session is the default. When Steven runs two browser tabs of Claude Code in parallel, coordinate via `docs/WORK_IN_FLIGHT.md` and follow `docs/PARALLELISM_PLAN.md`:
+
+- Read `docs/WORK_IN_FLIGHT.md` before editing any file. Respect the other session's claims + the "Hot-shared" list.
+- Append a claim block with your branch, slice, files claimed, and (if applicable) reserved migration number.
+- Prefix every status message to Steven with `[Session A]` / `[Session B]` so cross-session output stays legible.
+- On merge, remove your claim block in the next PR's first commit (or a one-line cleanup PR if nothing's queued).
+- Conflict with the other session's claims → stop and ask Steven; do NOT coordinate with the other session directly.
+
+The bootstrap prompt Steven pastes into a second tab lives in `docs/PARALLELISM_PLAN.md` → *The bootstrap prompt*.
 
 ## Enabling auto-merge on every PR
 Every PR must have GitHub auto-merge armed at creation time. Call `mcp__github__enable_pr_auto_merge` (with `mergeMethod: "SQUASH"`) immediately after `create_pull_request` — it is not enabled implicitly. Without that call, the PR sits in the mergeable state until someone clicks the button in the UI, breaking the self-driving loop.
@@ -75,6 +96,31 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - `npm run typecheck` — tsc --noEmit
 - `npm run build` — production build
 - `npm run test` — Vitest
+- `npm run test:coverage` — Vitest with V8 coverage (60% line / 55% branch baseline)
+- `npm run test:e2e` — Playwright (requires `supabase start`)
+- `npm run analyze` — production build with @next/bundle-analyzer reports
+
+## DX hygiene
+Pre-commit and commit-message hygiene is enforced via Husky. Hooks install on
+`npm install` via the `prepare` script.
+
+- **pre-commit:** `lint-staged` runs ESLint (auto-fix) on staged JS/TS and
+  stylelint on CSS. Any remaining warning fails the commit — `--max-warnings=0`.
+- **commit-msg:** `commitlint` enforces Conventional Commits
+  (feat / fix / chore / refactor / docs / test / perf / build / ci / revert).
+  Milestone scopes like `feat(m3-6):` or `feat(infra):` pass the default rule
+  set; header length cap is 100 chars.
+
+Supply-chain scanning runs server-side:
+- **CodeQL** (`.github/workflows/codeql.yml`) — SAST on every PR + weekly cron.
+- **Dependabot** (`.github/dependabot.yml`) — weekly npm + actions refresh,
+  Radix grouped, minors/patches grouped, majors separate.
+- **gitleaks** (`.github/workflows/gitleaks.yml`) — secret scan with
+  `.gitleaks.toml` allow-list for the deterministic test master key + local
+  Supabase JWTs.
+- **npm audit** (`.github/workflows/audit.yml`) — blocks on critical CVEs in
+  prod deps, informational at high. Threshold will tighten to `high` once the
+  pending Next.js framework upgrade lands.
 
 ## Standards
 - Server Components by default; Client Components only when required
@@ -91,6 +137,47 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - Don't loop me in on routine errors — fix and retry
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
+
+## Performance standards
+- **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`
+  against a production build of `/login` (session-gated admin surfaces
+  are out of scope — they'd need the full Supabase-in-CI flow to render).
+  Thresholds are `warn` for now; baseline ratchets to `error` once we
+  have a few runs of stable history.
+- **EXPLAIN ANALYZE for hot-path queries:** any new DB query in a code
+  path that runs per-request or per-slot (chat route, batch worker,
+  middleware, admin list pages) MUST be EXPLAIN ANALYZE'd against a
+  realistic-volume seed before merge. Paste the plan in the PR
+  description so the index decision is visible in history. Pointed-read
+  queries keyed by PK/UUID skip this; new JOINs, LIKE / ILIKE, ORDER BY,
+  and anything without an obvious index path do not.
+
+## Data + AI conventions
+Lives in dedicated docs so this file doesn't sprawl:
+
+- `docs/DATA_CONVENTIONS.md` — soft-delete (`deleted_at` + `deleted_by`),
+  audit columns (`created_at` / `updated_at` / `created_by` / `updated_by`),
+  `version_lock` for optimistic concurrency, `supabase/data-migrations/`
+  contract. Forward-facing; existing tables fold in on the next natural
+  migration.
+- `docs/PROMPT_VERSIONING.md` — `lib/prompts/vN/` layout, per-version
+  immutability, eval harness under `__evals__/`, prompt injection
+  defense via tagged inputs, per-tenant cost budgets spec, Langfuse
+  integration. Cutover is its own sub-slice (blocked on
+  `LANGFUSE_*` env provisioning for the shipping path).
+- `docs/RUNBOOK.md` — on-call playbook: deploy rollback, auth
+  break-glass, batch cancellation, WP publish failures, Supabase
+  quota, security incident response.
+
+## Release hygiene
+- `.github/workflows/release-please.yml` watches main; every merge
+  aggregates conventional commits into a Release PR that bumps
+  `package.json` + generates `CHANGELOG.md`. Merging that PR cuts
+  a GitHub Release + git tag.
+- No external secrets — default `GITHUB_TOKEN` is enough.
+- Commit discipline matters for the changelog: `feat:` → Features,
+  `fix:` → Bug Fixes, `perf:` → Performance, etc. `chore:` / `test:`
+  / `ci:` / `build:` are hidden from the user-facing changelog.
 
 ## Observability + security contract
 Every change has to honour the following invariants. They landed with the
@@ -140,39 +227,16 @@ detail. Pick up on a cleanup slice that naturally lives in M6 (Per-Page
 Iteration UI, where admin UX polish fits), or earlier if a sibling slice
 happens to be in the same file.
 
-### High — remove scope_prefix from the Add Site form
-**Surface:** `components/AddSiteModal.tsx` line ~211 "Scope prefix" field.
-**Problem:** A solo-dev operator adding a client site shouldn't have to
-understand CSS-scoping strategy. The field leaks `sites.prefix` into the UX.
-**Fix:** auto-generate server-side at site creation. Algorithm:
-1. Lower-case, ASCII-slugify the site name; keep only `[a-z0-9]`.
-2. Take the first 2–4 characters.
-3. If that prefix already exists in `sites.prefix`, append a single digit
-   (2, 3, …) until unique, capped at length 4.
-4. If still colliding past `<prefix>9`, fall back to `<prefix>` + base-36
-   counter.
+### ~~High — remove scope_prefix from the Add Site form~~ (shipped in M2d)
+M2d's UX cleanup removed the Scope prefix field from `AddSiteModal.tsx`;
+`lib/sites.createSite` now auto-generates via `generateUniquePrefix` when the
+caller doesn't supply one.
 
-Hide the field from the form entirely. `lib/sites.createSite` accepts
-`prefix` today; flip it to optional + server-compute when absent.
-
-### Medium — jargon in design-system authoring forms
-Audited 2026-04; current offenders:
-
-- `components/TemplateFormModal.tsx`:
-  - "Composition (JSON array)" → "Template composition"
-  - "required_fields (JSON)" → "Required fields per component"
-  - "seo_defaults JSON (optional)" → "SEO defaults (optional)"
-- `components/ComponentFormModal.tsx`:
-  - "content_schema (JSON)" → "Content shape (JSON Schema)"
-  - "image_slots JSON (optional)" → "Image slots (optional)"
-- `components/CreateDesignSystemModal.tsx`:
-  - "tokens.css" / "base-styles.css" — keep the filenames (designers write
-    CSS; the names are accurate), but add a one-line sub-label explaining
-    what each section controls.
-
-Design-system authoring is a developer surface, so full de-jargoning isn't
-the goal — just hide the raw column names. JSON editing UX itself
-(`<Textarea>` with JSON.parse in onBlur) can survive.
+### ~~Medium — jargon in design-system authoring forms~~ (shipped in M6-4)
+The three form labels listed here all shipped in M6-4 — see
+`components/TemplateFormModal.tsx`, `components/ComponentFormModal.tsx`, and
+`components/CreateDesignSystemModal.tsx` for the updated copy + the two
+sub-labels under `tokens.css` / `base-styles.css`.
 
 ### Low — admin-surface labels that expose IDs
 Scan done 2026-04, none found on the primary surfaces:

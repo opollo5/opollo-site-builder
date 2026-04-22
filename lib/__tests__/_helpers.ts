@@ -23,6 +23,15 @@ export async function seedSite(overrides?: {
   if (error || !data) {
     throw new Error(`seedSite failed: ${error?.message ?? "no data"}`);
   }
+  // M8-2: raise the auto-created tenant_cost_budgets caps to a generous
+  // ceiling so the wider test suite (which seeds batches with many slots)
+  // doesn't trip the 500c/day default the migration ships with. Tests
+  // that specifically exercise the budget layer (m8-*) set their own
+  // caps explicitly.
+  await supabase
+    .from("tenant_cost_budgets")
+    .update({ daily_cap_cents: 100_000_000, monthly_cap_cents: 100_000_000 })
+    .eq("site_id", data.id);
   return { id: data.id as string, prefix: data.prefix as string };
 }
 

@@ -1,7 +1,10 @@
+import { Axiom } from "@axiomhq/js";
+
 import { getRequestContext } from "@/lib/request-context";
 
 // ---------------------------------------------------------------------------
-// Minimal structured logger. Zero deps; JSON-per-line to stdout/stderr.
+// Structured logger. JSON-per-line to stdout/stderr always; Axiom
+// ingest additionally when AXIOM_TOKEN + AXIOM_DATASET are set.
 //
 // Shape:
 //   { timestamp, level, msg, ...context, ...fields }
@@ -11,14 +14,19 @@ import { getRequestContext } from "@/lib/request-context";
 // - fields is the caller's own structured payload.
 // - level is "debug" | "info" | "warn" | "error".
 //
-// Why not pino: we want zero new runtime deps until we have somewhere
-// to ship logs to (Axiom — blocked on AXIOM_TOKEN provisioning). When
-// that token arrives, swap `emit()` for an @axiomhq/js transport. The
-// API stays identical.
-//
 // Level filtering honours LOG_LEVEL (defaults to "info" in prod, "debug"
 // in non-prod). Below-threshold calls are O(1) — no string building, no
 // JSON.stringify.
+//
+// Axiom transport (M10):
+//   - Additive to stdout, not a replacement. stdout lines are what
+//     Vercel's log explorer already indexes; Axiom is the long-retention
+//     queryable store.
+//   - Fire-and-forget: `axiom.ingest()` returns a promise we don't
+//     await. A slow or down Axiom must not block a request.
+//   - When AXIOM_TOKEN or AXIOM_DATASET is missing, the transport is a
+//     no-op and stdout is the only sink. Tests + local dev stay
+//     identical to the pre-M10 behaviour.
 // ---------------------------------------------------------------------------
 
 type Level = "debug" | "info" | "warn" | "error";
@@ -68,6 +76,27 @@ function sanitize(value: unknown, depth = 0): unknown {
   return value;
 }
 
+// Lazy singleton so we don't instantiate the Axiom client until the
+// first log call (and never in builds without a token).
+let cachedAxiom: Axiom | null | undefined = undefined;
+function axiomClient(): Axiom | null {
+  if (cachedAxiom !== undefined) return cachedAxiom;
+  const token = process.env.AXIOM_TOKEN;
+  const dataset = process.env.AXIOM_DATASET;
+  if (!token || !dataset) {
+    cachedAxiom = null;
+    return null;
+  }
+  cachedAxiom = new Axiom({ token });
+  return cachedAxiom;
+}
+
+// Reset helper — exposed only for tests that need to re-evaluate the
+// env vars after mutation.
+export function __resetAxiomClientForTests(): void {
+  cachedAxiom = undefined;
+}
+
 function emit(level: Level, msg: string, fields?: Fields): void {
   if (!shouldEmit(level)) return;
   const context = getRequestContext();
@@ -85,6 +114,29 @@ function emit(level: Level, msg: string, fields?: Fields): void {
   } else {
     // eslint-disable-next-line no-console -- structured logger sink
     console.log(line);
+  }
+
+  // Axiom ingest, additive. Fire-and-forget — failures must not
+  // block the request. A promise-rejection handler on the client
+  // surfaces transport errors to stderr without throwing upward.
+  const ax = axiomClient();
+  if (ax) {
+    const dataset = process.env.AXIOM_DATASET!;
+    try {
+      ax.ingest(dataset, [record]);
+    } catch (err) {
+      // Synchronous throw from the SDK (e.g. malformed payload). Log
+      // the failure locally; don't recurse into the logger.
+      // eslint-disable-next-line no-console -- transport diagnostics
+      console.error(
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          level: "warn",
+          msg: "axiom_ingest_failed",
+          error: err instanceof Error ? err.message : String(err),
+        }),
+      );
+    }
   }
 }
 

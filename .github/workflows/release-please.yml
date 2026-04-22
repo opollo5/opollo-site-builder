@@ -1,0 +1,28 @@
+name: Release
+
+# Maintains CHANGELOG.md, package.json version, and GitHub Releases
+# from conventional-commit history on main. Each merge to main either
+# opens or updates a "Release PR" that aggregates unreleased changes.
+# Merging that PR creates a GitHub Release + git tag.
+#
+# No external secrets — uses the default GITHUB_TOKEN. release-please
+# auto-skips when there are no feat/fix/etc commits to release.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          # Config lives at repo root. See .release-please-config.json
+          # and .release-please-manifest.json.
+          token: ${{ secrets.GITHUB_TOKEN }}

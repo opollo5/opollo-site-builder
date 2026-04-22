@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+# Enforces Conventional Commits (feat:, fix:, chore:, etc) on every
+# commit message. Config lives in .commitlintrc.cjs.
+npx --no-install commitlint --edit "$1"

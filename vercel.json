@@ -3,6 +3,14 @@
     {
       "path": "/api/cron/process-batch",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/process-regenerations",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/cron/budget-reset",
+      "schedule": "0 * * * *"
     }
   ]
 }

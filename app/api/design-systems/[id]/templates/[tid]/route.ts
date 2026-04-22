@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import {
   UpdateDesignTemplateSchema,
   deleteTemplate,
@@ -30,6 +31,9 @@ const PatchBodySchema = UpdateDesignTemplateSchema.and(
 // elsewhere after a template already referenced it could otherwise leave a
 // dangling ref; this route refuses such writes at the admin layer.
 export async function PATCH(req: Request, ctx: RouteContext) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const dsParam = validateUuidParam(ctx.params.id, "id");
   if (!dsParam.ok) return dsParam.response;
   const tidParam = validateUuidParam(ctx.params.tid, "tid");
@@ -55,6 +59,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
 // DELETE /api/design-systems/[id]/templates/[tid]?expected_version_lock=N
 export async function DELETE(req: Request, ctx: RouteContext) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const dsParam = validateUuidParam(ctx.params.id, "id");
   if (!dsParam.ok) return dsParam.response;
   const tidParam = validateUuidParam(ctx.params.tid, "tid");
