@@ -1,5 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+import { traceAnthropicCall } from "@/lib/langfuse";
+
 // ---------------------------------------------------------------------------
 // M3-4 — Anthropic call wrapper.
 //
@@ -59,29 +61,47 @@ function getClient(): Anthropic {
 /**
  * The production Anthropic call. processSlotAnthropic takes this as a
  * default and substitutes a stub in tests.
+ *
+ * M10: wrapped in a Langfuse span when LANGFUSE_* env vars are set.
+ * No-op when unconfigured — tests + local dev stay identical.
  */
 export const defaultAnthropicCall: AnthropicCallFn = async (req) => {
-  const client = getClient();
-  const message = await client.messages.create(
-    {
+  const span = traceAnthropicCall({
+    name: "anthropic_messages_create",
+    metadata: {
       model: req.model,
+      idempotency_key: req.idempotency_key,
       max_tokens: req.max_tokens,
-      system: req.system,
-      messages: req.messages,
     },
-    {
-      headers: { "Idempotency-Key": req.idempotency_key },
-    },
-  );
+    input: { system_prompt_bytes: req.system.length, messages: req.messages },
+  });
 
-  // Normalise to a minimal shape so tests don't need to mock the full
-  // SDK response.
-  return {
+  const client = getClient();
+  let message;
+  try {
+    message = await client.messages.create(
+      {
+        model: req.model,
+        max_tokens: req.max_tokens,
+        system: req.system,
+        messages: req.messages,
+      },
+      {
+        headers: { "Idempotency-Key": req.idempotency_key },
+      },
+    );
+  } catch (err) {
+    span.fail(err instanceof Error ? err.message : String(err));
+    throw err;
+  }
+
+  const textContent = message.content.filter(
+    (b): b is Extract<typeof b, { type: "text" }> => b.type === "text",
+  );
+  const normalised: AnthropicResponse = {
     id: message.id,
     model: message.model,
-    content: message.content
-      .filter((b): b is Extract<typeof b, { type: "text" }> => b.type === "text")
-      .map((b) => ({ type: "text" as const, text: b.text })),
+    content: textContent.map((b) => ({ type: "text" as const, text: b.text })),
     stop_reason: message.stop_reason ?? null,
     usage: {
       input_tokens: message.usage.input_tokens,
@@ -92,4 +112,22 @@ export const defaultAnthropicCall: AnthropicCallFn = async (req) => {
         message.usage.cache_read_input_tokens ?? undefined,
     },
   };
+
+  // Cost is computed downstream (costCents / pricing table lives in
+  // lib/anthropic-pricing.ts and varies per model). Pass 0 here; the
+  // caller's span overlay via anthropic-pricing will override in a
+  // future slice. For now the span captures tokens + response_id.
+  span.end({
+    response_id: normalised.id,
+    model: normalised.model,
+    input_tokens: normalised.usage.input_tokens,
+    output_tokens: normalised.usage.output_tokens,
+    cached_tokens:
+      (normalised.usage.cache_read_input_tokens ?? 0) +
+      (normalised.usage.cache_creation_input_tokens ?? 0),
+    cost_cents: 0,
+    output_text: textContent.map((b) => b.text).join("\n"),
+  });
+
+  return normalised;
 };

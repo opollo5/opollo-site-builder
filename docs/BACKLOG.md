@@ -6,7 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M9 — Next.js 14.2.35 CVE mitigation (in flight)
+## M10 — observability activation (shipped)
+
+Single-PR activation of the four observability vendors whose env vars were provisioned in Vercel on 2026-04-22: Sentry, Axiom, Langfuse, Upstash Redis. Graceful no-op per vendor when its envs are missing — so preview deployments without the full secret set still function.
+
+| Component | What landed |
+| --- | --- |
+| Sentry | `instrumentation.ts` / `instrumentation-client.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` + `withSentryConfig` wrap in `next.config.mjs`. Server + edge + client runtimes gated on `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`. |
+| Axiom | Additive transport in `lib/logger.ts`. stdout preserved; Axiom ingest is fire-and-forget with error swallow. |
+| Langfuse | `lib/langfuse.ts` singleton + `traceAnthropicCall()` span wrapper. `lib/anthropic-call.ts` wraps every call; span.fail() on throw, span.end() with tokens on success. |
+| Upstash Redis | `lib/redis.ts` singleton over `@upstash/redis`. Used by the self-probe for the round-trip check; consumers (rate limiting, prompt cache) land in follow-ups. |
+| Self-probe | `POST /api/ops/self-probe` returns per-vendor `{ ok, details/error }` envelope. Auth: admin session OR `OPOLLO_EMERGENCY_KEY` header. |
+| Runbook | `docs/runbook/observability-verification.md` — curl command, expected green response, per-vendor troubleshooting, automation snippet. |
+
+New env vars (all optional, no-op when missing): `SENTRY_DSN`, `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`, `NEXT_PUBLIC_SENTRY_DSN`, `AXIOM_TOKEN`, `AXIOM_DATASET`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, `LANGFUSE_HOST`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, `OPOLLO_EMERGENCY_KEY`.
+
+### Observability-deep follow-ups (unblocked)
+
+Now that the vendors are wired, the three deep-integration entries that used to say "blocked on env provisioning" are unblocked:
+
+- **Prompt versioning via Langfuse** (`docs/PROMPT_VERSIONING.md`): move `docs/SYSTEM_PROMPT_v1.md` / `docs/TOOL_SCHEMAS_v1.md` into `lib/prompts/v1/`, wire `resolvePrompt()`, link each `generations_events.anthropic_response_received` to a Langfuse trace. Span wrapper already ships in `lib/anthropic-call.ts`; remaining work is prompt-file relocation + cutover.
+- **Rate limiting via Upstash** (`lib/rate-limit.ts`): rate limiter on `/api/auth/*`, `/api/emergency`, `/login`. Redis client already available via `getRedisClient()`; remaining work is the sliding-window adapter + wiring into middleware + `/api/health` probe.
+- **Structured log queries via Axiom**: saved searches + alerts for `level:error`, request-id drill-downs, per-slice generation events. Ingest already live; remaining work is dashboard provisioning (operator-facing, not code).
+
+---
+
+## M9 — Next.js 14.2.35 CVE mitigation (shipped)
 
 Single-PR hybrid. See `docs/SECURITY_NEXTJS_CVES.md` for the full matrix. Config-level closure of the three unreachable CVEs (rewrites smuggling, Image Optimizer DoS, next/image disk cache) + documentation of the two partial RSC exposures that remain platform-mitigated on Vercel. Version stays at 14.2.35; the actual 14→16 jump is tracked under "M10-candidate: Next.js 14 → 16 migration" in Infra / observability below.
 
@@ -120,35 +145,17 @@ Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IM
 **Trigger:** next natural migration that touches any of these tables. Piggyback rather than dedicate.
 **Scope:** one sub-PR per table family; 200–400 lines each including tests. Can be worked in parallel once the plan for any one table is reviewed.
 
-### Prompt versioning cutover (`lib/prompts/v1/`)
-**What:** move `docs/SYSTEM_PROMPT_v1.md` and `docs/TOOL_SCHEMAS_v1.md` into `lib/prompts/v1/` per `docs/PROMPT_VERSIONING.md`. Wire the chat route through `resolvePrompt()`.
-**Why deferred:** touches the hot path (chat route / system prompt loader / tool schemas). Risky enough to want its own focused PR.
-**Trigger:** starting M4 (cost-control surface) or any time a v2 prompt is in scope.
-**Scope:** ~600 lines including tests + eval harness skeleton.
+### ~~Langfuse wiring~~ (shipped in M10)
+Client + span wrapper in `lib/langfuse.ts`; `lib/anthropic-call.ts` wraps every call. Prompt-versioning cutover still pending — tracked under M10 follow-ups above.
 
-### Langfuse wiring
-**What:** LLM observability per `docs/PROMPT_VERSIONING.md` — trace every Anthropic call, link to `generation_events.anthropic_response_received`.
-**Why deferred:** blocked on `LANGFUSE_PUBLIC_KEY` + `LANGFUSE_SECRET_KEY` env-var provisioning.
-**Trigger:** envs land.
-**Scope:** 100-line wrapper + zero-cost no-op when envs are missing.
+### ~~Sentry wiring~~ (shipped in M10)
+`instrumentation.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` / `instrumentation-client.ts` + `withSentryConfig` wrap in `next.config.mjs`. No-op without DSN.
 
-### Sentry wiring
-**What:** error tracking per the "Observability + security contract" in `CLAUDE.md`.
-**Why deferred:** blocked on `SENTRY_DSN` + `SENTRY_AUTH_TOKEN` env-var provisioning.
-**Trigger:** envs land.
-**Scope:** `sentry.client.config.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` skeleton + `next.config.mjs` `withSentryConfig` wrap. Graceful no-op without DSN.
+### ~~Axiom log shipping~~ (shipped in M10)
+Additive transport inside `lib/logger.ts`. stdout preserved for Vercel log streams + local dev; Axiom ingest is fire-and-forget.
 
-### Axiom log shipping
-**What:** swap `lib/logger.ts` transport from stdout to Axiom.
-**Why deferred:** blocked on `AXIOM_TOKEN` + `AXIOM_DATASET`.
-**Trigger:** envs land.
-**Scope:** one-file swap; API unchanged.
-
-### Upstash Redis rate limiting
-**What:** rate limiter on public-ish endpoints (`/api/auth/*`, `/api/emergency`, `/login` form-submission). In-memory fallback for local / tests.
-**Why deferred:** blocked on `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`.
-**Trigger:** envs land, or a live rate-abuse incident.
-**Scope:** `lib/rate-limit.ts` with the interface + adapters + `/api/health` Redis probe + tests.
+### ~~Upstash Redis~~ (shipped in M10 as client only — rate limiter follow-up tracked above)
+`lib/redis.ts` singleton available via `getRedisClient()`. The rate-limiter adapter (`lib/rate-limit.ts`) is listed under M10 follow-ups — unblocked but not yet wired.
 
 ### CSP enforce-mode migration (nonces)
 **What:** flip `Content-Security-Policy-Report-Only` to enforced. Requires per-request nonce injection via middleware → `next/headers` → inline `<script nonce>` in templates.
