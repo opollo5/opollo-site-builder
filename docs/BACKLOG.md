@@ -6,19 +6,19 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M11 — audit close-out (partial; three sub-slices corrected post-merge)
+## M11 — audit close-out (reconciled post-merge)
 
-Parent plan: `docs/plans/m11-parent.md`. Originally scoped as six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`. Audit 3 (`docs/plans/m11-parent.md` re-verified against code) found that the M11-6 doc slice landed "merged" rows for M11-2, M11-3, and M11-5 **without** the corresponding code PRs ever shipping. The table below reflects ground-truth as of Audit 3. The three missing slices are being closed in M11-7 (launch-blocker probe + font load) and M11-8 (test-coverage gaps).
+Parent plan: `docs/plans/m11-parent.md`. Originally scoped as six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`. Audit 3 (`docs/plans/m11-parent.md` re-verified against code) found that the M11-6 doc slice landed "merged" rows for M11-2, M11-3, and M11-5 **without** the corresponding code PRs ever shipping. The table below reflects ground-truth after the post-audit reconciliation (PRs #88, #94, #96).
 
 | Slice | Status | Notes |
 | --- | --- | --- |
 | M11-1 | merged (#87) | Chat route routed through `lib/logger` + new `traceAnthropicStream()` Langfuse wrapper. `e2e/chat.spec.ts` covers the streaming UI contract. |
-| M11-2 | **not shipped** — tracked in M11-8 | Audit 3 found only an aspirational comment at `lib/__tests__/regeneration-worker.test.ts:38`; no `DS_ARCHIVED` or `WP_CREDS_MISSING` assertion anywhere in test files. Production branches exist at `lib/regeneration-worker.ts:377,382` and `app/api/cron/process-regenerations/route.ts:171`. |
-| M11-3 | superseded by M11-7 | Audit 3 found the probe absent from `app/api/health/route.ts`. M11-7 implements `checkBudgetResetBacklog()` inline in the health route + `lib/__tests__/health-budget-reset.test.ts` covering the stuck-row, fresh-row, and sample-cap invariants. |
+| M11-2 | merged (#88) | DS_ARCHIVED + WP_CREDS_MISSING regeneration-branch tests. Added optional `buildSystemPrompt` DI param to `processRegenJobAnthropic` so the DS_ARCHIVED branch is unit-test reachable; WP_CREDS_MISSING covered by calling the real GET handler against a seeded credentials-less site. |
+| M11-3 | superseded by M11-7 | Audit 3 found the probe absent from `app/api/health/route.ts`. M11-7 implements `checkBudgetResetBacklog()` in `lib/health-checks.ts` + `lib/__tests__/health-budget-reset.test.ts` covering the stuck-row, fresh-row, and sample-cap invariants. |
 | M11-4 | merged (#90) | 500KB HTML cap enforced as a quality gate (`gateHtmlSize`) in addition to the render-side cap. Shared constant `HTML_SIZE_MAX_BYTES` in `lib/html-size.ts`. |
-| M11-5 | **not shipped** — tracked in M11-8 | Audit 3 found no `e2e/budgets.spec.ts` file and no budget-surface coverage in any existing spec. The admin badge + PATCH + VERSION_CONFLICT + invalid-input paths have zero E2E coverage. |
+| M11-5 | shipping in #96 | `e2e/budgets.spec.ts` — four tests against the pre-seeded E2E site (badge render + invalid-input guard + valid PATCH round-trip + stale-version 409). Replaces the previously-false "merged" claim from M11-6. |
 | M11-6 | merged (#92), doc-drift corrected | Retroactive parent plans for M1, M2, M3, M9, M10 added under `docs/plans/`. The "merged" rows this slice originally wrote for M11-2/3/5 were unsubstantiated; Audit 3 caught the drift and this entry is the correction. Process learning: retroactive-planning slices must verify, not declare. |
-| M11-7 | this entry | Launch-blocker fixes: `checkBudgetResetBacklog()` probe for real (closes M11-3) + `LEADSOURCE_FONT_LOAD_HTML` prefix on both publishers so generated pages actually load the three spec fonts (closes Audit 3 Finding #2). |
+| M11-7 | this entry | Launch-blocker fixes from Audit 3: `checkBudgetResetBacklog()` probe for real (closes M11-3) + `LEADSOURCE_FONT_LOAD_HTML` prefix on both publishers so generated pages actually load the three spec fonts (closes Audit 3 Finding #2). |
 
 No new env vars.
 
