@@ -1,4 +1,5 @@
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { withSentryConfig } from "@sentry/nextjs";
 
 // Bundle analyzer: enabled only when ANALYZE=true is set (i.e., via
 // `npm run analyze`). In production / CI / dev it's a no-op wrapper
@@ -62,4 +63,26 @@ const nextConfig = {
   },
 };
 
-export default withBundleAnalyzer(nextConfig);
+// M10: wrap with Sentry. No-op during builds without SENTRY_AUTH_TOKEN
+// (source-map upload skipped); runtime SDK still loads when SENTRY_DSN
+// is set via instrumentation.ts.
+const withSentry = (cfg) =>
+  withSentryConfig(cfg, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    authToken: process.env.SENTRY_AUTH_TOKEN,
+    silent: !process.env.SENTRY_AUTH_TOKEN,
+    // Tunnel Sentry requests through a Next.js route to bypass
+    // ad-blockers. Not critical for an admin app; keep default off.
+    tunnelRoute: undefined,
+    widenClientFileUpload: true,
+    hideSourceMaps: true,
+    webpack: {
+      // Replaces the deprecated top-level `disableLogger` /
+      // `automaticVercelMonitors` options (removed in a future release).
+      removeDebugLogging: true,
+      automaticVercelMonitors: false,
+    },
+  });
+
+export default withSentry(withBundleAnalyzer(nextConfig));
