@@ -2,6 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceeded,
+} from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +75,10 @@ function errorJson(
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireAdminForApi();
   if (gate.kind === "deny") return gate.response;
+
+  const rlId = gate.user ? `user:${gate.user.id}` : `ip:${getClientIp(req)}`;
+  const rl = await checkRateLimit("invite", rlId);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   let body: unknown;
   try {

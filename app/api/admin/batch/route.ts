@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { createBatchJob } from "@/lib/batch-jobs";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceeded,
+} from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/batch — M3-2.
@@ -59,6 +64,10 @@ function errorStatusFor(
 export async function POST(req: Request): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rlId = gate.user ? `user:${gate.user.id}` : `ip:${getClientIp(req)}`;
+  const rl = await checkRateLimit("batch", rlId);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const idempotencyKey = req.headers.get("idempotency-key");
   if (!idempotencyKey || idempotencyKey.trim() === "") {

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Client } from "pg";
 
 import {
@@ -10,7 +12,16 @@ import {
   type PublishRegenResult,
   type WpRegenCallBundle,
 } from "@/lib/regeneration-publisher";
-import { buildSystemPromptForSite } from "@/lib/system-prompt";
+import {
+  buildSystemPromptForSite,
+  type SiteIdentity,
+} from "@/lib/system-prompt";
+
+// Exposed so tests can stub the prompt builder to assert the
+// DS_ARCHIVED failure branch without relying on flaky file-system
+// state. Default is the real builder; production callers omit the
+// option.
+export type BuildSystemPromptFn = (site: SiteIdentity) => Promise<string>;
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -282,11 +293,14 @@ export async function processRegenJobAnthropic(
   jobId: string,
   opts: {
     anthropicCall?: AnthropicCallFn;
+    buildSystemPrompt?: BuildSystemPromptFn;
     client?: Client | null;
   } = {},
 ): Promise<ProcessRegenResult> {
   const supabase = getServiceRoleClient();
   const anthropicCall = opts.anthropicCall ?? defaultAnthropicCall;
+  const buildSystemPrompt =
+    opts.buildSystemPrompt ?? buildSystemPromptForSite;
 
   // Load the job + page + site context.
   const jobRes = await supabase
@@ -365,7 +379,7 @@ export async function processRegenJobAnthropic(
   // page's recorded DS version has been archived, fail loud.
   let systemPrompt: string;
   try {
-    systemPrompt = await buildSystemPromptForSite({
+    systemPrompt = await buildSystemPrompt({
       id: siteRes.data.id as string,
       site_name: siteRes.data.name as string,
       prefix: siteRes.data.prefix as string,

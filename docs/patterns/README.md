@@ -40,6 +40,12 @@ Each pattern file has the same shape:
 | [`rls-policy-test-matrix.md`](./rls-policy-test-matrix.md) | (role × table × op) matrix for any RLS migration. |
 | [`playwright-e2e-coverage.md`](./playwright-e2e-coverage.md) | Admin-UI E2E coverage per `CLAUDE.md`'s hard requirement. |
 
+### Operator UX
+
+| Pattern | Used when |
+| --- | --- |
+| [`assistive-operator-flow.md`](./assistive-operator-flow.md) | Any new admin UI, chat flow, site-setup step, or error surface an operator sees. Detect early, translate errors, confirm consequences. |
+
 ## Where else to look
 
 - `docs/RUNBOOK.md` — operations playbook (deploy rollback, auth break-glass, batch stuck, key rotation, missing migration, general incident recovery).
