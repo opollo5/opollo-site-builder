@@ -170,6 +170,18 @@ Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IM
 
 ## Infra / observability
 
+### Enable GitHub Actions to create pull requests (blocks release-please)
+**What:** repo setting at `Settings → Actions → General → Workflow permissions` → check **"Allow GitHub Actions to create and approve pull requests"**. One click; no code change.
+**Why blocked today:** `.github/workflows/release-please.yml` runs correctly after PR #106 fixed the config filename — it processes all 240 main commits, computes `0.1.0 → 0.1.1`, pushes the release branch — then fails on the last step when it tries to open the Release PR. The default `GITHUB_TOKEN` is denied PR creation unless this setting is flipped.
+**Error signature (so future-me doesn't re-diagnose):**
+```
+release-please failed: GitHub Actions is not permitted to create or
+approve pull requests. - https://docs.github.com/rest/pulls/pulls#create-a-pull-request
+```
+**Alternatives considered:** a PAT secret with `repo` scope would also unblock it, but costs a token to rotate and adds a single point of failure. The repo-setting flip is one-time, auditable, and uses the ambient `GITHUB_TOKEN`.
+**Trigger to pick up:** Steven flips the setting. After that, the next push to main will open the first Release PR (0.1.0 → 0.1.1). No code changes needed on our side.
+**Scope:** zero code; post-flip verification is `gh run list --workflow=release-please.yml --limit 1` showing a green run.
+
 ### ~~Fix Lighthouse CI first-run failure~~ (diagnosed + shipped in the patterns PR)
 **Original symptom:** `lhci` failing recurrently on PR #52 and PR #53 despite two rounds of patching.
 **Root cause:** `lighthouse:recommended` preset brings in many **error-level** assertions (render-blocking-resources, legacy-javascript, third-party-summary, etc.) that my explicit warn-level overrides didn't touch. Those error-level assertions fired on a minimal login page and caused `lhci autorun` to exit 1.
