@@ -6,7 +6,9 @@ import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { NewBatchButton } from "@/components/NewBatchButton";
 import { SiteActionsMenu } from "@/components/SiteActionsMenu";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
+import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { listSiteBriefs } from "@/lib/briefs";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { getTenantBudget } from "@/lib/tenant-budgets";
@@ -141,6 +143,10 @@ export default async function SiteDetailPage({
   const tenantBudget = await getTenantBudget(site.id);
   const isAdmin = access.user?.role === "admin" || access.user === null;
 
+  // M12-1 — briefs list. Empty for sites that haven't uploaded one yet.
+  const briefsResult = await listSiteBriefs(site.id);
+  const briefs = briefsResult.ok ? briefsResult.data.briefs : [];
+
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -187,7 +193,8 @@ export default async function SiteDetailPage({
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <section>
+        <div className="space-y-8">
+         <section>
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold">Recent batches</h2>
             <Link
@@ -255,6 +262,56 @@ export default async function SiteDetailPage({
             )}
           </div>
         </section>
+
+        <section>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Briefs</h2>
+            <UploadBriefButton siteId={site.id} />
+          </div>
+          <div className="mt-2 overflow-x-auto rounded-md border">
+            {briefs.length === 0 ? (
+              <p className="p-6 text-center text-xs text-muted-foreground">
+                No briefs yet. Upload a document to generate a whole site from a single brief.
+              </p>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-left text-muted-foreground">
+                    <th className="px-3 py-2 font-medium">Title</th>
+                    <th className="px-3 py-2 font-medium">Status</th>
+                    <th className="px-3 py-2 font-medium">Parser</th>
+                    <th className="px-3 py-2 font-medium">Updated</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {briefs.map((b) => (
+                    <tr key={b.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-2">
+                        <Link
+                          href={`/admin/sites/${site.id}/briefs/${b.id}/review`}
+                          className="font-medium hover:underline"
+                          data-testid={`brief-row-${b.id}`}
+                        >
+                          {b.title}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2">
+                        <StatusBadge status={b.status} />
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {b.parser_mode ?? "—"}
+                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">
+                        {formatDate(b.updated_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </section>
+        </div>
 
         <aside className="space-y-6">
           <div>

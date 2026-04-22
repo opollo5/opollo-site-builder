@@ -37,7 +37,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - 0010 — Session A — M5-1 component gallery schema (branch: feat/m5-1-component-gallery-schema)
 ```
 
-- 0013 — M12-1 briefs schema: `briefs`, `brief_pages`, `brief_runs`, `site_conventions` + `site-briefs` Storage bucket. Planned in `docs/plans/m12-1-slice.md`. Forward PR branch TBD (`feat/m12-1-briefs-schema`); this reservation lands with the planning PR so the number can't be claimed by another slice before M12-1 code opens.
+- 0013 — M12-1 briefs schema: `briefs`, `brief_pages`, `brief_runs`, `site_conventions` + `site-briefs` Storage bucket. Executing on `feat/m12-1-briefs-schema`.
 
 ## Claim block template
 

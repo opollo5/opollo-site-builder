@@ -1,0 +1,644 @@
+import { createHash, randomUUID } from "node:crypto";
+
+import { parseBriefDocument, type BriefPageDraft, type ParserWarning } from "@/lib/brief-parser";
+import { getServiceRoleClient } from "@/lib/supabase";
+import type { ApiResponse, ErrorCode } from "@/lib/tool-schemas";
+
+// ---------------------------------------------------------------------------
+// M12-1 — briefs lib.
+//
+// Owns the Storage write → DB insert → parser run contract for uploads,
+// plus the commit transition (parsed → committed) under page_hash
+// idempotency.
+//
+// All callers go through the admin API gate before reaching here; this
+// module uses the service-role Supabase client throughout. RLS is
+// defence-in-depth, not the authorisation boundary.
+// ---------------------------------------------------------------------------
+
+export const BRIEF_STORAGE_BUCKET = "site-briefs";
+export const BRIEF_MAX_BYTES = 10 * 1024 * 1024; // 10 MB (matches CHECK on briefs.source_size_bytes).
+export const BRIEF_MAX_CONTENT_TOKENS = 60_000; // Approximate cap per parent plan §Whole-doc context.
+export const BRIEF_ALLOWED_MIME_TYPES = ["text/plain", "text/markdown"] as const;
+export type BriefMimeType = (typeof BRIEF_ALLOWED_MIME_TYPES)[number];
+
+export type BriefRow = {
+  id: string;
+  site_id: string;
+  title: string;
+  status: "parsing" | "parsed" | "committed" | "failed_parse";
+  source_storage_path: string;
+  source_mime_type: BriefMimeType;
+  source_size_bytes: number;
+  source_sha256: string;
+  upload_idempotency_key: string;
+  parser_mode: "structural" | "claude_inference" | null;
+  parser_warnings: ParserWarning[];
+  parse_failure_code: string | null;
+  parse_failure_detail: string | null;
+  committed_at: string | null;
+  committed_by: string | null;
+  committed_page_hash: string | null;
+  version_lock: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BriefPageRow = {
+  id: string;
+  brief_id: string;
+  ordinal: number;
+  title: string;
+  slug_hint: string | null;
+  mode: "full_text" | "short_brief";
+  source_span_start: number | null;
+  source_span_end: number | null;
+  source_text: string;
+  word_count: number;
+  operator_notes: string | null;
+  version_lock: number;
+};
+
+export type UploadBriefInput = {
+  siteId: string;
+  title: string;
+  bytes: Uint8Array;
+  mimeType: BriefMimeType;
+  uploadedBy: string | null;
+  clientIdempotencyKey?: string;
+};
+
+export type UploadBriefData = {
+  brief_id: string;
+  site_id: string;
+  status: BriefRow["status"];
+  parser_mode: BriefRow["parser_mode"];
+  review_url: string;
+  replay: boolean;
+};
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function errorEnvelope<T = never>(
+  code: ErrorCode,
+  message: string,
+  opts: { details?: Record<string, unknown>; retryable?: boolean; suggested_action?: string } = {},
+): ApiResponse<T> {
+  return {
+    ok: false,
+    error: {
+      code,
+      message,
+      details: opts.details,
+      retryable: opts.retryable ?? false,
+      suggested_action: opts.suggested_action ?? "",
+    },
+    timestamp: now(),
+  };
+}
+
+function sha256Hex(bytes: Uint8Array | string): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+export function computeUploadIdempotencyKey(opts: {
+  siteId: string;
+  uploadedBy: string | null;
+  fileSha256: string;
+}): string {
+  const payload = `${opts.siteId}:${opts.uploadedBy ?? "anonymous"}:${opts.fileSha256}`;
+  return createHash("sha256").update(payload).digest("hex").slice(0, 64);
+}
+
+function briefStoragePath(siteId: string, briefId: string): string {
+  return `${siteId}/${briefId}.md`;
+}
+
+export function briefReviewUrl(siteId: string, briefId: string): string {
+  return `/admin/sites/${siteId}/briefs/${briefId}/review`;
+}
+
+// Rough token approximation: chars / 4. Conservative upper bound — the
+// post-parse check exists to prevent a downstream BRIEF_TOO_LARGE on
+// the runner; precision isn't load-bearing.
+function approxTokenCount(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+// ---------------------------------------------------------------------------
+// uploadBrief — Storage write + DB insert + in-band parser run.
+// ---------------------------------------------------------------------------
+
+export async function uploadBrief(
+  input: UploadBriefInput,
+): Promise<ApiResponse<UploadBriefData>> {
+  try {
+    return await uploadBriefImpl(input);
+  } catch (err) {
+    return errorEnvelope("INTERNAL_ERROR", `uploadBrief threw: ${
+      err instanceof Error ? err.message : String(err)
+    }`);
+  }
+}
+
+async function uploadBriefImpl(
+  input: UploadBriefInput,
+): Promise<ApiResponse<UploadBriefData>> {
+  const svc = getServiceRoleClient();
+
+  // 0. Guardrails the route already enforces, re-checked here as
+  // defence-in-depth.
+  if (input.bytes.byteLength === 0) {
+    return errorEnvelope("BRIEF_EMPTY", "Brief file is empty.");
+  }
+  if (input.bytes.byteLength > BRIEF_MAX_BYTES) {
+    return errorEnvelope("BRIEF_TOO_LARGE", `Brief exceeds the ${BRIEF_MAX_BYTES}-byte cap.`);
+  }
+  if (!BRIEF_ALLOWED_MIME_TYPES.includes(input.mimeType)) {
+    return errorEnvelope("BRIEF_UNSUPPORTED_TYPE", `Unsupported MIME type: ${input.mimeType}.`);
+  }
+
+  // Site exists + not soft-deleted.
+  const siteLookup = await svc
+    .from("sites")
+    .select("id")
+    .eq("id", input.siteId)
+    .neq("status", "removed")
+    .maybeSingle();
+  if (siteLookup.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to look up site.", {
+      details: { supabase_error: siteLookup.error },
+    });
+  }
+  if (!siteLookup.data) {
+    return errorEnvelope("NOT_FOUND", `No active site with id ${input.siteId}.`);
+  }
+
+  // 1. Compute SHA256 + idempotency key.
+  const fileSha256 = sha256Hex(input.bytes);
+  const idempotencyKey =
+    input.clientIdempotencyKey ??
+    computeUploadIdempotencyKey({
+      siteId: input.siteId,
+      uploadedBy: input.uploadedBy,
+      fileSha256,
+    });
+
+  // 2. Check for replay.
+  const existing = await svc
+    .from("briefs")
+    .select("*")
+    .eq("upload_idempotency_key", idempotencyKey)
+    .maybeSingle();
+  if (existing.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to query existing briefs.", {
+      details: { supabase_error: existing.error },
+    });
+  }
+  if (existing.data) {
+    const row = existing.data as BriefRow;
+    if (row.source_sha256 !== fileSha256) {
+      return errorEnvelope(
+        "IDEMPOTENCY_KEY_CONFLICT",
+        "That idempotency key is already in use for a different file.",
+        { details: { brief_id: row.id } },
+      );
+    }
+    return {
+      ok: true,
+      data: {
+        brief_id: row.id,
+        site_id: row.site_id,
+        status: row.status,
+        parser_mode: row.parser_mode,
+        review_url: briefReviewUrl(row.site_id, row.id),
+        replay: true,
+      },
+      timestamp: now(),
+    };
+  }
+
+  // 3. Upload to Storage. Pre-generate brief id so the path can be set
+  // on the INSERT row.
+  const briefId = randomUUID();
+  const storagePath = briefStoragePath(input.siteId, briefId);
+
+  const upload = await svc.storage.from(BRIEF_STORAGE_BUCKET).upload(
+    storagePath,
+    input.bytes,
+    {
+      contentType: input.mimeType,
+      upsert: true, // retry path re-writes the same key deterministically
+    },
+  );
+  if (upload.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Storage upload failed.", {
+      details: { storage_error: upload.error.message },
+    });
+  }
+
+  // 4. INSERT briefs row with status='parsing'.
+  const defaultTitle = input.title.length > 0 ? input.title.slice(0, 200) : "Untitled brief";
+  const insert = await svc
+    .from("briefs")
+    .insert({
+      id: briefId,
+      site_id: input.siteId,
+      title: defaultTitle,
+      status: "parsing",
+      source_storage_path: storagePath,
+      source_mime_type: input.mimeType,
+      source_size_bytes: input.bytes.byteLength,
+      source_sha256: fileSha256,
+      upload_idempotency_key: idempotencyKey,
+      created_by: input.uploadedBy,
+      updated_by: input.uploadedBy,
+    })
+    .select("*")
+    .single();
+
+  if (insert.error || !insert.data) {
+    // 23505 race: a concurrent upload landed the same idempotency key
+    // between our SELECT and our INSERT. Re-read and replay.
+    if (insert.error?.code === "23505") {
+      const again = await svc
+        .from("briefs")
+        .select("*")
+        .eq("upload_idempotency_key", idempotencyKey)
+        .maybeSingle();
+      if (again.data) {
+        const row = again.data as BriefRow;
+        if (row.source_sha256 === fileSha256) {
+          return {
+            ok: true,
+            data: {
+              brief_id: row.id,
+              site_id: row.site_id,
+              status: row.status,
+              parser_mode: row.parser_mode,
+              review_url: briefReviewUrl(row.site_id, row.id),
+              replay: true,
+            },
+            timestamp: now(),
+          };
+        }
+        return errorEnvelope(
+          "IDEMPOTENCY_KEY_CONFLICT",
+          "That idempotency key is already in use for a different file.",
+        );
+      }
+    }
+    return errorEnvelope("INTERNAL_ERROR", "Failed to insert brief row.", {
+      details: { supabase_error: insert.error ?? null },
+    });
+  }
+
+  // 5. Parse synchronously.
+  const sourceText = new TextDecoder("utf-8", { fatal: false }).decode(input.bytes);
+  const parseResult = await parseBriefDocument({
+    briefId,
+    source: sourceText,
+    sourceSha256: fileSha256,
+  });
+
+  if (!parseResult.ok) {
+    await svc
+      .from("briefs")
+      .update({
+        status: "failed_parse",
+        parse_failure_code: parseResult.code,
+        parse_failure_detail: parseResult.detail,
+        parser_warnings: parseResult.warnings,
+        updated_at: now(),
+      })
+      .eq("id", briefId);
+
+    return {
+      ok: true,
+      data: {
+        brief_id: briefId,
+        site_id: input.siteId,
+        status: "failed_parse",
+        parser_mode: null,
+        review_url: briefReviewUrl(input.siteId, briefId),
+        replay: false,
+      },
+      timestamp: now(),
+    };
+  }
+
+  // Post-parse token cap check — reject briefs the runner can't fit in
+  // its 60k input-token budget even if the file size is under 10 MB.
+  if (approxTokenCount(sourceText) > BRIEF_MAX_CONTENT_TOKENS) {
+    await svc
+      .from("briefs")
+      .update({
+        status: "failed_parse",
+        parse_failure_code: "BRIEF_TOO_LARGE",
+        parse_failure_detail: `Content exceeds the ~${BRIEF_MAX_CONTENT_TOKENS}-token cap.`,
+        parser_warnings: parseResult.warnings,
+        updated_at: now(),
+      })
+      .eq("id", briefId);
+    return errorEnvelope(
+      "BRIEF_TOO_LARGE",
+      "Brief content exceeds the token budget the runner can hold in context.",
+      { details: { brief_id: briefId } },
+    );
+  }
+
+  // 6. Insert brief_pages rows.
+  const pageRows = parseResult.pages.map((p: BriefPageDraft) => ({
+    brief_id: briefId,
+    ordinal: p.ordinal,
+    title: p.title.slice(0, 200),
+    mode: p.mode,
+    source_text: p.source_text,
+    word_count: p.word_count,
+    source_span_start: p.source_span_start,
+    source_span_end: p.source_span_end,
+    created_by: input.uploadedBy,
+    updated_by: input.uploadedBy,
+  }));
+
+  if (pageRows.length > 0) {
+    const pagesInsert = await svc.from("brief_pages").insert(pageRows);
+    if (pagesInsert.error) {
+      return errorEnvelope("INTERNAL_ERROR", "Failed to insert brief_pages.", {
+        details: { supabase_error: pagesInsert.error },
+      });
+    }
+  }
+
+  // 7. Flip briefs.status → parsed + write parser metadata.
+  const finalize = await svc
+    .from("briefs")
+    .update({
+      status: "parsed",
+      parser_mode: parseResult.parser_mode,
+      parser_warnings: parseResult.warnings,
+      version_lock: insert.data.version_lock + 1,
+      updated_at: now(),
+    })
+    .eq("id", briefId);
+  if (finalize.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to finalize brief.", {
+      details: { supabase_error: finalize.error },
+    });
+  }
+
+  return {
+    ok: true,
+    data: {
+      brief_id: briefId,
+      site_id: input.siteId,
+      status: "parsed",
+      parser_mode: parseResult.parser_mode,
+      review_url: briefReviewUrl(input.siteId, briefId),
+      replay: false,
+    },
+    timestamp: now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// getBriefWithPages — server component read helper.
+// ---------------------------------------------------------------------------
+
+export async function getBriefWithPages(
+  briefId: string,
+): Promise<ApiResponse<{ brief: BriefRow; pages: BriefPageRow[] }>> {
+  const svc = getServiceRoleClient();
+  const briefRes = await svc
+    .from("briefs")
+    .select("*")
+    .eq("id", briefId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (briefRes.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief.", {
+      details: { supabase_error: briefRes.error },
+    });
+  }
+  if (!briefRes.data) {
+    return errorEnvelope("NOT_FOUND", `No brief with id ${briefId}.`);
+  }
+
+  const pagesRes = await svc
+    .from("brief_pages")
+    .select("*")
+    .eq("brief_id", briefId)
+    .is("deleted_at", null)
+    .order("ordinal", { ascending: true });
+  if (pagesRes.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief pages.", {
+      details: { supabase_error: pagesRes.error },
+    });
+  }
+
+  return {
+    ok: true,
+    data: {
+      brief: briefRes.data as BriefRow,
+      pages: (pagesRes.data ?? []) as BriefPageRow[],
+    },
+    timestamp: now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// commitBrief — freeze the page list, unlock the runner.
+// ---------------------------------------------------------------------------
+
+export type CommitBriefInput = {
+  briefId: string;
+  expectedVersionLock: number;
+  pageHash: string;
+  committedBy: string | null;
+};
+
+export type CommitBriefData = {
+  brief_id: string;
+  committed_at: string;
+  committed_page_hash: string;
+  replay: boolean;
+};
+
+export function computePageHash(
+  pages: Array<Pick<BriefPageRow, "ordinal" | "title" | "mode" | "source_text">>,
+): string {
+  const normalised = [...pages]
+    .sort((a, b) => a.ordinal - b.ordinal)
+    .map((p) => ({
+      ordinal: p.ordinal,
+      title: p.title,
+      mode: p.mode,
+      source_sha256: sha256Hex(p.source_text),
+    }));
+  return sha256Hex(JSON.stringify(normalised));
+}
+
+export async function commitBrief(
+  input: CommitBriefInput,
+): Promise<ApiResponse<CommitBriefData>> {
+  try {
+    return await commitBriefImpl(input);
+  } catch (err) {
+    return errorEnvelope("INTERNAL_ERROR", `commitBrief threw: ${
+      err instanceof Error ? err.message : String(err)
+    }`);
+  }
+}
+
+async function commitBriefImpl(
+  input: CommitBriefInput,
+): Promise<ApiResponse<CommitBriefData>> {
+  const svc = getServiceRoleClient();
+
+  // 1. Fetch brief + its pages.
+  const briefRes = await svc
+    .from("briefs")
+    .select("*")
+    .eq("id", input.briefId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (briefRes.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief.", {
+      details: { supabase_error: briefRes.error },
+    });
+  }
+  if (!briefRes.data) {
+    return errorEnvelope("NOT_FOUND", `No brief with id ${input.briefId}.`);
+  }
+  const brief = briefRes.data as BriefRow;
+
+  // Replay: already committed + same page_hash → success envelope.
+  if (brief.status === "committed") {
+    if (brief.committed_page_hash === input.pageHash) {
+      return {
+        ok: true,
+        data: {
+          brief_id: brief.id,
+          committed_at: brief.committed_at ?? now(),
+          committed_page_hash: brief.committed_page_hash ?? input.pageHash,
+          replay: true,
+        },
+        timestamp: now(),
+      };
+    }
+    return errorEnvelope(
+      "ALREADY_EXISTS",
+      "This brief is already committed under a different page list.",
+      { details: { brief_id: brief.id } },
+    );
+  }
+
+  if (brief.status !== "parsed") {
+    return errorEnvelope(
+      "VALIDATION_FAILED",
+      `Brief is in status '${brief.status}', not 'parsed'. Cannot commit.`,
+    );
+  }
+
+  if (brief.version_lock !== input.expectedVersionLock) {
+    return errorEnvelope(
+      "VERSION_CONFLICT",
+      "The brief was edited while you were reviewing. Refresh and commit again.",
+      { details: { expected: input.expectedVersionLock, actual: brief.version_lock } },
+    );
+  }
+
+  const pagesRes = await svc
+    .from("brief_pages")
+    .select("ordinal, title, mode, source_text")
+    .eq("brief_id", brief.id)
+    .is("deleted_at", null)
+    .order("ordinal", { ascending: true });
+  if (pagesRes.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief pages.", {
+      details: { supabase_error: pagesRes.error },
+    });
+  }
+  const currentPages = (pagesRes.data ?? []) as Array<
+    Pick<BriefPageRow, "ordinal" | "title" | "mode" | "source_text">
+  >;
+
+  // Recompute the hash from the DB and compare.
+  const serverHash = computePageHash(currentPages);
+  if (serverHash !== input.pageHash) {
+    return errorEnvelope(
+      "VERSION_CONFLICT",
+      "The page list on the server differs from the list you committed. Refresh and try again.",
+      { details: { server_hash: serverHash } },
+    );
+  }
+
+  // 2. UPDATE briefs under version_lock.
+  const committedAt = now();
+  const update = await svc
+    .from("briefs")
+    .update({
+      status: "committed",
+      committed_at: committedAt,
+      committed_by: input.committedBy,
+      committed_page_hash: serverHash,
+      version_lock: brief.version_lock + 1,
+      updated_at: committedAt,
+      updated_by: input.committedBy,
+    })
+    .eq("id", brief.id)
+    .eq("version_lock", brief.version_lock)
+    .select("id")
+    .maybeSingle();
+
+  if (update.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to commit brief.", {
+      details: { supabase_error: update.error },
+    });
+  }
+  if (!update.data) {
+    return errorEnvelope(
+      "VERSION_CONFLICT",
+      "The brief was updated by another session. Refresh and commit again.",
+    );
+  }
+
+  return {
+    ok: true,
+    data: {
+      brief_id: brief.id,
+      committed_at: committedAt,
+      committed_page_hash: serverHash,
+      replay: false,
+    },
+    timestamp: now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// listSiteBriefs — for the site detail page's "Briefs" section.
+// ---------------------------------------------------------------------------
+
+export async function listSiteBriefs(
+  siteId: string,
+): Promise<ApiResponse<{ briefs: Array<Pick<BriefRow, "id" | "title" | "status" | "parser_mode" | "created_at" | "updated_at" | "committed_at">> }>> {
+  const svc = getServiceRoleClient();
+  const { data, error } = await svc
+    .from("briefs")
+    .select("id, title, status, parser_mode, created_at, updated_at, committed_at")
+    .eq("site_id", siteId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false });
+  if (error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to list briefs.", {
+      details: { supabase_error: error },
+    });
+  }
+  return {
+    ok: true,
+    data: { briefs: (data ?? []) as Array<Pick<BriefRow, "id" | "title" | "status" | "parser_mode" | "created_at" | "updated_at" | "committed_at">> },
+    timestamp: now(),
+  };
+}
