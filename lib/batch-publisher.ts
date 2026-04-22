@@ -1,5 +1,14 @@
 import { Client } from "pg";
 
+import {
+  extractCloudflareIds,
+  rewriteImageUrls,
+} from "@/lib/html-image-rewrite";
+import {
+  transferImagesForPage,
+  type WpMediaCallBundle,
+} from "@/lib/wp-media-transfer";
+
 // ---------------------------------------------------------------------------
 // M3-6 — WP publish with pre-commit slug claim.
 //
@@ -63,6 +72,19 @@ export type WpCallBundle = {
     wp_page_id: number;
     content: string;
   }) => Promise<WpUpdateResult>;
+  /**
+   * M4-7 — optional WP media transfer leg. When present and the page
+   * HTML references Cloudflare-delivered images, the publisher runs
+   * per-image transfer + URL rewrite before wp.create / wp.update.
+   * When absent, the publisher ships HTML as-is (M3 behaviour).
+   */
+  media?: WpMediaCallBundle;
+  /**
+   * M4-7 — constructs a Cloudflare delivery URL for a given image id.
+   * Used as the source URL for the WP media-upload step. When absent
+   * the default uses `CLOUDFLARE_IMAGES_HASH` from the environment.
+   */
+  cloudflareUrlFor?: (cloudflareId: string) => string;
 };
 
 export type PublishContext = {
@@ -284,6 +306,45 @@ export async function publishSlot(
         }
       }
 
+      // --- M4-7: transfer referenced images into the client WP media ----
+      //
+      // Runs BEFORE the WP page create/update so the rewritten HTML is
+      // what lands on WordPress. Uses its own supabase-js client — the
+      // pg transaction we hold here is scoped to the slug claim and is
+      // NOT held across the image/WP HTTP calls below.
+      //
+      // Skipped when wp.media is absent (M3 behaviour) or the HTML
+      // references no Cloudflare delivery URLs.
+      let finalHtml = publishCtx.generated_html;
+      if (wp.media) {
+        const cloudflareIds = extractCloudflareIds(publishCtx.generated_html);
+        if (cloudflareIds.size > 0) {
+          const transfer = await transferImagesForPage({
+            cloudflareIds,
+            siteId: publishCtx.site_id,
+            wpMedia: wp.media,
+            cloudflareUrlFor:
+              wp.cloudflareUrlFor ??
+              ((id) =>
+                `https://imagedelivery.net/${process.env.CLOUDFLARE_IMAGES_HASH ?? ""}/${id}/public`),
+          });
+          if (!transfer.ok) {
+            await c.query("ROLLBACK");
+            return {
+              ok: false as const,
+              code: transfer.code,
+              message: transfer.message,
+              retryable: transfer.retryable,
+            };
+          }
+          const rewrite = rewriteImageUrls(
+            publishCtx.generated_html,
+            transfer.mapping,
+          );
+          finalHtml = rewrite.rewrittenHtml;
+        }
+      }
+
       // --- WP call: GET-first for idempotent adoption, then POST or PUT --
       if (wpPageId === null) {
         const existing = await wp.getBySlug(publishCtx.slug);
@@ -300,7 +361,7 @@ export async function publishSlot(
           // WP already has a post for this slug — adopt + update.
           const upd = await wp.update({
             wp_page_id: existing.found.wp_page_id,
-            content: publishCtx.generated_html,
+            content: finalHtml,
           });
           if (!upd.ok) {
             await c.query("ROLLBACK");
@@ -316,7 +377,7 @@ export async function publishSlot(
           const created = await wp.create({
             slug: publishCtx.slug,
             title: publishCtx.title,
-            content: publishCtx.generated_html,
+            content: finalHtml,
           });
           if (!created.ok) {
             await c.query("ROLLBACK");
@@ -340,7 +401,7 @@ export async function publishSlot(
                updated_at = now()
          WHERE id = $1
         `,
-        [pagesId, wpPageId, publishCtx.generated_html],
+        [pagesId, wpPageId, finalHtml],
       );
 
       const finalise = await c.query(

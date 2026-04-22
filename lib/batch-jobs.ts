@@ -2,6 +2,10 @@ import { createHash } from "node:crypto";
 import { Client } from "pg";
 
 import { getServiceRoleClient } from "@/lib/supabase";
+import {
+  PROJECTED_COST_PER_BATCH_SLOT_CENTS,
+  reserveBudget,
+} from "@/lib/tenant-budgets";
 
 // ---------------------------------------------------------------------------
 // M3-2 — Batch-job creation.
@@ -62,6 +66,7 @@ export type CreateBatchError = {
       | "TEMPLATE_NOT_FOUND"
       | "TEMPLATE_NOT_ACTIVE"
       | "IDEMPOTENCY_KEY_CONFLICT"
+      | "BUDGET_EXCEEDED"
       | "INTERNAL_ERROR";
     message: string;
     details?: Record<string, unknown>;
@@ -303,6 +308,31 @@ export async function createBatchJob(
     }
 
     const job_id = insertJob.rows[0]!.id;
+
+    // M8-2 — reserve the projected cost against the tenant's daily +
+    // monthly budget. Runs inside the same transaction as the job
+    // INSERT so a BUDGET_EXCEEDED rolls back the job atomically.
+    // FOR UPDATE inside reserveBudget serialises concurrent enqueues
+    // against the same tenant.
+    const projectedCents =
+      PROJECTED_COST_PER_BATCH_SLOT_CENTS * input.slots.length;
+    const reservation = await reserveBudget(
+      client,
+      input.site_id,
+      projectedCents,
+    );
+    if (!reservation.ok) {
+      await client.query("ROLLBACK");
+      if (reservation.code === "BUDGET_EXCEEDED") {
+        return errorResult("BUDGET_EXCEEDED", reservation.message, {
+          period: reservation.period,
+          cap_cents: reservation.cap_cents,
+          usage_cents: reservation.usage_cents,
+          projected_cents: reservation.projected_cents,
+        });
+      }
+      return errorResult("INTERNAL_ERROR", reservation.message);
+    }
 
     // Bulk-insert slots. anthropic_idempotency_key / wp_idempotency_key
     // are deterministic on (job_id, slot_index) so every retry of the

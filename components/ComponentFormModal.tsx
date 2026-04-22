@@ -369,7 +369,7 @@ export function ComponentFormModal({
           </div>
 
           <div>
-            <Label htmlFor="cf-schema">content_schema (JSON)</Label>
+            <Label htmlFor="cf-schema">Content shape (JSON Schema)</Label>
             <textarea
               id="cf-schema"
               className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
@@ -382,7 +382,7 @@ export function ComponentFormModal({
           </div>
 
           <div>
-            <Label htmlFor="cf-image-slots">image_slots JSON (optional)</Label>
+            <Label htmlFor="cf-image-slots">Image slots (optional)</Label>
             <textarea
               id="cf-image-slots"
               className="mt-1 h-20 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"

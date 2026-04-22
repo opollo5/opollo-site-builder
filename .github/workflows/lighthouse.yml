@@ -1,0 +1,95 @@
+name: Lighthouse
+
+# Core Web Vitals + accessibility audit against a production build of
+# the app. Runs against the login page only — the rest of the admin
+# surface is session-gated and testing it would require the full
+# Supabase-in-CI flow that e2e.yml already runs.
+#
+# Assertions are `warn`-only for now. Once we have a few runs of
+# baseline history we'll flip categories:performance to `error`.
+#
+# Reports upload to Google's temporary public storage (no API keys).
+# Links land as a PR comment via the LHCI GitHub App when installed,
+# otherwise they show up in the job logs.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+concurrency:
+  group: lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lhci:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Legacy Basic Auth path — matches the default when
+      # FEATURE_SUPABASE_AUTH isn't set. /login renders without an
+      # upstream Supabase in this mode. Leave BASIC_AUTH_USER /
+      # BASIC_AUTH_PASSWORD unset so middleware falls through to
+      # NextResponse.next().
+      FEATURE_SUPABASE_AUTH: "false"
+      # Placeholders so any lazy env reads during module init don't
+      # crash the boot. The routes that actually call Supabase aren't
+      # hit by Lighthouse (only /login).
+      SUPABASE_URL: "http://127.0.0.1:54321"
+      SUPABASE_ANON_KEY: "placeholder-anon"
+      SUPABASE_SERVICE_ROLE_KEY: "placeholder-service"
+      OPOLLO_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/cache@v4
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Lighthouse CI
+        run: npm install --no-save @lhci/cli@0.13.x
+
+      # Non-blocking while baseline history is being collected. Our
+      # assertions are all warn-level, so a non-zero exit from lhci
+      # autorun implies something structural went wrong (Chrome crashed,
+      # server didn't bind, report upload failed) — useful to preserve
+      # as an artifact, not useful to block merge on.
+      - name: Run Lighthouse
+        id: lhci
+        continue-on-error: true
+        run: npx lhci autorun
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Upload Lighthouse report artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Summarise outcome
+        if: always()
+        run: |
+          if [ "${{ steps.lhci.outcome }}" = "success" ]; then
+            echo "## Lighthouse CI :white_check_mark:" >> "$GITHUB_STEP_SUMMARY"
+            echo "All assertions passed." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "## Lighthouse CI :warning:" >> "$GITHUB_STEP_SUMMARY"
+            echo "lhci autorun exited non-zero. Non-blocking today; reports artifact has the detail." >> "$GITHUB_STEP_SUMMARY"
+          fi
