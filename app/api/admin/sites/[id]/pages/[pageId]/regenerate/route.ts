@@ -2,6 +2,11 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceeded,
+} from "@/lib/rate-limit";
 import { enqueueRegenJob } from "@/lib/regeneration-publisher";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
@@ -44,13 +49,17 @@ function errorJson(
 }
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string; pageId: string } },
 ): Promise<NextResponse> {
   const gate = await requireAdminForApi({
     roles: ["admin", "operator"] as const,
   });
   if (gate.kind === "deny") return gate.response;
+
+  const rlId = gate.user ? `user:${gate.user.id}` : `ip:${getClientIp(req)}`;
+  const rl = await checkRateLimit("regen", rlId);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   if (!UUID_RE.test(params.id) || !UUID_RE.test(params.pageId)) {
     return errorJson(
