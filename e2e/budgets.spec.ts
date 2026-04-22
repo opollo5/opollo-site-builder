@@ -115,7 +115,11 @@ test.describe("tenant budget admin surface", () => {
 
     const err = page.getByTestId("edit-tenant-budget-error");
     await expect(err).toBeVisible();
-    await expect(err).toContainText(/version|conflict|stale/i);
+    // The client surfaces the server's VERSION_CONFLICT message as a
+    // human-readable "Another operator changed this budget since you
+    // opened the editor…". Match on load-bearing keywords so the
+    // assertion survives future copy tweaks.
+    await expect(err).toContainText(/another operator|changed|reload/i);
     await expect(
       page.getByRole("dialog", { name: /edit budget caps/i }),
     ).toBeVisible();
