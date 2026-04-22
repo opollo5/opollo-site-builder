@@ -3,9 +3,23 @@ import path from "node:path";
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "."),
-    },
+    // Array form so `server-only` can match a regex pattern. Next.js's
+    // bundler resolves `server-only` via its `react-server` export
+    // condition; vitest doesn't match that condition and would
+    // otherwise hit the package's default throw-at-import module.
+    // The package's own `empty.js` isn't exposed via its exports field,
+    // so we alias to a local zero-content stub instead. Result: vitest
+    // sees a no-op, the Next.js bundler enforces the real guard.
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, ".") },
+      {
+        find: /^server-only$/,
+        replacement: path.resolve(
+          __dirname,
+          "lib/__tests__/_server-only-stub.ts",
+        ),
+      },
+    ],
   },
   test: {
     globalSetup: ["./lib/__tests__/_globalSetup.ts"],

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createRouteAuthClient, getCurrentUser, type SessionUser } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
 
