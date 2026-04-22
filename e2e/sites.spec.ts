@@ -78,11 +78,13 @@ test.describe("sites CRUD", () => {
     // Playwright versions; use the testid we added on the summary.
     await row.getByTestId("site-actions-summary").click();
 
-    // Browser confirm() auto-accept.
-    page.once("dialog", (dialog) => {
-      void dialog.accept();
-    });
+    // Post-audit-3: archive now opens a ConfirmActionModal instead of
+    // firing window.confirm(). Click the menu entry to open the modal,
+    // then the modal's destructive confirm button.
     await row.getByTestId("site-archive-action").click();
+    const confirmDialog = page.getByRole("dialog", { name: /archive/i });
+    await expect(confirmDialog).toBeVisible();
+    await confirmDialog.getByRole("button", { name: /^archive$/i }).click();
 
     // After router.refresh the row should be gone.
     await expect(row).toHaveCount(0);
