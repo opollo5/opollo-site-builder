@@ -19,6 +19,8 @@ import { executeSearchImages } from "@/lib/search-images";
 import { executeUpdatePage } from "@/lib/update-page";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getSite } from "@/lib/sites";
+import { traceAnthropicStream } from "@/lib/langfuse";
+import { logger } from "@/lib/logger";
 import {
   runWithWpCredentials,
   type WpCredentialsOverride,
@@ -201,7 +203,7 @@ export async function POST(req: Request) {
 
         let stopReason: string | null = null;
 
-        console.log("[api/chat] starting stream", {
+        logger.info("api.chat.stream_start", {
           model: MODEL,
           msg_count: convo.length,
           system_prompt_chars: systemPrompt.length,
@@ -211,6 +213,20 @@ export async function POST(req: Request) {
         });
 
         for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+          const span = traceAnthropicStream({
+            name: "chat_messages_stream",
+            metadata: {
+              model: MODEL,
+              iter,
+              site_id: siteLogId,
+              using_env_fallback: !hasActiveSiteId,
+            },
+            input: {
+              system_prompt_bytes: systemPrompt.length,
+              msg_count: convo.length,
+            },
+          });
+
           const streamed = client.messages.stream({
             model: MODEL,
             max_tokens: MAX_TOKENS,
@@ -219,19 +235,34 @@ export async function POST(req: Request) {
             messages: convo,
           });
 
-          for await (const event of streamed) {
-            if (
-              event.type === "content_block_delta" &&
-              event.delta.type === "text_delta"
-            ) {
-              send("text", { delta: event.delta.text });
+          let finalMsg: Anthropic.Message;
+          try {
+            for await (const event of streamed) {
+              if (
+                event.type === "content_block_delta" &&
+                event.delta.type === "text_delta"
+              ) {
+                send("text", { delta: event.delta.text });
+              }
             }
+            finalMsg = await streamed.finalMessage();
+          } catch (iterErr) {
+            span.fail(
+              iterErr instanceof Error ? iterErr.message : String(iterErr),
+            );
+            throw iterErr;
           }
 
-          const finalMsg = await streamed.finalMessage();
           stopReason = finalMsg.stop_reason;
 
-          console.log("[api/chat] iteration complete", {
+          span.recordFinal({
+            id: finalMsg.id,
+            model: finalMsg.model,
+            stop_reason: finalMsg.stop_reason,
+            usage: finalMsg.usage,
+          });
+
+          logger.info("api.chat.iteration_complete", {
             iter,
             stop_reason: finalMsg.stop_reason,
             input_tokens: finalMsg.usage.input_tokens,
@@ -312,7 +343,7 @@ export async function POST(req: Request) {
           body: apiErr?.error,
           stack: err instanceof Error ? err.stack : undefined,
         };
-        console.error("[api/chat] streaming error:", diagnostic);
+        logger.error("api.chat.streaming_error", diagnostic);
 
         send("error", {
           code: "INTERNAL_ERROR",

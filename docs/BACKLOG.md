@@ -14,7 +14,7 @@ Single-PR activation of the four observability vendors whose env vars were provi
 | --- | --- |
 | Sentry | `instrumentation.ts` / `instrumentation-client.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` + `withSentryConfig` wrap in `next.config.mjs`. Server + edge + client runtimes gated on `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN`. |
 | Axiom | Additive transport in `lib/logger.ts`. stdout preserved; Axiom ingest is fire-and-forget with error swallow. |
-| Langfuse | `lib/langfuse.ts` singleton + `traceAnthropicCall()` span wrapper. `lib/anthropic-call.ts` wraps every call; span.fail() on throw, span.end() with tokens on success. |
+| Langfuse | `lib/langfuse.ts` singleton + `traceAnthropicCall()` span wrapper. `lib/anthropic-call.ts` wraps every non-chat call; span.fail() on throw, span.end() with tokens on success. Chat surface uses `traceAnthropicStream()` (M11-1) for the streaming path. |
 | Upstash Redis | `lib/redis.ts` singleton over `@upstash/redis`. Used by the self-probe for the round-trip check; consumers (rate limiting, prompt cache) land in follow-ups. |
 | Self-probe | `POST /api/ops/self-probe` returns per-vendor `{ ok, details/error }` envelope. Auth: admin session OR `OPOLLO_EMERGENCY_KEY` header. |
 | Runbook | `docs/runbook/observability-verification.md` — curl command, expected green response, per-vendor troubleshooting, automation snippet. |
@@ -146,7 +146,7 @@ Env vars: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IM
 **Scope:** one sub-PR per table family; 200–400 lines each including tests. Can be worked in parallel once the plan for any one table is reviewed.
 
 ### ~~Langfuse wiring~~ (shipped in M10)
-Client + span wrapper in `lib/langfuse.ts`; `lib/anthropic-call.ts` wraps every call. Prompt-versioning cutover still pending — tracked under M10 follow-ups above.
+Client + span wrapper in `lib/langfuse.ts`; `lib/anthropic-call.ts` wraps every non-chat call, and `traceAnthropicStream()` covers the chat streaming path (M11-1). Prompt-versioning cutover still pending — tracked under M10 follow-ups above.
 
 ### ~~Sentry wiring~~ (shipped in M10)
 `instrumentation.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts` / `instrumentation-client.ts` + `withSentryConfig` wrap in `next.config.mjs`. No-op without DSN.

@@ -160,3 +160,105 @@ export function traceAnthropicCall(
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// traceAnthropicStream — span wrapper for the streaming Anthropic call
+// used by the chat route.
+//
+// The chat surface uses `client.messages.stream(...)` which returns an
+// async iterable of SSE events + a `finalMessage()` promise. The
+// non-streaming `traceAnthropicCall` above doesn't fit that shape, so
+// this helper mirrors it for streaming callers:
+//
+//   - Caller invokes traceAnthropicStream() before starting the stream.
+//   - Caller passes the awaited `finalMessage()` result to
+//     recordFinal() once the stream drains. Tokens + cost land on the
+//     span at that point.
+//   - On throw, caller invokes fail() instead.
+//   - Langfuse errors are swallowed; the SSE response never breaks.
+//
+// When Langfuse isn't configured, the handle is a pure no-op. M11-1.
+// ---------------------------------------------------------------------------
+
+type AnthropicStreamUsage = {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+};
+
+type AnthropicStreamFinal = {
+  id: string;
+  model: string;
+  stop_reason: string | null;
+  usage: AnthropicStreamUsage;
+};
+
+export type LangfuseStreamHandle = {
+  recordFinal(final: AnthropicStreamFinal): void;
+  fail(message: string): void;
+  readonly traceId: string | null;
+};
+
+export function traceAnthropicStream(
+  opts: TraceAnthropicCallOptions,
+): LangfuseStreamHandle {
+  const client = getLangfuseClient();
+  if (!client) {
+    return {
+      recordFinal() {},
+      fail() {},
+      traceId: null,
+    };
+  }
+  const trace = client.trace({
+    name: opts.name,
+    metadata: opts.metadata,
+    input: opts.input,
+  });
+  const generation = trace.generation({
+    name: opts.name,
+    input: opts.input,
+    metadata: opts.metadata,
+  });
+  let closed = false;
+  return {
+    recordFinal(final) {
+      if (closed) return;
+      closed = true;
+      const cachedTokens =
+        (final.usage.cache_read_input_tokens ?? 0) +
+        (final.usage.cache_creation_input_tokens ?? 0);
+      try {
+        generation.end({
+          usage: {
+            input: final.usage.input_tokens,
+            output: final.usage.output_tokens,
+            total: final.usage.input_tokens + final.usage.output_tokens,
+            unit: "TOKENS",
+          },
+          model: final.model,
+          metadata: {
+            response_id: final.id,
+            stop_reason: final.stop_reason,
+            cached_tokens: cachedTokens,
+          },
+        });
+      } catch {
+        // Langfuse errors must not break the caller's SSE stream.
+      }
+    },
+    fail(message) {
+      if (closed) return;
+      closed = true;
+      try {
+        generation.end({ level: "ERROR", statusMessage: message });
+      } catch {
+        // swallow
+      }
+    },
+    get traceId() {
+      return trace.id ?? null;
+    },
+  };
+}
