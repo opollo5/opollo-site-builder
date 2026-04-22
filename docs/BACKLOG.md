@@ -64,7 +64,7 @@ New env vars (all optional, no-op when missing): `SENTRY_DSN`, `SENTRY_AUTH_TOKE
 Now that the vendors are wired, the three deep-integration entries that used to say "blocked on env provisioning" are unblocked:
 
 - **Prompt versioning via Langfuse** (`docs/PROMPT_VERSIONING.md`): move `docs/SYSTEM_PROMPT_v1.md` / `docs/TOOL_SCHEMAS_v1.md` into `lib/prompts/v1/`, wire `resolvePrompt()`, link each `generations_events.anthropic_response_received` to a Langfuse trace. Span wrapper already ships in `lib/anthropic-call.ts`; remaining work is prompt-file relocation + cutover.
-- **Rate limiting via Upstash** (`lib/rate-limit.ts`): rate limiter on `/api/auth/*`, `/api/emergency`, `/login`. Redis client already available via `getRedisClient()`; remaining work is the sliding-window adapter + wiring into middleware + `/api/health` probe.
+- ~~**Rate limiting via Upstash** (`lib/rate-limit.ts`)~~ — shipped in the security-audit follow-up. Named sliding-window buckets (`chat`, `batch`, `regen`, `tools`, `login`, `auth_callback`, `invite`, `register`) wire into cost-bearing and auth-adjacent routes; explicit per-route opt-in, no middleware magic. Fail-open when Upstash is unconfigured or unreachable. **Intentional deferrals still open:** (a) `/api/emergency` is NOT rate-limited — rate-limiting the break-glass route defeats its purpose during an active incident; (b) `/api/health` probe for Upstash reachability is still on the follow-up list; (c) no middleware-level "default 60/min" on every mutating route — opt-in was the explicit preference for audit visibility.
 - **Structured log queries via Axiom**: saved searches + alerts for `level:error`, request-id drill-downs, per-slice generation events. Ingest already live; remaining work is dashboard provisioning (operator-facing, not code).
 
 ---
@@ -192,8 +192,8 @@ Client + span wrapper in `lib/langfuse.ts`; `lib/anthropic-call.ts` wraps every 
 ### ~~Axiom log shipping~~ (shipped in M10)
 Additive transport inside `lib/logger.ts`. stdout preserved for Vercel log streams + local dev; Axiom ingest is fire-and-forget.
 
-### ~~Upstash Redis~~ (shipped in M10 as client only — rate limiter follow-up tracked above)
-`lib/redis.ts` singleton available via `getRedisClient()`. The rate-limiter adapter (`lib/rate-limit.ts`) is listed under M10 follow-ups — unblocked but not yet wired.
+### ~~Upstash Redis~~ (shipped in M10 as client only; rate-limit adapter shipped in security audit follow-up)
+`lib/redis.ts` singleton available via `getRedisClient()`. `lib/rate-limit.ts` adapter is live as of the security-audit Step 2 slice — named sliding-window buckets with explicit per-route opt-in. See the M10 follow-ups section above for scope + intentional deferrals.
 
 ### CSP enforce-mode migration (nonces)
 **What:** flip `Content-Security-Policy-Report-Only` to enforced. Requires per-request nonce injection via middleware → `next/headers` → inline `<script nonce>` in templates.
