@@ -34,6 +34,16 @@ export const ERROR_CODES = [
   "IMAGE_IN_USE",
   "REGEN_ALREADY_IN_FLIGHT",
   "BUDGET_EXCEEDED",
+  // M12-1 — briefs upload + parse + commit.
+  "BRIEF_EMPTY",
+  "BRIEF_TOO_LARGE",
+  "BRIEF_UNSUPPORTED_TYPE",
+  "BRIEF_PARSE_FAILED",
+  "BRIEF_RUN_ALREADY_ACTIVE",
+  "IDEMPOTENCY_KEY_CONFLICT",
+  "ALREADY_EXISTS",
+  "FORBIDDEN",
+  "UNAUTHORIZED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -74,10 +84,13 @@ export function errorCodeToStatus(code: ErrorCode): number {
   switch (code) {
     case "VALIDATION_FAILED":
     case "FK_VIOLATION":
+    case "BRIEF_EMPTY":
       return 400;
     case "AUTH_FAILED":
+    case "UNAUTHORIZED":
       return 401;
     case "CONFIRMATION_REQUIRED":
+    case "FORBIDDEN":
       return 403;
     case "NOT_FOUND":
       return 404;
@@ -86,7 +99,16 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "UNIQUE_VIOLATION":
     case "IMAGE_IN_USE":
     case "REGEN_ALREADY_IN_FLIGHT":
+    case "BRIEF_RUN_ALREADY_ACTIVE":
+    case "ALREADY_EXISTS":
       return 409;
+    case "BRIEF_TOO_LARGE":
+      return 413;
+    case "BRIEF_UNSUPPORTED_TYPE":
+      return 415;
+    case "IDEMPOTENCY_KEY_CONFLICT":
+    case "BRIEF_PARSE_FAILED":
+      return 422;
     case "RATE_LIMIT":
     case "BUDGET_EXCEEDED":
       return 429;
