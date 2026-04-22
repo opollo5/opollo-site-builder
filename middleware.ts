@@ -76,6 +76,11 @@ function isPublicPath(pathname: string): boolean {
   // involved. Required so the Vercel cron tick can reach the worker
   // endpoint without a session.
   if (pathname.startsWith("/api/cron/")) return true;
+  // /api/ops/* runs its own admin-OR-emergency-key auth. The
+  // emergency-key path exists so verification works even if Supabase
+  // Auth is the thing being debugged — we can't route the probe
+  // through the auth layer we're trying to verify.
+  if (pathname.startsWith("/api/ops/")) return true;
   // Static-asset guards come from the matcher below, but we keep this
   // belt-and-suspenders so a future matcher change doesn't accidentally
   // gate /_next.

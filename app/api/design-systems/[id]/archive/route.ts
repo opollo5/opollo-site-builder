@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { archiveDesignSystem } from "@/lib/design-systems";
 import {
   parseBodyWith,
@@ -17,6 +18,9 @@ const BodySchema = z.object({
 // When the target was the site's active DS, the success payload contains
 // warnings[] noting the site now has no active design system (per §M1b Q6).
 export async function POST(req: Request, ctx: { params: { id: string } }) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;
 

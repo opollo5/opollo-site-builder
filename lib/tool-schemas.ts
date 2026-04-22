@@ -31,6 +31,9 @@ export const ERROR_CODES = [
   "VERSION_CONFLICT",
   "UNIQUE_VIOLATION",
   "FK_VIOLATION",
+  "IMAGE_IN_USE",
+  "REGEN_ALREADY_IN_FLIGHT",
+  "BUDGET_EXCEEDED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -81,8 +84,11 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "PREFIX_TAKEN":
     case "VERSION_CONFLICT":
     case "UNIQUE_VIOLATION":
+    case "IMAGE_IN_USE":
+    case "REGEN_ALREADY_IN_FLIGHT":
       return 409;
     case "RATE_LIMIT":
+    case "BUDGET_EXCEEDED":
       return 429;
     case "UPSTREAM_BLOCKED":
     case "WP_API_ERROR":
@@ -408,5 +414,80 @@ export const deletePageJsonSchema = {
       },
     },
     required: ["page_id", "user_confirmed"],
+  },
+};
+
+// ---------- search_images ----------
+//
+// M4-6 — read-only tool surfacing the image library's FTS index + tag
+// filter to the chat model. Bounded query (limit cap 50 + deleted_at
+// filter) so the agent can't pathologically drag the DB. At least one
+// of {query, tags} must be supplied; an unfiltered browse is intentionally
+// not a tool — operators should use the future admin list view (M5/M6).
+
+export const SEARCH_IMAGES_MAX_LIMIT = 50;
+export const SEARCH_IMAGES_DEFAULT_LIMIT = 20;
+
+export const SearchImagesInputSchema = z
+  .object({
+    query: z.string().trim().min(1).max(200).optional(),
+    tags: z.array(z.string().min(1).max(60)).min(1).max(10).optional(),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(SEARCH_IMAGES_MAX_LIMIT)
+      .optional(),
+  })
+  .refine((v) => v.query !== undefined || v.tags !== undefined, {
+    message: "Supply at least one of `query` or `tags`.",
+  });
+
+export type SearchImagesInput = z.infer<typeof SearchImagesInputSchema>;
+
+export type SearchImagesResultImage = {
+  id: string;
+  cloudflare_id: string | null;
+  caption: string | null;
+  alt_text: string | null;
+  tags: string[];
+  width_px: number | null;
+  height_px: number | null;
+};
+
+export type SearchImagesData = {
+  images: SearchImagesResultImage[];
+};
+
+export const searchImagesJsonSchema = {
+  name: "search_images",
+  description:
+    "Search the image library by full-text caption query and/or tag set. Returns up to 50 matching images with their Cloudflare id, caption, alt_text, tags, and dimensions. At least one of `query` or `tags` must be supplied. Tag filtering is AND (every supplied tag must be present on the image).",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      query: {
+        type: "string",
+        minLength: 1,
+        maxLength: 200,
+        description:
+          "Free-text search against image captions (weighted) and tags. English FTS.",
+      },
+      tags: {
+        type: "array",
+        items: { type: "string", minLength: 1, maxLength: 60 },
+        minItems: 1,
+        maxItems: 10,
+        description:
+          "Tag set; every tag must be present on the image (AND semantics).",
+      },
+      limit: {
+        type: "integer",
+        minimum: 1,
+        maximum: SEARCH_IMAGES_MAX_LIMIT,
+        description: `Max rows to return. Defaults to ${SEARCH_IMAGES_DEFAULT_LIMIT}; cap is ${SEARCH_IMAGES_MAX_LIMIT}.`,
+      },
+    },
+    required: [],
   },
 };

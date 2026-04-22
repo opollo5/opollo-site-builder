@@ -15,8 +15,14 @@ test.describe("users admin surface", () => {
     await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
     await auditA11y(page, testInfo);
 
-    // The seeded admin row is present.
-    await expect(page.getByText(E2E_ADMIN_EMAIL)).toBeVisible();
+    // The seeded admin row is present. getByText would be a strict-mode
+    // violation because the admin email also renders in the header
+    // chrome's admin-user-email span. Scope the assertion to the users
+    // table row instead.
+    const selfRow = page.getByRole("row", {
+      name: new RegExp(E2E_ADMIN_EMAIL),
+    });
+    await expect(selfRow).toBeVisible();
 
     // Invite button opens the modal (M2d-3 shipped the backend + UI).
     await page.getByRole("button", { name: /invite user/i }).click();

@@ -100,6 +100,12 @@ export type WpUpdateFields = {
   content?: string;
   meta_description?: string;
   status?: string;
+  /**
+   * M7-5: drift reconciliation. When set, WP renames `post_name`
+   * atomically in the same PUT. Leave undefined to keep the existing
+   * slug.
+   */
+  slug?: string;
 };
 
 const MAX_RETRIES = 3;
@@ -472,6 +478,7 @@ export async function wpUpdatePage(
     wpBody.excerpt = fields.meta_description;
   }
   if (fields.status !== undefined) wpBody.status = fields.status;
+  if (fields.slug !== undefined) wpBody.slug = fields.slug;
 
   let res: Response;
   try {

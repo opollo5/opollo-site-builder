@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { createSite } from "@/lib/sites";
 import {
   RegisterSiteInputSchema,
@@ -12,6 +13,9 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   let body: unknown;
   try {
     body = await req.json();
