@@ -1,9 +1,15 @@
+import { Client } from "pg";
+
 import {
   extractCloudflareIds,
   rewriteImageUrls,
 } from "@/lib/html-image-rewrite";
 import { runGates, type RunGatesResult } from "@/lib/quality-gates";
 import { getServiceRoleClient } from "@/lib/supabase";
+import {
+  PROJECTED_COST_PER_REGEN_CENTS,
+  reserveBudget,
+} from "@/lib/tenant-budgets";
 import {
   transferImagesForPage,
   type WpMediaCallBundle,
@@ -583,6 +589,16 @@ export function readRegenDailyBudgetCents(): number {
  * Caller (the POST route) is responsible for the admin gate and UUID
  * validation. This helper assumes well-formed ids.
  */
+function requireDbUrl(): string {
+  const url = process.env.SUPABASE_DB_URL;
+  if (!url) {
+    throw new Error(
+      "SUPABASE_DB_URL is not set. Required by enqueueRegenJob for the budget reservation transaction.",
+    );
+  }
+  return url;
+}
+
 export async function enqueueRegenJob(
   input: EnqueueRegenJobInput,
 ): Promise<EnqueueRegenJobResult> {
@@ -611,10 +627,9 @@ export async function enqueueRegenJob(
     };
   }
 
-  // Daily budget guard. Sum cost_usd_cents for regen jobs created
-  // today (UTC day boundary). Refuse to enqueue if we'd exceed the
-  // cap. Tenant-wide — per-tenant caps are deferred to the
-  // tenant_cost_budgets backlog entry.
+  // Tenant-wide ceiling (M7-5). Kept as the outer guard above the
+  // per-tenant cap — prevents a new feature from draining every
+  // operator's budget when one tenant happens to have a high cap.
   const cap = readRegenDailyBudgetCents();
   const startOfDay = new Date();
   startOfDay.setUTCHours(0, 0, 0, 0);
@@ -641,30 +656,77 @@ export async function enqueueRegenJob(
       details: {
         cap_cents: cap,
         spent_today_cents: todaySoFar,
+        period: "tenant_wide",
       },
     };
   }
 
-  // Deterministic idempotency keys from the (to-be-minted) job id.
-  // Server-side generated so clients can't influence them.
+  // M8-2 — per-tenant cap + atomic insert inside one transaction.
+  // reserveBudget holds SELECT FOR UPDATE on tenant_cost_budgets;
+  // concurrent enqueues against the same tenant serialise. Rollback
+  // on any failure releases the lock without charging the budget.
   const jobId = crypto.randomUUID();
-  const insertRes = await supabase
-    .from("regeneration_jobs")
-    .insert({
-      id: jobId,
-      site_id: input.site_id,
-      page_id: input.page_id,
-      status: "pending",
-      expected_page_version: pageRes.data.version_lock as number,
-      anthropic_idempotency_key: `ant-regen-${jobId}`,
-      wp_idempotency_key: `wp-regen-${jobId}`,
-      created_by: input.created_by ?? null,
-    })
-    .select("id")
-    .single();
+  const client = new Client({ connectionString: requireDbUrl() });
+  await client.connect();
+  try {
+    await client.query("BEGIN");
 
-  if (insertRes.error) {
-    if (insertRes.error.code === "23505") {
+    const reservation = await reserveBudget(
+      client,
+      input.site_id,
+      PROJECTED_COST_PER_REGEN_CENTS,
+    );
+    if (!reservation.ok) {
+      await client.query("ROLLBACK");
+      if (reservation.code === "BUDGET_EXCEEDED") {
+        return {
+          ok: false,
+          code: "BUDGET_EXCEEDED",
+          message: reservation.message,
+          details: {
+            cap_cents: reservation.cap_cents,
+            usage_cents: reservation.usage_cents,
+            projected_cents: reservation.projected_cents,
+            period: reservation.period,
+          },
+        };
+      }
+      return {
+        ok: false,
+        code: "INTERNAL_ERROR",
+        message: reservation.message,
+      };
+    }
+
+    const insertRes = await client.query<{ id: string }>(
+      `
+      INSERT INTO regeneration_jobs
+        (id, site_id, page_id, status, expected_page_version,
+         anthropic_idempotency_key, wp_idempotency_key, created_by)
+      VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7)
+      RETURNING id
+      `,
+      [
+        jobId,
+        input.site_id,
+        input.page_id,
+        pageRes.data.version_lock as number,
+        `ant-regen-${jobId}`,
+        `wp-regen-${jobId}`,
+        input.created_by ?? null,
+      ],
+    );
+
+    await client.query("COMMIT");
+    return { ok: true, job_id: insertRes.rows[0]!.id };
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // swallow
+    }
+    const pgErr = err as { code?: string; message?: string };
+    if (pgErr.code === "23505") {
       return {
         ok: false,
         code: "REGEN_ALREADY_IN_FLIGHT",
@@ -676,9 +738,9 @@ export async function enqueueRegenJob(
     return {
       ok: false,
       code: "INTERNAL_ERROR",
-      message: `regeneration_jobs insert failed: ${insertRes.error.message}`,
+      message: `regeneration_jobs insert failed: ${pgErr.message ?? String(err)}`,
     };
+  } finally {
+    await client.end();
   }
-
-  return { ok: true, job_id: insertRes.data.id as string };
 }

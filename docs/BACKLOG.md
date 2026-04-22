@@ -12,8 +12,8 @@ Parent plan: `docs/plans/m8-parent.md`. Sub-slice status tracker:
 
 | Slice | Status | Notes |
 | --- | --- | --- |
-| M8-1 | in flight | `tenant_cost_budgets` schema + auto-create trigger + backfill of existing sites. UNIQUE on site_id. |
-| M8-2 | planned | Enforcement in `createBatchJob` + `enqueueRegenJob`. `SELECT … FOR UPDATE` + atomic usage increment. BUDGET_EXCEEDED on overdraw. |
+| M8-1 | merged (#79) | `tenant_cost_budgets` schema + auto-create trigger + backfill of existing sites. UNIQUE on site_id. |
+| M8-2 | in flight | Enforcement in `createBatchJob` + `enqueueRegenJob`. `SELECT … FOR UPDATE` + atomic usage increment via `lib/tenant-budgets.ts`. BUDGET_EXCEEDED on overdraw. |
 | M8-3 | planned | iStock seed (M4-5) integration — pre-flight per-tenant cap check. |
 | M8-4 | planned | `/api/cron/budget-reset` hourly reset cron. Daily + monthly rollover. |
 | M8-5 | planned | Admin UI budget badge on `/admin/sites/[id]` + PATCH endpoint with version_lock. |
