@@ -4,6 +4,7 @@ import {
   extractCloudflareIds,
   rewriteImageUrls,
 } from "@/lib/html-image-rewrite";
+import { LEADSOURCE_FONT_LOAD_HTML } from "@/lib/leadsource-fonts";
 import { runGates, type RunGatesResult } from "@/lib/quality-gates";
 import { getServiceRoleClient } from "@/lib/supabase";
 import {
@@ -347,10 +348,17 @@ async function publishRegenJobImpl(
       }
     }
 
+    // Prepend the LeadSource font-load <link> markup for the WP-bound
+    // HTML only. `finalHtml` stays as the post-image-rewrite body so
+    // the downstream `pages.generated_html` persist captures the model
+    // output verbatim; fonts are a rendering concern injected at the
+    // WP boundary. See lib/leadsource-fonts.ts.
+    const wpBoundHtml = LEADSOURCE_FONT_LOAD_HTML + finalHtml;
+
     // 5. WP PUT.
     const wpPut = await wp.updateByWpPageId({
       wp_page_id: wpPageId,
-      content: finalHtml,
+      content: wpBoundHtml,
       slug: driftDetected ? (page.slug as string) : undefined,
       title: page.title as string,
       idempotency_key: job.wp_idempotency_key as string,

@@ -66,5 +66,5 @@ M10 was not sub-sliced because the vendors don't depend on each other and the se
 ## Relationship to later milestones
 
 - M11-1 extends Langfuse to the chat streaming path via `traceAnthropicStream`, closes the last coverage gap and corrects the BACKLOG "wraps every call" overstatement.
-- M11-3 extends `/api/health` to flag stuck budget-reset cron rows, leaning on the same structured-logger + JSON-envelope discipline.
+- M11-7 extends `/api/health` with `checkBudgetResetBacklog()` to flag stuck budget-reset cron rows (originally scoped as M11-3; Audit 3 found the probe absent, M11-7 ships it). Leans on the same structured-logger + JSON-envelope discipline.
 - Rate limiting, prompt versioning, and Axiom dashboard wiring are follow-ups on the M10 foundation.

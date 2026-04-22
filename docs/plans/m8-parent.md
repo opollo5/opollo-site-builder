@@ -87,7 +87,7 @@ Standard version_lock pattern. Concurrent edits surface 409 `VERSION_CONFLICT` s
 
 1. **Race between budget check + increment.** → M8-2 uses `SELECT FOR UPDATE` inside a transaction. Unit test spawns two concurrent enqueue attempts against the same tenant with half-cap-each projected cost; asserts exactly one succeeds.
 
-2. **Reset cron doesn't fire.** → Monitoring via `/api/health` — shipped in M11-3. The probe flags rows whose `daily_reset_at` or `monthly_reset_at` is more than 25h in the past, returns 503 with a `budget_reset_backlog_count` + up-to-5 `site_id` sample. If the cron is stuck, on-call pages before usage saturates — loud operator visibility, no silent overdraw.
+2. **Reset cron doesn't fire.** → Monitoring via `/api/health` — shipped in M11-7 (M11-6 originally claimed the probe landed under M11-3, but Audit 3 found the probe absent from the route; M11-7 implements it for real). The probe flags rows whose `daily_reset_at` or `monthly_reset_at` is more than 25h in the past, returns 503 with a `budget_reset_backlog_count` + up-to-5 `site_id` sample. If the cron is stuck, on-call pages before usage saturates — loud operator visibility, no silent overdraw.
 
 3. **Existing batch jobs mid-flight when M8-2 ships.** → Per-slot cost is already tracked on `generation_job_pages.cost_usd_cents`. M8-2's enforcement is at enqueue time only; in-flight jobs complete normally. The first tick after M8-2 sees accurate per-tenant usage from the accumulated per-slot costs.
 

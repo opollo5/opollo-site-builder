@@ -4,6 +4,7 @@ import {
   extractCloudflareIds,
   rewriteImageUrls,
 } from "@/lib/html-image-rewrite";
+import { LEADSOURCE_FONT_LOAD_HTML } from "@/lib/leadsource-fonts";
 import {
   transferImagesForPage,
   type WpMediaCallBundle,
@@ -345,6 +346,13 @@ export async function publishSlot(
         }
       }
 
+      // Prepend the LeadSource font-load <link> markup for the WP-bound
+      // HTML only. `finalHtml` stays as the post-image-rewrite body so
+      // the downstream `pages.generated_html` UPDATE captures the model
+      // output verbatim; fonts are a rendering concern injected at the
+      // WP boundary. See lib/leadsource-fonts.ts.
+      const wpBoundHtml = LEADSOURCE_FONT_LOAD_HTML + finalHtml;
+
       // --- WP call: GET-first for idempotent adoption, then POST or PUT --
       if (wpPageId === null) {
         const existing = await wp.getBySlug(publishCtx.slug);
@@ -361,7 +369,7 @@ export async function publishSlot(
           // WP already has a post for this slug — adopt + update.
           const upd = await wp.update({
             wp_page_id: existing.found.wp_page_id,
-            content: finalHtml,
+            content: wpBoundHtml,
           });
           if (!upd.ok) {
             await c.query("ROLLBACK");
@@ -377,7 +385,7 @@ export async function publishSlot(
           const created = await wp.create({
             slug: publishCtx.slug,
             title: publishCtx.title,
-            content: finalHtml,
+            content: wpBoundHtml,
           });
           if (!created.ok) {
             await c.query("ROLLBACK");
