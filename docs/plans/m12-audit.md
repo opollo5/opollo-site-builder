@@ -1,5 +1,11 @@
 # M12 — Capability Audit
 
+## STATUS: superseded
+
+This is an overnight session artifact describing a 7-slice A–G split that is NOT the canonical M12 plan. See `docs/plans/m12-parent.md` for the canonical 6-slice split (M12-1 through M12-6). The capability-mapping evidence below is still useful background — the slice-ordering and table-layout prescriptions are not. Preserved as history; do not execute against.
+
+---
+
 Phase 1 of the overnight autonomous M12 build. Reads actual source (not plan docs) for each of the 18 capabilities the overnight prompt names, classifies each as **exists-reuse**, **exists-extend**, or **absent-build-new**, and names the concrete file(s).
 
 **Basis:** origin/main @ `29a89ac`, read on branch `claude/m12-00-reconcile` after Phase 0.
