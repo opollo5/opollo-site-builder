@@ -48,7 +48,7 @@ function SlotStateBadge({ state }: { state: string }) {
   };
   return (
     <span
-      className={`inline-flex rounded px-2 py-0.5 text-[11px] font-medium ${
+      className={`inline-flex rounded px-2 py-0.5 text-sm font-medium ${
         palette[state] ?? "bg-muted"
       }`}
     >
@@ -238,7 +238,7 @@ export default async function BatchDetailPage({
                             <div className="font-medium text-destructive">
                               {s.last_error_code as string}
                             </div>
-                            <div className="text-[11px]">
+                            <div className="text-sm">
                               {(s.last_error_message as string | null) ?? ""}
                             </div>
                           </div>
@@ -264,11 +264,11 @@ export default async function BatchDetailPage({
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{e.event as string}</span>
-                  <span className="text-[10px] text-muted-foreground">
+                  <span className="text-sm text-muted-foreground">
                     {formatDate(e.created_at as string)}
                   </span>
                 </div>
-                <pre className="mt-1 overflow-x-auto text-[11px] text-muted-foreground">
+                <pre className="mt-1 overflow-x-auto text-sm text-muted-foreground">
                   {JSON.stringify(e.details ?? {}, null, 2)}
                 </pre>
               </div>

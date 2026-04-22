@@ -73,7 +73,7 @@ function Row({
           style={{ width: `${paused ? 100 : pct}%` }}
         />
       </div>
-      <div className="text-[10px] text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         Resets {formatResetAt(resetAt)}
       </div>
     </div>

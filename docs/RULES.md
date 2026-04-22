@@ -46,6 +46,14 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ---
 
+## 6. ADD COLUMN on a populated table needs a default or a backfill
+
+**Rule.** New migrations of the form `ALTER TABLE <t> ADD COLUMN <c> <type> NOT NULL` against a table that already has rows in production MUST ship one of: (a) a `DEFAULT <value>` clause so existing rows get populated at ALTER time; or (b) an explicit backfill step in the same migration file (`UPDATE <t> SET <c> = ...` before the `SET NOT NULL`). A migration that only works on a fresh DB is a latent incident — it runs green in CI and blows up the first time it meets real data. Reviewers should bounce any `ADD COLUMN ... NOT NULL` without a default or backfill; migrations that rely on the target table being empty need that assumption stated explicitly in the migration's header comment AND verified against production row counts before merge.
+
+**Incident (Audit 3, 2026-04-22).** Migrations `0008_m3_4_slot_html.sql` and `0009_m3_7_retry_after.sql` add columns to `generation_job_pages` without defaults or backfills. They shipped clean because at the time every row in that table was either fresh or absent (M3 was the first milestone to populate it). Audit 3 surfaced the pattern as a latent risk — if a future rollback-and-replay scenario, fork, or migration-order reshuffle exposed those migrations to a populated table, they would fail on a live-DB upgrade. Runbook section `Apply a backfill-required migration to a populated production DB` covers the recovery path; this rule prevents new instances from landing.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.

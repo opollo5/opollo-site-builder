@@ -196,6 +196,26 @@ For a missing feature-path migration: disable the relevant `FEATURE_X` in Vercel
 - Why did the automated workflow miss it? Failing silently is the real bug — fix the workflow, not just the database.
 - If the migration contained a destructive step (`DROP COLUMN`, `DROP CONSTRAINT`), confirm no data loss against a recent Supabase backup.
 
+### Apply a backfill-required migration to a populated production DB
+
+Some shipped migrations add columns without `NOT NULL DEFAULT`; on a fresh DB this is fine, but applying against a production DB with existing rows requires a backfill. Audit 3 flagged `supabase/migrations/0008_m3_4_slot_html.sql` and `0009_m3_7_retry_after.sql` as examples — both add columns to `generation_job_pages` with no default and no backfill step. At the time they shipped, every production row was empty (M3 was the first milestone to populate the table), so there was no gap. Going forward, any migration that adds a column to a populated table MUST either supply `NOT NULL DEFAULT <value>` or include an explicit backfill.
+
+**When diagnosing a failed live-DB upgrade with `ERROR:  column "X" contains null values` or `ERROR: ... violates not-null constraint`:**
+
+1. Identify the migration file. Confirm it is the cause (check the error line number + the SQL near the ADD COLUMN / ALTER COLUMN).
+2. Run the backfill BEFORE the migration, in the same transaction window:
+   ```sql
+   BEGIN;
+   UPDATE <table> SET <new_column> = <safe_default> WHERE <new_column> IS NULL;
+   ALTER TABLE <table> ALTER COLUMN <new_column> SET NOT NULL;
+   COMMIT;
+   ```
+   `<safe_default>` depends on the column's semantics — zero for usage counters, `'pending'` for status enums, NULL-safe sentinel values for timestamps. Check the migration's comment header for the author's intent.
+3. Re-run the forward migration. It will no-op the `ALTER COLUMN ... NOT NULL` step and succeed.
+4. Record the incident — a follow-up migration should codify the backfill so future fresh-DB runs produce the same data shape.
+
+**Prevention going forward.** New `ALTER TABLE ... ADD COLUMN` migrations targeting populated tables MUST specify `NOT NULL DEFAULT <value>` or include an explicit backfill step in the same migration file. Reviewers should catch this during PR review; the CLAUDE.md write-safety-audit section covers the pattern. If in doubt, the safer path is a two-migration sequence: first add the column nullable with a backfill data-migration, then a follow-up migration flips it to NOT NULL once the backfill is verified in production.
+
 ---
 
 ## Rotate a secret
