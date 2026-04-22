@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { checkBudgetResetBacklog } from "@/app/api/health/route";
+import { checkBudgetResetBacklog } from "@/lib/health-checks";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 import { seedSite } from "./_helpers";
