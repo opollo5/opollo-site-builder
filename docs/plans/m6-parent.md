@@ -65,7 +65,7 @@ Narrow surface; documented so the per-slice "Risks identified and mitigated" sec
 
 - Read-only. No external calls, no writes, no billing. Service-role client after admin gate, matching every other admin surface.
 - The Tier-2 preview iframe sandboxes the rendered HTML: `sandbox="allow-same-origin"` (needed to apply our CSS), no `allow-scripts`. Operator doesn't need to execute scripts to preview; preventing `allow-scripts` is defence-in-depth against XSS inside an operator-controlled content brief.
-- `generated_html` may be arbitrarily large (40+ pages × ~30-100KB HTML). The detail page reads it directly; pagination would be premature. Cap rendering at 500KB inline + show a "Download full HTML" link beyond that (no operator ask to trigger this today; guard still applied).
+- `generated_html` may be arbitrarily large (40+ pages × ~30-100KB HTML). The detail page reads it directly; pagination would be premature. Cap rendering at 500KB inline (`HTML_SIZE_MAX_BYTES` in `lib/html-size.ts`); oversized payloads render a size warning + pointer to the WP admin rather than a raw-HTML download link (shipped in `components/PageHtmlPreview.tsx`). M11-4 hoisted the constant into a shared module and added the symmetric write-time quality gate.
 
 ### UX-debt cleanup (M6-4)
 
@@ -109,7 +109,7 @@ Per-slice plans elaborate these; listed here at the parent-milestone level so th
 
 4. **WP drift on slug edit.** → UI surfaces a warning on the slug field ("Renaming the slug here does not move the page on WordPress until the next publish"). Content-wise the DB edit is safe — title / meta_description are display-only. Re-publishing is a deferred M7 action. Documented in the risks audit rather than silently hidden.
 
-5. **`generated_html` size surprise.** → Detail page caps inline rendering at 500KB; larger payloads show a "Download raw HTML" link. Prevents the admin page from DOM-blocking on a pathological record.
+5. **`generated_html` size surprise.** → `components/PageHtmlPreview.tsx` caps inline rendering at 500KB via `HTML_SIZE_MAX_BYTES`; oversized payloads render a size warning + a pointer to the WordPress admin. Prevents the admin page from DOM-blocking on a pathological record. M11-4 hoisted the constant into `lib/html-size.ts` and added the symmetric write-time quality gate so oversized generations fail at commit rather than silently persisting.
 
 6. **Sandboxed preview iframe escaping.** → `sandbox="allow-same-origin"` only. No `allow-scripts`; no `allow-top-navigation`. If an operator-supplied content brief ever embedded a `<script>` in `generated_html`, it would not execute in the preview. Defence-in-depth against an accidental injection surface.
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import {
   createDesignSystem,
   listDesignSystems,
@@ -35,6 +36,9 @@ const CreateBodySchema = z.object({
 });
 
 export async function POST(req: Request, ctx: RouteContext) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;
 

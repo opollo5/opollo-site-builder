@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   ALL_GATES,
   gateHtmlBasics,
+  gateHtmlSize,
   gateMetaDescription,
   gateScopePrefix,
   gateSlugKebab,
   gateWrapper,
+  HTML_SIZE_MAX_BYTES,
   runGates,
   type GateContext,
 } from "@/lib/quality-gates";
@@ -278,17 +280,18 @@ describe("runGates", () => {
   });
 
   it("short-circuits on first failure and names the gate", () => {
-    // Wrapper missing → fails at the FIRST gate, later gates never run.
+    // Wrapper missing → html_size passes (tiny body), then wrapper
+    // fails; later gates never run.
     const r = runGates(ctx({ html: "<section><h1>x</h1></section>" }));
     expect(r.kind).toBe("failed");
     if (r.kind !== "failed") return;
     expect(r.first_failure.gate).toBe("wrapper");
-    expect(r.gates_run).toEqual(["wrapper"]);
+    expect(r.gates_run).toEqual(["html_size", "wrapper"]);
   });
 
   it("runs multiple gates in order when earlier ones pass", () => {
-    // Valid wrapper, valid scope prefix, but zero h1 → fails at
-    // html_basics (third gate).
+    // Valid size, valid wrapper, valid scope prefix, but zero h1 →
+    // fails at html_basics (fourth gate).
     const r = runGates(
       ctx({
         html:
@@ -298,6 +301,53 @@ describe("runGates", () => {
     expect(r.kind).toBe("failed");
     if (r.kind !== "failed") return;
     expect(r.first_failure.gate).toBe("html_basics");
-    expect(r.gates_run).toEqual(["wrapper", "scope_prefix", "html_basics"]);
+    expect(r.gates_run).toEqual([
+      "html_size",
+      "wrapper",
+      "scope_prefix",
+      "html_basics",
+    ]);
+  });
+
+  it("short-circuits at html_size before the regex-heavy gates touch an oversized payload", () => {
+    // Payload well over the 500KB cap. Even though the wrapper is
+    // missing and every other gate would fail, the runner must stop
+    // at html_size so we don't waste CPU scanning a 1MB string.
+    const oversize = "<section>" + "a".repeat(HTML_SIZE_MAX_BYTES + 1) + "</section>";
+    const r = runGates(ctx({ html: oversize }));
+    expect(r.kind).toBe("failed");
+    if (r.kind !== "failed") return;
+    expect(r.first_failure.gate).toBe("html_size");
+    expect(r.gates_run).toEqual(["html_size"]);
+    expect(r.first_failure.details?.code).toBe("HTML_TOO_LARGE");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// gateHtmlSize (M11-4)
+// ---------------------------------------------------------------------------
+
+describe("gateHtmlSize", () => {
+  it("passes for a comfortably-sized HTML payload", () => {
+    const r = gateHtmlSize(ctx({ html: validHtml() }));
+    expect(r.kind).toBe("pass");
+  });
+
+  it("passes at exactly the cap (boundary)", () => {
+    const atCap = "a".repeat(HTML_SIZE_MAX_BYTES);
+    const r = gateHtmlSize(ctx({ html: atCap }));
+    expect(r.kind).toBe("pass");
+  });
+
+  it("fails one byte over the cap with HTML_TOO_LARGE details", () => {
+    const overCap = "a".repeat(HTML_SIZE_MAX_BYTES + 1);
+    const r = gateHtmlSize(ctx({ html: overCap }));
+    expect(r.kind).toBe("fail");
+    if (r.kind !== "fail") return;
+    expect(r.gate).toBe("html_size");
+    expect(r.details?.code).toBe("HTML_TOO_LARGE");
+    expect(r.details?.actual_bytes).toBe(HTML_SIZE_MAX_BYTES + 1);
+    expect(r.details?.cap_bytes).toBe(HTML_SIZE_MAX_BYTES);
+    expect(r.reason).toMatch(/over/i);
   });
 });

@@ -1,3 +1,8 @@
+import {
+  HTML_SIZE_MAX_BYTES,
+  checkHtmlSize,
+} from "@/lib/html-size";
+
 // ---------------------------------------------------------------------------
 // M3-5 — Runtime quality gates.
 //
@@ -23,6 +28,17 @@
 //                             hyphens, no leading/trailing hyphen.
 //   meta_description   meta[name=description] content length is
 //                             50–160 chars.
+//
+// Added in M11-4:
+//
+//   html_size          Runs first so pathological mis-generations
+//                             short-circuit before the regex-heavy
+//                             gates scan a 1MB string. 500KB cap
+//                             matches the render-side cap in
+//                             components/PageHtmlPreview.tsx (both
+//                             import HTML_SIZE_MAX_BYTES from
+//                             lib/html-size so the numbers can never
+//                             drift).
 //
 // Gates deferred to a follow-up slice (M3-5b), with reasons:
 //
@@ -54,6 +70,7 @@ export type GateFail = {
 export type GateResult = GatePass | GateFail | GateSkip;
 
 export type GateName =
+  | "html_size"
   | "wrapper"
   | "scope_prefix"
   | "html_basics"
@@ -102,6 +119,26 @@ function countTagOccurrences(html: string, tag: string): number {
 // ---------------------------------------------------------------------------
 // Gate implementations
 // ---------------------------------------------------------------------------
+
+/**
+ * M11-4: reject generations whose HTML exceeds HTML_SIZE_MAX_BYTES
+ * (500KB). Runs first so oversized payloads short-circuit before the
+ * regex-heavy gates scan them.
+ */
+export const gateHtmlSize: GateFn = (ctx) => {
+  const res = checkHtmlSize(ctx.html);
+  if (res.ok) return { kind: "pass", gate: "html_size" };
+  return {
+    kind: "fail",
+    gate: "html_size",
+    reason: `Generated HTML is ${res.actual_bytes} bytes, over the ${res.cap_bytes}-byte cap.`,
+    details: {
+      code: "HTML_TOO_LARGE",
+      actual_bytes: res.actual_bytes,
+      cap_bytes: res.cap_bytes,
+    },
+  };
+};
 
 /** HC-2: outermost element has data-ds-version matching the site's active DS. */
 export const gateWrapper: GateFn = (ctx) => {
@@ -270,12 +307,17 @@ function validateMetaLen(content: string): GateResult {
 // ---------------------------------------------------------------------------
 
 export const ALL_GATES: Array<{ name: GateName; fn: GateFn }> = [
+  { name: "html_size", fn: gateHtmlSize },
   { name: "wrapper", fn: gateWrapper },
   { name: "scope_prefix", fn: gateScopePrefix },
   { name: "html_basics", fn: gateHtmlBasics },
   { name: "slug_kebab", fn: gateSlugKebab },
   { name: "meta_description", fn: gateMetaDescription },
 ];
+
+// Re-export HTML_SIZE_MAX_BYTES so callers who import only the gates
+// can read the cap constant without pulling a second module.
+export { HTML_SIZE_MAX_BYTES };
 
 export type RunGatesResult =
   | { kind: "passed"; gates_run: GateName[] }
