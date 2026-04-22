@@ -46,12 +46,112 @@ None new beyond existing `ANTHROPIC_API_KEY`, the Supabase trio (`NEXT_PUBLIC_SU
 
 ## Write-safety + design-quality contract
 
+### Sequential runner concurrency (M12-3)
+
+The runner is a `concurrency=1` worker keyed on `brief_id`. Only one pass on one page of one brief can be in flight at a time. The lease + heartbeat shape is reused verbatim from the M3 batch worker: a row in `brief_runs` with `worker_id`, `lease_until`, and `heartbeat_at` is claimed via `UPDATE ... WHERE status='queued' AND (lease_until IS NULL OR lease_until < now())` and refreshed every 30s. A DB unique partial index `ON brief_runs (brief_id) WHERE status='running'` enforces the "one active run per brief" invariant at the database level — two workers racing the same brief get a constraint violation on the second, not a corrupted shared state. Cross-brief parallelism is allowed: different briefs run on different workers concurrently.
+
+### Multi-pass per page (M12-3)
+
+Each page runs through up to three text passes — draft, self-critique, revise — and up to two visual passes. Each pass writes to `brief_pages.draft_html` under an idempotency key of `(brief_id, page_ordinal, pass_kind, pass_number)`. A retry of an interrupted pass reads the key, sees the row already exists, and short-circuits rather than re-billing Anthropic. Pass output is never the final authoritative state — the operator's approve action is what promotes `draft_html` to `generated_html`. Between passes we store the critique output separately (`brief_pages.critique_log` JSONB) so a re-run can use the same critique without re-calling Claude.
+
+### Visual review pass (M12-4)
+
+The Playwright renderer runs in a hermetic sandbox: no network egress beyond the site's DS CDN, no cookies, no service-role headers. Screenshots are written to an ephemeral worker tmpdir, base64-inlined into the Claude multi-modal call, and discarded as soon as the critique returns. **Screenshots are never persisted to Supabase Storage and never logged** — the critique text is what lands on `brief_pages.critique_log`. If an operator needs to re-see what Claude saw, the approve surface re-renders from the current `draft_html` on demand. This retention policy is enforced by the worker contract, not by a retention job — there's nothing to retain.
+
+### Whole-document context (M12-3)
+
+Each pass receives the full brief text as a `<brief_document>`-tagged input at the top of the user turn, followed by `<site_conventions>` (exact JSONB serialised), `<content_summary>` (the running compressed summary), and `<page_spec>` (the specific page's parsed section). Token budget per pass is capped at 60k input tokens; a brief exceeding that cap (a ~45k-word document) is rejected at upload time with `BRIEF_TOO_LARGE`. The whole-doc payload is cache-keyed via Anthropic prompt caching so passes 2..N on the same page reuse the brief + conventions segments without re-billing — critical to keeping multi-pass cost tractable.
+
+### Site-conventions capture (M12-2 + M12-3)
+
+`site_conventions` is written exactly once per brief — at the end of page 1's anchor cycle — and is read verbatim by pages 2..N. It is stored exact (structured JSONB, not prose) so pages 2..N receive hard constraints rather than a re-summarisation that could drift. The content summary, by contrast, is compressed on every append because it grows linearly with page count and would blow the token budget by page 20 if stored verbatim. The asymmetry is deliberate: conventions must not drift, content summary must not balloon.
+
+### First-page anchor (M12-2 + M12-3)
+
+Page 1 runs the standard multi-pass loop plus 2-3 additional revise cycles specifically to stabilise `site_conventions`. After the anchor cycles complete, the runner promotes the final conventions JSONB onto `site_briefs.site_conventions` (single-row update guarded by `version_lock`) and transitions page 1 to `awaiting_review`. Page 2 cannot start until the operator approves page 1 — the runner's page-ordinal state machine refuses to advance past page 1 while its status is not `approved`. This is the anchor gate: a bad voice or layout is caught at page 1 before N-1 downstream pages inherit it.
+
+### Resume after crash (M12-3)
+
+`brief_runs.current_ordinal` tracks the page index the runner is on; `brief_pages.current_pass_kind` and `current_pass_number` track the pass. On worker restart, the resume path reads the `brief_runs` row, sees `current_ordinal` + the corresponding `brief_pages` row's pass pointers, and hands control back to the runner at exactly that pass. The per-pass idempotency key ensures a pass that was mid-billing when the worker died is retried at-most-once without duplicating the write. Operator-visible state (`awaiting_review`, `approved`, `cancelled`) is never rolled back by a resume — resume only re-enters in-progress passes.
+
 ## Testing strategy
+
+| Slice | Patterns applied |
+| --- | --- |
+| M12-1 | `new-migration.md` for the three new tables + storage bucket policy. `new-api-route.md` for the upload route. `new-admin-page.md` for the parse-review surface. Parser unit tests cover the structural-first path (Markdown H1/H2, `---`, numbered headers) with table-driven fixtures; the Claude-inference fallback is tested with a recorded response fixture + one negative case. Operator-commit idempotency asserted by replaying the same upload twice and asserting a single `site_briefs` row. |
+| M12-2 | `new-migration.md` for the `brand_voice` / `design_direction` / `site_conventions` column adds. Anchor-promotion unit test seeds a mid-anchor run, invokes the promotion path twice (simulating a retry), and asserts the `site_conventions` JSONB + `version_lock` end-state is identical — write is idempotent. |
+| M12-3 | `background-worker-with-write-safety.md` for the runner lease + heartbeat shape. `concurrency-test-harness.md` for the two-workers-race-same-brief test asserting the partial-unique index on `brief_runs (brief_id) WHERE status='running'` rejects the second claim. `quality-gate-runner.md` for the gate-failure-blocks-approval test. Per-pass idempotency asserted by a resume-after-crash fixture: kill the worker mid-pass 2, restart, assert no duplicate Anthropic billing + the pass completes once. |
+| M12-4 | Playwright-worker unit test renders a fixture `draft_html` headlessly and asserts screenshot bytes + viewport dimensions. Claude critique call mocked via fetch intercept — real multi-modal response fixture replays deterministically. Cap-at-2-visual-iterations asserted by forcing every critique to return severity-high and verifying the runner stops after the second revise. Screenshot-retention test asserts the worker tmpdir is empty after the critique returns. |
+| M12-5 | `playwright-e2e-coverage.md`. New `e2e/briefs.spec.ts` drives the run surface: upload, commit parse, watch the runner transition page 1 through `generating` → `awaiting_review`, approve, repeat for page 2, cancel at page 3, assert generated pages stay in place, publish approved pages via the existing M7 surface. `auditA11y()` on each visited page. `VERSION_CONFLICT` surfaced when two tabs try to approve simultaneously — mirrors the M8-5 budget-editor spec. |
+| M12-6 | `playwright-e2e-coverage.md` extension — full-loop E2E covering the minimum happy path + cancel-mid-run + resume-after-crash. `ship-sub-slice.md` for the docs PR shape. Stretch PDF/.docx parser is covered under `feature-flagged-rollout.md` — flag defaults off, parser path exercised only when flag is on, text/markdown path is the always-on default. |
+
+**EXPLAIN ANALYZE requirement.** Two hot-path queries land in M12: (1) the `brief_pages` list query that powers the run surface — `SELECT ... FROM brief_pages WHERE brief_id = $1 ORDER BY ordinal` — needs an index on `(brief_id, ordinal)` and its plan attached to the M12-1 PR description. (2) The runner's claim query that reads the next pending page under the `brief_runs` lease — indexed by `(brief_id, status, ordinal)`, plan attached to the M12-3 PR. Pointed-read queries keyed by `brief_page_id` PK skip the requirement.
 
 ## Performance notes
 
+- **Wall-clock per run.** A representative 30-40 page site, each page running draft + self-critique + revise + up to two visual revise cycles, plus the 2-3 anchor cycles on page 1, plus operator-review pauses, lands at roughly 1.5-2 hours of wall-clock from commit to publish. The runner spends most of that time waiting on Anthropic responses; the operator spends most of the pause time reading a single page at a time. This is an intentional tradeoff — M3 ships a parallel batch in 10-15 minutes; M12 takes 10× longer to produce substantively better output.
+- **Per-page token cost.** Each page is 3-5× the Anthropic spend of a single-shot M3 slot: multi-pass (3 text passes × whole-doc context) + visual review (up to 2 multi-modal calls) + anchor extras on page 1. Prompt caching on the `<brief_document>` + `<site_conventions>` prefix keeps passes 2..N on the same page near-free on input tokens; output tokens still bill in full.
+- **Running-summary budget.** The content summary is capped at ~2k tokens. On every page approval the runner appends a 2-3 sentence summary of the just-approved page; every 10 pages a Claude compact pass rewrites the whole summary tighter. This keeps the context window flat as the site grows instead of expanding linearly — the compact pass costs one extra Claude call every 10 pages, which is a negligible tax against the savings on pages 11-40's input budget.
+- **Visual-review I/O.** Screenshots are PNG blobs in the 200-800KB range per page. They're base64-inlined into the Claude multi-modal call and discarded — no Storage write, no log line, no retention cost. The worker tmpdir is scoped per-page and unlinked on pass completion.
+- **Cross-milestone dep: M8 budget guard.** Because per-page cost is variable (anchor adds 2-3 cycles, visual review adds 0-2 cycles, worst-case page is ~7× a single-shot M3 slot), the M8 budget reserve path needs to be capacity-aware — reserving the worst-case ceiling per page up-front and releasing the unused delta at page completion. Today's `reserveBudget` reserves a fixed estimate; M12-3 extends it with a `reserveWithCeiling()` variant. This is flagged as a cross-milestone dependency on M8 — not a blocker for M12-1/M12-2 but a hard prerequisite for M12-3's merge.
+
 ## Risks identified and mitigated
+
+1. **Unbounded token growth past page 20.** → Running content summary is capped at ~2k tokens with a Claude compact pass every 10 pages. Input-token cost on page N is constant-bounded by `brief_size + site_conventions + 2k summary + page_spec`, not linear in N. Test: synthesise a 40-page brief fixture, assert pass-1 input-token count on page 40 is within 10% of page 10's.
+
+2. **Parser hallucinates pages not in the document.** → Structural-first parse returns only sections the parser found in the source text, tagged with their byte offsets. The Claude-inference fallback uses `<brief_document>`-tagged input prompting and returns a JSON list with per-entry source-quote citations; any entry without a matching span in the source fails validation and is dropped. Regardless of parser path, the operator must commit the list before the runner starts — a hallucinated page that slips through still requires an operator click to land.
+
+3. **Mid-run worker crash loses progress.** → `brief_runs.current_ordinal` + `brief_pages.current_pass_kind`/`current_pass_number` pointers identify the exact pass a restart should re-enter. Per-pass idempotency key `(brief_id, page_ordinal, pass_kind, pass_number)` prevents duplicate Anthropic billing on the retry. Test: kill the worker mid-pass 2 of a 3-page brief, restart, assert the run completes without a duplicate billing row.
+
+4. **Operator edits `brief_pages` body mid-run.** → Every `brief_pages` row carries `version_lock`; the runner reads+writes under optimistic concurrency. An operator edit to a future page is accepted but only applies when the runner reaches that page — edits to already-generating or already-generated pages return VERSION_CONFLICT and are surfaced to the operator as "page N is in flight; cancel the run to edit it". Already-approved pages are read-only.
+
+5. **Concurrent runs on the same brief.** → DB partial unique index `ON brief_runs (brief_id) WHERE status='running'` rejects a second claim at constraint-violation time. A second operator clicking "start run" while another run is active gets a clear error, not a corrupted shared state. Covered by the `concurrency-test-harness.md` two-workers-race-same-brief test.
+
+6. **Billed parse call duplicated on retry.** → Idempotency key on the Claude-inference fallback is `hash(brief_id + sha256(source_text))`. A retry replays the same key and short-circuits to the cached response. Structural parse is deterministic and not billed, so its retry is free.
+
+7. **PII in uploaded briefs.** → Supabase RLS scopes `site_briefs` + `brief_pages` + `brief_runs` to the owning site's tenant; no cross-tenant read is possible. Langfuse traces redact the brief body to a SHA256 digest + byte count before emitting; the actual text is never shipped off-platform. Operator-visible surfaces render from the primary DB, not from the trace store.
+
+8. **Visual review screenshot leaks sensitive content.** → Screenshots live in the worker tmpdir for the duration of a single Claude multi-modal call, are base64-inlined into that call, and are unlinked before the pass returns. No Storage write. No log line that includes screenshot bytes. No retention job. The critique text that persists on `brief_pages.critique_log` is plain language — it describes layout, not copy.
+
+9. **Quality degrades past page 20 as context compresses.** → Eval set lives under `lib/brief-runner/__evals__/` with a fixture 40-page brief + golden critique outputs at pages 1, 10, 20, 30, 40. CI runs the eval on every M12-3+ PR and fails if pass-2 self-critique on a late page misses a brief-required detail the early-page run caught. Pause-mode-only for launch gives a human review checkpoint per page regardless of what the eval catches.
+
+10. **Multi-pass cost blowup.** → Hard cap of 3 text passes + 2 visual passes per page enforced in the runner loop (not in the DB — the runner refuses to start pass 4). Per-page ceiling `reserveWithCeiling()` checks against the tenant's monthly cap before the first pass fires; if the worst-case ceiling would exceed the remaining budget, the run halts with `BUDGET_EXCEEDED` before spending a token.
+
+11. **DS-only generation produces incoherent layouts across pages.** → `site_conventions` is locked after page 1's anchor cycle and stored as exact JSONB, not prose. Pages 2..N receive it verbatim as hard constraints. The conventions schema includes typographic scale, section rhythm, hero pattern, and CTA phrasing — the four dimensions most responsible for the "this feels like one site" feel.
+
+12. **First-page anchor fails to produce usable conventions.** → Runner's page-ordinal state machine refuses to advance past page 1 while page 1 is not `approved`. If the anchor exhausts its cycle budget without converging (3 text + 2 visual passes), the runner halts with `ANCHOR_FAILED` and the operator decides whether to edit the brand voice / design direction and retry, or abandon the run. Page 2 never starts against a bad anchor.
 
 ## Relationship to existing patterns
 
+- **M12-1** follows `docs/patterns/new-api-route.md` for the upload route, `docs/patterns/new-migration.md` for the three new tables + storage-bucket policy, and `docs/patterns/new-admin-page.md` for the parse-review surface. The structural-first parser is a small new shape, but a single parser inside one slice isn't worth promoting to a pattern on its own.
+- **M12-2** follows `docs/patterns/new-migration.md` for the `brand_voice` / `design_direction` / `site_conventions` column adds and `docs/patterns/rls-policy-test-matrix.md` for the tenant-scoping tests on the new columns. The anchor-promotion idempotency check is one-off; no new pattern.
+- **M12-3** is a **new shape — promote to pattern if reused.** The multi-pass runner (draft → self-critique → revise with per-pass idempotency keys, whole-doc context with prompt caching, running-summary compaction, per-page quality gates) shares its lease/heartbeat mechanics with `docs/patterns/background-worker-with-write-safety.md` but the per-pass state-machine + context-management shape is genuinely new. If a future milestone (copy-editing agent, translation runner, anything else that needs multi-pass iterative Claude calls) asks for the same shape, promote `lib/brief-runner.ts` into `docs/patterns/multi-pass-runner.md`. Until then, the pattern lives as the single implementation.
+- **M12-4** is a **new shape — promote to pattern if reused.** Playwright render → screenshot → multi-modal Claude critique → revise is a loop we have not built before. It borrows the Playwright-worker shape from M7's quality-gate runner but the critique-feedback-into-revise pass is new. Flag for promotion to `docs/patterns/visual-critique-loop.md` on first reuse (e.g. a future design-review milestone that runs visual critique against already-published pages).
+- **M12-5** follows `docs/patterns/playwright-e2e-coverage.md` for `e2e/briefs.spec.ts` and `docs/patterns/new-admin-page.md` for the run surface. The operator state machine (pending → generating → awaiting_review → approved / cancelled) is admin-UI-sized and doesn't need its own pattern; VERSION_CONFLICT handling mirrors M8-5's existing shape.
+- **M12-6** follows `docs/patterns/playwright-e2e-coverage.md` for the full-loop E2E + `docs/patterns/feature-flagged-rollout.md` for the stretch PDF/.docx parser. The docs contribution — `docs/patterns/brief-driven-generation.md` — is itself the promotion artefact for the runner contract + anchor protocol + review state machine; it ships as part of M12-6, not as an afterthought.
+
+## Downstream dependencies (M13)
+
+M13 (blog post generation) extends this milestone's engine. The following are public surface for M13 — do not rename, relocate, or change signatures without coordinating via docs/WORK_IN_FLIGHT.md:
+
+- lib/brief-runner.ts (M13-3 adds a mode parameter; must not fork)
+- lib/brief-parser.ts (M13 reuses for post briefs)
+- site_conventions struct (M13 posts inherit verbatim)
+- Visual review pass (M13 applies to post templates)
+- Review checkpoint UI pattern
+- Running content_summary (M13 posts get cross-post continuity)
+
+See docs/plans/m13-parent.md and docs/CONTEXT.md.
+
 ## Sub-slice status tracker
+
+Maintained in `docs/BACKLOG.md` under a new **M12 — brief-driven generation** section. Updated on every merge:
+
+- `M12-1` — status (planned / in-flight / merged / blocked)
+- `M12-2` — status
+- `M12-3` — status
+- `M12-4` — status
+- `M12-5` — status
+- `M12-6` — status
+
+On M12-6 merge, auto-continue halts. User explicitly requested a checkpoint after the brief-driven generation milestone ships to decide on M13 scope (nav/menu generation, sitemap, multi-language briefs, brief versioning, auto-advance review — all currently in BACKLOG).
