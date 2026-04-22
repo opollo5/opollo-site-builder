@@ -2,11 +2,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { NewBatchButton } from "@/components/NewBatchButton";
 import { SiteActionsMenu } from "@/components/SiteActionsMenu";
+import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { getTenantBudget } from "@/lib/tenant-budgets";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
 
 // /admin/sites/[id] — M2d UX cleanup.
@@ -132,6 +135,12 @@ export default async function SiteDetailPage({
     .order("created_at", { ascending: false })
     .limit(20);
 
+  // M8-5 — tenant budget badge. Admin-only; operators view the
+  // site surface but only admins edit caps. The badge itself is
+  // visible to operators for budget self-diagnosis.
+  const tenantBudget = await getTenantBudget(site.id);
+  const isAdmin = access.user?.role === "admin" || access.user === null;
+
   return (
     <>
       <div className="flex items-start justify-between gap-4">
@@ -247,7 +256,26 @@ export default async function SiteDetailPage({
           </div>
         </section>
 
-        <aside>
+        <aside className="space-y-6">
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Budget</h2>
+              {isAdmin && tenantBudget && (
+                <EditTenantBudgetButton
+                  budget={{
+                    site_id: tenantBudget.site_id,
+                    daily_cap_cents: tenantBudget.daily_cap_cents,
+                    monthly_cap_cents: tenantBudget.monthly_cap_cents,
+                    version_lock: tenantBudget.version_lock,
+                  }}
+                />
+              )}
+            </div>
+            <div className="mt-2">
+              <TenantBudgetBadge budget={tenantBudget} />
+            </div>
+          </div>
+
           <h2 className="text-sm font-semibold">Design system</h2>
           <div className="mt-2 rounded-md border p-3 text-xs">
             {ds ? (
