@@ -96,7 +96,7 @@ describe("M12-1: RLS matrix for briefs + brief_pages + brief_runs + site_convent
       // Intentionally skip noRole so auth_role() returns NULL for them.
     ]);
 
-    const site = await seedSite({ prefix: `m12r${randHex().slice(0, 2)}` });
+    const site = await seedSite({ prefix: `r${randHex().slice(0, 3)}` });
     siteId = site.id;
 
     const brief = await svc
