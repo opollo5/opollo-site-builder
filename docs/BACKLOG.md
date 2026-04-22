@@ -14,8 +14,8 @@ Parent plan: `docs/plans/m8-parent.md`. Sub-slice status tracker:
 | --- | --- | --- |
 | M8-1 | merged (#79) | `tenant_cost_budgets` schema + auto-create trigger + backfill of existing sites. UNIQUE on site_id. |
 | M8-2 | merged (#80) | Enforcement in `createBatchJob` + `enqueueRegenJob`. `SELECT … FOR UPDATE` + atomic usage increment via `lib/tenant-budgets.ts`. BUDGET_EXCEEDED on overdraw. |
-| M8-3 | in flight | iStock seed (M4-5) integration — `ISTOCK_SEED_CAP_CENTS` env ceiling; effective cap = min(caller, env); `capSource` threaded through result + error. Note: per-tenant doesn't apply (ingest is global, tenant-agnostic); env-var cap replaces it. |
-| M8-4 | planned | `/api/cron/budget-reset` hourly reset cron. Daily + monthly rollover. |
+| M8-3 | merged (#81) | iStock seed (M4-5) integration — `ISTOCK_SEED_CAP_CENTS` env ceiling; effective cap = min(caller, env); `capSource` threaded through result + error. |
+| M8-4 | in flight | `/api/cron/budget-reset` hourly reset cron. Daily + monthly rollover via single UPDATE per period with `WHERE reset_at < now()` predicate. Idempotent under concurrent ticks. |
 | M8-5 | planned | Admin UI budget badge on `/admin/sites/[id]` + PATCH endpoint with version_lock. |
 
 New env vars (both optional, code-side defaults apply): `DEFAULT_TENANT_DAILY_BUDGET_CENTS` (default 500 = $5/day), `DEFAULT_TENANT_MONTHLY_BUDGET_CENTS` (default 10000 = $100/month).
