@@ -365,3 +365,64 @@ describe("reapExpiredRegenLeases", () => {
     expect(reaped.reapedCount).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// DS_ARCHIVED terminal failure (M11-2 — closes audit gap #7).
+//
+// The branch exists in lib/regeneration-worker.ts: if
+// `buildSystemPromptForSite` throws (design system for the page's
+// recorded version is gone), the job is recorded terminal-failed with
+// failure_code = 'DS_ARCHIVED' and the Anthropic call is never made.
+// Pre-M11-2 the branch was implemented but had zero test coverage.
+//
+// Production's `buildSystemPromptForSite` falls back to legacy blocks
+// rather than throwing under normal DB state, so the test uses the
+// M11-2 `buildSystemPrompt` DI param to inject a stub that throws.
+// ---------------------------------------------------------------------------
+
+describe("processRegenJobAnthropic — DS_ARCHIVED", () => {
+  it("records terminal failure with failure_code='DS_ARCHIVED' when the prompt builder throws", async () => {
+    const { id: siteId } = await seedSite({
+      prefix: "m11a",
+      name: "Regen DS-Archived",
+    });
+    // No active DS is seeded; the default buildSystemPromptForSite
+    // would have fallen back to legacy, so we inject a stub that
+    // throws to mirror "DS version has been archived since enqueue."
+    const pageId = await seedPage(siteId);
+    const jobId = await seedRegenJob(siteId, pageId);
+    await leaseNextRegenJob("worker-test");
+
+    const anthropicStub: ReturnType<typeof vi.fn> = vi.fn(async () =>
+      buildStubResponse(),
+    );
+    const promptStub = vi.fn(async () => {
+      throw new Error(
+        "Design system v1 has been archived; no active prompt block available.",
+      );
+    });
+
+    const result = await processRegenJobAnthropic(jobId, {
+      anthropicCall: anthropicStub as unknown as (
+        req: AnthropicRequest,
+      ) => Promise<AnthropicResponse>,
+      buildSystemPrompt: promptStub,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.code).toBe("DS_ARCHIVED");
+    expect(anthropicStub).not.toHaveBeenCalled();
+
+    const svc = getServiceRoleClient();
+    const { data: job } = await svc
+      .from("regeneration_jobs")
+      .select("status, failure_code, failure_detail, finished_at")
+      .eq("id", jobId)
+      .maybeSingle();
+    expect(job?.status).toBe("failed");
+    expect(job?.failure_code).toBe("DS_ARCHIVED");
+    expect(job?.failure_detail).toMatch(/archived/i);
+    expect(job?.finished_at).not.toBeNull();
+  });
+});
