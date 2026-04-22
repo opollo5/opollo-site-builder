@@ -19,6 +19,10 @@ import { seedSite } from "./_helpers";
 // the idempotency / version-conflict permutations.
 // ---------------------------------------------------------------------------
 
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 vi.mock("@/lib/anthropic-call", async () => {
   const actual = await vi.importActual<typeof import("@/lib/anthropic-call")>(
     "@/lib/anthropic-call",

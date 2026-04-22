@@ -18,6 +18,12 @@ import { seedSite } from "./_helpers";
 // markdown — but a stub is wired as a safety net).
 // ---------------------------------------------------------------------------
 
+// revalidatePath() only works inside a Next request context. Stub it
+// so the route handler doesn't throw when invoked from a Vitest test.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 vi.mock("@/lib/anthropic-call", async () => {
   const actual = await vi.importActual<typeof import("@/lib/anthropic-call")>(
     "@/lib/anthropic-call",
