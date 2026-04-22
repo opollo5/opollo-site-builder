@@ -48,7 +48,7 @@ Both new vars have code-side defaults so the migration runs cleanly without prov
 | --- | --- | --- | --- |
 | **M8-1** | Schema: `tenant_cost_budgets` table with `daily_cap_cents`, `monthly_cap_cents`, `daily_usage_cents`, `monthly_usage_cents`, `daily_reset_at`, `monthly_reset_at`, `version_lock`, audit columns. UNIQUE on site_id. RLS. Backfill trigger for new sites. Migration backfills existing sites. | High — UNIQUE on site_id prevents dup rows; version_lock for operator edits. | Nothing |
 | **M8-2** | Enforcement in `createBatchJob` + `enqueueRegenJob`. Sum projected cost + current usage; reject with `BUDGET_EXCEEDED`. Increment usage atomically on successful enqueue (UPDATE with the computed delta). | Critical — cap is the safety layer; race between check + increment must not allow overdraw. | M8-1 |
-| **M8-3** | iStock seed script integration. `lib/istock-seed.ts` pre-flight cost estimate + per-tenant cap check. On dry-run, show projected usage; on real run, refuse if over cap. | Medium — seed is idempotent; over-cap check short-circuits before any API call. | M8-2 |
+| **M8-3** | iStock seed script integration. `lib/istock-seed.ts` adds a process-level env ceiling (`ISTOCK_SEED_CAP_CENTS`); effective cap = `min(caller, env)`. Correction vs the original plan: the seed does NOT call `reserveBudget` against a specific site — the seed ingest is cross-tenant, so a process-level env cap is the right shape. A future slice can layer a per-tenant overlay if one customer needs a tighter seed budget. | Medium — seed is idempotent; over-cap check short-circuits before any API call. | M8-2 |
 | **M8-4** | Usage reset cron `/api/cron/budget-reset`. Runs hourly; zeros out rows whose `daily_reset_at` / `monthly_reset_at` is past. Sets the next reset to today-midnight+1day / next-month-1st. | Medium — race condition if two resets run simultaneously; advisory lock handles it. | M8-1 |
 | **M8-5** | Admin UI: budget badge on `/admin/sites/[id]` + PATCH endpoint to edit caps. Optimistic-locked on `version_lock`. Zod-validated. | Low — admin-only; caps can't go negative. | M8-1..M8-4 |
 
@@ -87,7 +87,7 @@ Standard version_lock pattern. Concurrent edits surface 409 `VERSION_CONFLICT` s
 
 1. **Race between budget check + increment.** → M8-2 uses `SELECT FOR UPDATE` inside a transaction. Unit test spawns two concurrent enqueue attempts against the same tenant with half-cap-each projected cost; asserts exactly one succeeds.
 
-2. **Reset cron doesn't fire.** → Monitoring via `/api/health` — we add a check that flags "N tenants have reset_at more than 25 hours in the past" as degraded. If the cron is stuck, usage eventually saturates and every enqueue fails with BUDGET_EXCEEDED — loud operator visibility, no silent overdraw.
+2. **Reset cron doesn't fire.** → Monitoring via `/api/health` — shipped in M11-3. The probe flags rows whose `daily_reset_at` or `monthly_reset_at` is more than 25h in the past, returns 503 with a `budget_reset_backlog_count` + up-to-5 `site_id` sample. If the cron is stuck, on-call pages before usage saturates — loud operator visibility, no silent overdraw.
 
 3. **Existing batch jobs mid-flight when M8-2 ships.** → Per-slot cost is already tracked on `generation_job_pages.cost_usd_cents`. M8-2's enforcement is at enqueue time only; in-flight jobs complete normally. The first tick after M8-2 sees accurate per-tenant usage from the accumulated per-slot costs.
 
