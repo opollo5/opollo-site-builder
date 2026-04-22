@@ -199,6 +199,28 @@ export function estimateIngestCost(imageCount: number): CostEstimate {
 }
 
 // ---------------------------------------------------------------------------
+// Env-var ceiling (M8-3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Global cap on one-shot iStock ingests. `ISTOCK_SEED_CAP_CENTS` at
+ * call time; defaults to 10000c ($100) — generously above the 9k-image
+ * catalogue's $63 cost but tight enough to catch a runaway rerun that
+ * multiplies requested_count by 10×.
+ *
+ * Unlike the tenant budgets (M8-1/M8-2) this is process-level, not
+ * per-tenant. The iStock seed ingests into the shared image_library
+ * and isn't scoped to any one site.
+ */
+export function readIstockSeedCapCents(): number {
+  const raw = process.env.ISTOCK_SEED_CAP_CENTS;
+  if (!raw) return 10000;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return 10000;
+  return Math.floor(parsed);
+}
+
+// ---------------------------------------------------------------------------
 // Seed
 // ---------------------------------------------------------------------------
 
@@ -217,6 +239,9 @@ export type SeedResult = {
   imagesAdopted: number;
   estimate: CostEstimate;
   budgetCapCents: number;
+  envCapCents: number;
+  effectiveCapCents: number;
+  capSource: "caller" | "env" | "default";
   dryRun: boolean;
   skippedOverBudget: boolean;
 };
@@ -224,13 +249,19 @@ export type SeedResult = {
 export class IngestBudgetError extends Error {
   public readonly estimate: CostEstimate;
   public readonly budgetCapCents: number;
-  constructor(estimate: CostEstimate, budgetCapCents: number) {
+  public readonly capSource: "caller" | "env" | "default";
+  constructor(
+    estimate: CostEstimate,
+    budgetCapCents: number,
+    capSource: "caller" | "env" | "default",
+  ) {
     super(
-      `Estimated cost ${estimate.totalCents} cents exceeds budget cap ${budgetCapCents} cents (${estimate.imageCount} images).`,
+      `Estimated cost ${estimate.totalCents} cents exceeds the ${capSource} budget cap of ${budgetCapCents} cents (${estimate.imageCount} images). Raise the cap via the --budget flag or ISTOCK_SEED_CAP_CENTS env var, or narrow the CSV.`,
     );
     this.name = "IngestBudgetError";
     this.estimate = estimate;
     this.budgetCapCents = budgetCapCents;
+    this.capSource = capSource;
   }
 }
 
@@ -247,15 +278,29 @@ export async function seedIstockLibrary(
   options: SeedOptions,
 ): Promise<SeedResult> {
   const estimate = estimateIngestCost(options.rows.length);
-  const budgetCap =
-    options.budgetCapCents ??
-    Math.max(
-      estimate.totalCents * DEFAULT_BUDGET_CAP_MULTIPLIER,
-      DEFAULT_BUDGET_FLOOR_CENTS,
-    );
+  const envCap = readIstockSeedCapCents();
+  const callerCap = options.budgetCapCents;
+  const defaultCap = Math.max(
+    estimate.totalCents * DEFAULT_BUDGET_CAP_MULTIPLIER,
+    DEFAULT_BUDGET_FLOOR_CENTS,
+  );
+
+  // M8-3: env-var cap is the outer ceiling. Caller's explicit cap
+  // (from --budget flag) applies on top of the env cap but can't
+  // exceed it. When the caller passes nothing, the default cap is
+  // the smaller of 2× estimate or the env cap.
+  let budgetCap: number;
+  let capSource: "caller" | "env" | "default";
+  if (callerCap !== undefined) {
+    budgetCap = Math.min(callerCap, envCap);
+    capSource = callerCap < envCap ? "caller" : "env";
+  } else {
+    budgetCap = Math.min(defaultCap, envCap);
+    capSource = defaultCap < envCap ? "default" : "env";
+  }
 
   if (estimate.totalCents > budgetCap) {
-    throw new IngestBudgetError(estimate, budgetCap);
+    throw new IngestBudgetError(estimate, budgetCap, capSource);
   }
 
   if (options.dryRun) {
@@ -266,6 +311,9 @@ export async function seedIstockLibrary(
       imagesAdopted: 0,
       estimate,
       budgetCapCents: budgetCap,
+      envCapCents: envCap,
+      effectiveCapCents: budgetCap,
+      capSource,
       dryRun: true,
       skippedOverBudget: false,
     };
@@ -404,6 +452,9 @@ export async function seedIstockLibrary(
     imagesAdopted: existingByIstockId.size,
     estimate,
     budgetCapCents: budgetCap,
+    envCapCents: envCap,
+    effectiveCapCents: budgetCap,
+    capSource,
     dryRun: false,
     skippedOverBudget: false,
   };
