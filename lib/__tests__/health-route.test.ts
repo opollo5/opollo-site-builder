@@ -86,8 +86,10 @@ describe("GET /api/health", () => {
 
     const siteIds: string[] = [];
     for (let i = 0; i < 7; i++) {
+      // sites.prefix caps at 4 chars (CHECK constraint), so keep the
+      // test-generated prefix short.
       const { id } = await seedSite({
-        prefix: `m11s${i}`,
+        prefix: `s${i}k`,
         name: `Stuck ${i}`,
       });
       siteIds.push(id);
