@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { activateDesignSystem } from "@/lib/design-systems";
 import {
   parseBodyWith,
@@ -17,6 +18,9 @@ const BodySchema = z.object({
 // archives any currently-active DS for the same site, atomically, via the
 // activate_design_system RPC from 0003_m1b_rpcs.sql.
 export async function POST(req: Request, ctx: { params: { id: string } }) {
+  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  if (gate.kind === "deny") return gate.response;
+
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;
 

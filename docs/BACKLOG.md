@@ -6,6 +6,23 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## M11 — audit close-out (shipped)
+
+Parent plan: `docs/plans/m11-parent.md`. Six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`.
+
+| Slice | Status | Notes |
+| --- | --- | --- |
+| M11-1 | merged (#87) | Chat route routed through `lib/logger` + new `traceAnthropicStream()` Langfuse wrapper. `e2e/chat.spec.ts` covers the streaming UI contract. Corrected the BACKLOG "wraps every call" overstatement. |
+| M11-2 | merged | DS_ARCHIVED + WP_CREDS_MISSING regeneration branches now test-covered. Added a `buildSystemPrompt` DI param to `processRegenJobAnthropic` so the archived-DS branch is reachable in tests without file-system trickery. |
+| M11-3 | merged | `/api/health` extended with a `checkBudgetResetBacklog()` probe. Flags rows whose `daily_reset_at` or `monthly_reset_at` is > 25h past; degrades the response to 503 with the backlog count + up-to-5-site sample. |
+| M11-4 | merged (#90) | 500KB HTML cap enforced as a quality gate (`gateHtmlSize`) in addition to the render-side cap. Shared constant `HTML_SIZE_MAX_BYTES` in `lib/html-size.ts`. |
+| M11-5 | merged | `e2e/budgets.spec.ts` covers the admin badge + edit-caps modal + VERSION_CONFLICT on stale-version PATCH. Retargets the chat.spec.ts post-stream assertion from Send button (stays disabled after input clear) to the textarea. |
+| M11-6 | merged | Retroactive parent plans for M1, M2, M3, M9, M10 added under `docs/plans/`. M6 + M8 parent plan overstatements corrected inline. |
+
+No new env vars.
+
+---
+
 ## M10 — observability activation (shipped)
 
 Single-PR activation of the four observability vendors whose env vars were provisioned in Vercel on 2026-04-22: Sentry, Axiom, Langfuse, Upstash Redis. Graceful no-op per vendor when its envs are missing — so preview deployments without the full secret set still function.
