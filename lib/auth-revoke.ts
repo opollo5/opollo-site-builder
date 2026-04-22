@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Client } from "pg";
 import { getServiceRoleClient } from "@/lib/supabase";
 

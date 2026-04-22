@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Client, type QueryResult } from "pg";
 
 import {

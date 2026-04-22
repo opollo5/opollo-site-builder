@@ -43,6 +43,15 @@ vi.mock("@/lib/auth", async () => {
   };
 });
 
+// next/headers throws "called outside a request scope" in unit tests.
+// The server action reads headers() only to extract the caller IP for
+// the rate limiter; stubbing to an empty Headers makes the limiter
+// see "ip:unknown" (shared-bucket fail-open path — already pinned by
+// rate-limit.test.ts).
+vi.mock("next/headers", () => ({
+  headers: () => new Headers(),
+}));
+
 const { loginAction } = await import("@/app/login/actions");
 
 function anonClient(): SupabaseClient {

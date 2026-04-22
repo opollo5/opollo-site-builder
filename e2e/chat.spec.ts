@@ -86,8 +86,10 @@ test.describe("chat builder", () => {
     await expect(page.getByText("Make me a homepage")).toBeVisible();
     await expect(page.getByText("Hello there")).toBeVisible();
 
-    // Send button returns to enabled state once the stream closes.
-    await expect(page.getByRole("button", { name: /send/i })).toBeEnabled();
+    // Stream closed cleanly: textarea re-enables (the Send button
+    // stays disabled because sendDisabled also checks `!input.trim()`
+    // and HomePageClient clears input on submit).
+    await expect(textarea).toBeEnabled();
   });
 
   test("error path — upstream failure renders an inline error bubble", async ({
@@ -114,7 +116,8 @@ test.describe("chat builder", () => {
     await page.getByRole("button", { name: /send/i }).click();
 
     await expect(page.getByText(/Anthropic upstream failed/)).toBeVisible();
-    // Stream closes cleanly: input re-enables, no hung "…" indicator.
-    await expect(page.getByRole("button", { name: /send/i })).toBeEnabled();
+    // Stream closed cleanly: textarea is enabled again (disabled
+    // only gates on streaming + activeSiteId; no hung "…" indicator).
+    await expect(textarea).toBeEnabled();
   });
 });

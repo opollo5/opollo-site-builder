@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { EditSiteModal } from "@/components/EditSiteModal";
 
 // Three-dot action menu attached to each site row. Opens in-place
@@ -24,39 +25,7 @@ export function SiteActionsMenu({
 }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
-  const [archiving, setArchiving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleArchive(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (
-      !confirm(
-        `Archive "${name}"?\n\nThe site will be hidden from the list; its prefix is freed for reuse. Active generation batches are not cancelled automatically.`,
-      )
-    ) {
-      return;
-    }
-    setArchiving(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/sites/${encodeURIComponent(siteId)}`, {
-        method: "DELETE",
-      });
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || !payload?.ok) {
-        setError(
-          payload?.error?.message ?? `Archive failed (HTTP ${res.status}).`,
-        );
-        setArchiving(false);
-        return;
-      }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setArchiving(false);
-    }
-  }
+  const [archiveOpen, setArchiveOpen] = useState(false);
 
   return (
     <div className="relative inline-block">
@@ -85,12 +54,15 @@ export function SiteActionsMenu({
           </button>
           <button
             type="button"
-            disabled={archiving}
-            className="w-full px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
-            onClick={handleArchive}
+            className="w-full px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setArchiveOpen(true);
+            }}
             data-testid="site-archive-action"
           >
-            {archiving ? "Archiving…" : "Archive"}
+            Archive
           </button>
           <button
             type="button"
@@ -102,16 +74,27 @@ export function SiteActionsMenu({
           </button>
         </div>
       </details>
-      {error && (
-        <p role="alert" className="absolute right-0 mt-1 text-[11px] text-destructive">
-          {error}
-        </p>
-      )}
       <EditSiteModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
         site={{ id: siteId, name, wp_url: wpUrl }}
       />
+      {archiveOpen && (
+        <ConfirmActionModal
+          open
+          title={`Archive "${name}"?`}
+          description="The site will be hidden from the list; its prefix is freed for reuse. Active generation batches are not cancelled automatically."
+          confirmLabel="Archive"
+          confirmVariant="destructive"
+          endpoint={`/api/sites/${encodeURIComponent(siteId)}`}
+          request={{ method: "DELETE", searchParams: {} }}
+          onClose={() => setArchiveOpen(false)}
+          onSuccess={() => {
+            setArchiveOpen(false);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

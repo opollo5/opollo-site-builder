@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
@@ -16,7 +17,7 @@ import { Button } from "@/components/ui/button";
 //      cancelled) don't refresh — nothing changes.
 //
 //   2. Cancel button. Visible for queued/running/partial batches.
-//      Posts to /cancel, refreshes. Disabled while posting.
+//      Opens a ConfirmActionModal that posts to /cancel + refreshes.
 // ---------------------------------------------------------------------------
 
 const POLL_MS = 3_000;
@@ -34,8 +35,7 @@ export function BatchDetailClient({
   status: string;
 }) {
   const router = useRouter();
-  const [cancelling, setCancelling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   useEffect(() => {
     if (TERMINAL_STATUSES.has(status)) return;
@@ -44,33 +44,6 @@ export function BatchDetailClient({
     }, POLL_MS);
     return () => clearInterval(t);
   }, [router, status]);
-
-  async function handleCancel() {
-    if (!confirm("Cancel this batch? In-flight slots will finish; pending slots will be marked skipped.")) {
-      return;
-    }
-    setCancelling(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/admin/batch/${encodeURIComponent(jobId)}/cancel`,
-        { method: "POST" },
-      );
-      const payload = await res.json().catch(() => null);
-      if (!res.ok || !payload?.ok) {
-        setError(
-          payload?.error?.message ??
-            `Cancel failed (HTTP ${res.status}).`,
-        );
-        setCancelling(false);
-        return;
-      }
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setCancelling(false);
-    }
-  }
 
   const cancellable =
     status === "queued" || status === "running" || status === "partial";
@@ -81,16 +54,26 @@ export function BatchDetailClient({
     <div className="flex flex-col items-end gap-1">
       <Button
         variant="outline"
-        onClick={handleCancel}
-        disabled={cancelling}
+        onClick={() => setCancelOpen(true)}
         className="text-destructive hover:bg-destructive/10"
       >
-        {cancelling ? "Cancelling…" : "Cancel batch"}
+        Cancel batch
       </Button>
-      {error && (
-        <p role="alert" className="text-xs text-destructive">
-          {error}
-        </p>
+      {cancelOpen && (
+        <ConfirmActionModal
+          open
+          title="Cancel this batch?"
+          description="In-flight slots will finish; pending slots will be marked skipped."
+          confirmLabel="Cancel batch"
+          confirmVariant="destructive"
+          endpoint={`/api/admin/batch/${encodeURIComponent(jobId)}/cancel`}
+          request={{ method: "POST", body: {} }}
+          onClose={() => setCancelOpen(false)}
+          onSuccess={() => {
+            setCancelOpen(false);
+            router.refresh();
+          }}
+        />
       )}
     </div>
   );

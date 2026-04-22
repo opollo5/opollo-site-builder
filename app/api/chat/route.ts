@@ -1,5 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 
+import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceeded,
+} from "@/lib/rate-limit";
 import {
   createPageJsonSchema,
   deletePageJsonSchema,
@@ -110,6 +116,12 @@ function errorResponse(code: string, message: string, status: number) {
 }
 
 export async function POST(req: Request) {
+  const supabase = createRouteAuthClient();
+  const user = await getCurrentUser(supabase);
+  const rlId = user ? `user:${user.id}` : `ip:${getClientIp(req)}`;
+  const rl = await checkRateLimit("chat", rlId);
+  if (!rl.ok) return rateLimitExceeded(rl);
+
   let body: any;
   try {
     body = await req.json();
