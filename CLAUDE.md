@@ -78,6 +78,17 @@ The bootstrap prompt Steven pastes into a second tab lives in `docs/PARALLELISM_
 ## Enabling auto-merge on every PR
 Every PR must have GitHub auto-merge armed at creation time. Call `mcp__github__enable_pr_auto_merge` (with `mergeMethod: "SQUASH"`) immediately after `create_pull_request` — it is not enabled implicitly. Without that call, the PR sits in the mergeable state until someone clicks the button in the UI, breaking the self-driving loop.
 
+## PR auto-merge monitoring
+
+When monitoring a PR with auto-merge armed, handle the "out-of-date with base branch" state, not just merged/failed. Specifically:
+
+1. If a polled PR shows state OPEN with mergeable=BEHIND (or equivalent signal that the branch is behind main), run `gh pr update-branch <PR>` automatically.
+2. If update-branch fails due to merge conflict, stop and report — do not force it.
+3. If update-branch succeeds, continue polling; CI will re-run and auto-merge fires when green.
+4. Apply this to every PR being monitored, including ones stacked behind other PRs that just merged.
+
+This prevents the failure mode where PR A merges, PR B becomes behind main, and the monitor waits forever because auto-merge can't fire on a behind-main branch.
+
 ## Self-audit is the review; proceed without external gate
 Self-audit is the first AND the final layer for planning. Once a plan has a populated **"Risks identified and mitigated"** section (see below for what that must contain), proceed directly to implementation. Do NOT post plans to Steven or Claude.ai as a review gate — not for parent milestones, not for sub-slices.
 
