@@ -38,13 +38,22 @@ Running log of the autonomous overnight M12 build. Updated after every slice. Fi
 4. **Superseded the verbose `docs/CONTEXT.md`** with the tighter 75-line version. The verbose version duplicates the parent plan; the anchor's job is locked-decisions + resume-protocol, not a second copy of the plan.
 5. **Did not close PR #101 (my earlier server-only + env cleanup).** A sandbox content-integrity block stopped the close-comment. The PR is genuinely redundant on the server-only portion (PR #102 shipped those) but the `.env.local.example` cleanup still has standalone value. Leaving it open for Steven to adjudicate — neither closing it autonomously nor making it a blocker for the overnight build.
 
+6. **Audit doc kept tight.** `docs/plans/m12-audit.md` carries the capability table + audit-surfaced slice adjustments only. The slice breakdown itself lives in `docs/plans/m12-reconciliation.md` — keeping the audit focused on evidence avoids doubling the plan across two files.
+
 (Will be appended as decisions surface.)
 
 ---
 
 ## Capability audit outcome
 
-Will be populated after Phase 1 lands on this branch.
+`docs/plans/m12-audit.md` (Phase 1) shipped on this same branch. Summary:
+
+- **4 capabilities purely new** (#3 multi-pass infra, #4 Playwright worker, #16 file upload, #17 doc parser).
+- **6 capabilities extend** existing M1/M4/M6/M7/M8 code.
+- **8 capabilities pure reuse** (Langfuse, RLS, publish, prompt caching, idempotency keys, admin auth, feature flags, resume-after-crash).
+- No ambiguous "parallel infrastructure" cases. Decision rule (>60% exists → extend, <30% → new) fired cleanly on every row.
+
+Audit-surfaced adjustments to the slice plan: upload idempotency key on Slice B, no new table for Slice A (writes into existing `design_systems`), `reserveWithCeiling()` folds into Slice D, Playwright-on-Vercel runtime constraint flagged for Slice E, two patterns (`multi-pass-runner.md`, `visual-critique-loop.md`) scheduled for Slice G promotion.
 
 ---
 
