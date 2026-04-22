@@ -23,6 +23,9 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          # Config lives at repo root. See .release-please-config.json
-          # and .release-please-manifest.json.
+          # Config lives at repo root. See release-please-config.json
+          # and .release-please-manifest.json. The config filename has no
+          # leading dot — that's the default release-please-action@v4
+          # looks for; the manifest filename does. Asymmetric but baked
+          # into the action defaults.
           token: ${{ secrets.GITHUB_TOKEN }}
