@@ -165,6 +165,76 @@ export async function bumpTenantUsage(
 }
 
 // ---------------------------------------------------------------------------
+// Reset cron (M8-4)
+// ---------------------------------------------------------------------------
+
+export type BudgetResetResult = {
+  dailyReset: number;
+  monthlyReset: number;
+};
+
+function requireBudgetResetDbUrl(): string {
+  const url = process.env.SUPABASE_DB_URL;
+  if (!url) {
+    throw new Error(
+      "SUPABASE_DB_URL is not set. Required by resetExpiredBudgets for the cron UPDATEs.",
+    );
+  }
+  return url;
+}
+
+/**
+ * Zero daily/monthly usage for any row whose reset timestamp is past.
+ * Advances the reset timestamp by one day / one month so the next
+ * tick doesn't re-reset the same row.
+ *
+ * Two concurrent cron ticks hitting the same row serialise at the
+ * row-lock layer — the second UPDATE sees no rows matching
+ * `daily_reset_at < now()` because the first already advanced the
+ * timestamp. No explicit advisory lock needed.
+ *
+ * Returns the count of rows reset in each period. Caller (cron
+ * entrypoint) logs the result for observability.
+ */
+export async function resetExpiredBudgets(opts: {
+  client?: Client | null;
+} = {}): Promise<BudgetResetResult> {
+  const run = async (c: Client): Promise<BudgetResetResult> => {
+    const daily = await c.query(
+      `
+      UPDATE tenant_cost_budgets
+         SET daily_usage_cents = 0,
+             daily_reset_at = daily_reset_at + interval '1 day',
+             updated_at = now()
+       WHERE daily_reset_at < now()
+      `,
+    );
+    const monthly = await c.query(
+      `
+      UPDATE tenant_cost_budgets
+         SET monthly_usage_cents = 0,
+             monthly_reset_at = monthly_reset_at + interval '1 month',
+             updated_at = now()
+       WHERE monthly_reset_at < now()
+      `,
+    );
+    return {
+      dailyReset: daily.rowCount ?? 0,
+      monthlyReset: monthly.rowCount ?? 0,
+    };
+  };
+
+  if (opts.client) return run(opts.client);
+  const c = new Client({ connectionString: requireBudgetResetDbUrl() });
+  await c.connect();
+  try {
+    return await run(c);
+  } finally {
+    await c.end();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Projection helpers.
 // ---------------------------------------------------------------------------
 
