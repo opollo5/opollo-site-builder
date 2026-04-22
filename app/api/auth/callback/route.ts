@@ -1,5 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createRouteAuthClient } from "@/lib/auth";
+import {
+  checkRateLimit,
+  getClientIp,
+  rateLimitExceeded,
+} from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // /api/auth/callback
@@ -36,6 +41,9 @@ function safeNext(req: NextRequest, rawNext: string | null): string {
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
+  const rl = await checkRateLimit("auth_callback", `ip:${getClientIp(req)}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
+
   const code = req.nextUrl.searchParams.get("code");
   const next = safeNext(req, req.nextUrl.searchParams.get("next"));
 

@@ -1,8 +1,10 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createRouteAuthClient } from "@/lib/auth";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 // ---------------------------------------------------------------------------
 // Server Action backing the /login form.
@@ -39,6 +41,17 @@ export async function loginAction(
   _prev: LoginState,
   formData: FormData,
 ): Promise<LoginState> {
+  // Rate-limit by IP before any DB call — a brute-force attempt
+  // shouldn't cost us Supabase queries. Server actions don't receive
+  // a Request; read the IP from `headers()`.
+  const ip = getClientIp(headers());
+  const rl = await checkRateLimit("login", `ip:${ip}`);
+  if (!rl.ok) {
+    return {
+      error: `Too many sign-in attempts. Try again in ${rl.retryAfterSec} seconds.`,
+    };
+  }
+
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const next = safeNext(formData.get("next"));
