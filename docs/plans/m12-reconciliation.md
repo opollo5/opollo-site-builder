@@ -1,5 +1,11 @@
 # M12 — Reconciliation Report
 
+## STATUS: superseded
+
+This is an overnight session artifact describing a 7-slice A–G split that is NOT the canonical M12 plan. See `docs/plans/m12-parent.md` for the canonical 6-slice split (M12-1 through M12-6). The repo-state reconciliation below is accurate for its timestamp and useful as history; the Slices A–G proposal it recommends was not adopted. Preserved as history; do not execute against.
+
+---
+
 Phase 0 output of the overnight autonomous M12 build session. Reads the repo + open PRs + existing plan docs + stray branches and locks the actual starting state so Phase 1 (capability audit) and Phase 2 (slice execution) don't re-derive it.
 
 **Generated:** 2026-04-22 late evening (overnight session).
