@@ -24,6 +24,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@sentry/nextjs": "^10.49.0",
     "@supabase/supabase-js": "^2.103.3",
+    "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
