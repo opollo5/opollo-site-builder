@@ -249,13 +249,13 @@ describe("seedIstockLibrary — budget cap", () => {
   it("throws IngestBudgetError when estimate exceeds the cap", async () => {
     const { rows } = parseIstockCsv(VALID_CSV);
     // estimate = 3 cents; cap = 1 cent → should abort.
-    await expect(
-      seedIstockLibrary({
-        rows,
-        jobIdempotencyKey: "budget-abort",
-        budgetCapCents: 1,
-      }),
-    ).rejects.toBeInstanceOf(IngestBudgetError);
+    const err = await seedIstockLibrary({
+      rows,
+      jobIdempotencyKey: "budget-abort",
+      budgetCapCents: 1,
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(IngestBudgetError);
+    expect((err as IngestBudgetError).capSource).toBe("caller");
   });
 
   it("auto-cap is DEFAULT_BUDGET_CAP_MULTIPLIER × estimate, floor 2000 cents", async () => {
@@ -269,5 +269,39 @@ describe("seedIstockLibrary — budget cap", () => {
       2000,
     );
     expect(result.budgetCapCents).toBe(expectedCap);
+  });
+
+  it("M8-3: ISTOCK_SEED_CAP_CENTS env var caps above the caller's value", async () => {
+    const { rows } = parseIstockCsv(VALID_CSV);
+    process.env.ISTOCK_SEED_CAP_CENTS = "2";
+    try {
+      const err = await seedIstockLibrary({
+        rows,
+        jobIdempotencyKey: "env-cap",
+        budgetCapCents: 1000,
+      }).catch((e) => e);
+      expect(err).toBeInstanceOf(IngestBudgetError);
+      // Env cap (2c) is lower than caller (1000c) → env wins.
+      expect((err as IngestBudgetError).capSource).toBe("env");
+      expect((err as IngestBudgetError).budgetCapCents).toBe(2);
+    } finally {
+      delete process.env.ISTOCK_SEED_CAP_CENTS;
+    }
+  });
+
+  it("M8-3: default uses min(2× estimate, env cap)", async () => {
+    const { rows } = parseIstockCsv(VALID_CSV);
+    // Env cap generous so default wins.
+    process.env.ISTOCK_SEED_CAP_CENTS = "1000000";
+    try {
+      const result = await seedIstockLibrary({
+        rows,
+        jobIdempotencyKey: `default-${Date.now()}`,
+      });
+      expect(result.capSource).toBe("default");
+      expect(result.envCapCents).toBe(1000000);
+    } finally {
+      delete process.env.ISTOCK_SEED_CAP_CENTS;
+    }
   });
 });
