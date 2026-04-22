@@ -333,6 +333,21 @@ the comment, add a fixture test that asserts "1M Opus tokens at 15 USD" produces
 
 ---
 
+## Deferred dependency upgrades
+
+Major-version dependabot PRs closed because each carries a breaking-change surface that requires a deliberate migration slice, not a drive-by merge. Re-open (or let dependabot reopen on the next refresh) when the migration is scheduled.
+
+| PR | Dependency | Jump | Reason deferred |
+| --- | --- | --- | --- |
+| #47 | `eslint` | 8.57.1 → 10.2.1 | Flat config (`eslint.config.js`) is the only supported format in v9+; our `.eslintrc` + `eslint-config-next@14` preset don't load under it. Needs a config rewrite + every `eslint-plugin-*` checked for flat-config support. |
+| #48 | `typescript` | 5.9.3 → 6.0.3 | Major bump surfaces new strict-mode errors across the codebase (already seeing `baseUrl` deprecation warnings on 5.x). Needs a dedicated pass to fix new diagnostics and re-pin any TS-version-sensitive deps (`ts-node`, `@typescript-eslint/*`). |
+| #49 | `tailwindcss` | 3.4.19 → 4.2.3 | v4 is a full rewrite (Oxide engine, new `@import "tailwindcss"` entry, CSS-first config, PostCSS plugin split). Will change the generated CSS for every page we ship to WP, so this is write-safety-adjacent — needs its own slice with visual-diff checks. |
+| #50 | `eslint-config-next` | 14.2.35 → 16.2.4 | Pinned to the Next.js major. v16 requires Next.js 16 (we're on 14.x); do this as part of the Next.js framework upgrade, not ahead of it. |
+
+**Trigger to pick up:** a dedicated tooling-upgrade slice (likely alongside the Next.js 14 → 15/16 migration when we decide to ship it). Until then dependabot will keep re-opening; close with the same comment + link back to this entry.
+
+---
+
 ## Promotion / demotion log
 
 When an item moves out of here — either because it shipped or because the trigger fired and it became active work — strike through the entry but keep it in history:
