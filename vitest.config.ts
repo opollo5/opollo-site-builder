@@ -3,9 +3,17 @@ import path from "node:path";
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "."),
-    },
+    // Array form so `server-only` can match a regex pattern. Next.js's
+    // bundler resolves `server-only` via its `react-server` export
+    // condition; vitest doesn't match that condition and would otherwise
+    // hit the package's default throw-at-import module. Aliasing the
+    // bare specifier to the package's own `empty.js` gives us the
+    // same no-op vitest sees today while preserving the lint-time
+    // guard Next.js enforces in the real bundle.
+    alias: [
+      { find: "@", replacement: path.resolve(__dirname, ".") },
+      { find: /^server-only$/, replacement: "server-only/empty.js" },
+    ],
   },
   test: {
     globalSetup: ["./lib/__tests__/_globalSetup.ts"],
