@@ -6,20 +6,41 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## M11 — audit close-out (shipped)
+## M11 — audit close-out (partial; three sub-slices corrected post-merge)
 
-Parent plan: `docs/plans/m11-parent.md`. Six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`.
+Parent plan: `docs/plans/m11-parent.md`. Originally scoped as six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`. Audit 3 (`docs/plans/m11-parent.md` re-verified against code) found that the M11-6 doc slice landed "merged" rows for M11-2, M11-3, and M11-5 **without** the corresponding code PRs ever shipping. The table below reflects ground-truth as of Audit 3. The three missing slices are being closed in M11-7 (launch-blocker probe + font load) and M11-8 (test-coverage gaps).
 
 | Slice | Status | Notes |
 | --- | --- | --- |
-| M11-1 | merged (#87) | Chat route routed through `lib/logger` + new `traceAnthropicStream()` Langfuse wrapper. `e2e/chat.spec.ts` covers the streaming UI contract. Corrected the BACKLOG "wraps every call" overstatement. |
-| M11-2 | merged | DS_ARCHIVED + WP_CREDS_MISSING regeneration branches now test-covered. Added a `buildSystemPrompt` DI param to `processRegenJobAnthropic` so the archived-DS branch is reachable in tests without file-system trickery. |
-| M11-3 | merged | `/api/health` extended with a `checkBudgetResetBacklog()` probe. Flags rows whose `daily_reset_at` or `monthly_reset_at` is > 25h past; degrades the response to 503 with the backlog count + up-to-5-site sample. |
+| M11-1 | merged (#87) | Chat route routed through `lib/logger` + new `traceAnthropicStream()` Langfuse wrapper. `e2e/chat.spec.ts` covers the streaming UI contract. |
+| M11-2 | **not shipped** — tracked in M11-8 | Audit 3 found only an aspirational comment at `lib/__tests__/regeneration-worker.test.ts:38`; no `DS_ARCHIVED` or `WP_CREDS_MISSING` assertion anywhere in test files. Production branches exist at `lib/regeneration-worker.ts:377,382` and `app/api/cron/process-regenerations/route.ts:171`. |
+| M11-3 | superseded by M11-7 | Audit 3 found the probe absent from `app/api/health/route.ts`. M11-7 implements `checkBudgetResetBacklog()` inline in the health route + `lib/__tests__/health-budget-reset.test.ts` covering the stuck-row, fresh-row, and sample-cap invariants. |
 | M11-4 | merged (#90) | 500KB HTML cap enforced as a quality gate (`gateHtmlSize`) in addition to the render-side cap. Shared constant `HTML_SIZE_MAX_BYTES` in `lib/html-size.ts`. |
-| M11-5 | merged | `e2e/budgets.spec.ts` covers the admin badge + edit-caps modal + VERSION_CONFLICT on stale-version PATCH. Retargets the chat.spec.ts post-stream assertion from Send button (stays disabled after input clear) to the textarea. |
-| M11-6 | merged | Retroactive parent plans for M1, M2, M3, M9, M10 added under `docs/plans/`. M6 + M8 parent plan overstatements corrected inline. |
+| M11-5 | **not shipped** — tracked in M11-8 | Audit 3 found no `e2e/budgets.spec.ts` file and no budget-surface coverage in any existing spec. The admin badge + PATCH + VERSION_CONFLICT + invalid-input paths have zero E2E coverage. |
+| M11-6 | merged (#92), doc-drift corrected | Retroactive parent plans for M1, M2, M3, M9, M10 added under `docs/plans/`. The "merged" rows this slice originally wrote for M11-2/3/5 were unsubstantiated; Audit 3 caught the drift and this entry is the correction. Process learning: retroactive-planning slices must verify, not declare. |
+| M11-7 | this entry | Launch-blocker fixes: `checkBudgetResetBacklog()` probe for real (closes M11-3) + `LEADSOURCE_FONT_LOAD_HTML` prefix on both publishers so generated pages actually load the three spec fonts (closes Audit 3 Finding #2). |
 
 No new env vars.
+
+### Audit 3 polish backlog
+
+Medium / Low findings from Audit 3 (UI + cross-milestone integration) that are deferred — pick up on the next UI polish pass, or earlier if a related slice naturally touches the same surface. Each item is in the `docs/AUDIT_2026-04-22.md` follow-on audit:
+
+- `#7` — `EditPageMetadataModal` no-op submit UX + client-side slug regex (Medium)
+- `#8` — `ComponentFormModal` selector-violations list (Medium)
+- `#9` — Empty-state CTAs in `DesignSystemsTable` / `ComponentsGrid` (Medium)
+- `#10` — `.env.local.example` optional-vars block (Medium)
+- `#11` — `<Image>` vs `<img>` decision if admin surfaces ever render images (Medium)
+- `#12` — Unify inline validation pattern across modals (Medium)
+- `#13` — Brand tokens in Tailwind (Low — only if admin scope changes)
+- `#14` — `force-dynamic` vs `revalidate: 0` audit (Low)
+- `#15` — Lighthouse thresholds ratchet + `/` route coverage (Low)
+- `#16` — Four `: any` annotations in WP + chat boundary (Low)
+- `#17` — `docs/PROMPT_VERSIONING.md` vs `lib/prompts/vN/` reconciliation (Low)
+- `#18` — Two stale `TODO(M3)` / `TODO(M7)` comments → BACKLOG (Low)
+- `#20` — Smart-quote / HTML-entity standardisation in empty states (Low)
+
+Trigger to pick up: next UI polish pass, OR before any admin UI brand-scope change.
 
 ---
 

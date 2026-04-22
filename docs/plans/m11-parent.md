@@ -147,13 +147,20 @@ No code. Every plan file references shipped migrations / commits / tests rather 
 
 ## Sub-slice status tracker
 
-Maintained in `docs/BACKLOG.md` under a new **M11 — audit close-out** section. Updated on every merge:
+Maintained in `docs/BACKLOG.md` under the **M11 — audit close-out** section. Updated on every merge.
 
-- `M11-1` — status (planned / in-flight / merged / blocked)
-- `M11-2` — status
-- `M11-3` — status
-- `M11-4` — status
-- `M11-5` — status
-- `M11-6` — status
+### Ground-truth as of Audit 3 (2026-04-22 re-verification)
 
-On M11-6 merge, auto-continue halts. User explicitly requested a review checkpoint after audit close-out to decide next steps (rate limiting, schema hygiene, DS authoring E2E, etc. — all in BACKLOG).
+Audit 3 re-checked each sub-slice against code, not against `docs/BACKLOG.md` claims. M11-6 originally landed "merged" entries for M11-2, M11-3, and M11-5 that the corresponding code PRs never fulfilled. The actual state:
+
+- `M11-1` — merged (#87). Verified: `app/api/chat/route.ts` uses `traceAnthropicStream` + `logger`; `e2e/chat.spec.ts` exists.
+- `M11-2` — **not shipped**. Only an aspirational comment at `lib/__tests__/regeneration-worker.test.ts:38`. Tracked in M11-8.
+- `M11-3` — **superseded by M11-7**. Probe was absent from `app/api/health/route.ts` despite BACKLOG claiming merged; M11-7 implements `checkBudgetResetBacklog()` for real.
+- `M11-4` — merged (#90). Verified: `lib/html-size.ts` constant + gate runner integration.
+- `M11-5` — **not shipped**. No `e2e/budgets.spec.ts` exists. Tracked in M11-8.
+- `M11-6` — merged (#92), but its retroactive-planning role introduced the three false "merged" claims above. Process learning: retroactive docs slices must verify, not declare. BACKLOG has been corrected to match ground-truth.
+
+### M11-7 + M11-8 follow-on slices
+
+- `M11-7` — launch-blocker fixes from Audit 3: real M11-3 probe + `LEADSOURCE_FONT_LOAD_HTML` prefix on both publishers so generated pages actually load the three spec fonts.
+- `M11-8` — honest close-out: ships M11-2 (DS_ARCHIVED + WP_CREDS_MISSING tests) and M11-5 (`e2e/budgets.spec.ts`) for real.
