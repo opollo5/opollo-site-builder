@@ -174,19 +174,26 @@ export function rateLimitExceeded(
 }
 
 /**
- * Read the caller's IP from request headers. On Vercel's edge + node
- * runtimes, `x-forwarded-for` is populated from the real client IP and
- * any client-supplied value is stripped at the edge, so the first
- * comma-separated entry is trustworthy. Falls back to `x-real-ip`, then
- * to "unknown" (shared bucket — a minor fail-open cost outside Vercel).
+ * Read the caller's IP from a Headers-like source. On Vercel's edge
+ * + node runtimes, `x-forwarded-for` is populated from the real
+ * client IP and any client-supplied value is stripped at the edge,
+ * so the first comma-separated entry is trustworthy. Falls back to
+ * `x-real-ip`, then to "unknown" (shared bucket — a minor fail-open
+ * cost outside Vercel).
+ *
+ * Accepts either a `Request` (route handlers) or a `Headers` /
+ * `ReadonlyHeaders` (server actions, via `headers()` from
+ * `next/headers`).
  */
-export function getClientIp(req: Request): string {
-  const xff = req.headers.get("x-forwarded-for");
+export function getClientIp(source: Request | Headers): string {
+  const get = (name: string): string | null =>
+    source instanceof Request ? source.headers.get(name) : source.get(name);
+  const xff = get("x-forwarded-for");
   if (xff) {
     const first = xff.split(",")[0]?.trim();
     if (first) return first;
   }
-  const xri = req.headers.get("x-real-ip");
+  const xri = get("x-real-ip");
   if (xri) return xri;
   return "unknown";
 }
