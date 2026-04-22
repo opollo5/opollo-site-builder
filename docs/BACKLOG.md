@@ -42,6 +42,19 @@ Medium / Low findings from Audit 3 (UI + cross-milestone integration) that are d
 
 Trigger to pick up: next UI polish pass, OR before any admin UI brand-scope change.
 
+### Security audit (2026-04-22 / audit 1 — security & secrets) backlog
+
+All Critical + High findings from the prompt-1 security audit closed by PRs #93 (role gates on design-systems + sites/register), #100 (rate limiting on cost-bearing + auth-adjacent routes), and #102 (server-only guards on node-only lib modules). Finding 6 (.env.local.example drift) closed alongside this entry in the same PR. One Medium deferral:
+
+- **RLS null-safety hardening (Medium, defense-in-depth).** Seven RLS policies across five migration files assume `auth.uid()` is non-NULL for authenticated sessions. PG semantics treat a NULL `USING` clause as not-visible — **no cross-tenant leak today** — but silent denial is the real failure mode during any auth-mechanism cutover. Files:
+  - `supabase/migrations/0004_m2a_auth_link.sql:148` — `public.auth_role()` body
+  - `supabase/migrations/0005_m2b_rls_policies.sql:112-114` — `opollo_users_self_read`
+  - `supabase/migrations/0007_m3_1_batch_schema.sql:125,249,291`
+  - `supabase/migrations/0010_m4_1_image_library_schema.sql:490,500,510`
+  - `supabase/migrations/0011_m7_1_regeneration_schema.sql:177,229`
+
+  Belt-and-braces prefix: `(auth.uid() IS NOT NULL AND ...) OR public.auth_role() = 'admin'`. **Trigger to pick up:** bundle into the next Supabase Auth migration slice — the one the audit calls "M3 auth migration", i.e. the next-after-M2 auth cutover, naming-ambiguous vs. the already-shipped batch-generator M3. Do NOT ship as a hotfix — the policies do not leak today; landing a belt-and-braces prefix outside a wider migration slice is churn for no live risk.
+
 ---
 
 ## M10 — observability activation (shipped)
