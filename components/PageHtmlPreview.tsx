@@ -1,3 +1,5 @@
+import { HTML_SIZE_MAX_BYTES, estimateHtmlBytes } from "@/lib/html-size";
+
 // ---------------------------------------------------------------------------
 // M6-2 — Tier-2 static HTML preview.
 //
@@ -7,19 +9,14 @@
 // operator-authored brief can't execute. `allow-same-origin` is off
 // too; we don't need it for static HTML + our design-system CSS.
 //
-// Rendering cap: if generated_html exceeds 500KB we show a size
-// warning + a download link rather than inlining — keeps the admin
-// page responsive on pathological rows.
+// Rendering cap: if generated_html exceeds HTML_SIZE_MAX_BYTES (500KB)
+// we show a size warning + a download link rather than inlining —
+// keeps the admin page responsive on pathological rows.
+//
+// The cap is also enforced as a quality gate at write-time (M11-4)
+// so this branch should rarely be reached in production; both sides
+// import the same constant so they can never drift.
 // ---------------------------------------------------------------------------
-
-const INLINE_HTML_MAX_BYTES = 500 * 1024;
-
-function estimateBytes(html: string): number {
-  // Byte-length estimate without spawning Buffer / TextEncoder on the
-  // server render hot path. Approximation is fine — we only need to
-  // gate the "inline vs. download" decision.
-  return html.length;
-}
 
 export function PageHtmlPreview({ html }: { html: string | null }) {
   if (!html) {
@@ -33,14 +30,14 @@ export function PageHtmlPreview({ html }: { html: string | null }) {
     );
   }
 
-  if (estimateBytes(html) > INLINE_HTML_MAX_BYTES) {
+  if (estimateHtmlBytes(html) > HTML_SIZE_MAX_BYTES) {
     return (
       <div
         className="flex h-64 w-full flex-col items-center justify-center gap-2 rounded-md border bg-muted/30 p-6 text-sm text-muted-foreground"
         data-testid="page-html-preview-too-large"
       >
         <p>
-          Generated HTML is larger than {INLINE_HTML_MAX_BYTES / 1024}KB — inline
+          Generated HTML is larger than {HTML_SIZE_MAX_BYTES / 1024}KB — inline
           preview skipped to keep the admin page responsive.
         </p>
         <p className="text-xs">
@@ -55,7 +52,7 @@ export function PageHtmlPreview({ html }: { html: string | null }) {
       <div className="flex items-center justify-between border-b px-3 py-2 text-xs text-muted-foreground">
         <span>Preview (static, design-system CSS only)</span>
         <span className="font-mono">
-          {(estimateBytes(html) / 1024).toFixed(1)} KB
+          {(estimateHtmlBytes(html) / 1024).toFixed(1)} KB
         </span>
       </div>
       {/*
