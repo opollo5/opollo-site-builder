@@ -76,6 +76,63 @@ Middleware now runs HTTP Basic Auth (set `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWOR
 
 ---
 
+## Supabase Auth URL configuration — required dashboard settings (M14-2)
+
+**Symptom:** password-reset / invite / magic-link emails land with a callback URL pointing at `localhost:3000` or a preview deploy instead of production; clicking the link lands the user on "Site can't be reached" or redirects to the wrong host.
+
+**Impact:** affected users (anyone receiving an email-driven auth link from prod) cannot complete the auth flow.
+
+**Why this needs a manual dashboard step:** the Supabase dashboard's **Site URL** + **Redirect URLs** allowlist are the authoritative values Supabase Auth consults when it sends an email. Code-side `redirectTo` is only honoured if it matches an entry in the allowlist; the Site URL is used as a fallback default when no redirectTo is supplied. Neither can be set via environment variables or the Supabase CLI — they live exclusively in the dashboard. This is the one configuration that code cannot fix.
+
+**Diagnose:**
+1. In the Supabase dashboard, navigate to **Authentication → URL Configuration**.
+2. Read the current **Site URL** value. If it's `http://localhost:3000` or any non-production URL, that is the bug.
+3. Read the **Redirect URLs** allowlist. Production callback URL must be present.
+
+**Apply (production project):**
+
+In **Authentication → URL Configuration**:
+
+| Field | Value |
+| --- | --- |
+| Site URL | `https://opollo.vercel.app` (or whatever the canonical production URL is — match `NEXT_PUBLIC_SITE_URL` in Vercel env) |
+| Redirect URLs allowlist | one entry per environment that sends auth emails. See list below. |
+
+**Redirect URLs allowlist entries:**
+
+```
+https://opollo.vercel.app/api/auth/callback
+https://opollo.vercel.app/auth/reset-password
+https://opollo.vercel.app/auth/forgot-password
+https://*-opollo.vercel.app/api/auth/callback
+https://*-opollo.vercel.app/auth/reset-password
+https://*-opollo.vercel.app/auth/forgot-password
+http://localhost:3000/api/auth/callback
+http://localhost:3000/auth/reset-password
+http://localhost:3000/auth/forgot-password
+```
+
+- First block: production. Required for every email sent to a real user.
+- Second block: Vercel preview deploys. The `*-opollo.vercel.app` wildcard covers every branch-preview URL.
+- Third block: local dev. Only needed if a developer tests email flows against the production Supabase project (not typical — local dev should use local Supabase).
+
+The `/auth/reset-password` and `/auth/forgot-password` entries are forward-looking — those routes land with M14-3. Registering them now means M14-3 doesn't need another dashboard trip.
+
+**Corresponding env var (set in Vercel):**
+
+`NEXT_PUBLIC_SITE_URL=https://opollo.vercel.app` on Vercel production. Preview + dev can leave it unset; the helper falls back to the request origin.
+
+**Verify:**
+1. Trigger one auth email from production (e.g. invite a throwaway email via `/admin/users` or hit `/auth/forgot-password` with a real admin email).
+2. Receive the email. The link's host must be `opollo.vercel.app`, not `localhost:3000`.
+3. Click it. It must land on the intended Opollo route, not on a Supabase error page saying "Invalid redirect URL."
+
+If a click lands on "Invalid redirect URL," the clicked URL wasn't in the allowlist. Add it and retry.
+
+**Resolve:** once the dashboard values are correct + the env var is set on Vercel production, the app's `lib/auth-redirect.ts` helper and every caller of it (invite route today, forgot-password + reset-password in M14-3) produce URLs that match the allowlist, and Supabase sends the correct host in emails. No redeploy needed after a dashboard change — the new values take effect on the next auth email.
+
+---
+
 ## Admin locked out — reset an admin password (M14-1)
 
 **Symptom:** an admin account (`hi@opollo.com`, any other `role='admin'` user) can't sign in and the self-service password-reset email is not usable — email not delivered, redirect misconfigured, Supabase auth email flow down.

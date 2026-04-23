@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
 import {
   checkRateLimit,
   getClientIp,
@@ -106,13 +107,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const email = parsed.data.email.trim().toLowerCase();
   const next = safeNext(parsed.data.next);
 
-  // Build the redirect target from the current request origin so
-  // invite links work across dev / preview / prod without wiring a
-  // separate SITE_URL env var. Supabase's magic-link flow tacks
+  // Build the redirect target through the canonical auth-redirect helper
+  // (M14-2). In production this resolves to NEXT_PUBLIC_SITE_URL if set,
+  // falling back to the incoming request origin. That combination covers
+  // local dev (no env, uses localhost origin), Vercel preview (no env,
+  // uses the preview hostname), and Vercel production (pinned via env,
+  // immune to Host-header spoofing). Supabase's magic-link flow tacks
   // `?code=<uuid>` onto redirect_to when the invitee clicks it; our
   // /api/auth/callback handler does the PKCE exchange.
-  const origin = req.nextUrl.origin;
-  const redirectTo = `${origin}/api/auth/callback?next=${encodeURIComponent(next)}`;
+  //
+  // The URL must also appear in the Supabase dashboard's Redirect URLs
+  // allowlist or Supabase rejects it — see docs/RUNBOOK.md
+  // "Supabase Auth URL configuration".
+  const redirectTo = buildAuthRedirectUrl(
+    `/api/auth/callback?next=${encodeURIComponent(next)}`,
+    req,
+  );
 
   const svc = getServiceRoleClient();
 
