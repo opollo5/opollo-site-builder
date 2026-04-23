@@ -74,6 +74,14 @@ export default async function AdminLayout({
               {user.email}
             </span>
           )}
+          {user && (
+            <Link
+              href="/account/security"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Security
+            </Link>
+          )}
           <Link
             href="/"
             className="text-xs text-muted-foreground hover:text-foreground"
