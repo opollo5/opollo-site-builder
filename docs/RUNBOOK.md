@@ -21,6 +21,7 @@ Keep this file terse. If a section grows past a screen, split it out.
 | `opollo_config.auth_kill_switch = 'on'` | Middleware falls back to HTTP Basic Auth (bypasses Supabase Auth entirely). | `POST /api/emergency` with `OPOLLO_EMERGENCY_KEY` + body `{"action":"kill_switch_on"}`. |
 | `opollo_config.auth_kill_switch = 'off'` (or row absent) | Restores normal Supabase Auth flow. | Same endpoint, `{"action":"kill_switch_off"}`. |
 | Revoke all sessions for one user | Invalidates refresh tokens + bans the user in `auth.users`. | `POST /api/admin/users/[id]/revoke` (admin required). Break-glass alt: `POST /api/emergency {"action":"revoke_user","user_id":"<uuid>"}`. |
+| Reset a locked-out admin's password | Sets a new password on `auth.users` directly via service-role. Does NOT revoke existing sessions. | `POST /api/ops/reset-admin-password` with `OPOLLO_EMERGENCY_KEY` + body `{"email":"<admin email>","new_password":"<new>"}`. |
 | Cancel in-flight batch | Stops pending slots from leasing; in-flight slots finish but don't flip status back. | `POST /api/admin/batch/[id]/cancel` (creator or admin). |
 | Rollback deploy | Re-tag the last known-good commit. | `vercel rollback <deployment-url>` or promote a prior deployment in the Vercel dashboard. |
 
@@ -72,6 +73,41 @@ Middleware now runs HTTP Basic Auth (set `BASIC_AUTH_USER` + `BASIC_AUTH_PASSWOR
 **Resolve:**
 - Supabase outage → wait for upstream recovery, then flip kill switch off.
 - Misconfigured env var → fix in Vercel, trigger a redeploy, confirm `/api/health` is green, flip kill switch off.
+
+---
+
+## Admin locked out — reset an admin password (M14-1)
+
+**Symptom:** an admin account (`hi@opollo.com`, any other `role='admin'` user) can't sign in and the self-service password-reset email is not usable — email not delivered, redirect misconfigured, Supabase auth email flow down.
+
+**Impact:** the affected admin is locked out. Other admins unaffected.
+
+**Diagnose:**
+1. Confirm the account exists in `opollo_users` with `role='admin'` and `deleted_at IS NULL`.
+2. Confirm `OPOLLO_EMERGENCY_KEY` is set in the target environment (Vercel production env for a prod reset; `.env.local` for dev).
+3. Confirm Supabase itself is reachable — `/api/health` should be 200. If Supabase is down, this tool will 500 because it calls `supabase.auth.admin.updateUserById` under the hood. In that case the fix is to restore Supabase first.
+
+**Mitigate:** hit the reset endpoint with the emergency key. Pick a strong throwaway password (≥12 chars); the admin rotates it via `/account/security` once logged in (M14-4, not yet shipped — until then, run this endpoint again to rotate).
+
+```bash
+curl -X POST https://opollo.vercel.app/api/ops/reset-admin-password \
+  -H "Authorization: Bearer $OPOLLO_EMERGENCY_KEY" \
+  -H "content-type: application/json" \
+  -d '{"email":"hi@opollo.com","new_password":"<strong-temp-password>"}'
+```
+
+Expected: `{"ok":true,"data":{"email":"...","user_id":"..."}}`. Sign in with the new password immediately and rotate it.
+
+**Guards the endpoint enforces:**
+- Key missing or <32 chars → 503 `EMERGENCY_NOT_CONFIGURED`.
+- Wrong key → 401 `UNAUTHORIZED` (constant-time compare).
+- Target not in `opollo_users` → 404 `NOT_FOUND`.
+- Target has `role != 'admin'` → 403 `FORBIDDEN`. This endpoint is admin-only — emergency-key compromise must not become a full tenant takeover. Use `POST /api/emergency {"action":"revoke_user"}` for non-admin intervention instead.
+- Password shorter than 12 chars → 400 `VALIDATION_FAILED`.
+
+**Resolve:**
+- After every successful reset, consider whether the emergency key has itself been compromised (who ran the command, were they authorised, was the key transmitted over a safe channel). If in doubt, rotate `OPOLLO_EMERGENCY_KEY` per "Rotate a secret" below.
+- This endpoint does NOT revoke existing sessions. If the lock-out is suspected compromise rather than a forgotten password, chain it with `POST /api/emergency {"action":"revoke_user","user_id":"<uuid>"}` to kill every session for the user.
 
 ---
 
