@@ -239,44 +239,18 @@ Additive transport inside `lib/logger.ts`. stdout preserved for Vercel log strea
 **Trigger:** after a few weeks of clean report-only traffic + after the Next.js upgrade (some nonce APIs changed across 14.x patches).
 **Scope:** middleware + layout + ~8 page updates.
 
-### Per-tenant cost budgets
-**What:** `tenant_cost_budgets` table + enforcement in `createBatchJob` per `docs/PROMPT_VERSIONING.md`.
-**Why deferred:** scope belongs with M4 (cost-control surface). Global Anthropic project cap in the dashboard is the stopgap.
-**Trigger:** start of M4.
-**Scope:** one migration + `createBatchJob` check + end-of-month reset cron + tests.
+### ~~Per-tenant cost budgets~~ (shipped in M8, PRs #79-#83)
+Full milestone landed as M8-1 through M8-5 — `tenant_cost_budgets` schema + auto-create trigger, enforcement in `createBatchJob` + `enqueueRegenJob`, iStock seed integration, hourly reset cron, admin UI budget badge + PATCH endpoint. See the M8 section above for the slice-by-slice breakdown.
 
-### Anthropic pricing-table scale audit
-**What:** reconcile `lib/anthropic-pricing.ts`'s rate table with the scale implied
-by its own doc-comment. The table entries (e.g. Sonnet 4.6 input=3.0) don't match
-the "$3/M input, micro-cents per token" convention stated in the file header —
-depending on which line is authoritative, absolute cost reporting is off by ~100×.
-**Why deferred:** existing M3 + M4-4 tests only assert "cost > 0" and
-sum-equals-sum reconciliation, so the miscalibration never fails a test. M4-5
-explicitly uses a direct per-image constant for its pre-flight estimate rather
-than routing through `computeCostCents`, which keeps the seed's operator-facing
-numbers matching the plan's published $63 figure for 9k images.
-**Trigger:** any slice that surfaces per-$ cost to a human (admin UI cost column,
-monthly-budget alert, tenant-cost dashboard). Once there's a consumer of absolute
-cost, rate calibration matters.
-**Scope:** decide the units convention, rewrite the table accordingly, update
-the comment, add a fixture test that asserts "1M Opus tokens at 15 USD" produces
-1500 cents.
+### ~~Anthropic pricing-table scale audit~~ (shipped PR #124)
+Rate table in `lib/anthropic-pricing.ts` reconciled with the units convention stated in its own header. Fixture test in `lib/__tests__/anthropic-pricing.test.ts` pins "1M Opus tokens at $15 → 1500 cents" so future drift fails loudly at the unit layer. Unblocks the M8-5 budget badge as a trustworthy per-$ consumer of `computeCostCents`.
 
 ---
 
 ## Testing
 
-### Investigate pre-existing E2E failures on main (sites + users + images specs)
-**What:** three E2E tests have been failing on main since M4-7 / M5-2. None of them blocked their originating merges because E2E is not a required check.
-- `e2e/sites.spec.ts:73` — `sites CRUD › archive flow removes the site from the default list`. Locator `getByRole('row', { name: /Archive Target <ts>/ }).getByRole('button', { name: /actions for/i })` never resolves — likely the row takes longer than 30s to appear post-create, OR the actions-button ARIA name drifted when `SiteActionsMenu` changed.
-- `e2e/users.spec.ts:19` — `users admin surface › /admin/users shows the seeded admin + invite modal opens`. Strict-mode violation: `getByText('playwright-admin@opollo.test')` matches both the header chrome's `admin-user-email` span and the users-table cell.
-- `e2e/images.spec.ts:243` — `images admin surface › edit modal updates caption + tags and the list reflects the change`. Strict-mode violation: `getByText(newCaption)` matches both the Breadcrumbs current-crumb node (which truncates the caption to 60 chars) and the detail-fields dd. Started failing when M5-2 added Breadcrumbs to the image detail page; the M5-3 edit test's post-save assertion was authored before the breadcrumb landed.
-
-**Why deferred:** not regressions from any M5/M6 PR; not worth blocking milestone timelines. All three need a focused PR to repro locally + fix deliberately (likely `getByTestId` in users.spec + images.spec to dodge strict mode, and waiting on `networkidle` after the site create before hunting the row).
-
-**Trigger:** pick up at the end of M6 as a standalone slice before M7 (M7 adds write-safety-critical E2E coverage; clean baseline matters). Could also slot in between M6 sub-slices if it happens to be fast.
-
-**Scope:** ~80 lines across three specs, mostly locator narrowing (`getByTestId` + more-specific text matchers). No lib/ or app/ changes expected.
+### ~~Investigate pre-existing E2E failures on main (sites + users + images specs)~~ (shipped PR #76 + PR #125)
+All three locator regressions fixed in PR #76 (sites / users / images spec narrowing + networkidle wait on the archive flow). E2E promoted from non-required to required branch-protection check in PR #125 — silent drift of the kind that let these three tests sit red for weeks is no longer possible; a red spec now blocks merge.
 
 ### Load testing (k6 / Artillery)
 **What:** scripted soak tests against the batch worker + chat route.
