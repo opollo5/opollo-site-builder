@@ -15,11 +15,21 @@ import { auditA11y, signInAsAdmin } from "./helpers";
 // row with prefix E2E_TEST_SITE_PREFIX.
 // ---------------------------------------------------------------------------
 
-const STRUCTURAL_BRIEF = `# Acme Brief
+// Each test needs a UNIQUE source document so the upload route's
+// idempotency key — sha256(site_id + uploaded_by + file_sha256) —
+// produces a fresh brief instead of dedup-replaying a previous
+// test's upload. Inlining the per-test `unique` string into the
+// brief content is the cheapest way to get that property while
+// keeping the parse result shape (H2 sections: Home / About /
+// Pricing) identical across tests.
+function makeBrief(unique: string): string {
+  return `# Acme Brief — ${unique}
+
+<!-- signature: ${unique} -->
 
 ## Home
 
-The home hero lands the tagline. Three feature cards follow.
+The home hero lands the tagline for ${unique}. Three feature cards follow.
 
 ## About
 
@@ -29,6 +39,7 @@ Our story and team.
 
 Three tiers.
 `;
+}
 
 async function findTestSiteDetailUrl(page: import("@playwright/test").Page): Promise<string> {
   await page.goto("/admin/sites");
@@ -78,14 +89,19 @@ test.describe("M12-1 briefs — upload + review", () => {
     await auditA11y(page, testInfo);
 
     const unique = `Playwright E2E ${Date.now()}`;
-    await uploadBrief(page, siteUrl, STRUCTURAL_BRIEF, unique);
+    await uploadBrief(page, siteUrl, makeBrief(unique), unique);
 
     await expect(page.getByRole("heading", { name: unique })).toBeVisible();
     await expect(page.getByText(/Awaiting review/i)).toBeVisible();
 
-    // 3 pages (Home / About / Pricing) rendered.
-    const pageItems = page.locator('ol li').filter({ hasText: /Home|About|Pricing/ });
-    await expect(pageItems).toHaveCount(3);
+    // 3 pages (Home / About / Pricing) rendered. The titles live in
+    // editable <Input> textboxes, not in text nodes — Playwright's
+    // hasText filter can't see input values, so we assert via the
+    // labelled controls directly.
+    await expect(page.locator("ol li")).toHaveCount(3);
+    await expect(page.getByLabel("Title for page 1")).toHaveValue("Home");
+    await expect(page.getByLabel("Title for page 2")).toHaveValue("About");
+    await expect(page.getByLabel("Title for page 3")).toHaveValue("Pricing");
 
     // Edit the Home title.
     const firstTitleInput = page.getByLabel(/Title for page 1/);
@@ -113,7 +129,7 @@ test.describe("M12-1 briefs — upload + review", () => {
     const siteUrl = await findTestSiteDetailUrl(page);
 
     const unique = `Edit Cancel ${Date.now()}`;
-    await uploadBrief(page, siteUrl, STRUCTURAL_BRIEF, unique);
+    await uploadBrief(page, siteUrl, makeBrief(unique), unique);
     const reviewUrl = page.url();
 
     // Change a title but leave the page without clicking Commit.
@@ -141,7 +157,7 @@ test.describe("M12-1 briefs — upload + review", () => {
     const siteUrl = await findTestSiteDetailUrl(pageA);
 
     const unique = `Double Commit ${Date.now()}`;
-    await uploadBrief(pageA, siteUrl, STRUCTURAL_BRIEF, unique);
+    await uploadBrief(pageA, siteUrl, makeBrief(unique), unique);
     const reviewUrl = pageA.url();
 
     const contextB = await browser.newContext();

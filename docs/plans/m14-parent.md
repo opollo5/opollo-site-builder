@@ -4,7 +4,9 @@
 
 The admin-auth surface has gaps that became visible when `hi@opollo.com` got locked out with no recovery path. There is no "forgot password" flow, no logged-in "change password" surface, the Supabase auth redirect configuration points at `localhost:3000` in production email links, and there is no permanent operator tool to reset a password when Supabase's self-service email flow is unreachable or misconfigured. M14 closes those gaps.
 
-M14-1 ships a single slice ahead of M12-2 / M13 / the rest of M14: a permanent, emergency-key-gated `/api/ops/reset-admin-password` endpoint that restores admin access when self-service recovery is not usable. M14-1 is the unblocker — it lets the locked-out admin regain access in ~30 seconds instead of waiting a week for the full reset flow. Every other M14 slice waits until M12 (briefs) and M13 (blog posts) land on main.
+M14-1 ships a single slice ahead of M12-2 / M13 / the rest of M14: a permanent, emergency-key-gated `/api/ops/reset-admin-password` endpoint that restores admin access when self-service recovery is not usable. M14-1 is the unblocker — it lets the locked-out admin regain access in ~30 seconds instead of waiting for the full reset flow.
+
+**Ordering (revised 2026-04-23, after e2e flake surfaced on main):** the full auth surface (M14-2 → M14-6) ships ahead of resuming M12-2, not after. Reasoning: without a working reset flow every lockout blocks Steven, which blocks UAT of M12/M13 work as it ships. Steven needs to be able to log in and recover access independently while testing M12 and M13 progress. M12-2 resumes after M14-6 merges AND Steven has end-to-end tested the reset flow.
 
 ## Why a separate milestone
 
@@ -21,14 +23,45 @@ The milestone is also write-safety-critical on a different axis than M12: passwo
 - **M14-5 — E2E + integration coverage.** Playwright specs for: (a) request reset → follow the email link (intercepted or via Supabase's test mode) → set new password → login with new password → assert the old password is rejected; (b) logged-in password change with incorrect current password → error, with correct current password → success, old password rejected after change; (c) expired-token and rate-limit-hit error surfaces. Uses the existing test-user pattern from `e2e/global-setup.ts` — no new harness. Do not skip because "auth is hard to test."
 - **M14-6 — documentation.** `docs/AUTH.md` with a mermaid (or text) diagram showing every auth flow: signup (if applicable), login, forgot password, reset password, logged-in password change, admin emergency reset. Strike any outdated "auth complete" claims from `docs/BACKLOG.md` and the M2 parent plan. `docs/RUNBOOK.md` gains the M14-1 ops entry alongside the existing `/api/emergency` entries.
 
+## Auth-gap audit (2026-04-23) — candidates for additional M14 sub-slices
+
+Steven requested a full audit of auth surfaces beyond password reset, to surface any additional gaps as candidates for extra M14 sub-slices. Findings below. **None of these are auto-added to M14 scope — each waits for Steven's explicit approval before becoming a sub-slice.** They live here as documented findings so the milestone can close cleanly when Steven confirms which stay in M14 and which move to BACKLOG.
+
+### 1. Email verification on signup — N/A
+No public signup path. Admin-invite-only. The invite flow bypasses `email_confirmed_at` because the Supabase-generated action URL's code exchange counts as confirmation. **Recommendation:** do not add to M14 — bring it in when a public signup path ships.
+
+### 2. User invitation flow — gap, candidate M14-7?
+Invite works end-to-end (`app/api/admin/users/invite` → Supabase `generateLink('invite')` → `/api/auth/callback` code exchange). Gaps: **invites are not expirable and not revocable.** No TTL on the magic link beyond Supabase's built-in, and no "cancel pending invite" admin action. For an admin-invite-only product, revocation is the bigger operational gap — you can't undo a mistaken invite. Candidate slice: invite TTL + revocation. Scope feels close to M14; operator-facing and auth-adjacent.
+
+### 3. Logout flow — implemented
+`/logout` (GET + POST) calls `supabase.auth.signOut()` → cookies cleared via the `@supabase/ssr` `setAll` callback → redirect to `/login`. No gap.
+
+### 4. Session expiry handling — gap, candidate M14-8?
+Middleware validates JWT; expired tokens redirect to `/login?next=...`. Fallback `/auth-error` page exists with a terse "we couldn't verify your session" message. **Gap:** no proactive expiry warning, no mid-workflow session-extend prompt, no "you're about to lose unsaved work" modal. Low-severity operationally today (admin UI is read-heavy; nothing in flight for more than a few minutes). Candidate slice: pre-expiry warning + session-extend UI. Feels more like an M14 polish slice than a hard requirement.
+
+### 5. Multi-factor auth — not implemented, not claimed
+Zero references to mfa / totp / 2fa in the codebase. Not surfaced in any UI or docs. **Recommendation:** keep out of M14. TOTP + recovery codes + MFA-aware admin gate is a milestone-sized scope, not a slice. BACKLOG entry.
+
+### 6. "Remember me" behavior — not implemented, low impact
+Login form has no remember-me checkbox. Supabase `@supabase/ssr` uses cookie-based sessions that persist per browser profile already, so the absence isn't functionally broken — just missing a UI affordance for short-lived sessions as an opt-out. **Recommendation:** out of M14; low value for an admin-only product.
+
+### 7. Account deletion — not implemented, not claimed
+No user-facing deletion. Admin-side uses revoke/reinstate (ban_duration) — data preserved. No hard-delete or right-to-erasure flow. **Recommendation:** out of M14 until a public-user surface ships. BACKLOG entry.
+
+**Summary of candidates requiring Steven's decision:**
+- **M14-7 (candidate)** — invite TTL + revocation. Operator-facing; auth-adjacent. Do you want this in M14 or as its own follow-up?
+- **M14-8 (candidate)** — session expiry pre-warning + session-extend UI. Polish; defer-worthy.
+
+The other five areas (email verification, logout, MFA, remember me, account deletion) are either fine as-is or belong to future milestones. Only M14-7 and M14-8 need a scope decision from Steven.
+
 ## Out of scope (tracked in BACKLOG.md)
 
-- **Email verification on signup.** Signup is admin-invite-only today; no public signup path. Email verification belongs to the future public-signup milestone.
-- **Multi-factor auth.** Not claimed anywhere today. Adding it requires TOTP UI + recovery codes + MFA-aware admin-gate logic. Its own milestone.
-- **"Remember me" toggle.** Supabase's refresh-token rotation already persists sessions across browser closes; adding a "remember me" UI is purely cosmetic until we have a reason for short-lived sessions as the default.
-- **Account deletion / GDPR-export.** No end-user surface yet; admin-invite-only + no end-user accounts means deletion is a back-office task. Ships when end-user accounts ship.
-- **Session expiry UX.** When a session expires mid-workflow today, the middleware redirects to `/login` on the next request. A "your session expired — save your work" banner is a quality-of-life item, not a gap.
-- **User invitation flow.** Invite flow exists (`app/api/admin/users/invite`) — not an M14 scope item; audit confirmed it already runs through the same Supabase auth primitives M14-2 will harden.
+- **Email verification on signup.** Signup is admin-invite-only today; no public signup path. Audit confirmed.
+- **Multi-factor auth.** Not claimed anywhere today. Audit confirmed zero references in the codebase.
+- **"Remember me" toggle.** Cookie-based sessions already persist; no UI affordance missed in practice.
+- **Account deletion / GDPR-export.** No end-user surface yet.
+- **User invitation flow expiry/revocation (M14-7 candidate).** Pending Steven's decision whether to fold into M14 or defer.
+- **Session expiry pre-warning (M14-8 candidate).** Pending Steven's decision.
 
 ## Env vars required
 
@@ -39,13 +72,13 @@ None new. `OPOLLO_EMERGENCY_KEY` is already provisioned (documented in `.env.loc
 | Slice | Scope | Write-safety rating | Blocks on |
 | --- | --- | --- | --- |
 | **M14-1** | `POST /api/ops/reset-admin-password` endpoint + admin-role guard + 12-char password floor + structured logging + unit test with mocked supabase admin. Runbook entry. Ships ahead of M12-2 because `hi@opollo.com` is currently locked out. | Medium — single service-role write, emergency-key-gated, admin-only target. Constant-time key compare. Admin-role guard prevents scope creep on key compromise. | Nothing. |
-| **M14-2** | Audit `emailRedirectTo` / `redirectTo` usage in `lib/` + every auth API route; wire everything to `NEXT_PUBLIC_SITE_URL`. Verify Vercel env. Document required Supabase dashboard Site URL + Redirect URLs allowlist values in runbook. | Low — pure configuration + docs. No new write paths. | M12 + M13 completion (per Steven's ordering call on 2026-04-23). |
-| **M14-3** | `/auth/forgot-password` + `/auth/reset-password` pages. `supabase.auth.resetPasswordForEmail` + `supabase.auth.updateUser` wiring. Password strength enforcement. Rate-limiter bucket for password reset requests. Error-code → user-friendly message table. | Medium — triggers emails (side-effectful, externally billed by Supabase). Rate limiter prevents email flood. 12-char password minimum. | M14-2. |
-| **M14-4** | `/account/security` page + user-menu entry. Current-password verification via fresh `signInWithPassword`. `supabase.auth.updateUser` for the new password. | Medium — password write. Current-password verification prevents CSRF-style password-change by a session hijacker. | M14-3 (shares password-strength component + error translations). |
-| **M14-5** | Playwright E2E: forgot-password end-to-end, logged-in password change, expired-token + rate-limit error surfaces. | Low — E2E only. | M14-4. |
-| **M14-6** | `docs/AUTH.md` with flow diagram. Backlog + M2-parent cleanup. Runbook consolidation. | Low — docs. | M14-5. |
+| **M14-2** | Audit `emailRedirectTo` / `redirectTo` usage in `lib/` + every auth API route; wire everything to `NEXT_PUBLIC_SITE_URL` (or equivalent). Verify the env var is set in Vercel production. Document required Supabase dashboard settings — Site URL + Redirect URLs allowlist — as a runbook entry with exact values and where to find each setting in the dashboard UI. | Low — pure configuration + docs. No new write paths. | M14-1 + `fix(e2e)` briefs-review spec green. |
+| **M14-3** | "Forgot password?" link on `/login` (below Sign In). `/auth/forgot-password` page → `supabase.auth.resetPasswordForEmail` with the M14-2-fixed `redirectTo` → success copy including "check your spam folder". `/auth/reset-password` page → handles Supabase recovery token → password + confirm form → `supabase.auth.updateUser`. Expired / invalid token surfaces a "Request a new link" CTA, not raw query-param error copy. Password strength floor = 12 chars, enforced client-side with live feedback. Upstash rate limiter keyed on email — 5 requests per email per hour. Every event logged via the structured logger (request, success, failure). | Medium — triggers Supabase-billed emails. Rate limiter prevents email flood. | M14-2. |
+| **M14-4** | `/account/security` page accessible from the user menu (menu entry added if absent). Current password + new password + confirm form. Verify current password by attempting a fresh `signInWithPassword` before calling `supabase.auth.updateUser`; mismatch returns a translated error. Same password-strength rules as M14-3. Every successful change logged. | Medium — password write. Current-password verification prevents a session hijacker from silently changing creds. | M14-3. |
+| **M14-5** | Playwright E2E covering: (a) request reset → mock the email callback → set new password → login with new → assert old password rejected; (b) logged-in password change — current-password-required, new-password-works, old-password-rejected-after-change; (c) error surfaces — expired token, invalid token, rate-limit hit. Uses the existing `e2e/global-setup.ts` test-user pattern. Do not skip E2E; auth is exactly where E2E matters most. | Low — E2E only. | M14-4. |
+| **M14-6** | `docs/AUTH.md` with flow diagram (text or mermaid) showing: login path, forgot-password path, reset-password path, logged-in password change, admin reset endpoint usage. Update the M2 parent plan (or create if missing) to reflect that auth was incomplete until M14 — list the specific gaps that existed. `docs/BACKLOG.md` cleanup: strike any "auth complete" claims, note M14 as the completion milestone. Runbook consolidation — one canonical auth incident playbook, cross-linked. | Low — docs. | M14-5. |
 
-**Execution order under the current ordering decision (2026-04-23):** M14-1 ships immediately, ahead of M12-2. M14-2 through M14-6 are parked until M12 (briefs, 5 remaining slices) and M13 (blog posts, 6 slices) land on main. When M13-6 merges, M14-2 picks up and the remaining slices run serial per the blocks-on table.
+**Execution order under the revised ordering decision (2026-04-23):** M14-1 is already merged (PR #113) and is the permanent break-glass tool. Next: `fix(e2e)` for the pre-existing briefs-review spec flake (keeps main green before piling on more slices), then M14-2 → M14-3 → M14-4 → M14-5 → M14-6 strictly serial. After M14-6 merges, auto-continue halts — Steven tests the full reset flow end-to-end and gives an explicit signal before M12-2 resumes. Silence is NOT a proceed signal at the M14-6 → M12-2 boundary.
 
 ## Write-safety + audit contract
 
@@ -119,11 +152,14 @@ Every new page M14-3 + M14-4 add goes through `auditA11y()` in its E2E spec per 
 
 ## Sub-slice status tracker
 
-- [ ] M14-1 — admin reset endpoint (ships ahead of M12-2)
-- [ ] M14-2 — Supabase redirect configuration (BLOCKED on M12 + M13 completion)
+- [x] M14-1 — admin reset endpoint (merged, PR #113)
+- [ ] `fix(e2e)` briefs-review spec — pre-existing flake on main; ship before M14-2 so the suite is green
+- [ ] M14-2 — Supabase redirect configuration
 - [ ] M14-3 — forgot password flow (BLOCKED on M14-2)
 - [ ] M14-4 — account security page (BLOCKED on M14-3)
 - [ ] M14-5 — E2E coverage (BLOCKED on M14-4)
 - [ ] M14-6 — docs + auth flow diagram (BLOCKED on M14-5)
+- [ ] M14-7 (candidate) — invite TTL + revocation (pending Steven approval)
+- [ ] M14-8 (candidate) — session expiry pre-warning (pending Steven approval)
 
-On M14-1 merge, auto-continue halts. Steven uses the endpoint once via hoppscotch to restore `hi@opollo.com` access. Remaining M14 slices wait until M13-6 merges. Explicit pause-gate at M14-1 → M14-2 boundary per Steven's ordering call on 2026-04-23.
+**Auto-continue rule:** silence at sub-slice boundaries = proceed, per the CLAUDE.md "Auto-continue" rule. **Explicit halt at M14-6 → M12-2:** after M14-6 merges, auto-continue halts. Steven tests the full reset flow end-to-end — request reset, receive email, set new password, log in with new, verify old rejected, exercise the logged-in password-change flow — and posts an explicit "resume M12-2" signal. Only then does M12-2 pick up. Silence at the M14-6 → M12-2 boundary is NOT a proceed signal.
