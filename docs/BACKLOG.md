@@ -113,7 +113,7 @@ Parent plan: `docs/plans/m8-parent.md`. All five sub-slices merged.
 | M8-4 | merged (#82) | `/api/cron/budget-reset` hourly reset cron. Daily + monthly rollover via single UPDATE per period with `WHERE reset_at < now()` predicate. Idempotent under concurrent ticks. |
 | M8-5 | merged (#83) | Admin UI budget badge on `/admin/sites/[id]` + PATCH endpoint with version_lock. |
 
-New env vars (both optional, code-side defaults apply): `DEFAULT_TENANT_DAILY_BUDGET_CENTS` (default 500 = $5/day), `DEFAULT_TENANT_MONTHLY_BUDGET_CENTS` (default 10000 = $100/month).
+~~New env vars (both optional, code-side defaults apply): `DEFAULT_TENANT_DAILY_BUDGET_CENTS` (default 500 = $5/day), `DEFAULT_TENANT_MONTHLY_BUDGET_CENTS` (default 10000 = $100/month).~~ **2026-04-24 (M15-3):** these env vars were never wired. The M8-1 migration hardcodes the column defaults (500 / 10000); no code reads the env var. Changing the baseline requires a forward migration. Entries also removed from `.env.local.example`.
 
 ---
 
@@ -127,7 +127,7 @@ Parent plan: `docs/plans/m7-parent.md`. Write-safety-critical milestone; all fiv
 | M7-2 | merged (#73) | Worker core (lease / heartbeat / reaper) + Anthropic integration + event-log-first billing + VERSION_CONFLICT short-circuit. |
 | M7-3 | merged (#75) | WP update stage with drift reconciliation + M4-7 image transfer + `pages.version_lock` bump. |
 | M7-4 | merged (#77) | Admin UI: "Re-generate" button + status polling panel + enqueue endpoint with REGEN_ALREADY_IN_FLIGHT guard. |
-| M7-5 | merged (#78) | Cron wiring (`/api/cron/process-regenerations`) + daily budget cap (`REGEN_DAILY_BUDGET_CENTS` → `BUDGET_EXCEEDED`) + retry/backoff via `retry_after` + REGEN_RETRY_BACKOFF_MS. |
+| M7-5 | merged (#78) | Cron wiring (`/api/cron/process-regenerations`) + daily budget cap (`REGEN_DAILY_BUDGET_CENTS` env → `BUDGET_EXCEEDED`) + retry/backoff via `retry_after`. Backoff values live in the `REGEN_RETRY_BACKOFF_MS` code constant in `lib/regeneration-worker.ts`, not an env var. |
 
 No new env vars — every external dependency (`ANTHROPIC_API_KEY`, `CLOUDFLARE_*`, `OPOLLO_MASTER_KEY`, `CRON_SECRET`) is already provisioned from M3 + M4.
 

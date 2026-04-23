@@ -6,7 +6,26 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
-_No active claims._
+---
+## Session B
+- Started: 2026-04-24
+- Branch: fix/m15-3-env-audit-actionables
+- Slice: M15-3 env audit + three actionable fixes (dual-key runbook honesty, env coupling validation at boot, doc-drift cleanup)
+- Files claimed:
+  - docs/SCHEMA_AUDIT_2026-04-24.md (M15-2 audit — merged within this PR)
+  - docs/ENV_AUDIT_2026-04-24.md (M15-3 audit — merged within this PR)
+  - docs/_audit_scratch/ (scratch inputs for M15-2..M15-6; removed before merge or in a follow-up)
+  - docs/RUNBOOK.md (master-key rotation section rewrite + LANGFUSE_HOST typo fix)
+  - docs/BACKLOG.md (DEFAULT_TENANT_* strike-through + REGEN_RETRY_BACKOFF_MS reclassify)
+  - docs/PROMPT_VERSIONING.md (not-yet-shipped banner)
+  - .env.local.example (dead DEFAULT_TENANT_* entries commented out)
+  - lib/env-validation.ts (new)
+  - lib/__tests__/env-validation.test.ts (new)
+  - instrumentation.ts (wire validateEnvCouplingOnce into register())
+- Migration number reserved: none
+- Expected completion: same session; auto-merge on green CI; then proceed to M15-4 audit under pause rules
+- Notes: M15-1 is in flight in Session A (`/api/ops/reset-admin-password` fix). Session B stays off that endpoint, the `opollo_users.deleted_at → revoked_at` fix, and any related migration.
+---
 
 ## Hot-shared files (always check before claiming)
 

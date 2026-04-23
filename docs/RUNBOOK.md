@@ -328,15 +328,19 @@ Some shipped migrations add columns without `NOT NULL DEFAULT`; on a fresh DB th
 
 ### OPOLLO_MASTER_KEY (encrypts `sites.wp_app_password`)
 
-Zero-downtime rotation:
+`lib/encryption.ts` reads a single active key. Rotation requires a write-freeze on `sites.wp_app_password` while every `site_credentials` row is re-encrypted. The `key_version` column on `site_credentials` is in place for a future dual-key zero-downtime path, but the code does not read `OPOLLO_MASTER_KEY_NEXT` today — do not rely on staging a `_NEXT` variable to run in parallel with the old key.
 
-1. `openssl rand -base64 32` → new key.
-2. Set `OPOLLO_MASTER_KEY_NEXT` in Vercel env to the new key; leave `OPOLLO_MASTER_KEY` as the old key. Redeploy.
-3. Run the rotation script (follow-up slice — for now, re-register each site through the Edit Site modal: the app encrypts with the new key on save).
-4. When every site row has been re-encrypted: set `OPOLLO_MASTER_KEY` to the new key, remove `OPOLLO_MASTER_KEY_NEXT`. Redeploy.
-5. Confirm: for every site, `editSiteModal → Save` round-trips successfully.
+1. `openssl rand -base64 32` → new key. Record it in the password manager.
+2. Freeze writes that touch `sites.wp_app_password`:
+   - Confirm no active batch: `SELECT count(*) FROM generation_jobs WHERE status IN ('queued','running');` must be 0. Wait for stragglers or cancel via `POST /api/admin/batch/[id]/cancel`.
+   - Pause the relevant Vercel crons (batch, transfer, regeneration).
+   - Turn on the auth kill switch to block admin UI writes: `POST /api/emergency` with `{"action":"kill_switch_on"}` (see the admin-reset section of this runbook for the curl shape).
+3. Re-encrypt every `site_credentials` row with the new key. Today this is an ad-hoc script run from a trusted machine (not committed): for each row, decrypt `site_secret_encrypted` with the old key, re-encrypt with the new key, write back the new ciphertext + fresh `iv` + bumped `key_version`, atomically per row (`UPDATE ... WHERE id = $1 RETURNING key_version`). Run against a staging clone of the row set first to verify.
+4. Swap the key in Vercel: `OPOLLO_MASTER_KEY` = new key. Redeploy.
+5. Unfreeze: `POST /api/emergency` with `{"action":"kill_switch_off"}`, resume crons.
+6. Confirm: in the admin UI, Edit Site → Save on one site. The round-trip must succeed (app decrypts with new key + re-encrypts back).
 
-**Downtime window:** none if staged. If the rotation script lands, this becomes a single-step rotation.
+**Downtime window:** the write-freeze — at current scale (<5 sites) that is seconds, not minutes. If rotation cadence becomes routine or the site count grows materially, invest in the dual-key code path (`lib/encryption.ts` accepts a staged `OPOLLO_MASTER_KEY_NEXT` and tries both on decrypt). That is a backlog item, not the current procedure. Do not follow an older version of this runbook that describes a zero-downtime `_NEXT` flow — the code does not support it.
 
 ### OPOLLO_EMERGENCY_KEY
 
@@ -393,7 +397,7 @@ For each tool (Sentry / Axiom / Langfuse / Upstash):
 2. **Copy the required env vars** from the vendor dashboard:
    - Sentry: `SENTRY_DSN`, `SENTRY_AUTH_TOKEN` (for source-map upload).
    - Axiom: `AXIOM_TOKEN`, `AXIOM_DATASET`.
-   - Langfuse: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, optionally `LANGFUSE_BASEURL` if self-hosted.
+   - Langfuse: `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`, optionally `LANGFUSE_HOST` if self-hosted (defaults to `https://us.cloud.langfuse.com`; set to `https://cloud.langfuse.com` for EU or to a custom URL for self-host).
    - Upstash: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 3. **Add them to Vercel** — Settings → Environment Variables. Set all three environments (Production, Preview, Development) unless the vendor is production-only.
 4. **Add to `.env.local.example`** with a comment explaining the default-off behaviour.

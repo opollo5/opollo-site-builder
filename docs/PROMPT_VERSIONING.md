@@ -1,5 +1,7 @@
 # Prompt Versioning
 
+> **Status: not yet shipped.** This file describes the target layout for a future cutover, not the current runtime. As of 2026-04-24, chat still loads `docs/SYSTEM_PROMPT_v1.md` + `docs/TOOL_SCHEMAS_v1.md` directly. The `lib/prompts/` directory, the `resolvePrompt()` helper, and the `OPOLLO_PROMPT_VERSION` env var described below do **not** exist in the codebase yet — setting `OPOLLO_PROMPT_VERSION` on Vercel today has no effect. The cutover is its own sub-slice, pending the `LANGFUSE_*` env provisioning called out later in this doc.
+
 Spec for how system prompts, tool schemas, and evaluation suites are organised in `lib/prompts/`. Target layout once we start routing chat traffic through versioned prompts and measuring with Langfuse.
 
 Current state: prompts live in `docs/SYSTEM_PROMPT_v1.md` and `docs/TOOL_SCHEMAS_v1.md`, loaded at runtime from the `outputFileTracingIncludes` bundle. This file is the migration target — not a rewrite instruction. The cutover PR will be its own sub-slice.
