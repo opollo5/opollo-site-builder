@@ -273,3 +273,35 @@ export async function requireRole(
 // Revocation lives in lib/auth-revoke.ts — it uses a direct Postgres
 // connection (pg) and must never be reachable from the Edge middleware
 // bundle. Import `signOutAuthUser` from "@/lib/auth-revoke" instead.
+
+// ---------------------------------------------------------------------------
+// Active-admin count.
+//
+// Both the /admin/users/[id]/role PATCH and /admin/users/[id]/revoke POST
+// routes need to block operations that would leave the org with zero
+// active admins. "Active" means role='admin' AND revoked_at IS NULL — a
+// revoked admin cannot sign in and does not count. The M15-4 audit found
+// a drift where /role PATCH was counting `role='admin'` only (without the
+// revoked_at filter), which could let an operator demote the last *active*
+// admin if a revoked admin existed on the table. Both call sites now go
+// through this shared helper so the count definition cannot drift again.
+//
+// Returns a discriminated result so callers can distinguish "couldn't
+// count" from "counted zero" without reading error codes. Service-role
+// client, bypasses RLS.
+// ---------------------------------------------------------------------------
+
+export async function countActiveAdmins(): Promise<
+  { ok: true; count: number } | { ok: false; error: string }
+> {
+  const svc = getServiceRoleClient();
+  const { count, error } = await svc
+    .from("opollo_users")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin")
+    .is("revoked_at", null);
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+  return { ok: true, count: count ?? 0 };
+}

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { countActiveAdmins } from "@/lib/auth";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -142,22 +143,22 @@ export async function PATCH(
   }
 
   // Last-admin guard — only matters when demoting away from 'admin'.
+  // Counts via countActiveAdmins() (role='admin' AND revoked_at IS NULL)
+  // so revoked admins don't prop up the count. See docs/ENDPOINT_AUDIT_2026-04-24.md
+  // finding #2 for the prior drift where this route counted revoked admins.
   if (currentRole === "admin" && targetRole !== "admin") {
-    const { count, error: countErr } = await svc
-      .from("opollo_users")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin");
-    if (countErr) {
+    const adminCount = await countActiveAdmins();
+    if (!adminCount.ok) {
       return errorJson(
         "INTERNAL_ERROR",
-        `Failed to count admins: ${countErr.message}`,
+        `Failed to count active admins: ${adminCount.error}`,
         500,
       );
     }
-    if ((count ?? 0) <= 1) {
+    if (adminCount.count <= 1) {
       return errorJson(
         "LAST_ADMIN",
-        "Refusing to demote the last remaining admin. Promote another admin first, or use the emergency route.",
+        "Refusing to demote the last remaining active admin. Promote another admin first, or use the emergency route.",
         409,
       );
     }

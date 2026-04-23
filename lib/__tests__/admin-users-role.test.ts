@@ -311,6 +311,48 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
     const body = await res.json();
     expect(body.error.code).toBe("LAST_ADMIN");
   });
+
+  // M15-4 regression. Prior to the fix, the LAST_ADMIN count filtered only
+  // on role='admin' and ignored revoked_at, so a revoked admin row would
+  // pad the count and let the caller demote the last *active* admin. This
+  // test seeds one active admin + one revoked admin, then attempts to
+  // demote the active one. With the fix, count(active)=1 and demotion
+  // must be blocked. Without the fix, count(all-with-admin-role)=2 and
+  // demotion would succeed — that's the bug.
+  it(
+    "LAST_ADMIN counts only active admins — revoked admins do not prop up the count",
+    async () => {
+      const activeAdmin = await seedAuthUser({ role: "admin" });
+      const revokedAdmin = await seedAuthUser({ role: "admin" });
+
+      // Stamp revoked_at on the second admin via service-role. The row
+      // keeps role='admin' but revoked_at is set, so the user cannot
+      // sign in and must not count toward the LAST_ADMIN floor.
+      const svc = getServiceRoleClient();
+      const { error: revokeErr } = await svc
+        .from("opollo_users")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", revokedAdmin.id);
+      expect(revokeErr).toBeNull();
+
+      // Flag-off path — the caller is superuser; targeting the sole
+      // active admin. With the fix, LAST_ADMIN fires (count=1).
+      delete process.env.FEATURE_SUPABASE_AUTH;
+      mockState.client = anonClient();
+
+      const res = await roleRoutePATCH(
+        makeRequest(activeAdmin.id, { role: "operator" }),
+        { params: { id: activeAdmin.id } },
+      );
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error.code).toBe("LAST_ADMIN");
+
+      // And the row was NOT demoted — defensive assertion against the
+      // "error returned but the write already landed" failure mode.
+      expect(await readRole(activeAdmin.id)).toBe("admin");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

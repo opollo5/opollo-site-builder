@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { countActiveAdmins } from "@/lib/auth";
 import { revokeUserSessions } from "@/lib/auth-revoke";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -95,19 +96,18 @@ export async function POST(
   }
 
   if (target.role === "admin") {
-    const { count, error: countErr } = await svc
-      .from("opollo_users")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "admin")
-      .is("revoked_at", null);
-    if (countErr) {
+    // Shared counter with /admin/users/[id]/role — both routes must
+    // agree on "active admin" = role='admin' AND revoked_at IS NULL.
+    // See lib/auth.ts#countActiveAdmins for the definition.
+    const adminCount = await countActiveAdmins();
+    if (!adminCount.ok) {
       return errorJson(
         "INTERNAL_ERROR",
-        `Failed to count active admins: ${countErr.message}`,
+        `Failed to count active admins: ${adminCount.error}`,
         500,
       );
     }
-    if ((count ?? 0) <= 1) {
+    if (adminCount.count <= 1) {
       return errorJson(
         "LAST_ADMIN",
         "Refusing to revoke the last active admin. Promote another admin first, or use the emergency route.",
