@@ -34,7 +34,8 @@ export type LimiterName =
   | "login"
   | "auth_callback"
   | "invite"
-  | "register";
+  | "register"
+  | "password_reset";
 
 type LimiterConfig = {
   requests: number;
@@ -42,14 +43,22 @@ type LimiterConfig = {
 };
 
 const CONFIGS: Record<LimiterName, LimiterConfig> = {
-  chat:          { requests: 120, window: "60 s" },
-  batch:         { requests: 30,  window: "60 s" },
-  regen:         { requests: 60,  window: "60 s" },
-  tools:         { requests: 120, window: "60 s" },
-  login:         { requests: 10,  window: "60 s" },
-  auth_callback: { requests: 10,  window: "60 s" },
-  invite:        { requests: 20,  window: "1 h" },
-  register:      { requests: 20,  window: "1 h" },
+  chat:           { requests: 120, window: "60 s" },
+  batch:          { requests: 30,  window: "60 s" },
+  regen:          { requests: 60,  window: "60 s" },
+  tools:          { requests: 120, window: "60 s" },
+  login:          { requests: 10,  window: "60 s" },
+  auth_callback:  { requests: 10,  window: "60 s" },
+  invite:         { requests: 20,  window: "1 h" },
+  register:       { requests: 20,  window: "1 h" },
+  // M14-3: forgot-password per-email bucket. 5 requests per email per
+  // hour caps both accidental user mashing and a compromised sender
+  // from email-bombing a specific address. Identifier convention:
+  // "email:<normalised_email>" — IP-based limiting is intentionally
+  // NOT used here because a single legitimate user behind a CGNAT
+  // shouldn't be throttled because of an unrelated user on the same
+  // IP, and an attacker rotating IPs wouldn't be slowed by it.
+  password_reset: { requests: 5,   window: "1 h" },
 };
 
 export type RateLimitResult =
