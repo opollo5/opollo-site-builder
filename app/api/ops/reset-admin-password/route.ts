@@ -129,16 +129,23 @@ export async function POST(req: Request): Promise<NextResponse> {
   const svc = getServiceRoleClient();
 
   try {
-    // Confirm the target is a current (non-deleted) admin. Supabase's
+    // Confirm the target is a current (non-revoked) admin. Supabase's
     // auth.users table is the source of truth for auth identity, but
     // opollo_users is the source of truth for role. The join path:
     // opollo_users.id == auth.users.id; we look up opollo_users by
     // email-equivalent, then use the id to drive the auth admin call.
+    //
+    // opollo_users does NOT carry a deleted_at column today — the
+    // BACKLOG schema-hygiene pass scopes soft-delete to the mutable
+    // content tables (sites / design_systems / pages / etc), not to
+    // the user table. User lifecycle uses revoked_at instead: revoked
+    // admins are refused here so a leaked emergency key can't reset
+    // a banned admin's password as part of a compromise chain.
     const { data: opolloUser, error: opolloErr } = await svc
       .from("opollo_users")
-      .select("id, role, deleted_at")
+      .select("id, role, revoked_at")
       .eq("email", normalizedEmail)
-      .is("deleted_at", null)
+      .is("revoked_at", null)
       .maybeSingle();
 
     if (opolloErr) {
