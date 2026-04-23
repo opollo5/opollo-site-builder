@@ -149,11 +149,11 @@ Every new page M14-3 + M14-4 add goes through `auditA11y()` in its E2E spec per 
 ## Sub-slice status tracker
 
 - [x] M14-1 — admin reset endpoint (merged, PR #113)
-- [ ] `fix(e2e)` briefs-review spec — pre-existing flake on main; ship before M14-2 so the suite is green
-- [ ] M14-2 — Supabase redirect configuration
-- [ ] M14-3 — forgot password flow (BLOCKED on M14-2)
-- [ ] M14-4 — account security page (BLOCKED on M14-3)
-- [ ] M14-5 — E2E coverage (BLOCKED on M14-4)
-- [ ] M14-6 — docs + auth flow diagram (BLOCKED on M14-5)
+- [x] `fix(e2e)` briefs-review spec (merged, PR #114 + PR #115 fixme)
+- [x] M14-2 — Supabase redirect configuration (merged, PR #116)
+- [x] M14-3 — forgot password flow (merged, PR #117)
+- [x] M14-4 — account security page (merged, PR #118)
+- [x] M14-5 — E2E coverage (merged, PR #119 + PR #120 public-paths fix + PR #121 email-flow rework)
+- [x] M14-6 — docs + auth flow diagram (this PR)
 
 **Auto-continue rule:** silence at sub-slice boundaries = proceed, per the CLAUDE.md "Auto-continue" rule. **Explicit halt at M14-6 → M12-2:** after M14-6 merges, auto-continue halts. Steven tests the full reset flow end-to-end — request reset, receive email, set new password, log in with new, verify old rejected, exercise the logged-in password-change flow — and posts an explicit "resume M12-2" signal. Only then does M12-2 pick up. Silence at the M14-6 → M12-2 boundary is NOT a proceed signal.

@@ -2,7 +2,16 @@
 
 ## Status
 
-Shipped. Backfilled during M11-6 (audit close-out 2026-04-22) so the risk audit has a single source of truth.
+Shipped, completed in M14. Backfilled during M11-6 (audit close-out 2026-04-22); retrospective note added 2026-04-24 after M14.
+
+M2 shipped the foundation — Supabase-backed sessions, role matrix, admin gate, kill switch, invite flow — but it did NOT ship self-service recovery. Specifically, M2 left these gaps, all of which became painful when `hi@opollo.com` locked out:
+
+- **No "Forgot password?" path.** A user who forgot their password had no way to recover it — the login form's only feedback on a bad password was a generic error.
+- **No `/account/security` page.** A signed-in user had no way to rotate their own password.
+- **No permanent operator recovery tool.** If Supabase's email flow was misconfigured or unreachable, a locked-out admin had no path back in short of a one-off database edit.
+- **Supabase dashboard redirect URLs never documented.** The production dashboard's Site URL had drifted to `localhost:3000`, so every auth email (if any were ever sent) would have landed at the wrong host.
+
+M14 closed all four. M2 is still the correct foundation — the role matrix, admin gate, emergency kill switch, and invite flow are all in use unchanged. The "auth is shipped" framing in this plan's original wording predated self-service recovery being a requirement; the door was held by admin-only invite flow until M14 added the self-service paths. See `docs/AUTH.md` for the post-M14 flow diagram.
 
 ## What it is
 
