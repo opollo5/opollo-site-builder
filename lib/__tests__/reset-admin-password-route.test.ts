@@ -21,7 +21,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 type OpolloUserRow = {
   id: string;
   role: string;
-  deleted_at: string | null;
+  revoked_at: string | null;
 };
 
 type LookupResult = {
@@ -36,20 +36,61 @@ type UpdateResult = {
 const mockState = vi.hoisted(() => ({
   lookupResult: null as LookupResult | null,
   lookupCalls: [] as Array<{ column: string; value: string }>,
+  selectColumns: [] as string[],
+  isCalls: [] as Array<{ column: string; value: unknown }>,
   updateResult: { error: null } as UpdateResult,
   updateCalls: [] as Array<{ userId: string; attributes: { password: string } }>,
 }));
+
+// Columns actually present on opollo_users as of migration 0006.
+// If the route .select()s or .is()-filters on anything outside this
+// set, the mock fails loudly — a unit-level tripwire for the
+// "queries a column the table doesn't have" class of bug that
+// shipped in the original M14-1 and only surfaced in production.
+const OPOLLO_USERS_COLUMNS = new Set([
+  "id",
+  "email",
+  "display_name",
+  "role",
+  "created_at",
+  "revoked_at",
+]);
+
+function assertValidColumnList(cols: string): void {
+  for (const col of cols.split(",").map((c) => c.trim()).filter(Boolean)) {
+    if (!OPOLLO_USERS_COLUMNS.has(col)) {
+      throw new Error(
+        `reset-admin-password.test: route selected non-existent opollo_users column "${col}". ` +
+          `Valid columns: ${[...OPOLLO_USERS_COLUMNS].join(", ")}.`,
+      );
+    }
+  }
+}
+
+function assertValidColumn(col: string): void {
+  if (!OPOLLO_USERS_COLUMNS.has(col)) {
+    throw new Error(
+      `reset-admin-password.test: route filtered on non-existent opollo_users column "${col}". ` +
+        `Valid columns: ${[...OPOLLO_USERS_COLUMNS].join(", ")}.`,
+    );
+  }
+}
 
 vi.mock("@/lib/supabase", () => ({
   getServiceRoleClient: () => ({
     from(_table: string) {
       return {
-        select(_cols: string) {
+        select(cols: string) {
+          mockState.selectColumns.push(cols);
+          assertValidColumnList(cols);
           return {
             eq(column: string, value: string) {
+              assertValidColumn(column);
               mockState.lookupCalls.push({ column, value });
               return {
-                is(_col: string, _val: null) {
+                is(col: string, val: unknown) {
+                  assertValidColumn(col);
+                  mockState.isCalls.push({ column: col, value: val });
                   return {
                     maybeSingle: async () => {
                       if (!mockState.lookupResult) {
@@ -141,11 +182,13 @@ beforeEach(() => {
     data: {
       id: ADMIN_UUID,
       role: "admin",
-      deleted_at: null,
+      revoked_at: null,
     },
     error: null,
   };
   mockState.lookupCalls = [];
+  mockState.selectColumns = [];
+  mockState.isCalls = [];
   mockState.updateResult = { error: null };
   mockState.updateCalls = [];
   loggerCalls.info.length = 0;
@@ -328,7 +371,7 @@ describe("POST /api/ops/reset-admin-password: target guard", () => {
 
   it("returns 403 when the matching user is an operator", async () => {
     mockState.lookupResult = {
-      data: { id: ADMIN_UUID, role: "operator", deleted_at: null },
+      data: { id: ADMIN_UUID, role: "operator", revoked_at: null },
       error: null,
     };
     const res = await resetAdminPasswordPOST(
@@ -345,7 +388,7 @@ describe("POST /api/ops/reset-admin-password: target guard", () => {
 
   it("returns 403 when the matching user is a viewer", async () => {
     mockState.lookupResult = {
-      data: { id: ADMIN_UUID, role: "viewer", deleted_at: null },
+      data: { id: ADMIN_UUID, role: "viewer", revoked_at: null },
       error: null,
     };
     const res = await resetAdminPasswordPOST(
@@ -369,6 +412,49 @@ describe("POST /api/ops/reset-admin-password: target guard", () => {
     expect(mockState.lookupCalls).toEqual([
       { column: "email", value: "hi@opollo.com" },
     ]);
+  });
+
+  it("filters on revoked_at (not deleted_at) — opollo_users has no soft-delete column", async () => {
+    // Regression pin: the original M14-1 shipped a query against
+    // opollo_users.deleted_at which is not a column on that table
+    // (soft-delete is scoped to mutable content tables per BACKLOG
+    // schema-hygiene). The mock's `assertValidColumn` fails the
+    // test if any non-existent column is ever selected or filtered.
+    await resetAdminPasswordPOST(
+      makeRequest(
+        { email: "hi@opollo.com", new_password: VALID_PASSWORD },
+        { key: KEY_32 },
+      ),
+    );
+    expect(mockState.isCalls).toEqual([
+      { column: "revoked_at", value: null },
+    ]);
+    expect(mockState.selectColumns).toEqual(["id, role, revoked_at"]);
+  });
+});
+
+describe("POST /api/ops/reset-admin-password: revoked admin is refused", () => {
+  beforeEach(() => {
+    process.env.OPOLLO_EMERGENCY_KEY = KEY_32;
+  });
+
+  it("returns 404 when the matching admin has a non-null revoked_at", async () => {
+    // The route filters `.is('revoked_at', null)` at the query layer,
+    // so a revoked admin surfaces as "no matching row" → NOT_FOUND.
+    // Simulates that by returning `data: null` from the mock — the
+    // same shape Supabase returns when the .is() predicate excludes
+    // every row.
+    mockState.lookupResult = { data: null, error: null };
+    const res = await resetAdminPasswordPOST(
+      makeRequest(
+        { email: "revoked-admin@opollo.com", new_password: VALID_PASSWORD },
+        { key: KEY_32 },
+      ),
+    );
+    expect(res.status).toBe(404);
+    const body = await res.json();
+    expect(body.error.code).toBe("NOT_FOUND");
+    expect(mockState.updateCalls).toHaveLength(0);
   });
 });
 
