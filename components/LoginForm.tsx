@@ -73,6 +73,15 @@ export function LoginForm({ next }: { next: string }) {
       )}
 
       <SubmitButton />
+
+      <p className="text-center text-xs text-muted-foreground">
+        <a
+          href="/auth/forgot-password"
+          className="underline hover:no-underline"
+        >
+          Forgot password?
+        </a>
+      </p>
     </form>
   );
 }
