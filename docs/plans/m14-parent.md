@@ -48,11 +48,7 @@ Login form has no remember-me checkbox. Supabase `@supabase/ssr` uses cookie-bas
 ### 7. Account deletion — not implemented, not claimed
 No user-facing deletion. Admin-side uses revoke/reinstate (ban_duration) — data preserved. No hard-delete or right-to-erasure flow. **Recommendation:** out of M14 until a public-user surface ships. BACKLOG entry.
 
-**Summary of candidates requiring Steven's decision:**
-- **M14-7 (candidate)** — invite TTL + revocation. Operator-facing; auth-adjacent. Do you want this in M14 or as its own follow-up?
-- **M14-8 (candidate)** — session expiry pre-warning + session-extend UI. Polish; defer-worthy.
-
-The other five areas (email verification, logout, MFA, remember me, account deletion) are either fine as-is or belong to future milestones. Only M14-7 and M14-8 need a scope decision from Steven.
+**Decision (2026-04-24):** neither candidate is in M14. Steven's call — product needs login + password reset to work, everything else is below the line. M14-7 (invite TTL + revocation) and M14-8 (session expiry pre-warning) move to `docs/BACKLOG.md` and get picked up when someone actually hits them. M14 stays at six slices: M14-1 (merged) → `fix(e2e)` → M14-2 → M14-3 → M14-4 → M14-5 → M14-6.
 
 ## Out of scope (tracked in BACKLOG.md)
 
@@ -60,8 +56,8 @@ The other five areas (email verification, logout, MFA, remember me, account dele
 - **Multi-factor auth.** Not claimed anywhere today. Audit confirmed zero references in the codebase.
 - **"Remember me" toggle.** Cookie-based sessions already persist; no UI affordance missed in practice.
 - **Account deletion / GDPR-export.** No end-user surface yet.
-- **User invitation flow expiry/revocation (M14-7 candidate).** Pending Steven's decision whether to fold into M14 or defer.
-- **Session expiry pre-warning (M14-8 candidate).** Pending Steven's decision.
+- **User invitation flow expiry/revocation.** Decision 2026-04-24: out of M14, deferred to BACKLOG.
+- **Session expiry pre-warning.** Decision 2026-04-24: out of M14, deferred to BACKLOG.
 
 ## Env vars required
 
@@ -159,7 +155,5 @@ Every new page M14-3 + M14-4 add goes through `auditA11y()` in its E2E spec per 
 - [ ] M14-4 — account security page (BLOCKED on M14-3)
 - [ ] M14-5 — E2E coverage (BLOCKED on M14-4)
 - [ ] M14-6 — docs + auth flow diagram (BLOCKED on M14-5)
-- [ ] M14-7 (candidate) — invite TTL + revocation (pending Steven approval)
-- [ ] M14-8 (candidate) — session expiry pre-warning (pending Steven approval)
 
 **Auto-continue rule:** silence at sub-slice boundaries = proceed, per the CLAUDE.md "Auto-continue" rule. **Explicit halt at M14-6 → M12-2:** after M14-6 merges, auto-continue halts. Steven tests the full reset flow end-to-end — request reset, receive email, set new password, log in with new, verify old rejected, exercise the logged-in password-change flow — and posts an explicit "resume M12-2" signal. Only then does M12-2 pick up. Silence at the M14-6 → M12-2 boundary is NOT a proceed signal.
