@@ -31,24 +31,25 @@ type Pricing = {
 
 // Rates sourced from Anthropic's pricing page as of 2026-04. Add new
 // models here as we onboard them; don't mutate existing entries.
+// Units: micro-cents per token (see header comment above).
 const PRICING_TABLE: Record<string, Pricing> = {
   "claude-opus-4-7": {
-    input: 15.0,
-    output: 75.0,
-    cache_write: 18.75,
-    cache_read: 1.5,
+    input: 1.5,
+    output: 7.5,
+    cache_write: 1.875,
+    cache_read: 0.15,
   },
   "claude-sonnet-4-6": {
-    input: 3.0,
-    output: 15.0,
-    cache_write: 3.75,
-    cache_read: 0.3,
+    input: 0.3,
+    output: 1.5,
+    cache_write: 0.375,
+    cache_read: 0.03,
   },
   "claude-haiku-4-5-20251001": {
-    input: 0.8,
-    output: 4.0,
-    cache_write: 1.0,
-    cache_read: 0.08,
+    input: 0.08,
+    output: 0.4,
+    cache_write: 0.1,
+    cache_read: 0.008,
   },
 };
 
@@ -89,9 +90,10 @@ export function computeCostCents(
     cacheWrite * microCentsPerToken.cache_write +
     cacheRead * microCentsPerToken.cache_read;
 
-  // microCents → cents: divide by 100. Round up — we'd rather pay a
-  // rounding cent to the operator's budget than undercount the spend.
-  return { cents: Math.ceil(microCents / 100), rateFound: true };
+  // microCents → cents: divide by 1000 (1 cent = 1000 micro-cents).
+  // Round up — we'd rather pay a rounding cent to the operator's budget
+  // than undercount the spend.
+  return { cents: Math.ceil(microCents / 1000), rateFound: true };
 }
 
 export function hasPricing(model: string): boolean {
