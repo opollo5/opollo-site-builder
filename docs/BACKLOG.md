@@ -6,6 +6,19 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Auth polish deferred from M14 (2026-04-24)
+
+Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 stays focused on password reset; these get picked up when they actually cost someone time.
+
+- **Invite TTL + revocation.** `app/api/admin/users/invite` generates a Supabase invite link but has no expiry beyond Supabase's built-in, and no "cancel pending invite" admin action. Pick up trigger: an admin mistakenly invites the wrong email and can't revoke. Scope: new `invites` table with `expires_at` + `revoked_at`, a DELETE route, and an admin-UI "pending invites" row list.
+- **Session expiry pre-warning.** Middleware redirects to `/login` when the JWT expires; no "session about to expire" UI, no session-extend prompt. Pick up trigger: an operator loses mid-workflow state because of an expiry they didn't see coming. Scope: client-side expiry timer + pre-expiry toast + "extend session" action that refreshes the token.
+
+## M12-6 — Save-Draft persistence for briefs review
+
+Surfaced by the `fix(e2e)` slice (2026-04-24). The M12-1 slice plan §6.2 called for a "Save draft" button that persists `brief_pages` edits under `version_lock` before commit. That button was never implemented — the commit endpoint therefore 409s on any edit-then-commit flow because the client's hash is computed from in-memory edits while the server recomputes from unedited DB rows. The happy-path E2E in `e2e/briefs-review.spec.ts` is `test.fixme`'d until this lands. Pick up trigger: M12-6 starts. Scope: new `PATCH /api/briefs/[brief_id]/pages` endpoint + "Save draft" button wired into `BriefReviewClient.tsx` + re-enable the fixme'd test.
+
+---
+
 ## M11 — audit close-out (reconciled post-merge)
 
 Parent plan: `docs/plans/m11-parent.md`. Originally scoped as six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`. Audit 3 (`docs/plans/m11-parent.md` re-verified against code) found that the M11-6 doc slice landed "merged" rows for M11-2, M11-3, and M11-5 **without** the corresponding code PRs ever shipping. The table below reflects ground-truth after the post-audit reconciliation (PRs #88, #94, #96).
