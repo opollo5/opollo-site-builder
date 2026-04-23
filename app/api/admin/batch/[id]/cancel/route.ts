@@ -115,12 +115,14 @@ export async function POST(
   // Flip job status + set cancel_requested_at. No ELSE — we just
   // overwrite whatever status we read, since the guard above limited
   // the set to {queued, running, partial}.
+  const now = new Date().toISOString();
   const { error: jobErr } = await svc
     .from("generation_jobs")
     .update({
       status: "cancelled",
-      cancel_requested_at: new Date().toISOString(),
-      finished_at: new Date().toISOString(),
+      cancel_requested_at: now,
+      finished_at: now,
+      updated_at: now,
     })
     .eq("id", jobId);
   if (jobErr) {
@@ -141,7 +143,8 @@ export async function POST(
       state: "skipped",
       last_error_code: "CANCELLED",
       last_error_message: "Batch was cancelled.",
-      finished_at: new Date().toISOString(),
+      finished_at: now,
+      updated_at: now,
       retry_after: null,
     })
     .eq("job_id", jobId)
