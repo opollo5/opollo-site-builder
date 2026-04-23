@@ -65,6 +65,14 @@ const PUBLIC_PATHS = new Set<string>([
   // itself doesn't expose sensitive data — just connectivity + build
   // info. See app/api/health/route.ts.
   "/api/health",
+  // M14-3 password-reset surfaces. Both are reachable without a
+  // session — /auth/forgot-password is the entry form, and
+  // /auth/reset-password decides server-side whether to render the
+  // form (recovery session present) or the "link expired" state
+  // (no session). The API counterparts under /api/auth/* are already
+  // covered by the prefix check below.
+  "/auth/forgot-password",
+  "/auth/reset-password",
 ]);
 
 function isPublicPath(pathname: string): boolean {

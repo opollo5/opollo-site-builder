@@ -184,6 +184,13 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, no session", () => {
       "/api/auth/callback",
       "/api/auth/login",
       "/api/emergency",
+      // M14-3 password-reset surfaces — added to the public-path set
+      // so unauthenticated users can land on the request form and
+      // the reset page's "expired link" state.
+      "/auth/forgot-password",
+      "/auth/reset-password",
+      "/api/auth/forgot-password",
+      "/api/auth/reset-password",
     ]) {
       const res = await middleware(makeRequest(p));
       expect(res.status).toBe(200);
