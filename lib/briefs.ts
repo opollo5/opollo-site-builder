@@ -40,6 +40,11 @@ export type BriefRow = {
   committed_at: string | null;
   committed_by: string | null;
   committed_page_hash: string | null;
+  // M12-2 — first-class fields for the operator-authored brand voice +
+  // design direction that feed the M12-3 runner + anchor cycle. Nullable;
+  // populated on the review page pre-commit (see commitBrief input).
+  brand_voice: string | null;
+  design_direction: string | null;
   version_lock: number;
   created_at: string;
   updated_at: string;
@@ -474,6 +479,12 @@ export type CommitBriefInput = {
   expectedVersionLock: number;
   pageHash: string;
   committedBy: string | null;
+  // M12-2 — optional overrides. `undefined` means "don't touch the
+  // column" (preserves prior value); `null` explicitly clears. Empty
+  // string is a valid distinct value but not treated differently from
+  // null by the runner.
+  brandVoice?: string | null;
+  designDirection?: string | null;
 };
 
 export type CommitBriefData = {
@@ -593,18 +604,32 @@ async function commitBriefImpl(
   }
 
   // 2. UPDATE briefs under version_lock.
+  //
+  // brand_voice / design_direction are only included in the UPDATE SET
+  // list when the caller explicitly provided them (`undefined` means
+  // "don't touch"). This keeps commit idempotent across code paths that
+  // don't know about the M12-2 fields — e.g. a server-side retry that
+  // reconstructs input without the user-supplied form values.
   const committedAt = now();
+  const updatePatch: Record<string, unknown> = {
+    status: "committed",
+    committed_at: committedAt,
+    committed_by: input.committedBy,
+    committed_page_hash: serverHash,
+    version_lock: brief.version_lock + 1,
+    updated_at: committedAt,
+    updated_by: input.committedBy,
+  };
+  if (input.brandVoice !== undefined) {
+    updatePatch.brand_voice = input.brandVoice;
+  }
+  if (input.designDirection !== undefined) {
+    updatePatch.design_direction = input.designDirection;
+  }
+
   const update = await svc
     .from("briefs")
-    .update({
-      status: "committed",
-      committed_at: committedAt,
-      committed_by: input.committedBy,
-      committed_page_hash: serverHash,
-      version_lock: brief.version_lock + 1,
-      updated_at: committedAt,
-      updated_by: input.committedBy,
-    })
+    .update(updatePatch)
     .eq("id", brief.id)
     .eq("version_lock", brief.version_lock)
     .select("id")
