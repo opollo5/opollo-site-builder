@@ -125,10 +125,10 @@ describe("createPost", () => {
   it("allows the same slug across different sites", async () => {
     const siteA = await seedSite({ name: "CA", prefix: "cpa" });
     const siteB = await seedSite({ name: "CB", prefix: "cpb" });
-    await seedPost(siteA.id, { slug: "shared", title: "A" });
+    await seedPost(siteA.id, { slug: "shared", title: "Site A post" });
     const res = await createPost({
       site_id: siteB.id,
-      title: "B",
+      title: "Site B post",
       slug: "shared",
       design_system_version: 1,
     });
