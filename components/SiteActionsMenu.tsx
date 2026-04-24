@@ -1,18 +1,49 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { createContext, useContext, useState, useRef, useEffect, ReactNode } from "react";
 
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { EditSiteModal } from "@/components/EditSiteModal";
 
-// Three-dot action menu attached to each site row. Opens in-place
-// (no dropdown library — a small uncontrolled <details> keeps the
-// dep surface minimal). Handles Edit + Archive.
-//
-// Clone Design System is deferred to a later slice — write-safety on
-// cloning (idempotency key, copy-on-write vs reference semantics)
-// needs its own thinking pass.
+type MenuContextType = {
+  openMenuId: string | null;
+  setOpenMenuId: (id: string | null) => void;
+};
+
+const MenuContext = createContext<MenuContextType | undefined>(undefined);
+
+function useMenuContext() {
+  const context = useContext(MenuContext);
+  if (!context) {
+    throw new Error("useMenuContext must be used within MenuProvider");
+  }
+  return context;
+}
+
+export function MenuProvider({ children }: { children: ReactNode }) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+
+    if (openMenuId) {
+      document.addEventListener("click", handleClickOutside);
+      return () => document.removeEventListener("click", handleClickOutside);
+    }
+  }, [openMenuId]);
+
+  return (
+    <MenuContext.Provider value={{ openMenuId, setOpenMenuId }}>
+      <div ref={menuRef}>{children}</div>
+    </MenuContext.Provider>
+  );
+}
 
 export function SiteActionsMenu({
   siteId,
@@ -24,56 +55,73 @@ export function SiteActionsMenu({
   wpUrl: string;
 }) {
   const router = useRouter();
+  const { openMenuId, setOpenMenuId } = useMenuContext();
   const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
+  const menuId = `site-actions-${siteId}`;
+  const isOpen = openMenuId === menuId;
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpenMenuId(isOpen ? null : menuId);
+  };
+
+  const handleAction = () => {
+    setOpenMenuId(null);
+  };
+
   return (
-    <div className="relative inline-block">
-      <details
-        className="group"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <summary
-          className="cursor-pointer list-none rounded px-2 py-1 text-muted-foreground hover:bg-muted"
+    <>
+      <div className="relative inline-block">
+        <button
+          onClick={handleToggle}
+          className="rounded px-2 py-1 text-muted-foreground hover:bg-muted"
           aria-label={`Actions for ${name}`}
           data-testid="site-actions-summary"
         >
           ⋯
-        </summary>
-        <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border bg-background shadow-md">
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setEditOpen(true);
-            }}
-          >
-            Edit
-          </button>
-          <button
-            type="button"
-            className="w-full px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              setArchiveOpen(true);
-            }}
-            data-testid="site-archive-action"
-          >
-            Archive
-          </button>
-          <button
-            type="button"
-            disabled
-            className="w-full cursor-not-allowed px-3 py-1.5 text-left text-xs text-muted-foreground"
-            title="Coming in a follow-up slice"
-          >
-            Clone DS (soon)
-          </button>
-        </div>
-      </details>
+        </button>
+
+        {isOpen && (
+          <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border bg-background shadow-md">
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setEditOpen(true);
+                handleAction();
+              }}
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              className="w-full px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setArchiveOpen(true);
+                handleAction();
+              }}
+              data-testid="site-archive-action"
+            >
+              Archive
+            </button>
+            <button
+              type="button"
+              disabled
+              className="w-full cursor-not-allowed px-3 py-1.5 text-left text-xs text-muted-foreground"
+              title="Coming in a follow-up slice"
+            >
+              Clone DS (soon)
+            </button>
+          </div>
+        )}
+      </div>
+
       <EditSiteModal
         open={editOpen}
         onClose={() => setEditOpen(false)}
@@ -95,6 +143,6 @@ export function SiteActionsMenu({
           }}
         />
       )}
-    </div>
+    </>
   );
 }
