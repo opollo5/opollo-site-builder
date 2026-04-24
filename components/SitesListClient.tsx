@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { AddSiteModal } from "@/components/AddSiteModal";
+import { MenuProvider } from "@/components/SiteActionsMenu";
 import { SitesTable } from "@/components/SitesTable";
 import { Button } from "@/components/ui/button";
 import type { SiteListItem } from "@/lib/tool-schemas";
@@ -32,7 +33,9 @@ export function SitesListClient({ sites }: { sites: SiteListItem[] }) {
       </div>
 
       <div className="mt-6">
-        <SitesTable sites={sites} />
+        <MenuProvider>
+          <SitesTable sites={sites} />
+        </MenuProvider>
       </div>
 
       <AddSiteModal
