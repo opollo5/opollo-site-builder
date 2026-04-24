@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { AdminNav } from "@/components/AdminNav";
 
 // Shared shell for every page under /admin.
 //
@@ -31,75 +31,7 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="flex h-12 flex-none items-center justify-between border-b px-4">
-        <div className="flex items-center gap-4">
-          <Link href="/admin/sites" className="text-sm font-semibold">
-            Opollo Site Builder
-          </Link>
-          <nav className="flex items-center gap-3 text-xs">
-            <Link
-              href="/admin/sites"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Sites
-            </Link>
-            <Link
-              href="/admin/batches"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Batches
-            </Link>
-            <Link
-              href="/admin/images"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Images
-            </Link>
-            {showUsersLink && (
-              <Link
-                href="/admin/users"
-                className="text-muted-foreground hover:text-foreground"
-              >
-                Users
-              </Link>
-            )}
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          {user && (
-            <span
-              className="text-xs text-muted-foreground"
-              data-testid="admin-user-email"
-            >
-              {user.email}
-            </span>
-          )}
-          {user && (
-            <Link
-              href="/account/security"
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Security
-            </Link>
-          )}
-          <Link
-            href="/"
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            ← Back to builder
-          </Link>
-          {user && (
-            <form action="/logout" method="POST">
-              <button
-                type="submit"
-                className="text-xs text-muted-foreground hover:text-foreground"
-              >
-                Sign out
-              </button>
-            </form>
-          )}
-        </div>
-      </header>
+      <AdminNav user={user} showUsersLink={showUsersLink} />
       <main className="mx-auto max-w-5xl p-6">{children}</main>
     </div>
   );
