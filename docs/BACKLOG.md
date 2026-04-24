@@ -6,6 +6,28 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## PDF / .docx brief parser (deferred from M12-6, 2026-04-24)
+
+**What:** Extend `lib/brief-parser.ts` to accept `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document` in addition to `text/plain` + `text/markdown`. The existing structural-first + Claude-inference-fallback parser runs against the extracted text; the only new work is the MIME-specific binary → UTF-8 decoder.
+
+**Why deferred:** Parent plan M12-6 called this a stretch ("skip if non-trivial, add to BACKLOG"). The integration is non-trivial: each parser is a separate npm dep (`pdf-parse`, `mammoth`) with its own footgun (pdf-parse silently loses formatting on scanned PDFs; mammoth's output includes odd Word artifacts that need post-processing). Both deps also bloat the Next.js serverless bundle — would need `serverComponentsExternalPackages` entries in `next.config.mjs` similar to the M12-4 playwright-core fix. Scope is >1 day of careful work; the markdown happy-path covers the 90% operator workflow today.
+
+**Trigger:** First operator request to upload a brief they already have as a PDF (investor deck, client proposal) and doesn't want to retype. Probably lands within the first 10 real sites.
+
+**Scope:**
+- Add `pdf-parse` + `mammoth` deps (note: both are CJS-only; next.config needs `serverComponentsExternalPackages: ["pdf-parse", "mammoth"]` — exact same treatment as `playwright-core` from M12-4)
+- Extend `BRIEF_ALLOWED_MIME_TYPES` in `lib/briefs.ts`
+- In `uploadBrief`, branch on MIME type: call `pdf-parse` or `mammoth` before the existing `new TextDecoder("utf-8")` path
+- Feature-flag behind `OPOLLO_BRIEF_BINARY_PARSERS=1` for the first rollout so a regression in the binary path doesn't regress the text/markdown happy path
+- Parser unit tests with one real PDF fixture + one real .docx fixture (redacted)
+- Update the upload-form accept attribute + the operator help copy in `AddBriefModal.tsx`
+
+**Non-goals:** OCR for scanned PDFs (`pdf-parse` returns blank text; out of scope, fail cleanly with `BRIEF_PARSE_FAILED`). Rich-text preservation (tables, images) — extract text only. The visual review pass regenerates design from scratch anyway.
+
+**Size:** Medium — ~3-4 hours PR with the two parser libs, feature flag, fixtures, and test coverage.
+
+---
+
 ## Auth polish deferred from M14 (2026-04-24)
 
 Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 stays focused on password reset; these get picked up when they actually cost someone time.

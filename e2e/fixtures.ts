@@ -10,3 +10,10 @@ export const E2E_ADMIN_PASSWORD = "playwright-password-1234";
 
 // Pre-seeded test site (global-setup inserts if missing).
 export const E2E_TEST_SITE_PREFIX = "e2e";
+
+// M12-6 — deterministic cron secret, matched in playwright.config.ts's
+// webServer.env.CRON_SECRET. Used by the brief-runner cron driver in
+// briefs-full-loop.spec.ts to advance the runner one tick at a time.
+// Never used in production — staging + prod cron secrets live in
+// deploy-time env.
+export const E2E_CRON_SECRET = "e2e-cron-secret-deterministic";
