@@ -894,6 +894,11 @@ async function processPagePassLoop(
     (page.critique_log as BriefPageCritiqueEntry[]).find(
       (c) => c.pass_kind === "self_critique",
     )?.output as string | null ?? null;
+  // Raw Anthropic text of the anchor's final revise pass. extractDraftHtml
+  // strips fenced code blocks out of draft_html (it shouldn't be rendered
+  // to WordPress with a stray ```json block), so we stash the raw text
+  // here and feed it to extractConventionsFromRevise after the loop.
+  let anchorFinalReviseRawText: string | null = null;
   let totalPassesRun = 0;
 
   while (kindToRun !== null) {
@@ -935,6 +940,9 @@ async function processPagePassLoop(
       });
       passText = out.text;
       response = out.response;
+      if (isAnchorFinalPass) {
+        anchorFinalReviseRawText = passText;
+      }
     } catch (err) {
       logger.error("brief_runner.pass_failed", {
         brief_run_id: run.id,
@@ -1094,8 +1102,13 @@ async function processPagePassLoop(
   }
 
   // On the anchor page, freeze site_conventions from the final draft.
+  // Use the captured raw anthropic text (which still contains the
+  // ```json fenced block) — page.draft_html has already had code blocks
+  // stripped by extractDraftHtml.
   if (isAnchor) {
-    const conventions = extractConventionsFromRevise(page.draft_html ?? "");
+    const conventions = extractConventionsFromRevise(
+      anchorFinalReviseRawText ?? page.draft_html ?? "",
+    );
     const freeze = await freezeSiteConventions({
       briefId: brief.id,
       conventions,
