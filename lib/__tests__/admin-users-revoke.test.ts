@@ -210,6 +210,40 @@ describe("POST /api/admin/users/[id]/revoke: guardrails", () => {
     const body = await res.json();
     expect(body.error.code).toBe("LAST_ADMIN");
   });
+
+  // M15-4 regression. Pinning the sibling invariant from the /role PATCH
+  // route: the LAST_ADMIN count must only include active admins. A
+  // revoked row with role='admin' does not satisfy the floor. Both routes
+  // now share the countActiveAdmins() helper in lib/auth.ts so this
+  // contract cannot drift again.
+  it(
+    "LAST_ADMIN counts only active admins — revoked admins do not prop up the count",
+    async () => {
+      const activeAdmin = await seedAuthUser({ role: "admin" });
+      const revokedAdmin = await seedAuthUser({ role: "admin" });
+
+      const svc = getServiceRoleClient();
+      const { error: revokeErr } = await svc
+        .from("opollo_users")
+        .update({ revoked_at: new Date().toISOString() })
+        .eq("id", revokedAdmin.id);
+      expect(revokeErr).toBeNull();
+
+      delete process.env.FEATURE_SUPABASE_AUTH;
+      mockState.client = anonClient();
+
+      const res = await revokePOST(makeRequest(activeAdmin.id), {
+        params: { id: activeAdmin.id },
+      });
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error.code).toBe("LAST_ADMIN");
+
+      // The active admin's revoked_at must still be null — the guard
+      // must short-circuit before any mutation.
+      expect(await readRevokedAt(activeAdmin.id)).toBeNull();
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------

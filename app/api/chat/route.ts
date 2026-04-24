@@ -27,6 +27,11 @@ import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getSite } from "@/lib/sites";
 import { traceAnthropicStream } from "@/lib/langfuse";
 import { logger } from "@/lib/logger";
+import { getRequestContext } from "@/lib/request-context";
+import {
+  buildChatErrorDiagnostic,
+  buildSafeSseErrorPayload,
+} from "@/lib/chat-errors";
 import {
   runWithWpCredentials,
   type WpCredentialsOverride,
@@ -344,29 +349,16 @@ export async function POST(req: Request) {
 
         send("done", { stop_reason: stopReason ?? "unknown" });
       } catch (err) {
+        // Full diagnostic goes to the server logger only. The SSE payload
+        // the browser receives is opaque — static code, static message,
+        // our request_id for support correlation. See
+        // docs/ENDPOINT_AUDIT_2026-04-24.md finding #1 + lib/chat-errors.ts
+        // for the rationale.
         const apiErr = err instanceof Anthropic.APIError ? err : null;
-
-        const diagnostic = {
-          model: MODEL,
-          message: err instanceof Error ? err.message : String(err),
-          name: err instanceof Error ? err.name : undefined,
-          status: apiErr?.status,
-          request_id: apiErr?.requestID,
-          body: apiErr?.error,
-          stack: err instanceof Error ? err.stack : undefined,
-        };
+        const diagnostic = buildChatErrorDiagnostic(err, MODEL, apiErr);
         logger.error("api.chat.streaming_error", diagnostic);
 
-        send("error", {
-          code: "INTERNAL_ERROR",
-          message: diagnostic.message,
-          details: {
-            name: diagnostic.name,
-            status: diagnostic.status,
-            request_id: diagnostic.request_id,
-            body: diagnostic.body,
-          },
-        });
+        send("error", buildSafeSseErrorPayload(getRequestContext().request_id ?? null));
       } finally {
         controller.close();
       }
