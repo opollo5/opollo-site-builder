@@ -107,12 +107,17 @@ function networkError(err: unknown): WpError {
  * without a live WP.
  */
 export function fingerprintFromNamespaces(
-  namespaces: string[],
+  namespaces: readonly unknown[],
 ): Pick<DetectSeoPluginsOk, "plugin" | "allDetected"> {
+  // Defensive filter — the input comes from WP's /wp-json/ response,
+  // which occasionally mixes in non-string entries on older WP + plugin
+  // combinations. Drop anything that isn't a string before fingerprinting
+  // so a single bad entry can't crash the whole detection pass.
+  const strings = namespaces.filter((n): n is string => typeof n === "string");
   const hits: SeoPluginInfo[] = [];
   const seen = new Set<SeoPluginName>();
   for (const def of PLUGIN_DEFS) {
-    for (const ns of namespaces) {
+    for (const ns of strings) {
       const matched = def.matcher(ns);
       if (!matched) continue;
       if (seen.has(def.name)) continue;

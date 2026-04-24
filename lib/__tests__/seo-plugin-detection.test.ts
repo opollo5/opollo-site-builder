@@ -123,10 +123,12 @@ describe("fingerprintFromNamespaces", () => {
   });
 
   it("ignores non-string entries in the namespaces array (defensive)", () => {
+    // The function accepts `readonly unknown[]` precisely so a noisy
+    // /wp-json/ response with a mis-typed entry can't crash detection.
     const result = fingerprintFromNamespaces([
       "wp/v2",
-      // @ts-expect-error — defensive: verify the function is tolerant.
       null,
+      42,
       "yoast/v1",
     ]);
     expect(result.plugin?.name).toBe("yoast");
