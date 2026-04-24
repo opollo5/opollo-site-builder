@@ -49,20 +49,30 @@ describe("buildSafeSseErrorPayload", () => {
 });
 
 describe("buildChatErrorDiagnostic — server-side log contract", () => {
-  it("captures the raw error message for an Anthropic APIError", () => {
+  it("captures the full error context for an Anthropic APIError", () => {
     const apiErr = new Anthropic.APIError(
       429,
       { error: { type: "rate_limit_exceeded", message: "quota exceeded" } },
       "Rate limit exceeded",
       new Headers({ "x-anthropic-request-id": "anth-req-xyz" }),
     );
-    const diagnostic = buildChatErrorDiagnostic(apiErr, "claude-opus-4-7", apiErr);
-    expect(diagnostic.message).toBe("Rate limit exceeded");
+    const diagnostic = buildChatErrorDiagnostic(
+      apiErr,
+      "claude-opus-4-7",
+      apiErr,
+    );
+    // The Anthropic SDK composes APIError.message from status + body, so
+    // we assert on substrings rather than equality. The invariant we
+    // care about is "the full error context reaches the server log" —
+    // not the exact serialization.
+    expect(diagnostic.message).toContain("429");
+    expect(diagnostic.message).toContain("rate_limit_exceeded");
     expect(diagnostic.status).toBe(429);
     expect(diagnostic.body).toEqual({
       error: { type: "rate_limit_exceeded", message: "quota exceeded" },
     });
     expect(diagnostic.stack).toBeTypeOf("string");
+    expect(diagnostic.model).toBe("claude-opus-4-7");
   });
 
   it("captures a plain Error without an Anthropic wrapper", () => {
