@@ -384,13 +384,20 @@ describe("buildSystemPromptForSite", () => {
     });
 
     expect(prompt).not.toContain("## Available components");
-    expect(errorSpy).toHaveBeenCalledWith(
-      "[system-prompt] FEATURE_DESIGN_SYSTEM_V2=on but no active design_system for site",
-      expect.objectContaining({
-        site_id: site.id,
-        site_name: "Test",
-        fallback: "legacy_html_blob",
-      }),
+    // Phase 2 of M15-7 routed this through logger.error, which emits one
+    // JSON line to console.error (instead of the old (message, payload)
+    // two-arg call). Parse the JSON and assert on the structured fields
+    // the logger attaches — same invariant, logger-native shape.
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const [logLine] = errorSpy.mock.calls[0];
+    expect(typeof logLine).toBe("string");
+    const record = JSON.parse(logLine as string);
+    expect(record.level).toBe("error");
+    expect(record.msg).toBe(
+      "system_prompt.resolve_design_system_slot_failed",
     );
+    expect(record.site_id).toBe(site.id);
+    expect(record.site_name).toBe("Test");
+    expect(record.fallback).toBe("legacy_html_blob");
   });
 });
