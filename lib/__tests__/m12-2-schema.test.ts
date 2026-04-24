@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -17,6 +17,10 @@ import { seedSite } from "./_helpers";
 //
 // Complements lib/__tests__/m12-1-schema.test.ts which covers the briefs
 // columns introduced in 0013.
+//
+// _setup.ts TRUNCATEs every table in beforeEach, so each test creates its
+// own site + brief fresh. Do not hoist seedSite() into beforeAll — the
+// truncate will wipe it.
 // ---------------------------------------------------------------------------
 
 function makeIdempKey(suffix: string): string {
@@ -58,21 +62,9 @@ async function insertBrief(opts: {
 }
 
 describe("M12-2: briefs.brand_voice + briefs.design_direction", () => {
-  let siteId: string;
-
-  beforeAll(async () => {
-    const site = await seedSite();
-    siteId = site.id;
-  });
-
-  afterAll(async () => {
-    const svc = getServiceRoleClient();
-    await svc.from("briefs").delete().eq("site_id", siteId);
-    await svc.from("sites").delete().eq("id", siteId);
-  });
-
   it("inserts a brief with both fields NULL by default", async () => {
-    const { id } = await insertBrief({ site_id: siteId });
+    const site = await seedSite();
+    const { id } = await insertBrief({ site_id: site.id });
     const svc = getServiceRoleClient();
     const { data, error } = await svc
       .from("briefs")
@@ -85,10 +77,11 @@ describe("M12-2: briefs.brand_voice + briefs.design_direction", () => {
   });
 
   it("round-trips non-empty values", async () => {
+    const site = await seedSite();
     const voice = "Warm, plain language. Second person default.";
     const direction = "Generous white space. Single CTA per section.";
     const { id } = await insertBrief({
-      site_id: siteId,
+      site_id: site.id,
       brand_voice: voice,
       design_direction: direction,
     });
@@ -103,8 +96,9 @@ describe("M12-2: briefs.brand_voice + briefs.design_direction", () => {
   });
 
   it("distinguishes empty string from NULL", async () => {
+    const site = await seedSite();
     const { id } = await insertBrief({
-      site_id: siteId,
+      site_id: site.id,
       brand_voice: "",
       design_direction: null,
     });
@@ -119,7 +113,8 @@ describe("M12-2: briefs.brand_voice + briefs.design_direction", () => {
   });
 
   it("accepts UPDATEs that set, clear, and re-set the fields", async () => {
-    const { id } = await insertBrief({ site_id: siteId });
+    const site = await seedSite();
+    const { id } = await insertBrief({ site_id: site.id });
     const svc = getServiceRoleClient();
 
     // Set both.
@@ -166,10 +161,11 @@ describe("M12-2: briefs.brand_voice + briefs.design_direction", () => {
   });
 
   it("accepts multi-line prose with punctuation + whitespace", async () => {
+    const site = await seedSite();
     const voice =
       "Line 1: be clear.\nLine 2: be brief.\n\nAvoid em-dashes — operators hate them.";
     const { id } = await insertBrief({
-      site_id: siteId,
+      site_id: site.id,
       brand_voice: voice,
     });
     const svc = getServiceRoleClient();

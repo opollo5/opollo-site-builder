@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   ANCHOR_EXTRA_CYCLES,
@@ -13,17 +13,40 @@ import { seedSite } from "./_helpers";
 // ---------------------------------------------------------------------------
 // M12-2 — lib/site-conventions.ts tests.
 //
-// Split into three concern groups:
+// Split into four concern groups:
 //
 //   1. ANCHOR_EXTRA_CYCLES constant exported — M12-3 will read it.
 //   2. SiteConventionsSchema — zod validation of the payload shape.
 //   3. freezeSiteConventions — idempotency + NOT_FOUND + read-after-write.
+//   4. getSiteConventions — read-path sanity.
 //
-// The runner doesn't exist yet (M12-3). This test harness calls
-// freezeSiteConventions directly; M12-3's runner will call it at the
-// end of page 1's anchor cycle. The contract pinned here is what M12-3
-// will rely on.
+// _setup.ts TRUNCATEs every table in beforeEach, so every test that needs a
+// brief creates its own site + brief fresh inside the test body. Do NOT
+// hoist to beforeAll — the truncate will wipe the row before the test runs.
 // ---------------------------------------------------------------------------
+
+async function seedBrief(siteId: string, suffix: string): Promise<string> {
+  const svc = getServiceRoleClient();
+  const unique = `${suffix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const { data, error } = await svc
+    .from("briefs")
+    .insert({
+      site_id: siteId,
+      title: `site-conventions test ${unique}`,
+      status: "parsed",
+      source_storage_path: `site-conventions-test/${unique}.md`,
+      source_mime_type: "text/markdown",
+      source_size_bytes: 128,
+      source_sha256: "0".repeat(64),
+      upload_idempotency_key: `site-conv-${unique}`,
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    throw new Error(`seedBrief: ${error?.message ?? "no data"}`);
+  }
+  return data.id as string;
+}
 
 describe("ANCHOR_EXTRA_CYCLES", () => {
   it("exports a positive integer", () => {
@@ -81,49 +104,8 @@ describe("SiteConventionsSchema", () => {
 });
 
 describe("freezeSiteConventions", () => {
-  let siteId: string;
-  const createdBriefIds: string[] = [];
-
-  async function seedBrief(): Promise<string> {
-    const svc = getServiceRoleClient();
-    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const { data, error } = await svc
-      .from("briefs")
-      .insert({
-        site_id: siteId,
-        title: `site-conventions test ${unique}`,
-        status: "parsed",
-        source_storage_path: `site-conventions-test/${unique}.md`,
-        source_mime_type: "text/markdown",
-        source_size_bytes: 128,
-        source_sha256: "0".repeat(64),
-        upload_idempotency_key: `site-conv-${unique}`,
-      })
-      .select("id")
-      .single();
-    if (error || !data) {
-      throw new Error(`seedBrief: ${error?.message ?? "no data"}`);
-    }
-    const id = data.id as string;
-    createdBriefIds.push(id);
-    return id;
-  }
-
-  beforeAll(async () => {
-    const site = await seedSite();
-    siteId = site.id;
-  });
-
-  afterAll(async () => {
-    const svc = getServiceRoleClient();
-    if (createdBriefIds.length > 0) {
-      // site_conventions rows cascade via brief FK; delete briefs.
-      await svc.from("briefs").delete().in("id", createdBriefIds);
-    }
-    await svc.from("sites").delete().eq("id", siteId);
-  });
-
   it("returns NOT_FOUND when the brief doesn't exist", async () => {
+    // No site/brief seeded — the UUID is a pure ghost.
     const res = await freezeSiteConventions({
       briefId: "00000000-0000-0000-0000-000000000000",
       conventions: { tone_register: "neutral" },
@@ -134,7 +116,8 @@ describe("freezeSiteConventions", () => {
   });
 
   it("returns VALIDATION_FAILED on invalid payload", async () => {
-    const briefId = await seedBrief();
+    const site = await seedSite();
+    const briefId = await seedBrief(site.id, "validation");
     const res = await freezeSiteConventions({
       briefId,
       conventions: { typographic_scale: 1.25 },
@@ -145,7 +128,8 @@ describe("freezeSiteConventions", () => {
   });
 
   it("first call inserts the row with frozen_at set, wasAlreadyFrozen=false", async () => {
-    const briefId = await seedBrief();
+    const site = await seedSite();
+    const briefId = await seedBrief(site.id, "first");
     const conventions = {
       tone_register: "neutral",
       typographic_scale: "1.25",
@@ -163,7 +147,8 @@ describe("freezeSiteConventions", () => {
   });
 
   it("second call on same brief returns wasAlreadyFrozen=true without mutating", async () => {
-    const briefId = await seedBrief();
+    const site = await seedSite();
+    const briefId = await seedBrief(site.id, "second");
     const firstConventions = { tone_register: "neutral" };
     const first = await freezeSiteConventions({
       briefId,
@@ -191,7 +176,8 @@ describe("freezeSiteConventions", () => {
   });
 
   it("concurrent calls resolve to the same frozen row", async () => {
-    const briefId = await seedBrief();
+    const site = await seedSite();
+    const briefId = await seedBrief(site.id, "concurrent");
     const conventions = { tone_register: "urgent" };
     // Fire both promises in the same tick. Whichever INSERT wins, the
     // other must resolve via the post-conflict read path.
@@ -214,55 +200,16 @@ describe("freezeSiteConventions", () => {
 });
 
 describe("getSiteConventions", () => {
-  let siteId: string;
-  const createdBriefIds: string[] = [];
-
-  async function seedBrief(): Promise<string> {
-    const svc = getServiceRoleClient();
-    const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    const { data, error } = await svc
-      .from("briefs")
-      .insert({
-        site_id: siteId,
-        title: `get-conventions test ${unique}`,
-        status: "parsed",
-        source_storage_path: `get-conventions-test/${unique}.md`,
-        source_mime_type: "text/markdown",
-        source_size_bytes: 128,
-        source_sha256: "0".repeat(64),
-        upload_idempotency_key: `get-conv-${unique}`,
-      })
-      .select("id")
-      .single();
-    if (error || !data) {
-      throw new Error(`seedBrief: ${error?.message ?? "no data"}`);
-    }
-    const id = data.id as string;
-    createdBriefIds.push(id);
-    return id;
-  }
-
-  beforeAll(async () => {
-    const site = await seedSite();
-    siteId = site.id;
-  });
-
-  afterAll(async () => {
-    const svc = getServiceRoleClient();
-    if (createdBriefIds.length > 0) {
-      await svc.from("briefs").delete().in("id", createdBriefIds);
-    }
-    await svc.from("sites").delete().eq("id", siteId);
-  });
-
   it("returns null when no conventions row exists for a brief", async () => {
-    const briefId = await seedBrief();
+    const site = await seedSite();
+    const briefId = await seedBrief(site.id, "get-null");
     const res = await getSiteConventions(briefId);
     expect(res).toBeNull();
   });
 
   it("returns the row after freezeSiteConventions has run", async () => {
-    const briefId = await seedBrief();
+    const site = await seedSite();
+    const briefId = await seedBrief(site.id, "get-row");
     await freezeSiteConventions({
       briefId,
       conventions: { tone_register: "playful" },
