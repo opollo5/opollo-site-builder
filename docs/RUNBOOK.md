@@ -244,7 +244,7 @@ Expected: `{"ok":true,"data":{"email":"...","user_id":"..."}}`. Sign in with the
 **Mitigate:** rotate immediately.
 
 - `SUPABASE_SERVICE_ROLE_KEY` → Supabase dashboard → Settings → API → Reset service role key. Update Vercel env, redeploy.
-- `OPOLLO_MASTER_KEY` → generate new key (`openssl rand -base64 32`), stage it as `OPOLLO_MASTER_KEY_NEXT`, run the rotation migration that re-encrypts all `sites.wp_app_password` with the new key, swap the env var, redeploy. (Rotation script is a follow-up — for now, manual re-register of each site works as a last resort.)
+- `OPOLLO_MASTER_KEY` → generate new key (`openssl rand -base64 32`), freeze writes that touch `sites.wp_app_password`, re-encrypt every `site_credentials` row with the new key via an ad-hoc script (`lib/encryption.ts` currently reads a single active key — no `_NEXT` dual-key fallback today), swap the env var in Vercel, redeploy, unfreeze. Details in the "OPOLLO_MASTER_KEY (encrypts `sites.wp_app_password`)" section below. Dual-key zero-downtime rotation is a backlog item.
 - `OPOLLO_EMERGENCY_KEY` → regenerate (`openssl rand -base64 48`), update Vercel, redeploy. No data re-encrypt needed.
 - `CRON_SECRET` → regenerate, update Vercel + Vercel cron config, redeploy.
 - WP app password → generate a new one in WP admin, update via Edit Site modal.
