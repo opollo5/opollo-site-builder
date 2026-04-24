@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { computeCostCents } from "../anthropic-pricing";
+import {
+  ANTHROPIC_MODEL_ALLOWLIST,
+  computeCostCents,
+  estimateBriefRunCostCents,
+  estimatePerPageCostCents,
+  isAllowedAnthropicModel,
+} from "../anthropic-pricing";
 
 describe("anthropic-pricing", () => {
   it("should compute 1M Opus input tokens as 1500 cents ($15)", () => {
@@ -73,5 +79,97 @@ describe("anthropic-pricing", () => {
 
     expect(result.rateFound).toBe(false);
     expect(result.cents).toBe(0);
+  });
+});
+
+describe("M12-4 model allowlist", () => {
+  it("allowlist covers the three shipping Claude 4.x models", () => {
+    expect(ANTHROPIC_MODEL_ALLOWLIST).toEqual(
+      expect.arrayContaining([
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001",
+      ]),
+    );
+  });
+
+  it("isAllowedAnthropicModel matches the allowlist", () => {
+    expect(isAllowedAnthropicModel("claude-opus-4-7")).toBe(true);
+    expect(isAllowedAnthropicModel("claude-sonnet-4-6")).toBe(true);
+    expect(isAllowedAnthropicModel("claude-haiku-4-5-20251001")).toBe(true);
+  });
+
+  it("rejects unknown model strings", () => {
+    expect(isAllowedAnthropicModel("gpt-4")).toBe(false);
+    expect(isAllowedAnthropicModel("claude-opus-5")).toBe(false);
+    expect(isAllowedAnthropicModel("")).toBe(false);
+  });
+});
+
+describe("M12-4 pre-flight brief-run cost estimator", () => {
+  it("estimatePerPageCostCents returns 0 for an unknown model", () => {
+    expect(
+      estimatePerPageCostCents("unknown-model", "claude-sonnet-4-6", false),
+    ).toBe(0);
+    expect(
+      estimatePerPageCostCents("claude-sonnet-4-6", "unknown-model", false),
+    ).toBe(0);
+  });
+
+  it("anchor page costs more than a non-anchor page", () => {
+    const nonAnchor = estimatePerPageCostCents(
+      "claude-sonnet-4-6",
+      "claude-sonnet-4-6",
+      false,
+    );
+    const anchor = estimatePerPageCostCents(
+      "claude-sonnet-4-6",
+      "claude-sonnet-4-6",
+      true,
+    );
+    expect(anchor).toBeGreaterThan(nonAnchor);
+  });
+
+  it("Opus costs more than Sonnet for the same page shape", () => {
+    const sonnet = estimatePerPageCostCents(
+      "claude-sonnet-4-6",
+      "claude-sonnet-4-6",
+      false,
+    );
+    const opusText = estimatePerPageCostCents(
+      "claude-opus-4-7",
+      "claude-sonnet-4-6",
+      false,
+    );
+    expect(opusText).toBeGreaterThan(sonnet);
+  });
+
+  it("estimateBriefRunCostCents returns 0 for zero pages", () => {
+    expect(
+      estimateBriefRunCostCents({
+        text_model: "claude-sonnet-4-6",
+        visual_model: "claude-sonnet-4-6",
+        page_count: 0,
+        anchor_present: false,
+      }),
+    ).toBe(0);
+  });
+
+  it("estimateBriefRunCostCents scales roughly with page count", () => {
+    const five = estimateBriefRunCostCents({
+      text_model: "claude-sonnet-4-6",
+      visual_model: "claude-sonnet-4-6",
+      page_count: 5,
+      anchor_present: true,
+    });
+    const ten = estimateBriefRunCostCents({
+      text_model: "claude-sonnet-4-6",
+      visual_model: "claude-sonnet-4-6",
+      page_count: 10,
+      anchor_present: true,
+    });
+    expect(ten).toBeGreaterThan(five);
+    // Not exactly 2× because anchor is counted once regardless of page_count.
+    expect(ten).toBeLessThan(five * 2.5);
   });
 });

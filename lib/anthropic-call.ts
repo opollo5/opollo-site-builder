@@ -21,11 +21,30 @@ import { traceAnthropicCall } from "@/lib/langfuse";
 //      real Anthropic credentials or network.
 // ---------------------------------------------------------------------------
 
+// M12-4 — multi-modal content blocks. `content` on a user message can be
+// either a plain string (existing callers — batch worker, text-only brief
+// runner passes) or an array of content blocks mixing text + image. Image
+// blocks are base64-inlined and never touch Storage or logs (see Risk #8
+// of the M12 parent plan: visual review screenshot retention).
+export type AnthropicTextBlock = { type: "text"; text: string };
+export type AnthropicImageBlock = {
+  type: "image";
+  source: {
+    type: "base64";
+    media_type: "image/png" | "image/jpeg" | "image/webp" | "image/gif";
+    data: string;
+  };
+};
+export type AnthropicContentBlock = AnthropicTextBlock | AnthropicImageBlock;
+
 export type AnthropicRequest = {
   model: string;
   max_tokens: number;
   system: string;
-  messages: Array<{ role: "user" | "assistant"; content: string }>;
+  messages: Array<{
+    role: "user" | "assistant";
+    content: string | Array<AnthropicContentBlock>;
+  }>;
   idempotency_key: string;
 };
 
@@ -65,6 +84,33 @@ function getClient(): Anthropic {
  * M10: wrapped in a Langfuse span when LANGFUSE_* env vars are set.
  * No-op when unconfigured — tests + local dev stay identical.
  */
+// Redact image bytes so screenshot data never lands in observability.
+// Parent plan Risk #8: "No log line that includes screenshot bytes."
+function redactMessagesForTrace(
+  messages: AnthropicRequest["messages"],
+): Array<{ role: string; content: unknown }> {
+  return messages.map((m) => {
+    if (typeof m.content === "string") {
+      return { role: m.role, content: m.content };
+    }
+    return {
+      role: m.role,
+      content: m.content.map((block) =>
+        block.type === "image"
+          ? {
+              type: "image",
+              source: {
+                type: "base64",
+                media_type: block.source.media_type,
+                data_bytes: block.source.data.length,
+              },
+            }
+          : block,
+      ),
+    };
+  });
+}
+
 export const defaultAnthropicCall: AnthropicCallFn = async (req) => {
   const span = traceAnthropicCall({
     name: "anthropic_messages_create",
@@ -73,7 +119,10 @@ export const defaultAnthropicCall: AnthropicCallFn = async (req) => {
       idempotency_key: req.idempotency_key,
       max_tokens: req.max_tokens,
     },
-    input: { system_prompt_bytes: req.system.length, messages: req.messages },
+    input: {
+      system_prompt_bytes: req.system.length,
+      messages: redactMessagesForTrace(req.messages),
+    },
   });
 
   const client = getClient();

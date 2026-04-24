@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 
+import { estimateBriefRunCostCents } from "@/lib/anthropic-pricing";
 import { parseBriefDocument, type BriefPageDraft, type ParserWarning } from "@/lib/brief-parser";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -45,6 +46,12 @@ export type BriefRow = {
   // populated on the review page pre-commit (see commitBrief input).
   brand_voice: string | null;
   design_direction: string | null;
+  // M12-4 — per-brief model tier. Defaults to claude-sonnet-4-6 for both
+  // via migration 0020. Allowlist-guarded at runner start (see
+  // lib/anthropic-pricing.ts::isAllowedAnthropicModel) so an unknown
+  // value surfaces as INVALID_MODEL without firing the call.
+  text_model: string;
+  visual_model: string;
   version_lock: number;
   created_at: string;
   updated_at: string;
@@ -58,7 +65,17 @@ export type BriefPageStatus =
   | "failed"
   | "skipped";
 
-export type BriefPagePassKind = "draft" | "self_critique" | "revise";
+export type BriefPagePassKind =
+  | "draft"
+  | "self_critique"
+  | "revise"
+  // M12-4 — visual review loop.
+  | "visual_critique"
+  | "visual_revise";
+
+// M12-4 — set on brief_pages when the visual review loop halted without
+// converging. See docs/plans/m12-parent.md §Cost controls + Risk #13.
+export type BriefPageQualityFlag = "cost_ceiling" | "capped_with_issues";
 
 export type BriefPageCritiqueEntry = {
   pass_kind: BriefPagePassKind;
@@ -70,6 +87,11 @@ export type BriefPageCritiqueEntry = {
     output_tokens: number;
     cached_tokens?: number;
   };
+  // M12-4 — integer cents charged for this pass. Computed via
+  // lib/anthropic-pricing.ts::computeCostCents. Persisted alongside
+  // the critique log so operator-facing cost rollup doesn't need to
+  // rebuild from brief_pages.page_cost_cents alone.
+  cost_cents?: number;
 };
 
 export type BriefPageRow = {
@@ -94,6 +116,9 @@ export type BriefPageRow = {
   critique_log: BriefPageCritiqueEntry[];
   approved_at: string | null;
   approved_by: string | null;
+  // M12-4 — cost accounting + quality flag.
+  page_cost_cents: number;
+  quality_flag: BriefPageQualityFlag | null;
 };
 
 export type UploadBriefInput = {
@@ -712,6 +737,187 @@ export async function listSiteBriefs(
   return {
     ok: true,
     data: { briefs: (data ?? []) as Array<Pick<BriefRow, "id" | "title" | "status" | "parser_mode" | "created_at" | "updated_at" | "committed_at">> },
+    timestamp: now(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// M12-4 — startBriefRun + pre-flight cost estimate.
+//
+// Risk #15 (operator-blind overspend): before an operator kicks off a
+// brief run, surface the estimated cost against the tenant's remaining
+// monthly budget. If the estimate exceeds 50% of remaining budget,
+// return CONFIRMATION_REQUIRED — the UI (M12-5) prompts the operator
+// and re-submits with confirmed: true to proceed.
+//
+// This is a soft gate. The hard gate is the existing reserveWithCeiling
+// path in lib/tenant-budgets.ts which halts the runner mid-flight if
+// actuals exceed the monthly cap. This function only blocks pre-flight
+// — once the run starts, a runaway cost is caught by the per-page
+// ceiling + reserveWithCeiling, not this helper.
+// ---------------------------------------------------------------------------
+
+export type StartBriefRunInput = {
+  briefId: string;
+  startedBy: string | null;
+  confirmed?: boolean;
+};
+
+export type StartBriefRunData = {
+  brief_run_id: string;
+  estimate_cents: number;
+  remaining_budget_cents: number;
+  // Soft cap — if estimate exceeds this fraction of remaining_budget_cents,
+  // we require the operator to confirm. 0.5 by design (see Risk #15).
+};
+
+const BUDGET_CONFIRMATION_THRESHOLD = 0.5;
+
+export async function estimateBriefRunCost(
+  briefId: string,
+): Promise<
+  | { ok: true; estimate_cents: number; page_count: number }
+  | { ok: false; code: "NOT_FOUND" | "INTERNAL_ERROR"; message: string }
+> {
+  const svc = getServiceRoleClient();
+  const briefRes = await svc
+    .from("briefs")
+    .select("id, text_model, visual_model, status")
+    .eq("id", briefId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (briefRes.error) {
+    return {
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: briefRes.error.message,
+    };
+  }
+  if (!briefRes.data) {
+    return {
+      ok: false,
+      code: "NOT_FOUND",
+      message: `No brief with id ${briefId}.`,
+    };
+  }
+  const brief = briefRes.data as {
+    id: string;
+    text_model: string;
+    visual_model: string;
+    status: BriefRow["status"];
+  };
+  const pagesRes = await svc
+    .from("brief_pages")
+    .select("id", { count: "exact", head: true })
+    .eq("brief_id", briefId)
+    .is("deleted_at", null);
+  const pageCount = pagesRes.count ?? 0;
+  const estimate = estimateBriefRunCostCents({
+    text_model: brief.text_model,
+    visual_model: brief.visual_model,
+    page_count: pageCount,
+    anchor_present: pageCount > 0,
+  });
+  return { ok: true, estimate_cents: estimate, page_count: pageCount };
+}
+
+export async function startBriefRun(
+  input: StartBriefRunInput,
+): Promise<ApiResponse<StartBriefRunData>> {
+  const svc = getServiceRoleClient();
+
+  const briefRes = await svc
+    .from("briefs")
+    .select("id, site_id, status")
+    .eq("id", input.briefId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (briefRes.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief.", {
+      details: { supabase_error: briefRes.error },
+    });
+  }
+  if (!briefRes.data) {
+    return errorEnvelope("NOT_FOUND", `No brief ${input.briefId}.`);
+  }
+  const brief = briefRes.data as { id: string; site_id: string; status: BriefRow["status"] };
+  if (brief.status !== "committed") {
+    return errorEnvelope(
+      "VALIDATION_FAILED",
+      `Brief is in status '${brief.status}', not 'committed'. Commit the brief before starting a run.`,
+    );
+  }
+
+  // Estimate + remaining budget.
+  const estimate = await estimateBriefRunCost(input.briefId);
+  if (!estimate.ok) {
+    return errorEnvelope(estimate.code, estimate.message);
+  }
+  const budget = await svc
+    .from("tenant_cost_budgets")
+    .select("monthly_cap_cents, monthly_usage_cents")
+    .eq("site_id", brief.site_id)
+    .maybeSingle();
+  if (budget.error) {
+    return errorEnvelope("INTERNAL_ERROR", "Failed to fetch tenant budget.", {
+      details: { supabase_error: budget.error },
+    });
+  }
+  const cap = Number(budget.data?.monthly_cap_cents ?? 0);
+  const usage = Number(budget.data?.monthly_usage_cents ?? 0);
+  const remainingBudgetCents = Math.max(0, cap - usage);
+
+  const requiresConfirmation =
+    !input.confirmed &&
+    remainingBudgetCents > 0 &&
+    estimate.estimate_cents > remainingBudgetCents * BUDGET_CONFIRMATION_THRESHOLD;
+
+  if (requiresConfirmation) {
+    return errorEnvelope(
+      "CONFIRMATION_REQUIRED",
+      `This run's estimated cost (${estimate.estimate_cents} cents) exceeds 50% of the remaining tenant budget (${remainingBudgetCents} cents). Re-submit with confirmed: true to proceed.`,
+      {
+        details: {
+          estimate_cents: estimate.estimate_cents,
+          remaining_budget_cents: remainingBudgetCents,
+          threshold: BUDGET_CONFIRMATION_THRESHOLD,
+          page_count: estimate.page_count,
+        },
+      },
+    );
+  }
+
+  // Insert the brief_run row. The DB partial UNIQUE index
+  // brief_runs_one_active_per_brief guards against two active runs on
+  // the same brief.
+  const runInsert = await svc
+    .from("brief_runs")
+    .insert({
+      brief_id: brief.id,
+      status: "queued",
+      created_by: input.startedBy,
+      updated_by: input.startedBy,
+    })
+    .select("id")
+    .single();
+  if (runInsert.error || !runInsert.data) {
+    if (runInsert.error?.code === "23505") {
+      return errorEnvelope(
+        "BRIEF_RUN_ALREADY_ACTIVE",
+        "There is already an active brief_run for this brief. Cancel it before starting a new one.",
+      );
+    }
+    return errorEnvelope("INTERNAL_ERROR", "Failed to insert brief_run.", {
+      details: { supabase_error: runInsert.error ?? null },
+    });
+  }
+  return {
+    ok: true,
+    data: {
+      brief_run_id: runInsert.data.id as string,
+      estimate_cents: estimate.estimate_cents,
+      remaining_budget_cents: remainingBudgetCents,
+    },
     timestamp: now(),
   };
 }

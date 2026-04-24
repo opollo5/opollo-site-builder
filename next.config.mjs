@@ -60,6 +60,15 @@ const nextConfig = {
     outputFileTracingIncludes: {
       "/api/chat": ["./docs/SYSTEM_PROMPT_v1.md"],
     },
+    // M12-4: playwright-core is a very large node-only package that
+    // webpack cannot bundle cleanly — it contains non-JS assets in its
+    // vendored recorder UI that the webpack loader graph trips over.
+    // Mark it as an external server package so it loads at runtime via
+    // Node's require, not the webpack bundle. visual-review.ts only
+    // reaches playwright-core through `await import("playwright-core")`
+    // inside defaultVisualRender; tests inject a stub render fn so the
+    // import is never evaluated at test time.
+    serverComponentsExternalPackages: ["playwright-core"],
   },
 };
 
