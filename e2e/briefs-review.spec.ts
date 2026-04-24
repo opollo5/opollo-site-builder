@@ -181,7 +181,7 @@ test.describe("M12-1 briefs — upload + review", () => {
     await pageA.getByRole("button", { name: /Commit page list/i }).click();
     const dialogA = pageA.getByRole("dialog", { name: /Commit this page list\?/i });
     await dialogA.getByRole("button", { name: /^Commit page list$/i }).click();
-    await expect(pageA.getByText(/This page list is committed\./i)).toBeVisible();
+    await expect(pageA.getByText(/This brief is locked in\./i)).toBeVisible();
 
     // B tries to commit without refresh. B's version_lock is stale →
     // ALREADY_EXISTS since A already committed with the matching hash.
@@ -193,7 +193,7 @@ test.describe("M12-1 briefs — upload + review", () => {
     // Because B's hash matches A's (neither edited), the server treats
     // this as a successful replay — so the UI should flip to committed
     // on the next render too. This asserts the idempotent-replay path.
-    await expect(pageB.getByText(/This page list is committed\./i)).toBeVisible();
+    await expect(pageB.getByText(/This brief is locked in\./i)).toBeVisible();
 
     await contextA.close();
     await contextB.close();
