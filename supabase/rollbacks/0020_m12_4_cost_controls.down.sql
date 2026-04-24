@@ -1,4 +1,4 @@
--- Rollback for 0019 — drops cost-control columns.
+-- Rollback for 0020 — drops cost-control columns.
 --
 -- Columns dropped in the order opposite to their add so the allowlist
 -- CHECK on briefs.text_model / briefs.visual_model is removed with its

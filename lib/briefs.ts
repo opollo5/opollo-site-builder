@@ -47,7 +47,7 @@ export type BriefRow = {
   brand_voice: string | null;
   design_direction: string | null;
   // M12-4 — per-brief model tier. Defaults to claude-sonnet-4-6 for both
-  // via migration 0019. Allowlist-guarded at runner start (see
+  // via migration 0020. Allowlist-guarded at runner start (see
   // lib/anthropic-pricing.ts::isAllowedAnthropicModel) so an unknown
   // value surfaces as INVALID_MODEL without firing the call.
   text_model: string;

@@ -56,7 +56,7 @@ const PRICING_TABLE: Record<string, Pricing> = {
 /**
  * M12-4 Risk #14 — single source of truth for models the runner is
  * allowed to invoke. Matches the CHECK constraint on briefs.text_model /
- * briefs.visual_model in migration 0019. Derived from PRICING_TABLE so
+ * briefs.visual_model in migration 0020. Derived from PRICING_TABLE so
  * an unpriced model can never be allow-listed.
  */
 export const ANTHROPIC_MODEL_ALLOWLIST: ReadonlyArray<string> = Object.freeze(

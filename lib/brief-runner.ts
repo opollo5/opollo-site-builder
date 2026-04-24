@@ -123,7 +123,7 @@ export const STANDARD_TEXT_PASSES = 3; // draft, self_critique, revise
 // briefs.text_model (M12-4 Risk #14 — no hard-coded model in the runner).
 // RUNNER_MODEL stays exported for M12-3 callers that already imported it;
 // the value now represents the FALLBACK model used only if a brief was
-// inserted before briefs.text_model existed (migration 0019 default
+// inserted before briefs.text_model existed (migration 0020 default
 // covers new rows).
 export const RUNNER_MODEL = "claude-sonnet-4-6";
 export const RUNNER_MAX_TOKENS = 4096;

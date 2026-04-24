@@ -1,6 +1,11 @@
--- 0019 — M12-4 cost-control columns on brief_pages + brief_runs + briefs +
+-- 0020 — M12-4 cost-control columns on brief_pages + brief_runs + briefs +
 -- tenant_cost_budgets. Reference: docs/plans/m12-parent.md §Cost controls
 -- (M12-4 amendment) + §Risks identified and mitigated #13/#14/#15.
+--
+-- Numbering note: M13-1 landed 0019 on main while this PR was in-flight.
+-- This slice's additive migration is ordering-independent (M12 tables
+-- don't reference M13's posts table, and vice versa), so bumping to
+-- 0020 is a pure file rename.
 --
 -- Additive-only ALTER TABLE. Every column has a safe DEFAULT so existing
 -- rows from M12-1/M12-2/M12-3 fold in without a backfill job.
