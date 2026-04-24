@@ -888,3 +888,62 @@ export async function wpDeletePost(
     status: opts.force ? "deleted" : "trash",
   };
 }
+
+// ---------------------------------------------------------------------------
+// M13-4 — capability probe for publish-time preflight.
+//
+// Hits /wp-json/wp/v2/users/me. WP responds with the authenticated
+// user's row INCLUDING a `capabilities` map keyed by capability name.
+// The preflight layer in lib/site-preflight.ts reads the two capabilities
+// the post publish path cares about — `edit_posts` + `upload_files` —
+// and blocks the publish confirm step with a translated message if
+// either is missing.
+//
+// Why this is a transport-layer helper rather than logic in lib/site-
+// preflight.ts: the fetch + auth + error-mapping shape is identical to
+// every other wp* helper, and keeping them in one file matches the
+// existing pattern (wpCreatePage, wpListPages, etc.).
+// ---------------------------------------------------------------------------
+
+export type WpUserCapabilities = Record<string, boolean>;
+
+export type WpGetMeResult =
+  | {
+      ok: true;
+      user_id: number;
+      username: string;
+      capabilities: WpUserCapabilities;
+    }
+  | WpError;
+
+export async function wpGetMe(cfg: WpConfig): Promise<WpGetMeResult> {
+  // context=edit is required to get the capabilities map back in the
+  // response body — context=view (the default) omits it.
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/users/me?context=edit", {
+      method: "GET",
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<{
+    id?: number;
+    username?: string;
+    slug?: string;
+    capabilities?: Record<string, boolean>;
+  }>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  return {
+    ok: true,
+    user_id: Number(body?.id ?? 0),
+    username: (body?.username ?? body?.slug ?? "") as string,
+    capabilities: (body?.capabilities ?? {}) as WpUserCapabilities,
+  };
+}

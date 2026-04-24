@@ -1781,7 +1781,17 @@ export type ApprovePageInput = {
 };
 
 export type ApprovePageResult =
-  | { ok: true; pageStatus: "approved"; runStatus: BriefRunRow["status"] }
+  | {
+      ok: true;
+      pageStatus: "approved";
+      runStatus: BriefRunRow["status"];
+      // M13-4 — when the parent brief has content_type='post', approval
+      // also lands a posts row with generated_html populated. post_id
+      // is the new row's id; null for page-mode briefs or when the
+      // bridge step failed (see failed_bridge_reason).
+      post_id: string | null;
+      failed_bridge_reason: string | null;
+    }
   | {
       ok: false;
       code: "NOT_FOUND" | "INVALID_STATE" | "VERSION_CONFLICT" | "INTERNAL_ERROR";
@@ -1793,10 +1803,13 @@ export async function approveBriefPage(
 ): Promise<ApprovePageResult> {
   const svc = getServiceRoleClient();
 
-  // Read page + brief_run state.
+  // Read page + brief_run state. M13-4 also carries title + slug_hint
+  // so the post-mode bridge can derive a slug at the end.
   const pageRes = await svc
     .from("brief_pages")
-    .select("id, brief_id, ordinal, page_status, draft_html, version_lock")
+    .select(
+      "id, brief_id, ordinal, page_status, draft_html, title, slug_hint, source_text, version_lock",
+    )
     .eq("id", input.pageId)
     .is("deleted_at", null)
     .maybeSingle();
@@ -1824,6 +1837,9 @@ export async function approveBriefPage(
     ordinal: number;
     page_status: BriefPageStatus;
     draft_html: string | null;
+    title: string;
+    slug_hint: string | null;
+    source_text: string;
     version_lock: number;
   };
 
@@ -1893,10 +1909,27 @@ export async function approveBriefPage(
     });
     // Page is approved; run state isn't critical to the approve contract.
     // Return success; the next runner tick will surface any drift.
-    return { ok: true, pageStatus: "approved", runStatus: "paused" };
+    const bridgeAfterRunLookupErr = await bridgeApprovedPageToPostIfNeeded(
+      page,
+      nowIso,
+    );
+    return {
+      ok: true,
+      pageStatus: "approved",
+      runStatus: "paused",
+      post_id: bridgeAfterRunLookupErr.post_id,
+      failed_bridge_reason: bridgeAfterRunLookupErr.failed_bridge_reason,
+    };
   }
   if (!runRes.data) {
-    return { ok: true, pageStatus: "approved", runStatus: "paused" };
+    const bridgeNoRun = await bridgeApprovedPageToPostIfNeeded(page, nowIso);
+    return {
+      ok: true,
+      pageStatus: "approved",
+      runStatus: "paused",
+      post_id: bridgeNoRun.post_id,
+      failed_bridge_reason: bridgeNoRun.failed_bridge_reason,
+    };
   }
 
   const runSnap = runRes.data as {
@@ -1933,12 +1966,174 @@ export async function approveBriefPage(
       page_id: page.id,
       error: runUpd.error,
     });
-    return { ok: true, pageStatus: "approved", runStatus: "paused" };
+    const bridgeEarly = await bridgeApprovedPageToPostIfNeeded(page, nowIso);
+    return {
+      ok: true,
+      pageStatus: "approved",
+      runStatus: "paused",
+      post_id: bridgeEarly.post_id,
+      failed_bridge_reason: bridgeEarly.failed_bridge_reason,
+    };
   }
 
+  const bridge = await bridgeApprovedPageToPostIfNeeded(page, nowIso);
   return {
     ok: true,
     pageStatus: "approved",
     runStatus: (runUpd.data as { status: BriefRunRow["status"] }).status,
+    post_id: bridge.post_id,
+    failed_bridge_reason: bridge.failed_bridge_reason,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// M13-4 — brief-page → posts bridge.
+//
+// When a brief_page is approved AND the parent brief's content_type
+// is 'post', also create (or adopt) a posts row with generated_html
+// populated. The posts row is what the /admin/sites/[id]/posts
+// surface lists; without the bridge, approved post drafts stay
+// stranded in brief_pages and never surface to the operator.
+//
+// Idempotency contract:
+//   - Slug is deterministic: slug_hint if non-null, else slugify(title).
+//   - A matching live post (site_id + slug, deleted_at IS NULL) is
+//     adopted — the bridge returns that post's id and does NOT update
+//     its HTML. The operator's next action is a manual edit or a new
+//     brief cycle.
+//   - A UNIQUE_VIOLATION on insert is treated as a soft failure with
+//     a `slug_already_in_use` reason; approval itself stays successful.
+//
+// Failure contract: the bridge NEVER rolls back the brief_page
+// approval. The operator sees a warning in the UI ("post couldn't be
+// created: …") and can retry via manual createPost. Approval state
+// on brief_pages is the source of truth.
+// ---------------------------------------------------------------------------
+
+function slugifyForPost(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 100) // POST_SLUG_MAX from lib/posts.ts
+    || `post-${Date.now().toString(36)}`;
+}
+
+async function bridgeApprovedPageToPostIfNeeded(
+  page: {
+    id: string;
+    brief_id: string;
+    title: string;
+    slug_hint: string | null;
+    draft_html: string | null;
+    source_text: string;
+  },
+  _nowIso: string,
+): Promise<{ post_id: string | null; failed_bridge_reason: string | null }> {
+  const svc = getServiceRoleClient();
+
+  // 1. Check the parent brief's content_type. Page-mode briefs short-
+  //    circuit — the bridge is a no-op and approval returns post_id: null.
+  const briefRes = await svc
+    .from("briefs")
+    .select("site_id, content_type")
+    .eq("id", page.brief_id)
+    .maybeSingle();
+  if (briefRes.error || !briefRes.data) {
+    logger.warn("approve.post_bridge.brief_lookup_failed", {
+      brief_id: page.brief_id,
+      page_id: page.id,
+      error: briefRes.error,
+    });
+    return { post_id: null, failed_bridge_reason: "brief_lookup_failed" };
+  }
+  const brief = briefRes.data as {
+    site_id: string;
+    content_type: "page" | "post";
+  };
+  if (brief.content_type !== "post") {
+    return { post_id: null, failed_bridge_reason: null };
+  }
+
+  // 2. Derive a deterministic slug.
+  const slug =
+    page.slug_hint && page.slug_hint.trim() !== ""
+      ? slugifyForPost(page.slug_hint)
+      : slugifyForPost(page.title);
+
+  // 3. Adopt an existing live post with the same (site_id, slug). Posts
+  //    already-published on WP surface via (site_id, wp_post_id); the
+  //    live-slug check is how we detect a prior bridge on the same
+  //    page before that happens.
+  const existing = await svc
+    .from("posts")
+    .select("id")
+    .eq("site_id", brief.site_id)
+    .eq("slug", slug)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (existing.error) {
+    logger.warn("approve.post_bridge.existing_lookup_failed", {
+      site_id: brief.site_id,
+      slug,
+      error: existing.error,
+    });
+    return { post_id: null, failed_bridge_reason: "existing_lookup_failed" };
+  }
+  if (existing.data) {
+    return {
+      post_id: existing.data.id as string,
+      failed_bridge_reason: null,
+    };
+  }
+
+  // 4. Resolve design_system_version — posts require a non-null value.
+  //    Use the site's currently-active DS version; fall back to 1 (the
+  //    M1b default) if no active DS exists so we don't block approval.
+  const dsRes = await svc
+    .from("design_systems")
+    .select("version")
+    .eq("site_id", brief.site_id)
+    .eq("status", "active")
+    .maybeSingle();
+  const dsVersion = (dsRes.data?.version as number | undefined) ?? 1;
+
+  // 5. Insert the posts row. A 23505 here means another operator raced
+  //    us to the same slug — treat as soft failure so approval stays
+  //    successful.
+  const insertRes = await svc
+    .from("posts")
+    .insert({
+      site_id: brief.site_id,
+      content_type: "post",
+      title: page.title,
+      slug,
+      design_system_version: dsVersion,
+      status: "draft",
+      generated_html: page.draft_html,
+      content_brief: { source_text: page.source_text, brief_id: page.brief_id },
+    })
+    .select("id")
+    .maybeSingle();
+  if (insertRes.error) {
+    const pgCode = (insertRes.error as { code?: string }).code;
+    logger.warn("approve.post_bridge.insert_failed", {
+      site_id: brief.site_id,
+      slug,
+      pg_code: pgCode,
+      error: insertRes.error,
+    });
+    return {
+      post_id: null,
+      failed_bridge_reason:
+        pgCode === "23505" ? "slug_already_in_use" : "insert_failed",
+    };
+  }
+  if (!insertRes.data) {
+    return { post_id: null, failed_bridge_reason: "insert_returned_no_row" };
+  }
+  return {
+    post_id: insertRes.data.id as string,
+    failed_bridge_reason: null,
   };
 }

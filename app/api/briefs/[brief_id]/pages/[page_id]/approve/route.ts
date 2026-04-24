@@ -146,7 +146,8 @@ export async function POST(
   }
 
   // Bust the review page + site detail caches so the approve surfaces
-  // the new state on next render.
+  // the new state on next render. M13-4: also bust the posts surfaces
+  // when the bridge landed a posts row.
   const siteLookup = await svc
     .from("briefs")
     .select("site_id")
@@ -158,6 +159,10 @@ export async function POST(
       `/admin/sites/${siteId}/briefs/${briefIdCheck.value}/review`,
     );
     revalidatePath(`/admin/sites/${siteId}`);
+    if (result.post_id) {
+      revalidatePath(`/admin/sites/${siteId}/posts`);
+      revalidatePath(`/admin/sites/${siteId}/posts/${result.post_id}`);
+    }
   }
 
   return NextResponse.json(
@@ -167,6 +172,14 @@ export async function POST(
         page_id: pageIdCheck.value,
         page_status: result.pageStatus,
         run_status: result.runStatus,
+        // M13-4 — post_id is non-null when the approve bridged a
+        // content_type='post' brief_page into a new posts row.
+        // failed_bridge_reason surfaces the specific soft-failure if
+        // the bridge attempted and couldn't insert (e.g.,
+        // slug_already_in_use). Page-mode approvals always return null
+        // for both.
+        post_id: result.post_id,
+        failed_bridge_reason: result.failed_bridge_reason,
       },
       timestamp: new Date().toISOString(),
     },
