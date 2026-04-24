@@ -3,8 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
-import { NewBatchButton } from "@/components/NewBatchButton";
-import { SiteActionsMenu } from "@/components/SiteActionsMenu";
+import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -179,17 +178,10 @@ export default async function SiteDetailPage({
             <span>updated {formatDate(site.updated_at)}</span>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <NewBatchButton
-            site={{ id: site.id, name: site.name }}
-            templates={batchTemplateOptions}
-          />
-          <SiteActionsMenu
-            siteId={site.id}
-            name={site.name}
-            wpUrl={site.wp_url}
-          />
-        </div>
+        <SiteDetailActions
+          site={{ id: site.id, name: site.name, wp_url: site.wp_url }}
+          templates={batchTemplateOptions}
+        />
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
