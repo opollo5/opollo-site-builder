@@ -465,8 +465,15 @@ function systemPromptFor(ctx: PageContext): string {
 }
 
 function userPromptForDraft(ctx: PageContext): string {
+  // M12-5 — operator_notes surface here. Captured by the "revise with
+  // note" action; present only when the operator flipped this page back
+  // to pending with feedback. Empty for fresh runs.
+  const operatorNotesBlock =
+    ctx.page.operator_notes && ctx.page.operator_notes.trim() !== ""
+      ? `\n<operator_notes>\n${ctx.page.operator_notes}\n</operator_notes>`
+      : "";
   return [
-    `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\nOrdinal: ${ctx.page.ordinal}\n\n${ctx.page.source_text}\n</page_spec>`,
+    `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\nOrdinal: ${ctx.page.ordinal}\n\n${ctx.page.source_text}\n</page_spec>${operatorNotesBlock}`,
     "",
     "Produce the page's HTML. Respond with the HTML only.",
   ].join("\n");
