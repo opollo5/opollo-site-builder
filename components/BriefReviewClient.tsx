@@ -439,10 +439,24 @@ export function BriefReviewClient({
           className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-4 text-sm"
           role="status"
         >
-          <p className="font-medium">This page list is committed.</p>
-          <p className="mt-1 text-muted-foreground">
-            Starting generation runs becomes available in M12-5.
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="font-medium">This brief is locked in.</p>
+              <p className="mt-1 text-muted-foreground">
+                Page generation will be available soon — we&apos;ll email you when it&apos;s ready.
+              </p>
+            </div>
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+            >
+              <a href={`/admin/sites/${siteId}`}>
+                Back to briefs
+              </a>
+            </Button>
+          </div>
         </div>
       )}
 
