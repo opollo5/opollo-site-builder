@@ -60,9 +60,8 @@ export async function POST(req: Request): Promise<NextResponse> {
   try {
     form = await req.formData();
   } catch (err) {
-    return validationError("Request must be multipart/form-data.", {
-      detail: err instanceof Error ? err.message : String(err),
-    });
+    logger.error("briefs.upload.parse_form_failed", { error: err });
+    return validationError("Request must be multipart/form-data.");
   }
 
   const siteId = form.get("site_id");
