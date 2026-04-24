@@ -9,22 +9,20 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session B
 - Started: 2026-04-24
-- Branch: fix/m15-3-env-audit-actionables
-- Slice: M15-3 env audit + three actionable fixes (dual-key runbook honesty, env coupling validation at boot, doc-drift cleanup)
+- Branch: feat/m12-2-brand-voice-site-conventions
+- Slice: M12-2 — brand_voice + design_direction columns on briefs; site_conventions zod schema + freezeSiteConventions idempotency helper; anchor-cycle scaffold for M12-3
 - Files claimed:
-  - docs/SCHEMA_AUDIT_2026-04-24.md (M15-2 audit — merged within this PR)
-  - docs/ENV_AUDIT_2026-04-24.md (M15-3 audit — merged within this PR)
-  - docs/_audit_scratch/ (scratch inputs for M15-2..M15-6; removed before merge or in a follow-up)
-  - docs/RUNBOOK.md (master-key rotation section rewrite + LANGFUSE_HOST typo fix)
-  - docs/BACKLOG.md (DEFAULT_TENANT_* strike-through + REGEN_RETRY_BACKOFF_MS reclassify)
-  - docs/PROMPT_VERSIONING.md (not-yet-shipped banner)
-  - .env.local.example (dead DEFAULT_TENANT_* entries commented out)
-  - lib/env-validation.ts (new)
-  - lib/__tests__/env-validation.test.ts (new)
-  - instrumentation.ts (wire validateEnvCouplingOnce into register())
-- Migration number reserved: none
-- Expected completion: same session; auto-merge on green CI; then proceed to M15-4 audit under pause rules
-- Notes: M15-1 is in flight in Session A (`/api/ops/reset-admin-password` fix). Session B stays off that endpoint, the `opollo_users.deleted_at → revoked_at` fix, and any related migration.
+  - supabase/migrations/0017_m12_2_briefs_brand_voice_design_direction.sql (new)
+  - supabase/rollbacks/0017_m12_2_briefs_brand_voice_design_direction.down.sql (new)
+  - lib/site-conventions.ts (new — zod schema, freezeSiteConventions, ANCHOR_EXTRA_CYCLES)
+  - lib/__tests__/site-conventions.test.ts (new — zod parse + idempotency + concurrent-call coverage)
+  - lib/__tests__/m12-2-schema.test.ts (new — columns exist on briefs, nullable, defaults)
+  - lib/briefs.ts (extend BriefRow type, commitBrief persists brand_voice + design_direction)
+  - app/api/briefs/[brief_id]/commit/route.ts (extend CommitBodySchema with optional strings)
+  - components/BriefReviewClient.tsx (add Brand Voice + Design Direction textareas pre-commit)
+- Migration number reserved: 0017 (next free after 0015 on main; 0016 is the parallel session's untracked `0016_m15_rls_documentation.sql` — not colliding)
+- Expected completion: same session; auto-merge on green CI
+- Notes: M12-1 shipped four tables (briefs / brief_pages / brief_runs / site_conventions) in 0013 — site_conventions is a table, NOT a JSONB column on briefs as the parent plan originally proposed. M12-2 builds on that consolidated shape. Runner + Claude-inferred defaults for voice/direction land in M12-3; M12-2 ships empty-string defaults + operator-fills form.
 ---
 
 ## Hot-shared files (always check before claiming)
@@ -57,6 +55,7 @@ When a session starts a migration, reserve the number here before writing the fi
 ```
 
 - 0013 — M12-1 briefs schema: `briefs`, `brief_pages`, `brief_runs`, `site_conventions` + `site-briefs` Storage bucket. Executing on `feat/m12-1-briefs-schema`.
+- 0017 — M12-2 brand_voice + design_direction columns on briefs. Executing on `feat/m12-2-brand-voice-site-conventions`.
 
 ## Claim block template
 

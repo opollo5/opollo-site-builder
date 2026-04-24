@@ -15,9 +15,19 @@ import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // M12-1 — POST /api/briefs/[brief_id]/commit.
+// M12-2 — accepts optional brand_voice + design_direction in the body;
+//         those fields are persisted atomically with the committed
+//         transition. Both are nullable strings capped at 4 KB. Omitted
+//         fields preserve whatever value is currently on the row
+//         (don't-touch semantics — see commitBrief input docs).
 //
 // Body:
-//   { expected_version_lock: int, page_hash: string }
+//   {
+//     expected_version_lock: int,
+//     page_hash: string,
+//     brand_voice?: string | null,
+//     design_direction?: string | null,
+//   }
 //
 // Freezes the brief's page list under optimistic-concurrency. Idempotent
 // on (brief_id, page_hash): a replay with the same hash returns
@@ -27,9 +37,24 @@ import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// 4 KB cap on brand_voice + design_direction prose. Descriptive fields;
+// not documents. Anything longer is almost certainly an operator pasting
+// the wrong thing into the wrong field.
+const VOICE_DIRECTION_MAX_BYTES = 4096;
+
 const CommitBodySchema = z.object({
   expected_version_lock: z.number().int().nonnegative(),
   page_hash: z.string().min(32).max(256),
+  brand_voice: z
+    .string()
+    .max(VOICE_DIRECTION_MAX_BYTES)
+    .nullable()
+    .optional(),
+  design_direction: z
+    .string()
+    .max(VOICE_DIRECTION_MAX_BYTES)
+    .nullable()
+    .optional(),
 });
 
 export async function POST(
@@ -51,6 +76,8 @@ export async function POST(
     expectedVersionLock: parsed.data.expected_version_lock,
     pageHash: parsed.data.page_hash,
     committedBy: gate.user?.id ?? null,
+    brandVoice: parsed.data.brand_voice,
+    designDirection: parsed.data.design_direction,
   });
 
   if (!result.ok) {

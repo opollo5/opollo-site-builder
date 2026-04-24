@@ -97,6 +97,14 @@ export function BriefReviewClient({
   const [pages, setPages] = useState<EditablePage[]>(() => toEditable(initialPages));
   const [commitState, setCommitState] = useState<CommitState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // M12-2 — brand_voice + design_direction feed the M12-3 runner. Captured
+  // pre-commit; editable here while status='parsed', read-only after commit.
+  const [brandVoice, setBrandVoice] = useState<string>(
+    brief.brand_voice ?? "",
+  );
+  const [designDirection, setDesignDirection] = useState<string>(
+    brief.design_direction ?? "",
+  );
 
   const isReadOnly = brief.status === "committed";
   const isFailed = brief.status === "failed_parse";
@@ -149,12 +157,20 @@ export function BriefReviewClient({
     setErrorMessage(null);
     try {
       const hash = await computePageHash(sortedPages);
+      // Normalise empty strings to null so the server treats "operator
+      // opened the field, typed, then cleared" the same as "never
+      // touched". The server-side schema accepts both shapes.
+      const voiceValue = brandVoice.trim() === "" ? null : brandVoice;
+      const directionValue =
+        designDirection.trim() === "" ? null : designDirection;
       const res = await fetch(`/api/briefs/${brief.id}/commit`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           expected_version_lock: brief.version_lock,
           page_hash: hash,
+          brand_voice: voiceValue,
+          design_direction: directionValue,
         }),
       });
       const payload = (await res.json()) as {
@@ -241,6 +257,71 @@ export function BriefReviewClient({
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {errorMessage}
         </div>
+      )}
+
+      {(brief.status === "parsed" || brief.status === "committed") && (
+        <section aria-labelledby="voice-direction-heading" className="rounded-lg border p-4">
+          <div className="mb-3">
+            <h2 id="voice-direction-heading" className="text-lg font-medium">
+              Brand voice &amp; design direction
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              These guide every page the generator produces. Optional today;
+              required before the runner ships in M12-3.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="brand-voice-input"
+                className="block text-xs font-medium text-muted-foreground"
+              >
+                Brand voice
+              </label>
+              <Textarea
+                id="brand-voice-input"
+                className="mt-1"
+                rows={5}
+                value={brandVoice}
+                onChange={(e) => setBrandVoice(e.target.value)}
+                disabled={isReadOnly}
+                placeholder="e.g. Warm, confident, plain language. Avoid jargon. Second-person (you / your) by default."
+                aria-describedby="brand-voice-hint"
+              />
+              <p
+                id="brand-voice-hint"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                How every page should sound. 4 KB max.
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="design-direction-input"
+                className="block text-xs font-medium text-muted-foreground"
+              >
+                Design direction
+              </label>
+              <Textarea
+                id="design-direction-input"
+                className="mt-1"
+                rows={5}
+                value={designDirection}
+                onChange={(e) => setDesignDirection(e.target.value)}
+                disabled={isReadOnly}
+                placeholder="e.g. Generous white space. Hero with photo background. Single CTA per section, accent color for emphasis."
+                aria-describedby="design-direction-hint"
+              />
+              <p
+                id="design-direction-hint"
+                className="mt-1 text-xs text-muted-foreground"
+              >
+                Constrains the anchor cycle on page 1, then re-used verbatim
+                for pages 2..N. 4 KB max.
+              </p>
+            </div>
+          </div>
+        </section>
       )}
 
       {(brief.status === "parsed" || brief.status === "committed") && (
