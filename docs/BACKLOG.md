@@ -6,6 +6,30 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Kadence typography + spacing globals sync (deferred from M13-5, 2026-04-24)
+
+**What:** M13-5 ships palette-only sync (DS palette → `kadence_blocks_colors` WP option via `/wp/v2/settings`). Typography (heading/body font family, scale, weight, line-height) and spacing (xxs→xl ramp) globals stay operator-owned via WP Admin → Customizer. A future slice auto-syncs them alongside the palette.
+
+**Why deferred:** Pre-flight source check against `stellarwp/kadence-blocks` master at plan-time confirmed:
+- Palette IS REST-writable on free tier (`register_setting` + `show_in_rest: true` on `kadence_blocks_colors`).
+- Typography + spacing live in the Kadence Theme as Customizer theme mods (`get_theme_mod` / `set_theme_mod`). The theme registers zero `register_rest_route` calls; mods are not `show_in_rest`.
+- Writing these via REST on free tier would require either (a) paid-tier Kadence Pro, which may add the REST surface, or (b) shipping an Opollo must-use plugin (`/wp-content/mu-plugins/opollo-theme-bridge.php`) that wraps `set_theme_mod` behind a custom `/wp-json/opollo/v1/theme-globals` endpoint.
+
+Option (b) expands the write-safety blast radius significantly — mu-plugin installs are semi-permanent (no WP Admin uninstall path) and become an attack surface on every Opollo-managed site. Not worth shipping until a real operator hits the pain.
+
+**Trigger:** First operator who asks for brand-consistent H1 sizing / spacing across their generated pages. Likely lands within the first dozen real sites shipped, because typography drift is a visible branding problem on multi-page sites.
+
+**Scope when it ships:**
+- Pick between (a) paid-tier license + REST write or (b) mu-plugin bridge. Paid-tier is the honest first try; mu-plugin is the fallback.
+- Extend `lib/kadence-mapper.ts` (ships in M13-5b) to emit typography + spacing proposals from the DS tokens_css (parser already handles custom properties like `--<prefix>-font-sans`, `--<prefix>-space-md`).
+- Extend the Appearance panel diff table with two new sections.
+- Extend `appearance_events` event enum: `typography_dry_run`, `typography_completed`, `spacing_dry_run`, `spacing_completed`. Migration needed — the CHECK enum is declared in 0022.
+- Extend the rollback path: snapshot the full Kadence theme-mods pre-image before every write.
+
+**Size:** Medium (~1 day) if paid-tier route works. Large (~3-4 days) if mu-plugin route is needed — that's a whole new deployment vector plus its own preflight + install + version-upgrade story.
+
+---
+
 ## PDF / .docx brief parser (deferred from M12-6, 2026-04-24)
 
 **What:** Extend `lib/brief-parser.ts` to accept `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document` in addition to `text/plain` + `text/markdown`. The existing structural-first + Claude-inference-fallback parser runs against the extracted text; the only new work is the MIME-specific binary → UTF-8 decoder.

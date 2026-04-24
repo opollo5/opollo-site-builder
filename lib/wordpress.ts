@@ -947,3 +947,132 @@ export async function wpGetMe(cfg: WpConfig): Promise<WpGetMeResult> {
     capabilities: (body?.capabilities ?? {}) as WpUserCapabilities,
   };
 }
+
+// ---------------------------------------------------------------------------
+// M13-5a — theme + settings REST helpers.
+//
+// These are generic WP Core endpoints, not Kadence-specific. Living
+// here keeps the Kadence-specific layer in lib/kadence-rest.ts thin
+// (just parses the Kadence payload out of a WP Core settings read).
+//
+// Endpoints:
+//   GET /wp/v2/themes?status=active   → active theme
+//   GET /wp/v2/themes                 → all installed themes
+//   GET /wp/v2/settings               → site options, including those
+//                                        with show_in_rest:true
+// ---------------------------------------------------------------------------
+
+export type WpTheme = {
+  stylesheet: string; // stable slug, e.g. "kadence"
+  template: string;
+  name: string;
+  version: string;
+  status: string;
+  author?: string;
+  author_uri?: string;
+  theme_uri?: string;
+  description?: string;
+};
+
+export type WpListThemesResult = WpResult<{ themes: WpTheme[] }>;
+export type WpGetActiveThemeResult = WpResult<{ theme: WpTheme | null }>;
+
+function mapThemeBody(raw: unknown): WpTheme {
+  const r = raw as Record<string, unknown>;
+  const nameField = r.name as { rendered?: string } | string | undefined;
+  const descField = r.description as { rendered?: string } | string | undefined;
+  return {
+    stylesheet: String(r.stylesheet ?? r.slug ?? ""),
+    template: String(r.template ?? ""),
+    name:
+      typeof nameField === "string"
+        ? nameField
+        : nameField?.rendered ?? String(r.stylesheet ?? ""),
+    version: String(r.version ?? ""),
+    status: String(r.status ?? "active"),
+    author: r.author as string | undefined,
+    author_uri: r.author_uri as string | undefined,
+    theme_uri: r.theme_uri as string | undefined,
+    description:
+      typeof descField === "string" ? descField : descField?.rendered,
+  };
+}
+
+/**
+ * List all themes installed on the WP site. Free-tier WP exposes a
+ * stylesheet slug + version on every entry; caller can filter locally
+ * to detect whether Kadence is installed (stylesheet === "kadence").
+ */
+export async function wpListThemes(
+  cfg: WpConfig,
+): Promise<WpListThemesResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/themes", { method: "GET" });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<unknown[]>(res);
+  if (!parsed.ok) return parsed;
+  const list = Array.isArray(parsed.body) ? parsed.body : [];
+  return { ok: true, themes: list.map(mapThemeBody) };
+}
+
+/**
+ * Fetch the currently-active theme. Returns { theme: null } if WP
+ * returned an empty list (unexpected — every WP site has an active
+ * theme — but we handle defensively rather than throwing).
+ */
+export async function wpGetActiveTheme(
+  cfg: WpConfig,
+): Promise<WpGetActiveThemeResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/themes?status=active", {
+      method: "GET",
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<unknown[]>(res);
+  if (!parsed.ok) return parsed;
+  const list = Array.isArray(parsed.body) ? parsed.body : [];
+  if (list.length === 0) return { ok: true, theme: null };
+  return { ok: true, theme: mapThemeBody(list[0]) };
+}
+
+/**
+ * Read the settings object from /wp/v2/settings. This is the WP Core
+ * endpoint that surfaces every option registered with
+ * register_setting(..., show_in_rest: true). Kadence Blocks registers
+ * `kadence_blocks_colors` here, so M13-5's palette read flows through
+ * this helper.
+ *
+ * Caller owns extracting the specific setting key they care about;
+ * we return the raw body so lib/kadence-rest.ts can JSON-parse the
+ * palette field without this helper knowing about Kadence.
+ */
+export type WpGetSettingsResult = WpResult<{ settings: Record<string, unknown> }>;
+
+export async function wpGetSettings(
+  cfg: WpConfig,
+): Promise<WpGetSettingsResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/settings", { method: "GET" });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<Record<string, unknown>>(res);
+  if (!parsed.ok) return parsed;
+  return {
+    ok: true,
+    settings: (parsed.body ?? {}) as Record<string, unknown>,
+  };
+}
