@@ -7,6 +7,7 @@ import {
 import { listComponents, type DesignComponent } from "@/lib/components";
 import { listTemplates, type DesignTemplate } from "@/lib/templates";
 import { renderRegistryBlock } from "@/lib/design-system-prompt";
+import { logger } from "@/lib/logger";
 
 export type SystemPromptContext = {
   site_name: string;
@@ -129,7 +130,7 @@ export async function loadActiveRegistry(
 } | null> {
   const dsRes = await getActiveDesignSystem(site_id);
   if (!dsRes.ok) {
-    console.error("[system-prompt] getActiveDesignSystem failed", {
+    logger.error("system_prompt.load_active_ds_failed", {
       site_id,
       error: dsRes.error,
     });
@@ -144,17 +145,17 @@ export async function loadActiveRegistry(
   ]);
 
   if (!compRes.ok) {
-    console.error("[system-prompt] listComponents failed", {
+    logger.error("system_prompt.load_components_failed", {
       site_id,
-      ds_id: ds.id,
+      design_system_id: ds.id,
       error: compRes.error,
     });
     return null;
   }
   if (!tmplRes.ok) {
-    console.error("[system-prompt] listTemplates failed", {
+    logger.error("system_prompt.load_templates_failed", {
       site_id,
-      ds_id: ds.id,
+      design_system_id: ds.id,
       error: tmplRes.error,
     });
     return null;
@@ -212,18 +213,15 @@ async function resolveDesignSystemSlot(site: SiteIdentity): Promise<{
 
   const registry = await loadActiveRegistry(site.id);
   if (!registry) {
-    // Flag is on but we have no active DS (or a transient read failure). The
-    // log is deliberately console.error + structured so operators see it
-    // clearly in production — an active-DS miss usually means someone forgot
-    // to activate a seeded design system.
-    console.error(
-      "[system-prompt] FEATURE_DESIGN_SYSTEM_V2=on but no active design_system for site",
-      {
-        site_id: site.id,
-        site_name: site.site_name,
-        fallback: "legacy_html_blob",
-      },
-    );
+    // Flag is on but we have no active DS (or a transient read failure).
+    // An active-DS miss usually means someone forgot to activate a seeded
+    // design system; logger.error routes to both stdout and Axiom so
+    // operators see it in the same place as all other structured events.
+    logger.error("system_prompt.resolve_design_system_slot_failed", {
+      site_id: site.id,
+      site_name: site.site_name,
+      fallback: "legacy_html_blob",
+    });
     return legacy;
   }
 

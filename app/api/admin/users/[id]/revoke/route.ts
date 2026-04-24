@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { countActiveAdmins } from "@/lib/auth";
 import { revokeUserSessions } from "@/lib/auth-revoke";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -85,9 +86,10 @@ export async function POST(
     .eq("id", userId)
     .maybeSingle();
   if (fetchErr) {
+    logger.error("admin.users.revoke.fetch_failed", { user_id: userId, error: fetchErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to read target user: ${fetchErr.message}`,
+      "Failed to read user. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }
@@ -101,9 +103,10 @@ export async function POST(
     // See lib/auth.ts#countActiveAdmins for the definition.
     const adminCount = await countActiveAdmins();
     if (!adminCount.ok) {
+      logger.error("admin.users.revoke.count_failed", { user_id: userId, error: adminCount.error });
       return errorJson(
         "INTERNAL_ERROR",
-        `Failed to count active admins: ${adminCount.error}`,
+        "Failed to count active admins. Please try again or contact support with the request id from the response headers.",
         500,
       );
     }
@@ -120,9 +123,10 @@ export async function POST(
     ban_duration: BAN_FOREVER,
   });
   if (banErr) {
+    logger.error("admin.users.revoke.ban_failed", { user_id: userId, error: banErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to ban user in auth.users: ${banErr.message}`,
+      "Failed to ban user. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }
@@ -133,10 +137,10 @@ export async function POST(
     // The ban already landed, so the immediate effect is the same even
     // if the session sweep fails. Surface it so operators know to
     // retry, but don't lie about success.
-    const message = err instanceof Error ? err.message : String(err);
+    logger.error("admin.users.revoke.session_sweep_failed", { user_id: userId, error: err });
     return errorJson(
       "INTERNAL_ERROR",
-      `User banned, but session sweep failed: ${message}`,
+      "User banned, but session sweep failed. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }

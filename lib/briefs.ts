@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { parseBriefDocument, type BriefPageDraft, type ParserWarning } from "@/lib/brief-parser";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse, ErrorCode } from "@/lib/tool-schemas";
 
@@ -373,6 +374,9 @@ async function uploadBriefImpl(
   }
 
   // 7. Flip briefs.status → parsed + write parser metadata.
+  // CAS on version_lock prevents a concurrent update from silently
+  // winning — matches the pattern used by commitBrief and every other
+  // version_lock-bearing UPDATE in the repo.
   const finalize = await svc
     .from("briefs")
     .update({
@@ -382,11 +386,24 @@ async function uploadBriefImpl(
       version_lock: insert.data.version_lock + 1,
       updated_at: now(),
     })
-    .eq("id", briefId);
+    .eq("id", briefId)
+    .eq("version_lock", insert.data.version_lock)
+    .select("id")
+    .maybeSingle();
   if (finalize.error) {
     return errorEnvelope("INTERNAL_ERROR", "Failed to finalize brief.", {
       details: { supabase_error: finalize.error },
     });
+  }
+  if (!finalize.data) {
+    logger.error("briefs.parse.finalize_version_lock_mismatch", {
+      brief_id: briefId,
+      expected_version_lock: insert.data.version_lock,
+    });
+    return errorEnvelope(
+      "INTERNAL_ERROR",
+      "Brief was modified by a concurrent request during parse. Please retry.",
+    );
   }
 
   return {

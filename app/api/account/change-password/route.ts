@@ -174,7 +174,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const message =
         code === "SAME_PASSWORD"
           ? "New password must be different from your current password."
-          : `Password update failed: ${error.message}`;
+          : "Password update failed. Please try again or contact support with the request id from the response headers.";
       logger.warn("change_password_supabase_error", {
         user_id: user.id,
         email: user.email,

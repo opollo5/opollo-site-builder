@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -147,9 +148,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         409,
       );
     }
+    logger.error("admin.users.invite.generate_failed", { error });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to generate invite: ${error.message}`,
+      "Failed to generate invite. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }

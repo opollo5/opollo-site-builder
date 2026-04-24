@@ -5,6 +5,7 @@ import {
   type SiteRecord,
 } from "@/lib/tool-schemas";
 import { decrypt, encrypt } from "@/lib/encryption";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 export type SiteCredentials = {
@@ -166,15 +167,15 @@ async function rollbackSite(siteId: string): Promise<void> {
     const supabase = getServiceRoleClient();
     const { error } = await supabase.from("sites").delete().eq("id", siteId);
     if (error) {
-      console.error("[sites.createSite] rollback delete failed", {
+      logger.error("sites.createSite.rollback_delete_failed", {
         site_id: siteId,
         error,
       });
     }
   } catch (err) {
-    console.error("[sites.createSite] rollback threw", {
+    logger.error("sites.createSite.rollback_threw", {
       site_id: siteId,
-      err,
+      error: err,
     });
   }
 }

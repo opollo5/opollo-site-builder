@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -42,12 +43,13 @@ export async function GET(): Promise<NextResponse> {
     .order("created_at", { ascending: false });
 
   if (error) {
+    logger.error("admin.users.list.read_failed", { error });
     return NextResponse.json(
       {
         ok: false,
         error: {
           code: "INTERNAL_ERROR",
-          message: `Failed to read opollo_users: ${error.message}`,
+          message: "Failed to read users. Please try again or contact support with the request id from the response headers.",
           retryable: true,
         },
         timestamp: new Date().toISOString(),

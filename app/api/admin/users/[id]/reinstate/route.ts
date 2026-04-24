@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -57,9 +58,10 @@ export async function POST(
     .eq("id", userId)
     .maybeSingle();
   if (fetchErr) {
+    logger.error("admin.users.reinstate.fetch_failed", { user_id: userId, error: fetchErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to read target user: ${fetchErr.message}`,
+      "Failed to read user. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }
@@ -73,9 +75,10 @@ export async function POST(
     ban_duration: "none",
   });
   if (unbanErr) {
+    logger.error("admin.users.reinstate.unban_failed", { user_id: userId, error: unbanErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to unban user in auth.users: ${unbanErr.message}`,
+      "Failed to unban user. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }
@@ -96,9 +99,10 @@ export async function POST(
     .update({ revoked_at: null })
     .eq("id", userId);
   if (clearErr) {
+    logger.error("admin.users.reinstate.clear_revoked_failed", { user_id: userId, error: clearErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to clear revoked_at: ${clearErr.message}`,
+      "Failed to reinstate user. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }

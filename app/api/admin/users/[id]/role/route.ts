@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { countActiveAdmins } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -120,9 +121,10 @@ export async function PATCH(
     .eq("id", userId)
     .maybeSingle();
   if (fetchErr) {
+    logger.error("admin.users.role.fetch_failed", { user_id: userId, error: fetchErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to read target user: ${fetchErr.message}`,
+      "Failed to read user. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }
@@ -149,9 +151,10 @@ export async function PATCH(
   if (currentRole === "admin" && targetRole !== "admin") {
     const adminCount = await countActiveAdmins();
     if (!adminCount.ok) {
+      logger.error("admin.users.role.count_failed", { user_id: userId, error: adminCount.error });
       return errorJson(
         "INTERNAL_ERROR",
-        `Failed to count active admins: ${adminCount.error}`,
+        "Failed to count active admins. Please try again or contact support with the request id from the response headers.",
         500,
       );
     }
@@ -169,9 +172,10 @@ export async function PATCH(
     .update({ role: targetRole })
     .eq("id", userId);
   if (updateErr) {
+    logger.error("admin.users.role.update_failed", { user_id: userId, error: updateErr });
     return errorJson(
       "INTERNAL_ERROR",
-      `Failed to update role: ${updateErr.message}`,
+      "Failed to update role. Please try again or contact support with the request id from the response headers.",
       500,
     );
   }
