@@ -71,6 +71,11 @@ export default defineConfig({
       // Opt-in: Playwright runs with FEATURE_SUPABASE_AUTH=true so the
       // admin-layout gate is on and the sign-in flow is exercised.
       FEATURE_SUPABASE_AUTH: "true",
+      // M12-6 — deterministic CRON_SECRET so the brief-runner cron
+      // endpoint accepts Bearer tokens from the E2E spec. Shared via
+      // e2e/fixtures.ts::E2E_CRON_SECRET. Matches the 16-char minimum
+      // the cron route enforces.
+      CRON_SECRET: "e2e-cron-secret-deterministic",
     },
   },
   globalSetup: "./e2e/global-setup.ts",

@@ -9,6 +9,10 @@
       "schedule": "* * * * *"
     },
     {
+      "path": "/api/cron/process-brief-runner",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/cron/budget-reset",
       "schedule": "0 * * * *"
     }
