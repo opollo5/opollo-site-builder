@@ -125,7 +125,11 @@ describe("POST /api/briefs/[brief_id]/run — start run", () => {
       }),
       { params: { brief_id: briefId } },
     );
-    expect(first.status).toBe(429);
+    // CONFIRMATION_REQUIRED maps to 403 per lib/tool-schemas.ts
+    // errorCodeToStatus (shared with the FORBIDDEN code class). The
+    // client reads the error.code field, not the HTTP status, to open
+    // the confirmation modal — see BriefRunClient.handleStartRun.
+    expect(first.status).toBe(403);
     const firstBody = (await first.json()) as {
       ok: boolean;
       error: { code: string };
