@@ -1,0 +1,38 @@
+/*
+ * Leadsource-shaped DS fixture. Matches the seed/leadsource/tokens.css
+ * structure: brand first, neutrals, type, then non-color values. No
+ * explicit --ls-palette-N names — the mapper falls back to
+ * 'ordered_hex' and takes the first 8 colors in declaration order.
+ */
+
+.ls-scope {
+  /* Brand palette */
+  --ls-blue:          #185FA5;
+  --ls-blue-dark:     #0C447C;
+  --ls-blue-light:    #E6F1FB;
+  --ls-teal:          #1D9E75;
+  --ls-amber:         #BA7517;
+
+  /* Neutrals */
+  --ls-ink:           #1A1A1A;
+  --ls-text:          #2C2C2A;
+  --ls-muted:         #6B6B66;
+  --ls-dim:           #9A9A94;
+  --ls-surface:       #FAFAF6;
+  --ls-surface-2:     #F1EFE8;
+  --ls-border:        #E8E6DE;
+  --ls-border-strong: #D3D1C7;
+  --ls-white:         #FFFFFF;
+
+  /* Gradients — NOT colors; parser skips. */
+  --ls-arc:           linear-gradient(135deg, #185FA5 0%, #1D9E75 50%, #BA7517 100%);
+
+  /* Typography — parser skips (non-color). */
+  --ls-font-sans:     'Inter', sans-serif;
+  --ls-font-display:  'Inter Tight', sans-serif;
+
+  /* Spacing — parser skips (non-color). */
+  --ls-space-xs:      4px;
+  --ls-space-sm:      8px;
+  --ls-space-md:      16px;
+}

@@ -1,0 +1,15 @@
+/*
+ * Sparse DS fixture — only 4 color tokens. Mapper returns
+ * source='insufficient' + slots=[] so the UI surfaces a blocker.
+ */
+
+.xyz-scope {
+  --xyz-primary:  #336699;
+  --xyz-secondary: #99ccff;
+  --xyz-dark:     #222222;
+  --xyz-light:    #f4f4f4;
+
+  /* All non-color values below — parser skips. */
+  --xyz-font-body: 'Georgia', serif;
+  --xyz-space-md:  12px;
+}

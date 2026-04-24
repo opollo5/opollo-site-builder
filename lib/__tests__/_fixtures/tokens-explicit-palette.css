@@ -1,0 +1,21 @@
+/*
+ * DS fixture with explicit --acme-palette-N slot naming. The mapper
+ * detects all 8 explicit slots and returns source='explicit' — these
+ * take precedence over any other color tokens in the file.
+ */
+
+.acme-scope {
+  /* Explicit Kadence slot mapping — operator opted into this shape. */
+  --acme-palette-1:   #FF0055;
+  --acme-palette-2:   #FF8800;
+  --acme-palette-3:   #FFCC00;
+  --acme-palette-4:   #22AAFF;
+  --acme-palette-5:   #9922EE;
+  --acme-palette-6:   #22EE88;
+  --acme-palette-7:   #EEEEEE;
+  --acme-palette-8:   #111111;
+
+  /* Extra colors that the mapper should IGNORE when explicit mode is on. */
+  --acme-brand-blue:  #0044CC;
+  --acme-brand-red:   #CC0000;
+}
