@@ -146,6 +146,60 @@ export async function reserveBudget(
 }
 
 /**
+ * M12-3 — ceiling-based reservation for variable-cost work.
+ *
+ * The brief runner's per-page cost is variable: anchor page adds 2
+ * extra revise cycles, actuals come in lower than worst-case.
+ * `reserveBudget` reserves a fixed projected amount; for the brief
+ * runner we reserve the WORST-CASE upfront so a tenant cannot
+ * overspend mid-run, then RELEASE the unused delta when the page
+ * completes. Semantically identical to reserveBudget — the name
+ * communicates intent.
+ */
+export async function reserveWithCeiling(
+  client: Client,
+  siteId: string,
+  ceilingCents: number,
+): Promise<ReserveBudgetResult> {
+  return reserveBudget(client, siteId, ceilingCents);
+}
+
+/**
+ * M12-3 — refund unused reservation after a ceiling-based reserve.
+ *
+ * Called at the end of the brief runner's per-page work with the
+ * delta `(ceiling - actual)`. Decrements both daily + monthly usage
+ * counters atomically, clamped at zero floor (defence-in-depth;
+ * the CHECK on tenant_cost_budgets.daily_usage_cents catches the
+ * underlying bug if it ever surfaces).
+ */
+export async function releaseBudget(
+  client: Client,
+  siteId: string,
+  refundCents: number,
+): Promise<{ ok: true } | { ok: false; code: "INTERNAL_ERROR"; message: string }> {
+  if (refundCents < 0) {
+    return {
+      ok: false,
+      code: "INTERNAL_ERROR",
+      message: `releaseBudget called with negative refundCents (${refundCents}). Use bumpTenantUsage for that.`,
+    };
+  }
+  if (refundCents === 0) return { ok: true };
+  await client.query(
+    `
+    UPDATE tenant_cost_budgets
+       SET daily_usage_cents = GREATEST(0, daily_usage_cents - $2),
+           monthly_usage_cents = GREATEST(0, monthly_usage_cents - $2),
+           updated_at = now()
+     WHERE site_id = $1
+    `,
+    [siteId, refundCents],
+  );
+  return { ok: true };
+}
+
+/**
  * Unconditional usage bump. Skips the cap check — used by reset /
  * reconciliation paths. Callers that are enqueueing billed work
  * should use reserveBudget instead.
@@ -258,6 +312,23 @@ export const PROJECTED_COST_PER_BATCH_SLOT_CENTS = 30;
  * same shape as one batch slot — same prompt, same token budget.
  */
 export const PROJECTED_COST_PER_REGEN_CENTS = 30;
+
+/**
+ * M12-3 — worst-case ceiling per brief-runner page.
+ *
+ * Standard page (non-anchor): draft + self_critique + revise =
+ * 3 text passes × ~30c per pass worst case. Prompt-caching on the
+ * brief document keeps passes 2..N near-free on input, so 90c is
+ * a conservative ceiling; actuals tend to be much lower.
+ */
+export const BRIEF_PAGE_CEILING_CENTS = 90;
+
+/**
+ * M12-3 — worst-case ceiling for the anchor page (page 0).
+ * Standard 3 text passes + ANCHOR_EXTRA_CYCLES (2) extra revises =
+ * 5 text passes × ~30c = 150c worst case.
+ */
+export const BRIEF_ANCHOR_PAGE_CEILING_CENTS = 150;
 
 // ---------------------------------------------------------------------------
 // Read / update for the admin UI (M8-5)
