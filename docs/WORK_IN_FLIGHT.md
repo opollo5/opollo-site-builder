@@ -28,22 +28,16 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session M13-plumbing
 - Started: 2026-04-24
-- Branch: feat/m13-1-posts-schema (first PR), then feat/m13-2-wp-posts-wrapper (second PR, same worktree rebased off main)
-- Slice: M13-1 posts schema + content_type axis + lib/posts.ts; then M13-2 WP REST posts wrapper (wpCreatePost / wpUpdatePost / wpGetPostBySlug / wpDeletePost) + SEO plugin detection + post-error translations. Running in parallel with the M12-4 session on another terminal per docs/plans/m13-parent.md §Dependency on M12 — "M13-1 and M13-2 are orthogonal to M12 and can ship in parallel with M12-1/M12-2".
+- Branch: feat/m13-2-wp-posts-wrapper (M13-1 shipped in #142)
+- Slice: M13-2 — WP REST posts wrapper (wpCreatePost / wpUpdatePost / wpGetPostBySlug / wpDeletePost added additively to lib/wordpress.ts) + SEO plugin detection (Yoast / RankMath / SEOPress) + post-error translations. Running in parallel with the M12-4 session on another terminal per docs/plans/m13-parent.md §Dependency on M12 — "M13-1 and M13-2 are orthogonal to M12".
 - Files claimed:
-  - supabase/migrations/0019_m13_1_posts_schema.sql (new)
-  - supabase/rollbacks/0019_m13_1_posts_schema.down.sql (new)
-  - lib/posts.ts (new)
-  - lib/__tests__/posts.test.ts (new)
-  - lib/__tests__/m13-1-schema.test.ts (new)
-  - lib/wordpress.ts (M13-2 — additive only; new wpCreatePost / wpUpdatePost / wpGetPostBySlug / wpDeletePost alongside existing page wrappers; existing page functions untouched)
-  - lib/seo-plugin-detection.ts (new — M13-2)
-  - lib/error-translations.ts (new — M13-2, scoped to the post-related REST failures M13 surfaces)
-  - lib/__tests__/wordpress-posts.test.ts (new — M13-2)
-  - lib/__tests__/seo-plugin-detection.test.ts (new — M13-2)
-  - lib/__tests__/error-translations.test.ts (new — M13-2)
-- Migration number reserved: 0019
-- Expected completion: two PRs back-to-back, same day; auto-merge on green CI
+  - lib/wordpress.ts (additive only; new wpCreatePost / wpUpdatePost / wpGetPostBySlug / wpDeletePost alongside existing page wrappers; existing page functions untouched)
+  - lib/seo-plugin-detection.ts (new)
+  - lib/error-translations.ts (new; scoped to the post-related REST failures M13 surfaces)
+  - lib/__tests__/wordpress-posts.test.ts (new)
+  - lib/__tests__/seo-plugin-detection.test.ts (new)
+  - lib/__tests__/error-translations.test.ts (new)
+- Expected completion: same day; auto-merge on green CI
 - Notes: Worktree-isolated at `.claude/worktrees/m13-1-posts-schema` to avoid HEAD races with the other session (see MEMORY.md "Parallel sessions, single clone"). Explicitly DOES NOT modify `lib/brief-runner.ts`, `lib/visual-review.ts`, `lib/anthropic-call.ts`, or `docs/plans/m12-parent.md` — these are in-flight M12 territory. Session stops after M13-2 merges; M13-3 onward hard-blocks on M12-3.
 ---
 
@@ -78,7 +72,7 @@ When a session starts a migration, reserve the number here before writing the fi
 
 - 0013 — M12-1 briefs schema: `briefs`, `brief_pages`, `brief_runs`, `site_conventions` + `site-briefs` Storage bucket. Executing on `feat/m12-1-briefs-schema`.
 - 0017 — M12-2 brand_voice + design_direction columns on briefs. Executing on `feat/m12-2-brand-voice-site-conventions`.
-- 0019 — M13-1 posts schema: `posts` table with `content_type='post'` CHECK, nullable `wp_post_id`, partial UNIQUE `(site_id, wp_post_id) WHERE wp_post_id IS NOT NULL`, soft-delete + audit + `version_lock`, RLS matching M2b. Executing on `feat/m13-1-posts-schema`.
+- ~~0019 — M13-1 posts schema.~~ Shipped in #142.
 
 ## Claim block template
 
