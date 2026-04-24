@@ -97,6 +97,9 @@ export function BriefReviewClient({
   const [pages, setPages] = useState<EditablePage[]>(() => toEditable(initialPages));
   const [commitState, setCommitState] = useState<CommitState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  // Track the latest brief state (especially version_lock after save draft).
+  const [latestBrief, setLatestBrief] = useState<BriefRow>(brief);
   // M12-2 — brand_voice + design_direction feed the M12-3 runner. Captured
   // pre-commit; editable here while status='parsed', read-only after commit.
   const [brandVoice, setBrandVoice] = useState<string>(
@@ -152,6 +155,52 @@ export function BriefReviewClient({
     });
   }
 
+  async function handleSaveDraft() {
+    setIsSavingDraft(true);
+    setErrorMessage(null);
+    try {
+      const pageUpdates = sortedPages.map((p) => ({
+        id: p.id,
+        title: p.title,
+        mode: p.mode,
+        source_text: p.source_text,
+        operator_notes: p.operator_notes,
+      }));
+
+      const res = await fetch(`/api/briefs/${brief.id}/pages`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          expected_version_lock: brief.version_lock,
+          pages: pageUpdates,
+        }),
+      });
+      const payload = (await res.json()) as {
+        ok: boolean;
+        data?: { brief: typeof brief; pages: typeof initialPages };
+        error?: { code: string; message: string };
+      };
+      if (res.ok && payload.ok && payload.data) {
+        setPages(toEditable(payload.data.pages));
+        setLatestBrief(payload.data.brief);
+        setIsSavingDraft(false);
+        return;
+      }
+      const code = payload.error?.code ?? "INTERNAL_ERROR";
+      const message =
+        code === "VERSION_CONFLICT"
+          ? "Someone else edited this brief while you were reviewing. Refresh and try again."
+          : payload.error?.message ?? `Save failed (HTTP ${res.status}).`;
+      setErrorMessage(message);
+      setIsSavingDraft(false);
+    } catch (err) {
+      setErrorMessage(
+        `Network error: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      setIsSavingDraft(false);
+    }
+  }
+
   async function handleCommit() {
     setCommitState("committing");
     setErrorMessage(null);
@@ -167,7 +216,7 @@ export function BriefReviewClient({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          expected_version_lock: brief.version_lock,
+          expected_version_lock: latestBrief.version_lock,
           page_hash: hash,
           brand_voice: voiceValue,
           design_direction: directionValue,
@@ -423,6 +472,14 @@ export function BriefReviewClient({
 
       {brief.status === "parsed" && (
         <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleSaveDraft}
+            disabled={isSavingDraft || sortedPages.length === 0}
+          >
+            {isSavingDraft ? "Saving…" : "Save draft"}
+          </Button>
           <Button
             type="button"
             variant="default"

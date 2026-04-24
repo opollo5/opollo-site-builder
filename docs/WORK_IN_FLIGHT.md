@@ -7,22 +7,18 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
 ---
-## Session B
+## Session A
 - Started: 2026-04-24
-- Branch: feat/m12-2-brand-voice-site-conventions
-- Slice: M12-2 — brand_voice + design_direction columns on briefs; site_conventions zod schema + freezeSiteConventions idempotency helper; anchor-cycle scaffold for M12-3
+- Branch: feat/m12-6-save-draft-persistence
+- Slice: M12-6 — Save-Draft persistence for briefs review; PATCH endpoint + button + re-enable fixme'd E2E test
 - Files claimed:
-  - supabase/migrations/0017_m12_2_briefs_brand_voice_design_direction.sql (new)
-  - supabase/rollbacks/0017_m12_2_briefs_brand_voice_design_direction.down.sql (new)
-  - lib/site-conventions.ts (new — zod schema, freezeSiteConventions, ANCHOR_EXTRA_CYCLES)
-  - lib/__tests__/site-conventions.test.ts (new — zod parse + idempotency + concurrent-call coverage)
-  - lib/__tests__/m12-2-schema.test.ts (new — columns exist on briefs, nullable, defaults)
-  - lib/briefs.ts (extend BriefRow type, commitBrief persists brand_voice + design_direction)
-  - app/api/briefs/[brief_id]/commit/route.ts (extend CommitBodySchema with optional strings)
-  - components/BriefReviewClient.tsx (add Brand Voice + Design Direction textareas pre-commit)
-- Migration number reserved: 0017 (next free after 0015 on main; 0016 is the parallel session's untracked `0016_m15_rls_documentation.sql` — not colliding)
+  - app/api/briefs/[brief_id]/pages/route.ts (new PATCH handler)
+  - components/BriefReviewClient.tsx (add "Save draft" button + endpoint call)
+  - e2e/briefs-review.spec.ts (re-enable fixme'd upload→parse→commit test)
+  - lib/briefs.ts (if persistence logic needed)
+- Migration number reserved: none (data-only, no schema changes)
 - Expected completion: same session; auto-merge on green CI
-- Notes: M12-1 shipped four tables (briefs / brief_pages / brief_runs / site_conventions) in 0013 — site_conventions is a table, NOT a JSONB column on briefs as the parent plan originally proposed. M12-2 builds on that consolidated shape. Runner + Claude-inferred defaults for voice/direction land in M12-3; M12-2 ships empty-string defaults + operator-fills form.
+- Notes: M12-1 shipped with version_lock on brief_pages; M12-6 enables saving edits before commit to prevent 409 hash mismatch. The commit flow currently 409s because client computes hash from in-memory edits while server recomputes from unedited DB rows.
 ---
 
 ## Hot-shared files (always check before claiming)

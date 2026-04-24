@@ -82,17 +82,8 @@ test.describe("M12-1 briefs — upload + review", () => {
   });
 
   // TODO(M12-6): re-enable once the Save-Draft persistence gap lands.
-  //
-  // Current UI posts only the in-memory edited state's hash to the commit
-  // endpoint; server recomputes hash from the unedited DB rows and
-  // returns VERSION_CONFLICT. The M12-1 slice plan §6.2 called for a
-  // "Save draft" button that writes edits to brief_pages under
-  // version_lock before commit — that piece never shipped. Until it does,
-  // any test that edits then commits will 409 legitimately.
-  //
-  // The two other tests in this file (edit cancel, double commit) do
-  // NOT rely on pre-commit edits and stay enabled.
-  test.fixme("upload → parse → commit happy path", async ({ page }, testInfo) => {
+  // M12-6 — exercises the full upload → edit → save draft → commit flow.
+  test("upload → parse → commit happy path", async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     const siteUrl = await findTestSiteDetailUrl(page);
 
@@ -124,6 +115,9 @@ test.describe("M12-1 briefs — upload + review", () => {
 
     await auditA11y(page, testInfo);
 
+    // Save draft to persist edits to DB.
+    await page.getByRole("button", { name: /Save draft/i }).click();
+
     // Commit.
     await page.getByRole("button", { name: /Commit page list/i }).click();
     const confirmDialog = page.getByRole("dialog", { name: /Commit this page list\?/i });
@@ -131,7 +125,7 @@ test.describe("M12-1 briefs — upload + review", () => {
     await confirmDialog.getByRole("button", { name: /^Commit page list$/i }).click();
 
     // Page re-renders with the committed state.
-    await expect(page.getByText(/This page list is committed\./i)).toBeVisible();
+    await expect(page.getByText(/This brief is locked in\./i)).toBeVisible();
     await expect(page.getByRole("button", { name: /Commit page list/i })).toHaveCount(0);
   });
 
