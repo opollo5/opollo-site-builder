@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { ANTHROPIC_MODEL_ALLOWLIST } from "@/lib/anthropic-pricing";
 import { commitBrief } from "@/lib/briefs";
 import {
   parseBodyWith,
@@ -15,11 +16,9 @@ import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // M12-1 — POST /api/briefs/[brief_id]/commit.
-// M12-2 — accepts optional brand_voice + design_direction in the body;
-//         those fields are persisted atomically with the committed
-//         transition. Both are nullable strings capped at 4 KB. Omitted
-//         fields preserve whatever value is currently on the row
-//         (don't-touch semantics — see commitBrief input docs).
+// M12-2 — accepts optional brand_voice + design_direction in the body.
+// M12-5 — accepts optional text_model + visual_model (allowlist-validated)
+//         so the operator can pick per-brief tiers on the review surface.
 //
 // Body:
 //   {
@@ -27,6 +26,8 @@ import { logger } from "@/lib/logger";
 //     page_hash: string,
 //     brand_voice?: string | null,
 //     design_direction?: string | null,
+//     text_model?: string,        // must be in ANTHROPIC_MODEL_ALLOWLIST
+//     visual_model?: string,      // must be in ANTHROPIC_MODEL_ALLOWLIST
 //   }
 //
 // Freezes the brief's page list under optimistic-concurrency. Idempotent
@@ -42,6 +43,13 @@ export const dynamic = "force-dynamic";
 // the wrong thing into the wrong field.
 const VOICE_DIRECTION_MAX_BYTES = 4096;
 
+const ModelSchema = z
+  .string()
+  .refine(
+    (v) => ANTHROPIC_MODEL_ALLOWLIST.includes(v),
+    { message: "Unknown model id. Pick from the operator form's dropdown." },
+  );
+
 const CommitBodySchema = z.object({
   expected_version_lock: z.number().int().nonnegative(),
   page_hash: z.string().min(32).max(256),
@@ -55,6 +63,8 @@ const CommitBodySchema = z.object({
     .max(VOICE_DIRECTION_MAX_BYTES)
     .nullable()
     .optional(),
+  text_model: ModelSchema.optional(),
+  visual_model: ModelSchema.optional(),
 });
 
 export async function POST(
@@ -78,6 +88,8 @@ export async function POST(
     committedBy: gate.user?.id ?? null,
     brandVoice: parsed.data.brand_voice,
     designDirection: parsed.data.design_direction,
+    textModel: parsed.data.text_model,
+    visualModel: parsed.data.visual_model,
   });
 
   if (!result.ok) {

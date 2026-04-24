@@ -65,6 +65,32 @@ export type BriefPageStatus =
   | "failed"
   | "skipped";
 
+// M12-5 — client-safe snapshot of the brief_runs row. Subset of the
+// server-only BriefRunRow in lib/brief-runner.ts; the columns the run
+// surface page reads + the client component renders.
+export type BriefRunSnapshot = {
+  id: string;
+  brief_id: string;
+  status:
+    | "queued"
+    | "running"
+    | "paused"
+    | "succeeded"
+    | "failed"
+    | "cancelled";
+  current_ordinal: number | null;
+  content_summary: string;
+  run_cost_cents: number;
+  failure_code: string | null;
+  failure_detail: string | null;
+  cancel_requested_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  version_lock: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type BriefPagePassKind =
   | "draft"
   | "self_critique"
@@ -541,6 +567,11 @@ export type CommitBriefInput = {
   // null by the runner.
   brandVoice?: string | null;
   designDirection?: string | null;
+  // M12-5 — operator-chosen model tier per brief. `undefined` preserves
+  // the migration default (sonnet). DB CHECK validates the value against
+  // the allowlist; the runner has an app-layer guard too.
+  textModel?: string;
+  visualModel?: string;
 };
 
 export type CommitBriefData = {
@@ -681,6 +712,12 @@ async function commitBriefImpl(
   }
   if (input.designDirection !== undefined) {
     updatePatch.design_direction = input.designDirection;
+  }
+  if (input.textModel !== undefined) {
+    updatePatch.text_model = input.textModel;
+  }
+  if (input.visualModel !== undefined) {
+    updatePatch.visual_model = input.visualModel;
   }
 
   const update = await svc

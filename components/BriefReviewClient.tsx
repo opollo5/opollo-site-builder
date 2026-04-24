@@ -8,6 +8,32 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { BriefPageRow, BriefRow } from "@/lib/briefs";
 
+// Operator-facing labels for the Anthropic model allowlist. Kept
+// inline (not imported from lib/anthropic-pricing) because the display
+// copy is UI concern, not a data contract. If a new model is added to
+// the allowlist, this table gets a new row in the same PR.
+const MODEL_OPTIONS: Array<{
+  value: string;
+  label: string;
+  hint: string;
+}> = [
+  {
+    value: "claude-haiku-4-5-20251001",
+    label: "Haiku (fastest, cheapest)",
+    hint: "Best for simple copy or straightforward layouts. ~5-10× cheaper than Opus.",
+  },
+  {
+    value: "claude-sonnet-4-6",
+    label: "Sonnet (balanced — default)",
+    hint: "Default for both text and visual. Good quality, moderate cost.",
+  },
+  {
+    value: "claude-opus-4-7",
+    label: "Opus (highest quality, most expensive)",
+    hint: "Reserve for complex-judgment briefs. ~5× the cost of Sonnet.",
+  },
+];
+
 // ---------------------------------------------------------------------------
 // M12-1 — client component for the brief-review page.
 //
@@ -105,6 +131,16 @@ export function BriefReviewClient({
   const [designDirection, setDesignDirection] = useState<string>(
     brief.design_direction ?? "",
   );
+  // M12-5 — operator picks model tiers at commit time. Default to the
+  // value the server committed the brief with; fall back to Sonnet when
+  // a pre-M12-4 row somehow has no value (defensive — migration 0020
+  // fills everything with 'claude-sonnet-4-6').
+  const [textModel, setTextModel] = useState<string>(
+    brief.text_model ?? "claude-sonnet-4-6",
+  );
+  const [visualModel, setVisualModel] = useState<string>(
+    brief.visual_model ?? "claude-sonnet-4-6",
+  );
 
   const isReadOnly = brief.status === "committed";
   const isFailed = brief.status === "failed_parse";
@@ -171,6 +207,8 @@ export function BriefReviewClient({
           page_hash: hash,
           brand_voice: voiceValue,
           design_direction: directionValue,
+          text_model: textModel,
+          visual_model: visualModel,
         }),
       });
       const payload = (await res.json()) as {
@@ -325,6 +363,72 @@ export function BriefReviewClient({
       )}
 
       {(brief.status === "parsed" || brief.status === "committed") && (
+        <section aria-labelledby="model-tier-heading" className="rounded-lg border p-4">
+          <div className="mb-3">
+            <h2 id="model-tier-heading" className="text-lg font-medium">
+              Model tier
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pick the Claude model for text generation and for the visual
+              review critique. Sonnet is the default for both — Opus is
+              reserved for complex-judgment briefs. See the cost estimate on
+              the run surface before starting.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <label
+                htmlFor="text-model-select"
+                className="block text-xs font-medium text-muted-foreground"
+              >
+                Text model (draft / critique / revise passes)
+              </label>
+              <select
+                id="text-model-select"
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:opacity-50"
+                value={textModel}
+                onChange={(e) => setTextModel(e.target.value)}
+                disabled={isReadOnly}
+              >
+                {MODEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {MODEL_OPTIONS.find((o) => o.value === textModel)?.hint ?? ""}
+              </p>
+            </div>
+            <div>
+              <label
+                htmlFor="visual-model-select"
+                className="block text-xs font-medium text-muted-foreground"
+              >
+                Visual critique model
+              </label>
+              <select
+                id="visual-model-select"
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm disabled:opacity-50"
+                value={visualModel}
+                onChange={(e) => setVisualModel(e.target.value)}
+                disabled={isReadOnly}
+              >
+                {MODEL_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {MODEL_OPTIONS.find((o) => o.value === visualModel)?.hint ?? ""}
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {(brief.status === "parsed" || brief.status === "committed") && (
         <section aria-label="Page list">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-lg font-medium">Page list</h2>
@@ -441,21 +545,25 @@ export function BriefReviewClient({
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="font-medium">This brief is locked in.</p>
+              <p className="font-medium">This brief is committed.</p>
               <p className="mt-1 text-muted-foreground">
-                Page generation will be available soon — we&apos;ll email you when it&apos;s ready.
+                You&apos;re ready to run the generator. The run surface shows
+                the cost estimate, approval controls, and visual critique per
+                page.
               </p>
             </div>
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="shrink-0"
-            >
-              <a href={`/admin/sites/${siteId}`}>
-                Back to briefs
-              </a>
-            </Button>
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+              <Button asChild variant="outline" size="sm">
+                <a href={`/admin/sites/${siteId}`}>Back to briefs</a>
+              </Button>
+              <Button asChild size="sm">
+                <a
+                  href={`/admin/sites/${siteId}/briefs/${brief.id}/run`}
+                >
+                  Open run surface →
+                </a>
+              </Button>
+            </div>
           </div>
         </div>
       )}
