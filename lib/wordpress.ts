@@ -1076,3 +1076,47 @@ export async function wpGetSettings(
     settings: (parsed.body ?? {}) as Record<string, unknown>,
   };
 }
+
+/**
+ * M13-5c — write-path counterpart to wpGetSettings.
+ *
+ * POST /wp/v2/settings with a partial patch. WP's settings endpoint
+ * merges the patch into the existing options: fields omitted from the
+ * body are left untouched, fields present replace the current value.
+ * Our caller (lib/kadence-rest::putKadencePalette) only sends
+ * kadence_blocks_colors, so only that option changes.
+ *
+ * Capability required on WP: `manage_options` — the site's app password
+ * must have admin-level access. Preflight enforces this upstream via
+ * `edit_theme_options` + friends; a missing cap here would have been
+ * caught before the confirmed-sync call fires.
+ *
+ * Returns the full updated settings object WP echoes back. Caller
+ * verifies the field they sent round-trips correctly (defense against
+ * WP's sanitize_text_field silently dropping characters the kadence
+ * palette JSON doesn't contain but a future payload might).
+ */
+export type WpPutSettingsResult = WpResult<{ settings: Record<string, unknown> }>;
+
+export async function wpPutSettings(
+  cfg: WpConfig,
+  patch: Record<string, unknown>,
+): Promise<WpPutSettingsResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/settings", {
+      method: "POST",
+      body: JSON.stringify(patch),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<Record<string, unknown>>(res);
+  if (!parsed.ok) return parsed;
+  return {
+    ok: true,
+    settings: (parsed.body ?? {}) as Record<string, unknown>,
+  };
+}

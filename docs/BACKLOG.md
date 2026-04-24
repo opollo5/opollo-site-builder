@@ -6,6 +6,30 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Opollo mu-plugin for one-click Kadence install + theme-mod write (deferred from M13-5c, 2026-04-24)
+
+**What:** A small Opollo-authored WordPress plugin (`opollo-theme-bridge`) that ships a REST endpoint for theme install + activate + theme-mod writes. Would close two M13-5 gaps in one artifact:
+- Theme install + activate (free-tier WP Core's `/wp/v2/themes` is read-only; see Rescope 2 on the M13-5 parent-plan row)
+- Typography + spacing globals writes (Kadence Theme mods have no REST surface — see the "Kadence typography + spacing globals sync" entry below)
+
+Bootstrap path exists: WP Core's `/wp/v2/plugins` POST (cap `install_plugins`, WP 5.5+) can install + activate the Opollo plugin. Once active, it exposes `POST /wp-json/opollo/v1/themes/install`, `POST /wp-json/opollo/v1/themes/activate`, and `POST /wp-json/opollo/v1/theme-globals` wrapping `Theme_Upgrader::install()`, `switch_theme()`, and `set_theme_mod()` respectively.
+
+**Why deferred:** Building and publishing a WP plugin is a whole product surface of its own. Needs a separate repo + release pipeline, its own security review (plugin has admin privileges on every site that installs it), upgrade coordination across Opollo-managed sites, and a WP Core + Kadence version compatibility matrix. Today's manual path (operator installs Kadence through WP Admin once + sets typography in Customizer once) is one-time friction. The mu-plugin removes that friction but adds permanent product-surface weight.
+
+**Trigger:** First paying operator requests one-click setup — "I want to register my site and have Opollo handle everything including Kadence install." The first 10-ish self-serve sites through the manual flow establish whether the friction is real or imagined; if support burden is small, the plugin stays on the backlog indefinitely.
+
+**Scope when it ships:**
+- New repo `opollo/opollo-theme-bridge` with the plugin PHP (Composer autoload, WP-standards phpcs, signed release via GitHub Actions)
+- Opollo-side: `lib/opollo-bridge.ts` with `installBridgePlugin` + `bridgeInstallTheme` + `bridgeActivateTheme` + `bridgeSetThemeMod`
+- New routes: `POST /api/sites/[id]/appearance/install-kadence` (replaces the manual-install banner in M13-5d), plus `sync-typography` + `sync-spacing` routes that plug into the extended mapper from the typography-spacing entry below
+- Appearance panel UI gains a "One-click setup" CTA that chains: install bridge → install Kadence → activate Kadence → sync palette → sync typography → sync spacing
+- Upgrade path: bridge version N+1 ships → Appearance panel surfaces an "Upgrade Opollo bridge plugin" banner; upgrade uses `PUT /wp/v2/plugins/:slug` (WP Core REST supports plugin updates)
+- Rollback: bridge is never auto-removed on Opollo side; operator uninstalls from WP Admin → Plugins like any other plugin
+
+**Size:** Extra-large (~2 weeks) for a public-directory release with security review + compatibility matrix. Medium (~1 week) if distributed as a private signed `.zip` URL for paying operators only.
+
+---
+
 ## Kadence typography + spacing globals sync (deferred from M13-5, 2026-04-24)
 
 **What:** M13-5 ships palette-only sync (DS palette → `kadence_blocks_colors` WP option via `/wp/v2/settings`). Typography (heading/body font family, scale, weight, line-height) and spacing (xxs→xl ramp) globals stay operator-owned via WP Admin → Customizer. A future slice auto-syncs them alongside the palette.

@@ -5,6 +5,7 @@ import {
   wpGetActiveTheme,
   wpGetSettings,
   wpListThemes,
+  wpPutSettings,
   type WpConfig,
   type WpError,
   type WpResult,
@@ -228,6 +229,85 @@ export async function getKadencePalette(
     });
   }
   return { ok: true, ...parsed };
+}
+
+// ---------------------------------------------------------------------------
+// M13-5c — palette write.
+//
+// `putKadencePalette` is the only write primitive in this file; every
+// mutation of Kadence-owned state flows through here so tests + audit
+// have a single function to intercept.
+// ---------------------------------------------------------------------------
+
+/**
+ * Serialize a KadencePaletteEntry array into Kadence's on-wire shape.
+ * Kadence stores the palette as a JSON-encoded STRING under the
+ * `kadence_blocks_colors` option (see register_setting call in
+ * stellarwp/kadence-blocks). Fields Kadence recognises on each entry:
+ *   - slug  (palette1..palette8)
+ *   - name  (human-readable label shown in the Customizer)
+ *   - color (hex string)
+ */
+export function serializeKadencePalette(
+  palette: KadencePaletteEntry[],
+): string {
+  return JSON.stringify(
+    palette.map((p) => ({ slug: p.slug, name: p.name, color: p.color })),
+  );
+}
+
+export type PutKadencePaletteResult =
+  | {
+      ok: true;
+      /** The palette Kadence echoed back after sanitisation. */
+      written: KadencePalette;
+      /**
+       * Whether the echoed value exactly matches what we sent.
+       * `false` means WP's sanitize_text_field stripped characters or
+       * Kadence rejected one of the slots. Caller surfaces this as a
+       * warning; the write still happened.
+       */
+      round_trip_ok: boolean;
+    }
+  | WpError;
+
+/**
+ * Write a palette to WP via `/wp/v2/settings`. Caller MUST have
+ * already:
+ *   - run preflight (cap check passed)
+ *   - confirmed Kadence is active (otherwise writing
+ *     kadence_blocks_colors is harmless but pointless; the panel
+ *     wouldn't use the palette anyway)
+ *   - snapshotted the prior palette into appearance_events for
+ *     rollback recovery
+ *
+ * On success, returns what WP echoed back + a round_trip_ok flag the
+ * caller uses to detect sanitisation drift.
+ */
+export async function putKadencePalette(
+  cfg: WpConfig,
+  palette: KadencePaletteEntry[],
+): Promise<PutKadencePaletteResult> {
+  const payload = serializeKadencePalette(palette);
+  const res = await wpPutSettings(cfg, { kadence_blocks_colors: payload });
+  if (!res.ok) return res;
+
+  const echoedRaw = res.settings["kadence_blocks_colors"];
+  const written = parseKadencePaletteOption(echoedRaw);
+  // Round-trip check: WP's sanitize_text_field strips tags / certain
+  // control chars. Our palette JSON has neither, so the echo should
+  // match. If it doesn't, something changed server-side we need to
+  // know about.
+  const echoedSerialized = serializeKadencePalette(written.palette);
+  const round_trip_ok = echoedSerialized === payload;
+  if (!round_trip_ok) {
+    logger.warn("kadence_rest.palette_write_round_trip_mismatch", {
+      sent_length: payload.length,
+      echoed_length: echoedSerialized.length,
+      echoed_source: written.source,
+    });
+  }
+  return { ok: true, written, round_trip_ok };
 }
 
 /**
