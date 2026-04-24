@@ -47,8 +47,16 @@
 --                      CHECK >= 1 so a zero doesn't accidentally
 --                      brick the runner.
 
+-- page_cost_cents is `int` (not bigint) because:
+--   a) real-world brief runs bottom out at a few hundred cents per page
+--      (ceiling is 200c default); int4 max 2_147_483_647 cents = $21M
+--      is several orders of magnitude larger than any conceivable run.
+--   b) node-pg returns bigint as a STRING by default — that bites the
+--      in-memory `page.page_cost_cents += passCost` idiom (string
+--      concatenation instead of numeric addition), so staying at int
+--      avoids the SerDe trap without having to configure custom parsers.
 ALTER TABLE brief_pages
-  ADD COLUMN page_cost_cents bigint NOT NULL DEFAULT 0
+  ADD COLUMN page_cost_cents int NOT NULL DEFAULT 0
     CHECK (page_cost_cents >= 0),
   ADD COLUMN quality_flag text
     CHECK (quality_flag IS NULL OR quality_flag IN (
@@ -61,8 +69,9 @@ COMMENT ON COLUMN brief_pages.page_cost_cents IS
 COMMENT ON COLUMN brief_pages.quality_flag IS
   'Set when the visual-review loop halted without converging: cost_ceiling (per-page cents ceiling hit) or capped_with_issues (2-iteration cap reached with severity-high critique remaining). NULL = clean.';
 
+-- Same int (not bigint) reasoning as page_cost_cents above.
 ALTER TABLE brief_runs
-  ADD COLUMN run_cost_cents bigint NOT NULL DEFAULT 0
+  ADD COLUMN run_cost_cents int NOT NULL DEFAULT 0
     CHECK (run_cost_cents >= 0);
 
 COMMENT ON COLUMN brief_runs.run_cost_cents IS

@@ -99,7 +99,21 @@ describe("startBriefRun", () => {
     const site = await seedSite();
     const svc = getServiceRoleClient();
     const { briefId } = await seedCommittedBriefWithPages(site.id, 2);
-    await svc.from("briefs").update({ status: "parsed" }).eq("id", briefId);
+    // briefs has two coherence CHECKs tying status='committed' to
+    // non-null committed_at + committed_page_hash. A naive status
+    // UPDATE would violate them; flip all three atomically.
+    const downshift = await svc
+      .from("briefs")
+      .update({
+        status: "parsed",
+        committed_at: null,
+        committed_page_hash: null,
+      })
+      .eq("id", briefId)
+      .select("status")
+      .single();
+    expect(downshift.error).toBeNull();
+    expect(downshift.data?.status).toBe("parsed");
 
     const res = await startBriefRun({ briefId, startedBy: null });
     expect(res.ok).toBe(false);

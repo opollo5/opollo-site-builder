@@ -126,7 +126,9 @@ export function estimatePerPageCostCents(
   const visualMicroCents =
     visualInput * visualRates.input + visualOutput * visualRates.output;
 
-  return Math.ceil((textMicroCents + visualMicroCents) / 100_000);
+  // Unit math: microCents → cents via /1000 (1 cent = 1000 micro-cents),
+  // matching computeCostCents in this file.
+  return Math.ceil((textMicroCents + visualMicroCents) / 1000);
 }
 
 /**
