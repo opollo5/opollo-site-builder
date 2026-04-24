@@ -13,6 +13,35 @@ Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 st
 - **Invite TTL + revocation.** `app/api/admin/users/invite` generates a Supabase invite link but has no expiry beyond Supabase's built-in, and no "cancel pending invite" admin action. Pick up trigger: an admin mistakenly invites the wrong email and can't revoke. Scope: new `invites` table with `expires_at` + `revoked_at`, a DELETE route, and an admin-UI "pending invites" row list.
 - **Session expiry pre-warning.** Middleware redirects to `/login` when the JWT expires; no "session about to expire" UI, no session-extend prompt. Pick up trigger: an operator loses mid-workflow state because of an expiry they didn't see coming. Scope: client-side expiry timer + pre-expiry toast + "extend session" action that refreshes the token.
 
+## UX polish deferred from M15 (2026-04-24)
+
+Captured during UAT prep in parallel with M15-7. Deferred to avoid collision in concurrent development; highest-priority UX fixes picked up once M15-7 ships.
+
+### Admin top navigation redesign
+
+**What:** Current top nav at `/admin` is functional but unpolished: links stretch wide across the full screen width, spacing between items is inconsistent, user email + Security + "Back to builder" + Sign out are all crammed into the right edge with no visual hierarchy. Feels like a prototype, not a product.
+
+**Why deferred:** Captured during UAT prep after being observed live. M15-7 is mid-flight.
+
+**Trigger:** After M15-7 Phase 4 completes, paired with the site actions menu fix (similar file surface, same review).
+
+**Desired end state (professional SaaS admin pattern):**
+- Left side: logo + primary nav (Sites, Batches, Images, Users) — compact, grouped, clear visual separation from right side
+- Right side: user menu as a single button (avatar or email with chevron) that opens a dropdown containing: Security, Back to builder, Sign out, any future account actions
+- Collapse the cluttered right-edge links into that dropdown
+- Add subtle visual treatment: border-bottom, slight background contrast, or shadow to separate nav from page content
+- Responsive: collapse nav items to hamburger on mobile widths
+- Active route indicator on the current page link (underline, bold, or background accent)
+- Consistent horizontal padding, max-width container so nav doesn't stretch edge-to-edge on wide screens
+
+**Inspiration patterns:** Vercel dashboard, Linear, Stripe Dashboard, Supabase dashboard top nav
+
+**Files likely involved:** Top-level admin layout component (probably `app/admin/layout.tsx` and a Nav or Header component), plus any user menu dropdown component
+
+**Size:** Medium — ~60-90 min focused PR. Needs care because it touches every admin page.
+
+**Non-goals for this slice:** Don't redesign page content, sidebars, or individual table layouts. Scope is strictly the top nav bar.
+
 ## M12-6 — Save-Draft persistence for briefs review
 
 Surfaced by the `fix(e2e)` slice (2026-04-24). The M12-1 slice plan §6.2 called for a "Save draft" button that persists `brief_pages` edits under `version_lock` before commit. That button was never implemented — the commit endpoint therefore 409s on any edit-then-commit flow because the client's hash is computed from in-memory edits while the server recomputes from unedited DB rows. The happy-path E2E in `e2e/briefs-review.spec.ts` is `test.fixme`'d until this lands. Pick up trigger: M12-6 starts. Scope: new `PATCH /api/briefs/[brief_id]/pages` endpoint + "Save draft" button wired into `BriefReviewClient.tsx` + re-enable the fixme'd test.
