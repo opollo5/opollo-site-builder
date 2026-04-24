@@ -19,6 +19,123 @@ Surfaced by the `fix(e2e)` slice (2026-04-24). The M12-1 slice plan §6.2 called
 
 ---
 
+## M15 audit residue (2026-04-24)
+
+The M15 audit series surfaced **~100 findings** across five audits — M15-2 schema (14), M15-3 env (14), M15-4 endpoints (19), M15-5 cross-cutting risk (27), M15-6 test coverage (~30). Roughly half shipped during the series; the rest are catalogued below.
+
+Reports live at:
+- `docs/SCHEMA_AUDIT_2026-04-24.md` (M15-2)
+- `docs/ENV_AUDIT_2026-04-24.md` (M15-3)
+- `docs/ENDPOINT_AUDIT_2026-04-24.md` (M15-4)
+- `docs/PRODUCTION_RISK_AUDIT_2026-04-24.md` (M15-5)
+- `docs/TEST_COVERAGE_AUDIT_2026-04-24.md` (M15-6)
+
+### Shipped during the M15 series (reference index)
+
+| PR | Scope |
+|---|---|
+| #127 | M15-3 fix: env-coupling validation at boot (`lib/env-validation.ts`), dead env vars removed from `.env.local.example` (`DEFAULT_TENANT_*`), `LANGFUSE_BASEURL`→`LANGFUSE_HOST` typo, `REGEN_RETRY_BACKOFF_MS` reclassified as code constant, `OPOLLO_PROMPT_VERSION` "not yet shipped" banner, `OPOLLO_MASTER_KEY_NEXT` runbook section rewritten to match single-key reality |
+| #128 | Parallel session: dead M1 schema tables dropped (`page_history`, `site_context`, `pairing_codes`, `health_checks`, `chat_sessions`, `chat_sessions_archive`) |
+| #129 | Parallel session: `version_lock >= 1` CHECK constraints on 5 tables, `updated_at` set on batch-cancel UPDATE, Zod↔DB column sync test |
+| #130 | M15-4 fix: chat SSE error sanitization (`lib/chat-errors.ts`), `countActiveAdmins()` helper shared by `role` + `revoke` (LAST_ADMIN filter on `revoked_at IS NULL`) |
+| #131 | M15-7 Phase 1: `lib/encryption.ts` unit tests (24 tests — round-trip, tamper, wrong-key, invalid env, key version, malformed input), `RUNBOOK.md` summary reconciliation |
+| #132 | M15-7 Phase 2: 6 `console.error` sites → `logger.error`, 17 `err.message` leak sites sanitized across 9 routes, `lib/briefs.ts` parse-finalize UPDATE now has `version_lock` CAS |
+| #133 | M15-7 Phase 3a: `app/api/chat/route.ts` integration tests (12 tests) |
+| #134 | M15-7 Phase 3b: `app/api/tools/*` route tests (28 tests across 7 files) |
+| #135 | M15-7 Phase 3c: `lib/wordpress.ts` unit tests (58 tests) |
+
+### Open — operational decisions needed
+
+- **[M15-5 #1] `/api/cron/process-transfer` not in `vercel.json`.** Route exists, worker is correct, nothing fires it. Trace in `docs/PRODUCTION_RISK_AUDIT_2026-04-24.md` showed publish-flow image transfer is inline-synchronous; only the iStock seed CLI creates `transfer_jobs` rows that need the cron to drain. **Decision needed:** run `SELECT count(*) FROM transfer_job_items WHERE state = 'pending';` — if `0`, delete route + `lib/transfer-worker.ts` (dead code); if `>0`, wire cron. Pick up trigger: Steven's DB check. Scope: either 1 line added to `vercel.json` + cron monitoring, or ~600 lines deleted (worker + route + tests).
+- **[M15-5 #2] `bumpTenantUsage()` exported but never called.** Tenant budget counters track reservations only; actual-cost writeback helper is defined but unwired. Resolved during M15-7 as COSMETIC: `PROJECTED_COST_PER_BATCH_SLOT_CENTS = 30` and `PROJECTED_COST_PER_REGEN_CENTS = 30` are worst-case ceilings per the author's comment ("conservative — actual costs tend to be lower"). Tenants under-utilize caps but cannot overspend. Pick up trigger: tenant reports under-utilization complaint, OR we want actual-vs-projected reconciliation for billing accuracy. Scope: wire `bumpTenantUsage` into batch-worker slot-completion + regen finalization paths with the delta `actual - reserved`.
+
+### Open — grouped by next-natural-slice trigger
+
+#### Security / auth tightening (next security review pass)
+
+- **[M15-4 #3] `tools/*` write routes have no session requirement.** `tools/publish_page`, `tools/update_page`, `tools/delete_page` are reachable with just a rate-limit token. M15-7 Phase 3b (#134) pinned current behaviour in tests; when auth gets tightened, tests will need to update. Scope: add `requireAdminForApi(['admin', 'operator'])` to the three write routes + refresh the tests.
+- **[M15-4 #8] 6 public GET routes have no route-level auth gate.** `sites/list`, `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`, `design-systems/[id]/preview` rely entirely on middleware. Defense-in-depth gap. Scope: add `requireAdminForApi()` to each; cost is one import + one check per route.
+- **[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.** Direct POST outside the chat flow → executor uses empty AsyncLocalStorage context. Needs verification that direct calls fail safely. Scope: either (a) remove the tools routes if only used internally by chat, or (b) seed context from the request body's `site_id`.
+- **[M15-5 #12] `image_usage` RLS excludes `viewer` role.** Asymmetry vs `image_library` + `image_metadata`. Check if intentional; if so, comment the migration; if not, align the policy.
+
+#### Observability + write-safety hygiene (next defense-in-depth slice)
+
+- **[M15-4 #5] `retryable: true` on VALIDATION_FAILED in 5 routes.** Admin/images/[id], admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId], admin/users/invite, admin/users/[id]/role. Clients with auto-retry loop forever on fixable input. Scope: force `retryable: false`; migrate the 5 holdouts to `lib/http.validationError()`.
+- **[M15-4 #6] No timeouts on external-call fetches** anywhere in the codebase (only `Sentry.flush(5000)` exists). Hanging Anthropic/WP/Supabase/Upstash drains function pool. Scope: `withTimeout(promise, ms)` helper in `lib/http.ts`; wrap external calls. Suggested initial values: Anthropic 60s, WordPress 30s, Cloudflare 30s, Supabase 15s.
+- **[M15-4 #7] ~15 routes still have no structured logging.** Partial coverage via #132 (9 routes + 2 libs). Remaining: admin/batch POST, admin/images/[id] restore, admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId] and its regenerate, auth/callback, design-systems/*, sites/register, sites/[id], sites/[id]/design-systems, sites/list, tools/* (all 7). Scope: add `logger.error()` on every error-return path; incremental, one route at a time.
+- **[M15-4 #12] Malformed JSON behavior inconsistent.** Old pattern (`try { body = req.json() } catch { body = {} }`) gives confusing "missing field" error; new pattern (`lib/http.readJsonBody`) gives clear "Request body must be valid JSON." Migration incomplete. Scope: migrate old-pattern routes to `readJsonBody` + `parseBodyWith`.
+
+#### Rate-limiting coverage (next rate-limit slice)
+
+- **[M15-4 #9] 9 sensitive routes without a rate limit.** User-mgmt (revoke, reinstate, role), budget PATCH, briefs upload (10MB), design-system writes, `sites/list`, `design-systems/[id]/preview`. Scope: add named buckets in `lib/rate-limit.ts` (`user_mgmt`, `admin_write`, `briefs`); wire each route.
+
+#### Schema + constraint polish (next migration slice)
+
+- **[M15-2 #4] Missing index on regen daily-budget query.** `lib/regeneration-worker.ts#checkDailyBudget` does `.select("cost_usd_cents").gte("created_at", startOfDay)` with no supporting index. Per-enqueue cost. Scope: either add `idx_regen_jobs_created_at` partial index or scope the query to `site_id` (existing composite index then covers it).
+- **[M15-2 #5] No cancel endpoint for `transfer_jobs`.** Schema has `cancel_requested_at` column; no route uses it. Overlaps with [M15-5 #1] — if transfer cron is wired, add cancel; if cron is dead, drop the column.
+- **[M15-2 #8] Event-table PK type inconsistency.** `generation_events` + `regeneration_events` are `bigserial`; `transfer_events` is `uuid`. Cosmetic unless we build a unified event stream.
+- **[M15-2 #10] Lease-coherent CHECK asymmetry.** `transfer_job_items_lease_coherent` requires `worker_id IS NOT NULL` in leased states; `generation_job_pages_lease_coherent` + `regeneration_jobs_lease_coherent` don't. Scope: tighten M3/M7 CHECKs after verifying no orphan-leased rows in production.
+- **[M15-2 #12] `image_usage` RLS excludes viewer.** See [M15-4 #8] grouping above — same theme.
+- **[M15-2 #13, #14] Service-role-only write tables + `opollo_config` read — undocumented at the migration level.** Intentional (workers use service-role; `first_admin_email` protected from enumeration) but the reasoning lives only in commit history. Scope: one-line comment blocks in each migration.
+
+#### Test coverage (opportunistic — add when touching the surface)
+
+- **[M15-6 #5-12] Route handler tests not written.** Remaining after M15-7 Phase 3 (which covered chat, tools, wordpress):
+  - `cron/process-batch` route handler (lib-level well-covered)
+  - `cron/process-transfer` (overlaps [M15-5 #1]; test only after cron decision)
+  - `cron/budget-reset` route handler
+  - `cron/process-regenerations` — only WP_CREDS_MISSING branch covered
+  - `ops/self-probe` (no test at all)
+  - `sites/[id]` PATCH/DELETE
+  - `admin/images/[id]` + `/restore`
+  - `admin/sites/[id]/pages/[pageId]` PATCH
+- **[M15-6 #13] 6 of 7 tool JSON schemas untested.** `lib/tool-schemas.ts` — `searchImagesJsonSchema` tested; others aren't. Scope: parametric tests across all 7.
+- **[M15-6 #14] Tool lib implementations untested.** `lib/create-page.ts`, `lib/update-page.ts`, `lib/delete-page.ts`, `lib/get-page.ts`, `lib/list-pages.ts`, `lib/publish-page.ts`. M15-7 Phase 3b (#134) pins delegation at the route layer; the libs themselves wrap WP + Supabase calls with no dedicated tests. Scope: 2-3 hours per lib.
+- **[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.** Blocked on M12-6 save-draft. Re-enable when M12-6 lands.
+- **[M15-6 #17] `health-route.test.ts` only covers happy path.** Degraded branches untested. Scope: 1 hour.
+
+#### Tech-debt (bundled cleanup, no urgency)
+
+- **[M15-4 #14] 12 local `errorJson()` helpers across route files.** Migration to `lib/http.respond()` / `lib/http.validationError()` incomplete. Large mechanical diff.
+- **[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.** Move to `lib/http.ts` or `lib/crypto-compare.ts`.
+- **[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum** (`lib/tool-schemas.ts`). Add to enum or rename to existing code.
+- **[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.** Probably intentional (financial); needs one-line comment.
+- **[M15-4 #18] `/api/health` envelope outlier** — no `ok` field. Document the deviation in a route comment or align.
+- **[M15-4 #19] `/api/health` no outer try/catch.** If a helper throws (vs returning error-shaped), 500 is unstructured. Wrap.
+- **[M15-5 dead code] `lib/class-registry.ts`, `lib/content-schemas.ts`, `lib/supabase.ts#getAnonClient`.** Tested/scaffolded but not wired. Scope: per-module decision — ship the feature they were preparing, or delete. Triggers: class-registry unblocks a planned per-component CSS gate; content-schemas unblocks structured inline-HTML; getAnonClient unblocks a planned Stage-2 client-surface.
+- **[M15-2 #2 residue] `brief_runs` + `site_conventions`** — M12-1 forward-looking tables, not referenced in production code today. Close naturally when M12-2+ wires them. Comment at migration 0013 noting the forward intent would help.
+- **[M15-2 #11 residue] Dynamic update spreads** (`updateDesignSystem`, `updateComponent`, `updateTemplate`). Zod↔DB sync test in #129 guards against drift; the pattern itself is unchanged. Full resolution lands with M15-8 type generation.
+
+#### Env + doc polish (trivial, opportunistic)
+
+- **[M15-3 #6] `NEXT_PUBLIC_VERCEL_ENV` not auto-exposed by Vercel.** Client-side Sentry env tag falls back to `NODE_ENV` on previews. Scope: either set explicitly in Vercel dashboard, or pipe `VERCEL_ENV` through `next.config.mjs` `env:` block.
+- **[M15-3 #10] `LEADSOURCE_WP_USER` / `LEADSOURCE_WP_APP_PASSWORD` undocumented format.** WP Application Password (24-char hyphen-separated), NOT the regular WP login password. Add 3-line comment in `.env.local.example`.
+- **[M15-3 #11] `SENTRY_ORG` / `SENTRY_PROJECT` undocumented context.** They're only needed at build-time for source-map upload; runtime Sentry works without them. Add inline comment in `.env.local.example`.
+- **[M15-3 #12] `DATABASE_URL` shell variable vs `SUPABASE_DB_URL` runtime env naming collision.** RUNBOOK uses `$DATABASE_URL` for CLI; Vercel workers use `SUPABASE_DB_URL`. Add a one-line callout in RUNBOOK's migration section clarifying the distinction.
+- **[M15-3 #13] `ANALYZE` env var undocumented.** Only relevant to `npm run analyze`. Low priority.
+- **[M15-5 Langfuse EU drift.** `lib/langfuse.ts:37` defaults to `https://us.cloud.langfuse.com`. EU projects without `LANGFUSE_HOST` silently go to the wrong datacenter. Not affected today (we're on US). Close when the `.env.local.example` comment ever needs updating anyway.
+
+#### Closed by M15-8 (future milestone — type generation + CI gates)
+
+- **[M15-2 #1] No generated `types/supabase.ts`.** M15-8 scope.
+- **[M15-3 #14] No CI gate between `process.env.X` usage and `.env.local.example`.** M15-8 scope.
+
+### Triggers — summary
+
+| Section | Pick-up trigger |
+|---|---|
+| Operational decisions | Steven's one-line DB query + decision call |
+| Security / auth tightening | Next security review pass OR external auth-gap finding |
+| Observability + write-safety hygiene | Next defense-in-depth slice (bundle #5 + #6 + #7 + #12 together) |
+| Rate-limiting coverage | Next rate-limit slice (bundle #9 alone) |
+| Schema + constraint polish | Next migration slice that naturally touches the same tables |
+| Test coverage | Opportunistic — whenever touching the surface |
+| Tech-debt | Batched into a periodic "tech-debt PR" — no urgency per item |
+| Env + doc polish | Opportunistic — when touching `.env.local.example` or `RUNBOOK.md` for other reasons |
+| M15-8 closures | Next M15-8 milestone (type generation, env CI gate) |
+
+---
+
 ## M11 — audit close-out (reconciled post-merge)
 
 Parent plan: `docs/plans/m11-parent.md`. Originally scoped as six sub-slices closing every concrete gap surfaced by `docs/AUDIT_2026-04-22.md`. Audit 3 (`docs/plans/m11-parent.md` re-verified against code) found that the M11-6 doc slice landed "merged" rows for M11-2, M11-3, and M11-5 **without** the corresponding code PRs ever shipping. The table below reflects ground-truth after the post-audit reconciliation (PRs #88, #94, #96).
