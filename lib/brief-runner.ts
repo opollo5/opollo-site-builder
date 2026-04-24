@@ -7,9 +7,14 @@ import {
   type AnthropicCallFn,
   type AnthropicResponse,
 } from "@/lib/anthropic-call";
+import {
+  computeCostCents,
+  isAllowedAnthropicModel,
+} from "@/lib/anthropic-pricing";
 import type {
   BriefPageCritiqueEntry,
   BriefPagePassKind,
+  BriefPageQualityFlag,
   BriefPageRow,
   BriefPageStatus,
   BriefRow,
@@ -29,6 +34,16 @@ import {
   releaseBudget,
   reserveWithCeiling,
 } from "@/lib/tenant-budgets";
+import {
+  VISUAL_MAX_ITERATIONS,
+  defaultVisualRender,
+  hasSeverityHighIssues,
+  resolvePerPageCeilingCents,
+  runOneVisualIteration,
+  wouldExceedPageCeiling,
+  type VisualCritique,
+  type VisualRenderFn,
+} from "@/lib/visual-review";
 
 // ---------------------------------------------------------------------------
 // M12-3 — Brief runner.
@@ -104,10 +119,13 @@ export const DEFAULT_HEARTBEAT_MS = 30_000;
 // Anchor page = standard + ANCHOR_EXTRA_CYCLES extra revises.
 export const STANDARD_TEXT_PASSES = 3; // draft, self_critique, revise
 
-// Model + token budget. Opus is the default per product decision; tests
-// substitute a stub call function entirely so model choice here is just
-// a label.
-export const RUNNER_MODEL = "claude-opus-4-7";
+// Token budget for text passes. Model is resolved per-run from
+// briefs.text_model (M12-4 Risk #14 — no hard-coded model in the runner).
+// RUNNER_MODEL stays exported for M12-3 callers that already imported it;
+// the value now represents the FALLBACK model used only if a brief was
+// inserted before briefs.text_model existed (migration 0019 default
+// covers new rows).
+export const RUNNER_MODEL = "claude-sonnet-4-6";
 export const RUNNER_MAX_TOKENS = 4096;
 
 // Cap on brief_runs.content_summary length. Parent plan §Running-summary
@@ -140,6 +158,10 @@ export type BriefRunRow = {
   failure_detail: string | null;
   cancel_requested_at: string | null;
   content_summary: string;
+  // M12-4 — running sum of every brief_pages.page_cost_cents for this run.
+  // Updated in the same CAS transaction as the critique_log write so the
+  // rollup never drifts from the per-page totals.
+  run_cost_cents: number;
   version_lock: number;
   created_at: string;
   updated_at: string;
@@ -179,6 +201,10 @@ export type BriefRunTickOpts = {
   workerId?: string;
   leaseDurationMs?: number;
   anthropicCall?: AnthropicCallFn;
+  // M12-4 — DI seam for the visual render. Tests stub this so chromium
+  // isn't required in the `test` CI job. Defaults to the production
+  // Playwright-based implementation.
+  visualRender?: VisualRenderFn;
   // Injected clock for tests that need to make lease math deterministic.
   nowMs?: () => number;
   // Advisory override: if the caller supplies a pg.Client, the runner
@@ -237,7 +263,7 @@ export async function leaseBriefRun(
       SELECT id, brief_id, status, current_ordinal, worker_id,
              lease_expires_at, last_heartbeat_at, started_at, finished_at,
              failure_code, failure_detail, cancel_requested_at,
-             content_summary, version_lock, created_at, updated_at
+             content_summary, run_cost_cents, version_lock, created_at, updated_at
         FROM brief_runs
        WHERE id = $1
          AND status IN ('queued','running','paused')
@@ -266,7 +292,7 @@ export async function leaseBriefRun(
       RETURNING id, brief_id, status, current_ordinal, worker_id,
                 lease_expires_at, last_heartbeat_at, started_at, finished_at,
                 failure_code, failure_detail, cancel_requested_at,
-                content_summary, version_lock, created_at, updated_at
+                content_summary, run_cost_cents, version_lock, created_at, updated_at
       `,
       [briefRunId, workerId, leaseDurationMs, row.version_lock],
     );
@@ -413,6 +439,10 @@ type PageContext = {
   siteConventions: SiteConventions | null;
   previousDraft: string | null;
   previousCritique: string | null;
+  // M12-4 — carried into visual_revise passes so the model sees the
+  // layout feedback from the multi-modal critique. Null on text-only
+  // passes.
+  previousVisualCritique: string | null;
 };
 
 function systemPromptFor(ctx: PageContext): string {
@@ -467,14 +497,31 @@ function userPromptForRevise(ctx: PageContext, isAnchor: boolean): string {
   ].join("\n");
 }
 
+function userPromptForVisualRevise(ctx: PageContext): string {
+  return [
+    `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\n\n${ctx.page.source_text}\n</page_spec>`,
+    "",
+    `<draft>\n${ctx.previousDraft ?? ""}\n</draft>`,
+    "",
+    `<visual_critique>\n${ctx.previousVisualCritique ?? ""}\n</visual_critique>`,
+    "",
+    "Apply the visual critique to the draft. The critique is based on a rendered screenshot; prioritise layout, contrast, whitespace, and CTA prominence fixes. Respond with the revised HTML only.",
+  ].join("\n");
+}
+
 // ---------------------------------------------------------------------------
 // Pass execution
 // ---------------------------------------------------------------------------
 
+// Text-producing pass kinds. visual_critique is multi-modal and goes
+// through lib/visual-review.ts::runOneVisualIteration, not runOnePass.
+type TextPassKind = "draft" | "self_critique" | "revise" | "visual_revise";
+
 async function runOnePass(opts: {
   call: AnthropicCallFn;
+  model: string;
   ctx: PageContext;
-  passKind: BriefPagePassKind;
+  passKind: TextPassKind;
   passNumber: number;
   isAnchorFinalPass: boolean;
 }): Promise<{
@@ -493,10 +540,13 @@ async function runOnePass(opts: {
     case "revise":
       userPrompt = userPromptForRevise(ctx, opts.isAnchorFinalPass);
       break;
+    case "visual_revise":
+      userPrompt = userPromptForVisualRevise(ctx);
+      break;
   }
 
   const response = await opts.call({
-    model: RUNNER_MODEL,
+    model: opts.model,
     max_tokens: RUNNER_MAX_TOKENS,
     system: systemPromptFor(ctx),
     messages: [{ role: "user", content: userPrompt }],
@@ -510,11 +560,16 @@ async function runOnePass(opts: {
   return { text: extractText(response), response };
 }
 
+// Sequence return type narrowed — the text pass loop never dispatches
+// to a visual pass via nextPassAfter. Visual critique / visual_revise
+// live in runVisualReviewLoop.
+type TextSequencePassKind = "draft" | "self_critique" | "revise";
+
 function nextPassAfter(
   kind: BriefPagePassKind | null,
   currentNumber: number,
   isAnchor: boolean,
-): { kind: BriefPagePassKind; number: number } | null {
+): { kind: TextSequencePassKind; number: number } | null {
   // Linear sequence: draft → self_critique → revise. On anchor pages,
   // we append ANCHOR_EXTRA_CYCLES additional revises. After the last
   // revise we're done (return null → gates).
@@ -571,6 +626,7 @@ export async function processBriefRunTick(
   const workerId = opts.workerId ?? `runner-${process.pid}-${Date.now()}`;
   const leaseDurationMs = opts.leaseDurationMs ?? DEFAULT_LEASE_MS;
   const call = opts.anthropicCall ?? defaultAnthropicCall;
+  const visualRender = opts.visualRender ?? defaultVisualRender;
 
   return withClient(opts.client ?? null, async (client) => {
     const leased = await leaseBriefRun(
@@ -603,7 +659,7 @@ export async function processBriefRunTick(
     }
 
     try {
-      return await advanceOneStep(client, leased, call);
+      return await advanceOneStep(client, leased, call, visualRender);
     } catch (err) {
       logger.error("brief_runner.tick_unhandled", {
         brief_run_id: briefRunId,
@@ -633,6 +689,7 @@ async function advanceOneStep(
   client: Client,
   run: BriefRunRow,
   call: AnthropicCallFn,
+  visualRender: VisualRenderFn,
 ): Promise<BriefRunTickResult> {
   // Fetch the brief + current page.
   const briefRes = await client.query<BriefRow>(
@@ -748,7 +805,7 @@ async function advanceOneStep(
     }
 
     // page_status is 'pending' or 'generating' — run the pass loop.
-    return await processPagePassLoop(client, run, brief, page, call);
+    return await processPagePassLoop(client, run, brief, page, call, visualRender);
   }
 }
 
@@ -758,11 +815,55 @@ async function processPagePassLoop(
   brief: BriefRow,
   page: BriefPageRow,
   call: AnthropicCallFn,
+  visualRender: VisualRenderFn,
 ): Promise<BriefRunTickResult> {
   const isAnchor = page.ordinal === 0;
   const ceiling = isAnchor
     ? BRIEF_ANCHOR_PAGE_CEILING_CENTS
     : BRIEF_PAGE_CEILING_CENTS;
+
+  // M12-4 Risk #14 — validate model tiers before firing any call. A DB
+  // CHECK guards the column at INSERT/UPDATE time, but a backfill bug or
+  // an ops-layer patch could slip an unknown value in. Fail the page
+  // with INVALID_MODEL rather than sending a request with an unknown
+  // model string (which Anthropic would either bill at an unpredictable
+  // rate or reject with a 400).
+  if (
+    !isAllowedAnthropicModel(brief.text_model) ||
+    !isAllowedAnthropicModel(brief.visual_model)
+  ) {
+    await client.query(
+      `UPDATE brief_pages
+         SET page_status = 'failed',
+             updated_at = now(),
+             version_lock = version_lock + 1
+       WHERE id = $1 AND version_lock = $2`,
+      [page.id, page.version_lock],
+    );
+    await client.query(
+      `UPDATE brief_runs
+         SET status = 'failed',
+             failure_code = 'INVALID_MODEL',
+             failure_detail = $2,
+             finished_at = now(),
+             lease_expires_at = NULL,
+             worker_id = NULL,
+             updated_at = now(),
+             version_lock = version_lock + 1
+       WHERE id = $1`,
+      [
+        run.id,
+        `Brief has unknown model: text_model='${brief.text_model}', visual_model='${brief.visual_model}'.`,
+      ],
+    );
+    return {
+      ok: true,
+      outcome: "page_failed",
+      runStatus: "failed",
+      currentOrdinal: page.ordinal,
+      pageStatus: "failed",
+    };
+  }
 
   // Budget reservation. Only reserves on the first tick for this page
   // (when current_pass_kind is null). Subsequent ticks (resume) skip
@@ -867,7 +968,7 @@ async function processPagePassLoop(
   const conventionsRow = await getSiteConventions(brief.id);
 
   // Resume pointer.
-  let kindToRun: BriefPagePassKind | null = null;
+  let kindToRun: TextSequencePassKind | null = null;
   let numberToRun = 0;
   const next = nextPassAfter(
     page.current_pass_kind,
@@ -921,6 +1022,7 @@ async function processPagePassLoop(
       siteConventions: conventionsRow ?? null,
       previousDraft,
       previousCritique,
+      previousVisualCritique: null,
     };
 
     const isAnchorFinalPass =
@@ -933,6 +1035,7 @@ async function processPagePassLoop(
     try {
       const out = await runOnePass({
         call,
+        model: brief.text_model,
         ctx,
         passKind: kindToRun,
         passNumber: numberToRun,
@@ -992,7 +1095,10 @@ async function processPagePassLoop(
       };
     }
 
-    // Persist the pass result under version_lock CAS.
+    // Persist the pass result under version_lock CAS. M12-4: cost-accounting
+    // is folded into the same UPDATE so a CAS conflict can't leave
+    // page_cost_cents out of sync with critique_log.
+    const passCost = computeCostCents(brief.text_model, response.usage).cents;
     const criticalLog = [
       ...(page.critique_log as BriefPageCritiqueEntry[]),
       {
@@ -1010,6 +1116,7 @@ async function processPagePassLoop(
             (response.usage.cache_read_input_tokens ?? 0) +
             (response.usage.cache_creation_input_tokens ?? 0),
         },
+        cost_cents: passCost,
       },
     ];
 
@@ -1024,6 +1131,7 @@ async function processPagePassLoop(
              critique_log = $3::jsonb,
              current_pass_kind = $4,
              current_pass_number = $5,
+             page_cost_cents = page_cost_cents + $7,
              updated_at = now(),
              version_lock = version_lock + 1
        WHERE id = $1 AND version_lock = $6
@@ -1035,6 +1143,7 @@ async function processPagePassLoop(
         kindToRun,
         numberToRun,
         page.version_lock,
+        passCost,
       ],
     );
     if ((upd.rowCount ?? 0) === 0) {
@@ -1044,12 +1153,18 @@ async function processPagePassLoop(
         message: `Page ${page.ordinal} was edited mid-pass. Cancel and retry.`,
       };
     }
+    // Roll the cost up onto the run in the same transaction shape.
+    await client.query(
+      `UPDATE brief_runs SET run_cost_cents = run_cost_cents + $2, updated_at = now() WHERE id = $1`,
+      [run.id, passCost],
+    );
     // Update the in-memory page so the loop's next iteration reads it.
     page.draft_html = newDraftHtml;
     page.critique_log = criticalLog;
     page.current_pass_kind = kindToRun;
     page.current_pass_number = numberToRun;
     page.version_lock += 1;
+    page.page_cost_cents += passCost;
 
     if (kindToRun === "self_critique") {
       previousCritique = passText;
@@ -1140,7 +1255,24 @@ async function processPagePassLoop(
     }
   }
 
-  // Transition to awaiting_review.
+  // M12-4 — Visual review loop. Runs up to VISUAL_MAX_ITERATIONS per page,
+  // gated by the per-page cost ceiling (tenant override or lib default).
+  // Sets brief_pages.quality_flag when the loop halts without converging.
+  const visualOutcome = await runVisualReviewLoop(
+    client,
+    run,
+    brief,
+    page,
+    call,
+    visualRender,
+  );
+  if (visualOutcome.fatal) {
+    return visualOutcome.fatal;
+  }
+
+  // Transition to awaiting_review. If visualOutcome set a quality_flag,
+  // it's already persisted to the page row; this UPDATE only flips
+  // page_status.
   const updAwait = await client.query(
     `
     UPDATE brief_pages
@@ -1181,6 +1313,340 @@ async function processPagePassLoop(
     currentOrdinal: page.ordinal,
     pageStatus: "awaiting_review",
   };
+}
+
+// ---------------------------------------------------------------------------
+// M12-4 — Visual review loop.
+//
+// Runs after the text passes + gates + (optional) anchor freeze, before
+// the awaiting_review transition. One iteration = one critique call +
+// (optionally) one visual_revise text pass that applies the critique.
+// Loop halts when:
+//
+//   (a) critique returns no severity-high issues → clean exit, no
+//       quality_flag
+//   (b) iterations hit VISUAL_MAX_ITERATIONS with severity-high remaining
+//       → quality_flag = 'capped_with_issues'
+//   (c) projected next iteration cost + page_cost_cents > ceiling
+//       → quality_flag = 'cost_ceiling'
+//   (d) critique parse failure or render failure on iteration N → log a
+//       warning and exit; operator sees the incomplete critique_log and
+//       decides. No retry in the same tick.
+//
+// Resume-after-crash: iteration count is reconstructed from critique_log
+// entries with pass_kind='visual_critique'. Anthropic's 24h idempotency
+// cache replays a critique call for free.
+//
+// Every persisted UPDATE stamps page_cost_cents + run_cost_cents in the
+// same CAS transaction as the critique_log write.
+// ---------------------------------------------------------------------------
+
+type VisualReviewOutcome = {
+  fatal?: BriefRunTickResult & { ok: false };
+};
+
+async function runVisualReviewLoop(
+  client: Client,
+  run: BriefRunRow,
+  brief: BriefRow,
+  page: BriefPageRow,
+  call: AnthropicCallFn,
+  visualRender: VisualRenderFn,
+): Promise<VisualReviewOutcome> {
+  // Resolve the per-page cost ceiling. Tenant override wins; else the
+  // lib default from lib/visual-review.
+  const budgetRes = await client.query<{
+    per_page_ceiling_cents_override: number | null;
+  }>(
+    `SELECT per_page_ceiling_cents_override FROM tenant_cost_budgets WHERE site_id = $1`,
+    [brief.site_id],
+  );
+  const tenantOverride = budgetRes.rows[0]?.per_page_ceiling_cents_override ?? null;
+  const perPageCeiling = resolvePerPageCeilingCents(tenantOverride);
+
+  // Iteration count resumed from critique_log — a crash mid-visual loop
+  // lands here with N critique entries already persisted.
+  const existingCritiqueCount = (
+    page.critique_log as BriefPageCritiqueEntry[]
+  ).filter((e) => e.pass_kind === "visual_critique").length;
+
+  let lastCritiqueText: string | null = null;
+  let lastCritiqueSeverityHigh = false;
+
+  for (let i = existingCritiqueCount; i < VISUAL_MAX_ITERATIONS; i++) {
+    // Per-iteration cost projection. Conservative — assume the next
+    // critique costs the median observed, ~5c on sonnet-4-6. If we're
+    // about to exceed the ceiling, set quality_flag and bail.
+    const projectedIterationCostCents = 10;
+    if (
+      wouldExceedPageCeiling({
+        currentPageCostCents: page.page_cost_cents,
+        projectedIterationCostCents,
+        ceilingCents: perPageCeiling,
+      })
+    ) {
+      await setPageQualityFlag(client, page, "cost_ceiling");
+      logger.info("brief_runner.visual.ceiling_hit", {
+        brief_run_id: run.id,
+        page_id: page.id,
+        page_cost_cents: page.page_cost_cents,
+        ceiling_cents: perPageCeiling,
+      });
+      return {};
+    }
+
+    const iteration = await runOneVisualIteration({
+      render: visualRender,
+      call,
+      model: brief.visual_model,
+      draftHtml: page.draft_html ?? "",
+      siteConventionsCss: null,
+      ctx: {
+        pageTitle: page.title,
+        pageSourceText: page.source_text,
+        brandVoice: brief.brand_voice,
+        designDirection: brief.design_direction,
+        siteConventions: null,
+        previousCritique: lastCritiqueText,
+      },
+      idempotencyKey: passIdempotencyKey({
+        briefId: brief.id,
+        ordinal: page.ordinal,
+        passKind: "visual_critique",
+        passNumber: i,
+      }),
+    });
+
+    if (!iteration.ok) {
+      // Render / parse / Anthropic error. Log + exit without a
+      // quality_flag — the operator sees the missing critique and
+      // decides.
+      logger.warn("brief_runner.visual.iteration_failed", {
+        brief_run_id: run.id,
+        page_id: page.id,
+        iteration: i,
+        code: iteration.code,
+        message: iteration.message,
+      });
+      return {};
+    }
+
+    const critiqueCost = iteration.response
+      ? computeCostCents(brief.visual_model, iteration.response.usage).cents
+      : 0;
+    const critiqueText = renderCritiqueAsText(iteration.critique);
+    const updatedLog: BriefPageCritiqueEntry[] = [
+      ...(page.critique_log as BriefPageCritiqueEntry[]),
+      {
+        pass_kind: "visual_critique",
+        pass_number: i,
+        anthropic_response_id: iteration.response.id,
+        output: iteration.critique,
+        usage: {
+          input_tokens: iteration.response.usage.input_tokens,
+          output_tokens: iteration.response.usage.output_tokens,
+          cached_tokens:
+            (iteration.response.usage.cache_read_input_tokens ?? 0) +
+            (iteration.response.usage.cache_creation_input_tokens ?? 0),
+        },
+        cost_cents: critiqueCost,
+      },
+    ];
+    const critiqueUpd = await client.query(
+      `UPDATE brief_pages
+         SET critique_log = $2::jsonb,
+             current_pass_kind = 'visual_critique',
+             current_pass_number = $3,
+             page_cost_cents = page_cost_cents + $4,
+             updated_at = now(),
+             version_lock = version_lock + 1
+       WHERE id = $1 AND version_lock = $5`,
+      [page.id, JSON.stringify(updatedLog), i, critiqueCost, page.version_lock],
+    );
+    if ((critiqueUpd.rowCount ?? 0) === 0) {
+      return {
+        fatal: {
+          ok: false,
+          code: "VERSION_CONFLICT",
+          message: `Page ${page.ordinal} was edited mid visual-critique. Cancel and retry.`,
+        },
+      };
+    }
+    await client.query(
+      `UPDATE brief_runs SET run_cost_cents = run_cost_cents + $2, updated_at = now() WHERE id = $1`,
+      [run.id, critiqueCost],
+    );
+    page.critique_log = updatedLog;
+    page.current_pass_kind = "visual_critique";
+    page.current_pass_number = i;
+    page.version_lock += 1;
+    page.page_cost_cents += critiqueCost;
+
+    lastCritiqueText = critiqueText;
+    lastCritiqueSeverityHigh = hasSeverityHighIssues(iteration.critique);
+
+    if (!lastCritiqueSeverityHigh) {
+      // Clean exit — critique flagged no blockers.
+      return {};
+    }
+
+    // Would a revise pass push us past the cap / ceiling?
+    const isLastIteration = i + 1 >= VISUAL_MAX_ITERATIONS;
+    if (isLastIteration) {
+      await setPageQualityFlag(client, page, "capped_with_issues");
+      return {};
+    }
+    // Ceiling check on the revise too — the revise is a text pass,
+    // conservatively assume ~15c on sonnet-4-6.
+    const projectedRevCostCents = 15;
+    if (
+      wouldExceedPageCeiling({
+        currentPageCostCents: page.page_cost_cents,
+        projectedIterationCostCents: projectedRevCostCents,
+        ceilingCents: perPageCeiling,
+      })
+    ) {
+      await setPageQualityFlag(client, page, "cost_ceiling");
+      logger.info("brief_runner.visual.ceiling_hit_before_revise", {
+        brief_run_id: run.id,
+        page_id: page.id,
+        page_cost_cents: page.page_cost_cents,
+        ceiling_cents: perPageCeiling,
+      });
+      return {};
+    }
+
+    // Run the visual_revise text pass. It reuses runOnePass with the
+    // critique fed in via PageContext.previousVisualCritique.
+    let revisePassText: string;
+    let reviseResponse: AnthropicResponse;
+    try {
+      const out = await runOnePass({
+        call,
+        model: brief.text_model,
+        ctx: {
+          brief,
+          page,
+          contentSummary: run.content_summary,
+          siteConventions: null,
+          previousDraft: page.draft_html,
+          previousCritique: null,
+          previousVisualCritique: critiqueText,
+        },
+        passKind: "visual_revise",
+        passNumber: i,
+        isAnchorFinalPass: false,
+      });
+      revisePassText = out.text;
+      reviseResponse = out.response;
+    } catch (err) {
+      logger.warn("brief_runner.visual.revise_failed", {
+        brief_run_id: run.id,
+        page_id: page.id,
+        iteration: i,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Revise failure — commit what we have, proceed to awaiting_review.
+      return {};
+    }
+
+    const reviseCost = computeCostCents(brief.text_model, reviseResponse.usage).cents;
+    const newDraftHtml = extractDraftHtml(revisePassText);
+    const updatedLog2: BriefPageCritiqueEntry[] = [
+      ...(page.critique_log as BriefPageCritiqueEntry[]),
+      {
+        pass_kind: "visual_revise",
+        pass_number: i,
+        anthropic_response_id: reviseResponse.id,
+        output: newDraftHtml,
+        usage: {
+          input_tokens: reviseResponse.usage.input_tokens,
+          output_tokens: reviseResponse.usage.output_tokens,
+          cached_tokens:
+            (reviseResponse.usage.cache_read_input_tokens ?? 0) +
+            (reviseResponse.usage.cache_creation_input_tokens ?? 0),
+        },
+        cost_cents: reviseCost,
+      },
+    ];
+    const reviseUpd = await client.query(
+      `UPDATE brief_pages
+         SET draft_html = $2,
+             critique_log = $3::jsonb,
+             current_pass_kind = 'visual_revise',
+             current_pass_number = $4,
+             page_cost_cents = page_cost_cents + $5,
+             updated_at = now(),
+             version_lock = version_lock + 1
+       WHERE id = $1 AND version_lock = $6`,
+      [
+        page.id,
+        newDraftHtml,
+        JSON.stringify(updatedLog2),
+        i,
+        reviseCost,
+        page.version_lock,
+      ],
+    );
+    if ((reviseUpd.rowCount ?? 0) === 0) {
+      return {
+        fatal: {
+          ok: false,
+          code: "VERSION_CONFLICT",
+          message: `Page ${page.ordinal} was edited mid visual-revise. Cancel and retry.`,
+        },
+      };
+    }
+    await client.query(
+      `UPDATE brief_runs SET run_cost_cents = run_cost_cents + $2, updated_at = now() WHERE id = $1`,
+      [run.id, reviseCost],
+    );
+    page.draft_html = newDraftHtml;
+    page.critique_log = updatedLog2;
+    page.current_pass_kind = "visual_revise";
+    page.current_pass_number = i;
+    page.version_lock += 1;
+    page.page_cost_cents += reviseCost;
+  }
+
+  // Fell out of the for loop (only reached when existingCritiqueCount
+  // was already >= VISUAL_MAX_ITERATIONS on entry — shouldn't happen
+  // fresh, can happen on resume).
+  if (lastCritiqueSeverityHigh) {
+    await setPageQualityFlag(client, page, "capped_with_issues");
+  }
+  return {};
+}
+
+function renderCritiqueAsText(critique: VisualCritique): string {
+  const lines: string[] = [];
+  for (const issue of critique.issues) {
+    lines.push(`- [${issue.severity}] (${issue.category}) ${issue.note}`);
+  }
+  if (critique.overall_notes) {
+    lines.push("");
+    lines.push(critique.overall_notes);
+  }
+  return lines.join("\n");
+}
+
+async function setPageQualityFlag(
+  client: Client,
+  page: BriefPageRow,
+  flag: BriefPageQualityFlag,
+): Promise<void> {
+  const upd = await client.query(
+    `UPDATE brief_pages
+       SET quality_flag = $2,
+           updated_at = now(),
+           version_lock = version_lock + 1
+     WHERE id = $1 AND version_lock = $3`,
+    [page.id, flag, page.version_lock],
+  );
+  if ((upd.rowCount ?? 0) > 0) {
+    page.quality_flag = flag;
+    page.version_lock += 1;
+  }
 }
 
 // ---------------------------------------------------------------------------
