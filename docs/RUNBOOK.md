@@ -493,3 +493,23 @@ When a live incident surfaces a gap, write it up here the same day. Template:
 ```
 
 Keep the Quick-reference table in sync.
+
+---
+
+## CI/CD — Required checks and branch protection
+
+**E2E coverage is now a required check.** As of the E2E stabilisation work (PR #76 + branch-protection promotion), every PR to main must pass `npm run test:e2e` before auto-merge can fire.
+
+**Why:** E2E spec failures indicate broken user flows; unit + lint tests don't catch routing errors, integration bugs, or UI state mismatches. Three pre-existing E2E spec flakes (sites archive flow, users strict-mode, images breadcrumb) were fixed in PR #76. With those stabilised, E2E is reliable enough to be a merge gate.
+
+**Running E2E locally before pushing:**
+- Prerequisite: `supabase start` (running local Postgres + API).
+- Run all specs: `npm run test:e2e`.
+- Run a single spec: `npm run test:e2e -- e2e/sites.spec.ts`.
+- Run tests matching a grep: `npm run test:e2e -- --grep "archive flow"`.
+- If you see `getByText` strict-mode violations: use `getByTestId` or scope with `getByRole('row', ...)` instead.
+
+**When E2E is flaky (rare):**
+- Check Vercel deployment logs for seed data — if the E2E admin user or fixture site didn't backfill, specs fail with "user not found" or "site not found."
+- Rerun the failing PR in GitHub Actions if logs are clean (transient Playwright timing issue).
+- If the same test fails twice, open an issue on the spec itself before escalating — likely a race condition or a recent code change broke the locator.
