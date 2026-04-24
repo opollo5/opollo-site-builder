@@ -25,22 +25,6 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 - Notes: M12-1 shipped four tables (briefs / brief_pages / brief_runs / site_conventions) in 0013 — site_conventions is a table, NOT a JSONB column on briefs as the parent plan originally proposed. M12-2 builds on that consolidated shape. Runner + Claude-inferred defaults for voice/direction land in M12-3; M12-2 ships empty-string defaults + operator-fills form.
 ---
 
----
-## Session M13-plumbing
-- Started: 2026-04-24
-- Branch: feat/m13-2-wp-posts-wrapper (M13-1 shipped in #142)
-- Slice: M13-2 — WP REST posts wrapper (wpCreatePost / wpUpdatePost / wpGetPostBySlug / wpDeletePost added additively to lib/wordpress.ts) + SEO plugin detection (Yoast / RankMath / SEOPress) + post-error translations. Running in parallel with the M12-4 session on another terminal per docs/plans/m13-parent.md §Dependency on M12 — "M13-1 and M13-2 are orthogonal to M12".
-- Files claimed:
-  - lib/wordpress.ts (additive only; new wpCreatePost / wpUpdatePost / wpGetPostBySlug / wpDeletePost alongside existing page wrappers; existing page functions untouched)
-  - lib/seo-plugin-detection.ts (new)
-  - lib/error-translations.ts (new; scoped to the post-related REST failures M13 surfaces)
-  - lib/__tests__/wordpress-posts.test.ts (new)
-  - lib/__tests__/seo-plugin-detection.test.ts (new)
-  - lib/__tests__/error-translations.test.ts (new)
-- Expected completion: same day; auto-merge on green CI
-- Notes: Worktree-isolated at `.claude/worktrees/m13-1-posts-schema` to avoid HEAD races with the other session (see MEMORY.md "Parallel sessions, single clone"). Explicitly DOES NOT modify `lib/brief-runner.ts`, `lib/visual-review.ts`, `lib/anthropic-call.ts`, or `docs/plans/m12-parent.md` — these are in-flight M12 territory. Session stops after M13-2 merges; M13-3 onward hard-blocks on M12-3.
----
-
 ## Hot-shared files (always check before claiming)
 
 Even with no other session active, assume these files are "hot" and coordinate explicitly if touching them while another session is in flight:
