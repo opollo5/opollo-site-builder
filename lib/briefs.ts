@@ -52,6 +52,12 @@ export type BriefRow = {
   // value surfaces as INVALID_MODEL without firing the call.
   text_model: string;
   visual_model: string;
+  // M13-3 — routes the runner's dispatch between 'page' mode (anchor
+  // cycle on ordinal 0, standard quality gates) and 'post' mode
+  // (anchor cycle disabled, post-specific quality gates). Defaults to
+  // 'page' at the schema layer (migration 0021) so every pre-M13
+  // brief folds in unchanged.
+  content_type: "page" | "post";
   version_lock: number;
   created_at: string;
   updated_at: string;

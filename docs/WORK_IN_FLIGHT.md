@@ -25,6 +25,23 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 - Notes: M12-1 shipped four tables (briefs / brief_pages / brief_runs / site_conventions) in 0013 — site_conventions is a table, NOT a JSONB column on briefs as the parent plan originally proposed. M12-2 builds on that consolidated shape. Runner + Claude-inferred defaults for voice/direction land in M12-3; M12-2 ships empty-string defaults + operator-fills form.
 ---
 
+---
+## Session M13-plumbing
+- Started: 2026-04-24
+- Branch: feat/m13-3-runner-mode (M13-1 shipped in #142; M13-2 in #143)
+- Slice: M13-3 — runner `mode: 'page' | 'post'` dispatch via MODE_CONFIGS + `briefs.content_type` schema column + post-specific quality gates (meta description length cap). Anchor cycle disabled in post mode. No changes to M12-4's visual-review loop.
+- Files claimed:
+  - supabase/migrations/0021_m13_3_briefs_content_type.sql (new)
+  - supabase/rollbacks/0021_m13_3_briefs_content_type.down.sql (new)
+  - lib/briefs.ts (extend BriefRow with content_type — no other changes)
+  - lib/brief-runner.ts (add RunnerMode + MODE_CONFIGS + resolveRunnerMode + runPostQualityGates; thread modeConfig through processPagePassLoop)
+  - lib/__tests__/brief-runner-mode.test.ts (new — dispatch table + resolveRunnerMode + post gate + integration tick)
+  - lib/__tests__/m13-3-schema.test.ts (new — content_type CHECK + default + NOT NULL)
+- Migration number reserved: 0021
+- Expected completion: same day; auto-merge on green CI
+- Notes: Runs only after M12-4 (#141) merged so the visual-review primitive is on main. Does not touch any M12 or M13-1/M13-2 file. M13-4 onward is still deferred to a later session.
+---
+
 ## Hot-shared files (always check before claiming)
 
 Even with no other session active, assume these files are "hot" and coordinate explicitly if touching them while another session is in flight:
@@ -57,6 +74,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - 0013 — M12-1 briefs schema: `briefs`, `brief_pages`, `brief_runs`, `site_conventions` + `site-briefs` Storage bucket. Executing on `feat/m12-1-briefs-schema`.
 - 0017 — M12-2 brand_voice + design_direction columns on briefs. Executing on `feat/m12-2-brand-voice-site-conventions`.
 - ~~0019 — M13-1 posts schema.~~ Shipped in #142.
+- 0021 — M13-3 briefs.content_type column. Executing on `feat/m13-3-runner-mode`.
 
 ## Claim block template
 

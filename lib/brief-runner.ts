@@ -587,17 +587,114 @@ function nextPassAfter(
 }
 
 // ---------------------------------------------------------------------------
+// Runner mode dispatch (M13-3)
+//
+// `brief.content_type` drives a two-entry dispatch table: 'page' keeps
+// M12's behaviour (anchor cycle on ordinal 0, standard quality gates,
+// anchor-page budget ceiling) verbatim; 'post' disables the anchor
+// cycle entirely (the site is already anchored by M12's page run, so
+// the running content_summary is the only continuity posts need) and
+// layers post-specific quality gates on top of the base ones.
+//
+// Write-safety invariants pinned by the dispatch table:
+//   - Anchor-cycle count is zero for posts. Asserted by
+//     modeConfigFor('post').anchorExtraCycles === 0. A production
+//     anchor cycle on a post mode run would first need the dispatch
+//     table to lie — covered by the unit test in brief-runner-mode.test.ts.
+//   - Content-type assertion: the runner reads brief.content_type and
+//     fails BRIEF_INVALID_CONTENT_TYPE (schema-impossible given the
+//     migration 0021 CHECK, but defense-in-depth) before firing any
+//     billed call.
+//   - New mode = new entry in the dispatch. A forked runner-for-posts
+//     would drift silently; the single dispatch stays in lockstep.
+// ---------------------------------------------------------------------------
+
+export type RunnerMode = "page" | "post";
+
+export type RunnerModeConfig = {
+  mode: RunnerMode;
+  /** Anchor-cycle extra revises. 'page' = ANCHOR_EXTRA_CYCLES; 'post' = 0. */
+  anchorExtraCycles: number;
+  /**
+   * Returns the first failing gate specific to this mode after the base
+   * gate has passed. `null` means all post-specific gates accepted the draft.
+   */
+  runModeSpecificGates: (draftHtml: string) => null | {
+    code: string;
+    message: string;
+  };
+};
+
+export const MODE_CONFIGS: Readonly<Record<RunnerMode, RunnerModeConfig>> = {
+  page: {
+    mode: "page",
+    anchorExtraCycles: ANCHOR_EXTRA_CYCLES,
+    runModeSpecificGates: () => null,
+  },
+  post: {
+    mode: "post",
+    anchorExtraCycles: 0,
+    runModeSpecificGates: runPostQualityGates,
+  },
+} as const;
+
+export function resolveRunnerMode(brief: BriefRow): RunnerMode {
+  return brief.content_type === "post" ? "post" : "page";
+}
+
+// Hard cap on meta-description length — WP excerpt / SEO plugins
+// typically clamp around 155–160; the M13-1 posts layer uses 300 as
+// the outer Zod bound (POST_EXCERPT_MAX). We gate at the outer bound
+// so the runner rejects obviously-too-long metas but doesn't overfit
+// to one plugin's preference.
+export const POST_META_DESCRIPTION_MAX = 300;
+
+/**
+ * Post-specific quality gates (M13-3).
+ *
+ * Runs on the post's draft_html AFTER the base gate passes. Rejects
+ * drafts whose meta description exceeds POST_META_DESCRIPTION_MAX. The
+ * other post-specific checks called out in the parent plan
+ * (featured-image presence conditional on SEO plugin detection,
+ * taxonomy whitelist) plug in here as the M13-4 preflight wiring
+ * lands; the function's shape is what the parent plan's "dispatch
+ * table" contract is pinning.
+ */
+export function runPostQualityGates(
+  draftHtml: string,
+): null | { code: string; message: string } {
+  // Extract the value of every <meta name="description" content="…">
+  // tag, tolerating attribute-order variants (`content=` before `name=`).
+  // On multiple hits, the first wins — WP's excerpt is the first-match
+  // shape in practice. A missing tag is fine: WP derives an excerpt
+  // from the post body if one isn't supplied.
+  const metaRe =
+    /<meta[^>]*\bname\s*=\s*["']description["'][^>]*\bcontent\s*=\s*["']([^"']*)["'][^>]*>|<meta[^>]*\bcontent\s*=\s*["']([^"']*)["'][^>]*\bname\s*=\s*["']description["'][^>]*>/i;
+  const match = metaRe.exec(draftHtml);
+  if (!match) return null;
+  const value = (match[1] ?? match[2] ?? "").trim();
+  if (value.length > POST_META_DESCRIPTION_MAX) {
+    return {
+      code: "POST_META_DESCRIPTION_TOO_LONG",
+      message: `meta name="description" is ${value.length} chars (max ${POST_META_DESCRIPTION_MAX}).`,
+    };
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Quality gate hook
 // ---------------------------------------------------------------------------
 
 /**
- * Minimal gate function for M12-3: ensures draft_html is non-empty and
- * HTML-ish (contains at least one tag). M12-4+ plugs in the existing
- * lib/quality-gates.ts surface (HTML size cap, DS-token whitelist,
- * link integrity) which currently targets batch/regen outputs and
- * needs a thin adapter for brief-runner inputs.
+ * Base gate function: ensures draft_html is non-empty and HTML-ish.
+ * Mode-specific gates layer on top via MODE_CONFIGS; callers invoke
+ * the base gate first, then delegate to the mode config.
  */
-function runGatesForBriefPage(draftHtml: string | null): {
+function runGatesForBriefPage(
+  draftHtml: string | null,
+  modeConfig: RunnerModeConfig = MODE_CONFIGS.page,
+): {
   ok: boolean;
   code?: string;
   message?: string;
@@ -611,6 +708,10 @@ function runGatesForBriefPage(draftHtml: string | null): {
       code: "NOT_HTML",
       message: "Draft does not contain any HTML tags.",
     };
+  }
+  const modeGate = modeConfig.runModeSpecificGates(draftHtml);
+  if (modeGate) {
+    return { ok: false, code: modeGate.code, message: modeGate.message };
   }
   return { ok: true };
 }
@@ -817,7 +918,14 @@ async function processPagePassLoop(
   call: AnthropicCallFn,
   visualRender: VisualRenderFn,
 ): Promise<BriefRunTickResult> {
-  const isAnchor = page.ordinal === 0;
+  const mode = resolveRunnerMode(brief);
+  const modeConfig = MODE_CONFIGS[mode];
+  // M13-3: anchor cycle fires on ordinal 0 ONLY in page mode. In post
+  // mode there is no anchor cycle — the site is already anchored by
+  // M12's page run and posts inherit site_conventions via the frozen
+  // row. A regression that flipped this back to `page.ordinal === 0`
+  // would silently burn ANCHOR_EXTRA_CYCLES of Anthropic spend per post.
+  const isAnchor = modeConfig.anchorExtraCycles > 0 && page.ordinal === 0;
   const ceiling = isAnchor
     ? BRIEF_ANCHOR_PAGE_CEILING_CENTS
     : BRIEF_PAGE_CEILING_CENTS;
@@ -1179,8 +1287,9 @@ async function processPagePassLoop(
     numberToRun = peek.number;
   }
 
-  // All passes done. Run the gate.
-  const gate = runGatesForBriefPage(page.draft_html);
+  // All passes done. Run the base gate + mode-specific gates from the
+  // dispatch table (M13-3).
+  const gate = runGatesForBriefPage(page.draft_html, modeConfig);
   if (!gate.ok) {
     await client.query(
       `
