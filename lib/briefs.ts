@@ -50,6 +50,28 @@ export type BriefRow = {
   updated_at: string;
 };
 
+export type BriefPageStatus =
+  | "pending"
+  | "generating"
+  | "awaiting_review"
+  | "approved"
+  | "failed"
+  | "skipped";
+
+export type BriefPagePassKind = "draft" | "self_critique" | "revise";
+
+export type BriefPageCritiqueEntry = {
+  pass_kind: BriefPagePassKind;
+  pass_number: number;
+  anthropic_response_id: string | null;
+  output: unknown;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    cached_tokens?: number;
+  };
+};
+
 export type BriefPageRow = {
   id: string;
   brief_id: string;
@@ -63,6 +85,15 @@ export type BriefPageRow = {
   word_count: number;
   operator_notes: string | null;
   version_lock: number;
+  // M12-3 — runner state.
+  page_status: BriefPageStatus;
+  current_pass_kind: BriefPagePassKind | null;
+  current_pass_number: number;
+  draft_html: string | null;
+  generated_html: string | null;
+  critique_log: BriefPageCritiqueEntry[];
+  approved_at: string | null;
+  approved_by: string | null;
 };
 
 export type UploadBriefInput = {
