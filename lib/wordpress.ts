@@ -576,3 +576,315 @@ export async function wpDeletePage(
     status: "trash",
   };
 }
+
+// ===========================================================================
+// M13-2 — WordPress REST posts wrapper
+//
+// Additive counterpart to the wpCreatePage / wpUpdatePage / wpGetPage /
+// wpDeletePage helpers above. Posts hit /wp-json/wp/v2/posts (NOT
+// /pages), which carries taxonomies (categories / tags), featured
+// media, and — if installed — SEO plugin meta. These wrappers deliberately
+// do not touch the page helpers so the chat tools (M7 page-publish path)
+// stay independent of the post surface.
+//
+// Shape invariants:
+//   - Inputs/outputs mirror the page wrappers where they overlap
+//     (title, slug, content, excerpt).
+//   - Post-specific extensions (categories, tags, featured_media, meta)
+//     are OPTIONAL on the Input type; a missing field is not sent to
+//     WP (preserves existing WP values on UPDATE; omits on CREATE).
+//   - Same Basic-Auth header, same exponential-backoff retry via
+//     wpFetch, same error mapping through mapHttpErrorToWpError — the
+//     operator sees AUTH_FAILED / UPSTREAM_BLOCKED / NOT_FOUND /
+//     RATE_LIMIT / WP_API_ERROR exactly as they do on pages today.
+// ===========================================================================
+
+export type WpPostStatus = "draft" | "publish" | "pending" | "private" | "future";
+
+export type WpCreatePostInput = {
+  title: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
+  /** Defaults to "draft" when omitted. */
+  status?: WpPostStatus;
+  /** Category term IDs as stored in WP (/wp/v2/categories). */
+  categories?: number[];
+  /** Tag term IDs as stored in WP (/wp/v2/tags). */
+  tags?: number[];
+  /** Media attachment ID from /wp/v2/media — the featured image. */
+  featured_media?: number;
+  /** Raw WP `meta` object. Yoast / RankMath / SEOPress meta fields go here. */
+  meta?: Record<string, unknown>;
+};
+
+export type WpUpdatePostFields = {
+  title?: string;
+  slug?: string;
+  content?: string;
+  excerpt?: string;
+  status?: WpPostStatus;
+  categories?: number[];
+  tags?: number[];
+  featured_media?: number;
+  meta?: Record<string, unknown>;
+};
+
+export type WpPostRecord = {
+  post_id: number;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt: string;
+  status: string;
+  categories: number[];
+  tags: number[];
+  featured_media: number | null;
+  link: string;
+  modified_date: string;
+};
+
+export type WpCreatePostData = {
+  post_id: number;
+  preview_url: string;
+  admin_url: string;
+  slug: string;
+  status: string;
+  link: string;
+};
+
+export type WpUpdatePostData = {
+  post_id: number;
+  slug: string;
+  status: string;
+  modified_date: string;
+};
+
+export type WpDeletePostData = {
+  post_id: number;
+  status: "trash" | "deleted";
+};
+
+export type WpCreatePostResult = WpResult<WpCreatePostData>;
+export type WpUpdatePostResult = WpResult<WpUpdatePostData>;
+export type WpGetPostResult = WpResult<WpPostRecord>;
+export type WpDeletePostResult = WpResult<WpDeletePostData>;
+
+function toPostRecord(raw: any): WpPostRecord {
+  const categories = Array.isArray(raw?.categories)
+    ? (raw.categories as unknown[])
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n))
+    : [];
+  const tags = Array.isArray(raw?.tags)
+    ? (raw.tags as unknown[])
+        .map((n) => Number(n))
+        .filter((n) => Number.isFinite(n))
+    : [];
+  const featured =
+    typeof raw?.featured_media === "number" && raw.featured_media > 0
+      ? raw.featured_media
+      : null;
+  return {
+    post_id: Number(raw?.id),
+    title: rawString(raw?.title),
+    slug: typeof raw?.slug === "string" ? raw.slug : "",
+    content: rawString(raw?.content),
+    excerpt: rawString(raw?.excerpt),
+    status: typeof raw?.status === "string" ? raw.status : "",
+    categories,
+    tags,
+    featured_media: featured,
+    link: typeof raw?.link === "string" ? raw.link : "",
+    modified_date:
+      typeof raw?.modified_gmt === "string"
+        ? raw.modified_gmt
+        : typeof raw?.modified === "string"
+          ? raw.modified
+          : "",
+  };
+}
+
+function buildCreatePostBody(input: WpCreatePostInput): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    title: input.title,
+    slug: input.slug,
+    content: input.content,
+    status: input.status ?? "draft",
+  };
+  if (input.excerpt !== undefined) body.excerpt = input.excerpt;
+  if (input.categories !== undefined) body.categories = input.categories;
+  if (input.tags !== undefined) body.tags = input.tags;
+  if (input.featured_media !== undefined) body.featured_media = input.featured_media;
+  if (input.meta !== undefined) body.meta = input.meta;
+  return body;
+}
+
+function buildUpdatePostBody(fields: WpUpdatePostFields): Record<string, unknown> {
+  const body: Record<string, unknown> = {};
+  if (fields.title !== undefined) body.title = fields.title;
+  if (fields.slug !== undefined) body.slug = fields.slug;
+  if (fields.content !== undefined) body.content = fields.content;
+  if (fields.excerpt !== undefined) body.excerpt = fields.excerpt;
+  if (fields.status !== undefined) body.status = fields.status;
+  if (fields.categories !== undefined) body.categories = fields.categories;
+  if (fields.tags !== undefined) body.tags = fields.tags;
+  if (fields.featured_media !== undefined) body.featured_media = fields.featured_media;
+  if (fields.meta !== undefined) body.meta = fields.meta;
+  return body;
+}
+
+// ---------- wpCreatePost ----------
+
+export async function wpCreatePost(
+  cfg: WpConfig,
+  input: WpCreatePostInput,
+): Promise<WpCreatePostResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/posts", {
+      method: "POST",
+      body: JSON.stringify(buildCreatePostBody(input)),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  const base = trimTrailingSlash(cfg.baseUrl);
+  const id = Number(body?.id);
+  return {
+    ok: true,
+    post_id: id,
+    preview_url: `${base}/?p=${id}&preview=true`,
+    admin_url: `${base}/wp-admin/post.php?post=${id}&action=edit`,
+    slug: typeof body?.slug === "string" ? body.slug : input.slug,
+    status: typeof body?.status === "string" ? body.status : (input.status ?? "draft"),
+    link: typeof body?.link === "string" ? body.link : `${base}/?p=${id}`,
+  };
+}
+
+// ---------- wpUpdatePost ----------
+
+export async function wpUpdatePost(
+  cfg: WpConfig,
+  postId: number,
+  fields: WpUpdatePostFields,
+): Promise<WpUpdatePostResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, `/wp-json/wp/v2/posts/${postId}`, {
+      method: "POST",
+      body: JSON.stringify(buildUpdatePostBody(fields)),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  return {
+    ok: true,
+    post_id: Number(body?.id ?? postId),
+    slug: typeof body?.slug === "string" ? body.slug : "",
+    status: typeof body?.status === "string" ? body.status : "",
+    modified_date:
+      typeof body?.modified_gmt === "string"
+        ? body.modified_gmt
+        : typeof body?.modified === "string"
+          ? body.modified
+          : "",
+  };
+}
+
+// ---------- wpGetPostBySlug ----------
+
+export async function wpGetPostBySlug(
+  cfg: WpConfig,
+  slug: string,
+  opts: { status?: "any" | WpPostStatus } = {},
+): Promise<WpGetPostResult> {
+  // WP returns an array when queried by slug; empty array → NOT_FOUND,
+  // first element → the post record. Using context=edit to fetch the
+  // raw (un-rendered) fields the operator/runner needs to round-trip.
+  const status = opts.status ?? "any";
+  const qs = new URLSearchParams();
+  qs.set("slug", slug);
+  qs.set("status", status);
+  qs.set("per_page", "1");
+  qs.set("context", "edit");
+
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, `/wp-json/wp/v2/posts?${qs.toString()}`, {
+      method: "GET",
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any[]>(res);
+  if (!parsed.ok) return parsed;
+  const list = Array.isArray(parsed.body) ? parsed.body : [];
+  if (list.length === 0) {
+    return {
+      ok: false,
+      code: "NOT_FOUND",
+      message: `No post found with slug "${slug}".`,
+      details: { slug, status },
+      retryable: false,
+      suggested_action: "Verify the slug and status filter.",
+    };
+  }
+  return { ok: true, ...toPostRecord(list[0]) };
+}
+
+// ---------- wpDeletePost ----------
+
+export async function wpDeletePost(
+  cfg: WpConfig,
+  postId: number,
+  opts: { force?: boolean } = {},
+): Promise<WpDeletePostResult> {
+  // WP's default DELETE on /posts/:id sends the row to trash (recoverable).
+  // ?force=true bypasses trash and hard-deletes — reserved for operator
+  // "permanent delete" actions. Opollo's default is trash (recoverable).
+  const path = opts.force
+    ? `/wp-json/wp/v2/posts/${postId}?force=true`
+    : `/wp-json/wp/v2/posts/${postId}`;
+
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, path, { method: "DELETE" });
+  } catch (err) {
+    return networkError(err);
+  }
+
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+
+  const parsed = await parseJsonOrError<any>(res);
+  if (!parsed.ok) return parsed;
+  const body = parsed.body;
+
+  const id = Number(body?.id ?? body?.previous?.id ?? postId);
+  return {
+    ok: true,
+    post_id: id,
+    status: opts.force ? "deleted" : "trash",
+  };
+}
