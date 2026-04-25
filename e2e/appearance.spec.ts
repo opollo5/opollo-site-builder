@@ -126,4 +126,95 @@ test.describe("M13-5d appearance panel", () => {
       page.getByRole("button", { name: /re-check/i }),
     ).toBeVisible();
   });
+
+  // M13-6b — extension: audit-log render coverage + write-safety invariant.
+  test("audit log renders the operator-facing event vocabulary", async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(30_000);
+    const site = await findTestSite();
+    const svc = supabaseServiceClient();
+
+    // Seed one row of each operator-visible event type so the audit
+    // log section exercises every label branch in
+    // AppearanceEventLog.EVENT_PRESENTATION. Order doesn't matter —
+    // listAppearanceEventsForSite returns newest-first, but we only
+    // care that the four distinguishing labels render.
+    await svc.from("appearance_events").insert([
+      {
+        site_id: site.id,
+        event: "preflight_run",
+        details: { outcome: "blocked", blocker_code: "REST_UNREACHABLE" },
+      },
+      {
+        site_id: site.id,
+        event: "globals_dry_run",
+        details: { any_changes: true, note: "5 slot changes pending" },
+      },
+      {
+        site_id: site.id,
+        event: "globals_completed",
+        details: { round_trip_ok: true },
+      },
+      {
+        site_id: site.id,
+        event: "rollback_completed",
+        details: {},
+      },
+    ]);
+
+    await page.goto(`/admin/sites/${site.id}/appearance`);
+    await expect(
+      page.getByRole("heading", { name: /recent activity/i }),
+    ).toBeVisible();
+
+    // Distinguishing labels per event type — incident-reconstruction
+    // surface relies on these being visually distinct.
+    await expect(page.getByText(/^Preflight$/i).first()).toBeVisible();
+    await expect(page.getByText(/^Dry-run$/i).first()).toBeVisible();
+    await expect(page.getByText(/^Synced$/i).first()).toBeVisible();
+    await expect(page.getByText(/^Rolled back$/i).first()).toBeVisible();
+
+    // The blocked-preflight summary surfaces the blocker code so an
+    // on-call operator can match it against the runbook.
+    await expect(page.getByText(/REST_UNREACHABLE/)).toBeVisible();
+
+    await auditA11y(page, testInfo);
+  });
+
+  test("sync confirm modal is unreachable when preflight isn't ready", async ({
+    page,
+  }) => {
+    test.setTimeout(30_000);
+    const site = await findTestSite();
+
+    // Visit the panel. The E2E test site's wp_url ("https://e2e.test")
+    // doesn't resolve, so /preflight returns a blocker (REST_UNREACHABLE
+    // or similar network-level failure). MODE_CONFIGS post-condition:
+    // the "Sync Now" button is rendered exclusively inside the
+    // ready-phase ReadyState component (AppearancePanelClient.tsx
+    // gates `phase === "ready"` only). With preflight non-ready, no
+    // path opens the SyncConfirmModal.
+    await page.goto(`/admin/sites/${site.id}/appearance`);
+
+    // Wait for preflight to resolve to a terminal non-loading phase.
+    await expect(
+      page.getByText(/Checking Kadence on this site/i),
+    ).not.toBeVisible({ timeout: 15_000 });
+
+    // Write-safety invariant: no Sync Now button, no open sync modal.
+    // We assert both — a future regression that decouples the button
+    // from ReadyState would surface here.
+    await expect(
+      page.getByRole("button", { name: /^Sync Now$/i }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("dialog", { name: /sync.*kadence|sync.*palette/i }),
+    ).toHaveCount(0);
+
+    // The re-check affordance IS available — operator's recovery path.
+    await expect(
+      page.getByRole("button", { name: /re-check/i }),
+    ).toBeVisible();
+  });
 });
