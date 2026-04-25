@@ -159,6 +159,7 @@ Supply-chain scanning runs server-side:
 - Don't loop me in on routine errors — fix and retry
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
+- **RUNBOOK is load-bearing for incident response. Code that changes a blocker code, audit event name, or error envelope MUST update the matching `docs/RUNBOOK.md` entry in the same PR.**
 
 ## Performance standards
 - **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`
