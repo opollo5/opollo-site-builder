@@ -371,6 +371,21 @@ export default async function SiteDetailPage({
               </>
             )}
           </div>
+
+          {/* M13-5d — Appearance panel link. */}
+          <div className="rounded-lg border p-4 text-sm">
+            <h2 className="text-base font-medium">Appearance</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Sync the active DS palette to Kadence on this site&apos;s
+              WordPress install.
+            </p>
+            <Link
+              href={`/admin/sites/${site.id}/appearance`}
+              className="mt-2 inline-block text-muted-foreground hover:text-foreground"
+            >
+              Open Appearance panel →
+            </Link>
+          </div>
         </aside>
       </div>
     </>
