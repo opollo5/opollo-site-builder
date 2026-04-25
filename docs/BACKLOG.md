@@ -6,6 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Staging-environment E2E for sync confirm + actual WP publish (deferred from M13-6b, 2026-04-26)
+
+**Tags:** `e2e`, `staging`, `wp-integration`
+
+**What:** A Playwright suite that runs against a real (or near-real) WordPress backend, exercising the two surfaces the in-CI E2E can't reach:
+- **Sync confirm modal post-action flow** — open the SyncConfirmModal from the ready phase, click "Sync Now", drive the dry-run → confirmed POST cycle, assert the `globals_completed` event lands and the palette round-trips. Today's `e2e/appearance.spec.ts` only covers the structural surfaces — modal entry is gated behind `phase === "ready"`, which requires a real WP with Kadence active.
+- **Actual `/posts/[id]/publish` round-trip** — create a draft post, click Publish, assert the `wpCreatePost` call lands, `posts.wp_post_id` populates, and the live post is reachable via WP REST. Today's `e2e/posts.spec.ts` covers preflight blocker + draft list + unpublish modal opens, but stops short of the mutation that talks to WP.
+
+**Why deferred:** The CI E2E stack runs Supabase locally + Next.js dev — no WordPress instance. Standing up a stable WP (with Kadence theme + a known plugin set) inside CI is a real engineering project: container image, init script, idempotent reset between specs, secret management for the application password, plus the moving target of WP/Kadence version pins. The unit-layer coverage already pins the route-level behavior (`appearance-sync-routes.test.ts`, `posts-publish-routes.test.ts` mock `global.fetch` at the WP-call boundary), so the gap is end-to-end-only.
+
+**Trigger:** Pick this up when ANY of:
+- A WP-talking write-path regression escapes both unit + manual smoke (the gap stops being theoretical).
+- We onboard a paying operator and need a pre-merge gate that runs against a representative WP, not just the unit-layer mock.
+- Onboarding flow ships and "fresh-WP-to-first-publish" becomes a test case worth formalising.
+
+**Scope:**
+- Provision a staging WP (containerised — `wordpress:latest` + Kadence theme + an admin app-password seed). Decision point: WP Playground (browser-only) vs. Docker-based local-staging vs. a real always-on staging URL.
+- New Playwright project in `playwright.config.ts` named `staging-wp` that runs only when `STAGING_WP_URL` is set; CI workflow opt-in via a secrets-gated job.
+- Two specs: `e2e/staging/appearance-sync.spec.ts` (sync confirm → completed → rollback round-trip) and `e2e/staging/posts-publish.spec.ts` (draft → publish → live → unpublish → trash).
+- Both specs run `auditA11y` on every visited admin page (per CLAUDE.md E2E coverage rule).
+- Document the secret-management story (where the app password lives, how it's rotated; do not check fixture credentials into the repo).
+
+**Size:** Medium (~3-5 days for the WP infra + the two specs + CI workflow + secret rotation story). Depends most on WP Playground vs. Docker decision — Playground is faster to set up but loses some Kadence plugin paths; Docker is heavier but matches a real operator's WP closer.
+
+---
+
 ## Site actions dropdown clipped on /admin/sites list (deferred from M13-6a, 2026-04-26)
 
 **Tags:** `ux-polish`
