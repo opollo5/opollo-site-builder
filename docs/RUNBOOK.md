@@ -478,6 +478,154 @@ Log the provisioning date + vendor account IDs somewhere persistent; each rotati
 
 ---
 
+## auth-capability-missing — operator can't publish a post or sync a palette
+
+**Symptom:** publish or appearance-panel button returns a translated banner naming a missing capability. HTTP 403 with `error.code === "PREFLIGHT_BLOCKED"` and `error.details.blocker.code === "AUTH_CAPABILITY_MISSING"`. Specific capability list in `error.details.blocker.missing_capabilities`.
+
+**Impact:** all WP-bound writes for this site are blocked — posts can't publish, palette can't sync. Reads (preflight, dry-run) still work.
+
+**Diagnose:**
+1. Look at `appearance_events` for the latest `preflight_run` row with `details.outcome = 'blocked'` — `details.blocker_code` will be `AUTH_CAPABILITY_MISSING`. Same shape lands in M13-4's posts publish path via the route's translated error envelope.
+2. The capability list this code path checks is pinned in `lib/site-preflight.ts::REQUIRED_PUBLISH_CAPABILITIES` (currently `edit_posts` + `upload_files`). Palette sync needs the same plus the operator's WP user must have `manage_options` for the `/wp/v2/settings` write — that's checked at write-time, not preflight, so a missing `manage_options` surfaces as `WP_API_ERROR` 401 from the sync route, not a preflight blocker.
+3. Cross-reference the actual capability list against what WP returned: hit `/wp-json/wp/v2/users/me?context=edit` with the stored app password. The `capabilities` map is the truth.
+
+**Mitigate:**
+- No mitigation — the operator's WP user genuinely lacks the capability; there's no Opollo-side fix.
+
+**Resolve:**
+- Operator promotes the WP user to Editor (or Administrator if `manage_options` is needed) in WP Admin → Users.
+- Operator regenerates the app password (the old one belongs to the prior role's session in some WP versions) in WP Admin → Profile → Application Passwords.
+- Operator updates Opollo's stored credential via the Edit Site modal — `sites.site_credentials.wp_app_password` (encrypted column) is rewritten.
+- Re-run preflight from the Appearance panel or the post detail page; blocker should clear.
+
+---
+
+## rest-disabled — WP REST returns 404 on /users/me or /themes
+
+**Symptom:** preflight banner with `error.details.blocker.code === "REST_UNREACHABLE"`. Operator-facing copy: "WordPress REST is unreachable. The /wp-json/wp/v2/users/me endpoint returned 404."
+
+**Impact:** every Opollo write to this site is blocked. Detection, sync, publish, unpublish, posts admin — all gated by preflight.
+
+**Diagnose:**
+1. `curl '<wp_url>/wp-json/'` from a developer machine — if 404, REST is disabled site-wide. If 200 but `/wp-json/wp/v2/users/me` 404s, REST is partially blocked (security plugin scoping).
+2. Common causes: iThemes Security's "Disable XML-RPC + REST" feature, WP Hide plugin's REST URL rewrite, Cloudflare WAF rule blocking `/wp-json/*`, an override `.htaccess` rule, or a defunct `rest_authentication_errors` filter in `functions.php`.
+
+**Mitigate:**
+- No Opollo-side mitigation; operator must restore REST.
+
+**Resolve:**
+- Operator disables the REST-blocking plugin or rule:
+  - iThemes Security → Settings → Tweaks → "REST API" set to "Default Access".
+  - WP Hide → Rewrite → restore default `/wp-json/` path.
+  - Cloudflare → WAF → exclude `/wp-json/*` from any blocking rule.
+  - `.htaccess` — remove any `RewriteRule ^wp-json/`.
+- Re-run preflight. The blocker should flip to `REST_AUTH_FAILED` (if creds wrong) or clear entirely.
+
+---
+
+## seo-plugin-missing — post publish blocked because brief declared SEO meta
+
+**Symptom:** post publish gated by a quality-gate failure naming a missing SEO plugin. Operator sees a translated banner: "This post's brief declared SEO meta but no compatible plugin (Yoast / RankMath / SEOPress) is detected on the site."
+
+**Impact:** the specific post can't publish. Other posts on the same site still publish if their briefs don't declare SEO meta.
+
+**Diagnose:**
+1. `lib/seo-plugin-detection.ts` fingerprints the active SEO plugin from `/wp-json/` namespace listing. If the post's brief declared `yoast.*` / `rank_math.*` / `seo_press.*` meta keys, M13-3's post quality gate enforces presence.
+2. Hit `/wp-json/` and look for `wp/v2/types/post` schema fields — Yoast, RankMath, and SEOPress all expose meta fields under a recognizable namespace (`yoast_head_json`, `rank_math_meta`, `_seopress_*`).
+3. Check the brief's source for declared SEO meta — currently exposed via `briefs.brand_voice` / `briefs.design_direction` content; structured SEO meta declaration is BACKLOG.
+
+**Mitigate:**
+- Operator can publish without the SEO meta by editing the brief to remove the SEO directive, then re-running. The post will publish without those meta fields.
+
+**Resolve:**
+- Operator installs one of: Yoast SEO, Rank Math, SEOPress (Steven's preference order: RankMath → Yoast → SEOPress, all free-tier).
+- Operator activates the plugin in WP Admin → Plugins.
+- Re-run preflight from the post detail page; gate should clear.
+- Long term: brief authors should declare which SEO plugin they're targeting upfront so Opollo can preflight at brief-commit time, not publish time. BACKLOG.
+
+---
+
+## kadence-customizer-drift — palette sync hits WP_STATE_DRIFTED
+
+**Symptom:** Appearance panel sync confirm hits 409 `WP_STATE_DRIFTED`. Banner: "WordPress changed between your preview and confirm. We've refreshed the diff — review again before syncing." Diff table shows different "current" colors than the operator saw 30 seconds ago.
+
+**Impact:** sync is blocked but no data loss. Operator's intent is preserved; they need to re-review against the new state.
+
+**Diagnose:**
+1. The drift hash in `lib/kadence-palette-sync.ts::hashPalette` re-reads WP's current palette right before the write. A mismatch with the dry-run's hash triggers the failure.
+2. Common cause: operator (or another team member) opened WP Admin → Customizer → Global Colors and saved a change between Opollo's dry-run and confirm.
+3. Check `appearance_events` for the latest `globals_failed` row with `details.stage = 'drift_check'` — `details.expected_sha` vs `details.actual_sha` confirms the hash mismatch happened at confirm-time.
+
+**Mitigate:**
+- The route automatically re-runs preflight on `WP_STATE_DRIFTED` and surfaces the fresh diff. Operator decides:
+  - Keep their Customizer edits → close the panel without syncing; Opollo's stored DS palette remains source of truth, but Customizer wins for now.
+  - Override Customizer with DS → confirm the new diff (which now reflects the Customizer edits as "current"); sync overwrites them.
+
+**Resolve:**
+- The drift signal is the system working as designed — operator-visible alert prevents silent overwrite.
+- If frequent drift is a workflow problem (multi-author teams stomping each other), the long-term fix is the parent plan's deferred merge-aware sync. BACKLOG candidate alongside the typography+spacing slice.
+
+---
+
+## stuck-brief-run — brief_run row not advancing past 'running'
+
+**Symptom:** Run surface shows a page in `generating` for longer than the lease window (default 60s). Operator clicks Re-check; status doesn't change. Cron logs may show "lease still held by worker_id=X".
+
+**Impact:** that specific brief is paused. Other briefs on the site continue running normally.
+
+**Diagnose:**
+1. `SELECT id, status, worker_id, lease_expires_at, last_heartbeat_at FROM brief_runs WHERE brief_id='<uuid>';` — if `lease_expires_at < now()`, the lease should be reaped on the next cron tick (every minute via `vercel.json`).
+2. `SELECT id, event, details, created_at FROM brief_runs_events WHERE brief_run_id='<uuid>' ORDER BY created_at DESC LIMIT 20;` shows lease/heartbeat history.
+3. Check Vercel cron logs for `process-brief-runner` — if cron is silent, the schedule is broken (verify `vercel.json` deployed and `CRON_SECRET` is set).
+
+**Mitigate:**
+- Manual reaper — under CAS, reset the row:
+  ```sql
+  UPDATE brief_runs
+     SET status = 'queued',
+         worker_id = NULL,
+         lease_expires_at = NULL,
+         updated_at = now(),
+         version_lock = version_lock + 1
+   WHERE id = '<uuid>'
+     AND version_lock = <current_lock>;
+  ```
+  Next cron tick will lease it cleanly.
+- If the row is genuinely corrupt (page state diverged from run state), cancel the run from the UI and re-upload the brief.
+
+**Resolve:**
+- Most stuck-run cases are cron-schedule problems — verify `vercel.json` includes `/api/cron/process-brief-runner` and `CRON_SECRET` is provisioned in the Vercel project. CRON-related diagnostics live in M12-6's runner cron entry.
+- If the worker_id is from a deploy that's been replaced, the new deploy's cron picks up the lease via `FOR UPDATE SKIP LOCKED` once `lease_expires_at` passes. No action needed.
+
+---
+
+## orphan-post-row — brief_page approved but no posts row created
+
+**Symptom:** brief_page status=approved with non-null draft_html, but `/admin/sites/[id]/posts` doesn't show the post. `approveBriefPage`'s response included `failed_bridge_reason` non-null when the operator clicked Approve.
+
+**Impact:** the brief generation succeeded; the post is "stuck" between brief_page and posts table — operator can't publish it from the posts admin because there's no post row.
+
+**Diagnose:**
+1. The bridge in `lib/brief-runner.ts::bridgeApprovedPageToPostIfNeeded` logs `failed_bridge_reason` on every soft failure. Look at the approve route response (network tab on the Approve button click) for the `failed_bridge_reason` field. Common values:
+   - `slug_already_in_use` — another live post on the site already has this slug. UNIQUE violation on `posts(site_id, slug)`.
+   - `existing_lookup_failed` / `insert_failed` — Supabase write error; check supabase logs.
+   - `brief_lookup_failed` — brief vanished (soft-delete race).
+2. `SELECT id, slug, deleted_at FROM posts WHERE site_id='<uuid>' AND slug='<derived-slug>';` — if a row exists but with a different brief origin, the slug collision is real.
+3. The slug derivation: `slug_hint` if non-null on the brief_page, else `slugify(title)`. The slugify shape is in `lib/brief-runner.ts::slugifyForPost`.
+
+**Mitigate:**
+- Operator manually creates the post via `lib/posts.createPost` from a one-off script or admin route, copying `generated_html` + `title` from the approved brief_page.
+
+**Resolve:**
+- For `slug_already_in_use`: edit the brief_page's `slug_hint` to a unique value, then re-approve. The bridge runs again on re-approve and produces a fresh post row. The first failed attempt left the brief_page in approved state, so re-approve will hit the `INVALID_STATE` check from `approveBriefPage` — manually flip the brief_page back to `awaiting_review` first:
+  ```sql
+  UPDATE brief_pages SET page_status = 'awaiting_review', version_lock = version_lock + 1
+   WHERE id = '<uuid>' AND version_lock = <current_lock>;
+  ```
+- For systemic slug collisions (multiple sites generating posts with the same titles): the title-based slug derivation is too coarse. Long-term fix is to scope the slug under the site's prefix, OR include the brief_id in the slug. BACKLOG.
+
+---
+
 ## Adding a new runbook entry
 
 When a live incident surfaces a gap, write it up here the same day. Template:

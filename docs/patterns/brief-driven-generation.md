@@ -167,3 +167,56 @@ As of M12-6, this pattern is in production as the whole-site brief runner:
 - Cron tick at `/api/cron/process-brief-runner` (1-minute Vercel schedule)
 
 M13's post-runner (M13-3) reuses the same runner via the mode dispatch — first cross-reuse. If a third shape lands, audit this doc against the actual diff; promote any stable deltas into the checklist above.
+
+## Post mode (M13)
+
+The first cross-reuse of this pattern is the post-runner. It does **not** fork `lib/brief-runner.ts`; it adds a new entry to the mode dispatch table.
+
+### Mode axis
+
+`briefs.content_type` (CHECK enum `('page','post')`, migration 0021) is the dispatch axis. `resolveRunnerMode(brief)` returns `'page' | 'post'`. `MODE_CONFIGS[mode]` carries the per-mode deltas:
+
+| Knob | `'page'` | `'post'` |
+| --- | --- | --- |
+| Anchor extra cycles | `ANCHOR_EXTRA_CYCLES` (2) | `0` — anchor cycle is disabled. |
+| Mode-specific gates | none | `runPostQualityGates` (meta-description length cap; featured-image / taxonomy hooks plug in here as preflight wiring lands). |
+| Page → output bridge | none (brief_pages is the output). | `bridgeApprovedPageToPostIfNeeded` writes a `posts` row at approval. |
+
+The dispatch is the only mode-aware code path. New mode = new entry; a forked runner-for-posts would drift silently. Asserted by `lib/__tests__/brief-runner-mode.test.ts`: `MODE_CONFIGS.post.anchorExtraCycles === 0`.
+
+### Anchor cycle disabled for posts
+
+The page-mode anchor (page 0 + 2 extra revises + frozen `site_conventions`) presupposes a brand-new site that needs first-time conventions. Posts run against an **already-anchored** site: the running `content_summary` from prior approved posts is the only continuity needed. `MODE_CONFIGS.post.anchorExtraCycles = 0` — text sequence is `draft:0 → self_critique:0 → revise:0` flat, no `revise:1`/`revise:2`. The runner never writes to `site_conventions` on a post run.
+
+### Post-specific quality gates
+
+`runPostQualityGates(draftHtml)` runs **after** the base gate passes. Today: meta-description length capped at `POST_META_DESCRIPTION_MAX` (300, the outer Zod bound). Hook points named in the parent plan land here as their preflight surface arrives — featured-image presence (conditional on M13-3's SEO plugin detection in `lib/seo-plugin-detection.ts`), taxonomy whitelist. Gate failure routes through the same `quality_flag` + `awaiting_review` path as a page failure; no separate state machine.
+
+### brief_page → posts bridge (M13-4)
+
+`approveBriefPage` calls `bridgeApprovedPageToPostIfNeeded` after the brief-page CAS commits. The bridge is the only place `brief_pages` (a generation-time artefact) becomes a `posts` row (the operator's editable surface). Contract:
+
+- **No-op on page-mode briefs.** The bridge reads `briefs.content_type`; `'page'` returns `{ post_id: null }` and the approval looks like a page approval.
+- **Deterministic slug.** `slugifyForPost(slug_hint || title)` — lowercase, `[^a-z0-9]+ → -`, trimmed, capped at 100 chars. Stable across retries; same approval re-run never inserts a duplicate.
+- **Live-slug adoption.** Existing `posts` row matching `(site_id, slug, deleted_at IS NULL)` is adopted and returned; the bridge does **not** overwrite its HTML. Operator's next action is a manual edit or a fresh brief cycle. This is what makes the bridge replay-safe across the whole approval surface, not just within one tick.
+- **Soft-fail on race.** A 23505 on insert (concurrent operator beat us to the slug) returns `{ post_id: null, failed_bridge_reason: 'slug_already_in_use' }`. **Approval itself stays committed** — the brief_page is approved, the post just didn't materialise. Operator sees a UI warning and retries via manual `createPost`.
+- **Never rolls back the approval.** Any bridge failure (brief lookup, existing lookup, insert) is a soft failure. `brief_pages.page_status = 'approved'` is the source of truth; the post row is downstream.
+
+### Publish path (M13-3)
+
+Once a `posts` row exists, the publish lane is independent of the runner. `POST /api/sites/[id]/posts/[post_id]/publish`:
+
+1. Site preflight (`lib/site-preflight.ts`) — REQUIRED_PUBLISH_CAPABILITIES gate; missing capabilities raise blocker codes consumed by the runbook (`auth-capability-missing`, `rest-disabled`, `seo-plugin-missing`).
+2. `wpCreatePost` on first publish; `wpUpdatePost` on re-publish (decided by `posts.wp_post_id IS NULL`).
+3. CAS on `posts.version_lock`. A racing publish trips `VERSION_CONFLICT`; the operator re-reads the row and retries.
+4. Audit event written before the response returns.
+
+Unpublish at `POST /api/sites/[id]/posts/[post_id]/unpublish` mirrors the shape (status flip on WP + CAS on `posts`).
+
+### Kadence palette is independent of post content
+
+M13-5's palette sync mutates `wp_options` (`kadence_blocks_colors`); it does **not** touch post HTML, post markup, or the post-runner. A drifted palette never blocks a post run, and a post run never invalidates a synced palette. The two surfaces share only the `appearance_events` audit table for operator-visible history. If a future change tries to entangle them (e.g. post-render asserting palette freshness), that's a parent-plan-level scope decision, not a runner change.
+
+### What's not in M13
+
+Multi-author authorship, post scheduling (`status='scheduled' + scheduled_for`), and custom post types (CPTs beyond the built-in `'post'`) are all in BACKLOG. Today's runner assumes single-tenant operator authorship + immediate publish + WP core post type only; future axes plug in via the same dispatch table, not a fork.

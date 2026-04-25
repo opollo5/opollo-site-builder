@@ -6,6 +6,51 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Site actions dropdown clipped on /admin/sites list (deferred from M13-6a, 2026-04-26)
+
+**Tags:** `ux-polish`
+
+**What:** The actions dropdown on each row of `/admin/sites` is rendered inside a table whose container has `overflow-x-auto` (or similar) for horizontal-scroll-on-narrow. The menu's pop-out is clipped by that overflow context — items below the row's visible bounds are unreachable, particularly on rows near the bottom of a long list where the menu would otherwise extend off-table.
+
+**Why deferred:** Captured live during product walkthrough. Not a write-safety issue and not an incident, but actively annoying. M13-6 is closing out E2E + docs scope; this fits a future UX polish slice cleanly.
+
+**Trigger:** Now-ish — any operator using > 1 menu item on the site list will hit it once the list grows past ~5 rows. Bumps to "high" if site count grows past a screen and the dropdown blocks routine ops.
+
+**Scope:**
+- Two viable shapes; pick whichever fits the existing dropdown component:
+  - **(a) Portal-rendered menu** — migrate the dropdown to a portal (e.g., Radix Popover or headless-ui Menu) so the menu renders outside the overflow context. Cleanest if the rest of the codebase already uses Radix.
+  - **(b) Overflow tweak** — `overflow: visible` on the table container while keeping horizontal scroll on a different scope (e.g., `overflow-x-auto` on a deeper child wrapping just the cell text). Less invasive but easier to break with future CSS changes.
+- Either way: assert with a Playwright test that opens a row in the bottom third of the list, opens the menu, and clicks the bottom-most item — should hit successfully without scroll-jumping.
+
+**Size:** Small — ~30 min for portal solution, ~1 hr for overflow CSS (the latter usually has surprises).
+
+---
+
+## Cloudflare image upload friction → S3 alternative investigation (deferred from M13-6a, 2026-04-26)
+
+**Tags:** `storage`, `audit-target`
+
+**What:** Investigate replacing Cloudflare Images with S3 (+ a thin upload + derivative wrapper) for the Opollo image library. Captured during product readiness review — specific friction points: pricing cliff at higher tier, derivative API ergonomics, debugging when uploads fail mid-flight.
+
+**Why deferred:** M3/M4 shipped Cloudflare Images and it works. Migrating would touch `lib/cloudflare-images.ts`, `image_library` schema, every uploader path (manual upload + iStock + transfer worker), and all generated HTML's image URL rewriting. Whole-day-of-changes work. Not justified until product readiness audit confirms the friction is real for paying operators (vs. internal-team workflow speed-bump that goes away with familiarity).
+
+**Trigger:** Product-readiness audit names this as a top-N migration blocker, OR a paying operator's image volume crosses Cloudflare's pricing cliff in a way S3 + custom derivative pipeline would meaningfully improve. Either signals the migration is paying back the implementation cost.
+
+**Scope:**
+- Comparison matrix:
+  - Per-image cost at three volume tiers (operators today, 5 sites of 30 pages, 50 sites of 30 pages)
+  - Latency on upload + derivative serve (US + EU)
+  - SDK ergonomics (Cloudflare's Images API vs. S3 + Lambda@Edge or Cloudflare R2)
+  - Image-derivative API surface (Cloudflare's variants vs. on-the-fly image proxy)
+  - Debugging story (how do you find a stuck upload?)
+- POC: build an S3-backed `lib/cloudflare-images.ts` adapter behind a feature flag (`OPOLLO_IMAGE_BACKEND=s3`). Run a real upload through it end-to-end.
+- Migration path planning: existing `image_library` rows have Cloudflare-specific URLs in `cloudflare_id`; an S3 migration needs a backfill story OR a dual-read path that resolves either.
+- Decision doc: comparison-matrix-driven recommendation. Ship to BACKLOG-decided once audit completes.
+
+**Size:** Medium-large for the investigation + POC (~1 week). The full migration if approved is its own milestone (~2-3 weeks including the backfill).
+
+---
+
 ## Opollo mu-plugin for one-click Kadence install + theme-mod write (deferred from M13-5c, 2026-04-24)
 
 **What:** A small Opollo-authored WordPress plugin (`opollo-theme-bridge`) that ships a REST endpoint for theme install + activate + theme-mod writes. Would close two M13-5 gaps in one artifact:
