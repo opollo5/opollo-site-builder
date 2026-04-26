@@ -262,3 +262,112 @@ test.describe.serial("M14-5 account-security change-password", () => {
     user.password = newPassword;
   });
 });
+
+// ---------------------------------------------------------------------------
+// Recovery email link → /api/auth/callback PKCE hop (audit fix-pass PR 4).
+//
+// AUDIT.md (2026-04-26) §1 flagged that the existing "reset-password
+// updates the password when a session is active" test (above, lines
+// 137-177) deliberately skips the email-link hop — it signs in via
+// /login, navigates directly to /auth/reset-password, and validates
+// only the form behaviour. That leaves the actual production path
+// uncovered: an operator clicks the recovery link in their inbox →
+// browser follows the verify URL → redirect chain ends at our
+// /api/auth/callback?code=...&next=/auth/reset-password → cookie
+// session is set → /auth/reset-password renders the form. If
+// Supabase's redirectTo allowlist is misconfigured, the verify URL
+// 302s to an error page instead of our callback, and the production
+// flow silently breaks.
+//
+// This test drives the full chain. We use auth.admin.generateLink to
+// produce the same action_link the email would contain, navigate it
+// with Playwright (which follows redirects), and assert the session
+// lands on /auth/reset-password with a working form. If the local
+// Supabase project is configured for implicit-flow rather than PKCE,
+// the redirect will deliver tokens in the URL fragment instead of a
+// `code` query param — the cookie-based session won't be set, the
+// /auth/reset-password page will render in its no-session "link
+// expired" state, and this test will fail. That failure is the
+// signal the audit was asking for.
+//
+// Uses its own throwaway user, separate from the user the existing
+// describe.serial block above mutates — so the two are independent.
+// ---------------------------------------------------------------------------
+
+test.describe.serial("M14-5 recovery email-link callback hop (audit PR 4)", () => {
+  let user: TestUser;
+
+  test.beforeAll(async () => {
+    user = await createTestUser("recovery-link");
+  });
+
+  test.afterAll(async () => {
+    if (user) await deleteTestUser(user.id);
+  });
+
+  test("generated recovery link redirects through /api/auth/callback to a working reset form", async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+
+    const svc = serviceClient();
+
+    // Build the same redirectTo the production /api/auth/forgot-password
+    // route uses (lib/auth-helpers.ts::buildAuthRedirectUrl shape):
+    // <origin>/api/auth/callback?next=%2Fauth%2Freset-password.
+    // Origin is the Playwright base URL; for a local CI run that's
+    // http://localhost:3000.
+    const origin = new URL(page.url() || "http://localhost:3000").origin;
+    const redirectTo = `${origin}/api/auth/callback?next=%2Fauth%2Freset-password`;
+
+    // generateLink mirrors what svc.auth.resetPasswordForEmail would
+    // produce — same template, same redirect, same token validity
+    // window — but returns the action_link to us directly instead of
+    // sending it via email. Drives the entire production hop chain.
+    const { data, error } = await svc.auth.admin.generateLink({
+      type: "recovery",
+      email: user.email,
+      options: { redirectTo },
+    });
+    if (error || !data?.properties?.action_link) {
+      throw new Error(
+        `generateLink(recovery) failed: ${error?.message ?? "no action_link"}`,
+      );
+    }
+    const actionLink = data.properties.action_link;
+
+    // Navigate. Playwright follows the verify → callback redirect
+    // chain. End state: /auth/reset-password with a session cookie.
+    await page.goto(actionLink);
+    await page.waitForURL(/\/auth\/reset-password/, { timeout: 15_000 });
+
+    // Negative assertion: we did NOT land on the no-session "link
+    // expired" surface. That would mean the redirect chain delivered
+    // tokens in a URL fragment (implicit flow) and our cookie-based
+    // /api/auth/callback never ran — the audit's exact concern.
+    await expect(
+      page.getByRole("heading", { name: /reset link expired/i }),
+    ).toHaveCount(0);
+
+    // Positive assertion: the form is rendered with both password
+    // fields, meaning the auth context is established server-side.
+    await expect(page.getByLabel(/^new password$/i)).toBeVisible();
+    await expect(page.getByLabel(/confirm new password/i)).toBeVisible();
+
+    // Drive the rotation through the form to confirm the session cookie
+    // really does authenticate the /api/auth/reset-password POST.
+    const newPassword = "recovery-link-pwd-12-strong";
+    await page.getByLabel(/^new password$/i).fill(newPassword);
+    await page.getByLabel(/confirm new password/i).fill(newPassword);
+    await page.getByRole("button", { name: /update password/i }).click();
+    await page.waitForURL(/\/admin\/sites/);
+
+    // Sign out then verify the new password is the live credential.
+    await page.getByRole("button", { name: /sign out/i }).click();
+    await page.waitForURL(/\/login/);
+    await signInViaForm(page, user.email, newPassword);
+    await expect(page).toHaveURL(/\/admin\/sites/);
+
+    user.password = newPassword;
+  });
+});
