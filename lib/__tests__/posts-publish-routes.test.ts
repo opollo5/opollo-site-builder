@@ -62,7 +62,7 @@ type CannedResponse = {
 };
 
 function mockFetch(responses: Record<string, CannedResponse>) {
-  globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+  globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     // Find the first matching prefix.
     for (const [needle, resp] of Object.entries(responses)) {
@@ -73,11 +73,11 @@ function mockFetch(responses: Record<string, CannedResponse>) {
         });
       }
     }
-    // Default to 404 if no match — surfaces unexpected calls loudly.
-    return new Response(JSON.stringify({ error: `unmocked: ${url}` }), {
-      status: 404,
-      headers: { "content-type": "application/json" },
-    });
+    // No match -> pass through to the real fetch. Supabase REST calls
+    // share globalThis.fetch with the WP calls under test; swallowing
+    // them as "unmocked" 404s makes the route's first DB query fail and
+    // the test asserts on a 500 instead of the real status it expects.
+    return originalFetch(input, init);
   }) as unknown as typeof fetch;
 }
 
