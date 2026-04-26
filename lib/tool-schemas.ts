@@ -44,6 +44,20 @@ export const ERROR_CODES = [
   "ALREADY_EXISTS",
   "FORBIDDEN",
   "UNAUTHORIZED",
+  // Audit fix-pass 2026-04-27 — promote pre-existing route-emitted
+  // codes into the canonical vocabulary so operator-UI consumers
+  // (AccountSecurityForm, ResetPasswordForm, batch admin) and any
+  // future caller using respond() get a typed code + a canonical
+  // HTTP status. Local jsonError helpers in the affected routes
+  // continue to specify their own status; this expansion is for the
+  // canonical mapping path.
+  "PASSWORD_WEAK",
+  "SAME_PASSWORD",
+  "INCORRECT_CURRENT_PASSWORD",
+  "UPDATE_FAILED",
+  "EMERGENCY_NOT_CONFIGURED",
+  "TEMPLATE_NOT_FOUND",
+  "TEMPLATE_NOT_ACTIVE",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -91,8 +105,10 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 401;
     case "CONFIRMATION_REQUIRED":
     case "FORBIDDEN":
+    case "INCORRECT_CURRENT_PASSWORD":
       return 403;
     case "NOT_FOUND":
+    case "TEMPLATE_NOT_FOUND":
       return 404;
     case "PREFIX_TAKEN":
     case "VERSION_CONFLICT":
@@ -101,6 +117,7 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "REGEN_ALREADY_IN_FLIGHT":
     case "BRIEF_RUN_ALREADY_ACTIVE":
     case "ALREADY_EXISTS":
+    case "TEMPLATE_NOT_ACTIVE":
       return 409;
     case "BRIEF_TOO_LARGE":
       return 413;
@@ -108,6 +125,8 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 415;
     case "IDEMPOTENCY_KEY_CONFLICT":
     case "BRIEF_PARSE_FAILED":
+    case "PASSWORD_WEAK":
+    case "SAME_PASSWORD":
       return 422;
     case "RATE_LIMIT":
     case "BUDGET_EXCEEDED":
@@ -116,7 +135,10 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "WP_API_ERROR":
     case "NETWORK_ERROR":
       return 502;
+    case "EMERGENCY_NOT_CONFIGURED":
+      return 503;
     case "INTERNAL_ERROR":
+    case "UPDATE_FAILED":
       return 500;
   }
 }
