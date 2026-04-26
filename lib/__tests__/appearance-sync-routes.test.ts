@@ -176,10 +176,12 @@ function mockWp(state: MockWpState) {
         headers: { "content-type": "application/json" },
       });
     }
-    return new Response(JSON.stringify({ error: `unmocked: ${url}` }), {
-      status: 404,
-      headers: { "content-type": "application/json" },
-    });
+    // No WP route match -> pass through to the real fetch. Supabase
+    // REST calls share globalThis.fetch with the WP traffic under
+    // test; swallowing them as "unmocked" 404s makes the route's
+    // appearance_events insert fail and the test asserts on a 500
+    // instead of the real status it expects.
+    return originalFetch(input, init);
   }) as unknown as typeof fetch;
 }
 
