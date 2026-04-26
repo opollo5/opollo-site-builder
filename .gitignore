@@ -17,3 +17,8 @@ yarn-error.log*
 .vercel
 next-env.d.ts
 *.tsbuildinfo
+
+# Output of scripts/bulk-upload-cloudflare-images.py — operational
+# upload logs (filenames + cloudflare_ids + per-row status). Resumable
+# state, not source.
+scripts/output/
