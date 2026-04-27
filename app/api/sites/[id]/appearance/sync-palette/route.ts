@@ -13,6 +13,7 @@ import {
   confirmedPaletteSync,
   paletteDryRunFromContext,
 } from "@/lib/kadence-palette-sync";
+import { logger } from "@/lib/logger";
 import { preflightSitePublish } from "@/lib/site-preflight";
 
 // ---------------------------------------------------------------------------
@@ -115,6 +116,11 @@ export async function POST(
     if (ctxRes.code === "WP_REST_UNREACHABLE") {
       return envelope("WP_API_ERROR", ctxRes.message, 502, ctxRes.details);
     }
+    logger.error("appearance.sync_palette.context_internal_error", {
+      site_id: idCheck.value,
+      ctx_code: ctxRes.code,
+      ctx_message: ctxRes.message,
+    });
     return envelope("INTERNAL_ERROR", ctxRes.message, 500);
   }
 
@@ -183,6 +189,11 @@ export async function POST(
     if (result.code === "WP_WRITE_FAILED") {
       return envelope("WP_API_ERROR", result.message, 502, result.details);
     }
+    logger.error("appearance.sync_palette.confirm_internal_error", {
+      site_id: idCheck.value,
+      result_code: result.code,
+      result_message: result.message,
+    });
     return envelope("INTERNAL_ERROR", result.message, 500);
   }
 
