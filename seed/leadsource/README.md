@@ -144,6 +144,8 @@ emit the wrapper — it's a render-time concern.
 ## Inline HTML
 
 The `urgency-band.body_html` field accepts inline emphasis via a
-whitelisted set of tags: `<br>`, `<strong>`, `<em>`. Validation lives in
-`lib/content-schemas.ts` as `InlineHtmlSchema` — a reusable Zod schema
-available for any future component field that needs the same.
+whitelisted set of tags: `<br>`, `<strong>`, `<em>`. The reusable
+`InlineHtmlSchema` Zod validator that this section originally pointed
+at (`lib/content-schemas.ts`) was removed in the audit cleanup — it
+shipped as M1c but was never wired into the batch generator. Re-add
+when a content-validation pass actually consumes it.

@@ -190,7 +190,7 @@ The page-mode anchor (page 0 + 2 extra revises + frozen `site_conventions`) pres
 
 ### Post-specific quality gates
 
-`runPostQualityGates(draftHtml)` runs **after** the base gate passes. Today: meta-description length capped at `POST_META_DESCRIPTION_MAX` (300, the outer Zod bound). Hook points named in the parent plan land here as their preflight surface arrives — featured-image presence (conditional on M13-3's SEO plugin detection in `lib/seo-plugin-detection.ts`), taxonomy whitelist. Gate failure routes through the same `quality_flag` + `awaiting_review` path as a page failure; no separate state machine.
+`runPostQualityGates(draftHtml)` runs **after** the base gate passes. Today: meta-description length capped at `POST_META_DESCRIPTION_MAX` (300, the outer Zod bound). Hook points named in the parent plan land here as their preflight surface arrives — featured-image presence and taxonomy whitelist are deferred (the M13-2 SEO plugin detection lib was unwired and removed in the audit cleanup; re-add when an actual gate hooks it). Gate failure routes through the same `quality_flag` + `awaiting_review` path as a page failure; no separate state machine.
 
 ### brief_page → posts bridge (M13-4)
 

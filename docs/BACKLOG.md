@@ -6,6 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Generated Supabase types + CI schema/code drift gate (M15-8 candidate, deferred from milestone delivery audit, 2026-04-27)
+
+**Tags:** `infra`, `audit`, `m15`
+
+**What:** Generate `types/supabase.ts` from the live schema via `supabase gen types typescript --linked` and gate every CI run on a check that fails when committed lib code references a column / table the latest migration set doesn't define. Today, lib code can ship referencing a column added in a parallel PR (or never added) and the bug surfaces only at runtime — typically as a silent `INTERNAL_ERROR` 500 because PostgREST returns `42703` and the route's catch-all swallows it.
+
+**Why deferred:** This is the structural fix for a class of bugs the audit triage hit head-on. It hasn't been picked up sooner because (a) the failure mode hadn't bitten production until recently, and (b) it touches the test runner, the CI workflow, and adds a pre-commit hook — non-trivial to land cleanly. Captured as a candidate slice rather than a forced next-up because it's earned its priority by precedent, not by an imminent blocker.
+
+**Precedent:** **M13-5c version_lock incident.** PR #154 shipped `lib/kadence-palette-sync.ts` referencing `sites.version_lock` for CAS across `stampFirstDetection`, `confirmedPaletteSync`, and `rollbackPalette`. Migration 0022 (m13-5a) added two other columns to `sites` but never `version_lock`. Every CAS call returned PostgREST 42703; the route's silent `INTERNAL_ERROR` fallback hid the failure from CI logs. The bug sat on `main` for ~3 days, two audit passes, and one explicit diagnostic CI run before the cause was identified. Fix: migration 0025 + Phase 3 logger.error hardening (PR #169). The whole episode would have been a build-time TypeScript error if `types/supabase.ts` were generated from the migration set and the CAS-using lib were typed against it.
+
+**Trigger:** Pick this up when ANY of:
+- The next schema/code drift bug ships (column referenced by code but missing from migrations, or vice versa).
+- Before the next major schema migration set lands (so the next big change benefits from the gate).
+- A paying customer hits a silent `INTERNAL_ERROR` we can trace to a missing column / RLS / function.
+
+**Scope:**
+- `supabase gen types typescript --linked > types/supabase.ts` — wire into a CI step (or pre-commit hook) that runs on PR and fails if the generated file diverges from what's committed.
+- Update `lib/supabase.ts` `getServiceRoleClient()` to type the client as `SupabaseClient<Database>` so column access is type-checked. Migrate call sites incrementally — start with the high-write-safety libs (`lib/posts.ts`, `lib/sites.ts`, `lib/kadence-palette-sync.ts`, `lib/transfer-worker.ts`).
+- Decide on the freshness contract: regenerate-on-migration-merge (CI step) vs. regenerate-on-PR-open. Probably the former.
+- Document the round-trip in `docs/RUNBOOK.md`: how to regenerate locally, what to do when the gate flags a drift mid-PR.
+- Optional follow-up: the same generated types could power a route-level TS plugin that catches `.from("table").select("col")` where `col` doesn't exist on `table`. Stretch goal.
+
+**Size:** Medium-large. ~2-3 days for the core type generation + CI gate. Migrating call sites to typed clients is its own incremental slice (could span weeks of natural touch-points).
+
+---
+
 ## Pattern audit — silent INTERNAL_ERROR fallbacks across all routes (deferred from audit triage, 2026-04-27)
 
 **Tags:** `audit`, `observability`, `discipline`
