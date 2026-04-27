@@ -6,6 +6,29 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Existing CI E2E suite has been red since at least PR #149 (deferred from audit triage, 2026-04-27)
+
+**Tags:** `e2e`, `ci`, `audit`
+
+**What:** The `E2E` GitHub Actions workflow (Playwright against `supabase start` + `next dev`) has been failing on `main` continuously since commit `cbc1127` (PR #149, 2026-04-24 10:59 UTC) — predates the M13 work. Auto-merge on every PR since has fired despite this, because branch protection doesn't gate on E2E. Distinct from the unit-test failures fixed in PRs #166 / 167 / 168 — those traced to specific m13-* PRs and have known root causes; this E2E redness is older and uninvestigated.
+
+**Why deferred:** Audit triage scope was the 19 vitest failures introduced by m13 PRs. Diagnosing the E2E failure requires reading the failed Playwright report (different log shape, different fixtures, different stack), and the four unit-test clusters were the higher-leverage fix — they cover the same write-paths at the route layer. Risk is acceptable while no paying customer hits the WP-publish path.
+
+**Trigger:** Pick this up when ANY of:
+- First paying customer onboards (the unit-layer mocks stop being a sufficient safety net once a real operator hits these paths).
+- A WP-talking write-path regression escapes both unit + manual smoke.
+- Auto-merge is tightened to require the E2E check to pass (would block all future PRs until E2E is green).
+
+**Scope:**
+- Pull the most recent failed E2E artifact from CI; identify whether the failure is in setup (supabase migrations, env), in the test itself (selector drift, timing), or in a real regression.
+- If setup or test drift: fix in place.
+- If a real regression: bisect against `cbc1127` to find the offending change.
+- Document outcome in the PR; if root cause spans multiple PRs, peel into separate fixes.
+
+**Size:** Unknown — could be a 30-min fixture fix or a multi-day bisect. Read the artifact first to size.
+
+---
+
 ## Staging-environment E2E for sync confirm + actual WP publish (deferred from M13-6b, 2026-04-26)
 
 **Tags:** `e2e`, `staging`, `wp-integration`
