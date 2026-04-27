@@ -8,27 +8,35 @@ import { Input } from "@/components/ui/input";
 
 // ---------------------------------------------------------------------------
 // M12-1 — UploadBriefModal.
+// UAT-smoke-1 — adds paste-text source mode + content_type radio group.
 //
-// Entry point for the brief-driven flow. Renders a file picker + title
-// field, POSTs the multipart form to /api/briefs/upload, and on success
-// navigates to the review page. Errors are translated to plain-English
-// strings per docs/patterns/assistive-operator-flow.md.
+// Two source modes:
+//   - file: existing file picker (.txt / .md, ≤ 10 MB).
+//   - paste: textarea — operator pastes raw markdown directly. Routed
+//            through the same parser path on the server (treated as
+//            text/markdown).
+//
+// content_type: 'page' (default) | 'post'. Sent as a separate form
+// field; server defaults to 'page' if absent or unrecognised.
 // ---------------------------------------------------------------------------
 
 const ERROR_TRANSLATIONS: Record<string, string> = {
-  BRIEF_EMPTY: "Your brief is empty. Upload a file with content and try again.",
+  BRIEF_EMPTY: "Your brief is empty. Provide a non-empty file or paste content and try again.",
   BRIEF_TOO_LARGE:
     "That brief is too large. The 10 MB cap is there so the generator can keep the whole document in context.",
   BRIEF_UNSUPPORTED_TYPE:
-    "Upload a plain-text (.txt) or Markdown (.md) file. Other formats aren't supported yet.",
+    "Upload a plain-text (.txt) or Markdown (.md) file — or paste the brief instead.",
   IDEMPOTENCY_KEY_CONFLICT:
     "We've already stored a different brief with this idempotency key. Refresh and upload again without supplying a key.",
   VALIDATION_FAILED:
-    "Some required fields are missing or invalid. Check the file and try again.",
+    "Some required fields are missing or invalid. Check the form and try again.",
   FORBIDDEN: "Your account doesn't have permission to upload briefs.",
   UNAUTHORIZED: "Please sign in again.",
   NOT_FOUND: "This site no longer exists. Refresh the page and try again.",
 };
+
+type SourceMode = "file" | "paste";
+type ContentType = "page" | "post";
 
 export function UploadBriefModal({
   open,
@@ -43,6 +51,9 @@ export function UploadBriefModal({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [title, setTitle] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [pasteText, setPasteText] = useState("");
+  const [sourceMode, setSourceMode] = useState<SourceMode>("file");
+  const [contentType, setContentType] = useState<ContentType>("page");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -50,6 +61,9 @@ export function UploadBriefModal({
     if (!open) return;
     setTitle("");
     setSelectedFileName(null);
+    setPasteText("");
+    setSourceMode("file");
+    setContentType("page");
     setFormError(null);
     setSubmitting(false);
   }, [open]);
@@ -67,12 +81,19 @@ export function UploadBriefModal({
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const fileInput = fileInputRef.current;
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-      setFormError("Pick a .txt or .md file to upload.");
-      return;
+
+    if (sourceMode === "file") {
+      const fileInput = fileInputRef.current;
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        setFormError("Pick a .txt or .md file to upload, or switch to Paste text.");
+        return;
+      }
+    } else {
+      if (pasteText.trim().length === 0) {
+        setFormError("Paste the brief text into the textarea, or switch to Upload file.");
+        return;
+      }
     }
-    const file = fileInput.files[0];
 
     setSubmitting(true);
     setFormError(null);
@@ -80,8 +101,21 @@ export function UploadBriefModal({
     try {
       const form = new FormData();
       form.append("site_id", siteId);
-      form.append("title", title.trim().length > 0 ? title.trim() : file.name.replace(/\.[^.]+$/, ""));
-      form.append("file", file);
+      form.append("content_type", contentType);
+
+      let derivedDefaultTitle: string;
+      if (sourceMode === "file") {
+        const file = fileInputRef.current!.files![0]!;
+        form.append("file", file);
+        derivedDefaultTitle = file.name.replace(/\.[^.]+$/, "");
+      } else {
+        form.append("paste_text", pasteText);
+        derivedDefaultTitle = "Pasted brief";
+      }
+      form.append(
+        "title",
+        title.trim().length > 0 ? title.trim() : derivedDefaultTitle,
+      );
 
       const res = await fetch("/api/briefs/upload", {
         method: "POST",
@@ -134,38 +168,126 @@ export function UploadBriefModal({
           Upload a brief
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          A brief is a single document describing every page you want
-          generated. We&apos;ll parse it into a page list you can review
+          A brief is a single document describing every page (or post) you
+          want generated. We&apos;ll parse it into a list you can review
           before anything runs.
         </p>
 
         <div className="mt-4 space-y-4">
-          <div>
-            <label htmlFor="brief-file" className="block text-sm font-medium">
-              File
-            </label>
-            <input
-              id="brief-file"
-              ref={fileInputRef}
-              type="file"
-              accept=".txt,.md,text/plain,text/markdown"
-              className="mt-1 block w-full text-sm"
-              disabled={submitting}
-              onChange={(e) => {
-                const f = e.target.files?.[0] ?? null;
-                setSelectedFileName(f?.name ?? null);
-              }}
-              required
-            />
+          {/* Content type — page vs post. */}
+          <fieldset>
+            <legend className="block text-sm font-medium">Content type</legend>
+            <div className="mt-1 flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="content_type"
+                  value="page"
+                  checked={contentType === "page"}
+                  onChange={() => setContentType("page")}
+                  disabled={submitting}
+                />
+                Page brief
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="content_type"
+                  value="post"
+                  checked={contentType === "post"}
+                  onChange={() => setContentType("post")}
+                  disabled={submitting}
+                />
+                Post brief
+              </label>
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Plain text (.txt) or Markdown (.md). Max 10 MB.
+              Page briefs build site pages with anchor + revise cycles. Post
+              briefs build blog posts (no anchor cycle).
             </p>
-            {selectedFileName && (
-              <p className="mt-1 text-xs text-foreground">
-                Selected: <span className="font-medium">{selectedFileName}</span>
+          </fieldset>
+
+          {/* Source mode — file vs paste. */}
+          <fieldset>
+            <legend className="block text-sm font-medium">Source</legend>
+            <div className="mt-1 flex items-center gap-4">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="source_mode"
+                  value="file"
+                  checked={sourceMode === "file"}
+                  onChange={() => setSourceMode("file")}
+                  disabled={submitting}
+                />
+                Upload file
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name="source_mode"
+                  value="paste"
+                  checked={sourceMode === "paste"}
+                  onChange={() => setSourceMode("paste")}
+                  disabled={submitting}
+                />
+                Paste text
+              </label>
+            </div>
+          </fieldset>
+
+          {sourceMode === "file" ? (
+            <div>
+              <label htmlFor="brief-file" className="block text-sm font-medium">
+                File
+              </label>
+              <input
+                id="brief-file"
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.md,text/plain,text/markdown"
+                className="mt-1 block w-full text-sm"
+                disabled={submitting}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setSelectedFileName(f?.name ?? null);
+                }}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Plain text (.txt) or Markdown (.md). Max 10 MB.
               </p>
-            )}
-          </div>
+              {selectedFileName && (
+                <p className="mt-1 text-xs text-foreground">
+                  Selected: <span className="font-medium">{selectedFileName}</span>
+                </p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="brief-paste" className="block text-sm font-medium">
+                Brief content
+              </label>
+              <textarea
+                id="brief-paste"
+                value={pasteText}
+                onChange={(e) => setPasteText(e.target.value)}
+                disabled={submitting}
+                rows={12}
+                className="mt-1 block w-full rounded-md border bg-background p-2 font-mono text-sm"
+                placeholder={`# Site brief
+
+## Page 1: Home
+Description of the home page...
+
+## Page 2: About
+Description of the about page...`}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Paste markdown-shaped brief content. Use ## headings to
+                separate pages. Max 10 MB of text.
+              </p>
+            </div>
+          )}
 
           <div>
             <label htmlFor="brief-title" className="block text-sm font-medium">
@@ -176,7 +298,11 @@ export function UploadBriefModal({
               className="mt-1"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Defaults to the filename"
+              placeholder={
+                sourceMode === "file"
+                  ? "Defaults to the filename"
+                  : "Defaults to 'Pasted brief'"
+              }
               disabled={submitting}
               maxLength={200}
             />

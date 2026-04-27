@@ -242,4 +242,132 @@ describe("POST /api/briefs/upload", () => {
     const body = (await res.json()) as { error: { code: string } };
     expect(body.error.code).toBe("NOT_FOUND");
   });
+
+  // -----------------------------------------------------------------------
+  // 9. UAT-smoke-1: paste_text source mode
+  // -----------------------------------------------------------------------
+  it("paste_text path: raw markdown text → 201 with parsed status, default title 'Pasted brief'", async () => {
+    const { id: siteId } = await seedSite({ prefix: "mu9a" });
+    const form = new FormData();
+    form.append("site_id", siteId);
+    form.append("paste_text", STRUCTURAL_MD);
+    const req = new Request("http://localhost/api/briefs/upload", {
+      method: "POST",
+      body: form,
+    });
+    const res = await uploadBriefPOST(req);
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as {
+      ok: boolean;
+      data?: { brief_id: string; status: string };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.data?.status).toBe("parsed");
+
+    const svc = getServiceRoleClient();
+    const brief = await svc
+      .from("briefs")
+      .select("title, source_mime_type, content_type")
+      .eq("id", body.data!.brief_id)
+      .single();
+    expect(brief.error).toBeNull();
+    expect(brief.data?.title).toBe("Pasted brief");
+    expect(brief.data?.source_mime_type).toBe("text/markdown");
+    expect(brief.data?.content_type).toBe("page"); // default
+  });
+
+  it("paste_text path: explicit content_type='post' → brief row has content_type 'post'", async () => {
+    const { id: siteId } = await seedSite({ prefix: "mu9b" });
+    const form = new FormData();
+    form.append("site_id", siteId);
+    form.append("paste_text", STRUCTURAL_MD);
+    form.append("content_type", "post");
+    form.append("title", "My posts brief");
+    const req = new Request("http://localhost/api/briefs/upload", {
+      method: "POST",
+      body: form,
+    });
+    const res = await uploadBriefPOST(req);
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { data: { brief_id: string } };
+    const svc = getServiceRoleClient();
+    const brief = await svc
+      .from("briefs")
+      .select("title, content_type")
+      .eq("id", body.data.brief_id)
+      .single();
+    expect(brief.data?.title).toBe("My posts brief");
+    expect(brief.data?.content_type).toBe("post");
+  });
+
+  it("paste_text path: empty paste with no file → 400 VALIDATION_FAILED", async () => {
+    const { id: siteId } = await seedSite({ prefix: "mu9c" });
+    const form = new FormData();
+    form.append("site_id", siteId);
+    form.append("paste_text", "   \n\n  "); // whitespace only
+    const req = new Request("http://localhost/api/briefs/upload", {
+      method: "POST",
+      body: form,
+    });
+    const res = await uploadBriefPOST(req);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("VALIDATION_FAILED");
+  });
+
+  it("file path with content_type='post' → brief row has content_type 'post'", async () => {
+    const { id: siteId } = await seedSite({ prefix: "mu9d" });
+    const form = new FormData();
+    form.append("site_id", siteId);
+    form.append("content_type", "post");
+    form.append(
+      "file",
+      new Blob([STRUCTURAL_MD], { type: "text/markdown" }),
+      "brief.md",
+    );
+    const req = new Request("http://localhost/api/briefs/upload", {
+      method: "POST",
+      body: form,
+    });
+    const res = await uploadBriefPOST(req);
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { data: { brief_id: string } };
+    const svc = getServiceRoleClient();
+    const brief = await svc
+      .from("briefs")
+      .select("content_type")
+      .eq("id", body.data.brief_id)
+      .single();
+    expect(brief.data?.content_type).toBe("post");
+  });
+
+  it("unrecognised content_type values silently default to 'page'", async () => {
+    const { id: siteId } = await seedSite({ prefix: "mu9e" });
+    const form = new FormData();
+    form.append("site_id", siteId);
+    form.append("content_type", "garbage");
+    form.append(
+      "file",
+      new Blob([STRUCTURAL_MD], { type: "text/markdown" }),
+      "brief.md",
+    );
+    const req = new Request("http://localhost/api/briefs/upload", {
+      method: "POST",
+      body: form,
+    });
+    const res = await uploadBriefPOST(req);
+    expect(res.status).toBe(201);
+
+    const body = (await res.json()) as { data: { brief_id: string } };
+    const svc = getServiceRoleClient();
+    const brief = await svc
+      .from("briefs")
+      .select("content_type")
+      .eq("id", body.data.brief_id)
+      .single();
+    expect(brief.data?.content_type).toBe("page");
+  });
 });
