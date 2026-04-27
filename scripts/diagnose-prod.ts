@@ -236,7 +236,7 @@ async function diagnoseBriefPage(
   const pageRes = await rdb
     .from("brief_pages")
     .select(
-      "id, brief_id, ordinal, title, slug_hint, mode, page_status, current_pass_kind, current_pass_number, page_cost_cents, quality_flag, approved_at, version_lock, source_span_start, source_span_end, word_count, draft_html, critique_log, deleted_at, created_at, updated_at",
+      "id, brief_id, ordinal, title, slug_hint, mode, page_status, current_pass_kind, current_pass_number, page_cost_cents, quality_flag, approved_at, version_lock, source_span_start, source_span_end, word_count, draft_html, generated_html, critique_log, deleted_at, created_at, updated_at",
     )
     .eq("id", pageId)
     .maybeSingle();
@@ -245,15 +245,19 @@ async function diagnoseBriefPage(
   const page = pageRes.data as Record<string, unknown>;
 
   const draftHtml = (page.draft_html as string | null | undefined) ?? null;
+  const generatedHtml = (page.generated_html as string | null | undefined) ?? null;
   const critiqueLog = (page.critique_log as unknown[] | null | undefined) ?? null;
   const draftHtmlLen = draftHtml ? draftHtml.length : 0;
+  const generatedHtmlLen = generatedHtml ? generatedHtml.length : 0;
   const critiqueEntries = Array.isArray(critiqueLog) ? critiqueLog.length : 0;
 
-  // Strip the bulky fields from the JSON payload — they're rarely
-  // useful at full size in a diagnostic dump and they bloat stdout.
-  // The lengths above are the diagnostic signal.
+  // Strip the bulky HTML/critique fields from the JSON payload — they're
+  // rarely useful at full size in a diagnostic dump and they bloat stdout.
+  // The lengths + presence flags below are the diagnostic signal.
   const slim: Record<string, unknown> = { ...page };
   slim.draft_html = draftHtml === null ? null : `<${draftHtmlLen} chars>`;
+  slim.generated_html =
+    generatedHtml === null ? null : `<${generatedHtmlLen} chars>`;
   slim.critique_log = critiqueLog === null ? null : `<${critiqueEntries} entries>`;
 
   summary([
@@ -267,7 +271,8 @@ async function diagnoseBriefPage(
     `  page_cost_cents:       ${page.page_cost_cents ?? 0}`,
     `  quality_flag:          ${page.quality_flag ?? "<null>"}`,
     `  approved_at:           ${page.approved_at ?? "<null>"}`,
-    `  draft_html length:     ${draftHtmlLen}`,
+    `  has_html:              ${draftHtmlLen > 0} (draft_html ${draftHtmlLen} chars)`,
+    `  has_generated_html:    ${generatedHtml !== null} (${generatedHtmlLen} chars)`,
     `  critique_log entries:  ${critiqueEntries}`,
     `  version_lock:          ${page.version_lock}`,
     `  updated_at:            ${page.updated_at} (age ${fmtAge(ageSeconds(page.updated_at as string))})`,
@@ -279,7 +284,10 @@ async function diagnoseBriefPage(
     data: {
       page: slim,
       derived: {
+        has_html: draftHtmlLen > 0,
+        has_generated_html: generatedHtml !== null,
         draft_html_length: draftHtmlLen,
+        generated_html_length: generatedHtmlLen,
         critique_log_entries: critiqueEntries,
       },
     },
