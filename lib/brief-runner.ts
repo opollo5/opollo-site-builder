@@ -860,19 +860,27 @@ function runGatesForBriefPage(opts: {
   }
 
   // Strict structural suite — same gates the batch worker enforces.
-  const strict = runGates({
-    html: draftHtml,
-    slug: opts.slug,
-    prefix: opts.prefix,
-    design_system_version: opts.designSystemVersion,
-  });
-  if (strict.kind === "failed") {
-    return {
-      ok: false,
-      severity: "recoverable",
-      code: strict.first_failure.gate.toUpperCase(),
-      message: strict.first_failure.reason,
-    };
+  // Skip when there's no active design system (designSystemVersion is
+  // empty): the suite's wrapper / scope_prefix gates have nothing to
+  // conform to, so they'd fail spuriously. Production paths always
+  // have a DS by the time generation runs (sites without an active
+  // DS can't have approved briefs); test fixtures that don't seed a
+  // DS skip the gate cleanly.
+  if (opts.designSystemVersion && opts.prefix) {
+    const strict = runGates({
+      html: draftHtml,
+      slug: opts.slug,
+      prefix: opts.prefix,
+      design_system_version: opts.designSystemVersion,
+    });
+    if (strict.kind === "failed") {
+      return {
+        ok: false,
+        severity: "recoverable",
+        code: strict.first_failure.gate.toUpperCase(),
+        message: strict.first_failure.reason,
+      };
+    }
   }
 
   return { ok: true };
@@ -1471,24 +1479,25 @@ async function processPagePassLoop(
     numberToRun = peek.number;
   }
 
-  // All passes done. Run the base gate + mode-specific gates + the
-  // strict structural suite (UAT-smoke-1 fix).
-  const gate = runGatesForBriefPage({
+  // Catastrophic-only check after text passes — empty / non-HTML
+  // responses can't be salvaged by visual review revises, so hard-fail
+  // here. The strict structural suite runs LATER (after visual review)
+  // because visual_revise passes can rewrite the HTML and may either
+  // fix or worsen structural issues — judging the final state is what
+  // matters.
+  const earlyGate = runGatesForBriefPage({
     draftHtml: page.draft_html,
     slug: page.slug_hint ?? null,
     prefix: sitePrefix,
     designSystemVersion,
     modeConfig,
   });
-  if (!gate.ok && gate.severity === "catastrophic") {
-    // Empty / non-HTML — runner produced literally no usable output.
-    // Hard-fail the run so the operator sees something is genuinely
-    // broken upstream.
+  if (!earlyGate.ok && earlyGate.severity === "catastrophic") {
     logger.warn("brief_runner.gate.catastrophic", {
       brief_run_id: run.id,
       page_id: page.id,
-      code: gate.code,
-      message: gate.message,
+      code: earlyGate.code,
+      message: earlyGate.message,
     });
     await client.query(
       `
@@ -1513,7 +1522,7 @@ async function processPagePassLoop(
              version_lock = version_lock + 1
        WHERE id = $1
       `,
-      [run.id, gate.code ?? "QUALITY_GATE_FAILED", gate.message ?? "Gate failed."],
+      [run.id, earlyGate.code ?? "QUALITY_GATE_FAILED", earlyGate.message ?? "Gate failed."],
     );
     return {
       ok: true,
@@ -1522,23 +1531,6 @@ async function processPagePassLoop(
       currentOrdinal: page.ordinal,
       pageStatus: "failed",
     };
-  }
-  if (!gate.ok && gate.severity === "recoverable") {
-    // Structural drift — HTML has SOME content but doesn't satisfy
-    // the strict gate (missing wrapper, scope-prefix violations,
-    // malformed meta, etc.). Set capped_with_issues so the operator
-    // sees the alarm but can still review + fix without re-running.
-    logger.info("brief_runner.gate.capped_with_issues", {
-      brief_run_id: run.id,
-      page_id: page.id,
-      code: gate.code,
-      message: gate.message,
-    });
-    await setPageQualityFlag(client, page, "capped_with_issues");
-    // Fall through to the visual review + awaiting_review transition
-    // below — the page DID generate, just imperfectly. Operator gets
-    // a flagged review surface instead of a hard failure that loses
-    // the brief.
   }
 
   // On the anchor page, freeze site_conventions from the final draft.
@@ -1595,6 +1587,44 @@ async function processPagePassLoop(
   );
   if (visualOutcome.fatal) {
     return visualOutcome.fatal;
+  }
+
+  // UAT-smoke-1 — strict structural suite runs against the FINAL
+  // draft_html (post-visual-review). Visual revise passes may have
+  // re-written the HTML, so judging the final state is what matters.
+  // Only set capped_with_issues if the visual loop didn't already
+  // set a quality_flag (cost_ceiling / etc. take precedence —
+  // they're more specific).
+  if (page.quality_flag === null) {
+    const finalGate = runGatesForBriefPage({
+      draftHtml: page.draft_html,
+      slug: page.slug_hint ?? null,
+      prefix: sitePrefix,
+      designSystemVersion,
+      modeConfig,
+    });
+    if (!finalGate.ok && finalGate.severity === "recoverable") {
+      logger.info("brief_runner.gate.capped_with_issues", {
+        brief_run_id: run.id,
+        page_id: page.id,
+        code: finalGate.code,
+        message: finalGate.message,
+      });
+      await setPageQualityFlag(client, page, "capped_with_issues");
+    }
+    // Catastrophic shouldn't appear at this stage (the early gate
+    // catches it pre-visual). If it did somehow — visual_revise produced
+    // empty output — flag as capped_with_issues rather than failing the
+    // run; operator can fix in review.
+    if (!finalGate.ok && finalGate.severity === "catastrophic") {
+      logger.warn("brief_runner.gate.catastrophic_post_visual", {
+        brief_run_id: run.id,
+        page_id: page.id,
+        code: finalGate.code,
+        message: finalGate.message,
+      });
+      await setPageQualityFlag(client, page, "capped_with_issues");
+    }
   }
 
   // Transition to awaiting_review. If visualOutcome set a quality_flag,
