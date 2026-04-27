@@ -231,7 +231,17 @@ async function diagnoseBriefPage(
   rdb: ReadOnlyClient,
   args: string[],
 ): Promise<unknown> {
-  const pageId = requireUuid(args[0], "<page-id>");
+  // brief-page <page-id> [--raw]
+  // --raw emits the full draft_html + generated_html in stdout instead
+  // of the slimmed `<N chars>` placeholder. Useful for render-bug
+  // investigations (markdown fence, CSS, doctype, max_tokens truncation).
+  const positional: string[] = [];
+  let raw = false;
+  for (const a of args) {
+    if (a === "--raw") raw = true;
+    else positional.push(a);
+  }
+  const pageId = requireUuid(positional[0], "<page-id>");
 
   const pageRes = await rdb
     .from("brief_pages")
@@ -251,14 +261,24 @@ async function diagnoseBriefPage(
   const generatedHtmlLen = generatedHtml ? generatedHtml.length : 0;
   const critiqueEntries = Array.isArray(critiqueLog) ? critiqueLog.length : 0;
 
-  // Strip the bulky HTML/critique fields from the JSON payload — they're
-  // rarely useful at full size in a diagnostic dump and they bloat stdout.
-  // The lengths + presence flags below are the diagnostic signal.
+  // Head + tail previews so structural truncation (no closing </html>,
+  // markdown fence around the doc) is visible from the stderr summary
+  // without --raw.
+  const draftHead = draftHtml ? draftHtml.slice(0, 80) : null;
+  const draftTail = draftHtml ? draftHtml.slice(-80) : null;
+  const generatedHead = generatedHtml ? generatedHtml.slice(0, 80) : null;
+  const generatedTail = generatedHtml ? generatedHtml.slice(-80) : null;
+
+  // Strip / keep bulky fields based on --raw. Default slim because
+  // 10–50KB of HTML in stdout dwarfs the rest of the payload.
   const slim: Record<string, unknown> = { ...page };
-  slim.draft_html = draftHtml === null ? null : `<${draftHtmlLen} chars>`;
-  slim.generated_html =
-    generatedHtml === null ? null : `<${generatedHtmlLen} chars>`;
-  slim.critique_log = critiqueLog === null ? null : `<${critiqueEntries} entries>`;
+  if (!raw) {
+    slim.draft_html = draftHtml === null ? null : `<${draftHtmlLen} chars>`;
+    slim.generated_html =
+      generatedHtml === null ? null : `<${generatedHtmlLen} chars>`;
+    slim.critique_log =
+      critiqueLog === null ? null : `<${critiqueEntries} entries>`;
+  }
 
   summary([
     "── brief-page ──",
@@ -273,9 +293,14 @@ async function diagnoseBriefPage(
     `  approved_at:           ${page.approved_at ?? "<null>"}`,
     `  has_html:              ${draftHtmlLen > 0} (draft_html ${draftHtmlLen} chars)`,
     `  has_generated_html:    ${generatedHtml !== null} (${generatedHtmlLen} chars)`,
+    `  draft_html head:       ${draftHead === null ? "<null>" : JSON.stringify(draftHead)}`,
+    `  draft_html tail:       ${draftTail === null ? "<null>" : JSON.stringify(draftTail)}`,
+    `  generated_html head:   ${generatedHead === null ? "<null>" : JSON.stringify(generatedHead)}`,
+    `  generated_html tail:   ${generatedTail === null ? "<null>" : JSON.stringify(generatedTail)}`,
     `  critique_log entries:  ${critiqueEntries}`,
     `  version_lock:          ${page.version_lock}`,
     `  updated_at:            ${page.updated_at} (age ${fmtAge(ageSeconds(page.updated_at as string))})`,
+    raw ? "  --raw: full HTML included in stdout JSON" : "  (pass --raw to dump full HTML)",
   ]);
 
   return {
@@ -289,6 +314,8 @@ async function diagnoseBriefPage(
         draft_html_length: draftHtmlLen,
         generated_html_length: generatedHtmlLen,
         critique_log_entries: critiqueEntries,
+        draft_html_head: draftHead,
+        generated_html_head: generatedHead,
       },
     },
   };
