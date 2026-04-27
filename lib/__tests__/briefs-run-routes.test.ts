@@ -53,6 +53,14 @@ async function seedCommittedBriefWithPages(
       upload_idempotency_key: `run-routes-${unique}`,
       committed_at: new Date().toISOString(),
       committed_page_hash: "e".repeat(64),
+      // UAT-smoke-1: PR #182 flipped briefs.{text,visual}_model column
+      // defaults to Haiku 4.5. The CONFIRMATION_REQUIRED test below
+      // depends on the cost estimate tripping 50% of a 100c budget,
+      // which Haiku rates don't satisfy. Pin Sonnet here so cost
+      // calibration stays the same as when these tests were written;
+      // tests that specifically exercise Haiku semantics override.
+      text_model: "claude-sonnet-4-6",
+      visual_model: "claude-sonnet-4-6",
     })
     .select("id")
     .single();
