@@ -93,8 +93,13 @@ describe("parsePaletteTokens", () => {
   });
 
   it("preserves alpha in #RGBA and #RRGGBBAA", () => {
+    // Multi-line: parser requires one declaration per line (DECLARATION_RE
+    // anchors on `^\s*--`).
     const tokens = parsePaletteTokens(
-      `.scope { --x-a: #abcd; --x-b: #aabbccdd; }`,
+      `.scope {
+        --x-a: #abcd;
+        --x-b: #aabbccdd;
+      }`,
       "x",
     );
     expect(tokens[0]?.color).toBe("#AABBCCDD");
@@ -137,7 +142,12 @@ describe("parsePaletteTokens", () => {
   });
 
   it("handles property names without matching the prefix — label falls back to full name", () => {
-    const tokens = parsePaletteTokens(`.scope { --random-thing: #111222; }`, "ls");
+    const tokens = parsePaletteTokens(
+      `.scope {
+        --random-thing: #111222;
+      }`,
+      "ls",
+    );
     expect(tokens[0]?.label).toBe("Random thing");
   });
 
