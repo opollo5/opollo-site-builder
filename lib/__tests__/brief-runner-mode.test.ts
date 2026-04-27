@@ -186,7 +186,9 @@ function countingStub(record: { count: number; keys: string[] }): AnthropicCallF
     const kind = req.idempotency_key.split(":").at(-2) ?? "";
     let text: string;
     if (kind === "draft" || kind === "revise" || kind === "visual_revise") {
-      text = "<section><h1>Post draft</h1><p>Body copy.</p></section>";
+      // Full-document shell — structural-completeness gate (2026-04-28).
+      text =
+        '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Post draft</h1><p>Body copy.</p></section></body></html>';
     } else if (kind === "self_critique") {
       text = "- Tighten intro\n- Add CTA";
     } else {

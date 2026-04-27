@@ -127,7 +127,18 @@ export const STANDARD_TEXT_PASSES = 3; // draft, self_critique, revise
 // inserted before briefs.text_model existed (migration 0020 default
 // covers new rows).
 export const RUNNER_MODEL = "claude-sonnet-4-6";
-export const RUNNER_MAX_TOKENS = 4096;
+// Bumped 2026-04-28 from 4096 after UAT smoke 1 surfaced silent
+// truncation: every text-pass response on brief_pages.dcbdf7d5... hit
+// exactly 4096 output tokens, leaving draft_html truncated mid-CSS
+// (no <body>, no closing tags). Realistic Claude-generated landing
+// pages with full inline CSS routinely exceed 3K tokens; 4K is too
+// tight a cap. 16K gives 4x headroom while staying well under the
+// model's 64K (Sonnet/Haiku 4.x) / 32K (Opus 4.x) per-response cap.
+// The structural-completeness gate added in this same PR is the
+// belt: any future truncation that still slips through (e.g. a
+// future model with a smaller cap) gets surfaced as
+// capped_with_issues rather than rendering a black-box iframe.
+export const RUNNER_MAX_TOKENS = 16384;
 
 // Cap on brief_runs.content_summary length. Parent plan §Running-summary
 // budget says ~2k tokens; we measure in chars (4 chars ≈ 1 token average)
@@ -791,6 +802,77 @@ export function runPostQualityGates(
 }
 
 // ---------------------------------------------------------------------------
+// Structural completeness gate (UAT smoke 1, 2026-04-28)
+//
+// Catches the failure mode where a runner-generated draft_html has SOME
+// HTML tags (passes the catastrophic NOT_HTML check) but is missing
+// the universal HTML wrappers — typically because max_tokens
+// truncated the response mid-document. These checks have nothing to
+// do with the design-system contract, so they run unconditionally,
+// not gated on designSystemVersion the way the strict suite is.
+//
+// Returns null on success. Returns { code, message } on the FIRST
+// missing element so the operator gets a specific, actionable label.
+// ---------------------------------------------------------------------------
+
+export function runStructuralCompletenessCheck(
+  draftHtml: string,
+): { ok: true } | { ok: false; code: string; message: string } {
+  const checks: { label: string; code: string; pattern: RegExp }[] = [
+    {
+      label: "<!DOCTYPE html>",
+      code: "MALFORMED_HTML_MISSING_DOCTYPE",
+      pattern: /<!DOCTYPE\s+html\b/i,
+    },
+    {
+      label: "<html>",
+      code: "MALFORMED_HTML_MISSING_HTML_OPEN",
+      pattern: /<html\b/i,
+    },
+    {
+      label: "</html>",
+      code: "MALFORMED_HTML_MISSING_HTML_CLOSE",
+      pattern: /<\/html\s*>/i,
+    },
+    {
+      label: "<body>",
+      code: "MALFORMED_HTML_MISSING_BODY_OPEN",
+      pattern: /<body\b/i,
+    },
+    {
+      label: "</body>",
+      code: "MALFORMED_HTML_MISSING_BODY_CLOSE",
+      pattern: /<\/body\s*>/i,
+    },
+  ];
+
+  for (const c of checks) {
+    if (!c.pattern.test(draftHtml)) {
+      return {
+        ok: false,
+        code: c.code,
+        message: `Draft HTML is missing required ${c.label} (likely truncated mid-response).`,
+      };
+    }
+  }
+
+  // Balanced <style> / </style>. We allow zero pairs (HTML without
+  // inline style is fine), but reject N opens != M closes — that's
+  // the most common shape mid-CSS truncation produces.
+  const openStyles = (draftHtml.match(/<style\b[^>]*>/gi) ?? []).length;
+  const closeStyles = (draftHtml.match(/<\/style\s*>/gi) ?? []).length;
+  if (openStyles !== closeStyles) {
+    return {
+      ok: false,
+      code: "MALFORMED_HTML_UNBALANCED_STYLE",
+      message: `Draft HTML has ${openStyles} <style> tags but ${closeStyles} </style> closes (unbalanced — likely truncated mid-CSS).`,
+    };
+  }
+
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
 // Quality gate hook
 // ---------------------------------------------------------------------------
 
@@ -847,6 +929,27 @@ function runGatesForBriefPage(opts: {
     };
   }
 
+  // Structural-completeness gate (UAT smoke 1, 2026-04-28).
+  // Runs UNCONDITIONALLY — does NOT depend on designSystemVersion or
+  // prefix. PR #181's strict-suite bypass for sites without an active
+  // DS left a hole: a max_tokens-truncated response with no <body>
+  // and no closing tags has SOME HTML tags (passes NOT_HTML above)
+  // but renders as a blank/dark-background iframe in the operator's
+  // preview because the browser's error recovery creates an implicit
+  // empty body that picks up the inline-style background-color rule.
+  // These checks are universal HTML well-formedness — they have
+  // nothing to do with the design-system contract, so they can't be
+  // gated on it.
+  const structural = runStructuralCompletenessCheck(draftHtml);
+  if (!structural.ok) {
+    return {
+      ok: false,
+      severity: "recoverable",
+      code: structural.code,
+      message: structural.message,
+    };
+  }
+
   // Mode-specific gate (e.g. POST_META_DESCRIPTION_TOO_LONG for posts).
   // Treated as recoverable — operator can edit meta in the panel.
   const modeGate = modeConfig.runModeSpecificGates(draftHtml);
@@ -865,7 +968,9 @@ function runGatesForBriefPage(opts: {
   // conform to, so they'd fail spuriously. Production paths always
   // have a DS by the time generation runs (sites without an active
   // DS can't have approved briefs); test fixtures that don't seed a
-  // DS skip the gate cleanly.
+  // DS skip the gate cleanly. Note: the structural-completeness
+  // check above runs even when this branch is skipped — that's the
+  // universal-HTML safety net the bypass loophole no longer covers.
   if (opts.designSystemVersion && opts.prefix) {
     const strict = runGates({
       html: draftHtml,

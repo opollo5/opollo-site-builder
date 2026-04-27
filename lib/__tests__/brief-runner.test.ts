@@ -34,9 +34,13 @@ import { seedSite } from "./_helpers";
 
 type RecordedCall = Pick<AnthropicRequest, "idempotency_key" | "model">;
 
-const DRAFT_OUTPUT = "<section><h1>Hello</h1><p>Draft copy.</p></section>";
+// Full-document shells satisfy the structural-completeness gate
+// (lib/brief-runner.ts::runStructuralCompletenessCheck, 2026-04-28).
+const DRAFT_OUTPUT =
+  '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Hello</h1><p>Draft copy.</p></section></body></html>';
 const CRITIQUE_OUTPUT = "- Make the headline punchier.";
-const REVISE_OUTPUT = "<section><h1>Punchier</h1><p>Revised copy.</p></section>";
+const REVISE_OUTPUT =
+  '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Punchier</h1><p>Revised copy.</p></section></body></html>';
 
 function passTextFor(key: string): string {
   // Key shape: brief:<id>:p<ord>:<kind>:<num>

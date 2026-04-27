@@ -186,9 +186,9 @@ async function main(): Promise<number> {
       "  brief_pages: page_status='pending', draft_html=NULL, critique_log=[],",
       "               current_pass_kind=NULL, current_pass_number=0, page_cost_cents=0,",
       "               quality_flag=NULL, approved_at=NULL, version_lock+=1",
-      "  brief_runs:  status='running', finished_at=NULL, failure_code=NULL,",
+      "  brief_runs:  status='queued', finished_at=NULL, failure_code=NULL,",
       "               failure_detail=NULL, lease_expires_at=NULL, worker_id=NULL,",
-      "               version_lock+=1",
+      "               started_at=NULL, last_heartbeat_at=NULL, version_lock+=1",
       "",
     ].join("\n"),
   );
@@ -234,15 +234,26 @@ async function main(): Promise<number> {
   );
 
   // 3. Reset the run under CAS.
+  // Note 2026-04-28 (BACKLOG): set status='queued' (not 'running').
+  // The cron's find-work query filters status='queued' (exact); the
+  // reaper requires lease_expires_at IS NOT NULL AND < now(). Setting
+  // status='running' with NULL lease_expires_at lands the row in a
+  // state neither subsystem recognises — the page sits in limbo until
+  // a manual SQL re-queue. 'queued' is the canonical ready-to-be-leased
+  // shape (matches the UPDATE clause reapExpiredBriefRuns produces).
+  // Also clears started_at + last_heartbeat_at so the lease/heartbeat
+  // invariants aren't violated when the cron next leases the row.
   const runUpd = await supabase
     .from("brief_runs")
     .update({
-      status: "running",
+      status: "queued",
       finished_at: null,
       failure_code: null,
       failure_detail: null,
       lease_expires_at: null,
       worker_id: null,
+      started_at: null,
+      last_heartbeat_at: null,
       version_lock: run.version_lock + 1,
     })
     .eq("id", run.id)
