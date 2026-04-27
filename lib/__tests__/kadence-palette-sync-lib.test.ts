@@ -10,6 +10,11 @@ import { getServiceRoleClient } from "@/lib/supabase";
 
 import { seedSite } from "./_helpers";
 
+// DIAGNOSTIC (cluster-c repro, revert in fix PR): capture global.fetch at
+// file load time so the failing test can detect whether some other test
+// file leaked a mock onto globalThis.fetch.
+const originalFetchAtFileLoad = globalThis.fetch;
+
 // ---------------------------------------------------------------------------
 // M13-5c — unit tests for pure helpers + the CAS-stamping helper.
 //
@@ -104,6 +109,42 @@ describe("stampFirstDetection — CAS + idempotency", () => {
       .select("version_lock, kadence_installed_at")
       .eq("id", site.id)
       .single();
+    // DIAGNOSTIC (cluster-c repro, revert in fix PR): dump everything
+    // we'd need to distinguish schema-cache-stale, fetch-mock-leak,
+    // seedSite race, or a real lib defect.
+    // eslint-disable-next-line no-console
+    console.log(
+      "DEBUG_C1 " +
+        JSON.stringify({
+          site_id: site.id,
+          beforeError: before.error,
+          beforeData: before.data,
+          beforeStatus: before.status,
+          keysOnRow: before.data ? Object.keys(before.data) : null,
+          fetchIsMocked: globalThis.fetch !== originalFetchAtFileLoad,
+          fetchName:
+            typeof globalThis.fetch === "function"
+              ? globalThis.fetch.name
+              : typeof globalThis.fetch,
+        }),
+    );
+    // Also dump the raw row via SELECT * to compare.
+    const star = await svc
+      .from("sites")
+      .select("*")
+      .eq("id", site.id)
+      .single();
+    // eslint-disable-next-line no-console
+    console.log(
+      "DEBUG_C1_STAR " +
+        JSON.stringify({
+          starError: star.error,
+          starKeys: star.data ? Object.keys(star.data).sort() : null,
+          star_kadence_installed_at: star.data
+            ? (star.data as Record<string, unknown>).kadence_installed_at
+            : "<no data>",
+        }),
+    );
     expect(before.data?.kadence_installed_at).toBeNull();
     const origLock = before.data?.version_lock as number;
 
