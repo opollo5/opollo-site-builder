@@ -20,6 +20,7 @@ import type {
   BriefRow,
 } from "@/lib/briefs";
 import { logger } from "@/lib/logger";
+import { runGates } from "@/lib/quality-gates";
 import {
   ANCHOR_EXTRA_CYCLES,
   SiteConventionsSchema,
@@ -406,12 +407,94 @@ function extractConventionsFromRevise(text: string): SiteConventions {
   return SiteConventionsSchema.parse({});
 }
 
-// Very lightweight HTML extractor: strip fenced code blocks; return
-// the remaining text. Production prompts in M12-4+ will return
-// structured output with explicit HTML markers; M12-3 takes whatever
-// Claude produces.
-function extractDraftHtml(text: string): string {
-  return text.replace(/```[a-z]*\s*[\s\S]*?```/g, "").trim();
+// Extract HTML from Anthropic's text response, tolerating model-side
+// markdown wrapping. Sonnet 4.6's default for code-shaped output is to
+// wrap in ``` fences (often ```html); the runner's prompt explicitly
+// forbids this but the extractor is the defense-in-depth layer when
+// the model ignores the instruction.
+//
+// Behaviour:
+//
+//   1. If the text starts with an opening ``` fence, find the matching
+//      closing ``` and return the inner content. Tolerates a missing
+//      closing fence (returns everything after the opening fence).
+//      Tolerates a leading language hint (```html, ```HTML, ``` html ).
+//
+//   2. If the text contains a ```html ... ``` block (not at the start —
+//      e.g. preceded by commentary like "Here's the page:"), return
+//      the inner content of that block.
+//
+//   3. Anchor mode appends a trailing ```json fenced block (per the
+//      anchor revise instruction). When the HTML extraction has run,
+//      strip any trailing ```json ... ``` block AND any trailing bare
+//      text after the HTML payload — anchorFinalReviseRawText is
+//      preserved separately for site_conventions extraction.
+//
+//   4. As a last-resort defense for outputs with multiple fenced
+//      blocks (commentary fences plus an HTML body), strip any
+//      remaining ``` ... ``` stragglers.
+//
+//   5. Trim. Empty input returns "".
+//
+// Renamed from extractDraftHtml (M12-3) which used to STRIP fenced
+// blocks rather than UNWRAP them — that was the BLOCKER from UAT
+// smoke 1: when Sonnet wrapped the entire HTML in ```html ... ```,
+// the old function deleted the HTML and left empty draft_html, OR
+// (when the closing fence was missing) returned the unwrapped text
+// with the leading ```html still present.
+export function extractHtmlFromAnthropicText(text: string): string {
+  if (!text) return "";
+  let working = text.trim();
+  if (working === "") return "";
+
+  // Case 1 + 2: leading or embedded ```...``` block. Match the FIRST
+  // fenced block and prefer its inner content. Lazy match so we get
+  // the smallest fence that closes; fence opener can be ``` or ```html
+  // (case-insensitive language hint, optional whitespace before the
+  // first newline).
+  const fencedRe = /```[ \t]*([a-zA-Z0-9_-]*)[ \t]*\r?\n([\s\S]*?)```/;
+  const fenced = fencedRe.exec(working);
+  if (fenced) {
+    const lang = (fenced[1] ?? "").toLowerCase();
+    // If the leading fence is ```json, this is probably an anchor JSON
+    // tail or a metadata block, not the HTML itself. Skip and try the
+    // next fence.
+    if (lang === "json") {
+      const after = working.slice((fenced.index ?? 0) + fenced[0].length);
+      const next = fencedRe.exec(after);
+      if (next) {
+        working = (next[2] ?? "").trim();
+      }
+    } else {
+      working = (fenced[2] ?? "").trim();
+    }
+  } else {
+    // Case 1 fallback: opening fence with NO closing fence. If the
+    // text starts with ``` (with or without language hint), strip
+    // everything up to the first newline and return the remainder.
+    const openOnlyRe = /^```[ \t]*[a-zA-Z0-9_-]*[ \t]*\r?\n/;
+    if (openOnlyRe.test(working)) {
+      working = working.replace(openOnlyRe, "").trim();
+    }
+  }
+
+  // Case 3: trailing ```json block (anchor mode) — strip it. Also
+  // strip any straggler trailing fences.
+  working = working.replace(/```[a-zA-Z0-9_-]*\s*[\s\S]*?```\s*$/g, "").trim();
+
+  // Case 4: any other inline fenced blocks remaining (commentary or
+  // metadata interleaved with HTML) — strip out non-HTML fences while
+  // leaving HTML-language fences in place. Conservative: strip every
+  // leftover fenced block. The HTML payload should already be unwrapped
+  // by case 1/2 so any remaining fences are commentary / json / etc.
+  working = working.replace(/```[a-zA-Z0-9_-]*\s*[\s\S]*?```/g, "").trim();
+
+  // Case 5: stray bare ``` (rare — Claude sometimes emits a closing
+  // fence at the very end of the response after the HTML).
+  working = working.replace(/^```[a-zA-Z0-9_-]*\s*/, "").trim();
+  working = working.replace(/\s*```$/, "").trim();
+
+  return working;
 }
 
 function appendToContentSummary(current: string, addendum: string): string {
@@ -443,11 +526,29 @@ type PageContext = {
   // layout feedback from the multi-modal critique. Null on text-only
   // passes.
   previousVisualCritique: string | null;
+  // UAT-smoke-1 fix — system prompt's structural HTML requirements
+  // (data-ds-version wrapper attribute, scope-prefix on classes) need
+  // these values to be templated into the prompt. Null only if the
+  // site row vanished mid-run (defended by an early failure path) or
+  // no active design system is found (caller has to fall back to "1"
+  // before insert, or hard-fail if ds version is required).
+  sitePrefix: string;
+  designSystemVersion: string;
 };
 
 function systemPromptFor(ctx: PageContext): string {
+  const dsVersion = ctx.designSystemVersion ?? "";
+  const prefix = ctx.sitePrefix ?? "";
   const parts = [
     "You are a website page generator. You produce one HTML page at a time against a whole-site brief.",
+    "",
+    "OUTPUT FORMAT — STRICT REQUIREMENTS:",
+    "1. Output raw HTML only. Do NOT wrap your response in markdown code fences. No ```html, no ```, no triple-backtick fences anywhere around the HTML body.",
+    `2. Wrap the entire page in a single outermost element carrying the attribute data-ds-version="${dsVersion}" exactly. The first opening tag of your response must include this attribute.`,
+    `3. Every CSS class in your HTML must start with the site prefix "${prefix}-" (for example "${prefix}-hero", "${prefix}-cta-button"). Do NOT use Tailwind classes, framework classes, or any class outside the prefix scope.`,
+    "4. Include exactly one <h1> element on the page.",
+    "5. Include a <meta name=\"description\" content=\"...\"> element whose content is between 50 and 160 characters.",
+    "6. Every <img> must have a non-empty alt attribute. No empty hrefs (no href=\"\") and no placeholder href=\"#\".",
     ctx.brief.brand_voice
       ? `\n<brand_voice>\n${ctx.brief.brand_voice}\n</brand_voice>`
       : "",
@@ -461,7 +562,7 @@ function systemPromptFor(ctx: PageContext): string {
       ? `\n<content_summary>\n${ctx.contentSummary}\n</content_summary>`
       : "",
   ];
-  return parts.join("");
+  return parts.join("\n");
 }
 
 function userPromptForDraft(ctx: PageContext): string {
@@ -475,7 +576,7 @@ function userPromptForDraft(ctx: PageContext): string {
   return [
     `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\nOrdinal: ${ctx.page.ordinal}\n\n${ctx.page.source_text}\n</page_spec>${operatorNotesBlock}`,
     "",
-    "Produce the page's HTML. Respond with the HTML only.",
+    "Produce the page's HTML following ALL the OUTPUT FORMAT requirements in the system prompt. Output raw HTML only. Do NOT wrap in markdown code fences (no ```html, no ```). Your response must start with the opening tag of the outermost element (which carries the data-ds-version attribute) and end with its closing tag.",
   ].join("\n");
 }
 
@@ -491,7 +592,7 @@ function userPromptForSelfCritique(ctx: PageContext): string {
 
 function userPromptForRevise(ctx: PageContext, isAnchor: boolean): string {
   const anchorInstruction = isAnchor
-    ? "\n\nAfter the HTML, append a ```json fenced block containing your chosen site_conventions JSON (typographic_scale, section_rhythm, hero_pattern, cta_phrasing, color_role_map, tone_register, additional)."
+    ? "\n\nAfter the HTML's closing tag, on a new line, append a ```json fenced block containing your chosen site_conventions JSON (typographic_scale, section_rhythm, hero_pattern, cta_phrasing, color_role_map, tone_register, additional). The JSON block is the ONLY place ``` fences are allowed in your response. The HTML itself must NOT be wrapped in fences."
     : "";
   return [
     `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\n\n${ctx.page.source_text}\n</page_spec>`,
@@ -500,7 +601,7 @@ function userPromptForRevise(ctx: PageContext, isAnchor: boolean): string {
     "",
     `<critique>\n${ctx.previousCritique ?? ""}\n</critique>`,
     "",
-    `Apply the critique to the draft. Respond with the revised HTML only.${anchorInstruction}`,
+    `Apply the critique to the draft. Output raw HTML only. Do NOT wrap the HTML in markdown code fences (no \`\`\`html, no \`\`\`). Your response must start with the opening tag of the outermost element (which carries the data-ds-version attribute) and continue from there.${anchorInstruction}`,
   ].join("\n");
 }
 
@@ -512,7 +613,7 @@ function userPromptForVisualRevise(ctx: PageContext): string {
     "",
     `<visual_critique>\n${ctx.previousVisualCritique ?? ""}\n</visual_critique>`,
     "",
-    "Apply the visual critique to the draft. The critique is based on a rendered screenshot; prioritise layout, contrast, whitespace, and CTA prominence fixes. Respond with the revised HTML only.",
+    "Apply the visual critique to the draft. The critique is based on a rendered screenshot; prioritise layout, contrast, whitespace, and CTA prominence fixes. Output raw HTML only. Do NOT wrap the HTML in markdown code fences (no ```html, no ```). Your response must start with the opening tag of the outermost element (which carries the data-ds-version attribute) and continue from there.",
   ].join("\n");
 }
 
@@ -694,32 +795,86 @@ export function runPostQualityGates(
 // ---------------------------------------------------------------------------
 
 /**
- * Base gate function: ensures draft_html is non-empty and HTML-ish.
- * Mode-specific gates layer on top via MODE_CONFIGS; callers invoke
- * the base gate first, then delegate to the mode config.
+ * Brief-page gate. Two severity tiers:
+ *
+ *   - **catastrophic**: draft_html is empty or contains no HTML tags.
+ *     The runner produced literally no usable output. page_status='failed'.
+ *
+ *   - **recoverable**: structural gate failure (wrapper attribute
+ *     missing, scope-prefix violations, malformed/missing meta
+ *     description, multiple h1s, oversized HTML, etc.). The page has
+ *     SOME HTML but doesn't satisfy the strict structural contract.
+ *     page_status='awaiting_review' with quality_flag='capped_with_issues'
+ *     so the operator can review + manually fix or revise-with-note.
+ *
+ * UAT-smoke-1 fix: previously the gate accepted ANY non-empty string
+ * with at least one HTML tag — meaning a markdown-fence-wrapped
+ * response with valid HTML inside passed the gate, transitioned to
+ * awaiting_review with no flag, and the operator saw a malformed
+ * page with no alarm. The strict tier now runs the full
+ * lib/quality-gates.ts ALL_GATES suite (mirrors the batch worker's
+ * standard) so structural drift is caught and flagged.
  */
-function runGatesForBriefPage(
-  draftHtml: string | null,
-  modeConfig: RunnerModeConfig = MODE_CONFIGS.page,
-): {
+function runGatesForBriefPage(opts: {
+  draftHtml: string | null;
+  slug: string | null;
+  prefix: string;
+  designSystemVersion: string;
+  modeConfig?: RunnerModeConfig;
+}): {
   ok: boolean;
+  severity?: "catastrophic" | "recoverable";
   code?: string;
   message?: string;
 } {
+  const modeConfig = opts.modeConfig ?? MODE_CONFIGS.page;
+  const draftHtml = opts.draftHtml;
+
   if (!draftHtml || draftHtml.trim() === "") {
-    return { ok: false, code: "EMPTY_HTML", message: "Draft HTML is empty." };
+    return {
+      ok: false,
+      severity: "catastrophic",
+      code: "EMPTY_HTML",
+      message: "Draft HTML is empty.",
+    };
   }
   if (!/<[a-z][\s\S]*>/i.test(draftHtml)) {
     return {
       ok: false,
+      severity: "catastrophic",
       code: "NOT_HTML",
       message: "Draft does not contain any HTML tags.",
     };
   }
+
+  // Mode-specific gate (e.g. POST_META_DESCRIPTION_TOO_LONG for posts).
+  // Treated as recoverable — operator can edit meta in the panel.
   const modeGate = modeConfig.runModeSpecificGates(draftHtml);
   if (modeGate) {
-    return { ok: false, code: modeGate.code, message: modeGate.message };
+    return {
+      ok: false,
+      severity: "recoverable",
+      code: modeGate.code,
+      message: modeGate.message,
+    };
   }
+
+  // Strict structural suite — same gates the batch worker enforces.
+  const strict = runGates({
+    html: draftHtml,
+    slug: opts.slug,
+    prefix: opts.prefix,
+    design_system_version: opts.designSystemVersion,
+  });
+  if (strict.kind === "failed") {
+    return {
+      ok: false,
+      severity: "recoverable",
+      code: strict.first_failure.gate.toUpperCase(),
+      message: strict.first_failure.reason,
+    };
+  }
+
   return { ok: true };
 }
 
@@ -1082,6 +1237,26 @@ async function processPagePassLoop(
   // Load site_conventions if present (pages 1..N read frozen conventions).
   const conventionsRow = await getSiteConventions(brief.id);
 
+  // UAT-smoke-1 fix — fetch site prefix + active DS version once per
+  // page-tick. Templated into the system prompt's structural HTML
+  // requirements (data-ds-version wrapper, scope-prefix on classes)
+  // and used by the strict gate after passes exhaust.
+  const siteRowRes = await client.query<{ prefix: string }>(
+    `SELECT prefix FROM sites WHERE id = $1`,
+    [brief.site_id],
+  );
+  const sitePrefix = siteRowRes.rows[0]?.prefix ?? "";
+  const dsRowRes = await client.query<{ version: number }>(
+    `SELECT version FROM design_systems
+      WHERE site_id = $1 AND status = 'active'
+      LIMIT 1`,
+    [brief.site_id],
+  );
+  const designSystemVersion =
+    dsRowRes.rows[0]?.version != null
+      ? String(dsRowRes.rows[0].version)
+      : "";
+
   // Resume pointer.
   let kindToRun: TextSequencePassKind | null = null;
   let numberToRun = 0;
@@ -1110,7 +1285,7 @@ async function processPagePassLoop(
     (page.critique_log as BriefPageCritiqueEntry[]).find(
       (c) => c.pass_kind === "self_critique",
     )?.output as string | null ?? null;
-  // Raw Anthropic text of the anchor's final revise pass. extractDraftHtml
+  // Raw Anthropic text of the anchor's final revise pass. extractHtmlFromAnthropicText
   // strips fenced code blocks out of draft_html (it shouldn't be rendered
   // to WordPress with a stray ```json block), so we stash the raw text
   // here and feed it to extractConventionsFromRevise after the loop.
@@ -1138,6 +1313,8 @@ async function processPagePassLoop(
       previousDraft,
       previousCritique,
       previousVisualCritique: null,
+      sitePrefix,
+      designSystemVersion,
     };
 
     const isAnchorFinalPass =
@@ -1223,7 +1400,7 @@ async function processPagePassLoop(
         output:
           kindToRun === "self_critique"
             ? passText
-            : extractDraftHtml(passText),
+            : extractHtmlFromAnthropicText(passText),
         usage: {
           input_tokens: response.usage.input_tokens,
           output_tokens: response.usage.output_tokens,
@@ -1236,7 +1413,7 @@ async function processPagePassLoop(
     ];
 
     const newDraftHtml =
-      kindToRun === "self_critique" ? page.draft_html : extractDraftHtml(passText);
+      kindToRun === "self_critique" ? page.draft_html : extractHtmlFromAnthropicText(passText);
 
     const peek = nextPassAfter(kindToRun, numberToRun, isAnchor);
     const upd = await client.query(
@@ -1294,10 +1471,25 @@ async function processPagePassLoop(
     numberToRun = peek.number;
   }
 
-  // All passes done. Run the base gate + mode-specific gates from the
-  // dispatch table (M13-3).
-  const gate = runGatesForBriefPage(page.draft_html, modeConfig);
-  if (!gate.ok) {
+  // All passes done. Run the base gate + mode-specific gates + the
+  // strict structural suite (UAT-smoke-1 fix).
+  const gate = runGatesForBriefPage({
+    draftHtml: page.draft_html,
+    slug: page.slug_hint ?? null,
+    prefix: sitePrefix,
+    designSystemVersion,
+    modeConfig,
+  });
+  if (!gate.ok && gate.severity === "catastrophic") {
+    // Empty / non-HTML — runner produced literally no usable output.
+    // Hard-fail the run so the operator sees something is genuinely
+    // broken upstream.
+    logger.warn("brief_runner.gate.catastrophic", {
+      brief_run_id: run.id,
+      page_id: page.id,
+      code: gate.code,
+      message: gate.message,
+    });
     await client.query(
       `
       UPDATE brief_pages
@@ -1331,11 +1523,28 @@ async function processPagePassLoop(
       pageStatus: "failed",
     };
   }
+  if (!gate.ok && gate.severity === "recoverable") {
+    // Structural drift — HTML has SOME content but doesn't satisfy
+    // the strict gate (missing wrapper, scope-prefix violations,
+    // malformed meta, etc.). Set capped_with_issues so the operator
+    // sees the alarm but can still review + fix without re-running.
+    logger.info("brief_runner.gate.capped_with_issues", {
+      brief_run_id: run.id,
+      page_id: page.id,
+      code: gate.code,
+      message: gate.message,
+    });
+    await setPageQualityFlag(client, page, "capped_with_issues");
+    // Fall through to the visual review + awaiting_review transition
+    // below — the page DID generate, just imperfectly. Operator gets
+    // a flagged review surface instead of a hard failure that loses
+    // the brief.
+  }
 
   // On the anchor page, freeze site_conventions from the final draft.
   // Use the captured raw anthropic text (which still contains the
   // ```json fenced block) — page.draft_html has already had code blocks
-  // stripped by extractDraftHtml.
+  // stripped by extractHtmlFromAnthropicText.
   if (isAnchor) {
     const conventions = extractConventionsFromRevise(
       anchorFinalReviseRawText ?? page.draft_html ?? "",
@@ -1381,6 +1590,8 @@ async function processPagePassLoop(
     page,
     call,
     visualRender,
+    sitePrefix,
+    designSystemVersion,
   );
   if (visualOutcome.fatal) {
     return visualOutcome.fatal;
@@ -1468,6 +1679,8 @@ async function runVisualReviewLoop(
   page: BriefPageRow,
   call: AnthropicCallFn,
   visualRender: VisualRenderFn,
+  sitePrefix: string,
+  designSystemVersion: string,
 ): Promise<VisualReviewOutcome> {
   // Resolve the per-page cost ceiling. Tenant override wins; else the
   // lib default from lib/visual-review.
@@ -1648,6 +1861,8 @@ async function runVisualReviewLoop(
           previousDraft: page.draft_html,
           previousCritique: null,
           previousVisualCritique: critiqueText,
+          sitePrefix,
+          designSystemVersion,
         },
         passKind: "visual_revise",
         passNumber: i,
@@ -1667,7 +1882,7 @@ async function runVisualReviewLoop(
     }
 
     const reviseCost = computeCostCents(brief.text_model, reviseResponse.usage).cents;
-    const newDraftHtml = extractDraftHtml(revisePassText);
+    const newDraftHtml = extractHtmlFromAnthropicText(revisePassText);
     const updatedLog2: BriefPageCritiqueEntry[] = [
       ...(page.critique_log as BriefPageCritiqueEntry[]),
       {
