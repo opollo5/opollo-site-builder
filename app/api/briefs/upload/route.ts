@@ -19,8 +19,14 @@ import {
 //
 // multipart/form-data with fields:
 //   file             — the brief document (text/plain | text/markdown; ≤ 10 MB).
+//                      EITHER file OR paste_text is required.
+//   paste_text       — UAT-smoke-1: raw markdown text from a textarea.
+//                      When present (and non-empty), used in place of
+//                      `file`. Treated as text/markdown.
 //   site_id          — UUID string.
 //   title            — optional operator-facing label.
+//   content_type     — UAT-smoke-1: 'page' or 'post'. Defaults to 'page'
+//                      if absent or unrecognised.
 //   idempotency_key  — optional client-supplied key.
 //
 // Returns the review URL on success. Parse runs synchronously in the
@@ -67,60 +73,106 @@ export async function POST(req: Request): Promise<NextResponse> {
   const siteId = form.get("site_id");
   const titleRaw = form.get("title");
   const file = form.get("file");
+  const pasteTextRaw = form.get("paste_text");
+  const contentTypeRaw = form.get("content_type");
   const clientIdempotencyKeyRaw = form.get("idempotency_key");
 
   if (typeof siteId !== "string" || !UUID_RE.test(siteId)) {
     return validationError("site_id must be a UUID.");
   }
-  if (!(file instanceof File)) {
-    return validationError("Missing 'file' field; expected a File object.");
+
+  // Resolve content_type: explicit 'post' or default to 'page'. Anything
+  // else (including absent / blank / unrecognised) lands as 'page'.
+  const contentType: "page" | "post" =
+    typeof contentTypeRaw === "string" && contentTypeRaw === "post"
+      ? "post"
+      : "page";
+
+  // Source resolution: paste_text wins if non-empty, else file.
+  const hasPaste =
+    typeof pasteTextRaw === "string" && pasteTextRaw.trim().length > 0;
+  const hasFile = file instanceof File && file.size > 0;
+  if (!hasPaste && !hasFile) {
+    return validationError(
+      "Provide either a 'file' (multipart) or non-empty 'paste_text' field.",
+    );
   }
-  if (file.size === 0) {
+
+  let bytes: Uint8Array;
+  let mimeType: BriefMimeType;
+  let sourceLabel: string;
+  if (hasPaste) {
+    const text = pasteTextRaw as string;
+    bytes = new TextEncoder().encode(text);
+    mimeType = "text/markdown" as BriefMimeType;
+    sourceLabel = "Pasted brief";
+  } else {
+    const f = file as File;
+    if (f.size > BRIEF_MAX_BYTES) {
+      const body: ApiResponse<never> = {
+        ok: false,
+        error: {
+          code: "BRIEF_TOO_LARGE",
+          message: `Brief exceeds the ${BRIEF_MAX_BYTES}-byte cap.`,
+          retryable: false,
+          suggested_action: "Upload a smaller file.",
+        },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(body, { status: 413 });
+    }
+    const detected = (f.type || "text/plain") as BriefMimeType;
+    if (!BRIEF_ALLOWED_MIME_TYPES.includes(detected)) {
+      const body: ApiResponse<never> = {
+        ok: false,
+        error: {
+          code: "BRIEF_UNSUPPORTED_TYPE",
+          message: `Unsupported MIME type: ${f.type || "unknown"}.`,
+          retryable: false,
+          suggested_action: "Upload a text/plain or text/markdown file.",
+        },
+        timestamp: new Date().toISOString(),
+      };
+      return NextResponse.json(body, { status: 415 });
+    }
+    bytes = new Uint8Array(await f.arrayBuffer());
+    mimeType = detected;
+    sourceLabel = f.name.replace(/\.[^.]+$/, "");
+  }
+
+  // Size guard for both file and paste paths (file path is checked
+  // again above for the structured 413; paste path lands here).
+  if (bytes.byteLength === 0) {
     const body: ApiResponse<never> = {
       ok: false,
       error: {
         code: "BRIEF_EMPTY",
-        message: "Brief file is empty.",
+        message: "Brief content is empty.",
         retryable: false,
-        suggested_action: "Upload a non-empty file and try again.",
+        suggested_action: "Provide a non-empty file or paste content.",
       },
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(body, { status: 400 });
   }
-  if (file.size > BRIEF_MAX_BYTES) {
+  if (bytes.byteLength > BRIEF_MAX_BYTES) {
     const body: ApiResponse<never> = {
       ok: false,
       error: {
         code: "BRIEF_TOO_LARGE",
         message: `Brief exceeds the ${BRIEF_MAX_BYTES}-byte cap.`,
         retryable: false,
-        suggested_action: "Upload a smaller file.",
+        suggested_action: "Trim the brief and try again.",
       },
       timestamp: new Date().toISOString(),
     };
     return NextResponse.json(body, { status: 413 });
   }
 
-  const mimeType = (file.type || "text/plain") as BriefMimeType;
-  if (!BRIEF_ALLOWED_MIME_TYPES.includes(mimeType)) {
-    const body: ApiResponse<never> = {
-      ok: false,
-      error: {
-        code: "BRIEF_UNSUPPORTED_TYPE",
-        message: `Unsupported MIME type: ${file.type || "unknown"}.`,
-        retryable: false,
-        suggested_action: "Upload a text/plain or text/markdown file.",
-      },
-      timestamp: new Date().toISOString(),
-    };
-    return NextResponse.json(body, { status: 415 });
-  }
-
   const defaultTitle =
     typeof titleRaw === "string" && titleRaw.trim().length > 0
       ? titleRaw.trim()
-      : file.name.replace(/\.[^.]+$/, "");
+      : sourceLabel;
 
   let clientIdempotencyKey: string | undefined;
   if (typeof clientIdempotencyKeyRaw === "string" && clientIdempotencyKeyRaw.trim().length > 0) {
@@ -131,8 +183,6 @@ export async function POST(req: Request): Promise<NextResponse> {
     clientIdempotencyKey = trimmed;
   }
 
-  const bytes = new Uint8Array(await file.arrayBuffer());
-
   const result = await uploadBrief({
     siteId,
     title: defaultTitle,
@@ -140,6 +190,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     mimeType,
     uploadedBy: gate.user?.id ?? null,
     clientIdempotencyKey,
+    contentType,
   });
 
   if (!result.ok) {

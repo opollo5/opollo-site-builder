@@ -160,6 +160,10 @@ export type UploadBriefInput = {
   mimeType: BriefMimeType;
   uploadedBy: string | null;
   clientIdempotencyKey?: string;
+  // UAT-smoke-1 — operator selects content_type at upload time.
+  // Defaults to 'page' (matches the briefs.content_type column default
+  // from migration 0021).
+  contentType?: "page" | "post";
 };
 
 export type UploadBriefData = {
@@ -335,21 +339,25 @@ async function uploadBriefImpl(
 
   // 4. INSERT briefs row with status='parsing'.
   const defaultTitle = input.title.length > 0 ? input.title.slice(0, 200) : "Untitled brief";
+  const insertRow: Record<string, unknown> = {
+    id: briefId,
+    site_id: input.siteId,
+    title: defaultTitle,
+    status: "parsing",
+    source_storage_path: storagePath,
+    source_mime_type: input.mimeType,
+    source_size_bytes: input.bytes.byteLength,
+    source_sha256: fileSha256,
+    upload_idempotency_key: idempotencyKey,
+    created_by: input.uploadedBy,
+    updated_by: input.uploadedBy,
+  };
+  if (input.contentType) {
+    insertRow.content_type = input.contentType;
+  }
   const insert = await svc
     .from("briefs")
-    .insert({
-      id: briefId,
-      site_id: input.siteId,
-      title: defaultTitle,
-      status: "parsing",
-      source_storage_path: storagePath,
-      source_mime_type: input.mimeType,
-      source_size_bytes: input.bytes.byteLength,
-      source_sha256: fileSha256,
-      upload_idempotency_key: idempotencyKey,
-      created_by: input.uploadedBy,
-      updated_by: input.uploadedBy,
-    })
+    .insert(insertRow)
     .select("*")
     .single();
 
