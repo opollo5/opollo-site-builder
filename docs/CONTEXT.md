@@ -38,7 +38,6 @@ M13 net-new:
 - content_type: "page" | "post" axis
 - WordPress REST for posts
 - lib/site-preflight.ts (capability check)
-- lib/seo-plugin-detection.ts
 - lib/error-translations.ts
 - Kadence install + DS → globals mapping
 - Appearance panel in admin

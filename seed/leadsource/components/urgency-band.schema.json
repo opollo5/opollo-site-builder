@@ -18,11 +18,11 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 800,
-        "description": "Plain text with optional inline emphasis. Only <br>, <strong>, and <em> tags are allowed. All other HTML will be rejected by the InlineHtmlSchema Zod validator in lib/content-schemas.ts."
+        "description": "Plain text with optional inline emphasis. Only <br>, <strong>, and <em> tags are allowed. The InlineHtmlSchema Zod validator that originally enforced this lived in lib/content-schemas.ts and was removed in the audit cleanup (shipped as M1c but never wired). Whitelist enforcement is operator-trust today; re-add when a content-validation pass consumes it."
       }
     }
   },
   "image_slots": null,
-  "usage_notes": "Amber-background 2-col band. Left cell: short amber label + big heading. Right cell: a paragraph with inline emphasis. This is the only component in the LeadSource design system that accepts inline HTML in body copy — use the reusable InlineHtmlSchema for any future field that needs the same.",
+  "usage_notes": "Amber-background 2-col band. Left cell: short amber label + big heading. Right cell: a paragraph with inline emphasis. This is the only component in the LeadSource design system that accepts inline HTML in body copy.",
   "preview_html": null
 }

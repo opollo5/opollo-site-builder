@@ -523,28 +523,6 @@ Log the provisioning date + vendor account IDs somewhere persistent; each rotati
 
 ---
 
-## seo-plugin-missing — post publish blocked because brief declared SEO meta
-
-**Symptom:** post publish gated by a quality-gate failure naming a missing SEO plugin. Operator sees a translated banner: "This post's brief declared SEO meta but no compatible plugin (Yoast / RankMath / SEOPress) is detected on the site."
-
-**Impact:** the specific post can't publish. Other posts on the same site still publish if their briefs don't declare SEO meta.
-
-**Diagnose:**
-1. `lib/seo-plugin-detection.ts` fingerprints the active SEO plugin from `/wp-json/` namespace listing. If the post's brief declared `yoast.*` / `rank_math.*` / `seo_press.*` meta keys, M13-3's post quality gate enforces presence.
-2. Hit `/wp-json/` and look for `wp/v2/types/post` schema fields — Yoast, RankMath, and SEOPress all expose meta fields under a recognizable namespace (`yoast_head_json`, `rank_math_meta`, `_seopress_*`).
-3. Check the brief's source for declared SEO meta — currently exposed via `briefs.brand_voice` / `briefs.design_direction` content; structured SEO meta declaration is BACKLOG.
-
-**Mitigate:**
-- Operator can publish without the SEO meta by editing the brief to remove the SEO directive, then re-running. The post will publish without those meta fields.
-
-**Resolve:**
-- Operator installs one of: Yoast SEO, Rank Math, SEOPress (Steven's preference order: RankMath → Yoast → SEOPress, all free-tier).
-- Operator activates the plugin in WP Admin → Plugins.
-- Re-run preflight from the post detail page; gate should clear.
-- Long term: brief authors should declare which SEO plugin they're targeting upfront so Opollo can preflight at brief-commit time, not publish time. BACKLOG.
-
----
-
 ## kadence-customizer-drift — palette sync hits WP_STATE_DRIFTED
 
 **Symptom:** Appearance panel sync confirm hits 409 `WP_STATE_DRIFTED`. Banner: "WordPress changed between your preview and confirm. We've refreshed the diff — review again before syncing." Diff table shows different "current" colors than the operator saw 30 seconds ago.
