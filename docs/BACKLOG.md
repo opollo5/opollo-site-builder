@@ -6,32 +6,6 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## scripts/recover-stuck-brief-page.ts produces a runner-impossible state (caught during UAT smoke 1, 2026-04-28)
-
-**Tags:** `bug`, `ops-tooling`, `recovery-script`
-
-**What:** `scripts/recover-stuck-brief-page.ts` sets `brief_runs.status = 'running'` while clearing `lease_expires_at`, `worker_id`, `started_at`, and `last_heartbeat_at` to NULL. That combination is **impossible** for the runner itself to produce — `leaseBriefRun` (`lib/brief-runner.ts:281-298`) atomically sets `status='running'` AND `lease_expires_at IS NOT NULL` AND `worker_id IS NOT NULL` together. The recovery output is a state that neither subsystem matches:
-
-- **Cron find-work** (`app/api/cron/process-brief-runner/route.ts:85-93`) filters `status = 'queued'` — exact equality, not `IN`. Skips the row.
-- **Reaper** (`lib/brief-runner.ts:354-358`) requires `lease_expires_at IS NOT NULL AND lease_expires_at < now()`. NULL doesn't qualify. Skips the row.
-
-Result: the recovered run sits in limbo forever; cron returns `nothing_queued` even though the row is "ready" by intent.
-
-Caught during UAT smoke 1 recovery for brief_run `053d9a25-f315-4174-8fde-7638edc78514` (page `dcbdf7d5-b867-443b-afdf-f60a28f968aa`). Workaround was a manual SQL re-queue. Diagnosis lives in the conversation log; see also the cron route comment + the `leaseBriefRun` invariant.
-
-**Why deferred:** the UAT BLOCKER (markdown code fence not stripped) takes priority. The recovery-script bug only fires when an operator explicitly runs the script, and the workaround is a ~6-line SQL update that's now well-documented from the diagnosis.
-
-**Trigger:** before the next time anyone other than Steven runs `recover-stuck-brief-page.ts`, OR as part of a "ops-tooling cleanup" slice in M16. Whichever comes first.
-
-**Scope:**
-- Change the recovery script to set `status = 'queued'` (not `'running'`) while still clearing the lease fields. That's the canonical "ready to be re-leased" shape — same UPDATE clause `reapExpiredBriefRuns` produces (`lib/brief-runner.ts:346-351`).
-- Add a unit test covering: feed it a stuck `'running'` row → assert post-state `status='queued'`, `worker_id IS NULL`, `lease_expires_at IS NULL`, `version_lock` incremented.
-- Optional defensive ratchet (separate PR): extend the reaper to also catch the orphan shape `(status='running' AND lease_expires_at IS NULL AND worker_id IS NULL)` so a future recovery-script bug surfaces as auto-recovery rather than a stuck queue. Trade-off: hides recovery mistakes that should ideally surface for diagnosis. Recommend skipping unless the orphan-shape recovery becomes routine.
-- Consider adding a `--dry-run` flag to print the post-state before applying — would have caught this on first run.
-
-**Size:** Small (~30 min for the script fix + test; another ~30 min if the defensive reaper change ships in a paired PR).
-
----
 
 ## Brief upload UX — paste raw text option (deferred from UAT smoke 1, 2026-04-28)
 

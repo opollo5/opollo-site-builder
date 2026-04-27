@@ -536,6 +536,21 @@ function PagePreview({
   onRevise: () => void;
 }) {
   const html = page.generated_html ?? page.draft_html ?? "";
+  // Belt-and-suspenders: even after the runner's structural gate (PR
+  // #188), an operator-edited or legacy row could still hold a
+  // truncated doc. Surface a banner above the iframe so a black/blank
+  // preview is never silent. Trigger if the doc claims completeness
+  // (<!DOCTYPE / <html opener) AND is missing closing </body> or
+  // </html>. Bare fragments — which never claim to be complete docs —
+  // skip the check.
+  const looksTruncated = useMemo(() => {
+    if (!html) return false;
+    const trimmed = html.trimEnd();
+    const claimsCompleteness =
+      /<!DOCTYPE\s+html\b/i.test(trimmed) || /<html[\s>]/i.test(trimmed);
+    if (!claimsCompleteness) return false;
+    return !/<\/body\s*>/i.test(trimmed) || !/<\/html\s*>$/i.test(trimmed);
+  }, [html]);
   const lastVisualCritique = useMemo(() => {
     const log = (page.critique_log ?? []) as BriefPageCritiqueEntry[];
     return [...log]
@@ -550,6 +565,24 @@ function PagePreview({
           <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
             Show rendered preview
           </summary>
+          {looksTruncated && (
+            <div
+              role="alert"
+              className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+            >
+              <p className="font-medium">
+                This page&apos;s HTML appears truncated.
+              </p>
+              <p className="mt-1">
+                The doc is missing a closing{" "}
+                <code className="font-mono">&lt;/body&gt;</code> or{" "}
+                <code className="font-mono">&lt;/html&gt;</code> tag, so the
+                preview below may render as a blank or solid-coloured frame.
+                Review the source carefully or click <em>Revise</em> to
+                regenerate.
+              </p>
+            </div>
+          )}
           <iframe
             // Sandbox prevents scripts, plugins, forms, popups from the
             // preview. draft_html is Claude-generated and already passes
