@@ -38,7 +38,8 @@ function makeSilentStub(): AnthropicCallFn {
       content: [
         {
           type: "text",
-          text: "<section><h1>Quiet</h1><p>Generated.</p></section>",
+          text:
+            '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Quiet</h1><p>Generated.</p></section></body></html>',
         },
       ],
       stop_reason: "end_turn",

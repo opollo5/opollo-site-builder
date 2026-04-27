@@ -30,7 +30,8 @@ import { seedSite } from "./_helpers";
 // valid SiteConventionsSchema and persists a row with frozen_at set.
 // ---------------------------------------------------------------------------
 
-const ANCHOR_REVISE_OUTPUT = `<section><h1>Anchor</h1><p>Final revision.</p></section>
+// Full-document shell — structural-completeness gate (2026-04-28).
+const ANCHOR_REVISE_OUTPUT = `<!DOCTYPE html><html lang="en"><head><title>Anchor</title></head><body><section><h1>Anchor</h1><p>Final revision.</p></section></body></html>
 
 \`\`\`json
 {
@@ -47,14 +48,16 @@ function makeAnchorStub(record: { last: string | null }): AnthropicCallFn {
     counter += 1;
     let text: string;
     if (req.idempotency_key.includes(":draft:")) {
-      text = "<section><h1>Draft</h1><p>First draft.</p></section>";
+      text =
+        '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Draft</h1><p>First draft.</p></section></body></html>';
     } else if (req.idempotency_key.includes(":self_critique:")) {
       text = "- Tighten headline\n- Add CTA";
     } else if (req.idempotency_key.endsWith(":revise:2")) {
       // Final anchor revise — emit the json fenced block.
       text = ANCHOR_REVISE_OUTPUT;
     } else {
-      text = "<section><h1>Revised</h1><p>Intermediate revise.</p></section>";
+      text =
+        '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Revised</h1><p>Intermediate revise.</p></section></body></html>';
     }
     record.last = req.idempotency_key;
     const resp: AnthropicResponse = {
