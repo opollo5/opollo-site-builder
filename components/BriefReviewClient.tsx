@@ -7,32 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { BriefPageRow, BriefRow } from "@/lib/briefs";
-
-// Operator-facing labels for the Anthropic model allowlist. Kept
-// inline (not imported from lib/anthropic-pricing) because the display
-// copy is UI concern, not a data contract. If a new model is added to
-// the allowlist, this table gets a new row in the same PR.
-const MODEL_OPTIONS: Array<{
-  value: string;
-  label: string;
-  hint: string;
-}> = [
-  {
-    value: "claude-haiku-4-5-20251001",
-    label: "Haiku (fastest, cheapest)",
-    hint: "Best for simple copy or straightforward layouts. ~5-10× cheaper than Opus.",
-  },
-  {
-    value: "claude-sonnet-4-6",
-    label: "Sonnet (balanced — default)",
-    hint: "Default for both text and visual. Good quality, moderate cost.",
-  },
-  {
-    value: "claude-opus-4-7",
-    label: "Opus (highest quality, most expensive)",
-    hint: "Reserve for complex-judgment briefs. ~5× the cost of Sonnet.",
-  },
-];
+import { DEFAULT_MODEL_ID, MODEL_OPTIONS } from "@/lib/anthropic-models";
 
 // ---------------------------------------------------------------------------
 // M12-1 — client component for the brief-review page.
@@ -135,14 +110,14 @@ export function BriefReviewClient({
     brief.design_direction ?? "",
   );
   // M12-5 — operator picks model tiers at commit time. Default to the
-  // value the server committed the brief with; fall back to Sonnet when
-  // a pre-M12-4 row somehow has no value (defensive — migration 0020
-  // fills everything with 'claude-sonnet-4-6').
+  // value the server committed the brief with; fall back to the cheap
+  // default (Haiku) when a row has no value, so dev/UAT runs don't
+  // accidentally spend Sonnet/Opus money. Operator opts up explicitly.
   const [textModel, setTextModel] = useState<string>(
-    brief.text_model ?? "claude-sonnet-4-6",
+    brief.text_model ?? DEFAULT_MODEL_ID,
   );
   const [visualModel, setVisualModel] = useState<string>(
-    brief.visual_model ?? "claude-sonnet-4-6",
+    brief.visual_model ?? DEFAULT_MODEL_ID,
   );
 
   const isReadOnly = brief.status === "committed";

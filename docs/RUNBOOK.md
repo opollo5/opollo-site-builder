@@ -622,6 +622,62 @@ Keep the Quick-reference table in sync.
 
 ---
 
+## Anthropic releases a new model — adding it to the operator picker
+
+**Symptom:** A new Claude model family ships (e.g. Sonnet 4.7) and operators want to use it on briefs. Currently the model isn't in the picker on the brief review screen, and the runner refuses to call it (rejected by the `ANTHROPIC_MODEL_ALLOWLIST` validator with `INVALID_MODEL`).
+
+**Impact:** None on existing briefs. Operators can't opt INTO the new model until you onboard it.
+
+**Cadence:** Roughly quarterly. Don't onboard a new model the day it ships — let pricing settle and check the rate against `lib/anthropic-pricing.ts:PRICING_TABLE` for surprises.
+
+**Procedure (single PR, three files):**
+
+1. **`lib/anthropic-pricing.ts:PRICING_TABLE`** — add the new entry. Rates from Anthropic's pricing page, in **micro-cents per token** (1 cent = 1000 micro-cents). Example for a hypothetical Sonnet 4.7 at `$1.50` input / `$7.50` output / `$1.875` cache write / `$0.15` cache read per 1M tokens:
+   ```ts
+   "claude-sonnet-4-7": {
+     input: 1.5,           // 1500 cents per 1M = 1_500_000 micro-cents per 1M = 1.5 micro-cents per token
+     output: 7.5,
+     cache_write: 1.875,
+     cache_read: 0.15,
+   },
+   ```
+   Don't mutate existing entries; the `PRICING_VERSION` string at the top of the file pins which table priced any historical run.
+
+2. **`lib/anthropic-models.ts:MODEL_OPTIONS`** — add an operator-facing entry. Pick the right `tier` (haiku / sonnet / opus) based on price relative to the existing tiers. Order in the array drives the picker's display order. Example:
+   ```ts
+   {
+     value: "claude-sonnet-4-7",
+     label: "Sonnet 4.7 (balanced)",
+     hint: "Newer Sonnet generation. Use when Haiku reads thin and Opus is overkill.",
+     tier: "sonnet",
+   },
+   ```
+   The module's load-time check will throw if this id isn't in `ANTHROPIC_MODEL_ALLOWLIST` (which is derived from `PRICING_TABLE` keys), so step 1 must be done first.
+
+3. **`supabase/migrations/00NN_models_<name>.sql`** — extend the `briefs.text_model` and `briefs.visual_model` `CHECK` constraints to accept the new id. Pattern:
+   ```sql
+   ALTER TABLE briefs
+     DROP CONSTRAINT briefs_text_model_check,
+     ADD CONSTRAINT briefs_text_model_check CHECK (text_model IN (
+       'claude-opus-4-7',
+       'claude-sonnet-4-6',
+       'claude-sonnet-4-7',          -- NEW
+       'claude-haiku-4-5-20251001'
+     ));
+   -- repeat for briefs_visual_model_check.
+   ```
+
+**Verify:**
+- `npm run lint` + `npm run typecheck` clean.
+- `npm test -- briefs-upload-route` — model picker round-trips through commit + INSERT without DB CHECK rejection.
+- After deploy: navigate to a brief review page, confirm the new option appears in the picker, and that committing with the new id round-trips through the runner without `INVALID_MODEL`.
+
+**Don't forget:**
+- BACKLOG entry "Model list freshness" — update with the date you last ran this procedure so the next reviewer can see the most-recent cadence point.
+- If the new model deprecates an existing one (Anthropic announces sunset), keep the old id in the allowlist + CHECK until the deprecation date passes — existing briefs reference it.
+
+---
+
 ## CI/CD — Required checks and branch protection
 
 **E2E coverage is now a required check.** As of the E2E stabilisation work (PR #76 + branch-protection promotion), every PR to main must pass `npm run test:e2e` before auto-merge can fire.
