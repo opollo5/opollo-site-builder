@@ -6,6 +6,29 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Pattern audit — silent INTERNAL_ERROR fallbacks across all routes (deferred from audit triage, 2026-04-27)
+
+**Tags:** `audit`, `observability`, `discipline`
+
+**What:** The Cluster C audit (PR #169) found that every appearance route had a silent `INTERNAL_ERROR` envelope fallback — `return envelope("INTERNAL_ERROR", ctxRes.message, 500)` with no preceding `logger.error`. That pattern hid a missing-column schema bug from CI logs for ~3 days; production operators saw a 500 toast with zero diagnostic trail. The fix shipped `logger.error` calls at 11 sites across `lib/kadence-palette-sync.ts` and the three appearance routes, but other route handlers in the codebase likely have the same anti-pattern.
+
+**Why deferred:** Cluster C scope was the 12 known failing tests + the immediate fix. A repo-wide sweep is its own slice — could touch 20+ files and would benefit from a lint rule rather than just a manual fix.
+
+**Trigger:** Any of:
+- Another silent-500 incident escapes to production / UAT.
+- Before first paying customer onboards (observability floor for support).
+- A natural pause between milestones where infra/discipline work fits.
+
+**Scope:**
+- Grep the codebase for `envelope\("INTERNAL_ERROR"` and `code: "INTERNAL_ERROR"` returns.
+- For every match, verify either (a) the catch-all has a `logger.error` immediately before it, or (b) the underlying error already gets logged somewhere upstream. Add `logger.error` everywhere case (a) doesn't already hold.
+- Consider an ESLint rule (`no-silent-internal-error`) that flags the pattern. The rule can match returns where `code: "INTERNAL_ERROR"` is set without a `logger.error` call in the same block.
+- Ship as one or more PRs depending on count. Each PR is grep + boilerplate add — small per-file but fans out.
+
+**Size:** Small per-file, possibly 20+ files. ~half a day if no surprises. ESLint rule is its own slice (separate PR, ~1 day) but the manual sweep should land first since it's the diagnostic floor.
+
+---
+
 ## Existing CI E2E suite has been red since at least PR #149 (deferred from audit triage, 2026-04-27)
 
 **Tags:** `e2e`, `ci`, `audit`

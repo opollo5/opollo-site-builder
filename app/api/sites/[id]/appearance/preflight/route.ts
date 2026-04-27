@@ -114,6 +114,11 @@ export async function POST(
     if (ctxRes.code === "WP_REST_UNREACHABLE") {
       return envelope("WP_API_ERROR", ctxRes.message, 502, ctxRes.details);
     }
+    logger.error("appearance.preflight.context_internal_error", {
+      site_id: idCheck.value,
+      ctx_code: ctxRes.code,
+      ctx_message: ctxRes.message,
+    });
     return envelope("INTERNAL_ERROR", ctxRes.message, 500);
   }
 

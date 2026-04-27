@@ -138,6 +138,11 @@ export async function buildPaletteSyncContext(
         message: siteRes.error.message,
       };
     }
+    logger.error("kadence_palette_sync.context.get_site_failed", {
+      site_id,
+      get_site_code: siteRes.error.code,
+      get_site_message: siteRes.error.message,
+    });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -172,6 +177,11 @@ export async function buildPaletteSyncContext(
     .eq("id", site_id)
     .single();
   if (versionRes.error || !versionRes.data) {
+    logger.error("kadence_palette_sync.context.version_lock_read_failed", {
+      site_id,
+      error: versionRes.error ?? null,
+      had_data: Boolean(versionRes.data),
+    });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -188,6 +198,10 @@ export async function buildPaletteSyncContext(
     .eq("status", "active")
     .maybeSingle();
   if (dsRes.error) {
+    logger.error("kadence_palette_sync.context.design_systems_read_failed", {
+      site_id,
+      error: dsRes.error,
+    });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -305,9 +319,16 @@ export async function stampFirstDetection(opts: {
     .eq("id", opts.site_id)
     .maybeSingle();
   if (before.error) {
+    logger.error("kadence_palette_sync.stamp.before_select_failed", {
+      site_id: opts.site_id,
+      error: before.error,
+    });
     return { ok: false, code: "INTERNAL_ERROR", message: before.error.message };
   }
   if (!before.data) {
+    logger.error("kadence_palette_sync.stamp.site_vanished", {
+      site_id: opts.site_id,
+    });
     return { ok: false, code: "INTERNAL_ERROR", message: "Site vanished." };
   }
   if (before.data.kadence_installed_at) {
@@ -334,6 +355,11 @@ export async function stampFirstDetection(opts: {
     .select("version_lock")
     .maybeSingle();
   if (upd.error) {
+    logger.error("kadence_palette_sync.stamp.cas_update_failed", {
+      site_id: opts.site_id,
+      expected_version_lock: opts.expected_version_lock,
+      error: upd.error,
+    });
     return { ok: false, code: "INTERNAL_ERROR", message: upd.error.message };
   }
   if (!upd.data) {
