@@ -436,23 +436,9 @@ Captured during UAT prep in parallel with M15-7. Deferred to avoid collision in 
 
 **Non-goals for this slice:** Don't redesign page content, sidebars, or individual table layouts. Scope is strictly the top nav bar.
 
-### Brief commit confirmation — dead-end screen with no next action
+### ~~Brief commit confirmation — dead-end screen with no next action~~ (resolved before this entry was actioned)
 
-**What:** After uploading a brief and confirming it, the user sees a green box saying "This page list is committed. Starting generation runs becomes available in M12-5." — but no button to take them anywhere. User is stranded on the current page with no clear next action.
-
-**Why deferred:** Captured during UAT prep. M15-7 just finished; UX polish slice will batch this with other items.
-
-**Trigger:** Paired with the site actions menu fix and admin top nav redesign in the UX polish slice.
-
-**Fix scope:**
-- Replace the dead-end green message with a proper confirmation state that includes a primary CTA button: "Back to briefs" (returns to `/admin/sites/[id]/briefs` or wherever the briefs list lives)
-- Remove jargon — "M12-5" is internal milestone language, not user-facing. Replace with user-friendly copy like: "This brief is locked in. Page generation will be available soon — we'll email you when it's ready" OR, if M12-5 has already shipped by the time this is fixed, remove the disabled messaging entirely
-- Consider an auto-redirect after a few seconds if no button is clicked, so refresh-happy users aren't stuck
-- Audit the rest of the app for similar dead-end confirmation states — any "feature X is complete" screen without a CTA pointing to the logical next step
-
-**Files likely involved:** `app/admin/sites/[id]/briefs/[briefId]/page.tsx` or component rendering the commit confirmation
-
-**Size:** Small — ~20-30 min if isolated, bundle with UX polish slice for efficiency
+Verified 2026-04-29: the post-commit panel in `BriefReviewClient.tsx` (~line 573) already renders user-friendly copy ("This brief is committed. You're ready to run the generator…") with two CTAs ("Back to briefs", "Open run surface →"). The dead-end + M12-5 jargon described in the original entry was fixed during M12-5 itself; the BACKLOG entry slipped through unmarked. Stale header comment updated in the same audit pass.
 
 ## M12-6 — Save-Draft persistence for briefs review
 
