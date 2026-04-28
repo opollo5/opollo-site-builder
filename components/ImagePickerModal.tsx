@@ -208,16 +208,7 @@ export function ImagePickerModal({
         )}
 
         {tab === "upload" && (
-          <div className="mt-4 rounded-lg border-2 border-dashed border-muted bg-muted/30 p-6 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">
-              Upload coming in BP-5
-            </p>
-            <p className="mt-1">
-              Drag-drop or pick a file to push it to Cloudflare Images, then
-              auto-select it. For now, upload via the bulk-upload script and
-              find your image in the Library tab.
-            </p>
-          </div>
+          <UploadTab onUploaded={(image) => handleSelect(image)} />
         )}
 
         {tab === "url" && (
@@ -233,6 +224,124 @@ export function ImagePickerModal({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function UploadTab({
+  onUploaded,
+}: {
+  onUploaded: (image: ImagePickerEntry) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFile(file: File) {
+    setError(null);
+    if (file.size === 0) {
+      setError("That file is empty.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError(
+        `That file is ${Math.round(file.size / 1024 / 1024)} MB — over the 10 MB cap.`,
+      );
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setError("Pick a JPEG, PNG, GIF, or WebP image.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/admin/images/upload", {
+        method: "POST",
+        body: form,
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok: true; data: ImagePickerEntry }
+        | { ok: false; error: { code: string; message: string } }
+        | null;
+      if (payload?.ok) {
+        onUploaded(payload.data);
+        return;
+      }
+      setError(
+        payload?.ok === false
+          ? payload.error.message
+          : `Upload failed (HTTP ${res.status}).`,
+      );
+    } catch (err) {
+      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div
+      className={cn(
+        "mt-4 rounded-lg border-2 border-dashed p-6 text-sm transition-smooth",
+        dragActive ? "border-ring bg-muted/40" : "border-muted bg-muted/30",
+      )}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        if (e.dataTransfer.types.includes("Files")) setDragActive(true);
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragActive(false);
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragActive(false);
+        const file = e.dataTransfer.files[0];
+        if (file) void handleFile(file);
+      }}
+    >
+      <p className="font-medium text-foreground">Upload an image</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Drag-drop a file here, or click the button below. JPEG / PNG / GIF /
+        WebP. Max 10 MB. Captioning runs in the background.
+      </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void handleFile(file);
+        }}
+      />
+      <div className="mt-4 flex items-center gap-3">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading ? "Uploading…" : "Pick file"}
+        </Button>
+        {uploading && (
+          <span className="text-xs text-muted-foreground">
+            Pushing to Cloudflare…
+          </span>
+        )}
+      </div>
+      {error && (
+        <div
+          role="alert"
+          className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+        >
+          {error}
+        </div>
+      )}
+    </div>
   );
 }
 

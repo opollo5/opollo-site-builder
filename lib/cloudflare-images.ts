@@ -296,6 +296,81 @@ export async function uploadImage(
   });
 }
 
+export type UploadFromBytesRequest = {
+  /** Stable Cloudflare id (idempotency key). Same shape as uploadImage. */
+  id: string;
+  /** Raw bytes of the image. */
+  bytes: Uint8Array;
+  /** Original filename for display + content-disposition. */
+  filename: string;
+  /** Optional MIME type. Defaults to application/octet-stream — Cloudflare sniffs the actual type. */
+  contentType?: string;
+};
+
+/**
+ * BP-5 — POST raw bytes to Cloudflare Images. Mirrors uploadImage's
+ * adoption + classification semantics but uses the multipart `file=`
+ * variant instead of `url=`. Used by the in-app upload picker when the
+ * operator drops a file rather than hosting it externally.
+ */
+export async function uploadImageFromBytes(
+  req: UploadFromBytesRequest,
+  opts: UploadOptions = {},
+): Promise<CloudflareImageRecord> {
+  const config = opts.config ?? readCloudflareConfig();
+  const endpoint = `${CLOUDFLARE_API_ROOT}/accounts/${config.accountId}/images/v1`;
+
+  const body = new FormData();
+  body.append("id", req.id);
+  // Copy into a fresh ArrayBuffer so the Blob constructor accepts it
+  // regardless of whether the caller's Uint8Array is backed by an
+  // ArrayBuffer or a SharedArrayBuffer (TS narrowing).
+  const ab = new ArrayBuffer(req.bytes.byteLength);
+  new Uint8Array(ab).set(req.bytes);
+  body.append(
+    "file",
+    new Blob([ab], { type: req.contentType ?? "application/octet-stream" }),
+    req.filename,
+  );
+
+  const call: CloudflareFetchFn =
+    opts.fetchImpl ?? ((url, init) => httpCall(url, init, opts.timeoutMs));
+
+  const res = await call(endpoint, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${config.apiToken}` },
+    body,
+  });
+
+  let envelope: CloudflareApiEnvelope<unknown> | null = null;
+  try {
+    envelope = (await res.json()) as CloudflareApiEnvelope<unknown>;
+  } catch {
+    // body wasn't JSON — fall through to status-based classification.
+  }
+
+  if (res.ok && envelope?.success && envelope.result) {
+    return parseRecord(envelope.result);
+  }
+
+  if (
+    res.status === 409 ||
+    (envelope != null && !envelope.success && isIdAlreadyExistsError(envelope))
+  ) {
+    return getImage(req.id, { config, fetchImpl: opts.fetchImpl });
+  }
+
+  const classified = classifyHttpStatus(res.status);
+  const detail =
+    envelope?.errors
+      ?.map((e) => `${e.code}:${e.message}`)
+      .join("; ") || `HTTP ${res.status}`;
+  throw new CloudflareCallError(classified.code, detail, {
+    retryable: classified.retryable,
+    httpStatus: res.status,
+  });
+}
+
 export async function getImage(
   id: string,
   opts: UploadOptions = {},
