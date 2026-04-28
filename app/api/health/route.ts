@@ -38,42 +38,71 @@ import { logger } from "@/lib/logger";
 // Probe functions live in @/lib/health-checks. Next.js 14 rejects
 // arbitrary named exports from route.ts at build time; keeping the
 // route file handler-only lets tests import the probes directly.
+//
+// Envelope shape note (M15-4 #18): /api/health uses a different
+// response shape from the rest of the API — no `ok` field, no
+// `error` envelope. The shape mirrors common health-check
+// conventions (Kubernetes liveness, Datadog HTTP check) so external
+// monitors can consume it without an Opollo-specific schema.
+// `status: "ok" | "degraded"` + per-check booleans. Documented here
+// rather than aligned to the standard envelope because health
+// monitors expect this shape, not ours.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<NextResponse> {
-  const [supabase, backlog] = await Promise.all([
-    checkSupabase(),
-    checkBudgetResetBacklog(),
-  ]);
+  // M15-4 #19: outer try/catch — if a probe helper THROWS (vs. returns
+  // an error-shaped result), we still return a structured 503 instead
+  // of an unhandled-rejection 500 with no body shape.
+  try {
+    const [supabase, backlog] = await Promise.all([
+      checkSupabase(),
+      checkBudgetResetBacklog(),
+    ]);
 
-  const allOk = supabase.result === "ok" && backlog.result === "ok";
-  const body = {
-    status: allOk ? "ok" : "degraded",
-    checks: {
-      supabase: supabase.result,
-      supabase_latency_ms: supabase.latency_ms,
-      ...(supabase.error ? { supabase_error: supabase.error } : {}),
-      budget_reset_backlog: backlog.result,
-      budget_reset_backlog_count: backlog.count,
-      budget_reset_backlog_sample: backlog.sample,
-      budget_reset_backlog_latency_ms: backlog.latency_ms,
-      ...(backlog.error ? { budget_reset_backlog_error: backlog.error } : {}),
-    },
-    build: {
-      commit: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
-      env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
-    },
-    timestamp: new Date().toISOString(),
-  };
+    const allOk = supabase.result === "ok" && backlog.result === "ok";
+    const body = {
+      status: allOk ? "ok" : "degraded",
+      checks: {
+        supabase: supabase.result,
+        supabase_latency_ms: supabase.latency_ms,
+        ...(supabase.error ? { supabase_error: supabase.error } : {}),
+        budget_reset_backlog: backlog.result,
+        budget_reset_backlog_count: backlog.count,
+        budget_reset_backlog_sample: backlog.sample,
+        budget_reset_backlog_latency_ms: backlog.latency_ms,
+        ...(backlog.error ? { budget_reset_backlog_error: backlog.error } : {}),
+      },
+      build: {
+        commit: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
+        env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
+      },
+      timestamp: new Date().toISOString(),
+    };
 
-  if (!allOk) {
-    // Readiness failure: log so Axiom picks it up once wired; otherwise
-    // it silently surfaces as a 503 to the monitor.
-    logger.warn("health.degraded", body);
+    if (!allOk) {
+      // Readiness failure: log so Axiom picks it up once wired; otherwise
+      // it silently surfaces as a 503 to the monitor.
+      logger.warn("health.degraded", body);
+    }
+
+    return NextResponse.json(body, { status: allOk ? 200 : 503 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error("health.probe_threw", { error: message });
+    return NextResponse.json(
+      {
+        status: "degraded",
+        checks: { probe_error: message },
+        build: {
+          commit: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
+          env: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? "unknown",
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 503 },
+    );
   }
-
-  return NextResponse.json(body, { status: allOk ? 200 : 503 });
 }

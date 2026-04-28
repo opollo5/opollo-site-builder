@@ -539,10 +539,10 @@ Reports live at:
 
 - **[M15-4 #14] 12 local `errorJson()` helpers across route files.** Migration to `lib/http.respond()` / `lib/http.validationError()` incomplete. Large mechanical diff.
 - **[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.** Move to `lib/http.ts` or `lib/crypto-compare.ts`.
-- **[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum** (`lib/tool-schemas.ts`). Add to enum or rename to existing code.
-- **[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.** Probably intentional (financial); needs one-line comment.
-- **[M15-4 #18] `/api/health` envelope outlier** — no `ok` field. Document the deviation in a route comment or align.
-- **[M15-4 #19] `/api/health` no outer try/catch.** If a helper throws (vs returning error-shaped), 500 is unstructured. Wrap.
+- ~~**[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum**.~~ Added to `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus 409 mapping (2026-04-29).
+- ~~**[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.**~~ Comment added in route handler explaining the financial-control rationale (2026-04-29).
+- ~~**[M15-4 #18] `/api/health` envelope outlier** — no `ok` field.~~ Deviation documented in route comment (2026-04-29).
+- ~~**[M15-4 #19] `/api/health` no outer try/catch.**~~ Wrapped in try/catch; thrown helper now produces a structured 503 with logger.error trail (2026-04-29).
 - **[M15-5 dead code] `lib/class-registry.ts`, `lib/content-schemas.ts`, `lib/supabase.ts#getAnonClient`.** Tested/scaffolded but not wired. Scope: per-module decision — ship the feature they were preparing, or delete. Triggers: class-registry unblocks a planned per-component CSS gate; content-schemas unblocks structured inline-HTML; getAnonClient unblocks a planned Stage-2 client-surface.
 - **[M15-2 #2 residue] `brief_runs` + `site_conventions`** — M12-1 forward-looking tables, not referenced in production code today. Close naturally when M12-2+ wires them. Comment at migration 0013 noting the forward intent would help.
 - **[M15-2 #11 residue] Dynamic update spreads** (`updateDesignSystem`, `updateComponent`, `updateTemplate`). Zod↔DB sync test in #129 guards against drift; the pattern itself is unchanged. Full resolution lands with M15-8 type generation.

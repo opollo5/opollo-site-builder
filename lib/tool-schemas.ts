@@ -58,6 +58,10 @@ export const ERROR_CODES = [
   "EMERGENCY_NOT_CONFIGURED",
   "TEMPLATE_NOT_FOUND",
   "TEMPLATE_NOT_ACTIVE",
+  // M15-4 #16 (added 2026-04-29) — promote the route-emitted code from
+  // admin/batch/[id]/cancel into the canonical vocabulary so any future
+  // caller using respond() routes through errorCodeToStatus.
+  "INVALID_STATE",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -118,6 +122,7 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "BRIEF_RUN_ALREADY_ACTIVE":
     case "ALREADY_EXISTS":
     case "TEMPLATE_NOT_ACTIVE":
+    case "INVALID_STATE":
       return 409;
     case "BRIEF_TOO_LARGE":
       return 413;
