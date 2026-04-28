@@ -525,9 +525,11 @@ Log the provisioning date + vendor account IDs somewhere persistent; each rotati
 
 ## kadence-customizer-drift — palette sync hits WP_STATE_DRIFTED
 
+**Severity (path B, post-2026-04-29):** **CONTENT BUG**, not polish. Under path B (decision PR #192), Opollo emits content fragments and the host theme owns visual tokens (palette, fonts, spacing). Kadence palette sync IS the visual contract — drift between the design-system tokens and the WP-side palette means published Opollo content renders with the wrong colours. Treat sync-drift incidents at the same urgency as a runner regression. Prior framing of "polish" is obsolete.
+
 **Symptom:** Appearance panel sync confirm hits 409 `WP_STATE_DRIFTED`. Banner: "WordPress changed between your preview and confirm. We've refreshed the diff — review again before syncing." Diff table shows different "current" colors than the operator saw 30 seconds ago.
 
-**Impact:** sync is blocked but no data loss. Operator's intent is preserved; they need to re-review against the new state.
+**Impact:** sync is blocked but no data loss. Under path B, **any content published while drift is unresolved will render with wrong colours** — the operator should publish nothing else until sync is reconciled. Operator's intent is preserved; they need to re-review against the new state.
 
 **Diagnose:**
 1. The drift hash in `lib/kadence-palette-sync.ts::hashPalette` re-reads WP's current palette right before the write. A mismatch with the dry-run's hash triggers the failure.
