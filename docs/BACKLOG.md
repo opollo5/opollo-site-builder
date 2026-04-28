@@ -128,25 +128,15 @@ Verified 2026-04-29: `UploadBriefModal.tsx` ships a `content_type` radio group v
 
 ---
 
-## Default model selection — currently Sonnet 4.6, should be Haiku 4.5 for dev/test (deferred from UAT smoke 1, 2026-04-28)
+## ~~Default model selection — Sonnet → Haiku for dev/test~~ (resolved before this entry was actioned)
 
-**Tags:** `cost-control`, `models`, `m16`
+Verified 2026-04-29: shipped via three layers that landed during M12-4 / UAT-smoke-1 followup:
 
-**What:** The brief runner / batch worker / regen worker default to Sonnet 4.6 across the board. UAT smoke 1 flagged the cost: 5x multiplier vs Haiku 4.5 for development and testing scenarios where the operator just needs to verify the pipeline runs end-to-end. Default should be **Haiku 4.5** with operator opt-in for Sonnet/Opus on real generation runs (production briefs that need quality-tier output).
+- **Schema layer**: `supabase/migrations/0027_briefs_model_default_haiku.sql` flipped `briefs.text_model` + `briefs.visual_model` column defaults to `claude-haiku-4-5-20251001`.
+- **Form layer**: `lib/anthropic-models.ts` exports `DEFAULT_MODEL_ID = "claude-haiku-4-5-20251001"`. `BriefReviewClient.tsx` model picker defaults to it (line 117 / 120).
+- **Runtime layer**: brief runner reads `brief.text_model` / `brief.visual_model` per call (lib/brief-runner.ts lines 1532, 1954, 2079). The `RUNNER_MODEL` constant stays as a documented historical fallback for pre-M12-4 briefs.
 
-**Why deferred:** Cost-control work fits the M16 cost-controls slice naturally. Mid-UAT swap risks confusing the smoke results — better to lock down the BLOCKER first, then reset costs cleanly.
-
-**Trigger:** M16 cost-control work, OR Steven's monthly Anthropic bill hits a threshold he wants to understand.
-
-**Scope:**
-- Find every hardcoded `claude-sonnet-4-6` / `claude-opus-4-7` reference across `lib/anthropic-call.ts`, `lib/anthropic-pricing.ts`, `lib/brief-runner.ts`, `lib/batch-worker.ts`, `lib/regeneration-worker.ts`, etc. — grep for `claude-` literals.
-- Centralise in a constant: `DEFAULT_GENERATION_MODEL = 'claude-haiku-4-5-20251001'`.
-- Per-route or per-brief opt-in: brief upload form gains a "Quality tier" selector (Haiku / Sonnet / Opus). Stored on `briefs` as `model_tier text NOT NULL DEFAULT 'haiku'`. Worker reads it; falls back to default if unset.
-- Pricing table needs Haiku 4.5 entries — verify `lib/anthropic-pricing.ts:HAIKU_4_5_*` rates exist; add if missing.
-- Migration adds the column.
-- Default flip is the last commit in the slice; before that, the new selector + column exist and operators can OPT INTO Haiku for testing. Order matters — flipping the default first risks accidentally cheaping-out a real production run before the selector lands.
-
-**Size:** Medium (~1-2 days). One migration + central constant + form selector + pricing table verification + E2E covering tier selection.
+Operator opt-up to Sonnet/Opus per-brief on the review surface is live. Pricing table includes Haiku 4.5 rates. Entry slipped through unmarked. **`CAPTION_MODEL` and `INFERENCE_MODEL` (parser fallback) still reference Sonnet** — those are different one-shot use cases not covered by the original entry; flag for a separate slice if cost is a concern.
 
 ---
 
