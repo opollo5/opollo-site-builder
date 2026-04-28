@@ -680,6 +680,10 @@ function buildRegenUserMessage(
   pageType: string,
   brief: unknown,
 ): string {
+  // Path B (PB-5, 2026-04-29): emit a contiguous fragment of top-level
+  // <section data-opollo …> elements. The host WP theme owns chrome
+  // (DOCTYPE/html/head/body/nav/header/footer) and visual tokens
+  // (palette, fonts, spacing). See docs/INTEGRATION_MODEL_DECISION.md.
   const briefJson = JSON.stringify(brief ?? {}, null, 2);
   return [
     `Re-generate the page "${title}" (slug: ${slug}, type: ${pageType}) against the current design system.`,
@@ -690,7 +694,12 @@ function buildRegenUserMessage(
     briefJson,
     "```",
     "",
-    "Return the full page HTML wrapped in the site's scope div. Follow every hard constraint in the system prompt.",
+    "OUTPUT FORMAT — STRICT REQUIREMENTS:",
+    "1. Output a CONTIGUOUS FRAGMENT of one or more top-level <section> elements. Do NOT emit any of: <!DOCTYPE>, <html>, <head>, <body>, <nav>, <header>, <footer>, <meta>, <link>, <title>, <script>. The host WP theme owns those.",
+    "2. Every top-level <section> MUST carry the data-opollo attribute (presence-only, no value required). The first top-level <section> MUST also carry data-ds-version=\"<DS version from system prompt>\".",
+    "3. Every CSS class must start with the site prefix (per the system prompt).",
+    "4. Inline <style> blocks are permitted ONLY for animation keyframes / scoped utility rules under 200 chars total.",
+    "5. Output raw HTML only. No markdown code fences.",
   ].join("\n");
 }
 

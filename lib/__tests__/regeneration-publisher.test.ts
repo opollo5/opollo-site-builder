@@ -31,17 +31,17 @@ import { seedSite } from "./_helpers";
 //      matching the WP call's shape.
 // ---------------------------------------------------------------------------
 
-// A minimal HTML fixture that passes every quality gate: scoped wrapper
-// with the site prefix + ds version, one <h1>, no empty hrefs, one
-// <img alt="…">, and a <meta name="description"> in the 50-160 range.
+// Path-B fragment (PB-5, 2026-04-29). Top-level <section data-opollo>
+// with site prefix + ds version, one <h1>, no empty hrefs, one
+// <img alt="…">. No <meta> — host theme owns it; PR #194 dropped
+// gateMetaDescription from ALL_GATES.
 function passingHtml(prefix: string, dsv: string): string {
   return [
-    `<div class="${prefix}-scope" data-ds-version="${dsv}">`,
-    `<meta name="description" content="A valid meta description at least fifty characters in length for the page." />`,
+    `<section data-opollo class="${prefix}-scope" data-ds-version="${dsv}">`,
     `<h1 class="${prefix}-title">Regenerated</h1>`,
     `<p class="${prefix}-body"><a href="/help" class="${prefix}-link">Help</a></p>`,
     `<img class="${prefix}-img" src="https://imagedelivery.net/HASH/cf-abc/public" alt="Preview image"/>`,
-    `</div>`,
+    `</section>`,
   ].join("");
 }
 
