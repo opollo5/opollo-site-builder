@@ -201,6 +201,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               ? metaDescription.value.trim()
               : null,
           metadata: lastParse ?? null,
+          // BP-7 — persist the picker selection so publish-time can
+          // transfer it to WP without the operator re-picking.
+          featured_image_id: featuredImage?.id ?? null,
         }),
       });
       const payload = (await res.json().catch(() => null)) as
