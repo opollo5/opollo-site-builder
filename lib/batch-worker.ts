@@ -11,6 +11,7 @@ import {
   publishSlot,
   type WpCallBundle,
 } from "@/lib/batch-publisher";
+import { runFragmentStructuralCheck } from "@/lib/brief-runner";
 import { runGates } from "@/lib/quality-gates";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -472,9 +473,18 @@ async function loadSlotContext(slotId: string): Promise<{
 }
 
 function buildUserMessage(inputs: Record<string, unknown>): string {
+  // Path B (PB-4, 2026-04-29): emit a contiguous fragment of top-level
+  // <section data-opollo …> elements. The host WP theme owns chrome
+  // (DOCTYPE/html/head/body/nav/header/footer) and visual tokens
+  // (palette, fonts, spacing). See docs/INTEGRATION_MODEL_DECISION.md.
   return [
     "Generate a page against the design system described in the system prompt.",
-    "Return only the HTML for the page body (no <html>, <head>, or surrounding markup).",
+    "OUTPUT FORMAT — STRICT REQUIREMENTS:",
+    "1. Output a CONTIGUOUS FRAGMENT of one or more top-level <section> elements. Do NOT emit any of: <!DOCTYPE>, <html>, <head>, <body>, <nav>, <header>, <footer>, <meta>, <link>, <title>, <script>. The host WP theme owns those.",
+    "2. Every top-level <section> MUST carry the data-opollo attribute (presence-only, no value required). The first top-level <section> MUST also carry data-ds-version=\"<DS version from system prompt>\" so the design-system version is auditable.",
+    "3. Every CSS class must start with the site prefix (per the system prompt).",
+    "4. Inline <style> blocks are permitted ONLY for animation keyframes / scoped utility rules under 200 chars total.",
+    "5. Output raw HTML only. No markdown code fences.",
     "Brief:",
     "```json",
     JSON.stringify(inputs, null, 2),
@@ -570,12 +580,29 @@ export async function processSlotAnthropic(
     typeof (ctx.inputs as { slug?: unknown }).slug === "string"
       ? ((ctx.inputs as { slug: string }).slug as string)
       : null;
-  const gateOutcome = runGates({
-    html: generatedHtml,
-    slug,
-    prefix: ctx.site.prefix,
-    design_system_version: ctx.design_system_version,
-  });
+  // PB-4 (2026-04-29): fragment-shape check runs FIRST. Catches host-WP
+  // chrome leakage (DOCTYPE/html/head/body/nav/header/footer/meta/link/
+  // title/script) before the strict suite. A leak here is wrapped into
+  // a synthetic GateOutcome so the existing failure path (event log,
+  // slot fail) handles it uniformly.
+  const fragmentCheck = runFragmentStructuralCheck(generatedHtml);
+  const gateOutcome = !fragmentCheck.ok
+    ? ({
+        kind: "failed" as const,
+        gates_run: ["fragment_structural"] as Array<string>,
+        first_failure: {
+          kind: "fail" as const,
+          gate: "fragment_structural" as never, // synthetic gate name
+          reason: fragmentCheck.message,
+          details: { code: fragmentCheck.code },
+        },
+      } as ReturnType<typeof runGates>)
+    : runGates({
+        html: generatedHtml,
+        slug,
+        prefix: ctx.site.prefix,
+        design_system_version: ctx.design_system_version,
+      });
 
   await withClient(opts.client ?? null, async (c) => {
     // EVENT LOG FIRST. If the subsequent slot UPDATE fails (DB blip,
