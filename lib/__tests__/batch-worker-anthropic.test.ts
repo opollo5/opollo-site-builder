@@ -97,15 +97,15 @@ type RecordedCall = {
   model: string;
 };
 
-// HTML that passes the M3-5 quality gates (wrapper + scope_prefix +
-// html_basics + slug_kebab + meta_description). Batch test seeds use
-// prefix 'ls' via seedSite defaults, DS version 1.
+// Path-B fragment (PB-4, 2026-04-29). Passes the M3-5 strict suite
+// (wrapper + scope_prefix + html_basics + slug_kebab) and the
+// fragment-shape check (data-opollo + no chrome). Meta description
+// is owned by the host theme + SEO plugin under path B.
 const GATE_PASSING_HTML = [
-  '<section class="ls-hero" data-ds-version="1">',
+  '<section data-opollo class="ls-hero" data-ds-version="1">',
   '  <h1 class="ls-hero-title">Hello</h1>',
   '  <p class="ls-hero-body"><a href="/landing">link</a></p>',
   '  <img src="/a.png" alt="descriptive" class="ls-hero-image"/>',
-  '  <meta name="description" content="A descriptive meta summary of the page that is comfortably between fifty and one hundred sixty characters."/>',
   "</section>",
 ].join("\n");
 

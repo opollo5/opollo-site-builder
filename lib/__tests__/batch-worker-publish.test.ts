@@ -96,15 +96,12 @@ async function seedBatch(
   return { jobId: res.data.job_id, siteId: site.id };
 }
 
-const DESCRIPTIVE_META =
-  "A descriptive meta summary of the page that is comfortably between fifty and one hundred sixty characters.";
-
+// Path-B fragment (PB-4, 2026-04-29). No <meta> — host theme owns it.
 const GATE_PASSING_HTML = [
-  '<section class="ls-hero" data-ds-version="1">',
+  '<section data-opollo class="ls-hero" data-ds-version="1">',
   '  <h1 class="ls-hero-title">Hello</h1>',
   '  <p class="ls-hero-body"><a href="/landing">link</a></p>',
   '  <img src="/a.png" alt="desc" class="ls-hero-image"/>',
-  `  <meta name="description" content="${DESCRIPTIVE_META}"/>`,
   "</section>",
 ].join("\n");
 

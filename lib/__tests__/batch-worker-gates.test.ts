@@ -103,22 +103,21 @@ function stubCallReturningHtml(html: string): AnthropicCallFn {
   });
 }
 
-const DESCRIPTIVE_META =
-  "A descriptive meta summary of the page that is comfortably between fifty and one hundred sixty characters.";
-
-const VALID_HTML = `<section class="ls-hero" data-ds-version="1">
+// Path-B fragment (PB-4, 2026-04-29). No <meta> tags — host WP theme
+// + SEO plugin own meta description. PB-1 dropped meta_description
+// from ALL_GATES so the strict suite no longer requires it either.
+const VALID_HTML = `<section data-opollo class="ls-hero" data-ds-version="1">
   <h1 class="ls-hero-title">Hello</h1>
   <p class="ls-hero-body">Body <a href="/landing">link</a></p>
   <img src="/a.png" alt="descriptive" class="ls-hero-image"/>
-  <meta name="description" content="${DESCRIPTIVE_META}"/>
 </section>`;
 
-// Missing data-ds-version — wrapper gate fires first.
-const WRAPPER_BROKEN_HTML = `<section class="ls-hero">
+// Missing data-ds-version — wrapper gate fires after the fragment
+// check passes (data-opollo present, no chrome leaks).
+const WRAPPER_BROKEN_HTML = `<section data-opollo class="ls-hero">
   <h1>Hello</h1>
   <p><a href="/x">link</a></p>
   <img src="/a.png" alt="x"/>
-  <meta name="description" content="${DESCRIPTIVE_META}"/>
 </section>`;
 
 describe("processSlotAnthropic — gates pass", () => {
