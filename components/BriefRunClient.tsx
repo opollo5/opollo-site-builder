@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,6 +13,22 @@ import type {
   BriefRunSnapshot,
 } from "@/lib/briefs";
 import { wrapForPreview } from "@/lib/preview-iframe-wrapper";
+import { usePoll } from "@/lib/use-poll";
+
+// RS-4 — payload shape returned by /api/briefs/[brief_id]/run/snapshot.
+// Mirrored locally so this component doesn't import from the route file.
+interface RunSnapshotPayload {
+  brief: BriefRow;
+  pages: BriefPageRow[];
+  active_run: BriefRunSnapshot | null;
+  remaining_budget_cents: number;
+  estimate_cents: number;
+}
+
+interface RunSnapshotEnvelope {
+  ok: boolean;
+  data?: RunSnapshotPayload;
+}
 
 // ---------------------------------------------------------------------------
 // M12-5 — /admin/sites/[id]/briefs/[brief_id]/run client component.
@@ -112,11 +127,11 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
 export function BriefRunClient({
   siteId,
   siteName,
-  brief,
-  pages,
-  activeRun,
-  estimateCents,
-  remainingBudgetCents,
+  brief: initialBrief,
+  pages: initialPages,
+  activeRun: initialActiveRun,
+  estimateCents: initialEstimateCents,
+  remainingBudgetCents: initialRemainingBudgetCents,
 }: {
   siteId: string;
   siteName: string;
@@ -126,12 +141,27 @@ export function BriefRunClient({
   estimateCents: number;
   remainingBudgetCents: number;
 }) {
-  const router = useRouter();
   const [controlState, setControlState] = useState<ControlState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [reviseOpen, setReviseOpen] = useState<string | null>(null); // page id
   const [reviseNote, setReviseNote] = useState("");
+
+  // RS-4 — poll the snapshot endpoint every 4s. The initial server-render
+  // hydrates the surface; live updates flow in via `polled.data`. After
+  // every successful mutation (start / approve / revise / cancel) we call
+  // `refresh` so the UI doesn't wait up to 4s for the next tick.
+  const polled = usePoll<RunSnapshotEnvelope>(
+    `/api/briefs/${initialBrief.id}/run/snapshot`,
+  );
+
+  const live = polled.data?.ok ? polled.data.data : undefined;
+  const brief = live?.brief ?? initialBrief;
+  const pages = live?.pages ?? initialPages;
+  const activeRun = live?.active_run ?? initialActiveRun;
+  const remainingBudgetCents =
+    live?.remaining_budget_cents ?? initialRemainingBudgetCents;
+  const estimateCents = live?.estimate_cents ?? initialEstimateCents;
 
   const sortedPages = useMemo(
     () => [...pages].sort((a, b) => a.ordinal - b.ordinal),
@@ -169,7 +199,7 @@ export function BriefRunClient({
       if (res.ok && payload.ok) {
         setControlState("idle");
         setConfirmOpen(false);
-        router.refresh();
+        void polled.refresh();
         return;
       }
       if (payload.error?.code === "CONFIRMATION_REQUIRED") {
@@ -205,7 +235,7 @@ export function BriefRunClient({
       };
       if (res.ok && payload.ok) {
         setControlState("idle");
-        router.refresh();
+        void polled.refresh();
         return;
       }
       setErrorMessage(
@@ -243,7 +273,7 @@ export function BriefRunClient({
       };
       if (res.ok && payload.ok) {
         setControlState("idle");
-        router.refresh();
+        void polled.refresh();
         return;
       }
       setErrorMessage(
@@ -288,7 +318,7 @@ export function BriefRunClient({
         setControlState("idle");
         setReviseOpen(null);
         setReviseNote("");
-        router.refresh();
+        void polled.refresh();
         return;
       }
       setErrorMessage(
@@ -318,6 +348,19 @@ export function BriefRunClient({
                 {" — "}
                 <RunStatusPill status={activeRun.status} />
               </>
+            )}
+            {/* RS-4 — discreet stale indicator. Only renders when the
+                last successful poll is more than 8s old (intervalMs * 2),
+                so a single late tick doesn't flicker the badge. */}
+            {polled.isStale && (
+              <span
+                role="status"
+                className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                title="Live updates paused — retrying"
+              >
+                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                Reconnecting…
+              </span>
             )}
           </p>
         </div>
