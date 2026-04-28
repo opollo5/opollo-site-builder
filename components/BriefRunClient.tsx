@@ -13,6 +13,7 @@ import type {
   BriefRow,
   BriefRunSnapshot,
 } from "@/lib/briefs";
+import { wrapForPreview } from "@/lib/preview-iframe-wrapper";
 
 // ---------------------------------------------------------------------------
 // M12-5 — /admin/sites/[id]/briefs/[brief_id]/run client component.
@@ -588,8 +589,15 @@ function PagePreview({
             // preview. draft_html is Claude-generated and already passes
             // the runner's quality gates, but belt-and-suspenders: render
             // it in a constrained frame.
+            //
+            // PB-3 (2026-04-29): wrapForPreview wraps path-B fragments in
+            // a synthetic doc with a shim stylesheet that approximates
+            // WP/Kadence defaults so the operator sees STYLED content
+            // for visual review rather than unstyled raw HTML. Path-A
+            // documents (claim completeness via DOCTYPE / <html opener)
+            // are passed through unchanged. See lib/preview-iframe-wrapper.ts.
             sandbox=""
-            srcDoc={html}
+            srcDoc={wrapForPreview(html)}
             className="mt-2 h-96 w-full rounded border"
             title={`Preview of ${page.title}`}
           />

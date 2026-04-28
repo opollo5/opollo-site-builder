@@ -6,6 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Preview iframe — fetch customer theme CSS for high-fidelity preview (path B, opened 2026-04-29 by PB-3)
+
+**Tags:** `path-b`, `m13`, `preview`, `ux`
+
+**What:** PB-3 (`lib/preview-iframe-wrapper.ts`) inlines a generic shim stylesheet that approximates WP/Kadence Blocks defaults. The operator sees STYLED content for visual review, but the styling is NOT pixel-accurate to the customer's actual published page (font face / palette / spacing rhythm / button shapes all differ).
+
+For high-fidelity preview, fetch the customer's actual theme CSS bundle and inline it into the synthetic wrapper instead of (or alongside) the shim. Two server-side fetch shapes worth considering:
+
+- **At server-render time**: `BriefRunPage` fetches `https://<customer-wp>/wp-content/themes/<active-theme>/style.css` + Kadence Blocks CSS bundle, passes the concatenated CSS as a prop to `BriefRunClient`. No CSP impact (server-side fetch). Cost: one extra HTTP round-trip per page render. Mitigation: cache the CSS in Supabase Storage keyed by `(site_id, theme_slug, css_sha256)`.
+- **Operator-triggered snapshot**: a "Refresh theme preview CSS" button in the Appearance panel writes a snapshot row. Iframe wrapper reads the latest snapshot. Operator controls freshness explicitly.
+
+**Why deferred:** PB-3's shim gives visual review just enough fidelity to validate content + structure + image placement. Pixel-accuracy doesn't block the path-B rebuild from shipping. Customer feedback will tell us whether the shim is "close enough" or whether the gap is a regular operator pain.
+
+**Trigger:** when an operator complains the preview doesn't match production well enough to approve confidently, OR when the M13 sync surface adds the snapshot capability for other reasons.
+
+**Scope:**
+- Add the snapshot table or storage bucket if the operator-triggered shape lands.
+- `lib/wp-theme-snapshot.ts`: fetch + store + retrieve helper.
+- `BriefRunPage` (server component): on render, attach the latest snapshot's CSS to the props handed to `BriefRunClient`.
+- `lib/preview-iframe-wrapper.ts`: take an optional `themeCss` parameter; inline it after the shim.
+- E2E: visual snapshot test comparing iframe render to production.
+
+**Size:** Medium (~3–5 hours for the snapshot path; another hour for E2E).
+
+---
+
 ## Post meta description via WP excerpt (path B, opened 2026-04-29 by PB-1)
 
 **Tags:** `path-b`, `m13`, `posts`, `seo`
