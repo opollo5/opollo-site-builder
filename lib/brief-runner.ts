@@ -127,18 +127,24 @@ export const STANDARD_TEXT_PASSES = 3; // draft, self_critique, revise
 // inserted before briefs.text_model existed (migration 0020 default
 // covers new rows).
 export const RUNNER_MODEL = "claude-sonnet-4-6";
-// Bumped 2026-04-28 from 4096 after UAT smoke 1 surfaced silent
-// truncation: every text-pass response on brief_pages.dcbdf7d5... hit
-// exactly 4096 output tokens, leaving draft_html truncated mid-CSS
-// (no <body>, no closing tags). Realistic Claude-generated landing
-// pages with full inline CSS routinely exceed 3K tokens; 4K is too
-// tight a cap. 16K gives 4x headroom while staying well under the
-// model's 64K (Sonnet/Haiku 4.x) / 32K (Opus 4.x) per-response cap.
-// The structural-completeness gate added in this same PR is the
-// belt: any future truncation that still slips through (e.g. a
-// future model with a smaller cap) gets surfaced as
-// capped_with_issues rather than rendering a black-box iframe.
-export const RUNNER_MAX_TOKENS = 16384;
+// PB-9 (2026-04-29): reset 16384 -> 4096 after path-B fragment rework
+// (PR #194) made path-A full-document outputs obsolete. Path-B
+// fragments are typically 2K-6K chars (~500-1500 tokens), so 4K is
+// comfortable headroom — and it sits at the org's per-minute output
+// cap on Sonnet 4.6 instead of 4x over it. Resolves BACKLOG entry
+// "brief-runner max_tokens=16384 collides with Anthropic org rate
+// limit of 4,000 output tokens/min on Sonnet 4.6".
+//
+// The fragment-shape gate from PR #194 plus the truncation banner
+// from PR #189 stay as belts: any rare fragment that exceeds 4K is
+// surfaced as a quality_flag rather than silently rendering as a
+// blank/styled-empty iframe.
+//
+// Pre-2026-04-28 history: 4096 was the original cap, raised to 16384
+// during the path-A truncation incident on page dcbdf7d5-... . That
+// incident was a content-shape problem, not a cap problem; path-B
+// fixes it at the source.
+export const RUNNER_MAX_TOKENS = 4096;
 
 // Cap on brief_runs.content_summary length. Parent plan §Running-summary
 // budget says ~2k tokens; we measure in chars (4 chars ≈ 1 token average)

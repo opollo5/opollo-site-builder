@@ -32,35 +32,6 @@ The replacement: populate the post's WP REST `excerpt` field from a brief-side e
 
 ---
 
-## brief-runner max_tokens=16384 collides with Anthropic org rate limit of 4,000 output tokens/min on Sonnet 4.6 (caught 2026-04-28)
-
-**Tags:** `bug`, `runner`, `rate-limit`, `m13`
-
-**What:** PR #188 raised `RUNNER_MAX_TOKENS` 4096 → 16384 to prevent the truncated-HTML black-box bug. That works for the *content* problem, but a single Anthropic call can now request up to 16K output tokens — quadruple the org's per-minute cap of 4,000 tokens/min on Sonnet 4.6. UAT smoke 1 retry on page `dcbdf7d5-...` hit this on a `visual_revise` pass after four prior text passes had already succeeded. Anthropic returned `429 rate_limit_error`; runner caught it in `processPagePassLoop` and marked the page `failed` with `failure_code='ANTHROPIC_ERROR'` even though the prior pass's `draft_html` was structurally complete and already persisted.
-
-Effect: any reasonably-sized brief run will sporadically fail mid-cycle whenever the per-minute window is already partially spent (concurrent runs, prior burst, etc.). The runner's existing failure path doesn't preserve partial progress — the operator sees a `failed` page even though the doc on disk is fine. Compounds with the recovery-wipe BACKLOG entry below (recovery destroys the partial-success doc).
-
-**Why deferred:** workaround for the live incident was a `failed → awaiting_review` status flip on a single page (one authorized UPDATE). Acceptable while UAT smoke 1 is the only running brief; will recur on every multi-brief day.
-
-**Trigger:** before the next major model swap, OR when rate-limit incidents recur in production. Whichever comes first.
-
-**Scope** (any one alone is partial mitigation; combine for full coverage):
-
-- **Per-call output throttle.** Cap `max_tokens` requested at `min(RUNNER_MAX_TOKENS, available_per_minute_budget)` where `available_per_minute_budget` is read from the previous response's `anthropic-ratelimit-output-tokens-remaining` header (Anthropic returns this on every response). When the per-minute window is fresh (4,000 available), use the full 16,384; when burst is spent, throttle to ≤4,000 and let the runner make multiple smaller calls instead of one big one.
-- **Pre-check rate-limit headers + back off.** Before firing a pass, read the cached `anthropic-ratelimit-output-tokens-reset` from the most recent response. If the next call's projected token count exceeds the remaining budget, sleep until reset (max 60s) before firing. Adds ~30s/page in the worst case but prevents 429s entirely.
-- **Sleep between large pass calls.** Cheapest: hardcode a 15s sleep between any two consecutive passes that each requested > 4,000 max_tokens. Doesn't read headers, doesn't adapt — but kills the burst pattern that triggers the limit. Adds 60–90s to a typical anchor cycle (4 passes × 15s).
-
-**Other notes:**
-
-- Anthropic does also rate-limit *input* tokens (~80,000/min on Sonnet 4.6). The system prompt + content_summary + previous_draft on a re-pass is multi-thousand tokens; cumulative bursts could trip that too. Whatever fix lands should at minimum log the rate-limit headers (output + input + requests) on every successful response so the operator-facing diagnostic surface (`scripts/diagnose-prod.ts`) can see the ceiling proximity.
-- A "preserve partial success" companion fix (so the runner doesn't mark a page `failed` when the previous pass produced a structurally complete doc) reduces the operator pain even without solving the rate limit. Smaller, more local change. Worth pairing.
-
-**Size:** Small (~1 hour) for the cheapest mitigation (sleep between large passes + log headers). Medium (~3 hours) for the per-call throttle reading response headers. Large if the partial-success preservation lands too.
-
-**Reference incident:** site `cdb5b15f-971d-4979-a18d-c3fd75a1c3ac`, page `dcbdf7d5-b867-443b-afdf-f60a28f968aa`. Rate limit fired 2026-04-28T04:37 UTC after 4 successful passes. `failure_detail` raw on the brief_runs row: `429 ... rate_limit_error: This request would exceed your organization's rate limit of 4,000 output tokens per minute (org: e1027476-...).`
-
----
-
 ## scripts/recover-stuck-brief-page.ts wipes draft_html unconditionally (caught 2026-04-28)
 
 **Tags:** `bug`, `ops-tooling`, `recovery-script`, `data-loss`
