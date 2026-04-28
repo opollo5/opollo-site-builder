@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BriefReviewClient } from "@/components/BriefReviewClient";
@@ -10,6 +10,12 @@ import { getSite } from "@/lib/sites";
 // Server Component. Fetches the brief + its pages server-side and
 // hands them to <BriefReviewClient /> which owns the editable list +
 // commit flow state machine.
+//
+// RS-3: when brief.status === "committed", the operator never sees
+// the review page — we redirect server-side to the run surface so a
+// bookmark, browser-back, or direct link skips the dead intermediate
+// state. Client-side, the commit handler also pushes to /run on
+// success, so the redirect is the safety net for non-flow entries.
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +48,10 @@ export default async function BriefReviewPage({
   }
 
   if (briefResult.data.brief.site_id !== params.id) notFound();
+
+  if (briefResult.data.brief.status === "committed") {
+    redirect(`/admin/sites/${params.id}/briefs/${params.brief_id}/run`);
+  }
 
   const site = siteResult.data.site;
   const { brief, pages } = briefResult.data;
