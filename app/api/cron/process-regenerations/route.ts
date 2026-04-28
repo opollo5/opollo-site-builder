@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 
+import { logger } from "@/lib/logger";
 import {
   DEFAULT_REGEN_LEASE_MS,
   leaseNextRegenJob,
@@ -235,6 +236,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logger.error("cron.process_regenerations.failed", { error: message });
     return NextResponse.json(
       {
         ok: false,

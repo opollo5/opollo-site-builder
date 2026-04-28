@@ -141,6 +141,11 @@ export async function POST(
       case "VERSION_CONFLICT":
         return errorEnvelope("VERSION_CONFLICT", result.message, 409);
       case "INTERNAL_ERROR":
+        logger.error("briefs.approve.internal_error", {
+          brief_id: briefIdCheck.value,
+          page_id: pageIdCheck.value,
+          message: result.message,
+        });
         return errorEnvelope("INTERNAL_ERROR", result.message, 500);
     }
   }

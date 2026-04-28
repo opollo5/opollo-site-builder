@@ -161,6 +161,10 @@ export async function POST(
   const siteRow = siteRes.data.site as { wp_url: string };
   const creds = siteRes.data.credentials;
   if (!creds) {
+    logger.error("posts.unpublish.creds_missing", {
+      site_id: siteIdCheck.value,
+      post_id: postIdCheck.value,
+    });
     return envelope("INTERNAL_ERROR", "Site has no WP credentials.", 500);
   }
   const cfg: WpConfig = {
