@@ -549,11 +549,11 @@ Reports live at:
 
 #### Env + doc polish (trivial, opportunistic)
 
-- **[M15-3 #6] `NEXT_PUBLIC_VERCEL_ENV` not auto-exposed by Vercel.** Client-side Sentry env tag falls back to `NODE_ENV` on previews. Scope: either set explicitly in Vercel dashboard, or pipe `VERCEL_ENV` through `next.config.mjs` `env:` block.
-- **[M15-3 #10] `LEADSOURCE_WP_USER` / `LEADSOURCE_WP_APP_PASSWORD` undocumented format.** WP Application Password (24-char hyphen-separated), NOT the regular WP login password. Add 3-line comment in `.env.local.example`.
-- **[M15-3 #11] `SENTRY_ORG` / `SENTRY_PROJECT` undocumented context.** They're only needed at build-time for source-map upload; runtime Sentry works without them. Add inline comment in `.env.local.example`.
-- **[M15-3 #12] `DATABASE_URL` shell variable vs `SUPABASE_DB_URL` runtime env naming collision.** RUNBOOK uses `$DATABASE_URL` for CLI; Vercel workers use `SUPABASE_DB_URL`. Add a one-line callout in RUNBOOK's migration section clarifying the distinction.
-- **[M15-3 #13] `ANALYZE` env var undocumented.** Only relevant to `npm run analyze`. Low priority.
+- ~~**[M15-3 #6] `NEXT_PUBLIC_VERCEL_ENV` not auto-exposed by Vercel.**~~ Documented in `.env.local.example` (2026-04-29).
+- ~~**[M15-3 #10] `LEADSOURCE_WP_USER` / `LEADSOURCE_WP_APP_PASSWORD` undocumented format.**~~ 4-line comment added in `.env.local.example` (2026-04-29).
+- ~~**[M15-3 #11] `SENTRY_ORG` / `SENTRY_PROJECT` undocumented context.**~~ Inline comment added (2026-04-29).
+- ~~**[M15-3 #12] `DATABASE_URL` shell variable vs `SUPABASE_DB_URL` runtime env naming collision.**~~ Documented in `.env.local.example` (2026-04-29) — `SUPABASE_DB_URL` block now explains the shell-vs-runtime layering.
+- **[M15-3 #13] `ANALYZE` env var undocumented.** Only relevant to `npm run analyze`. Low priority. Still open.
 - **[M15-5 Langfuse EU drift.** `lib/langfuse.ts:37` defaults to `https://us.cloud.langfuse.com`. EU projects without `LANGFUSE_HOST` silently go to the wrong datacenter. Not affected today (we're on US). Close when the `.env.local.example` comment ever needs updating anyway.
 
 #### Closed by M15-8 (future milestone — type generation + CI gates)
