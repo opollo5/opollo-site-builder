@@ -168,6 +168,24 @@ export function BriefRunClient({
     [pages],
   );
 
+  // RS-5 — first awaiting-review page (defensive — runner only ever has
+  // one at a time, but if a future race lands two, we point at the
+  // earliest ordinal so the operator works through them in order).
+  const firstAwaitingReview = useMemo(
+    () => sortedPages.find((p) => p.page_status === "awaiting_review") ?? null,
+    [sortedPages],
+  );
+
+  function scrollToPageCard(pageId: string) {
+    if (typeof document === "undefined") return;
+    const el = document.getElementById(`page-card-${pageId}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // After the smooth scroll begins, focus the card so screen-readers
+    // jump along with the visual focus.
+    el.focus({ preventScroll: true });
+  }
+
   const isRunTerminal =
     activeRun?.status === "succeeded" ||
     activeRun?.status === "failed" ||
@@ -346,7 +364,23 @@ export function BriefRunClient({
             {activeRun && (
               <>
                 {" — "}
-                <RunStatusPill status={activeRun.status} />
+                {/* RS-5 — when a specific page is awaiting review, the
+                    run-level pill becomes a clickable shortcut showing
+                    the ordinal so the operator knows exactly which page
+                    is blocking. Falls back to the static pill when no
+                    page is awaiting (defensive). */}
+                {activeRun.status === "paused" && firstAwaitingReview ? (
+                  <button
+                    type="button"
+                    onClick={() => scrollToPageCard(firstAwaitingReview.id)}
+                    className="inline-flex h-7 items-center rounded px-2 text-xs font-medium bg-yellow-500/10 text-yellow-900 hover:bg-yellow-500/20 focus:outline-none focus:ring-2 focus:ring-ring transition-smooth dark:text-yellow-200"
+                    aria-label={`Page ${firstAwaitingReview.ordinal + 1} (${firstAwaitingReview.title}) awaiting your review — jump to card`}
+                  >
+                    Page {firstAwaitingReview.ordinal + 1} awaiting your review →
+                  </button>
+                ) : (
+                  <RunStatusPill status={activeRun.status} />
+                )}
               </>
             )}
             {/* RS-4 — discreet stale indicator. Only renders when the
@@ -451,10 +485,20 @@ export function BriefRunClient({
               page.page_status === "awaiting_review" ||
               page.page_status === "failed" ||
               page.page_status === "approved";
+            const isAwaitingReview = page.page_status === "awaiting_review";
             return (
               <li
                 key={page.id}
-                className="rounded-lg border p-4"
+                // RS-5 — id + tabIndex give the run-level "Page N
+                // awaiting your review" badge a target for
+                // scrollIntoView + focus().
+                id={`page-card-${page.id}`}
+                tabIndex={-1}
+                className={
+                  isAwaitingReview
+                    ? "rounded-lg border-2 border-yellow-500/60 bg-yellow-500/5 p-4 ring-2 ring-yellow-500/20 transition-smooth focus:outline-none focus:ring-yellow-500/40"
+                    : "rounded-lg border p-4 transition-smooth focus:outline-none"
+                }
                 aria-labelledby={`page-${page.id}-title`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -478,15 +522,25 @@ export function BriefRunClient({
                       </span>
                     </div>
                   </div>
+                  {isAwaitingReview && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      // h-11 keeps the 44px tap target (mobile floor).
+                      className="h-11 shrink-0"
+                      onClick={() => scrollToPageCard(page.id)}
+                      aria-label={`Review page ${page.ordinal + 1}: ${page.title}`}
+                    >
+                      Review now →
+                    </Button>
+                  )}
                 </div>
 
                 {isExpanded && (
                   <PagePreview
                     page={page}
                     briefId={brief.id}
-                    isCurrentAwaitingReview={
-                      page.page_status === "awaiting_review"
-                    }
+                    isCurrentAwaitingReview={isAwaitingReview}
                     controlState={controlState}
                     onApprove={() => handleApprove(page)}
                     onRevise={() => setReviseOpen(page.id)}
