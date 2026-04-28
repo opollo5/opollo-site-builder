@@ -6,6 +6,31 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Legacy path-A row retire trigger (path B, opened 2026-04-29 by PB-6)
+
+**Tags:** `path-b`, `cleanup`, `data-migration`
+
+**What:** PB-6 chose "leave-as-is dual-path" — path-A rows (full HTML docs in `pages.generated_html` / `posts.generated_html` / `brief_pages.draft_html` / `brief_pages.generated_html`) coexist with path-B fragments. Publish + preview both branch via the `claimsCompleteness` heuristic in `lib/preview-iframe-wrapper.ts`. See `docs/plans/path-b-legacy-data-decision.md` for the trade-off rationale.
+
+When path-A rows become stale enough or visually disruptive enough, retire by running option 1 from the parent plan: schema migration adds `legacy_path_a boolean` column (backfill default true, new rows default false); publish path refuses path-A unless the operator explicitly approves a regen.
+
+**Why deferred:** zero-cost, zero-risk leave-as-is is the right default while path B is rolling out and the customer base is still small. Premature retirement adds runtime branches + operator banners + regen cost for content that's working today.
+
+**Trigger:** all path-A rows are older than the customer's data-retention threshold (typically 90 days for unpublished drafts, indefinite for published pages), OR an operator complains a published path-A page is now visually inconsistent with the rest of the site and wants Opollo to regen.
+
+**Scope:**
+- `scripts/diagnose-prod.ts`: add `legacy-row-counts` subcommand (per-table count of rows matching the path-A heuristic). ~30-line read-only addition.
+- Schema migration: add `legacy_path_a boolean` to the four tables; backfill default true via heuristic; new rows default false (runner sets the column on insert).
+- Publish path branch: refuse path-A unless `legacy_path_a` operator-approved-regen flow runs.
+- Operator-facing banner in BriefRunClient + page detail / post detail surfaces.
+- E2E for the regen-on-publish flow.
+
+**Size:** Medium (~3–5 hours for the survey + schema + branch; another hour or two for the operator-facing UX).
+
+**Reference:** `docs/plans/path-b-legacy-data-decision.md` — the current dual-path decision and its retire criteria.
+
+---
+
 ## Path-B publish gate on Kadence sync drift (path B, opened 2026-04-29 by PB-8)
 
 **Tags:** `path-b`, `m13`, `publish`, `feature-flag`

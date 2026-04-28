@@ -410,16 +410,14 @@ PB-6 is last so the decision is informed by real path-B output and real cost dat
 
 ## Sub-slice status tracker
 
-(filled in as PRs land)
-
 | Slice | PR | Merged | Notes |
 |---|---|---|---|
-| PB-1 + PB-2 | — | — | — |
-| PB-3 | — | — | — |
-| PB-4 | — | — | — |
-| PB-5 | — | — | — |
-| PB-6 (decision) | — | — | — |
-| PB-6 (impl) | — | — | — |
-| PB-7 | — | — | — |
-| PB-8 | — | — | — |
-| PB-9 | — | — | — |
+| PB-1 + PB-2 | #194 | 2026-04-28 | Brief-runner emits fragments; `runFragmentStructuralCheck` replaces path-A structural gate. |
+| PB-3 | #199 | 2026-04-28 | Lowest-risk variant: shim stylesheet in `lib/preview-iframe-wrapper.ts`. Customer-CSS fetch deferred to BACKLOG ("Preview iframe — fetch customer theme CSS for high-fidelity preview"). |
+| PB-4 | #197 | 2026-04-28 | M3 batch worker: prompt + fragment-structural gate added. |
+| PB-5 | #198 | 2026-04-28 | M7 regen worker: prompt + fragment-structural gate added. |
+| PB-6 (decision) | #201 | 2026-04-28 | "Leave-as-is dual-path" — see `docs/plans/path-b-legacy-data-decision.md`. Retire trigger captured in BACKLOG. |
+| PB-6 (impl) | — | (deferred) | Implementation deferred per the leave-as-is choice. Retire trigger in BACKLOG. |
+| PB-7 | #196 | 2026-04-28 | Regression test: WP wrappers forward fragment content unchanged. No production code change. |
+| PB-8 | #200 | 2026-04-28 | Docs-only: M13 sync drift severity bumped to "content bug" in RUNBOOK. Hard publish gate behind `FEATURE_PATH_B_PUBLISH_GATE` deferred to BACKLOG. |
+| PB-9 | #195 | 2026-04-28 | `RUNNER_MAX_TOKENS` 16384 → 4096; rate-limit BACKLOG entry retired. |
