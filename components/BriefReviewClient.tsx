@@ -89,11 +89,15 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
 export function BriefReviewClient({
   siteId,
   siteName,
+  siteBrandVoiceDefault,
+  siteDesignDirectionDefault,
   brief,
   initialPages,
 }: {
   siteId: string;
   siteName: string;
+  siteBrandVoiceDefault: string | null;
+  siteDesignDirectionDefault: string | null;
   brief: BriefRow;
   initialPages: BriefPageRow[];
 }) {
@@ -106,11 +110,27 @@ export function BriefReviewClient({
   const [latestBrief, setLatestBrief] = useState<BriefRow>(brief);
   // M12-2 — brand_voice + design_direction feed the M12-3 runner. Captured
   // pre-commit; editable here while status='parsed', read-only after commit.
+  //
+  // RS-2 — site-level defaults inherit when the brief row has no
+  // override yet. The operator can then "Customize for this brief"
+  // (collapsed by default whenever a site default exists) which keeps
+  // their override on the briefs row, never touching the site row.
   const [brandVoice, setBrandVoice] = useState<string>(
-    brief.brand_voice ?? "",
+    brief.brand_voice ?? siteBrandVoiceDefault ?? "",
   );
   const [designDirection, setDesignDirection] = useState<string>(
-    brief.design_direction ?? "",
+    brief.design_direction ?? siteDesignDirectionDefault ?? "",
+  );
+  const hasSiteDefault =
+    (siteBrandVoiceDefault ?? "").length > 0 ||
+    (siteDesignDirectionDefault ?? "").length > 0;
+  const hasPerBriefOverride =
+    brief.brand_voice !== null || brief.design_direction !== null;
+  // Collapse the editor when site defaults exist AND the brief hasn't
+  // already been overridden — operators land on a clean "inheriting"
+  // state and only expand when they want to deviate.
+  const [voiceOverrideOpen, setVoiceOverrideOpen] = useState<boolean>(
+    !hasSiteDefault || hasPerBriefOverride,
   );
   // M12-5 — operator picks model tiers at commit time. Default to the
   // value the server committed the brief with; fall back to the cheap
@@ -329,16 +349,61 @@ export function BriefReviewClient({
 
       {(brief.status === "parsed" || brief.status === "committed") && (
         <section aria-labelledby="voice-direction-heading" className="rounded-lg border p-4">
-          <div className="mb-3">
-            <h2 id="voice-direction-heading" className="text-lg font-medium">
-              Brand voice &amp; design direction
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              These guide every page the generator produces. Optional today;
-              required before the runner ships in M12-3.
-            </p>
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div>
+              <h2 id="voice-direction-heading" className="text-lg font-medium">
+                Brand voice &amp; design direction
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {hasSiteDefault && !voiceOverrideOpen
+                  ? "Inheriting from site defaults. Expand to customize for this brief."
+                  : hasSiteDefault
+                    ? "Override values for this brief only. The site defaults below stay unchanged."
+                    : "These guide every page the generator produces. Set once on Site Settings to inherit on every brief."}
+              </p>
+            </div>
+            {hasSiteDefault && !isReadOnly && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setVoiceOverrideOpen((v) => !v)}
+                aria-expanded={voiceOverrideOpen}
+                aria-controls="voice-direction-fields"
+              >
+                {voiceOverrideOpen ? "Use site defaults" : "Customize for this brief"}
+              </Button>
+            )}
           </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {hasSiteDefault && !voiceOverrideOpen && (
+            <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
+              {siteBrandVoiceDefault && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Brand voice (site default)
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap">
+                    {siteBrandVoiceDefault}
+                  </p>
+                </div>
+              )}
+              {siteDesignDirectionDefault && (
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Design direction (site default)
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap">
+                    {siteDesignDirectionDefault}
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+          <div
+            id="voice-direction-fields"
+            hidden={hasSiteDefault && !voiceOverrideOpen}
+            className="grid grid-cols-1 gap-4 md:grid-cols-2"
+          >
             <div>
               <label
                 htmlFor="brand-voice-input"

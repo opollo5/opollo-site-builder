@@ -448,6 +448,106 @@ export async function updateSiteBasics(
   }
 }
 
+// ---------------------------------------------------------------------------
+// updateSiteVoice (RS-2 — site-level brand voice & design direction)
+// ---------------------------------------------------------------------------
+//
+// Patch the site's brand_voice / design_direction defaults. Operator UX:
+// set once on the Site Settings page, every new brief inherits the
+// values. Per-brief override on briefs.brand_voice / briefs.design_direction
+// still wins at commit time.
+//
+// Optimistic concurrency on sites.version_lock — concurrent edits return
+// VERSION_CONFLICT (409). Either field may be null to clear it; passing
+// undefined leaves the existing value untouched.
+
+export async function updateSiteVoice(
+  id: string,
+  expectedVersionLock: number,
+  patch: { brand_voice?: string | null; design_direction?: string | null },
+): Promise<ApiResponse<SiteRecord>> {
+  try {
+    if (
+      patch.brand_voice === undefined &&
+      patch.design_direction === undefined
+    ) {
+      return internalError("updateSiteVoice called with empty patch.");
+    }
+    const supabase = getServiceRoleClient();
+
+    const updatePatch: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+      version_lock: expectedVersionLock + 1,
+    };
+    if (patch.brand_voice !== undefined) {
+      updatePatch.brand_voice = patch.brand_voice;
+    }
+    if (patch.design_direction !== undefined) {
+      updatePatch.design_direction = patch.design_direction;
+    }
+
+    const { data, error } = await supabase
+      .from("sites")
+      .update(updatePatch)
+      .eq("id", id)
+      .eq("version_lock", expectedVersionLock)
+      .neq("status", "removed")
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      return internalError("Failed to update site voice.", {
+        supabase_error: error,
+      });
+    }
+    if (!data) {
+      // Disambiguate NOT_FOUND vs VERSION_CONFLICT — re-read the row.
+      const { data: present } = await supabase
+        .from("sites")
+        .select("version_lock")
+        .eq("id", id)
+        .neq("status", "removed")
+        .maybeSingle();
+      if (!present) {
+        return {
+          ok: false,
+          error: {
+            code: "NOT_FOUND",
+            message: `No active site found with id ${id}.`,
+            details: { id },
+            retryable: false,
+            suggested_action:
+              "Verify the site id; removed sites are excluded.",
+          },
+          timestamp: now(),
+        };
+      }
+      return {
+        ok: false,
+        error: {
+          code: "VERSION_CONFLICT",
+          message:
+            "Another tab updated this site's voice settings. Reload to see the latest values, then re-apply your edit.",
+          details: {
+            id,
+            expected_version_lock: expectedVersionLock,
+            current_version_lock: present.version_lock,
+          },
+          retryable: false,
+          suggested_action:
+            "Reload the Settings page to see the latest version.",
+        },
+        timestamp: now(),
+      };
+    }
+    return { ok: true, data: data as SiteRecord, timestamp: now() };
+  } catch (err) {
+    return internalError(
+      `Unhandled error in updateSiteVoice: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
 /**
  * Soft-archive a site. Sets status='removed' so listSites filters it
  * out. The UNIQUE (prefix) WHERE status != 'removed' partial index

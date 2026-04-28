@@ -183,6 +183,11 @@ export type SiteRecord = {
   plugin_version: string | null;
   created_at: string;
   updated_at: string;
+  // RS-2: site-level defaults. Nullable; brief commit form populates from
+  // these when the operator hasn't set a per-brief override.
+  brand_voice: string | null;
+  design_direction: string | null;
+  version_lock: number;
 };
 
 export type SiteListItem = {

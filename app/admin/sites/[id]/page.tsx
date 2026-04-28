@@ -386,6 +386,27 @@ export default async function SiteDetailPage({
               Open Appearance panel →
             </Link>
           </div>
+
+          {/* RS-2 — Settings (brand voice + design direction defaults). */}
+          <div className="rounded-lg border p-4 text-sm">
+            <h2 className="text-base font-medium">Settings</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Brand voice &amp; design direction defaults that every new brief
+              inherits.
+              {(site.brand_voice || site.design_direction) && (
+                <span className="ml-1 text-emerald-700">Configured.</span>
+              )}
+              {!site.brand_voice && !site.design_direction && (
+                <span className="ml-1 text-muted-foreground">Not set.</span>
+              )}
+            </p>
+            <Link
+              href={`/admin/sites/${site.id}/settings`}
+              className="mt-2 inline-block text-muted-foreground hover:text-foreground"
+            >
+              Open Settings →
+            </Link>
+          </div>
         </aside>
       </div>
     </>
