@@ -124,8 +124,11 @@ test.describe("M12-1 briefs — upload + review", () => {
     await expect(confirmDialog).toBeVisible();
     await confirmDialog.getByRole("button", { name: /^Commit page list$/i }).click();
 
-    // Page re-renders with the committed state.
-    await expect(page.getByText(/This brief is locked in\./i)).toBeVisible();
+    // RS-3: successful commit redirects straight to the run surface;
+    // the operator never sees the intermediate "committed" panel.
+    await page.waitForURL(
+      /\/admin\/sites\/[0-9a-f-]{36}\/briefs\/[0-9a-f-]{36}\/run$/,
+    );
     await expect(page.getByRole("button", { name: /Commit page list/i })).toHaveCount(0);
   });
 
@@ -175,7 +178,10 @@ test.describe("M12-1 briefs — upload + review", () => {
     await pageA.getByRole("button", { name: /Commit page list/i }).click();
     const dialogA = pageA.getByRole("dialog", { name: /Commit this page list\?/i });
     await dialogA.getByRole("button", { name: /^Commit page list$/i }).click();
-    await expect(pageA.getByText(/This brief is locked in\./i)).toBeVisible();
+    // RS-3: successful commit lands on the run surface.
+    await pageA.waitForURL(
+      /\/admin\/sites\/[0-9a-f-]{36}\/briefs\/[0-9a-f-]{36}\/run$/,
+    );
 
     // B tries to commit without refresh. B's version_lock is stale →
     // ALREADY_EXISTS since A already committed with the matching hash.
@@ -185,9 +191,11 @@ test.describe("M12-1 briefs — upload + review", () => {
     await dialogB.getByRole("button", { name: /^Commit page list$/i }).click();
 
     // Because B's hash matches A's (neither edited), the server treats
-    // this as a successful replay — so the UI should flip to committed
-    // on the next render too. This asserts the idempotent-replay path.
-    await expect(pageB.getByText(/This brief is locked in\./i)).toBeVisible();
+    // this as a successful replay — UI flips to the run surface too.
+    // This asserts the idempotent-replay path.
+    await pageB.waitForURL(
+      /\/admin\/sites\/[0-9a-f-]{36}\/briefs\/[0-9a-f-]{36}\/run$/,
+    );
 
     await contextA.close();
     await contextB.close();

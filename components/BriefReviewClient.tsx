@@ -22,10 +22,11 @@ import { DEFAULT_MODEL_ID, MODEL_OPTIONS } from "@/lib/anthropic-models";
 //
 //   briefs.status='parsed'        → editable list + "Commit page list" CTA
 //
-//   briefs.status='committed'     → read-only list + post-commit panel
-//                                   with two CTAs: "Back to briefs" and
-//                                   "Open run surface →" (live since
-//                                   M12-5 shipped)
+//   briefs.status='committed'     → operator never sees this page; the
+//                                   /review route redirects to /run
+//                                   server-side, and the commit handler
+//                                   pushes to /run on success (RS-3).
+//                                   The DB-level state still exists.
 //
 //   briefs.status='failed_parse'  → red banner with the failure detail +
 //                                   re-upload suggestion
@@ -243,8 +244,11 @@ export function BriefReviewClient({
         error?: { code: string; message: string };
       };
       if (res.ok && payload.ok) {
-        setCommitState("idle");
-        router.refresh();
+        // RS-3: skip the intermediate "committed" panel — the operator
+        // wants to start the run, not see another OK screen. The /review
+        // route also redirects committed briefs to /run server-side, so
+        // a back-button + reload still lands on the run surface.
+        router.push(`/admin/sites/${siteId}/briefs/${brief.id}/run`);
         return;
       }
       const code = payload.error?.code ?? "INTERNAL_ERROR";
@@ -572,35 +576,11 @@ export function BriefReviewClient({
         </div>
       )}
 
-      {brief.status === "committed" && (
-        <div
-          className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-4 text-sm"
-          role="status"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="font-medium">This brief is committed.</p>
-              <p className="mt-1 text-muted-foreground">
-                You&apos;re ready to run the generator. The run surface shows
-                the cost estimate, approval controls, and visual critique per
-                page.
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-              <Button asChild variant="outline" size="sm">
-                <a href={`/admin/sites/${siteId}`}>Back to briefs</a>
-              </Button>
-              <Button asChild size="sm">
-                <a
-                  href={`/admin/sites/${siteId}/briefs/${brief.id}/run`}
-                >
-                  Open run surface →
-                </a>
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* RS-3: removed the post-commit panel. Successful commit pushes
+          the operator straight to /run; the /review route redirects
+          server-side if the operator returns to the URL with status
+          === "committed". The committed state still exists in the DB —
+          just no UI surface for it on this page. */}
 
       {commitState === "confirming" && (
         <CommitConfirmModal
