@@ -841,3 +841,47 @@ When an item moves out of here — either because it shipped or because the trig
 ```
 
 Don't delete; the history of what we deferred and why is part of the engineering record.
+
+### Autonomous BACKLOG sweep (2026-04-29, PRs #202–#212)
+
+Steven's "work through all open BACKLOG items autonomously" run. 11 PRs shipped; 12 entries retired (8 closed-by-fix, 4 closed-as-already-shipped); audit infrastructure shipped for a 13th item with the long tail flagged as opportunistic.
+
+| PR | What | Closes |
+|---|---|---|
+| #202 | recovery script `--force-wipe` + structural-completeness pre-flight | "recover-stuck-brief-page wipes draft_html unconditionally" |
+| #203 | sites table `overflow-hidden` → `rounded-md border` | "Site actions dropdown clipped on /admin/sites list" |
+| #204 | brief-commit confirmation already had CTAs (stale entry cleanup) | "Brief commit confirmation — dead-end screen" |
+| #205 | brief upload paste + content_type already shipped (stale entries) | "Brief upload UX — paste raw text option" + "content_type selector missing" |
+| #206 | logger.error on 8 critical INTERNAL_ERROR returns + audit script | "Pattern audit — silent INTERNAL_ERROR fallbacks" (audit infra; sweep opportunistic) |
+| #207 | model-list-freshness runbook already exists (stale entry cleanup) | "Model list freshness — Anthropic releases new models" |
+| #208 | default model already Haiku (stale entry cleanup) | "Default model selection — Sonnet → Haiku" |
+| #209 | env doc polish (4 of 5 M15-3 items) | M15-3 #6, #10, #11, #12 |
+| #210 | VALIDATION_FAILED retryable: false in 5 routes | M15-4 #5 |
+| #211 | INVALID_STATE in ERROR_CODES + budget admin-only comment + /api/health envelope + try/catch | M15-4 #16, #17, #18, #19 |
+| #212 | this entry — final BACKLOG sweep summary | (run housekeeping) |
+
+**What's still open (with triggers documented):**
+
+Path-B follow-ups (all explicitly trigger-gated; no action this run):
+- "Legacy path-A row retire trigger" — fires on stale-row accumulation or operator complaint
+- "Path-B publish gate on Kadence sync drift" (`FEATURE_PATH_B_PUBLISH_GATE`) — fires on visual regression or path-B becomes default
+- "Preview iframe — fetch customer theme CSS" — fires on operator visual-fidelity complaint
+- "Post meta description via WP excerpt" — fires on SEO regression or operator request
+
+Other trigger-gated items:
+- "Generated Supabase types + CI schema/code drift gate" (M15-8 candidate) — fires on next schema/code drift bug
+- "Existing CI E2E suite has been red since PR #149" — needs investigation; trigger is first paying customer
+- "Staging-environment E2E for sync confirm + actual WP publish" — heavy infra; trigger is paying customer onboarding
+- "Cloudflare image upload friction → S3 alternative investigation" — POC + migration; trigger is product-readiness audit
+- "Opollo mu-plugin for one-click Kadence install" — XL slice; trigger is first operator wanting one-click setup
+- "Kadence typography + spacing globals sync" — Medium-Large; trigger is operator brand-consistency complaint
+- "PDF / .docx brief parser" — Medium; trigger is first operator request to upload a non-text brief
+- "Auth polish deferred from M14" — trigger is operator pain
+- "Admin top navigation redesign" — Medium UX polish; trigger is product-readiness pass
+
+Audit residue (opportunistic — drive-by fix when touching the surface):
+M15-2 schema polish (#4, #5, #8, #10, #12, #13, #14); M15-4 security/auth (#3, #8, #11, #12); M15-4 observability hygiene (#6, #7, #12); M15-4 rate-limiting (#9); M15-4 tech-debt (#14, #15, dead code); M15-6 test coverage (#5-#17); M15-3 #13 ANALYZE; M11 Audit 3 polish #7-#20; M15-7 RLS null-safety hardening.
+
+Generic infra / product surface (all pre-existed this run, all explicitly trigger-gated): Stripe billing, Storybook, Feature flags, k6 load testing, chaos engineering, synthetic monitoring, property-based testing, size-limit budgets, admin de-jargoning, CHANGELOG, API ref, Next.js 14 → 16 framework upgrade, CSP enforce-mode, soft-delete schema hygiene, deferred dependency upgrades.
+
+**Production health throughout the sweep:** green. `scripts/diagnose-prod.ts health-deep` reported `overall: ok` at 3, 6, and 9 PRs. No new failed brief_runs, no stuck running runs, no budget-reset backlog.
