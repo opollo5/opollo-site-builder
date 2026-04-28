@@ -7,6 +7,7 @@ import {
   rewriteImageUrls,
 } from "@/lib/html-image-rewrite";
 import { LEADSOURCE_FONT_LOAD_HTML } from "@/lib/leadsource-fonts";
+import { runFragmentStructuralCheck } from "@/lib/brief-runner";
 import { runGates, type RunGatesResult } from "@/lib/quality-gates";
 import { getServiceRoleClient } from "@/lib/supabase";
 import {
@@ -248,13 +249,28 @@ async function publishRegenJobImpl(
     };
   }
 
-  // 1. Quality gates
-  const gates = runGates({
-    html: generatedHtml,
-    slug: page.slug as string,
-    prefix: site.prefix as string,
-    design_system_version: String(page.design_system_version ?? 1),
-  });
+  // 1. Quality gates. PB-5 (2026-04-29): fragment-shape check runs
+  // FIRST, before the strict suite. A fragment-shape failure is wrapped
+  // into a synthetic GateOutcome so the existing failure path
+  // (event log + status='failed_gates') handles it uniformly.
+  const fragmentCheck = runFragmentStructuralCheck(generatedHtml);
+  const gates: RunGatesResult = !fragmentCheck.ok
+    ? ({
+        kind: "failed",
+        gates_run: ["fragment_structural"] as Array<string>,
+        first_failure: {
+          kind: "fail",
+          gate: "fragment_structural" as never,
+          reason: fragmentCheck.message,
+          details: { code: fragmentCheck.code },
+        },
+      } as unknown as RunGatesResult)
+    : runGates({
+        html: generatedHtml,
+        slug: page.slug as string,
+        prefix: site.prefix as string,
+        design_system_version: String(page.design_system_version ?? 1),
+      });
   if (gates.kind === "failed") {
     await supabase.from("regeneration_events").insert({
       regeneration_job_id: jobId,
