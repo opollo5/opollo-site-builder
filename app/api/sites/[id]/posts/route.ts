@@ -34,6 +34,8 @@ const BodySchema = z
       .regex(/^[a-z0-9-]+$/),
     excerpt: z.string().max(2000).nullable().optional(),
     metadata: z.unknown().optional(),
+    // BP-7 — image_library row id chosen via the BP-4 picker.
+    featured_image_id: z.string().uuid().nullable().optional(),
   })
   .strict();
 
@@ -104,6 +106,7 @@ export async function POST(
     excerpt: parsed.data.excerpt ?? undefined,
     design_system_version: dsVersion,
     metadata: parsed.data.metadata,
+    featured_image_id: parsed.data.featured_image_id ?? undefined,
     created_by: gate.user?.id ?? null,
   });
 

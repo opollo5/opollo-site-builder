@@ -74,6 +74,11 @@ export const CreatePostInputSchema = z
     // BP-3: parser snapshot (title/slug/meta_*/source_map) for posts
     // created via the entry-point. NULL otherwise.
     metadata: z.unknown().optional(),
+    // BP-7: featured image reference (image_library.id). Optional at
+    // create time so a draft can save without an image; publish-time
+    // gate enforces requirement for entry-point posts (metadata IS NOT
+    // NULL).
+    featured_image_id: z.string().uuid().nullable().optional(),
   })
   .strict();
 
@@ -256,6 +261,8 @@ async function createPostImpl(
   if (input.generated_html !== undefined) insertRow.generated_html = input.generated_html;
   if (input.created_by !== undefined) insertRow.created_by = input.created_by;
   if (input.metadata !== undefined) insertRow.metadata = input.metadata;
+  if (input.featured_image_id !== undefined)
+    insertRow.featured_image_id = input.featured_image_id;
 
   const res = await supabase
     .from("posts")

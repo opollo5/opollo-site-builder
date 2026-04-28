@@ -18,6 +18,10 @@ import {
   wpUpdatePost,
   type WpConfig,
 } from "@/lib/wordpress";
+import {
+  uploadFeaturedMedia,
+  WpFeaturedMediaError,
+} from "@/lib/wp-featured-media";
 
 // ---------------------------------------------------------------------------
 // M13-4 — POST /api/sites/[id]/posts/[post_id]/publish
@@ -96,7 +100,7 @@ export async function POST(
   const postRes = await svc
     .from("posts")
     .select(
-      "id, site_id, slug, title, excerpt, status, wp_post_id, generated_html, version_lock",
+      "id, site_id, slug, title, excerpt, status, wp_post_id, generated_html, version_lock, metadata, featured_image_id, featured_wp_media_id",
     )
     .eq("id", postIdCheck.value)
     .is("deleted_at", null)
@@ -121,6 +125,11 @@ export async function POST(
     wp_post_id: number | null;
     generated_html: string | null;
     version_lock: number;
+    // BP-7 — metadata IS NOT NULL marks an entry-point post; gates the
+    // FEATURED_IMAGE_REQUIRED rule. Legacy brief-runner posts have NULL.
+    metadata: unknown | null;
+    featured_image_id: string | null;
+    featured_wp_media_id: number | null;
   };
   if (post.site_id !== siteIdCheck.value) {
     return envelope(
@@ -176,14 +185,77 @@ export async function POST(
     appPassword: creds.wp_app_password,
   };
 
+  // 3.5 BP-7: featured-image gate + transfer.
+  //
+  // Entry-point posts (metadata IS NOT NULL) MUST have a featured image
+  // selected. Legacy brief-runner posts (metadata IS NULL) skip the
+  // gate so existing publish paths don't regress.
+  const isEntryPointPost = post.metadata !== null;
+  if (isEntryPointPost && post.featured_image_id === null) {
+    return envelope(
+      "FEATURED_IMAGE_REQUIRED",
+      "This post needs a featured image. Pick one in the post editor before publishing.",
+      422,
+    );
+  }
+
+  let featuredMediaId: number | null = post.featured_wp_media_id;
+  let stampedFeaturedMedia = false;
+  if (post.featured_image_id !== null && featuredMediaId === null) {
+    // First-time transfer. Look up the image_library row, fetch the
+    // bytes from Cloudflare, push to WP /media. The wp_media_id stamp
+    // happens in step 5 alongside the publish-state CAS so a partial
+    // commit doesn't orphan a successful transfer.
+    const imgRes = await svc
+      .from("image_library")
+      .select("cloudflare_id, filename")
+      .eq("id", post.featured_image_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (imgRes.error || !imgRes.data || !imgRes.data.cloudflare_id) {
+      return envelope(
+        "FEATURED_IMAGE_NOT_FOUND",
+        "Featured image is missing from the library. Pick another image in the editor.",
+        422,
+      );
+    }
+    const marker = `opollo-post-${post.id.replace(/-/g, "")}`;
+    try {
+      const uploaded = await uploadFeaturedMedia(cfg, {
+        cloudflareId: imgRes.data.cloudflare_id as string,
+        filename: (imgRes.data.filename as string | null) ?? null,
+        marker,
+      });
+      featuredMediaId = uploaded.wp_media_id;
+      stampedFeaturedMedia = true;
+    } catch (err) {
+      if (err instanceof WpFeaturedMediaError) {
+        logger.warn("posts.publish.featured_media_failed", {
+          post_id: post.id,
+          code: err.code,
+          retryable: err.retryable,
+        });
+        return envelope(
+          err.code === "WP_AUTH_FAILED" ? "AUTH_FAILED" : "WP_API_ERROR",
+          `Featured image transfer failed: ${err.message}`,
+          err.code === "WP_AUTH_FAILED" ? 401 : err.retryable ? 502 : 422,
+        );
+      }
+      throw err;
+    }
+  }
+
   // 4. Publish / re-publish via WP REST.
   const excerptValue = post.excerpt ?? undefined;
+  const featuredMediaPatch =
+    featuredMediaId !== null ? { featured_media: featuredMediaId } : {};
   const wpResult = post.wp_post_id
     ? await wpUpdatePost(cfg, post.wp_post_id, {
         title: post.title,
         slug: post.slug,
         content: post.generated_html,
         ...(excerptValue !== undefined ? { excerpt: excerptValue } : {}),
+        ...featuredMediaPatch,
         status: "publish",
       })
     : await wpCreatePost(cfg, {
@@ -191,6 +263,7 @@ export async function POST(
         slug: post.slug,
         content: post.generated_html,
         ...(excerptValue !== undefined ? { excerpt: excerptValue } : {}),
+        ...featuredMediaPatch,
         status: "publish",
       });
   if (!wpResult.ok) {
@@ -229,6 +302,11 @@ export async function POST(
   };
   if (!post.wp_post_id) {
     updatePatch.wp_post_id = wpResult.post_id;
+  }
+  // BP-7 — stamp the WP media id so re-publish reuses the existing
+  // attachment instead of re-uploading the same bytes.
+  if (stampedFeaturedMedia && featuredMediaId !== null) {
+    updatePatch.featured_wp_media_id = featuredMediaId;
   }
 
   const upd = await svc
