@@ -212,15 +212,7 @@ export function ImagePickerModal({
         )}
 
         {tab === "url" && (
-          <div className="mt-4 rounded-lg border-2 border-dashed border-muted bg-muted/30 p-6 text-sm text-muted-foreground">
-            <p className="font-medium text-foreground">
-              Paste-URL coming in BP-6
-            </p>
-            <p className="mt-1">
-              Paste a public image URL — server fetches, runs SSRF guards,
-              uploads to Cloudflare, and auto-selects.
-            </p>
-          </div>
+          <UrlTab onFetched={(image) => handleSelect(image)} />
         )}
       </DialogContent>
     </Dialog>
@@ -332,6 +324,82 @@ function UploadTab({
             Pushing to Cloudflare…
           </span>
         )}
+      </div>
+      {error && (
+        <div
+          role="alert"
+          className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+        >
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UrlTab({
+  onFetched,
+}: {
+  onFetched: (image: ImagePickerEntry) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleFetch() {
+    setError(null);
+    if (!url.trim()) {
+      setError("Paste an image URL.");
+      return;
+    }
+    setFetching(true);
+    try {
+      const res = await fetch("/api/admin/images/fetch-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: url.trim() }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok: true; data: ImagePickerEntry }
+        | { ok: false; error: { code: string; message: string } }
+        | null;
+      if (payload?.ok) {
+        onFetched(payload.data);
+        return;
+      }
+      setError(
+        payload?.ok === false
+          ? payload.error.message
+          : `Fetch failed (HTTP ${res.status}).`,
+      );
+    } catch (err) {
+      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setFetching(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-lg border p-4 text-sm">
+      <p className="font-medium">Fetch image from URL</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Paste a public image URL. Server fetches, validates the type +
+        size, and uploads to the library. 30s timeout; 10 MB cap.
+        Internal IPs are blocked.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Input
+          type="url"
+          inputMode="url"
+          placeholder="https://example.com/image.jpg"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          disabled={fetching}
+          className="min-w-0 flex-1"
+        />
+        <Button type="button" onClick={handleFetch} disabled={fetching}>
+          {fetching ? "Fetching…" : "Fetch"}
+        </Button>
       </div>
       {error && (
         <div
