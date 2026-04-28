@@ -57,10 +57,13 @@
 
 import { createClient } from "@supabase/supabase-js";
 
+import { runFragmentStructuralCheck } from "../lib/brief-runner";
+
 type CliArgs = {
   pageId?: string;
   dryRun: boolean;
   confirm: boolean;
+  forceWipe: boolean;
 };
 
 function die(msg: string, code: number = 1): never {
@@ -69,12 +72,13 @@ function die(msg: string, code: number = 1): never {
 }
 
 function parseArgs(argv: readonly string[]): CliArgs {
-  const args: CliArgs = { dryRun: false, confirm: false };
+  const args: CliArgs = { dryRun: false, confirm: false, forceWipe: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--page-id") args.pageId = argv[++i];
     else if (a === "--dry-run") args.dryRun = true;
     else if (a === "--confirm") args.confirm = true;
+    else if (a === "--force-wipe") args.forceWipe = true;
     else if (a === "--help" || a === "-h") {
       printUsage();
       process.exit(0);
@@ -94,6 +98,10 @@ function printUsage(): void {
       "  --page-id <uuid>   Required. brief_pages.id of the stuck page.",
       "  --dry-run          Print the targeted state; no DB writes.",
       "  --confirm          Required for real runs (opt-in guard).",
+      "  --force-wipe       Required when the existing draft_html is structurally",
+      "                     complete (would otherwise abort with WIPE_BLOCKED).",
+      "                     The wipe is irreversible — Postgres UPDATE doesn't",
+      "                     preserve old row versions; PITR is the only restore.",
       "",
       "Required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY",
       "",
@@ -192,6 +200,39 @@ async function main(): Promise<number> {
       "",
     ].join("\n"),
   );
+
+  // BACKLOG-fix (2026-04-29): refuse to wipe a structurally-complete
+  // draft_html unless the operator passes --force-wipe. The wipe is
+  // irreversible (Postgres UPDATE doesn't preserve old row versions;
+  // PITR via dashboard is the only restore). Reference incident: page
+  // dcbdf7d5-... 2026-04-27T23:14 UTC blew away a clean 23,201-char
+  // doc that PR #188's gate had successfully retried. This guard
+  // forces an explicit operator decision rather than a silent wipe.
+  const completeness = runFragmentStructuralCheck(page.draft_html ?? "");
+  if (completeness.ok && !args.forceWipe) {
+    process.stderr.write(
+      [
+        "",
+        "WIPE_BLOCKED — existing draft_html is structurally complete.",
+        `  Length: ${(page.draft_html ?? "").length} chars`,
+        "  This recovery would destroy a salvageable draft. The wipe is",
+        "  irreversible (PITR is the only restore path).",
+        "",
+        "  If you really want to wipe (e.g. operator decided to re-generate",
+        "  from scratch), pass --force-wipe alongside --confirm. Otherwise:",
+        "    - Leave the page as-is and let the operator approve it.",
+        "    - Or use the admin UI's Revise-with-note flow to regenerate",
+        "      without losing the current draft.",
+        "",
+      ].join("\n"),
+    );
+    return 4;
+  }
+  if (completeness.ok && args.forceWipe) {
+    process.stderr.write(
+      "WARNING: --force-wipe acknowledged. Destroying a structurally-complete draft_html.\n",
+    );
+  }
 
   if (args.dryRun) {
     process.stdout.write("Dry-run — no DB writes performed.\n");
