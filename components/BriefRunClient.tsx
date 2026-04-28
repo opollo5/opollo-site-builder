@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { RunCostTicker } from "@/components/RunCostTicker";
 import type {
   BriefPageCritiqueEntry,
   BriefPageQualityFlag,
@@ -420,36 +421,9 @@ export function BriefRunClient({
         </div>
       )}
 
-      <section
-        aria-labelledby="cost-heading"
-        className="rounded-lg border p-4"
-      >
-        <h2 id="cost-heading" className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Cost
-        </h2>
-        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div>
-            <p className="text-xs text-muted-foreground">Estimate</p>
-            <p className="font-mono text-lg">{centsToUsd(estimateCents)}</p>
-            <p className="text-xs text-muted-foreground">
-              {sortedPages.length} page{sortedPages.length === 1 ? "" : "s"} ·{" "}
-              {brief.text_model} / {brief.visual_model}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Remaining this month</p>
-            <p className="font-mono text-lg">
-              {centsToUsd(remainingBudgetCents)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Spent on this run</p>
-            <p className="font-mono text-lg">
-              {centsToUsd(Number(activeRun?.run_cost_cents ?? 0))}
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* RS-6 — inline cost section dropped; the floating RunCostTicker
+          (rendered at the page root, fixed bottom-right / bottom-bar)
+          carries the same data plus a per-page breakdown. */}
 
       {canStartRun && (
         <div className="flex items-center justify-end gap-2">
@@ -577,6 +551,15 @@ export function BriefRunClient({
           submitting={controlState === "acting"}
         />
       )}
+
+      <RunCostTicker
+        estimateCents={estimateCents}
+        remainingBudgetCents={remainingBudgetCents}
+        spentCents={Number(activeRun?.run_cost_cents ?? 0)}
+        pages={sortedPages}
+        textModel={brief.text_model}
+        visualModel={brief.visual_model}
+      />
     </div>
   );
 }
