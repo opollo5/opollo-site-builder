@@ -5,7 +5,19 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Composer, type ComposerValue } from "@/components/Composer";
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ImagePickerModal,
@@ -94,7 +106,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [slug, setSlug] = useState<FieldState>(emptyField);
   const [metaTitle, setMetaTitle] = useState<FieldState>(emptyField);
   const [metaDescription, setMetaDescription] = useState<FieldState>(emptyField);
-  const [parentPage, setParentPage] = useState(""); // BP-8 will swap for combobox
+  // BP-8 — parent page comes from a combobox backed by /api/sites/[id]/wp-pages.
+  const [parentPage, setParentPage] = useState<WpPageOption | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastParse, setLastParse] = useState<BlogPostMetadata | null>(null);
@@ -150,6 +163,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     [slug.value],
   );
   const titleIsValid = title.value.trim().length > 0;
+  const metaTitleIsValid = metaTitle.value.trim().length > 0;
   const metaDescriptionIsValid =
     metaDescription.value.trim().length > 0 &&
     metaDescription.value.length <= 160;
@@ -159,6 +173,17 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     titleIsValid &&
     slugIsValid &&
     composerValue.text.trim().length > 0;
+
+  // BP-8 — Start Run gate. All publish-time required fields must be
+  // valid. Today Start Run does the same thing as Save Draft (router
+  // push to detail); BP-7 will plumb the actual featured-image transfer
+  // + WP create at this point.
+  const canStartRun =
+    canSaveDraft &&
+    metaTitleIsValid &&
+    metaDescriptionIsValid &&
+    parentPage !== null &&
+    featuredImage !== null;
 
   async function handleSaveDraft(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -320,16 +345,16 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           >
             Parent page
           </label>
-          <Input
-            id="post-parent-page"
-            className="mt-1"
+          <WpPageCombobox
+            siteId={siteId}
             value={parentPage}
-            onChange={(e) => setParentPage(e.target.value)}
+            onChange={setParentPage}
             disabled={submitting}
-            placeholder="(BP-8 will replace this with a WP-page combobox)"
+            triggerId="post-parent-page"
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Free-text for now. BP-8 wires the WP /pages picker.
+            Where this post will live in the WP site tree (queries
+            <code className="ml-1 font-mono">/wp/v2/pages</code>).
           </p>
         </div>
 
@@ -438,17 +463,21 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           {submitting ? "Saving…" : "Save draft"}
         </Button>
         <Button
-          type="button"
-          disabled
-          title="Featured image required (BP-4 + BP-8 will wire this)"
+          type="submit"
+          disabled={!canStartRun}
+          title={
+            canStartRun
+              ? "Save the draft and continue to publish."
+              : "All required fields must be valid: title, slug, meta title, meta description, parent page, featured image."
+          }
         >
-          Start run
+          {submitting ? "Saving…" : "Start run"}
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Start run is disabled until BP-7 (featured-image attach) + BP-8
-        (run-start gate) ship. Save a draft now and the post detail
-        page will surface the start affordance.
+        Start run currently saves a draft and routes to the post detail
+        page. BP-7 will plumb the featured-image transfer + WP create
+        directly from this button.
       </p>
 
       <ImagePickerModal
@@ -457,5 +486,154 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         onSelect={(image) => setFeaturedImage(image)}
       />
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BP-8 — WP parent-page combobox.
+//
+// Backed by /api/sites/[id]/wp-pages. Search is forwarded to WP's
+// `search` param (full-text against title + slug). Fetches once on
+// open then on debounced query change.
+// ---------------------------------------------------------------------------
+
+export interface WpPageOption {
+  page_id: number;
+  title: string;
+  slug: string;
+}
+
+function WpPageCombobox({
+  siteId,
+  value,
+  onChange,
+  disabled,
+  triggerId,
+}: {
+  siteId: string;
+  value: WpPageOption | null;
+  onChange: (next: WpPageOption | null) => void;
+  disabled?: boolean;
+  triggerId?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [pages, setPages] = useState<WpPageOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const ctrl = new AbortController();
+    const id = setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params = new URLSearchParams();
+        if (query.trim()) params.set("q", query.trim());
+        const res = await fetch(
+          `/api/sites/${siteId}/wp-pages?${params.toString()}`,
+          { signal: ctrl.signal, cache: "no-store" },
+        );
+        if (ctrl.signal.aborted) return;
+        const payload = (await res.json().catch(() => null)) as
+          | {
+              ok: true;
+              data: {
+                pages: { page_id: number; title: string; slug: string }[];
+              };
+            }
+          | { ok: false; error: { code: string; message: string } }
+          | null;
+        if (!payload?.ok) {
+          setError(
+            payload?.ok === false
+              ? payload.error.message
+              : `Failed to load WP pages (HTTP ${res.status}).`,
+          );
+          setPages([]);
+          return;
+        }
+        setPages(
+          payload.data.pages.map((p) => ({
+            page_id: p.page_id,
+            title: p.title,
+            slug: p.slug,
+          })),
+        );
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!ctrl.signal.aborted) setLoading(false);
+      }
+    }, 250);
+    return () => {
+      clearTimeout(id);
+      ctrl.abort();
+    };
+  }, [open, query, siteId]);
+
+  return (
+    <Popover open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
+      <PopoverTrigger asChild>
+        <button
+          id={triggerId}
+          type="button"
+          disabled={disabled}
+          className="mt-1 flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-sm transition-smooth focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className={value ? "" : "text-muted-foreground"}>
+            {value ? `${value.title} (${value.slug})` : "Pick a parent page…"}
+          </span>
+          <span aria-hidden className="ml-2 text-xs text-muted-foreground">
+            ▾
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-[var(--radix-popover-trigger-width)] p-0"
+      >
+        <Command shouldFilter={false}>
+          <CommandInput
+            placeholder="Search pages by title or slug"
+            value={query}
+            onValueChange={setQuery}
+          />
+          <CommandList>
+            {error && (
+              <div
+                role="alert"
+                className="px-3 py-2 text-xs text-destructive"
+              >
+                {error}
+              </div>
+            )}
+            <CommandEmpty>
+              {loading ? "Loading…" : "No pages match."}
+            </CommandEmpty>
+            {pages.map((p) => (
+              <CommandItem
+                key={p.page_id}
+                value={`${p.title} ${p.slug}`}
+                onSelect={() => {
+                  onChange(p);
+                  setOpen(false);
+                }}
+              >
+                <span className="flex-1 truncate">{p.title}</span>
+                <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                  /{p.slug}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 }
