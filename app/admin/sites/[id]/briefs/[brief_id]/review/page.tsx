@@ -69,6 +69,8 @@ export default async function BriefReviewPage({
       <BriefReviewClient
         siteId={site.id}
         siteName={site.name}
+        siteBrandVoiceDefault={site.brand_voice}
+        siteDesignDirectionDefault={site.design_direction}
         brief={brief}
         initialPages={pages}
       />
