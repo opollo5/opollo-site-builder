@@ -6,6 +6,18 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Component test infra — jsdom + @testing-library/react (opened 2026-04-27 by RS-1 / RS-4)
+
+**What:** Add `jsdom` (or `happy-dom`), `@testing-library/react`, and a vitest project split (or `environmentMatchGlobs`) so we can run hook + component tests under `lib/__tests__/` (or a new `components/__tests__/`).
+
+**Why deferred:** RS-1 (`Composer`) and RS-4 (`usePoll`) both wanted unit-level coverage and the parent plan called for it, but adding the full DOM-test stack is its own architectural decision (env split, ~30 MB devDeps, vitest config rewrite, deciding whether the existing `lib/__tests__` Supabase setup runs for component files too). Out of scope for the UX overhaul slices — they ship behind E2E + manual smoke instead.
+
+**Trigger to pick it up:** the next slice that needs to test a hook with non-trivial state transitions (e.g. RS-6 cost-ticker count-up animation, BP-4 image-picker keyboard nav), OR a regression in `Composer` / `usePoll` that's hard to reproduce manually.
+
+**Rough scope:** ~½ day. Config split, two example tests (one hook, one component), CI-mode config so the new runner doesn't require `supabase start`.
+
+---
+
 ## Legacy path-A row retire trigger (path B, opened 2026-04-29 by PB-6)
 
 **Tags:** `path-b`, `cleanup`, `data-migration`
