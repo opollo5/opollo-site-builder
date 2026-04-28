@@ -109,7 +109,7 @@ export async function PATCH(
           code: "VALIDATION_FAILED",
           message: "Body failed validation.",
           details: { issues: parsed.error.issues },
-          retryable: true,
+          retryable: false, // VALIDATION_FAILED is not retryable — same input loops forever (M15-4 #5)
         },
         timestamp: new Date().toISOString(),
       },

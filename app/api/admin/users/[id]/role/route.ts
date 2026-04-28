@@ -95,7 +95,7 @@ export async function PATCH(
           code: "VALIDATION_FAILED",
           message: "Body must be { role: 'admin' | 'operator' | 'viewer' }.",
           details: { issues: parsed.error.issues },
-          retryable: true,
+          retryable: false, // VALIDATION_FAILED is not retryable — same input loops forever (M15-4 #5)
         },
         timestamp: new Date().toISOString(),
       },
