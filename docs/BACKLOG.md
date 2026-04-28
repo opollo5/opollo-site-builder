@@ -299,23 +299,9 @@ The replacement: populate the post's WP REST `excerpt` field from a brief-side e
 
 ---
 
-## Site actions dropdown clipped on /admin/sites list (deferred from M13-6a, 2026-04-26)
+## ~~Site actions dropdown clipped on /admin/sites list~~ (shipped PR pending — 2026-04-29)
 
-**Tags:** `ux-polish`
-
-**What:** The actions dropdown on each row of `/admin/sites` is rendered inside a table whose container has `overflow-x-auto` (or similar) for horizontal-scroll-on-narrow. The menu's pop-out is clipped by that overflow context — items below the row's visible bounds are unreachable, particularly on rows near the bottom of a long list where the menu would otherwise extend off-table.
-
-**Why deferred:** Captured live during product walkthrough. Not a write-safety issue and not an incident, but actively annoying. M13-6 is closing out E2E + docs scope; this fits a future UX polish slice cleanly.
-
-**Trigger:** Now-ish — any operator using > 1 menu item on the site list will hit it once the list grows past ~5 rows. Bumps to "high" if site count grows past a screen and the dropdown blocks routine ops.
-
-**Scope:**
-- Two viable shapes; pick whichever fits the existing dropdown component:
-  - **(a) Portal-rendered menu** — migrate the dropdown to a portal (e.g., Radix Popover or headless-ui Menu) so the menu renders outside the overflow context. Cleanest if the rest of the codebase already uses Radix.
-  - **(b) Overflow tweak** — `overflow: visible` on the table container while keeping horizontal scroll on a different scope (e.g., `overflow-x-auto` on a deeper child wrapping just the cell text). Less invasive but easier to break with future CSS changes.
-- Either way: assert with a Playwright test that opens a row in the bottom third of the list, opens the menu, and clicks the bottom-most item — should hit successfully without scroll-jumping.
-
-**Size:** Small — ~30 min for portal solution, ~1 hr for overflow CSS (the latter usually has surprises).
+**Resolved:** Picked option (b) from the original entry — minimal overflow-class change in `components/SitesTable.tsx`. Wrapper dropped `overflow-hidden` so the SiteActionsMenu can extend past the table. Trade-off: row corners no longer masked by the rounded border (minor visual nit vs. routinely-clipped operator actions). Portal migration deferred — would require pulling Radix Popover into the codebase as a new dep; not worth the surface area for this fix.
 
 ---
 

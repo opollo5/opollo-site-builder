@@ -45,8 +45,14 @@ export function SitesTable({ sites }: { sites: SiteListItem[] }) {
     );
   }
 
+  // BACKLOG fix (2026-04-29): the wrapper used `overflow-hidden` to
+  // mask the table's corners against the rounded border, but it also
+  // created a clipping context that hid the SiteActionsMenu pop-out
+  // on rows near the bottom of the list. Drop overflow-hidden so the
+  // menu can extend past the table; corner masking is a minor visual
+  // nit vs. routinely-clipped operator actions.
   return (
-    <div className="overflow-hidden rounded-md border">
+    <div className="rounded-md border">
       <table className="w-full text-sm">
         <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
