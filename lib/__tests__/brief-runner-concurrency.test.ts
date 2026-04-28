@@ -38,8 +38,9 @@ function makeSilentStub(): AnthropicCallFn {
       content: [
         {
           type: "text",
+          // Path-B fragment (PB-1, 2026-04-29).
           text:
-            '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Quiet</h1><p>Generated.</p></section></body></html>',
+            '<section data-opollo><h1>Quiet</h1><p>Generated.</p></section>',
         },
       ],
       stop_reason: "end_turn",

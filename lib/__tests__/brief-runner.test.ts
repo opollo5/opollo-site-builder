@@ -34,13 +34,14 @@ import { seedSite } from "./_helpers";
 
 type RecordedCall = Pick<AnthropicRequest, "idempotency_key" | "model">;
 
-// Full-document shells satisfy the structural-completeness gate
-// (lib/brief-runner.ts::runStructuralCompletenessCheck, 2026-04-28).
+// Path-B fragments (PB-1, 2026-04-29). Each fixture is a contiguous
+// fragment of <section data-opollo …> elements with no host chrome.
+// Satisfies runFragmentStructuralCheck in lib/brief-runner.ts.
 const DRAFT_OUTPUT =
-  '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Hello</h1><p>Draft copy.</p></section></body></html>';
+  '<section data-opollo><h1>Hello</h1><p>Draft copy.</p></section>';
 const CRITIQUE_OUTPUT = "- Make the headline punchier.";
 const REVISE_OUTPUT =
-  '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Punchier</h1><p>Revised copy.</p></section></body></html>';
+  '<section data-opollo><h1>Punchier</h1><p>Revised copy.</p></section>';
 
 function passTextFor(key: string): string {
   // Key shape: brief:<id>:p<ord>:<kind>:<num>

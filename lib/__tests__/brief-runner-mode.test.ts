@@ -33,8 +33,11 @@ import { seedSite } from "./_helpers";
 //   3. resolveRunnerMode falls back to 'page' for unrecognised
 //      content_type values so a mis-migrated row never sends us into
 //      an undefined dispatch entry.
-//   4. runPostQualityGates rejects an over-long meta description
-//      (parent plan §M13-3 "excerpt length cap").
+//   4. runPostQualityGates is a no-op under path B (PB-1, 2026-04-29).
+//      The runner emits content fragments without a <head>, so the
+//      meta-description-in-HTML check can never fire. Post excerpt
+//      population now flows through the WP REST `excerpt` field (see
+//      BACKLOG: "Post meta description via WP excerpt (path B)").
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -56,13 +59,17 @@ describe("MODE_CONFIGS", () => {
     expect(MODE_CONFIGS.page.runModeSpecificGates("<p>ok</p>")).toBeNull();
   });
 
-  it("post mode routes through runPostQualityGates", () => {
-    // Long meta description should surface a gate failure via the
-    // post-mode dispatch entry.
-    const html = `<html><head><meta name="description" content="${"a".repeat(POST_META_DESCRIPTION_MAX + 1)}"></head><body><p>Hi</p></body></html>`;
-    const gate = MODE_CONFIGS.post.runModeSpecificGates(html);
-    expect(gate).not.toBeNull();
-    expect(gate?.code).toBe("POST_META_DESCRIPTION_TOO_LONG");
+  it("post mode's runModeSpecificGates is a no-op under path B (meta description moved to WP excerpt)", () => {
+    // Path B: the runner emits fragments with no <head>, so the legacy
+    // meta-description-in-HTML gate has nothing to fire on. Even an
+    // input that previously would have failed now returns null.
+    const fragment = `<section data-opollo><h1>Post</h1><p>Body.</p></section>`;
+    expect(MODE_CONFIGS.post.runModeSpecificGates(fragment)).toBeNull();
+    // And the legacy <meta>-bearing input also returns null — see the
+    // BACKLOG entry for the WP REST excerpt wiring that replaces this
+    // surface.
+    const legacy = `<html><head><meta name="description" content="${"a".repeat(POST_META_DESCRIPTION_MAX + 1)}"></head><body><p>Hi</p></body></html>`;
+    expect(MODE_CONFIGS.post.runModeSpecificGates(legacy)).toBeNull();
   });
 });
 
@@ -124,48 +131,28 @@ describe("resolveRunnerMode", () => {
 // Unit — runPostQualityGates
 // ---------------------------------------------------------------------------
 
-describe("runPostQualityGates", () => {
-  it("accepts HTML with no meta description", () => {
-    expect(runPostQualityGates("<p>Body only.</p>")).toBeNull();
+describe("runPostQualityGates (path B no-op)", () => {
+  // Under path B (PB-1, 2026-04-29), the runner emits content fragments
+  // without a <head>, so the meta-description-in-HTML check has nothing
+  // to fire on. The function is preserved as the dispatch-table seam
+  // for future post-specific checks (featured-image, taxonomy whitelist
+  // — see parent plan §M13-3) but currently returns null on every
+  // input. Meta description population for posts will flow through the
+  // WP REST `excerpt` field — see BACKLOG: "Post meta description via
+  // WP excerpt (path B)".
+  it("returns null on a path-B fragment", () => {
+    const fragment = `<section data-opollo><h1>Post</h1><p>Body.</p></section>`;
+    expect(runPostQualityGates(fragment)).toBeNull();
   });
 
-  it("accepts a meta description within the cap", () => {
-    const html = `<html><head><meta name="description" content="Short and sweet."></head><body><p>Body.</p></body></html>`;
-    expect(runPostQualityGates(html)).toBeNull();
-  });
-
-  it("rejects a meta description over POST_META_DESCRIPTION_MAX", () => {
+  it("returns null on legacy path-A HTML even with an over-long meta description", () => {
     const longContent = "x".repeat(POST_META_DESCRIPTION_MAX + 10);
-    const html = `<html><head><meta name="description" content="${longContent}"></head><body><p>Body.</p></body></html>`;
-    const gate = runPostQualityGates(html);
-    expect(gate).not.toBeNull();
-    expect(gate?.code).toBe("POST_META_DESCRIPTION_TOO_LONG");
+    const legacy = `<html><head><meta name="description" content="${longContent}"></head><body><p>Body.</p></body></html>`;
+    expect(runPostQualityGates(legacy)).toBeNull();
   });
 
-  it("accepts a meta description at exactly POST_META_DESCRIPTION_MAX chars", () => {
-    const maxContent = "a".repeat(POST_META_DESCRIPTION_MAX);
-    const html = `<html><head><meta name="description" content="${maxContent}"></head></html>`;
-    expect(runPostQualityGates(html)).toBeNull();
-  });
-
-  it("tolerates attribute-order variants (content= before name=)", () => {
-    const longContent = "x".repeat(POST_META_DESCRIPTION_MAX + 1);
-    const html = `<meta content="${longContent}" name="description">`;
-    const gate = runPostQualityGates(html);
-    expect(gate?.code).toBe("POST_META_DESCRIPTION_TOO_LONG");
-  });
-
-  it("only considers the first meta description tag if multiple are present", () => {
-    const short = "Short desc.";
-    const long = "x".repeat(POST_META_DESCRIPTION_MAX + 10);
-    const html = `<meta name="description" content="${short}"><meta name="description" content="${long}">`;
-    expect(runPostQualityGates(html)).toBeNull();
-  });
-
-  it("ignores other meta tags (e.g. og:description)", () => {
-    const longContent = "x".repeat(POST_META_DESCRIPTION_MAX + 10);
-    const html = `<meta property="og:description" content="${longContent}"><p>Body.</p>`;
-    expect(runPostQualityGates(html)).toBeNull();
+  it("returns null on empty input", () => {
+    expect(runPostQualityGates("")).toBeNull();
   });
 });
 
@@ -186,9 +173,9 @@ function countingStub(record: { count: number; keys: string[] }): AnthropicCallF
     const kind = req.idempotency_key.split(":").at(-2) ?? "";
     let text: string;
     if (kind === "draft" || kind === "revise" || kind === "visual_revise") {
-      // Full-document shell — structural-completeness gate (2026-04-28).
+      // Path-B fragment (PB-1, 2026-04-29).
       text =
-        '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Post draft</h1><p>Body copy.</p></section></body></html>';
+        '<section data-opollo><h1>Post draft</h1><p>Body copy.</p></section>';
     } else if (kind === "self_critique") {
       text = "- Tighten intro\n- Add CTA";
     } else {

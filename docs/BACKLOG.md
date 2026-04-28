@@ -6,6 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Post meta description via WP excerpt (path B, opened 2026-04-29 by PB-1)
+
+**Tags:** `path-b`, `m13`, `posts`, `seo`
+
+**What:** PB-1 (path B prompt + gate rework) dropped `<meta name="description">` from the runner's output and made `runPostQualityGates` a no-op. The runner no longer emits a `<head>`, so meta descriptions can never appear in the generated HTML. Posts published in the meantime will fall back to WP's auto-derived excerpt (first 55 words of the body), which is functional but not operator-controlled.
+
+The replacement: populate the post's WP REST `excerpt` field from a brief-side excerpt slot. Either (a) the operator authors an excerpt in the brief markdown ahead of generation, OR (b) the runner generates an excerpt as a structured-output side channel during the visual_revise pass. Either way, the publish path (`lib/wp-rest-posts.ts`) needs to POST the excerpt as a sibling field to `content`. Unit-validate the excerpt length against `POST_META_DESCRIPTION_MAX` (300, currently exported and unused).
+
+**Why deferred:** PB-1's scope is bounded to runner prompt + gate rework. Adding a new brief-authored field + UI surface + WP REST plumbing would more than double the slice. WP's auto-excerpt is a reasonable fallback for the few posts that publish before this lands.
+
+**Trigger:** when an operator complains about a published post's meta description, OR when path-B SEO regression testing surfaces missing-excerpt as a real problem. Whichever comes first.
+
+**Scope:**
+- Brief schema: optional `excerpt` field per post (parser pulls from a `## Excerpt` section in the brief markdown, or an inline frontmatter field).
+- Runner: optionally generates an excerpt as part of the final pass and stores in `posts.excerpt` (column already exists per migration 0019).
+- WP REST: `lib/wp-rest-posts.ts` POSTs `excerpt` alongside `content` on publish.
+- Validate excerpt against `POST_META_DESCRIPTION_MAX` server-side before POST.
+- BriefReviewClient surface: show the excerpt slot, allow inline edits.
+- E2E: extend posts spec to verify excerpt round-trips to WP.
+
+**Size:** Medium (~3 hours runner + WP wiring; another ~2 hours UI + E2E).
+
+**Reference:** `lib/brief-runner.ts::runPostQualityGates` is the no-op seam; `POST_META_DESCRIPTION_MAX` is the validation cap; `posts.excerpt` is the column.
+
+---
+
 ## brief-runner max_tokens=16384 collides with Anthropic org rate limit of 4,000 output tokens/min on Sonnet 4.6 (caught 2026-04-28)
 
 **Tags:** `bug`, `runner`, `rate-limit`, `m13`

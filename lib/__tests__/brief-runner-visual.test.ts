@@ -32,10 +32,10 @@ import { seedSite } from "./_helpers";
 
 type RecordedCall = Pick<AnthropicRequest, "idempotency_key" | "model">;
 
-// Full-document shell satisfies the structural-completeness gate
-// (lib/brief-runner.ts::runStructuralCompletenessCheck, 2026-04-28).
+// Path-B fragment (PB-1, 2026-04-29). Satisfies runFragmentStructuralCheck
+// in lib/brief-runner.ts.
 const PLAIN_HTML =
-  '<!DOCTYPE html><html lang="en"><head><title>T</title></head><body><section><h1>Hello</h1><p>World.</p></section></body></html>';
+  '<section data-opollo><h1>Hello</h1><p>World.</p></section>';
 
 function makeTextStub(record: RecordedCall[]): AnthropicCallFn {
   let counter = 0;

@@ -306,13 +306,20 @@ function validateMetaLen(content: string): GateResult {
 // Runner
 // ---------------------------------------------------------------------------
 
+// Path B (PB-1, 2026-04-29): gateMetaDescription dropped from ALL_GATES.
+// Runner now emits content fragments without a <head>, so meta tags
+// can never appear in the HTML. Population for posts will flow through
+// the WP REST `excerpt` field (BACKLOG: "Post meta description via WP
+// excerpt (path B)"). Pages don't need a meta description in WP at
+// all — the theme + SEO plugin handle it. The gate function stays
+// exported for any future caller that needs it, but the production
+// runner never invokes it.
 export const ALL_GATES: Array<{ name: GateName; fn: GateFn }> = [
   { name: "html_size", fn: gateHtmlSize },
   { name: "wrapper", fn: gateWrapper },
   { name: "scope_prefix", fn: gateScopePrefix },
   { name: "html_basics", fn: gateHtmlBasics },
   { name: "slug_kebab", fn: gateSlugKebab },
-  { name: "meta_description", fn: gateMetaDescription },
 ];
 
 // Re-export HTML_SIZE_MAX_BYTES so callers who import only the gates

@@ -550,16 +550,23 @@ type PageContext = {
 function systemPromptFor(ctx: PageContext): string {
   const dsVersion = ctx.designSystemVersion ?? "";
   const prefix = ctx.sitePrefix ?? "";
+  // Path B (PB-1, 2026-04-29): the runner emits BODY FRAGMENTS that
+  // slot into the host WP page's content area. The host theme owns
+  // chrome (DOCTYPE, html, head, body, nav, header, footer) and visual
+  // tokens (palette, fonts, container width). See
+  // docs/INTEGRATION_MODEL_DECISION.md and
+  // docs/plans/path-b-migration-parent.md.
   const parts = [
-    "You are a website page generator. You produce one HTML page at a time against a whole-site brief.",
+    "You are a website page generator. You produce one CONTENT FRAGMENT at a time. The fragment slots into a WordPress page's content area; the host theme provides the surrounding chrome (DOCTYPE, html, head, body, nav, header, footer) and base visual tokens (palette, fonts, spacing).",
     "",
     "OUTPUT FORMAT — STRICT REQUIREMENTS:",
     "1. Output raw HTML only. Do NOT wrap your response in markdown code fences. No ```html, no ```, no triple-backtick fences anywhere around the HTML body.",
-    `2. Wrap the entire page in a single outermost element carrying the attribute data-ds-version="${dsVersion}" exactly. The first opening tag of your response must include this attribute.`,
-    `3. Every CSS class in your HTML must start with the site prefix "${prefix}-" (for example "${prefix}-hero", "${prefix}-cta-button"). Do NOT use Tailwind classes, framework classes, or any class outside the prefix scope.`,
-    "4. Include exactly one <h1> element on the page.",
-    "5. Include a <meta name=\"description\" content=\"...\"> element whose content is between 50 and 160 characters.",
-    "6. Every <img> must have a non-empty alt attribute. No empty hrefs (no href=\"\") and no placeholder href=\"#\".",
+    "2. Output a CONTIGUOUS FRAGMENT of one or more top-level <section> elements. Do NOT emit any of: <!DOCTYPE>, <html>, <head>, <body>, <nav>, <header>, <footer>, <meta>, <link>, <title>, <script>. The host WP theme owns those.",
+    `3. Every top-level <section> MUST carry the data-opollo attribute (presence-only — no value required) so the host theme + admin tooling can identify Opollo content. The first top-level <section> MUST also carry data-ds-version="${dsVersion}" exactly so the design-system version is auditable.`,
+    `4. Every CSS class in your HTML must start with the site prefix "${prefix}-" (for example "${prefix}-hero", "${prefix}-cta-button"). Do NOT use Tailwind classes, framework classes, or any class outside the prefix scope.`,
+    "5. Include exactly one <h1> element across the whole fragment.",
+    "6. Inline <style> blocks are permitted ONLY for animation keyframes / scoped utility rules; total inline-style content across the fragment MUST be under 200 characters. Visual styling (colours, fonts, spacing) inherits from the host theme + design-system tokens applied at the [data-opollo] CSS scope by the theme.",
+    "7. Every <img> must have a non-empty alt attribute. No empty hrefs (no href=\"\") and no placeholder href=\"#\".",
     ctx.brief.brand_voice
       ? `\n<brand_voice>\n${ctx.brief.brand_voice}\n</brand_voice>`
       : "",
@@ -587,7 +594,7 @@ function userPromptForDraft(ctx: PageContext): string {
   return [
     `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\nOrdinal: ${ctx.page.ordinal}\n\n${ctx.page.source_text}\n</page_spec>${operatorNotesBlock}`,
     "",
-    "Produce the page's HTML following ALL the OUTPUT FORMAT requirements in the system prompt. Output raw HTML only. Do NOT wrap in markdown code fences (no ```html, no ```). Your response must start with the opening tag of the outermost element (which carries the data-ds-version attribute) and end with its closing tag.",
+    "Produce the page's CONTENT FRAGMENT following ALL the OUTPUT FORMAT requirements in the system prompt. Output raw HTML only. Do NOT wrap in markdown code fences (no ```html, no ```). Your response must start with `<section data-opollo` and end with the matching `</section>` of the last top-level section.",
   ].join("\n");
 }
 
@@ -603,7 +610,7 @@ function userPromptForSelfCritique(ctx: PageContext): string {
 
 function userPromptForRevise(ctx: PageContext, isAnchor: boolean): string {
   const anchorInstruction = isAnchor
-    ? "\n\nAfter the HTML's closing tag, on a new line, append a ```json fenced block containing your chosen site_conventions JSON (typographic_scale, section_rhythm, hero_pattern, cta_phrasing, color_role_map, tone_register, additional). The JSON block is the ONLY place ``` fences are allowed in your response. The HTML itself must NOT be wrapped in fences."
+    ? "\n\nAfter the LAST top-level section's closing `</section>`, on a new line, append a ```json fenced block containing your chosen site_conventions JSON (typographic_scale, section_rhythm, hero_pattern, cta_phrasing, color_role_map, tone_register, additional). The JSON block is the ONLY place ``` fences are allowed in your response. The HTML fragment itself must NOT be wrapped in fences."
     : "";
   return [
     `<page_spec>\nTitle: ${ctx.page.title}\nMode: ${ctx.page.mode}\n\n${ctx.page.source_text}\n</page_spec>`,
@@ -612,7 +619,7 @@ function userPromptForRevise(ctx: PageContext, isAnchor: boolean): string {
     "",
     `<critique>\n${ctx.previousCritique ?? ""}\n</critique>`,
     "",
-    `Apply the critique to the draft. Output raw HTML only. Do NOT wrap the HTML in markdown code fences (no \`\`\`html, no \`\`\`). Your response must start with the opening tag of the outermost element (which carries the data-ds-version attribute) and continue from there.${anchorInstruction}`,
+    `Apply the critique to the draft. Output the revised CONTENT FRAGMENT following ALL the OUTPUT FORMAT requirements in the system prompt. Output raw HTML only. Do NOT wrap the HTML in markdown code fences (no \`\`\`html, no \`\`\`). Your response must start with \`<section data-opollo\` and end with the matching \`</section>\` of the last top-level section.${anchorInstruction}`,
   ].join("\n");
 }
 
@@ -624,7 +631,7 @@ function userPromptForVisualRevise(ctx: PageContext): string {
     "",
     `<visual_critique>\n${ctx.previousVisualCritique ?? ""}\n</visual_critique>`,
     "",
-    "Apply the visual critique to the draft. The critique is based on a rendered screenshot; prioritise layout, contrast, whitespace, and CTA prominence fixes. Output raw HTML only. Do NOT wrap the HTML in markdown code fences (no ```html, no ```). Your response must start with the opening tag of the outermost element (which carries the data-ds-version attribute) and continue from there.",
+    "Apply the visual critique to the draft. The critique is based on a rendered screenshot; prioritise layout, contrast, whitespace, and CTA prominence fixes. Output the revised CONTENT FRAGMENT following ALL the OUTPUT FORMAT requirements in the system prompt. Output raw HTML only. Do NOT wrap the HTML in markdown code fences (no ```html, no ```). Your response must start with `<section data-opollo` and end with the matching `</section>` of the last top-level section.",
   ].join("\n");
 }
 
@@ -766,38 +773,30 @@ export function resolveRunnerMode(brief: BriefRow): RunnerMode {
 // the outer Zod bound (POST_EXCERPT_MAX). We gate at the outer bound
 // so the runner rejects obviously-too-long metas but doesn't overfit
 // to one plugin's preference.
+// Path B (PB-1, 2026-04-29): unused in production. Preserved as a
+// constant for any caller that wants to validate operator-supplied
+// excerpt copy server-side before WP REST POST.
 export const POST_META_DESCRIPTION_MAX = 300;
 
 /**
  * Post-specific quality gates (M13-3).
  *
- * Runs on the post's draft_html AFTER the base gate passes. Rejects
- * drafts whose meta description exceeds POST_META_DESCRIPTION_MAX. The
- * other post-specific checks called out in the parent plan
- * (featured-image presence conditional on SEO plugin detection,
- * taxonomy whitelist) plug in here as the M13-4 preflight wiring
- * lands; the function's shape is what the parent plan's "dispatch
- * table" contract is pinning.
+ * Path B (PB-1, 2026-04-29): the meta-description-in-HTML check is
+ * dropped because the runner no longer emits a <head> (the host WP
+ * theme owns chrome). Meta-description population for posts now needs
+ * to flow through the WP REST `excerpt` field on the post — see
+ * BACKLOG entry "Post meta description via WP excerpt (path B)" for
+ * the wiring plan. Until that lands, posts publish without an
+ * Opollo-controlled meta description; WP derives one from the body.
+ *
+ * The function is preserved as the dispatch-table seam for M13's
+ * other post-specific checks (featured-image presence conditional on
+ * SEO plugin, taxonomy whitelist) which plug in as M13-4's preflight
+ * wiring lands.
  */
 export function runPostQualityGates(
-  draftHtml: string,
+  _draftHtml: string,
 ): null | { code: string; message: string } {
-  // Extract the value of every <meta name="description" content="…">
-  // tag, tolerating attribute-order variants (`content=` before `name=`).
-  // On multiple hits, the first wins — WP's excerpt is the first-match
-  // shape in practice. A missing tag is fine: WP derives an excerpt
-  // from the post body if one isn't supplied.
-  const metaRe =
-    /<meta[^>]*\bname\s*=\s*["']description["'][^>]*\bcontent\s*=\s*["']([^"']*)["'][^>]*>|<meta[^>]*\bcontent\s*=\s*["']([^"']*)["'][^>]*\bname\s*=\s*["']description["'][^>]*>/i;
-  const match = metaRe.exec(draftHtml);
-  if (!match) return null;
-  const value = (match[1] ?? match[2] ?? "").trim();
-  if (value.length > POST_META_DESCRIPTION_MAX) {
-    return {
-      code: "POST_META_DESCRIPTION_TOO_LONG",
-      message: `meta name="description" is ${value.length} chars (max ${POST_META_DESCRIPTION_MAX}).`,
-    };
-  }
   return null;
 }
 
@@ -814,6 +813,93 @@ export function runPostQualityGates(
 // Returns null on success. Returns { code, message } on the FIRST
 // missing element so the operator gets a specific, actionable label.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Fragment structural check (PB-1, 2026-04-29)
+//
+// Path B replacement for runStructuralCompletenessCheck. Validates the
+// shape of a CONTENT FRAGMENT — the runner's path-B output. Rejects
+// any leakage of host-WP chrome (DOCTYPE / html / head / body / nav /
+// header / footer / meta / link / title / script), requires at least
+// one top-level <section data-opollo …>, and caps inline <style>
+// content at 200 chars total.
+//
+// runStructuralCompletenessCheck below is retained for path-A
+// validation (smoke fixtures, retired pages) but no longer wired into
+// runGatesForBriefPage's production path.
+//
+// Returns null on success. Returns { code, message } on the FIRST
+// failure so the operator gets a specific, actionable label.
+// ---------------------------------------------------------------------------
+
+export function runFragmentStructuralCheck(
+  fragment: string,
+): { ok: true } | { ok: false; code: string; message: string } {
+  const trimmed = fragment.trim();
+  if (trimmed.length === 0) {
+    return {
+      ok: false,
+      code: "FRAGMENT_EMPTY",
+      message: "Draft fragment is empty.",
+    };
+  }
+
+  // Forbidden chrome elements. Each row: a regex matching the element's
+  // open tag (case-insensitive), a code, and a one-line failure message.
+  const forbidden: Array<{ re: RegExp; code: string; label: string }> = [
+    { re: /<!DOCTYPE/i, code: "FRAGMENT_DOCTYPE_LEAKED", label: "<!DOCTYPE>" },
+    { re: /<html\b/i, code: "FRAGMENT_HTML_TAG_LEAKED", label: "<html>" },
+    { re: /<head\b/i, code: "FRAGMENT_HEAD_TAG_LEAKED", label: "<head>" },
+    { re: /<body\b/i, code: "FRAGMENT_BODY_TAG_LEAKED", label: "<body>" },
+    { re: /<nav\b/i, code: "FRAGMENT_NAV_TAG_LEAKED", label: "<nav>" },
+    { re: /<header\b/i, code: "FRAGMENT_HEADER_TAG_LEAKED", label: "<header>" },
+    { re: /<footer\b/i, code: "FRAGMENT_FOOTER_TAG_LEAKED", label: "<footer>" },
+    { re: /<meta\b/i, code: "FRAGMENT_META_TAG_LEAKED", label: "<meta>" },
+    { re: /<link\b/i, code: "FRAGMENT_LINK_TAG_LEAKED", label: "<link>" },
+    { re: /<title\b/i, code: "FRAGMENT_TITLE_TAG_LEAKED", label: "<title>" },
+    { re: /<script\b/i, code: "FRAGMENT_SCRIPT_TAG_LEAKED", label: "<script>" },
+  ];
+  for (const f of forbidden) {
+    if (f.re.test(trimmed)) {
+      return {
+        ok: false,
+        code: f.code,
+        message: `Fragment must not contain ${f.label} (host WP theme owns chrome). See docs/INTEGRATION_MODEL_DECISION.md.`,
+      };
+    }
+  }
+
+  // Must contain at least one top-level <section data-opollo …>. The
+  // attribute is presence-only — its value is unused. The check is
+  // tolerant of attribute order and quoting.
+  const hasOpolloSection = /<section\b[^>]*\bdata-opollo\b/i.test(trimmed);
+  if (!hasOpolloSection) {
+    return {
+      ok: false,
+      code: "FRAGMENT_MISSING_DATA_OPOLLO_SECTION",
+      message:
+        "Fragment must include at least one top-level <section data-opollo …>. The attribute is the marker the host theme uses to scope Opollo content.",
+    };
+  }
+
+  // Inline <style> total content must be under 200 chars. Allowance
+  // covers scoped animation-keyframe / utility rules; visual styling
+  // proper inherits from the host theme.
+  const styleBlocks = trimmed.match(/<style\b[^>]*>([\s\S]*?)<\/style>/gi) ?? [];
+  const styleContentTotal = styleBlocks.reduce(
+    (sum, block) => sum + block.replace(/^<style[^>]*>|<\/style>$/gi, "").length,
+    0,
+  );
+  if (styleContentTotal > 200) {
+    return {
+      ok: false,
+      code: "FRAGMENT_INLINE_STYLE_OVER_LIMIT",
+      message: `Inline <style> content totals ${styleContentTotal} chars (max 200). Visual styling belongs on the host theme via M13 sync, not inline.`,
+    };
+  }
+
+  return { ok: true };
+}
 
 export function runStructuralCompletenessCheck(
   draftHtml: string,
@@ -929,18 +1015,15 @@ function runGatesForBriefPage(opts: {
     };
   }
 
-  // Structural-completeness gate (UAT smoke 1, 2026-04-28).
-  // Runs UNCONDITIONALLY — does NOT depend on designSystemVersion or
-  // prefix. PR #181's strict-suite bypass for sites without an active
-  // DS left a hole: a max_tokens-truncated response with no <body>
-  // and no closing tags has SOME HTML tags (passes NOT_HTML above)
-  // but renders as a blank/dark-background iframe in the operator's
-  // preview because the browser's error recovery creates an implicit
-  // empty body that picks up the inline-style background-color rule.
-  // These checks are universal HTML well-formedness — they have
-  // nothing to do with the design-system contract, so they can't be
-  // gated on it.
-  const structural = runStructuralCompletenessCheck(draftHtml);
+  // Fragment structural check (PB-1, 2026-04-29).
+  // Path B: the runner emits content fragments, not complete documents.
+  // This check rejects any leakage of host-WP chrome (DOCTYPE / html /
+  // head / body / nav / header / footer / meta / link / title / script),
+  // requires the data-opollo marker on a top-level section, and caps
+  // inline <style> content. Like the path-A check it replaced, it runs
+  // UNCONDITIONALLY (independent of designSystemVersion / prefix) — the
+  // shape contract holds whether or not a DS is configured.
+  const structural = runFragmentStructuralCheck(draftHtml);
   if (!structural.ok) {
     return {
       ok: false,
