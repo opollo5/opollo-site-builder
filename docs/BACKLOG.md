@@ -6,6 +6,28 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## scripts/recover-stuck-brief-page.ts wipes draft_html unconditionally (caught 2026-04-28)
+
+**Tags:** `bug`, `ops-tooling`, `recovery-script`, `data-loss`
+
+**What:** `scripts/recover-stuck-brief-page.ts` always sets `draft_html = NULL` and `critique_log = []` regardless of whether the existing draft is salvageable. During the 2026-04-28 incident pipeline test, this destroyed a structurally-complete 23,201-char `draft_html` that PR #188's gate had successfully retried — the recovery was run on a page that was already in a usable `awaiting_review` state, and the wipe left no audit trail / restore path inside the application. Postgres `UPDATE` does not preserve old row versions; PITR via Supabase dashboard was the only restore option.
+
+**Why deferred:** the immediate workaround (raise daily budget + re-recover + let runner regenerate) recovered cleanly, and the tenant cap-bump is a one-line operator action. No active incident needs this fix today.
+
+**Trigger:** before the next time the recovery script is used in anger, OR as part of the M16 ops-tooling pass. Whichever comes first.
+
+**Scope** (any one of these would be sufficient; combine as needed):
+
+- **Refuse to wipe if structurally complete.** Pre-flight check: if existing `draft_html` passes `isHtmlStructurallyComplete()` (lib/brief-runner.ts), abort the recovery with a clear message ("page is already complete; pass --force-wipe to override"). The `--force-wipe` opt-in puts the destructive choice in the operator's hands.
+- **Preserve previous draft as a backup column.** Add `brief_pages.previous_draft_html text` (nullable, no CHECK) and have the recovery script copy the current `draft_html` into it before NULLing. Single-slot backup; next recovery overwrites. One column, one migration; no audit-table sprawl.
+- **Stamp a `recovery_events` row** before wiping, with `{page_id, prior_draft_html, prior_critique_log, recovered_at, recovered_by}`. Heavier but gives full history; useful if recoveries become routine.
+
+**Size:** Small (~30 min for the structural-complete refuse + `--force-wipe` flag, no schema). Medium (~90 min) if the backup column or audit-events table land too.
+
+**Reference incident:** site `cdb5b15f-971d-4979-a18d-c3fd75a1c3ac`, page `dcbdf7d5-b867-443b-afdf-f60a28f968aa`. Recovery at 2026-04-27T23:14 UTC blew away a clean doc that PR #188 had produced; required a budget-cap bump + re-recover + regen cycle to restore.
+
+---
+
 
 ## Brief upload UX — paste raw text option (deferred from UAT smoke 1, 2026-04-28)
 
