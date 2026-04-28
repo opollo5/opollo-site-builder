@@ -62,6 +62,10 @@ export async function POST(
     .is("deleted_at", null)
     .maybeSingle();
   if (briefLookup.error) {
+    logger.error("briefs.cancel.brief_lookup_failed", {
+      brief_id: idCheck.value,
+      error: briefLookup.error,
+    });
     return envelope("INTERNAL_ERROR", "Failed to look up brief.", 500);
   }
   if (!briefLookup.data) {

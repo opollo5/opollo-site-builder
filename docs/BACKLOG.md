@@ -227,26 +227,22 @@ The replacement: populate the post's WP REST `excerpt` field from a brief-side e
 
 ---
 
-## Pattern audit — silent INTERNAL_ERROR fallbacks across all routes (deferred from audit triage, 2026-04-27)
+## Pattern audit — silent INTERNAL_ERROR fallbacks (audit infra shipped 2026-04-29; sweep opportunistic)
 
 **Tags:** `audit`, `observability`, `discipline`
 
-**What:** The Cluster C audit (PR #169) found that every appearance route had a silent `INTERNAL_ERROR` envelope fallback — `return envelope("INTERNAL_ERROR", ctxRes.message, 500)` with no preceding `logger.error`. That pattern hid a missing-column schema bug from CI logs for ~3 days; production operators saw a 500 toast with zero diagnostic trail. The fix shipped `logger.error` calls at 11 sites across `lib/kadence-palette-sync.ts` and the three appearance routes, but other route handlers in the codebase likely have the same anti-pattern.
+**Status (2026-04-29):** audit infrastructure shipped — `scripts/audit-internal-error-logging.ts` runs the BACKLOG-described grep heuristic and reports file:line for each silent return. Initial run: 64 sites; after the high-impact pass (cron paths + critical mutations: cancel, approve, budget-reset, process-batch, process-regenerations, process-transfer, posts/unpublish), 56 remain. Most remaining are in `lib/briefs.ts` where `errorEnvelope` already captures the underlying error in `details.supabase_error` — the violation is soft (no `logger.error` call) but the data isn't lost.
 
-**Why deferred:** Cluster C scope was the 12 known failing tests + the immediate fix. A repo-wide sweep is its own slice — could touch 20+ files and would benefit from a lint rule rather than just a manual fix.
+**Remaining work — opportunistic:**
+- Run `npx tsx scripts/audit-internal-error-logging.ts` before / during any future PR that touches the listed files; add `logger.error` alongside the envelope return.
+- ESLint rule (`no-silent-internal-error`) deferred — would catch new violations at PR time. Worth picking up if violations accumulate again.
 
 **Trigger:** Any of:
-- Another silent-500 incident escapes to production / UAT.
-- Before first paying customer onboards (observability floor for support).
-- A natural pause between milestones where infra/discipline work fits.
+- Another silent-500 incident escapes to production / UAT (re-prioritise to a focused sweep).
+- Before first paying customer onboards (run the audit script and clean the long tail).
+- A future PR touches one of the flagged files (drive-by fix while in the area).
 
-**Scope:**
-- Grep the codebase for `envelope\("INTERNAL_ERROR"` and `code: "INTERNAL_ERROR"` returns.
-- For every match, verify either (a) the catch-all has a `logger.error` immediately before it, or (b) the underlying error already gets logged somewhere upstream. Add `logger.error` everywhere case (a) doesn't already hold.
-- Consider an ESLint rule (`no-silent-internal-error`) that flags the pattern. The rule can match returns where `code: "INTERNAL_ERROR"` is set without a `logger.error` call in the same block.
-- Ship as one or more PRs depending on count. Each PR is grep + boilerplate add — small per-file but fans out.
-
-**Size:** Small per-file, possibly 20+ files. ~half a day if no surprises. ESLint rule is its own slice (separate PR, ~1 day) but the manual sweep should land first since it's the diagnostic floor.
+**Reference:** the original Cluster C incident (PR #169) hid a missing-column schema bug for 3 days. Future incidents should be spotted faster via the audit script's regular use.
 
 ---
 

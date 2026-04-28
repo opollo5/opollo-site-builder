@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 
+import { logger } from "@/lib/logger";
 import { resetExpiredBudgets } from "@/lib/tenant-budgets";
 
 // ---------------------------------------------------------------------------
@@ -70,6 +71,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logger.error("cron.budget_reset.failed", { error: message });
     return NextResponse.json(
       {
         ok: false,

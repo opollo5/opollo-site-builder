@@ -8,6 +8,7 @@ import {
   processSlotDummy,
   reapExpiredLeases,
 } from "@/lib/batch-worker";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // GET/POST /api/cron/process-batch — M3-3.
@@ -116,6 +117,7 @@ async function handle(req: NextRequest): Promise<NextResponse> {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logger.error("cron.process_batch.failed", { error: message });
     return NextResponse.json(
       {
         ok: false,
