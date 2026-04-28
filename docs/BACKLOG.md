@@ -150,24 +150,9 @@ Verified 2026-04-29: `UploadBriefModal.tsx` ships a `content_type` radio group v
 
 ---
 
-## Model list freshness — Anthropic releases new models, allowlist goes stale (deferred from UAT smoke 1, 2026-04-28)
+## ~~Model list freshness — Anthropic releases new models~~ (resolved before this entry was actioned)
 
-**Tags:** `models`, `maintenance`, `runbook`
-
-**What:** Today's hardcoded allowlist of Anthropic models (Opus 4.7, Sonnet 4.6, Haiku 4.5) goes stale every time Anthropic ships a new model family. Operators who want to use a newer model (or operators reading a stale runbook) have no path. Need a periodic update process — either runbook entry that humans follow on each model release, or an automated check that flags stale allowlists during CI.
-
-**Why deferred:** Not blocking anything today — current models cover all known UAT scenarios. Captured to prevent quiet drift.
-
-**Trigger:** When Anthropic releases a new model family AND operators want to use it (the conjunction matters — release alone doesn't force action).
-
-**Scope (option A, runbook-only — minimum viable):**
-- New `docs/RUNBOOK.md` entry: "Anthropic releases a new model family." Steps: (1) check the model's pricing on the Anthropic console, (2) add to `lib/anthropic-pricing.ts` table, (3) add to model allowlist in `lib/anthropic-call.ts` (or wherever the validator lives), (4) update `docs/CONTEXT.md` model-family note, (5) test the new model via a single-page brief run.
-- Manual cadence: roughly quarterly.
-
-**Scope (option B, automated check — heavier):**
-- CI job that pings the Anthropic models endpoint (`/v1/models` if available) and diffs against `lib/anthropic-pricing.ts`. Fails CI if a new model is available and not yet in the allowlist. This is more work and depends on Anthropic exposing a stable model-listing endpoint.
-
-**Size:** Small for option A (~1 hour, just doc work). Medium for option B (~half day, CI workflow + endpoint check + careful failure modes).
+Verified 2026-04-29: `docs/RUNBOOK.md` already has the full procedure at "Anthropic releases a new model — adding it to the operator picker" (around line 627). Steps cover pricing-table update, allowlist update, CHECK-constraint widening migration, and verify checklist. Option A from the original entry is shipped. Option B (automated CI check) deferred as not earning its keep until the manual cadence proves insufficient.
 
 ---
 
