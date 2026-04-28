@@ -142,11 +142,21 @@ export default async function SitePostsList({
         ]}
       />
 
-      <div className="mt-6 flex items-center justify-between">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Posts</h1>
-        <p className="text-xs text-muted-foreground">
-          {total} total{total > 0 ? ` · showing ${rangeStart}–${rangeEnd}` : ""}
-        </p>
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-muted-foreground">
+            {total} total{total > 0 ? ` · showing ${rangeStart}–${rangeEnd}` : ""}
+          </p>
+          {/* BP-3 — entry-point for single-post creation. */}
+          <Link
+            href={`/admin/sites/${site.id}/posts/new`}
+            className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted transition-smooth"
+            data-testid="new-post-button"
+          >
+            New post
+          </Link>
+        </div>
       </div>
 
       <form

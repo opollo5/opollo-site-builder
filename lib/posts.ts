@@ -71,6 +71,9 @@ export const CreatePostInputSchema = z
     content_structured: z.unknown().optional(),
     generated_html: z.string().nullable().optional(),
     created_by: z.string().uuid().nullable().optional(),
+    // BP-3: parser snapshot (title/slug/meta_*/source_map) for posts
+    // created via the entry-point. NULL otherwise.
+    metadata: z.unknown().optional(),
   })
   .strict();
 
@@ -252,6 +255,7 @@ async function createPostImpl(
   }
   if (input.generated_html !== undefined) insertRow.generated_html = input.generated_html;
   if (input.created_by !== undefined) insertRow.created_by = input.created_by;
+  if (input.metadata !== undefined) insertRow.metadata = input.metadata;
 
   const res = await supabase
     .from("posts")
