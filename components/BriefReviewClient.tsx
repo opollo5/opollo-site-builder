@@ -22,8 +22,10 @@ import { DEFAULT_MODEL_ID, MODEL_OPTIONS } from "@/lib/anthropic-models";
 //
 //   briefs.status='parsed'        → editable list + "Commit page list" CTA
 //
-//   briefs.status='committed'     → read-only list, start-run CTA disabled
-//                                   with an "Available in M12-5" tooltip
+//   briefs.status='committed'     → read-only list + post-commit panel
+//                                   with two CTAs: "Back to briefs" and
+//                                   "Open run surface →" (live since
+//                                   M12-5 shipped)
 //
 //   briefs.status='failed_parse'  → red banner with the failure detail +
 //                                   re-upload suggestion
