@@ -116,45 +116,15 @@ The replacement: populate the post's WP REST `excerpt` field from a brief-side e
 ---
 
 
-## Brief upload UX — paste raw text option (deferred from UAT smoke 1, 2026-04-28)
+## ~~Brief upload UX — paste raw text option~~ (resolved before this entry was actioned)
 
-**Tags:** `ux`, `briefs`, `m16`
-
-**What:** The brief upload form requires operators to save their content as `.md` or `.docx` and upload it. UAT smoke 1 surfaced this as friction: the operator had the brief in a chat window / email / scratch document and had to round-trip through saving a file. Add a "Paste raw text" mode to `BriefUploadForm` (or whatever the upload component is named) that opens a textarea, accepts paste, and routes through the same parser path as the file upload — `lib/brief-parser.ts` already takes a string, so the wiring is just a UI affordance.
-
-**Why deferred:** UAT-blocking BLOCKER (markdown code fence not stripped) needs to ship first. This is a UX paper-cut, not a correctness issue — operators have a workaround.
-
-**Trigger:** M16 / UAT improvements pass, OR next operator complains about the file-save round-trip.
-
-**Scope:**
-- New radio / tab in the upload form: "Upload file" vs "Paste text".
-- Textarea with min-height + monospace font, placeholder showing the expected brief shape.
-- POST routes through the same `parseBriefMarkdown` / `parseBriefDocx` selector based on a content-type field.
-- Server-side: same `lib/brief-parser.ts` entry point; treat pasted text as `.md` by default (most operator-pasted content will be markdown-shaped).
-- E2E: extend `e2e/briefs-review.spec.ts` to cover the paste path.
-
-**Size:** Small (~half day). UI + plumbing + one E2E.
+Verified 2026-04-29: `components/UploadBriefModal.tsx` (header comment line 11: "UAT-smoke-1 — adds paste-text source mode + content_type radio group") ships paste-text mode alongside file upload via the `SourceMode` type. Routed through the same parser path on the server. The BACKLOG entry slipped through unmarked when the UAT-smoke-1 fix landed.
 
 ---
 
-## Brief upload UX — content_type selector missing (deferred from UAT smoke 1, 2026-04-28)
+## ~~Brief upload UX — content_type selector missing~~ (resolved before this entry was actioned)
 
-**Tags:** `ux`, `briefs`, `posts`, `m13`, `uat-blocker-adjacent`
-
-**What:** The upload form has no UI for selecting `content_type` — it silently defaults to `'page'`. M13-1 added the `content_type` axis to `briefs` (`page` | `post`) and the runner has full M13-3 mode dispatch on it, but the upload UI never grew the selector. Operators uploading a post-mode brief have no operator-facing path; the only way to create a post-mode brief today is via SQL or the `createBrief` lib helper directly.
-
-**Why deferred:** Page-mode UAT goes through a separate critical path. Post-mode UAT is the next surface to test, and that scenario needs this selector to exist before the first run. Captured here so it's not forgotten between UAT scenarios.
-
-**Trigger:** Before the next post-mode UAT scenario starts. **This effectively blocks any post-mode UAT** — flag accordingly when scheduling.
-
-**Scope:**
-- Add a `<select>` or radio group: "Page brief" / "Post brief". Default `page` (preserves current behaviour).
-- POST body grows a `content_type` field; existing default-to-page path stays a no-op for legacy clients.
-- Server-side validation against the `briefs.content_type` CHECK enum (`'page'`, `'post'`).
-- Stamp `briefs.content_type` from the request body on insert. Today the column defaults to `'page'`; the migration's CHECK constraint already gates invalid values.
-- E2E: extend `e2e/briefs-review.spec.ts` (or equivalent) to cover both modes selectable from the form.
-
-**Size:** Small (~2-3 hours). Form + route + E2E.
+Verified 2026-04-29: `UploadBriefModal.tsx` ships a `content_type` radio group via the `ContentType` type. POST body forwards the field; server defaults to `'page'` if absent. Post-mode UAT is unblocked. Entry slipped through unmarked.
 
 ---
 
