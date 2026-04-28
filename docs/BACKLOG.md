@@ -6,6 +6,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Path-B publish gate on Kadence sync drift (path B, opened 2026-04-29 by PB-8)
+
+**Tags:** `path-b`, `m13`, `publish`, `feature-flag`
+
+**What:** Under path B, the host theme owns visual tokens (palette, fonts, spacing) — so Kadence palette sync is the visual contract for published Opollo content. Drift between the design-system tokens and the WP palette = published content renders with wrong colours.
+
+PB-8 documented the new severity in `docs/RUNBOOK.md` ("kadence-customizer-drift — palette sync hits WP_STATE_DRIFTED" entry). The next layer is a hard preflight gate: refuse publish on a site whose `kadence_globals_synced_at` is null OR whose stored DS palette doesn't match the last successful WP read. Operator must run sync before publish proceeds.
+
+Implementation should be flag-gated (`FEATURE_PATH_B_PUBLISH_GATE`, default off; flip on per-site as path-B rollouts complete) so existing customers aren't blocked the moment the gate lands.
+
+**Why deferred:** PB-8 surfaced the severity bump in the runbook; the operator-facing visual treatment (red banner in the Appearance panel) and the preflight gate itself widen scope into the M13 surface area. Worth a dedicated slice that touches `app/api/sites/[id]/appearance/preflight/route.ts`, `app/api/sites/[id]/posts/[post_id]/publish/route.ts`, `app/api/sites/[id]/pages/[page_id]/publish/route.ts`, and `components/AppearancePanel.tsx` together with E2E coverage of the gated-publish path.
+
+**Trigger:** when an operator publishes path-B content against a drifted site and gets a visual regression, OR when path-B becomes the default (every new site uses path B) and we want hard guardrails before rollout. Whichever comes first.
+
+**Scope:**
+- Add `FEATURE_PATH_B_PUBLISH_GATE` env-var doc to `.env.local.example`.
+- Extend `lib/site-preflight.ts` with a `checkKadenceSyncFresh(siteId)` helper.
+- Wire the helper into the four publish + preflight routes above. When the flag is on AND the site has a drift state, return `409 KADENCE_SYNC_DRIFT_BLOCKED` with a translated message naming the Appearance panel link.
+- `components/AppearancePanel.tsx`: visual treatment of "out of sync" upgrades from yellow warning to red alert when the flag is on.
+- Sync-drift unit tests bump severity (`expect(...).toBeNull()` → `expect(...).toMatchObject({ code: 'KADENCE_SYNC_DRIFT_BLOCKED' })`).
+- E2E: `e2e/appearance.spec.ts` covers the publish-blocked-on-drift path.
+
+**Size:** Medium (~3–5 hours including E2E + flag plumbing).
+
+---
+
 ## Preview iframe — fetch customer theme CSS for high-fidelity preview (path B, opened 2026-04-29 by PB-3)
 
 **Tags:** `path-b`, `m13`, `preview`, `ux`
