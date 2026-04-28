@@ -70,6 +70,11 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
+  // M15-4 #17: admin-only (NOT admin+operator like sibling routes).
+  // Budget edits are financial controls — operator role can VIEW the
+  // current usage on the site detail page but cannot raise / lower
+  // caps. Tightening this rule needs an explicit role-policy decision,
+  // not a drive-by widening.
   const gate = await requireAdminForApi();
   if (gate.kind === "deny") return gate.response;
 
