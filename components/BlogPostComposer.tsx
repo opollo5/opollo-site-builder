@@ -8,6 +8,10 @@ import { Composer, type ComposerValue } from "@/components/Composer";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  ImagePickerModal,
+  type ImagePickerEntry,
+} from "@/components/ImagePickerModal";
+import {
   parseBlogPostMetadata,
   slugify,
   type BlogPostMetadata,
@@ -94,6 +98,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastParse, setLastParse] = useState<BlogPostMetadata | null>(null);
+  // BP-4 — featured image is local-only state for now. BP-7 will
+  // persist via posts.featured_image_id and transfer to WP at publish.
+  const [featuredImage, setFeaturedImage] =
+    useState<ImagePickerEntry | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   // Debounced re-parse on every text change. Pure-logic call, but
   // 200ms keeps every keystroke from reflowing four field updates.
@@ -365,12 +374,54 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         </div>
       </fieldset>
 
-      <div className="rounded-md border-2 border-dashed border-muted bg-muted/30 p-4 text-sm">
-        <p className="font-medium">Featured image</p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Picker lands in BP-4. For now, save as draft and add the image
-          on the post detail page.
-        </p>
+      <div className="rounded-md border p-4 text-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium">Featured image</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Required at publish (enforced by BP-7&apos;s server-side
+              guard). Selecting here previews; persistence + WP attachment
+              ship in BP-7.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPickerOpen(true)}
+            disabled={submitting}
+          >
+            {featuredImage ? "Change image" : "Pick image"}
+          </Button>
+        </div>
+        {featuredImage && featuredImage.delivery_url && (
+          <div className="mt-3 flex items-center gap-3">
+            {/* Cloudflare Images delivery URL — no Next/Image to avoid
+                wiring imagedelivery.net into next.config remotePatterns
+                for a thumbnail with explicit w=/h= params already. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
+              alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
+              className="h-20 w-20 rounded-md border object-cover"
+            />
+            <div className="min-w-0">
+              <p
+                className="truncate text-sm font-medium"
+                title={featuredImage.caption ?? featuredImage.filename ?? ""}
+              >
+                {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setFeaturedImage(null)}
+                className="text-xs text-muted-foreground underline hover:text-foreground"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {formError && (
@@ -395,10 +446,16 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         </Button>
       </div>
       <p className="text-xs text-muted-foreground">
-        Start run is disabled until the featured-image picker (BP-4) and
-        run-start gate (BP-8) ship. Save a draft now and the post detail
+        Start run is disabled until BP-7 (featured-image attach) + BP-8
+        (run-start gate) ship. Save a draft now and the post detail
         page will surface the start affordance.
       </p>
+
+      <ImagePickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(image) => setFeaturedImage(image)}
+      />
     </form>
   );
 }
