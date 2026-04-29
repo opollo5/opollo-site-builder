@@ -482,6 +482,15 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={(image) => setFeaturedImage(image)}
+        // R1-5 — pre-save suggestion context. Composer doesn't have a
+        // post id yet (save creates one); pass title + body snippet
+        // weighted toward title (3× repeat) so the picker's Suggested
+        // tab can FTS-rank library images.
+        suggestionContext={
+          title.value.trim().length > 0 || composerValue.text.trim().length > 0
+            ? `${title.value} ${title.value} ${title.value} ${composerValue.text.slice(0, 400)}`.trim()
+            : null
+        }
       />
     </form>
   );
