@@ -3,8 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { H1 } from "@/components/ui/typography";
+import { H1, H3 } from "@/components/ui/typography";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { ImageArchiveButton } from "@/components/ImageArchiveButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -106,12 +107,9 @@ export default async function AdminImageDetailPage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <div
-        role="alert"
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-      >
-        Failed to load image: {result.error.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load image">
+        {result.error.message}
+      </Alert>
     );
   }
 
@@ -267,12 +265,12 @@ export default async function AdminImageDetailPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold">
+        <H3>
           Used on sites{" "}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs font-normal text-muted-foreground">
             ({usage.length})
           </span>
-        </h2>
+        </H3>
         <p className="text-xs text-muted-foreground">
           Every WP site this image has been mirrored to via the publish pipeline.
         </p>
@@ -346,12 +344,12 @@ export default async function AdminImageDetailPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold">
+        <H3>
           Additional metadata{" "}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs font-normal text-muted-foreground">
             ({metadata.length})
           </span>
-        </h2>
+        </H3>
         <p className="text-xs text-muted-foreground">
           EXIF, licensing notes, model info, and any other per-image attributes
           tracked outside the main row.
