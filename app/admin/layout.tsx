@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { AdminNav } from "@/components/AdminNav";
+import { CommandPalette } from "@/components/CommandPalette";
 import { Toaster } from "@/components/ui/toaster";
 
 // Shared shell for every page under /admin.
@@ -38,6 +39,10 @@ export default async function AdminLayout({
           `toast.success("…")` / `toast.error("…")` from anywhere in
           the admin tree. */}
       <Toaster />
+      {/* C-1 — global ⌘K command palette. Listens for the keyboard
+          shortcut anywhere in the admin tree; static admin nav +
+          lazy-loaded site list + recent-sites localStorage. */}
+      <CommandPalette />
     </div>
   );
 }
