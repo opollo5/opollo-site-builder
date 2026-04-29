@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -310,31 +311,23 @@ export function BriefReviewClient({
       )}
 
       {isFailed && failureMessage && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        >
-          <p className="font-medium">We couldn&apos;t parse this brief.</p>
-          <p className="mt-1">{failureMessage}</p>
-          <p className="mt-3">
+        <Alert variant="destructive" title="We couldn't parse this brief.">
+          <p>{failureMessage}</p>
+          <p className="mt-2">
             <a
               href={`/admin/sites/${siteId}`}
-              className="underline hover:no-underline"
+              className="underline transition-smooth hover:no-underline"
             >
               Back to site overview
             </a>{" "}
             to upload a new version.
           </p>
-        </div>
+        </Alert>
       )}
 
       {warnings.length > 0 && !isFailed && (
-        <div
-          role="status"
-          className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-900 dark:text-yellow-200"
-        >
-          <p className="font-medium">Parser warnings:</p>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
+        <Alert variant="warning" title="Parser warnings">
+          <ul className="mt-1 list-disc space-y-1 pl-5">
             {warnings.map((w: { code: string; detail?: string }, i: number) => (
               <li key={i}>
                 <code className="text-xs">{w.code}</code>
@@ -342,20 +335,16 @@ export function BriefReviewClient({
               </li>
             ))}
           </ul>
-        </div>
+        </Alert>
       )}
 
-      {errorMessage && (
-        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
 
       {(brief.status === "parsed" || brief.status === "committed") && (
         <section aria-labelledby="voice-direction-heading" className="rounded-lg border p-4">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <h2 id="voice-direction-heading" className="text-lg font-medium">
+              <h2 id="voice-direction-heading" className="text-base font-semibold">
                 Brand voice &amp; design direction
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -464,7 +453,7 @@ export function BriefReviewClient({
       {(brief.status === "parsed" || brief.status === "committed") && (
         <section aria-labelledby="model-tier-heading" className="rounded-lg border p-4">
           <div className="mb-3">
-            <h2 id="model-tier-heading" className="text-lg font-medium">
+            <h2 id="model-tier-heading" className="text-base font-semibold">
               Model tier
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -530,7 +519,7 @@ export function BriefReviewClient({
       {(brief.status === "parsed" || brief.status === "committed") && (
         <section aria-label="Page list">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-lg font-medium">Page list</h2>
+            <h2 className="text-base font-semibold">Page list</h2>
             <p className="text-xs text-muted-foreground">
               {sortedPages.length} page{sortedPages.length === 1 ? "" : "s"}
             </p>
