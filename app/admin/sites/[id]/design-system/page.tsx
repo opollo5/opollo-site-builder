@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { CreateDesignSystemModal } from "@/components/CreateDesignSystemModal";
 import { DesignSystemsTable } from "@/components/DesignSystemsTable";
+import { H1 } from "@/components/ui/typography";
 import { useDesignSystemLayout } from "@/components/design-system-context";
 import type { DesignSystem } from "@/lib/design-systems";
 
@@ -23,7 +24,7 @@ export default function DesignSystemVersionsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Versions</h1>
+          <H1>Versions</H1>
           <p className="text-sm text-muted-foreground">
             One version is active at a time. Edit draft versions before
             activating — activation is atomic and archives the previous active

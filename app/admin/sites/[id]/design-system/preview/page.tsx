@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { H1 } from "@/components/ui/typography";
 import { PreviewGallery } from "@/components/PreviewGallery";
 import {
   resolveSelectedDesignSystem,
@@ -86,7 +87,7 @@ export default function DesignSystemPreviewPage() {
   return (
     <>
       <div>
-        <h1 className="text-xl font-semibold">Preview</h1>
+        <H1>Preview</H1>
         <p className="text-sm text-muted-foreground">
           Read-only metadata view of design system v{selectedDs.version} (
           {selectedDs.status}). Live component rendering lands with M3 — this

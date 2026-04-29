@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SiteVoiceSettingsForm } from "@/components/SiteVoiceSettingsForm";
+import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -53,7 +54,7 @@ export default async function SiteSettingsPage({
           { label: "Settings" },
         ]}
       />
-      <h1 className="mt-2 text-xl font-semibold">{site.name} — Settings</h1>
+      <H1 className="mt-2">{site.name} — Settings</H1>
       <p className="mt-1 text-sm text-muted-foreground">
         These values pre-populate every new brief. Each brief can still
         override at commit time without changing the site default.

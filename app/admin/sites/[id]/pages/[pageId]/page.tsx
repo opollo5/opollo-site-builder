@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
+import { H1 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
 import { RegenerateButton } from "@/components/RegenerateButton";
@@ -131,7 +132,7 @@ export default async function PageDetail({
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold">{page.title}</h1>
+          <H1 className="truncate">{page.title}</H1>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {statusBadge(page.status)}
             <span className="rounded bg-muted px-2 py-0.5">

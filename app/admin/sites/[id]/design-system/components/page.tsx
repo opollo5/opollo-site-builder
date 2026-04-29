@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { H1 } from "@/components/ui/typography";
 import { ComponentFormModal, type ComponentFormMode } from "@/components/ComponentFormModal";
 import { ComponentsGrid } from "@/components/ComponentsGrid";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
@@ -109,7 +110,7 @@ export default function DesignSystemComponentsPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Components</h1>
+          <H1>Components</H1>
           <p className="text-sm text-muted-foreground">
             Components registered on design system v{selectedDs.version} (
             {selectedDs.status}).

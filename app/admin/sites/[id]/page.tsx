@@ -5,6 +5,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
+import { H1 } from "@/components/ui/typography";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -157,7 +158,7 @@ export default async function SiteDetailPage({
               { label: site.name },
             ]}
           />
-          <h1 className="mt-1 text-xl font-semibold">{site.name}</h1>
+          <H1 className="mt-1">{site.name}</H1>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
             <StatusBadge status={site.status} />
             <a

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
+import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -196,7 +197,7 @@ export default async function AdminBatchesPage({
     <>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Batches</h1>
+          <H1>Batches</H1>
           <p className="text-sm text-muted-foreground">
             {siteForButton
               ? `Batches for ${siteForButton.name}.`

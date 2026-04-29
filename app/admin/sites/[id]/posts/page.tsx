@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { H1 } from "@/components/ui/typography";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
   listPostsForSite,
@@ -143,7 +144,7 @@ export default async function SitePostsList({
       />
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">Posts</h1>
+        <H1>Posts</H1>
         <div className="flex items-center gap-3">
           <p className="text-xs text-muted-foreground">
             {total} total{total > 0 ? ` · showing ${rangeStart}–${rangeEnd}` : ""}
