@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
+import { createRolloutForApply } from "@/lib/optimiser/staged-rollout/manager";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -101,6 +102,36 @@ export async function reconcileProposalRunStatus(
         next_status: nextStatus,
         err: updRes.error.message,
       });
+    }
+
+    // OPTIMISER-16: when proposal flips to 'applied', kick off the
+    // staged rollout. CAS on the update above guarantees we only
+    // create one rollout per applied transition. Skip rollout
+    // creation on 'applied_then_failed' — nothing to roll out.
+    if (nextStatus === "applied" && !updRes.error) {
+      const proposalDetail = await supabase
+        .from("opt_proposals")
+        .select("client_id, landing_page_id")
+        .eq("id", proposalId)
+        .maybeSingle();
+      if (proposalDetail.data) {
+        const landingPage = await supabase
+          .from("opt_landing_pages")
+          .select("page_id")
+          .eq("id", proposalDetail.data.landing_page_id as string)
+          .maybeSingle();
+        const rolloutResult = await createRolloutForApply({
+          proposalId,
+          clientId: proposalDetail.data.client_id as string,
+          pageId: (landingPage.data?.page_id as string | null) ?? null,
+        });
+        if (!rolloutResult.ok) {
+          logger.error("sync-proposal-status: rollout creation failed", {
+            proposal_id: proposalId,
+            err: rolloutResult.error,
+          });
+        }
+      }
     }
   }
 

@@ -16,7 +16,11 @@ export type ChangeLogEvent =
   | "manual_rollback"
   | "rolled_back"
   | "reverted"
-  | "reprompted";
+  | "reprompted"
+  | "staged_rollout_started"
+  | "staged_rollout_promoted"
+  | "staged_rollout_auto_reverted"
+  | "staged_rollout_window_expired";
 
 export type ChangeLogRow = {
   id: number;
