@@ -1,47 +1,83 @@
 import Link from "next/link";
+import { Globe, Plus } from "lucide-react";
 
 import { SiteActionsMenu } from "@/components/SiteActionsMenu";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { SiteListItem } from "@/lib/tool-schemas";
 import { cn, formatRelativeTime } from "@/lib/utils";
+
+// ---------------------------------------------------------------------------
+// B-2 — Sites list polish.
+//
+// Density: row height tightened to ~44px (px-3 py-2.5). Status cell
+// keeps the dot + text pattern (distinct from StatusPill — chosen for
+// the list-density, single-state context).
+// Empty state folded to A-6's EmptyState primitive.
+// Hover surface uses the .transition-smooth token for a less abrupt
+// background flip.
+// Status colors lean on A-2's success/warning tokens for AA-pass
+// contrast against tinted backgrounds.
+// ---------------------------------------------------------------------------
 
 function statusDotClass(status: string): string {
   switch (status) {
     case "active":
-      return "bg-green-500";
+      return "bg-success";
     case "pending_pairing":
-      return "bg-slate-400";
+      return "bg-muted-foreground/40";
     case "paused":
-      return "bg-yellow-500";
+      return "bg-warning";
     case "removed":
-      return "bg-slate-300";
+      return "bg-muted-foreground/30";
     default:
-      return "bg-red-500";
+      return "bg-destructive";
   }
 }
 
 function StatusCell({ status }: { status: string }) {
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-2 text-sm">
       <span
         aria-hidden="true"
-        className={cn("inline-block h-2 w-2 rounded-full", statusDotClass(status))}
+        className={cn(
+          "inline-block h-2 w-2 rounded-full",
+          statusDotClass(status),
+        )}
       />
-      <span className="text-sm capitalize">{status.replace(/_/g, " ")}</span>
+      <span className="capitalize">{status.replace(/_/g, " ")}</span>
     </span>
   );
 }
 
-// Sites table with row-level navigation + action menu. The row <a>
-// wrapper covers the primary cells; the actions column stops event
-// propagation so the menu doesn't double-fire with a row click.
-export function SitesTable({ sites }: { sites: SiteListItem[] }) {
+interface SitesTableProps {
+  sites: SiteListItem[];
+  onCreateClick?: () => void;
+}
+
+export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
   if (sites.length === 0) {
     return (
-      <div className="rounded-md border border-dashed p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No sites yet. Click &ldquo;Add new site&rdquo; to get started.
-        </p>
-      </div>
+      <EmptyState
+        icon={Globe}
+        iconLabel="No sites"
+        title="No sites connected yet"
+        body={
+          <>
+            Sites become available after you connect a WordPress install
+            with the Opollo plugin. Add your first site to start
+            generating pages.
+          </>
+        }
+        cta={
+          onCreateClick && (
+            <Button onClick={onCreateClick}>
+              <Plus aria-hidden className="h-4 w-4" />
+              Add a site
+            </Button>
+          )
+        }
+      />
     );
   }
 
@@ -49,17 +85,16 @@ export function SitesTable({ sites }: { sites: SiteListItem[] }) {
   // mask the table's corners against the rounded border, but it also
   // created a clipping context that hid the SiteActionsMenu pop-out
   // on rows near the bottom of the list. Drop overflow-hidden so the
-  // menu can extend past the table; corner masking is a minor visual
-  // nit vs. routinely-clipped operator actions.
+  // menu can extend past the table.
   return (
     <div className="rounded-md border">
       <table className="w-full text-sm">
         <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="px-4 py-2 font-medium">Name</th>
-            <th className="px-4 py-2 font-medium">WP URL</th>
-            <th className="px-4 py-2 font-medium">Status</th>
-            <th className="px-4 py-2 font-medium">Updated</th>
+            <th className="px-3 py-2 font-medium">Name</th>
+            <th className="px-3 py-2 font-medium">WP URL</th>
+            <th className="px-3 py-2 font-medium">Status</th>
+            <th className="px-3 py-2 font-medium">Updated</th>
             <th className="w-10 px-2 py-2"></th>
           </tr>
         </thead>
@@ -67,35 +102,38 @@ export function SitesTable({ sites }: { sites: SiteListItem[] }) {
           {sites.map((s) => (
             <tr
               key={s.id}
-              className="group border-b last:border-b-0 hover:bg-muted/40"
+              className="group border-b transition-smooth last:border-b-0 hover:bg-muted/40"
             >
-              <td className="px-4 py-3 font-medium">
+              <td className="px-3 py-2.5 font-medium">
                 <Link
                   href={`/admin/sites/${s.id}`}
-                  className="block hover:underline"
+                  className="block transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  data-testid={`site-row-link-${s.id}`}
                 >
                   {s.name}
                 </Link>
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-3 py-2.5 text-muted-foreground">
                 <a
                   href={s.wp_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="hover:underline"
+                  className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {s.wp_url}
                 </a>
               </td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5">
                 <StatusCell status={s.status} />
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
-                {formatRelativeTime(s.updated_at)}
+              <td className="px-3 py-2.5 text-xs text-muted-foreground">
+                <span data-screenshot-mask>
+                  {formatRelativeTime(s.updated_at)}
+                </span>
               </td>
               <td
-                className="px-2 py-3 text-right"
+                className="px-2 py-2.5 text-right"
                 onClick={(e) => e.stopPropagation()}
               >
                 <SiteActionsMenu
