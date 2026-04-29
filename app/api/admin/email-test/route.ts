@@ -4,12 +4,14 @@ import { z } from "zod";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderBaseEmail } from "@/lib/email/templates/base";
+import { isEmailTestAllowed } from "@/lib/email-test-gate";
 
-// AUTH-FOUNDATION P1.2 — POST /api/admin/email-test.
+// AUTH-FOUNDATION P1.2 + P1-FIX — POST /api/admin/email-test.
 //
-// Backs /admin/email-test. Dev-only by env gate; admin/operator gate
-// behind that. Phase 3 will replace the env gate with a super_admin
-// role check (the API route + the page move together).
+// Backs /admin/email-test. Host-aware gate (allowed on local dev,
+// Vercel preview, and the staging *.vercel.app alias; blocked on prod
+// custom domains); admin/operator gate behind that. Phase 3 will
+// replace the host gate with a super_admin role check.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,10 +36,10 @@ function deny(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (process.env.NODE_ENV === "production") {
+  if (!isEmailTestAllowed()) {
     return deny(
-      "NOT_AVAILABLE_IN_PROD",
-      "Email-test endpoint is dev-only.",
+      "NOT_AVAILABLE_ON_THIS_HOST",
+      "Email-test endpoint is not available on production custom domains.",
       404,
     );
   }
