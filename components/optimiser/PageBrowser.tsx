@@ -11,9 +11,14 @@ import type {
   OptDataReliability,
   OptPageState,
 } from "@/lib/optimiser/types";
+import {
+  classificationBadgeColor,
+  classificationLabel,
+} from "@/lib/optimiser/scoring/classify";
+import type { ScoreClassification } from "@/lib/optimiser/scoring/types";
 
-// Page browser (§9.3). Lists every landing page for the selected
-// client with state + data reliability dot + key metrics.
+// Page browser (§9.3 + addendum §4.1).
+// v1.6 adds the composite-score column + classification badge.
 
 const STATE_PILL: Record<OptPageState, string> = {
   active: "bg-blue-100 text-blue-900 border-blue-200",
@@ -50,6 +55,8 @@ export type PageBrowserProps = {
 
 export function PageBrowser({ client, pages }: PageBrowserProps) {
   const [filterState, setFilterState] = useState<"all" | OptPageState>("all");
+  const [filterClassification, setFilterClassification] =
+    useState<"all" | ScoreClassification>("all");
   const [filterReliability, setFilterReliability] =
     useState<"all" | OptDataReliability>("all");
   const [search, setSearch] = useState("");
@@ -57,6 +64,12 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
   const filtered = useMemo(() => {
     return pages.filter((p) => {
       if (filterState !== "all" && p.state !== filterState) return false;
+      if (
+        filterClassification !== "all" &&
+        p.current_classification !== filterClassification
+      ) {
+        return false;
+      }
       if (filterReliability !== "all" && p.data_reliability !== filterReliability) {
         return false;
       }
@@ -65,9 +78,25 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
       }
       return true;
     });
-  }, [pages, filterState, filterReliability, search]);
+  }, [pages, filterState, filterClassification, filterReliability, search]);
 
-  const counts = useMemo(() => {
+  const classCounts = useMemo(() => {
+    const c: Record<ScoreClassification | "total" | "uncategorised", number> = {
+      total: pages.length,
+      high_performer: 0,
+      optimisable: 0,
+      needs_attention: 0,
+      uncategorised: 0,
+    };
+    for (const p of pages) {
+      const cls = p.current_classification as ScoreClassification | null;
+      if (cls && cls in c) c[cls] += 1;
+      else c.uncategorised += 1;
+    }
+    return c;
+  }, [pages]);
+
+  const stateCounts = useMemo(() => {
     const c: Record<OptPageState | "total", number> = {
       total: pages.length,
       active: 0,
@@ -83,26 +112,26 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <Pill onClick={() => setFilterState("all")} active={filterState === "all"}>
-            All ({counts.total})
-          </Pill>
-          <Pill onClick={() => setFilterState("active")} active={filterState === "active"}>
-            Active ({counts.active})
-          </Pill>
-          <Pill onClick={() => setFilterState("healthy")} active={filterState === "healthy"}>
-            Healthy ({counts.healthy})
+          <Pill onClick={() => setFilterClassification("all")} active={filterClassification === "all"}>
+            All ({classCounts.total})
           </Pill>
           <Pill
-            onClick={() => setFilterState("insufficient_data")}
-            active={filterState === "insufficient_data"}
+            onClick={() => setFilterClassification("high_performer")}
+            active={filterClassification === "high_performer"}
           >
-            Gathering ({counts.insufficient_data})
+            High performers ({classCounts.high_performer})
           </Pill>
           <Pill
-            onClick={() => setFilterState("read_only_external")}
-            active={filterState === "read_only_external"}
+            onClick={() => setFilterClassification("optimisable")}
+            active={filterClassification === "optimisable"}
           >
-            Read-only ({counts.read_only_external})
+            Optimisable ({classCounts.optimisable})
+          </Pill>
+          <Pill
+            onClick={() => setFilterClassification("needs_attention")}
+            active={filterClassification === "needs_attention"}
+          >
+            Needs attention ({classCounts.needs_attention})
           </Pill>
         </div>
         <div className="ml-auto flex items-center gap-2">
@@ -124,6 +153,21 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
             <option value="amber">Amber+</option>
             <option value="red">Red only</option>
           </select>
+          <select
+            value={filterState}
+            onChange={(e) => setFilterState(e.target.value as "all" | OptPageState)}
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          >
+            <option value="all">State: any ({stateCounts.total})</option>
+            <option value="active">Active ({stateCounts.active})</option>
+            <option value="healthy">Healthy ({stateCounts.healthy})</option>
+            <option value="insufficient_data">
+              Gathering ({stateCounts.insufficient_data})
+            </option>
+            <option value="read_only_external">
+              Read-only ({stateCounts.read_only_external})
+            </option>
+          </select>
         </div>
       </div>
 
@@ -133,6 +177,7 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
             <tr>
               <th className="px-3 py-2 w-8"></th>
               <th className="px-3 py-2">Page</th>
+              <th className="px-3 py-2">Score</th>
               <th className="px-3 py-2">State</th>
               <th className="px-3 py-2 text-right">Alignment</th>
               <th className="px-3 py-2 text-right">CR</th>
@@ -145,15 +190,17 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
           <tbody>
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={10} className="px-3 py-8 text-center text-muted-foreground">
                   No pages match the current filters.
                 </td>
               </tr>
             )}
             {filtered.map((p) => {
               const dot = RELIABILITY_DOT[p.data_reliability];
+              const cls = p.current_classification as ScoreClassification | null;
+              const score = p.current_composite_score as number | null;
               return (
-                <tr key={p.id} className="border-t border-border align-top">
+                <tr key={p.id} className="border-t border-border align-top hover:bg-muted/20">
                   <td className="px-3 py-2">
                     <span
                       title={dot.label}
@@ -162,7 +209,12 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <div className="font-mono text-xs">{p.url}</div>
+                    <Link
+                      href={`/optimiser/pages/${p.id}`}
+                      className="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                    >
+                      {p.url}
+                    </Link>
                     {(p.active_technical_alerts ?? []).length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {(p.active_technical_alerts as string[]).map((alert) => (
@@ -174,6 +226,13 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
                           </span>
                         ))}
                       </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {score != null && cls ? (
+                      <ScoreBadge score={score} classification={cls} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -220,6 +279,13 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
           className="text-primary underline-offset-4 hover:underline"
         >
           settings
+        </Link>{" "}
+        ·{" "}
+        <Link
+          href={`/optimiser/clients/${client.id}/settings`}
+          className="text-primary underline-offset-4 hover:underline"
+        >
+          score weights
         </Link>
       </p>
     </div>
@@ -244,5 +310,24 @@ function Pill({
     >
       {children}
     </Button>
+  );
+}
+
+function ScoreBadge({
+  score,
+  classification,
+}: {
+  score: number;
+  classification: ScoreClassification;
+}) {
+  const colours = classificationBadgeColor(classification);
+  return (
+    <span
+      className={`inline-flex items-center gap-2 rounded-full border px-2 py-0.5 ${colours.bg} ${colours.border} ${colours.text}`}
+      title={classificationLabel(classification)}
+    >
+      <span aria-hidden className={`inline-block size-2 rounded-full ${colours.dot}`} />
+      <span className="font-mono text-sm font-semibold">{score}</span>
+    </span>
   );
 }

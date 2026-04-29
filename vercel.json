@@ -51,6 +51,10 @@
     {
       "path": "/api/cron/optimiser-expire-proposals",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-evaluate-scores",
+      "schedule": "45 7 * * *"
     }
   ]
 }

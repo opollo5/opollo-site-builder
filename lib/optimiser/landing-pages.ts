@@ -26,13 +26,22 @@ export type LandingPage = {
   active_technical_alerts: unknown[];
   data_reliability: "green" | "amber" | "red";
   data_reliability_checks: Record<string, unknown>;
+  // v1.6 — composite-score cache columns. NULL until the
+  // /api/cron/optimiser-evaluate-scores tick has run for this page.
+  current_composite_score: number | null;
+  current_classification:
+    | "high_performer"
+    | "optimisable"
+    | "needs_attention"
+    | null;
+  conversion_n_a: boolean;
   version_lock: number;
   created_at: string;
   updated_at: string;
 };
 
 const COLS =
-  "id, client_id, url, display_name, managed, management_mode, page_id, state, state_evaluated_at, state_reasons, spend_30d_usd_cents, sessions_30d, core_offer, page_snapshot, active_technical_alerts, data_reliability, data_reliability_checks, version_lock, created_at, updated_at";
+  "id, client_id, url, display_name, managed, management_mode, page_id, state, state_evaluated_at, state_reasons, spend_30d_usd_cents, sessions_30d, core_offer, page_snapshot, active_technical_alerts, data_reliability, data_reliability_checks, current_composite_score, current_classification, conversion_n_a, version_lock, created_at, updated_at";
 
 export async function listLandingPagesForClient(
   clientId: string,

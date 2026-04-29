@@ -23,13 +23,27 @@ export type OptClient = {
   confidence_overrides: Record<string, unknown>;
   data_threshold_overrides: Record<string, unknown>;
   onboarded_at: string | null;
+  // v1.6 additions — composite-score weights + conversion-component
+  // availability + causal-delta measurement window.
+  score_weights: {
+    alignment: number;
+    behaviour: number;
+    conversion: number;
+    technical: number;
+  };
+  conversion_components_present: {
+    cr: boolean;
+    cpa: boolean;
+    revenue: boolean;
+  };
+  causal_eval_window_days: number;
   version_lock: number;
   created_at: string;
   updated_at: string;
 };
 
 const CLIENT_COLUMNS =
-  "id, name, primary_contact_email, cross_client_learning_consent, llm_monthly_budget_usd, hosting_mode, hosting_cname_host, client_slug, staged_rollout_config, confidence_overrides, data_threshold_overrides, onboarded_at, version_lock, created_at, updated_at";
+  "id, name, primary_contact_email, cross_client_learning_consent, llm_monthly_budget_usd, hosting_mode, hosting_cname_host, client_slug, staged_rollout_config, confidence_overrides, data_threshold_overrides, onboarded_at, score_weights, conversion_components_present, causal_eval_window_days, version_lock, created_at, updated_at";
 
 export async function listClients(): Promise<OptClient[]> {
   const supabase = getServiceRoleClient();

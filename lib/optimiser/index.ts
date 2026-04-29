@@ -181,3 +181,50 @@ export type {
   SourceDiagnostic,
   EnvCheck,
 } from "./diagnostics";
+
+// Slice 12 surface — v1.6 composite scoring
+export {
+  classify,
+  classificationLabel,
+  classificationBadgeColor,
+} from "./scoring/classify";
+export type {
+  ScoreClassification,
+  ScoreWeights,
+  ConversionComponentsPresent,
+  SubscoreBundle,
+  CompositeResult,
+  CompositeConfidence,
+} from "./scoring/types";
+export {
+  DEFAULT_SCORE_WEIGHTS,
+  DEFAULT_CONVERSION_COMPONENTS,
+} from "./scoring/types";
+export {
+  computeBehaviourSubscore,
+  type BehaviourCohortRow,
+  type BehaviourScoreResult,
+} from "./scoring/behaviour-subscore";
+export {
+  computeConversionSubscore,
+  costPerConversionFromRollup,
+  type ConversionCohortRow,
+  type ConversionScoreResult,
+} from "./scoring/conversion-subscore";
+export {
+  computeTechnicalSubscore,
+  type TechnicalScoreResult,
+} from "./scoring/technical-subscore";
+export {
+  computeCompositeScore,
+  lowestContribution,
+} from "./scoring/composite-score";
+export {
+  runEvaluateScoresForAllClients,
+  type EvaluateScoresOutcome,
+} from "./scoring/evaluate-scores-job";
+export {
+  listScoreHistory,
+  listScoreSparkline,
+  type ScoreHistoryRow,
+} from "./scoring/score-history";
