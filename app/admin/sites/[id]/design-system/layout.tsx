@@ -9,7 +9,9 @@ import {
 } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/ui/skeleton";
 import {
   DesignSystemLayoutContext,
   resolveSelectedDesignSystem,
@@ -202,22 +204,17 @@ export default function DesignSystemLayout({
       </div>
 
       <div className="mt-6">
-        {state.status === "loading" && (
-          <div className="rounded-md border p-8 text-center">
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          </div>
-        )}
+        {state.status === "loading" && <CardSkeleton lines={3} />}
 
         {state.status === "error" && (
-          <div
-            className="flex items-center justify-between rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            role="alert"
-          >
-            <span>{state.message}</span>
-            <Button variant="outline" size="sm" onClick={() => void load()}>
-              Retry
-            </Button>
-          </div>
+          <Alert variant="destructive" title="Failed to load design system">
+            <div className="flex items-center justify-between gap-3">
+              <span>{state.message}</span>
+              <Button variant="outline" size="sm" onClick={() => void load()}>
+                Retry
+              </Button>
+            </div>
+          </Alert>
         )}
 
         {state.status === "ready" && (
