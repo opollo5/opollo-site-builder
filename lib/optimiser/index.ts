@@ -130,3 +130,37 @@ export type {
 
 export { runScorePagesForAllClients } from "./score-pages-job";
 export type { ScorePagesOutcome } from "./score-pages-job";
+
+// Slice 6 surface
+export {
+  listPendingProposals,
+  getProposalWithEvidence,
+  approveProposal,
+  rejectProposal,
+  expireStaleProposals,
+} from "./proposals";
+export type { Proposal, ApproveResult, RejectResult } from "./proposals";
+
+export {
+  recordRejection,
+  suppressedPlaybooksFor,
+  listClientMemory,
+  setMemoryCleared,
+} from "./client-memory";
+export type { ClientMemoryRow, RejectionReason } from "./client-memory";
+
+export {
+  recordChangeLog,
+  listChangeLog,
+  manualRollbackProposal,
+} from "./change-log";
+export type { ChangeLogEvent, ChangeLogRow } from "./change-log";
+
+export { lintChangeSet } from "./guardrails";
+export type { GuardrailResult, LintInputs } from "./guardrails";
+
+export { sendEmail, escapeHtml } from "./email/send";
+export type { EmailPayload, SendResult } from "./email/send";
+
+export { planDigests, sendDigest } from "./email/digests";
+export type { DigestKind, DigestDecision, DigestSendResult } from "./email/digests";
