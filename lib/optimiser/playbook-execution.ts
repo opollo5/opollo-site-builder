@@ -29,7 +29,10 @@ export type PlaybookTrigger =
 export type TriggerCondition = {
   metric: string;
   op: "gt" | "lt" | "gte" | "lte" | "eq" | "ne";
-  value: number | boolean;
+  // Phase 2 Slice 20 added string thresholds (intent_class equality
+  // checks). gt/lt operators stay numeric-only — string comparisons
+  // are rejected at compare() time.
+  value: number | boolean | string;
 };
 
 export type PlaybookRow = {
@@ -48,13 +51,14 @@ export type PlaybookRow = {
 export type EvaluationResult = {
   fired: boolean;
   magnitude: number;
-  reasons: Array<{ metric: string; op: string; threshold: number | boolean; observed: number | boolean | null; passed: boolean }>;
+  reasons: Array<{ metric: string; op: string; threshold: number | boolean | string; observed: number | boolean | string | null; passed: boolean }>;
 };
 
 export type MetricBag = {
   alignment_score: number | null;
   bounce_rate: number;
   conversion_rate: number;
+  avg_engagement_time_s: number;
   avg_scroll_depth: number;
   avg_scroll_depth_desktop: number;
   form_starts: number;
@@ -68,6 +72,17 @@ export type MetricBag = {
   sessions_14d: number;
   conversions_14d: number;
   clicks_14d: number;
+  // Phase 2 Slice 20 — behaviour-driven trigger inputs from Clarity.
+  // Defaults: 0 (so a missing-data page never spuriously fires a
+  // behaviour-trigger playbook).
+  rage_clicks_per_session: number;
+  dead_clicks_per_session: number;
+  quick_back_rate: number;
+  // Phase 2 Slice 20 — Phase 2 content_fix playbook inputs.
+  proof_near_cta: boolean;
+  testimonial_in_viewport_1_to_3: boolean;
+  search_intent_class: "informational" | "transactional" | "navigational" | "unknown";
+  page_intent_class: "informational" | "transactional" | "unknown";
 };
 
 export function buildMetricBag(args: {
@@ -85,11 +100,25 @@ export function buildMetricBag(args: {
   sessions14d?: number;
   conversions14d?: number;
   clicks14d?: number;
+  // Phase 2 Slice 20 — behaviour-trigger inputs from Clarity.
+  rageClicksPerSession?: number;
+  deadClicksPerSession?: number;
+  quickBackRate?: number;
+  // Phase 2 Slice 20 — Phase 2 playbook inputs.
+  proofNearCta?: boolean;
+  testimonialInViewport1To3?: boolean;
+  searchIntentClass?:
+    | "informational"
+    | "transactional"
+    | "navigational"
+    | "unknown";
+  pageIntentClass?: "informational" | "transactional" | "unknown";
 }): MetricBag {
   return {
     alignment_score: args.alignmentScore,
     bounce_rate: args.rollup.bounce_rate,
     conversion_rate: args.rollup.conversion_rate,
+    avg_engagement_time_s: args.rollup.avg_engagement_time_s,
     avg_scroll_depth: args.rollup.avg_scroll_depth,
     avg_scroll_depth_desktop: args.rollup.avg_scroll_depth,
     form_starts: args.formStarts ?? 0,
@@ -103,6 +132,13 @@ export function buildMetricBag(args: {
     sessions_14d: args.sessions14d ?? args.rollup.sessions,
     conversions_14d: args.conversions14d ?? args.rollup.conversions,
     clicks_14d: args.clicks14d ?? args.rollup.clicks,
+    rage_clicks_per_session: args.rageClicksPerSession ?? 0,
+    dead_clicks_per_session: args.deadClicksPerSession ?? 0,
+    quick_back_rate: args.quickBackRate ?? 0,
+    proof_near_cta: args.proofNearCta ?? false,
+    testimonial_in_viewport_1_to_3: args.testimonialInViewport1To3 ?? false,
+    search_intent_class: args.searchIntentClass ?? "unknown",
+    page_intent_class: args.pageIntentClass ?? "unknown",
   };
 }
 
@@ -152,11 +188,18 @@ export function evaluatePlaybook(
 }
 
 function compare(
-  observed: number | boolean | null,
+  observed: number | boolean | string | null,
   op: TriggerCondition["op"],
-  threshold: number | boolean,
+  threshold: number | boolean | string,
 ): boolean {
   if (observed === null) return false;
+  if (typeof observed === "string" || typeof threshold === "string") {
+    if (op === "eq") return observed === threshold;
+    if (op === "ne") return observed !== threshold;
+    // gt/lt on strings is a misconfigured trigger; refuse rather than
+    // compare lexicographically.
+    return false;
+  }
   if (typeof observed === "boolean" || typeof threshold === "boolean") {
     if (op === "eq") return observed === threshold;
     if (op === "ne") return observed !== threshold;
