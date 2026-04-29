@@ -584,6 +584,7 @@ function UrlSubMode({
       <button
         type="button"
         onClick={() => setOpen(true)}
+        data-testid="picker-url-disclosure"
         className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
       >
         <Link2 aria-hidden className="h-3 w-3" />
@@ -594,7 +595,23 @@ function UrlSubMode({
 
   return (
     <div className="rounded-md border p-3 text-sm">
-      <p className="text-xs font-medium">Fetch image from URL</p>
+      {/* R2-fix — header row with a cancel affordance so the operator
+          can collapse the disclosure if they opened it accidentally. */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium">Fetch image from URL</p>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setUrl("");
+            setError(null);
+          }}
+          aria-label="Cancel URL fetch"
+          className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        >
+          Cancel
+        </button>
+      </div>
       <p className="mt-1 text-xs text-muted-foreground">
         Server fetches, validates type + size, and uploads to the library.
         30s timeout; 10 MB cap. Internal IPs blocked.
@@ -607,6 +624,7 @@ function UrlSubMode({
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           disabled={fetching}
+          data-testid="picker-url-input"
           className="min-w-0 flex-1"
         />
         <Button
@@ -614,6 +632,7 @@ function UrlSubMode({
           size="sm"
           onClick={handleFetch}
           disabled={fetching}
+          data-testid="picker-url-fetch"
         >
           {fetching ? "Fetching…" : "Fetch"}
         </Button>
@@ -652,8 +671,13 @@ function SegmentedTab({
       aria-selected={active}
       onClick={onClick}
       data-testid={testId}
+      // R2-fix — focus-visible ring needs offset + z-index lift so it
+      // doesn't clip against the segmented container's border or get
+      // visually masked by neighbour tabs. ring-offset-2 +
+      // ring-offset-background gives breathing room; relative z-10
+      // lifts the focused tab above siblings.
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded px-3 text-sm font-medium transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "relative inline-flex h-8 items-center gap-1.5 rounded px-3 text-sm font-medium transition-smooth focus:outline-none focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         active
           ? "bg-background text-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground",
