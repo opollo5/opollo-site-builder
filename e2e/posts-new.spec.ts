@@ -69,4 +69,66 @@ test.describe("/admin/posts/new — top-level entry", () => {
 
     await auditA11y(page, testInfo);
   });
+
+  // BL-2 — autosave + progressive disclosure round-trip.
+  test("autosave persists across reload and disclosure toggles", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/posts/new");
+
+    // Pick the seeded site so the composer mounts with a stable
+    // localStorage key.
+    await page.getByTestId("posts-new-site-picker").click();
+    const firstOption = page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first();
+    await firstOption.click();
+
+    // Advanced fields are collapsed by default for a fresh draft.
+    const panel = page.getByTestId("post-advanced-panel");
+    await expect(panel).toHaveCount(0);
+
+    // Type into the textarea + title; autosave fires after the 800ms
+    // debounce.
+    const composer = page.locator("#post-composer-input");
+    await composer.fill("Hello world body for autosave probe.");
+    await page.locator("#post-title").fill("Autosave probe");
+
+    // Save indicator surfaces.
+    await expect(page.getByTestId("post-save-status")).toContainText(
+      /saving|saved/i,
+      { timeout: 5000 },
+    );
+
+    // Open the disclosure manually.
+    await page.getByTestId("post-advanced-toggle").click();
+    await expect(page.getByTestId("post-advanced-panel")).toBeVisible();
+
+    // Reload — the snapshot should rehydrate the title + body.
+    await page.reload();
+
+    // The site picker resets to "Pick a site…" because the page
+    // tracks selection client-side, but the composer's localStorage
+    // is keyed by siteId. Re-pick the site to remount the composer.
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    await expect(page.locator("#post-title")).toHaveValue(
+      /autosave probe/i,
+    );
+    await expect(page.locator("#post-composer-input")).toHaveValue(
+      /hello world body for autosave probe/i,
+    );
+
+    // "Draft restored" status surfaces with a Discard control.
+    await expect(page.getByTestId("post-save-status")).toContainText(
+      /draft restored|saved/i,
+    );
+
+    await auditA11y(page, testInfo);
+  });
 });

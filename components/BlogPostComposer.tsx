@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -31,6 +38,7 @@ import {
   type BlogPostMetadata,
   type ParseSource,
 } from "@/lib/blog-post-parser";
+import { cn, formatRelativeTime } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // BP-3 — Blog-post entry-point composer.
@@ -45,9 +53,20 @@ import {
 // detail page on success. The "Start run" button is disabled with
 // "Featured image required" copy until BP-4 (image picker) and BP-8
 // (run-start gate) wire it.
+//
+// BL-2 layered on:
+//   - localStorage autosave (debounced 800ms). Keyed by siteId so two
+//     drafts on different sites don't collide. Saved state indicator
+//     reads "Saving…" / "Saved · just now" / "Saved 2m ago".
+//   - Progressive disclosure — meta title / meta description / parent
+//     page / featured image collapse behind a "More options" toggle
+//     that auto-opens when any of those fields has a value (parser
+//     pre-fill or operator edit). Save Draft works without expanding.
 // ---------------------------------------------------------------------------
 
 const PARSE_DEBOUNCE_MS = 200;
+const AUTOSAVE_DEBOUNCE_MS = 800;
+const AUTOSAVE_STATUS_FRESH_MS = 1500;
 
 const SOURCE_HINTS: Record<ParseSource, string> = {
   yaml: "Auto-filled from YAML front-matter",
@@ -98,6 +117,30 @@ function applyParse(
   return { value: parsed, source, touched: false };
 }
 
+// BL-2 autosave shape — kept narrow on purpose so a future schema
+// change (e.g. a new field on FieldState) doesn't silently corrupt
+// stored drafts. Restoration tolerates partial / missing fields.
+interface DraftSnapshot {
+  v: 1;
+  composerText: string;
+  title: FieldState;
+  slug: FieldState;
+  metaTitle: FieldState;
+  metaDescription: FieldState;
+  parentPage: WpPageOption | null;
+  featuredImage: ImagePickerEntry | null;
+  savedAt: number;
+}
+
+function draftStorageKey(siteId: string): string {
+  return `opollo:post-draft:${siteId}`;
+}
+
+type AutosaveState =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved"; at: number };
+
 export function BlogPostComposer({ siteId }: { siteId: string }) {
   const router = useRouter();
   const [composerValue, setComposerValue] = useState<ComposerValue>({
@@ -118,6 +161,66 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [featuredImage, setFeaturedImage] =
     useState<ImagePickerEntry | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // BL-2 — autosave state machine + disclosure toggle.
+  const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
+  // Hydration guard — restore-from-localStorage runs once, AFTER mount,
+  // so SSR + first client render match. The ref blocks autosave from
+  // firing during the restore tick (otherwise the restored values would
+  // immediately get re-saved and trigger a Saved indicator on load).
+  const restoredRef = useRef(false);
+
+  // BL-2 — restore from localStorage on mount. Runs once per siteId.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(draftStorageKey(siteId));
+      if (!raw) {
+        restoredRef.current = true;
+        return;
+      }
+      const parsed = JSON.parse(raw) as DraftSnapshot;
+      if (parsed?.v !== 1) {
+        restoredRef.current = true;
+        return;
+      }
+      // Apply each section guardedly so a partial snapshot doesn't
+      // throw. Operator can still type into anything that's missing.
+      if (typeof parsed.composerText === "string") {
+        setComposerValue({ text: parsed.composerText, file: null });
+      }
+      if (parsed.title) setTitle(parsed.title);
+      if (parsed.slug) setSlug(parsed.slug);
+      if (parsed.metaTitle) setMetaTitle(parsed.metaTitle);
+      if (parsed.metaDescription) setMetaDescription(parsed.metaDescription);
+      if (parsed.parentPage !== undefined) setParentPage(parsed.parentPage);
+      if (parsed.featuredImage !== undefined) {
+        setFeaturedImage(parsed.featuredImage);
+      }
+      // Surface the restore in the saved indicator + auto-open the
+      // disclosure if the restored draft used any advanced fields.
+      setDraftRestoredAt(parsed.savedAt);
+      if (
+        parsed.metaTitle?.value ||
+        parsed.metaDescription?.value ||
+        parsed.parentPage ||
+        parsed.featuredImage
+      ) {
+        setShowAdvanced(true);
+      }
+    } catch {
+      // Corrupt JSON — wipe the slot so subsequent loads don't loop.
+      try {
+        window.localStorage.removeItem(draftStorageKey(siteId));
+      } catch {}
+    } finally {
+      restoredRef.current = true;
+    }
+    // siteId is the storage key — re-run when the operator switches
+    // sites (PostsNewClient remounts BlogPostComposer on site change,
+    // but defending against in-place siteId swaps too).
+  }, [siteId]);
 
   // Debounced re-parse on every text change. Pure-logic call, but
   // 200ms keeps every keystroke from reflowing four field updates.
@@ -144,6 +247,81 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     }, PARSE_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [composerValue.text]);
+
+  // BL-2 — debounced autosave to localStorage. Skips while the form is
+  // submitting (the success path navigates away anyway) and waits for
+  // the initial restore to complete so we don't immediately re-save
+  // the snapshot we just loaded.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!restoredRef.current) return;
+    if (submitting) return;
+    // Empty form? Don't pollute storage with an empty snapshot.
+    if (
+      composerValue.text.length === 0 &&
+      title.value.length === 0 &&
+      slug.value.length === 0 &&
+      metaTitle.value.length === 0 &&
+      metaDescription.value.length === 0 &&
+      parentPage === null &&
+      featuredImage === null
+    ) {
+      return;
+    }
+    setAutosave({ kind: "saving" });
+    const id = setTimeout(() => {
+      const snapshot: DraftSnapshot = {
+        v: 1,
+        composerText: composerValue.text,
+        title,
+        slug,
+        metaTitle,
+        metaDescription,
+        parentPage,
+        featuredImage,
+        savedAt: Date.now(),
+      };
+      try {
+        window.localStorage.setItem(
+          draftStorageKey(siteId),
+          JSON.stringify(snapshot),
+        );
+        setAutosave({ kind: "saved", at: snapshot.savedAt });
+      } catch {
+        // Quota / disabled — fall back to idle so the indicator clears.
+        setAutosave({ kind: "idle" });
+      }
+    }, AUTOSAVE_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [
+    composerValue.text,
+    title,
+    slug,
+    metaTitle,
+    metaDescription,
+    parentPage,
+    featuredImage,
+    siteId,
+    submitting,
+  ]);
+
+  const discardDraft = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(draftStorageKey(siteId));
+    } catch {}
+    setComposerValue({ text: "", file: null });
+    setTitle(emptyField());
+    setSlug(emptyField());
+    setMetaTitle(emptyField());
+    setMetaDescription(emptyField());
+    setParentPage(null);
+    setFeaturedImage(null);
+    setLastParse(null);
+    setAutosave({ kind: "idle" });
+    setDraftRestoredAt(null);
+    setShowAdvanced(false);
+  }, [siteId]);
 
   // If the operator clears a touched field, snap it back to the
   // parsed value rather than leaving the form blank between edits.
@@ -213,6 +391,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         | { ok: false; error: { code: string; message: string } }
         | null;
       if (payload?.ok) {
+        // BL-2 — wipe the autosave slot before navigating so a refresh
+        // on the detail page doesn't restore a now-saved snapshot.
+        try {
+          window.localStorage.removeItem(draftStorageKey(siteId));
+        } catch {}
         router.push(payload.data.edit_url);
         return;
       }
@@ -317,144 +500,168 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             )}
           </div>
         </div>
-
-        <div>
-          <label
-            htmlFor="post-meta-title"
-            className="block text-sm font-medium"
-          >
-            Meta title (SEO)
-          </label>
-          <Input
-            id="post-meta-title"
-            className="mt-1"
-            value={metaTitle.value}
-            onChange={(e) =>
-              setFieldValue(
-                setMetaTitle,
-                e.target.value,
-                lastParse?.meta_title ?? null,
-                lastParse?.source_map.meta_title ?? "derived",
-              )
-            }
-            disabled={submitting}
-            maxLength={200}
-          />
-          <SourceHint source={metaTitle.source} />
-        </div>
-
-        <div>
-          <label
-            htmlFor="post-parent-page"
-            className="block text-sm font-medium"
-          >
-            Parent page
-          </label>
-          <WpPageCombobox
-            siteId={siteId}
-            value={parentPage}
-            onChange={setParentPage}
-            disabled={submitting}
-            triggerId="post-parent-page"
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            Where this post will live in the WP site tree (queries
-            <code className="ml-1 font-mono">/wp/v2/pages</code>).
-          </p>
-        </div>
-
-        <div className="md:col-span-2">
-          <label
-            htmlFor="post-meta-description"
-            className="block text-sm font-medium"
-          >
-            Meta description (SEO)
-          </label>
-          <Textarea
-            id="post-meta-description"
-            className="mt-1"
-            rows={3}
-            value={metaDescription.value}
-            onChange={(e) =>
-              setFieldValue(
-                setMetaDescription,
-                e.target.value,
-                lastParse?.meta_description ?? null,
-                lastParse?.source_map.meta_description ?? "derived",
-              )
-            }
-            disabled={submitting}
-            maxLength={400}
-            aria-invalid={
-              metaDescription.value.length > 0 && !metaDescriptionIsValid
-            }
-          />
-          <div className="mt-1 flex items-center justify-between gap-2 text-xs">
-            <SourceHint source={metaDescription.source} />
-            <span
-              className={
-                metaDescription.value.length > 160
-                  ? "text-destructive"
-                  : "text-muted-foreground"
-              }
-            >
-              {metaDescription.value.length}/160
-            </span>
-          </div>
-        </div>
       </fieldset>
 
-      <div className="rounded-md border p-4 text-sm">
-        <div className="flex items-start justify-between gap-3">
+      <AdvancedDisclosure
+        open={showAdvanced}
+        onToggle={() => setShowAdvanced((v) => !v)}
+        summary={summarizeAdvanced({
+          metaTitle,
+          metaDescription,
+          parentPage,
+          featuredImage,
+        })}
+      >
+        <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <p className="font-medium">Featured image</p>
+            <label
+              htmlFor="post-meta-title"
+              className="block text-sm font-medium"
+            >
+              Meta title (SEO)
+            </label>
+            <Input
+              id="post-meta-title"
+              className="mt-1"
+              value={metaTitle.value}
+              onChange={(e) =>
+                setFieldValue(
+                  setMetaTitle,
+                  e.target.value,
+                  lastParse?.meta_title ?? null,
+                  lastParse?.source_map.meta_title ?? "derived",
+                )
+              }
+              disabled={submitting}
+              maxLength={200}
+            />
+            <SourceHint source={metaTitle.source} />
+          </div>
+
+          <div>
+            <label
+              htmlFor="post-parent-page"
+              className="block text-sm font-medium"
+            >
+              Parent page
+            </label>
+            <WpPageCombobox
+              siteId={siteId}
+              value={parentPage}
+              onChange={setParentPage}
+              disabled={submitting}
+              triggerId="post-parent-page"
+            />
             <p className="mt-1 text-xs text-muted-foreground">
-              Required at publish (enforced by BP-7&apos;s server-side
-              guard). Selecting here previews; persistence + WP attachment
-              ship in BP-7.
+              Where this post will live in the WP site tree (queries
+              <code className="ml-1 font-mono">/wp/v2/pages</code>).
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPickerOpen(true)}
-            disabled={submitting}
-          >
-            {featuredImage ? "Change image" : "Pick image"}
-          </Button>
-        </div>
-        {featuredImage && featuredImage.delivery_url && (
-          <div className="mt-3 flex items-center gap-3">
-            {/* Cloudflare Images delivery URL — no Next/Image to avoid
-                wiring imagedelivery.net into next.config remotePatterns
-                for a thumbnail with explicit w=/h= params already. */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
-              alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
-              className="h-20 w-20 rounded-md border object-cover"
+
+          <div className="md:col-span-2">
+            <label
+              htmlFor="post-meta-description"
+              className="block text-sm font-medium"
+            >
+              Meta description (SEO)
+            </label>
+            <Textarea
+              id="post-meta-description"
+              className="mt-1"
+              rows={3}
+              value={metaDescription.value}
+              onChange={(e) =>
+                setFieldValue(
+                  setMetaDescription,
+                  e.target.value,
+                  lastParse?.meta_description ?? null,
+                  lastParse?.source_map.meta_description ?? "derived",
+                )
+              }
+              disabled={submitting}
+              maxLength={400}
+              aria-invalid={
+                metaDescription.value.length > 0 && !metaDescriptionIsValid
+              }
             />
-            <div className="min-w-0">
-              <p
-                className="truncate text-sm font-medium"
-                title={featuredImage.caption ?? featuredImage.filename ?? ""}
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs">
+              <SourceHint source={metaDescription.source} />
+              <span
+                className={
+                  metaDescription.value.length > 160
+                    ? "text-destructive"
+                    : "text-muted-foreground"
+                }
               >
-                {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
-              </p>
-              <button
-                type="button"
-                onClick={() => setFeaturedImage(null)}
-                className="text-xs text-muted-foreground underline hover:text-foreground"
-              >
-                Remove
-              </button>
+                {metaDescription.value.length}/160
+              </span>
             </div>
           </div>
-        )}
-      </div>
+        </fieldset>
+
+        <div className="mt-4 rounded-md border p-4 text-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-medium">Featured image</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Required at publish (enforced by BP-7&apos;s server-side
+                guard). Selecting here previews; persistence + WP attachment
+                ship in BP-7.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPickerOpen(true)}
+              disabled={submitting}
+            >
+              {featuredImage ? "Change image" : "Pick image"}
+            </Button>
+          </div>
+          {featuredImage && featuredImage.delivery_url && (
+            <div className="mt-3 flex items-center gap-3">
+              {/* Cloudflare Images delivery URL — no Next/Image to avoid
+                  wiring imagedelivery.net into next.config remotePatterns
+                  for a thumbnail with explicit w=/h= params already. */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
+                alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
+                className="h-20 w-20 rounded-md border object-cover"
+              />
+              <div className="min-w-0">
+                <p
+                  className="truncate text-sm font-medium"
+                  title={featuredImage.caption ?? featuredImage.filename ?? ""}
+                >
+                  {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setFeaturedImage(null)}
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </AdvancedDisclosure>
 
       {formError && <Alert variant="destructive">{formError}</Alert>}
+
+      {/* BL-2 — saved indicator + restored draft notice + discard button.
+          Sits flush above the action row so the operator catches the
+          state change in their primary scan path. */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <SaveStatus
+          autosave={autosave}
+          restoredAt={draftRestoredAt}
+          onDiscard={discardDraft}
+        />
+      </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="submit" disabled={!canSaveDraft}>
@@ -472,11 +679,19 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           {submitting ? "Saving…" : "Start run"}
         </Button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Start run currently saves a draft and routes to the post detail
-        page. BP-7 will plumb the featured-image transfer + WP create
-        directly from this button.
-      </p>
+      {!canStartRun && canSaveDraft && (
+        <p className="text-xs text-muted-foreground">
+          Start run needs the SEO meta fields, parent page, and featured
+          image — open <button
+            type="button"
+            onClick={() => setShowAdvanced(true)}
+            className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+          >
+            More options
+          </button>
+          {" "}to fill them in.
+        </p>
+      )}
 
       <ImagePickerModal
         open={pickerOpen}
@@ -493,6 +708,126 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         }
       />
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BL-2 — Progressive disclosure wrapper for advanced fields.
+// ---------------------------------------------------------------------------
+
+function summarizeAdvanced({
+  metaTitle,
+  metaDescription,
+  parentPage,
+  featuredImage,
+}: {
+  metaTitle: FieldState;
+  metaDescription: FieldState;
+  parentPage: WpPageOption | null;
+  featuredImage: ImagePickerEntry | null;
+}): string {
+  const filled: string[] = [];
+  if (metaTitle.value.trim()) filled.push("meta title");
+  if (metaDescription.value.trim()) filled.push("meta description");
+  if (parentPage) filled.push("parent page");
+  if (featuredImage) filled.push("featured image");
+  if (filled.length === 0) return "SEO meta, parent page, featured image";
+  return filled.join(", ");
+}
+
+function AdvancedDisclosure({
+  open,
+  onToggle,
+  summary,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  summary: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-md border bg-muted/20">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        data-testid="post-advanced-toggle"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-smooth hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {open ? (
+          <ChevronDown aria-hidden className="h-4 w-4 text-muted-foreground" />
+        ) : (
+          <ChevronRight aria-hidden className="h-4 w-4 text-muted-foreground" />
+        )}
+        <span className="font-medium">More options</span>
+        <span className="truncate text-xs text-muted-foreground">{summary}</span>
+      </button>
+      {open && (
+        <div
+          data-testid="post-advanced-panel"
+          className="border-t p-4"
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BL-2 — Save status indicator. Reads the autosave state machine and
+// surfaces a single inline string the operator can scan without context
+// switching.
+// ---------------------------------------------------------------------------
+
+function SaveStatus({
+  autosave,
+  restoredAt,
+  onDiscard,
+}: {
+  autosave: AutosaveState;
+  restoredAt: number | null;
+  onDiscard: () => void;
+}) {
+  // Restore notice takes priority on first paint; once the operator
+  // edits anything the autosave indicator owns the slot.
+  const showingRestore = restoredAt !== null && autosave.kind === "idle";
+
+  let label = "";
+  if (showingRestore) {
+    label = `Draft restored from ${formatRelativeTime(
+      new Date(restoredAt!).toISOString(),
+    )}.`;
+  } else if (autosave.kind === "saving") {
+    label = "Saving…";
+  } else if (autosave.kind === "saved") {
+    const fresh = Date.now() - autosave.at < AUTOSAVE_STATUS_FRESH_MS;
+    label = fresh
+      ? "Saved · just now"
+      : `Saved · ${formatRelativeTime(new Date(autosave.at).toISOString())}`;
+  }
+
+  return (
+    <span
+      data-testid="post-save-status"
+      className={cn(
+        "inline-flex items-center gap-2 transition-smooth",
+        label ? "opacity-100" : "opacity-0",
+      )}
+      aria-live="polite"
+    >
+      {label && <span>{label}</span>}
+      {(showingRestore || autosave.kind === "saved") && (
+        <button
+          type="button"
+          onClick={onDiscard}
+          className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+        >
+          Discard draft
+        </button>
+      )}
+    </span>
   );
 }
 
