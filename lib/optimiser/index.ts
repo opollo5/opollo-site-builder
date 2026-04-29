@@ -93,3 +93,40 @@ export type {
 
 export { runEvaluatePagesForAllClients } from "./evaluate-pages-job";
 export type { EvaluatePagesOutcome } from "./evaluate-pages-job";
+
+// Slice 5 surface
+export { analyseHtml } from "./page-content-analysis";
+export type { PageSnapshot } from "./page-content-analysis";
+
+export { computeConfidence } from "./confidence";
+export type { ConfidenceInputs, ConfidenceResult } from "./confidence";
+
+export { scoreAlignment } from "./alignment-scoring";
+export type {
+  AlignmentScoreInputs,
+  AlignmentScore,
+  AlignmentSubscores,
+} from "./alignment-scoring";
+
+export {
+  buildMetricBag,
+  evaluatePlaybook,
+  listPhase1ContentPlaybooks,
+  listPhase1TechnicalAlertPlaybooks,
+} from "./playbook-execution";
+export type {
+  PlaybookRow,
+  PlaybookTrigger,
+  TriggerCondition,
+  EvaluationResult,
+  MetricBag,
+} from "./playbook-execution";
+
+export { generateProposal } from "./proposal-generation";
+export type {
+  GenerateProposalInputs,
+  GenerateProposalResult,
+} from "./proposal-generation";
+
+export { runScorePagesForAllClients } from "./score-pages-job";
+export type { ScorePagesOutcome } from "./score-pages-job";
