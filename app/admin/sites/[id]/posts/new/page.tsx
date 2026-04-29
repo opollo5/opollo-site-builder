@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BlogPostComposer } from "@/components/BlogPostComposer";
-import { H1 } from "@/components/ui/typography";
+import { Alert } from "@/components/ui/alert";
+import { H1, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -30,20 +31,15 @@ export default async function BlogPostEntryPage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <main className="mx-auto max-w-3xl p-6">
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        >
-          {result.error.message}
-        </div>
-      </main>
+      <div className="mx-auto max-w-3xl">
+        <Alert variant="destructive">{result.error.message}</Alert>
+      </div>
     );
   }
   const site = result.data.site;
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
+    <div className="mx-auto max-w-4xl">
       <Breadcrumbs
         crumbs={[
           { label: "Sites", href: "/admin/sites" },
@@ -53,15 +49,15 @@ export default async function BlogPostEntryPage({
         ]}
       />
       <H1 className="mt-2">New blog post</H1>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <Lead className="mt-1">
         Paste a markdown / HTML / YAML-fronted post. We&apos;ll parse the
-        metadata into the fields below — every value is editable before
-        you save the draft.
-      </p>
+        metadata into the fields below — every value is editable before you
+        save the draft.
+      </Lead>
 
       <div className="mt-6">
         <BlogPostComposer siteId={site.id} />
       </div>
-    </main>
+    </div>
   );
 }
