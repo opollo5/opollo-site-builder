@@ -49,6 +49,10 @@ const config: Config = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        // R1 — page-background tint. Cards stay on `bg-background` so
+        // their edges register against the canvas. Use as `bg-canvas`
+        // on the page wrapper only.
+        canvas: "hsl(var(--canvas))",
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
