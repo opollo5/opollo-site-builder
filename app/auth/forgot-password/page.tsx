@@ -1,4 +1,5 @@
 import { ForgotPasswordForm } from "@/components/ForgotPasswordForm";
+import { H1, Lead } from "@/components/ui/typography";
 
 // ---------------------------------------------------------------------------
 // /auth/forgot-password — M14-3.
@@ -15,14 +16,17 @@ export default function ForgotPasswordPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6">
       <div className="w-full text-center">
-        <h1 className="text-xl font-semibold">Forgot your password?</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <H1>Forgot your password?</H1>
+        <Lead className="mt-2">
           Enter your email and we&apos;ll send you a reset link.
-        </p>
+        </Lead>
       </div>
       <ForgotPasswordForm />
       <div className="text-center text-xs text-muted-foreground">
-        <a href="/login" className="underline hover:no-underline">
+        <a
+          href="/login"
+          className="underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        >
           Back to sign in
         </a>
       </div>
