@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { AppearanceEventLog } from "@/components/AppearanceEventLog";
 import { KadencePaletteDiffTable } from "@/components/KadencePaletteDiffTable";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CardSkeleton } from "@/components/ui/skeleton";
+import { H1, Lead } from "@/components/ui/typography";
 import type { AppearanceEventRow } from "@/lib/appearance-events";
 import type {
   KadencePaletteProposal,
@@ -306,13 +309,14 @@ export function AppearancePanelClient({
   const wpDisplayUrl = siteWpUrl.replace(/\/+$/, "");
 
   return (
-    <div className="mt-6 space-y-6">
+    <div className="mt-4 space-y-5">
       <div>
-        <h1 className="text-2xl font-semibold">Appearance</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <H1>Appearance</H1>
+        <Lead className="mt-0.5">
           Sync this site&apos;s design-system palette to Kadence on{" "}
-          <span className="font-medium">{siteName}</span> ({wpDisplayUrl}).
-        </p>
+          <span className="font-medium text-foreground">{siteName}</span>{" "}
+          ({wpDisplayUrl}).
+        </Lead>
       </div>
 
       {/* Scope clarifier — what Opollo owns vs what the operator owns. */}
@@ -330,26 +334,19 @@ export function AppearancePanelClient({
       </div>
 
       {/* Top-level error banner — covers network errors + post-action errors. */}
-      {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
 
       {/* Status banner — varies by phase. */}
       {phase === "loading" && (
-        <div
-          role="status"
-          className="rounded-md border border-primary/40 bg-primary/5 p-4 text-sm"
-          aria-live="polite"
-        >
-          <p className="font-medium">Checking Kadence on this site…</p>
-          <p className="mt-1 text-muted-foreground">
+        <div className="space-y-3" aria-live="polite">
+          <Alert
+            variant="info"
+            title="Checking Kadence on this site…"
+          >
             Reading WordPress capabilities + theme state.
-          </p>
+          </Alert>
+          <CardSkeleton lines={3} />
+          <CardSkeleton lines={2} />
         </div>
       )}
 
