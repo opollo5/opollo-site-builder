@@ -114,6 +114,28 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
     [],
   );
 
+  // BL-8 — ⌘Enter triggers the publish run from anywhere in the bulk
+  // panel. Skipped if the run is already going or there's nothing
+  // to save.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const isCmdEnter =
+        (e.metaKey || e.ctrlKey) &&
+        !e.shiftKey &&
+        !e.altKey &&
+        e.key === "Enter";
+      if (!isCmdEnter) return;
+      const button = document.querySelector<HTMLButtonElement>(
+        '[data-testid="bulk-publish-button"]',
+      );
+      if (!button || button.disabled) return;
+      e.preventDefault();
+      button.click();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   // BL-7 — sequential publish orchestrator. Iterates accepted, non-
   // saved candidates and POSTs each to /api/sites/[siteId]/posts to
   // create a draft. Sequential so a failing card doesn't blow up the
@@ -368,6 +390,17 @@ Body of second post.`}
             {summary.detail}
           </p>
         )}
+        <span
+          aria-hidden
+          className="hidden items-center gap-0.5 text-xs text-muted-foreground sm:inline-flex"
+        >
+          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
+            ⌘
+          </kbd>
+          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
+            ↵
+          </kbd>
+        </span>
         <Button
           type="button"
           onClick={() => void runPublish()}
