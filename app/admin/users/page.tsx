@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { InviteUserButton } from "@/components/InviteUserButton";
-import { H1 } from "@/components/ui/typography";
+import { Alert } from "@/components/ui/alert";
+import { H1, Lead } from "@/components/ui/typography";
 import { UsersTable } from "@/components/UsersTable";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -42,25 +43,23 @@ export default async function AdminUsersPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <H1>Users</H1>
-          <p className="text-sm text-muted-foreground">
-            Everyone with access to this builder. Change a role inline; the
-            server blocks self-modification and last-admin demotions.
-          </p>
+          <Lead className="mt-0.5">
+            {(data ?? []).length === 0
+              ? "No users yet."
+              : `${(data ?? []).length} ${(data ?? []).length === 1 ? "user" : "users"} with access to this builder. Change a role inline; the server blocks self-modification and last-admin demotions.`}
+          </Lead>
         </div>
         <InviteUserButton />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         {error ? (
-          <div
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            role="alert"
-          >
-            Failed to load users: {error.message}
-          </div>
+          <Alert variant="destructive" title="Failed to load users">
+            {error.message}
+          </Alert>
         ) : (
           <UsersTable
             users={(data ?? []) as AdminUserRow[]}
