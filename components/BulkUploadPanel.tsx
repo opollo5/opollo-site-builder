@@ -56,18 +56,27 @@ export interface BulkCandidate {
   wordCount: number;
   /** Operator can flag a candidate to skip publishing. */
   rejected: boolean;
+  /** BL-7 publish lifecycle. */
+  status: BulkCandidateStatus;
+  /** Populated when status is `failed` or `saved`. */
+  error?: string;
+  postId?: string;
+  editUrl?: string;
 }
 
-export function BulkUploadPanel({ siteId }: { siteId: string }) {
-  // siteId reserved — BL-7's publish orchestrator will scope draft
-  // creation to the chosen site. BL-5 doesn't yet hit the API.
-  void siteId;
+export type BulkCandidateStatus =
+  | "pending"
+  | "saving"
+  | "saved"
+  | "failed";
 
+export function BulkUploadPanel({ siteId }: { siteId: string }) {
   const [pasted, setPasted] = useState("");
   const [files, setFiles] = useState<BulkCandidate[]>([]);
   const [pastedCandidates, setPastedCandidates] = useState<BulkCandidate[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [running, setRunning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // BL-6 — pasted candidates rebuild from `pasted` whenever the
@@ -91,6 +100,8 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
     [allCandidates],
   );
 
+  const summary = useMemo(() => summariseRun(allCandidates), [allCandidates]);
+
   const updateCandidate = useCallback(
     (id: string, patch: Partial<BulkCandidate>) => {
       setFiles((prev) =>
@@ -102,6 +113,79 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
     },
     [],
   );
+
+  // BL-7 — sequential publish orchestrator. Iterates accepted, non-
+  // saved candidates and POSTs each to /api/sites/[siteId]/posts to
+  // create a draft. Sequential so a failing card doesn't blow up the
+  // queue; per-candidate status updates render in real time.
+  const runPublish = useCallback(async () => {
+    if (running) return;
+    setRunning(true);
+    setError(null);
+    try {
+      // Snapshot the candidate list at run-start so newly-added
+      // candidates during the run don't get pulled into the loop.
+      const snapshot = allCandidates.filter(
+        (c) => !c.rejected && c.status !== "saved",
+      );
+      for (const c of snapshot) {
+        // Pre-flight validation — empty title or invalid slug -> mark
+        // failed without hitting the API. The route would 400 anyway;
+        // this just gives a clearer per-candidate error.
+        const titleTrim = c.title.trim();
+        if (titleTrim.length === 0) {
+          updateCandidate(c.id, {
+            status: "failed",
+            error: "Title is empty.",
+          });
+          continue;
+        }
+        if (!/^[a-z0-9-]+$/.test(c.slug)) {
+          updateCandidate(c.id, {
+            status: "failed",
+            error: "Slug must be lowercase letters, numbers, dashes only.",
+          });
+          continue;
+        }
+        updateCandidate(c.id, { status: "saving", error: undefined });
+        try {
+          const res = await fetch(`/api/sites/${siteId}/posts`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              title: titleTrim,
+              slug: c.slug,
+              metadata: parseBlogPostMetadata(c.source),
+            }),
+          });
+          const payload = (await res.json().catch(() => null)) as
+            | { ok: true; data: { id: string; edit_url: string } }
+            | { ok: false; error: { code: string; message: string } }
+            | null;
+          if (payload?.ok) {
+            updateCandidate(c.id, {
+              status: "saved",
+              postId: payload.data.id,
+              editUrl: payload.data.edit_url,
+            });
+          } else {
+            const msg =
+              payload?.ok === false
+                ? payload.error.message
+                : `Save failed (HTTP ${res.status}).`;
+            updateCandidate(c.id, { status: "failed", error: msg });
+          }
+        } catch (err) {
+          updateCandidate(c.id, {
+            status: "failed",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    } finally {
+      setRunning(false);
+    }
+  }, [allCandidates, siteId, running, updateCandidate]);
 
   const onFilesChosen = useCallback(async (chosen: FileList | File[]) => {
     setError(null);
@@ -246,14 +330,13 @@ Body of second post.`}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium" data-testid="bulk-summary">
-              {acceptedCount} {acceptedCount === 1 ? "post" : "posts"} ready
-              {allCandidates.length !== acceptedCount &&
-                ` · ${allCandidates.length - acceptedCount} rejected`}
+              {summary.headline}
             </p>
             <button
               type="button"
               onClick={clearAll}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+              disabled={running}
+              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
             >
               Clear all
             </button>
@@ -269,22 +352,86 @@ Body of second post.`}
                     ? () => removeFileCandidate(c.id)
                     : undefined
                 }
+                runDisabled={running}
               />
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">
-            BL-7 will plumb the publish orchestrator into the Continue button.
-          </p>
         </div>
       )}
 
-      <div className="flex justify-end">
-        <Button type="button" disabled title="Wired in BL-7.">
-          Continue to publish
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {summary.detail && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="bulk-run-detail"
+          >
+            {summary.detail}
+          </p>
+        )}
+        <Button
+          type="button"
+          onClick={() => void runPublish()}
+          disabled={running || acceptedCount === 0 || summary.runnable === 0}
+          data-testid="bulk-publish-button"
+        >
+          {running
+            ? `Saving ${summary.runningIndex}/${summary.runnable}…`
+            : summary.runnable === 0 && summary.savedCount > 0
+              ? "All saved"
+              : `Save ${summary.runnable} draft${summary.runnable === 1 ? "" : "s"}`}
         </Button>
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// BL-7 — run-state summary derived from the candidate list. Centralises
+// the four counts the UI needs (saved / runnable / failed / running)
+// so the button label and the summary line stay in sync.
+// ---------------------------------------------------------------------------
+
+function summariseRun(candidates: BulkCandidate[]) {
+  const accepted = candidates.filter((c) => !c.rejected);
+  const rejectedCount = candidates.length - accepted.length;
+  const savedCount = accepted.filter((c) => c.status === "saved").length;
+  const failedCount = accepted.filter((c) => c.status === "failed").length;
+  const savingIdx = accepted.findIndex((c) => c.status === "saving");
+  // "Runnable" = accepted, not yet saved (failed counts; operator can retry).
+  const runnable = accepted.filter((c) => c.status !== "saved").length;
+
+  let headline = "";
+  if (accepted.length === 0 && rejectedCount === 0) {
+    headline = "0 posts ready";
+  } else if (savedCount === 0 && failedCount === 0 && savingIdx === -1) {
+    headline = `${accepted.length} ${accepted.length === 1 ? "post" : "posts"} ready`;
+    if (rejectedCount > 0) headline += ` · ${rejectedCount} rejected`;
+  } else {
+    const parts: string[] = [];
+    if (savedCount > 0) parts.push(`${savedCount} saved`);
+    if (failedCount > 0) parts.push(`${failedCount} failed`);
+    if (runnable > savedCount + failedCount) {
+      parts.push(`${runnable - failedCount} pending`);
+    }
+    if (rejectedCount > 0) parts.push(`${rejectedCount} rejected`);
+    headline = parts.join(" · ") || `${accepted.length} posts ready`;
+  }
+
+  let detail: string | null = null;
+  if (failedCount > 0 && !accepted.some((c) => c.status === "saving")) {
+    detail = `${failedCount} failed — fix the highlighted cards and rerun.`;
+  } else if (savedCount > 0 && runnable === 0) {
+    detail = "All accepted drafts saved. Open each from its card to publish.";
+  }
+
+  return {
+    headline,
+    detail,
+    savedCount,
+    failedCount,
+    runnable,
+    runningIndex: savingIdx === -1 ? savedCount + failedCount + 1 : savingIdx + 1,
+  };
 }
 
 function isAcceptedFile(file: File): boolean {
@@ -309,6 +456,7 @@ function candidateFromSource(source: string, origin: string): BulkCandidate {
     detectedSlug: parsed.slug,
     wordCount: countWords(source),
     rejected: false,
+    status: "pending",
   };
 }
 
@@ -326,10 +474,12 @@ function BulkCandidateCard({
   candidate,
   onChange,
   onRemove,
+  runDisabled,
 }: {
   candidate: BulkCandidate;
   onChange: (patch: Partial<BulkCandidate>) => void;
   onRemove?: () => void;
+  runDisabled?: boolean;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const slugIsValid =
@@ -340,20 +490,33 @@ function BulkCandidateCard({
     [candidate.source],
   );
   const bodyTruncated = bodyPreview.length > BODY_PREVIEW_CHARS;
+  const inputsDisabled =
+    candidate.rejected || candidate.status === "saving" || runDisabled === true;
+  const savedReadOnly = candidate.status === "saved";
 
   return (
     <li
       className={cn(
         "rounded-md border bg-background transition-smooth",
         candidate.rejected && "opacity-50",
+        candidate.status === "saved" && "border-success/40",
+        candidate.status === "failed" && "border-destructive/40",
       )}
       data-testid="bulk-candidate-card"
       data-rejected={candidate.rejected ? "true" : "false"}
+      data-status={candidate.status}
     >
       <div className="flex items-start gap-3 p-3">
         <FileText
           aria-hidden
-          className="mt-2 h-4 w-4 shrink-0 text-muted-foreground"
+          className={cn(
+            "mt-2 h-4 w-4 shrink-0",
+            candidate.status === "saved"
+              ? "text-success"
+              : candidate.status === "failed"
+                ? "text-destructive"
+                : "text-muted-foreground",
+          )}
         />
         <div className="min-w-0 flex-1 space-y-2">
           <div className="grid grid-cols-1 gap-2 md:grid-cols-[2fr_1fr]">
@@ -362,7 +525,7 @@ function BulkCandidateCard({
               value={candidate.title}
               placeholder="Title"
               maxLength={200}
-              disabled={candidate.rejected}
+              disabled={inputsDisabled || savedReadOnly}
               onChange={(e) => onChange({ title: e.target.value })}
               data-testid="bulk-candidate-title"
               className="h-8 text-sm"
@@ -372,7 +535,7 @@ function BulkCandidateCard({
               value={candidate.slug}
               placeholder="slug"
               maxLength={100}
-              disabled={candidate.rejected}
+              disabled={inputsDisabled || savedReadOnly}
               onChange={(e) =>
                 onChange({ slug: e.target.value.toLowerCase() })
               }
@@ -394,6 +557,15 @@ function BulkCandidateCard({
               </span>
             )}
           </p>
+          {candidate.status === "failed" && candidate.error && (
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+              data-testid="bulk-candidate-error"
+            >
+              {candidate.error}
+            </p>
+          )}
           <button
             type="button"
             onClick={() => setPreviewOpen((v) => !v)}
@@ -426,26 +598,31 @@ function BulkCandidateCard({
           )}
         </div>
         <div className="flex shrink-0 flex-col items-end gap-1">
-          <button
-            type="button"
-            onClick={() => onChange({ rejected: !candidate.rejected })}
-            aria-pressed={candidate.rejected}
-            data-testid="bulk-candidate-reject"
-            className={cn(
-              "rounded border px-2 py-0.5 text-xs transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              candidate.rejected
-                ? "border-success/40 bg-success/10 text-success hover:bg-success/20"
-                : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
-          >
-            {candidate.rejected ? "Restore" : "Reject"}
-          </button>
-          {onRemove && (
+          <CandidateStatusBadge candidate={candidate} />
+          {!savedReadOnly && (
+            <button
+              type="button"
+              onClick={() => onChange({ rejected: !candidate.rejected })}
+              aria-pressed={candidate.rejected}
+              disabled={runDisabled || candidate.status === "saving"}
+              data-testid="bulk-candidate-reject"
+              className={cn(
+                "rounded border px-2 py-0.5 text-xs transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50",
+                candidate.rejected
+                  ? "border-success/40 bg-success/10 text-success hover:bg-success/20"
+                  : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+            >
+              {candidate.rejected ? "Restore" : "Reject"}
+            </button>
+          )}
+          {onRemove && !savedReadOnly && (
             <button
               type="button"
               onClick={onRemove}
+              disabled={runDisabled || candidate.status === "saving"}
               aria-label={`Remove ${candidate.origin}`}
-              className="rounded-md p-1 text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="rounded-md p-1 text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             >
               <X aria-hidden className="h-3.5 w-3.5" />
             </button>
@@ -454,6 +631,45 @@ function BulkCandidateCard({
       </div>
     </li>
   );
+}
+
+function CandidateStatusBadge({ candidate }: { candidate: BulkCandidate }) {
+  if (candidate.rejected) {
+    return (
+      <span className="rounded bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+        Rejected
+      </span>
+    );
+  }
+  switch (candidate.status) {
+    case "saving":
+      return (
+        <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/50" />
+          Saving
+        </span>
+      );
+    case "saved":
+      return (
+        <a
+          href={candidate.editUrl ?? "#"}
+          target="_blank"
+          rel="noreferrer"
+          className="rounded border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-success transition-smooth hover:bg-success/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="bulk-candidate-saved-link"
+        >
+          Saved · open
+        </a>
+      );
+    case "failed":
+      return (
+        <span className="rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-destructive">
+          Failed
+        </span>
+      );
+    default:
+      return null;
+  }
 }
 
 function extractBodyPreview(source: string): string {
