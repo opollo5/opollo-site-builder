@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
+import { H1 } from "@/components/ui/typography";
 import type { PostDetail } from "@/lib/posts";
 import type { PreflightResult } from "@/lib/site-preflight";
 
@@ -139,7 +141,7 @@ export function PostDetailClient({
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{post.title}</h1>
+          <H1>{post.title}</H1>
           <p className="mt-1 text-sm text-muted-foreground">
             <code className="text-xs">/{post.slug}</code>
             {" · "}
@@ -176,32 +178,26 @@ export function PostDetailClient({
       </div>
 
       {preflightBlocked && (
-        <div
-          role="alert"
-          className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200"
+        <Alert
+          variant="warning"
+          title={
+            "blocker" in preflight
+              ? preflight.blocker.title
+              : "Preflight failed."
+          }
         >
-          <p className="font-medium">
-            {"blocker" in preflight ? preflight.blocker.title : "Preflight failed."}
-          </p>
           {"blocker" in preflight && (
             <>
-              <p className="mt-1">{preflight.blocker.detail}</p>
+              <p>{preflight.blocker.detail}</p>
               <p className="mt-2 text-xs">
                 <strong>What to do:</strong> {preflight.blocker.nextAction}
               </p>
             </>
           )}
-        </div>
+        </Alert>
       )}
 
-      {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
 
       <section
         aria-labelledby="preview-heading"
