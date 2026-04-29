@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   StatusPill,
@@ -395,14 +396,7 @@ export function BriefRunClient({
         )}
       </div>
 
-      {errorMessage && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {errorMessage}
-        </div>
-      )}
+      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
 
       {/* RS-6 — inline cost section dropped; the floating RunCostTicker
           (rendered at the page root, fixed bottom-right / bottom-bar)
@@ -421,21 +415,21 @@ export function BriefRunClient({
       )}
 
       {activeRun?.status === "failed" && activeRun.failure_code && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+        <Alert
+          variant="destructive"
+          title={
+            <>
+              Run failed:{" "}
+              <code className="text-xs">{activeRun.failure_code}</code>
+            </>
+          }
         >
-          <p className="font-medium">
-            Run failed: <code className="text-xs">{activeRun.failure_code}</code>
-          </p>
-          {activeRun.failure_detail && (
-            <p className="mt-1">{activeRun.failure_detail}</p>
-          )}
-        </div>
+          {activeRun.failure_detail && <p>{activeRun.failure_detail}</p>}
+        </Alert>
       )}
 
       <section aria-label="Pages">
-        <h2 className="text-lg font-medium">Pages</h2>
+        <h2 className="text-base font-semibold">Pages</h2>
         <ol className="mt-3 space-y-3">
           {sortedPages.map((page) => {
             const isExpanded =
@@ -619,22 +613,18 @@ function PagePreview({
             Show rendered preview
           </summary>
           {looksTruncated && (
-            <div
-              role="alert"
-              className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+            <Alert
+              variant="destructive"
+              className="mt-2"
+              title="This page's HTML appears truncated."
             >
-              <p className="font-medium">
-                This page&apos;s HTML appears truncated.
-              </p>
-              <p className="mt-1">
-                The doc is missing a closing{" "}
-                <code className="font-mono">&lt;/body&gt;</code> or{" "}
-                <code className="font-mono">&lt;/html&gt;</code> tag, so the
-                preview below may render as a blank or solid-coloured frame.
-                Review the source carefully or click <em>Revise</em> to
-                regenerate.
-              </p>
-            </div>
+              The doc is missing a closing{" "}
+              <code className="font-mono">&lt;/body&gt;</code> or{" "}
+              <code className="font-mono">&lt;/html&gt;</code> tag, so the
+              preview below may render as a blank or solid-coloured frame.
+              Review the source carefully or click <em>Revise</em> to
+              regenerate.
+            </Alert>
           )}
           <iframe
             // Sandbox prevents scripts, plugins, forms, popups from the
