@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Sparkles, Upload as UploadIcon, Search, Link2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,20 +16,22 @@ import { cn } from "@/lib/utils";
 import type { ImageListItem } from "@/lib/image-library";
 
 // ---------------------------------------------------------------------------
-// BP-4 — Image picker modal.
+// R1-5..8 — Image picker overhaul.
 //
-// Three tabs:
-//   • Library     — search the existing image_library (1,777 stock images
-//                   today + every uploaded / fetched image). FTS via the
-//                   /api/admin/images/list endpoint.
-//   • Upload new  — stub. BP-5 wires multipart → Cloudflare Images.
-//   • Paste URL   — stub. BP-6 wires server-side fetch + SSRF guard.
+// Three tabs as a segmented control: Suggested / Browse / Upload.
+//
+//   • Suggested — opens by default when caller passes
+//                 `suggestionContext` (composer's title + body) or
+//                 `forPostId` (saved post). System fetches top-5
+//                 FTS-ranked images from the library; if no context
+//                 yet, falls back to recent uploads.
+//   • Browse    — manual search via FTS query. Paginated grid.
+//   • Upload    — drag-drop / pick a file (Cloudflare). Secondary
+//                 "Or paste a URL" affordance below for the BP-6
+//                 fetch path.
 //
 // Returns the selected ImagePickerEntry to the caller via onSelect.
 // Modal closes immediately after selection.
-//
-// Wired into BlogPostComposer in this slice as the BP-3 placeholder's
-// replacement; persistence + WP attachment land in BP-7.
 // ---------------------------------------------------------------------------
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -38,86 +41,172 @@ export interface ImagePickerEntry extends ImageListItem {
   delivery_url: string | null;
 }
 
-type Tab = "library" | "upload" | "url";
+interface ListResponse {
+  ok: true;
+  data: {
+    items: ImagePickerEntry[];
+    total: number;
+    suggestion: { based_on: string | null; fallback_to_recent: boolean } | null;
+  };
+}
+
+type Tab = "suggested" | "browse" | "upload";
 
 interface ImagePickerModalProps {
   open: boolean;
   onClose: () => void;
   onSelect: (image: ImagePickerEntry) => void;
+  /** Saved post id — picker queries the suggest endpoint with this. */
+  forPostId?: string | null;
+  /**
+   * Pre-save context (BlogPostComposer use case): composer concatenates
+   * `${title} ${body-snippet-weighted-toward-title}` and passes it
+   * here. Picker uses it to drive the Suggested tab without needing a
+   * persisted post id.
+   */
+  suggestionContext?: string | null;
 }
 
 export function ImagePickerModal({
   open,
   onClose,
   onSelect,
+  forPostId,
+  suggestionContext,
 }: ImagePickerModalProps) {
-  const [tab, setTab] = useState<Tab>("library");
-  const [query, setQuery] = useState("");
-  const [items, setItems] = useState<ImagePickerEntry[]>([]);
-  const [total, setTotal] = useState(0);
-  const [offset, setOffset] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const inFlightRef = useRef<AbortController | null>(null);
+  const hasSuggestionSource =
+    (forPostId !== undefined && forPostId !== null && forPostId.length > 0) ||
+    (suggestionContext !== undefined &&
+      suggestionContext !== null &&
+      suggestionContext.length > 0);
+  const [tab, setTab] = useState<Tab>(
+    hasSuggestionSource ? "suggested" : "browse",
+  );
+  const [browseQuery, setBrowseQuery] = useState("");
+  const [browseItems, setBrowseItems] = useState<ImagePickerEntry[]>([]);
+  const [browseTotal, setBrowseTotal] = useState(0);
+  const [browseOffset, setBrowseOffset] = useState(0);
+  const [browseLoading, setBrowseLoading] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
+  const [suggestItems, setSuggestItems] = useState<ImagePickerEntry[]>([]);
+  const [suggestBasedOn, setSuggestBasedOn] = useState<string | null>(null);
+  const [suggestFallback, setSuggestFallback] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+  const browseInFlightRef = useRef<AbortController | null>(null);
+  const suggestInFlightRef = useRef<AbortController | null>(null);
 
-  // Reset state every time the modal opens so a re-open doesn't show
-  // stale results from the previous session.
+  // Reset state every time the modal opens.
   useEffect(() => {
     if (!open) return;
-    setTab("library");
-    setQuery("");
-    setItems([]);
-    setTotal(0);
-    setOffset(0);
-    setError(null);
-  }, [open]);
+    setTab(hasSuggestionSource ? "suggested" : "browse");
+    setBrowseQuery("");
+    setBrowseItems([]);
+    setBrowseTotal(0);
+    setBrowseOffset(0);
+    setBrowseError(null);
+    setSuggestItems([]);
+    setSuggestBasedOn(null);
+    setSuggestFallback(false);
+    setSuggestError(null);
+  }, [open, hasSuggestionSource]);
 
-  // Debounced fetch on (open, tab=library, query, offset) change.
+  // Suggested tab fetch — runs on open + when context changes.
   useEffect(() => {
-    if (!open || tab !== "library") return;
+    if (!open || tab !== "suggested" || !hasSuggestionSource) return;
     const ctrl = new AbortController();
-    if (inFlightRef.current) inFlightRef.current.abort();
-    inFlightRef.current = ctrl;
+    if (suggestInFlightRef.current) suggestInFlightRef.current.abort();
+    suggestInFlightRef.current = ctrl;
 
-    const id = setTimeout(async () => {
-      setLoading(true);
-      setError(null);
+    void (async () => {
+      setSuggestLoading(true);
+      setSuggestError(null);
       try {
         const params = new URLSearchParams();
-        if (query.trim().length > 0) params.set("q", query.trim());
-        params.set("limit", String(PAGE_SIZE));
-        params.set("offset", String(offset));
+        if (forPostId) {
+          params.set("for_post", forPostId);
+        } else if (suggestionContext) {
+          params.set("suggest_from", suggestionContext);
+        }
+        params.set("limit", "5");
         const res = await fetch(`/api/admin/images/list?${params}`, {
           signal: ctrl.signal,
           cache: "no-store",
         });
         if (ctrl.signal.aborted) return;
         const payload = (await res.json().catch(() => null)) as
-          | {
-              ok: true;
-              data: { items: ImagePickerEntry[]; total: number };
-            }
+          | ListResponse
           | { ok: false; error: { code: string; message: string } }
           | null;
         if (!payload?.ok) {
-          setError(
+          setSuggestError(
+            payload?.ok === false
+              ? payload.error.message
+              : `Failed to load suggestions (HTTP ${res.status}).`,
+          );
+          return;
+        }
+        setSuggestItems(payload.data.items);
+        setSuggestBasedOn(payload.data.suggestion?.based_on ?? null);
+        setSuggestFallback(
+          payload.data.suggestion?.fallback_to_recent ?? false,
+        );
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return;
+        setSuggestError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!ctrl.signal.aborted) setSuggestLoading(false);
+      }
+    })();
+
+    return () => {
+      ctrl.abort();
+    };
+  }, [open, tab, hasSuggestionSource, forPostId, suggestionContext]);
+
+  // Browse tab fetch — debounced on query / paginated on offset.
+  useEffect(() => {
+    if (!open || tab !== "browse") return;
+    const ctrl = new AbortController();
+    if (browseInFlightRef.current) browseInFlightRef.current.abort();
+    browseInFlightRef.current = ctrl;
+
+    const id = setTimeout(async () => {
+      setBrowseLoading(true);
+      setBrowseError(null);
+      try {
+        const params = new URLSearchParams();
+        if (browseQuery.trim().length > 0) params.set("q", browseQuery.trim());
+        params.set("limit", String(PAGE_SIZE));
+        params.set("offset", String(browseOffset));
+        const res = await fetch(`/api/admin/images/list?${params}`, {
+          signal: ctrl.signal,
+          cache: "no-store",
+        });
+        if (ctrl.signal.aborted) return;
+        const payload = (await res.json().catch(() => null)) as
+          | ListResponse
+          | { ok: false; error: { code: string; message: string } }
+          | null;
+        if (!payload?.ok) {
+          setBrowseError(
             payload?.ok === false
               ? payload.error.message
               : `Failed to load images (HTTP ${res.status}).`,
           );
           return;
         }
-        // When offset === 0 the search/query changed — replace.
-        // Otherwise it's "Load more" — append.
-        setItems((prev) =>
-          offset === 0 ? payload.data.items : [...prev, ...payload.data.items],
+        setBrowseItems((prev) =>
+          browseOffset === 0
+            ? payload.data.items
+            : [...prev, ...payload.data.items],
         );
-        setTotal(payload.data.total);
+        setBrowseTotal(payload.data.total);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
-        setError(e instanceof Error ? e.message : String(e));
+        setBrowseError(e instanceof Error ? e.message : String(e));
       } finally {
-        if (!ctrl.signal.aborted) setLoading(false);
+        if (!ctrl.signal.aborted) setBrowseLoading(false);
       }
     }, SEARCH_DEBOUNCE_MS);
 
@@ -125,13 +214,11 @@ export function ImagePickerModal({
       clearTimeout(id);
       ctrl.abort();
     };
-  }, [open, tab, query, offset]);
+  }, [open, tab, browseQuery, browseOffset]);
 
-  // Reset offset to 0 whenever the search query changes, so paginating
-  // through the previous query doesn't leak into the new one.
   useEffect(() => {
-    setOffset(0);
-  }, [query]);
+    setBrowseOffset(0);
+  }, [browseQuery]);
 
   function handleSelect(image: ImagePickerEntry) {
     onSelect(image);
@@ -149,58 +236,91 @@ export function ImagePickerModal({
         <DialogHeader>
           <DialogTitle>Pick a featured image</DialogTitle>
           <DialogDescription>
-            Search the image library, upload a new image, or paste an image
-            URL.
+            Pick from suggestions, browse the full library, or upload a new
+            image.
           </DialogDescription>
         </DialogHeader>
 
-        <div role="tablist" aria-label="Image source" className="mt-2 flex gap-1 border-b">
-          <TabButton active={tab === "library"} onClick={() => setTab("library")}>
-            Library
-          </TabButton>
-          <TabButton active={tab === "upload"} onClick={() => setTab("upload")}>
-            Upload new
-          </TabButton>
-          <TabButton active={tab === "url"} onClick={() => setTab("url")}>
-            Paste URL
-          </TabButton>
+        {/* Segmented control: Suggested / Browse / Upload. */}
+        <div
+          role="tablist"
+          aria-label="Image source"
+          className="mt-2 inline-flex rounded-md border bg-muted/40 p-1 text-sm"
+        >
+          {hasSuggestionSource && (
+            <SegmentedTab
+              active={tab === "suggested"}
+              onClick={() => setTab("suggested")}
+              icon={Sparkles}
+              testId="picker-tab-suggested"
+            >
+              Suggested
+            </SegmentedTab>
+          )}
+          <SegmentedTab
+            active={tab === "browse"}
+            onClick={() => setTab("browse")}
+            icon={Search}
+            testId="picker-tab-browse"
+          >
+            Browse
+          </SegmentedTab>
+          <SegmentedTab
+            active={tab === "upload"}
+            onClick={() => setTab("upload")}
+            icon={UploadIcon}
+            testId="picker-tab-upload"
+          >
+            Upload
+          </SegmentedTab>
         </div>
 
-        {tab === "library" && (
+        {tab === "suggested" && (
+          <SuggestedPanel
+            loading={suggestLoading}
+            error={suggestError}
+            items={suggestItems}
+            basedOn={suggestBasedOn}
+            fallbackToRecent={suggestFallback}
+            onSelect={handleSelect}
+          />
+        )}
+
+        {tab === "browse" && (
           <div className="mt-4 space-y-3">
             <Input
               type="search"
               placeholder="Search by caption, alt, or filename"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              value={browseQuery}
+              onChange={(e) => setBrowseQuery(e.target.value)}
               aria-label="Search images"
             />
-            {error && (
+            {browseError && (
               <div
                 role="alert"
                 className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
               >
-                {error}
+                {browseError}
               </div>
             )}
-            <ImageGrid items={items} onSelect={handleSelect} />
+            <ImageGrid items={browseItems} onSelect={handleSelect} />
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {total > 0
-                  ? `Showing ${items.length} of ${total}`
-                  : loading
+                {browseTotal > 0
+                  ? `Showing ${browseItems.length} of ${browseTotal}`
+                  : browseLoading
                     ? "Loading…"
                     : "No images match."}
               </span>
-              {items.length < total && (
+              {browseItems.length < browseTotal && (
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setOffset(items.length)}
-                  disabled={loading}
+                  onClick={() => setBrowseOffset(browseItems.length)}
+                  disabled={browseLoading}
                 >
-                  {loading ? "Loading…" : "Load more"}
+                  {browseLoading ? "Loading…" : "Load more"}
                 </Button>
               )}
             </div>
@@ -210,14 +330,83 @@ export function ImagePickerModal({
         {tab === "upload" && (
           <UploadTab onUploaded={(image) => handleSelect(image)} />
         )}
-
-        {tab === "url" && (
-          <UrlTab onFetched={(image) => handleSelect(image)} />
-        )}
       </DialogContent>
     </Dialog>
   );
 }
+
+// ---------------------------------------------------------------------------
+
+function SuggestedPanel({
+  loading,
+  error,
+  items,
+  basedOn,
+  fallbackToRecent,
+  onSelect,
+}: {
+  loading: boolean;
+  error: string | null;
+  items: ImagePickerEntry[];
+  basedOn: string | null;
+  fallbackToRecent: boolean;
+  onSelect: (image: ImagePickerEntry) => void;
+}) {
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+        {fallbackToRecent ? (
+          <>No post content yet — showing your recent uploads.</>
+        ) : basedOn ? (
+          <>
+            Suggested for{" "}
+            <span className="font-medium text-foreground">
+              &ldquo;{basedOn}&rdquo;
+            </span>
+            . Click a thumbnail to select.
+          </>
+        ) : (
+          <>
+            Suggested based on the post content. Click a thumbnail to select.
+          </>
+        )}
+      </div>
+      {error && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
+        >
+          {error}
+        </div>
+      )}
+      {loading && items.length === 0 ? (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
+              key={i}
+              className="aspect-square w-full rounded-md border bg-muted opollo-shimmer"
+            />
+          ))}
+        </div>
+      ) : (
+        <>
+          <ImageGrid
+            items={items}
+            onSelect={onSelect}
+            colsClass="sm:grid-cols-3 md:grid-cols-5"
+          />
+          {!loading && items.length === 0 && (
+            <p className="px-3 py-4 text-center text-sm text-muted-foreground">
+              No suggestions yet. Try Browse or Upload above.
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 function UploadTab({
   onUploaded,
@@ -274,74 +463,83 @@ function UploadTab({
   }
 
   return (
-    <div
-      className={cn(
-        "mt-4 rounded-lg border-2 border-dashed p-6 text-sm transition-smooth",
-        dragActive ? "border-ring bg-muted/40" : "border-muted bg-muted/30",
-      )}
-      onDragEnter={(e) => {
-        e.preventDefault();
-        if (e.dataTransfer.types.includes("Files")) setDragActive(true);
-      }}
-      onDragOver={(e) => e.preventDefault()}
-      onDragLeave={(e) => {
-        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-        setDragActive(false);
-      }}
-      onDrop={(e) => {
-        e.preventDefault();
-        setDragActive(false);
-        const file = e.dataTransfer.files[0];
-        if (file) void handleFile(file);
-      }}
-    >
-      <p className="font-medium text-foreground">Upload an image</p>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Drag-drop a file here, or click the button below. JPEG / PNG / GIF /
-        WebP. Max 10 MB. Captioning runs in the background.
-      </p>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        className="sr-only"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
+    <div className="mt-4 space-y-3">
+      <div
+        className={cn(
+          "rounded-lg border-2 border-dashed p-6 text-sm transition-smooth",
+          dragActive ? "border-ring bg-muted/40" : "border-muted bg-muted/30",
+        )}
+        onDragEnter={(e) => {
+          e.preventDefault();
+          if (e.dataTransfer.types.includes("Files")) setDragActive(true);
+        }}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={(e) => {
+          if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+          setDragActive(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const file = e.dataTransfer.files[0];
           if (file) void handleFile(file);
         }}
-      />
-      <div className="mt-4 flex items-center gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => inputRef.current?.click()}
-          disabled={uploading}
-        >
-          {uploading ? "Uploading…" : "Pick file"}
-        </Button>
-        {uploading && (
-          <span className="text-xs text-muted-foreground">
-            Pushing to Cloudflare…
-          </span>
+      >
+        <p className="font-medium text-foreground">Upload an image</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Drag-drop a file here, or click the button below. JPEG / PNG /
+          GIF / WebP. Max 10 MB. Captioning runs in the background.
+        </p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) void handleFile(file);
+          }}
+        />
+        <div className="mt-4 flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => inputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? "Uploading…" : "Pick file"}
+          </Button>
+          {uploading && (
+            <span className="text-xs text-muted-foreground">
+              Pushing to Cloudflare…
+            </span>
+          )}
+        </div>
+        {error && (
+          <div
+            role="alert"
+            className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          >
+            {error}
+          </div>
         )}
       </div>
-      {error && (
-        <div
-          role="alert"
-          className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
-        >
-          {error}
-        </div>
-      )}
+
+      {/* R1-7 — secondary URL-paste affordance under the file picker.
+          BP-6's URL fetch lives here as a sub-mode rather than its own
+          tab (Steven's segmented control specced 3 tabs: Suggested /
+          Browse / Upload). */}
+      <UrlSubMode onFetched={onUploaded} />
     </div>
   );
 }
 
-function UrlTab({
+function UrlSubMode({
   onFetched,
 }: {
   onFetched: (image: ImagePickerEntry) => void;
 }) {
+  const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [fetching, setFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -373,21 +571,35 @@ function UrlTab({
           : `Fetch failed (HTTP ${res.status}).`,
       );
     } catch (err) {
-      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+      setError(
+        `Network error: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setFetching(false);
     }
   }
 
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+      >
+        <Link2 aria-hidden className="h-3 w-3" />
+        Or paste a URL instead
+      </button>
+    );
+  }
+
   return (
-    <div className="mt-4 rounded-lg border p-4 text-sm">
-      <p className="font-medium">Fetch image from URL</p>
+    <div className="rounded-md border p-3 text-sm">
+      <p className="text-xs font-medium">Fetch image from URL</p>
       <p className="mt-1 text-xs text-muted-foreground">
-        Paste a public image URL. Server fetches, validates the type +
-        size, and uploads to the library. 30s timeout; 10 MB cap.
-        Internal IPs are blocked.
+        Server fetches, validates type + size, and uploads to the library.
+        30s timeout; 10 MB cap. Internal IPs blocked.
       </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <Input
           type="url"
           inputMode="url"
@@ -397,14 +609,19 @@ function UrlTab({
           disabled={fetching}
           className="min-w-0 flex-1"
         />
-        <Button type="button" onClick={handleFetch} disabled={fetching}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleFetch}
+          disabled={fetching}
+        >
           {fetching ? "Fetching…" : "Fetch"}
         </Button>
       </div>
       {error && (
         <div
           role="alert"
-          className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
         >
           {error}
         </div>
@@ -413,13 +630,19 @@ function UrlTab({
   );
 }
 
-function TabButton({
+// ---------------------------------------------------------------------------
+
+function SegmentedTab({
   active,
   onClick,
+  icon: Icon,
+  testId,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  icon: typeof Sparkles;
+  testId?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -428,13 +651,15 @@ function TabButton({
       role="tab"
       aria-selected={active}
       onClick={onClick}
+      data-testid={testId}
       className={cn(
-        "h-10 rounded-t-md px-3 text-sm font-medium transition-smooth",
+        "inline-flex h-8 items-center gap-1.5 rounded px-3 text-sm font-medium transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         active
-          ? "border-b-2 border-primary text-foreground"
+          ? "bg-background text-foreground shadow-sm"
           : "text-muted-foreground hover:text-foreground",
       )}
     >
+      <Icon aria-hidden className="h-3.5 w-3.5" />
       {children}
     </button>
   );
@@ -443,14 +668,16 @@ function TabButton({
 function ImageGrid({
   items,
   onSelect,
+  colsClass = "sm:grid-cols-3 md:grid-cols-4",
 }: {
   items: ImagePickerEntry[];
   onSelect: (image: ImagePickerEntry) => void;
+  colsClass?: string;
 }) {
   if (items.length === 0) return null;
   return (
     <ul
-      className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4"
+      className={cn("grid grid-cols-2 gap-2", colsClass)}
       role="grid"
       aria-label="Image library"
     >
@@ -469,8 +696,6 @@ function ImageGrid({
             <div className="aspect-square w-full overflow-hidden">
               {img.delivery_url ? (
                 // Cloudflare delivery URL with explicit w=/h=/fit= sizing.
-                // Plain <img> avoids wiring imagedelivery.net into Next's
-                // image-optimization pipeline for a 200×200 thumbnail.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={`${img.delivery_url}/w=200,h=200,fit=cover`}
