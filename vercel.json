@@ -19,6 +19,22 @@
     {
       "path": "/api/cron/budget-reset",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-ads",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-clarity",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-ga4",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-pagespeed",
+      "schedule": "0 6 * * 1"
     }
   ]
 }
