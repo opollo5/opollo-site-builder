@@ -172,3 +172,12 @@ export type {
   LlmAlignmentResult,
   LlmSubscoreResult,
 } from "./llm-alignment";
+
+// Slice 10 surface
+export { runDiagnostics } from "./diagnostics";
+export type {
+  DiagnosticsReport,
+  ModuleDiagnostic,
+  SourceDiagnostic,
+  EnvCheck,
+} from "./diagnostics";
