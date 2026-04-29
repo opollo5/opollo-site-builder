@@ -1,10 +1,58 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { auditA11y, signInAsAdmin } from "./helpers";
+
+// AUTH-FOUNDATION P2.2 — sites CRUD now flows through /admin/sites/new
+// (single-page guided form) instead of the old AddSiteModal. The
+// Test-connection button is gated on a live POST to a third-party WP
+// install, which obviously isn't reachable from CI; we stub the
+// /api/sites/test-connection response so the form can pass its gate
+// and exercise the rest of the create flow.
+
+async function stubTestConnection(page: Page): Promise<void> {
+  await page.route("**/api/sites/test-connection", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        user: {
+          display_name: "E2E WP Admin",
+          username: "wpadmin",
+          roles: ["administrator"],
+        },
+      }),
+    });
+  });
+}
+
+async function createSiteViaForm(
+  page: Page,
+  fields: { name: string; url: string; user: string; password: string },
+): Promise<void> {
+  await page.goto("/admin/sites/new");
+  await page.getByTestId("site-name").fill(fields.name);
+  await page.getByTestId("site-wp-url").fill(fields.url);
+  await page.getByTestId("site-wp-user").fill(fields.user);
+  await page.getByTestId("site-wp-password").fill(fields.password);
+
+  // Save must be disabled until the test passes.
+  await expect(page.getByTestId("site-create-save")).toBeDisabled();
+
+  await page.getByTestId("site-test-connection").click();
+  await expect(page.getByTestId("site-test-result")).toContainText(
+    /Connected as/i,
+  );
+
+  await expect(page.getByTestId("site-create-save")).toBeEnabled();
+  await page.getByTestId("site-create-save").click();
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}$/);
+}
 
 test.describe("sites CRUD", () => {
   test.beforeEach(async ({ page }) => {
     await signInAsAdmin(page);
+    await stubTestConnection(page);
   });
 
   test("sites list renders + row click lands on detail", async ({
@@ -12,9 +60,7 @@ test.describe("sites CRUD", () => {
   }, testInfo) => {
     await page.goto("/admin/sites");
     await auditA11y(page, testInfo);
-    await expect(
-      page.getByRole("heading", { name: "Manage sites" }),
-    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Sites$/i })).toBeVisible();
 
     // Seeded test site should appear (global-setup guarantees it).
     const siteRow = page.getByRole("row", { name: /E2E Test Site/i });
@@ -28,65 +74,64 @@ test.describe("sites CRUD", () => {
     ).toBeVisible();
   });
 
-  test("add new site — flows end-to-end without the prefix field", async ({
+  test("add site — guided form gates save on a passing connection test", async ({
+    page,
+  }, testInfo) => {
+    const uniqueName = `Playwright Temp ${Date.now()}`;
+    await createSiteViaForm(page, {
+      name: uniqueName,
+      url: "https://temp.test",
+      user: "wp-user",
+      password: "abcd efgh ijkl mnop qrst uvwx",
+    });
+
+    // Detail page renders the new site name.
+    await expect(page.getByRole("heading", { name: uniqueName })).toBeVisible();
+
+    // Going back to the list shows the new row.
+    await page.goto("/admin/sites");
+    await expect(page.getByText(uniqueName).first()).toBeVisible();
+    await auditA11y(page, testInfo);
+  });
+
+  test("editing a credential after a passing test invalidates Save", async ({
     page,
   }) => {
-    await page.goto("/admin/sites");
-    await page.getByRole("button", { name: /add new site/i }).click();
+    await page.goto("/admin/sites/new");
+    await page.getByTestId("site-name").fill(`Invalidate ${Date.now()}`);
+    await page.getByTestId("site-wp-url").fill("https://invalidate.test");
+    await page.getByTestId("site-wp-user").fill("wp");
+    await page.getByTestId("site-wp-password").fill("password-1234");
+    await page.getByTestId("site-test-connection").click();
+    await expect(page.getByTestId("site-create-save")).toBeEnabled();
 
-    const uniqueName = `Playwright Temp ${Date.now()}`;
-    await page.getByLabel("Name").fill(uniqueName);
-    await page.getByLabel("WordPress URL").fill("https://temp.test");
-    await page.getByLabel("WordPress user").fill("wp-user");
-    await page.getByLabel("WordPress app password").fill("password-1234");
-
-    // Scope prefix field MUST NOT be present — M2d UX cleanup removed
-    // it entirely in favour of server-side auto-generation.
-    await expect(page.getByLabel(/scope prefix/i)).toHaveCount(0);
-
-    await page.getByRole("button", { name: /register site/i }).click();
-
-    // Modal closes on success and the new row appears after
-    // revalidatePath('/admin/sites').
-    await expect(page.getByText(uniqueName).first()).toBeVisible();
+    // Edit the password — Save should disable + the result panel
+    // should flip to the "credentials changed" tone.
+    await page.getByTestId("site-wp-password").fill("password-different");
+    await expect(page.getByTestId("site-create-save")).toBeDisabled();
   });
 
   test("archive flow removes the site from the default list", async ({
     page,
   }) => {
-    await page.goto("/admin/sites");
-
-    // Create a throwaway site for this test so we don't archive the
-    // shared e2e seed.
     const disposableName = `Archive Target ${Date.now()}`;
-    await page.getByRole("button", { name: /add new site/i }).click();
-    await page.getByLabel("Name").fill(disposableName);
-    await page.getByLabel("WordPress URL").fill("https://archive-me.test");
-    await page.getByLabel("WordPress user").fill("wp");
-    await page.getByLabel("WordPress app password").fill("password-1234");
-    await page.getByRole("button", { name: /register site/i }).click();
+    await createSiteViaForm(page, {
+      name: disposableName,
+      url: "https://archive-me.test",
+      user: "wp",
+      password: "password-1234",
+    });
 
-    // The modal closes + router.refresh re-renders the list. Wait for
-    // the row to appear before hunting the actions menu — prior impl
-    // used `getByText().first()` which didn't wait on the row locator
-    // itself and raced the `<details>` mount.
+    await page.goto("/admin/sites");
     const row = page.getByRole("row", { name: new RegExp(disposableName) });
     await expect(row).toBeVisible();
 
-    // Open the actions menu on the new row and archive.
-    // <summary> elements don't always resolve as role=button across
-    // Playwright versions; use the testid we added on the summary.
     await row.getByTestId("site-actions-summary").click();
-
-    // Post-audit-3: archive now opens a ConfirmActionModal instead of
-    // firing window.confirm(). Click the menu entry to open the modal,
-    // then the modal's destructive confirm button.
     await row.getByTestId("site-archive-action").click();
     const confirmDialog = page.getByRole("dialog", { name: /archive/i });
     await expect(confirmDialog).toBeVisible();
     await confirmDialog.getByRole("button", { name: /^archive$/i }).click();
 
-    // After router.refresh the row should be gone.
     await expect(row).toHaveCount(0);
   });
 });
