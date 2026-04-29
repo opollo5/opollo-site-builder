@@ -26,6 +26,7 @@
     "@radix-ui/react-scroll-area": "^1.2.0",
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.2.8",
+    "@sendgrid/mail": "^8.1.6",
     "@sentry/nextjs": "^10.49.0",
     "@supabase/supabase-js": "^2.104.0",
     "@upstash/ratelimit": "^2.0.8",

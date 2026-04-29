@@ -232,6 +232,13 @@ security-observability-baseline sub-PR and fail-fast CI is how they stay true.
   in-memory logger without Axiom token, etc.). Hard-requiring an env
   var at cold-start is reserved for secrets that are operationally
   guaranteed (Supabase URL, service role key).
+- **Transactional email** ships through `lib/email/sendgrid.ts` and
+  `lib/email/templates/base.ts` only. Direct `@sendgrid/mail` imports
+  outside those two files are a code-review block. Every send writes
+  a row to `email_log` (success or failure). Required env vars:
+  `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME`.
+  Smoke-test the wrapper from prod with
+  `npx tsx scripts/send-test-email.ts <to-email>`.
 
 ## E2E coverage is a hard requirement for admin UI changes
 Every PR that adds or substantially changes an admin-facing route, form, or action MUST include a Playwright spec for its happy path. Specs live in `e2e/*.spec.ts`; run locally with `npm run test:e2e` (requires `supabase start`).
