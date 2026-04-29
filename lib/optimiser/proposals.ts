@@ -7,6 +7,7 @@ import type { OptProposalCategory, OptProposalStatus, OptRiskLevel } from "./typ
 import { recordRejection } from "./client-memory";
 import { recordChangeLog } from "./change-log";
 import { lintChangeSet, type GuardrailResult } from "./guardrails";
+import { submitBriefForProposal } from "./site-builder-bridge/submit-brief";
 
 // ---------------------------------------------------------------------------
 // opt_proposals DAO + approve/reject/expire helpers.
@@ -115,7 +116,24 @@ export async function getProposalWithEvidence(id: string): Promise<{
 }
 
 export type ApproveResult =
-  | { ok: true; proposal_id: string; brief_submitted: boolean }
+  | {
+      ok: true;
+      proposal_id: string;
+      /**
+       * True when submit-brief succeeded and the proposal is now in
+       * `applying`. False when submit-brief failed but the approval
+       * itself is recorded — staff can retry via the manual handoff.
+       */
+      brief_submitted: boolean;
+      /** Set when brief_submitted = true. */
+      brief_id?: string;
+      /** Set when brief_submitted = true. */
+      brief_run_id?: string;
+      /** Set when brief_submitted = true. */
+      output_mode?: "slice" | "full_page";
+      /** Set when brief_submitted = false. */
+      submit_error?: { code: string; message: string };
+    }
   | {
       ok: false;
       code: "EXPIRED" | "GUARDRAIL_FAILED" | "STATUS_CONFLICT" | "INTERNAL_ERROR";
@@ -215,10 +233,44 @@ export async function approveProposal(args: {
     },
   });
 
-  // Phase 1.5: brief submission. Phase 1 marks the proposal applied
-  // synthetically once the Site Builder brief endpoint is wired up;
-  // here we leave it as `approved` for the manual handoff loop.
-  return { ok: true, proposal_id: args.proposalId, brief_submitted: false };
+  // OPTIMISER-15: brief submission integration.
+  // Approve fires submit-brief synchronously. On success, flip the
+  // proposal to `applying` so the UI starts polling /run-status. On
+  // failure, leave the proposal at `approved` so staff can retry via
+  // the manual handoff (the existing fallback) and surface the error
+  // to the response so the operator sees what went wrong.
+  const submitResult = await submitBriefForProposal({
+    proposalId: args.proposalId,
+    approverUserId: args.approverUserId,
+  });
+  if (!submitResult.ok) {
+    return {
+      ok: true,
+      proposal_id: args.proposalId,
+      brief_submitted: false,
+      submit_error: submitResult.error,
+    };
+  }
+
+  // Flip status approved → applying. CAS on status='approved' so a
+  // race with another submitter doesn't double-fire.
+  await supabase
+    .from("opt_proposals")
+    .update({
+      status: "applying",
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", args.proposalId)
+    .eq("status", "approved");
+
+  return {
+    ok: true,
+    proposal_id: args.proposalId,
+    brief_submitted: true,
+    brief_id: submitResult.brief_id,
+    brief_run_id: submitResult.brief_run_id,
+    output_mode: submitResult.output_mode,
+  };
 }
 
 export type RejectResult =
