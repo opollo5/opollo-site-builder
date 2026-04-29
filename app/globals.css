@@ -135,22 +135,32 @@
  * --------------------------------------------------------------------- */
 
 /* ---------------------------------------------------------------------------
- * RS-0 — Motion primitives.
+ * RS-0 / A-3 — Motion primitives.
  *
- * Shared vocabulary for animated state changes (RS-4 status pills, RS-5
- * awaiting-review highlight, RS-6 cost ticker) and the Radix wrappers in
- * components/ui/. We deliberately keep this small and named after intent
- * (`opollo-fade-in`) rather than mechanism (`animate-in`) so that future
- * polish (e.g. swapping a fade for a slide) doesn't require touching every
- * consumer.
+ * Shared vocabulary for animated state changes. We name utilities after
+ * intent (`opollo-fade-in`, `opollo-shimmer`) rather than mechanism so
+ * future polish (e.g. swapping a fade for a slide) doesn't require
+ * touching every consumer.
  *
- * `transition-smooth` is the default duration token: 200ms ease-out.
- * Reach for it on hover/focus state changes that don't need a keyframe.
+ * Four-tier duration system (do not introduce a 5th):
+ *
+ *   100ms   instant feedback                   .opollo-fade-out
+ *   150ms   micro-state change                 .opollo-fade-in
+ *   200ms   standard state change              .transition-smooth, .opollo-slide-up
+ *   250ms   noticeable but not gratuitous      .opollo-pop-in
+ *   600ms   data tick / count-up landing       .opollo-pulse-soft, RunCostTicker count-up
+ *   1500ms  loading shimmer (infinite loop)    .opollo-shimmer
+ *
+ * Easing curves:
+ *
+ *   cubic-bezier(0.4, 0, 0.2, 1)        standard ease-out (most utilities)
+ *   cubic-bezier(0.34, 1.56, 0.64, 1)   bounce-out for pop-in (slight overshoot)
  *
  * `prefers-reduced-motion: reduce` zeroes every motion utility below.
  * This honours the OS-level user preference and is the single place
  * accessibility-conscious users opt out — consumers don't need to gate
- * their own animations.
+ * their own animations. New utilities MUST be added to the
+ * reduced-motion block at the bottom.
  * ------------------------------------------------------------------------ */
 
 @layer utilities {
@@ -173,6 +183,54 @@
   .opollo-slide-up {
     animation: opollo-slide-up 200ms cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  /* A-3 — Skeleton shimmer. Drives the .skeleton primitive's
+   * "loading" pulse without using Tailwind's animate-pulse (which
+   * is a softer fade — too gentle to read as "this is loading").
+   * Linear-style left-to-right gradient sweep at ~1.5s. */
+  .opollo-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.6) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: opollo-shimmer 1500ms ease-in-out infinite;
+  }
+
+  /* A-3 — Soft pulse for "live data" tick. Status pills and the cost
+   * ticker reach for this when a value just changed; signals the
+   * change without yanking attention. 600ms one-shot, capped — not
+   * an infinite loop. Apply via a key prop change so React mounts
+   * a fresh element and the animation fires on every value-flip. */
+  .opollo-pulse-soft {
+    animation: opollo-pulse-soft 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* A-3 — Pop-in for count-up landing or new-item-appended state.
+   * Slightly more aggressive than slide-up: a 4% scale up + fade.
+   * 250ms, ease-out. Use sparingly; one element at a time. */
+  .opollo-pop-in {
+    animation: opollo-pop-in 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* A-3 — Stagger-in helpers. Each .opollo-stagger-in-N variant adds
+   * N * 50ms delay on top of opollo-fade-in so a list reveals one
+   * row at a time without manual JS choreography. Capped at -8 so
+   * we never animate more than 8 rows; long lists land instantly to
+   * avoid feeling sluggish.
+   *
+   * Usage: <li class="opollo-fade-in opollo-stagger-in-3"> in a loop
+   * where the loop index drives the suffix (0..7). */
+  .opollo-stagger-in-1 { animation-delay: 50ms; }
+  .opollo-stagger-in-2 { animation-delay: 100ms; }
+  .opollo-stagger-in-3 { animation-delay: 150ms; }
+  .opollo-stagger-in-4 { animation-delay: 200ms; }
+  .opollo-stagger-in-5 { animation-delay: 250ms; }
+  .opollo-stagger-in-6 { animation-delay: 300ms; }
+  .opollo-stagger-in-7 { animation-delay: 350ms; }
+  .opollo-stagger-in-8 { animation-delay: 400ms; }
 }
 
 @keyframes opollo-fade-in {
@@ -204,12 +262,64 @@
   }
 }
 
+@keyframes opollo-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@keyframes opollo-pulse-soft {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes opollo-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .transition-smooth,
   .opollo-fade-in,
   .opollo-fade-out,
-  .opollo-slide-up {
+  .opollo-slide-up,
+  .opollo-shimmer,
+  .opollo-pulse-soft,
+  .opollo-pop-in,
+  .opollo-stagger-in-1,
+  .opollo-stagger-in-2,
+  .opollo-stagger-in-3,
+  .opollo-stagger-in-4,
+  .opollo-stagger-in-5,
+  .opollo-stagger-in-6,
+  .opollo-stagger-in-7,
+  .opollo-stagger-in-8 {
     animation: none !important;
+    animation-delay: 0 !important;
     transition: none !important;
+    background: hsl(var(--muted)) !important;
   }
 }
