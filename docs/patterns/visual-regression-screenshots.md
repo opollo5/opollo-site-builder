@@ -28,6 +28,30 @@ writes them to `playwright-screenshots/<viewport>/<route-slug>.png`.
 
 ## How to run
 
+### In CI (canonical path)
+
+`.github/workflows/screenshots.yml` runs on every PR + push to main +
+on-demand `workflow_dispatch`. Each run uploads
+`playwright-screenshots/` as an artifact named
+`playwright-screenshots-<pr-number-or-sha>`. Reviewers download from
+the run's "Artifacts" panel, expand the zip, and review the PNGs in
+their image viewer of choice.
+
+The PR description should link to the relevant run + name the
+affected files. Example:
+
+```markdown
+## Screenshots
+
+[Latest screenshot CI run](https://github.com/opollo5/opollo-site-builder/actions/runs/12345)
+
+Surfaces this PR materially changed:
+- `desktop/admin-sites-list.png`
+- `mobile/admin-sites-list.png`
+```
+
+### Locally (when you need to iterate without pushing)
+
 ```bash
 # 1. Local Supabase running (the harness queries the seeded test site).
 supabase start
@@ -41,7 +65,8 @@ The script signs in as the seeded `playwright-admin@opollo.test` user
 and writes PNGs.
 
 Skipped by default in regular CI — `npm run test:e2e` passes a `RUN_SCREENSHOTS=1`
-env-var guard that's only set by the dedicated `npm run screenshots` script.
+env-var guard that's only set by the dedicated `npm run screenshots` script
+(via the workflow above).
 
 ## How to reference in a PR description
 

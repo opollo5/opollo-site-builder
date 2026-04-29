@@ -1,0 +1,104 @@
+name: Screenshots
+
+# Polish workstream visual-regression harness. Captures every admin
+# surface at desktop 1440×900 + mobile 380×844 against an ephemeral
+# local Supabase, uploads the playwright-screenshots/ folder as a
+# downloadable artifact.
+#
+# Per the world-class polish brief (PR #229) the per-screen Phase B
+# PRs and the R-0 operator-review report each need before/after PNGs.
+# This workflow makes them downloadable from every PR's CI run.
+#
+# Triggered:
+#   • pull_request — every Phase B / Phase C PR gets fresh screenshots
+#     for visual review.
+#   • workflow_dispatch — Steven can fire it manually against any
+#     branch (e.g. for the R-0 report PR).
+#   • push to main — captures the post-merge baseline; the artifact on
+#     the latest main run is the reference state.
+#
+# Skipped on forked-repo PRs (same as e2e.yml — secrets would leak).
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      # Same setup as e2e.yml — admin gate ON exercises the real auth
+      # flow; deterministic master key for ephemeral encryption.
+      FEATURE_SUPABASE_AUTH: "true"
+      OPOLLO_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Read Supabase credentials into env
+        run: |
+          URL=$(supabase status --output json | jq -r '.API_URL')
+          SVC=$(supabase status --output json | jq -r '.SERVICE_ROLE_KEY')
+          ANON=$(supabase status --output json | jq -r '.ANON_KEY')
+          DB=$(supabase status --output json | jq -r '.DB_URL')
+          echo "SUPABASE_URL=$URL" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$SVC" >> "$GITHUB_ENV"
+          echo "SUPABASE_ANON_KEY=$ANON" >> "$GITHUB_ENV"
+          echo "SUPABASE_DB_URL=$DB" >> "$GITHUB_ENV"
+
+      - name: Capture screenshots
+        run: npm run screenshots
+
+      - name: Upload screenshot artifact
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-screenshots-${{ github.event.pull_request.number || github.sha }}
+          path: playwright-screenshots
+          retention-days: 30
+          # if-no-files-found: warn rather than error — a partially
+          # broken capture run still gives reviewers something to look
+          # at while we triage the failure.
+          if-no-files-found: warn
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup || true
