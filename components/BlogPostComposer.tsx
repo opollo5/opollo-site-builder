@@ -68,6 +68,16 @@ const PARSE_DEBOUNCE_MS = 200;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 const AUTOSAVE_STATUS_FRESH_MS = 1500;
 
+// BL-3 — SEO recommendation envelopes. These are advisory only;
+// neither field is hard-capped at the recommendation line. Matches
+// what Google / Bing show in SERPs as of mid-2025.
+const TITLE_SEO_CAP = 60;
+const META_TITLE_SEO_CAP = 60;
+const META_DESCRIPTION_SEO_MIN = 120;
+const META_DESCRIPTION_SEO_MAX = 160;
+// Adult reading speed for prose, words-per-minute. Substack uses ~250.
+const READING_WPM = 230;
+
 const SOURCE_HINTS: Record<ParseSource, string> = {
   yaml: "Auto-filled from YAML front-matter",
   inline: "Auto-filled from inline label",
@@ -115,6 +125,26 @@ function applyParse(
   if (current.touched) return current;
   if (parsed === null) return current;
   return { value: parsed, source, touched: false };
+}
+
+// BL-3 — word + reading-time counter. Strips HTML tags, fenced code
+// blocks, and YAML front-matter so the figure tracks "what the reader
+// sees" rather than "raw markdown the operator pasted".
+function wordCount(text: string): number {
+  if (!text) return 0;
+  const stripped = text
+    .replace(/^---[\s\S]*?---/, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/```[\s\S]*?```/g, " ")
+    .replace(/`[^`]+`/g, " ")
+    .replace(/[#*_>~`-]+/g, " ");
+  const tokens = stripped.split(/\s+/).filter((t) => t.length > 0);
+  return tokens.length;
+}
+
+function readingMinutes(words: number): number {
+  if (words === 0) return 0;
+  return Math.max(1, Math.round(words / READING_WPM));
 }
 
 // BL-2 autosave shape — kept narrow on purpose so a future schema
@@ -418,12 +448,15 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   return (
     <form onSubmit={handleSaveDraft} className="space-y-6">
       <div>
-        <label
-          htmlFor="post-composer-input"
-          className="block text-sm font-medium"
-        >
-          Post content
-        </label>
+        <div className="flex items-baseline justify-between gap-2">
+          <label
+            htmlFor="post-composer-input"
+            className="block text-sm font-medium"
+          >
+            Post content
+          </label>
+          <ReadingChip text={composerValue.text} />
+        </div>
         <Composer
           textareaId="post-composer-input"
           value={composerValue}
@@ -454,9 +487,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           />
           <div className="mt-1 flex items-center justify-between gap-2">
             <SourceHint source={title.source} />
-            {!titleIsValid && (
-              <span className="text-xs text-destructive">Title required.</span>
-            )}
+            <TitleLengthHint
+              length={title.value.length}
+              valid={titleIsValid}
+            />
           </div>
         </div>
 
@@ -535,7 +569,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               disabled={submitting}
               maxLength={200}
             />
-            <SourceHint source={metaTitle.source} />
+            <div className="mt-1 flex items-center justify-between gap-2">
+              <SourceHint source={metaTitle.source} />
+              <MetaTitleLengthHint length={metaTitle.value.length} />
+            </div>
           </div>
 
           <div>
@@ -586,15 +623,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             />
             <div className="mt-1 flex items-center justify-between gap-2 text-xs">
               <SourceHint source={metaDescription.source} />
-              <span
-                className={
-                  metaDescription.value.length > 160
-                    ? "text-destructive"
-                    : "text-muted-foreground"
-                }
-              >
-                {metaDescription.value.length}/160
-              </span>
+              <MetaDescriptionLengthHint
+                length={metaDescription.value.length}
+              />
             </div>
           </div>
         </fieldset>
@@ -708,6 +739,102 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         }
       />
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BL-3 — Inline length / reading-time hints. Pure presentational.
+// ---------------------------------------------------------------------------
+
+function ReadingChip({ text }: { text: string }) {
+  const words = wordCount(text);
+  if (words === 0) return null;
+  const minutes = readingMinutes(words);
+  return (
+    <span
+      data-testid="post-reading-chip"
+      className="text-xs text-muted-foreground"
+    >
+      {words.toLocaleString()} {words === 1 ? "word" : "words"} ·{" "}
+      {minutes} min read
+    </span>
+  );
+}
+
+function TitleLengthHint({
+  length,
+  valid,
+}: {
+  length: number;
+  valid: boolean;
+}) {
+  if (!valid) {
+    return (
+      <span className="text-xs text-destructive">Title required.</span>
+    );
+  }
+  if (length === 0) return null;
+  const overSeoCap = length > TITLE_SEO_CAP;
+  return (
+    <span
+      data-testid="post-title-length-hint"
+      className={cn(
+        "text-xs",
+        overSeoCap ? "text-warning" : "text-muted-foreground",
+      )}
+    >
+      {length}/{TITLE_SEO_CAP}
+      {overSeoCap && " · search will truncate"}
+    </span>
+  );
+}
+
+function MetaTitleLengthHint({ length }: { length: number }) {
+  if (length === 0) return null;
+  const overSeoCap = length > META_TITLE_SEO_CAP;
+  return (
+    <span
+      data-testid="post-meta-title-length-hint"
+      className={cn(
+        "text-xs",
+        overSeoCap ? "text-warning" : "text-muted-foreground",
+      )}
+    >
+      {length}/{META_TITLE_SEO_CAP}
+      {overSeoCap && " · search will truncate"}
+    </span>
+  );
+}
+
+function MetaDescriptionLengthHint({ length }: { length: number }) {
+  // Three states: empty / under-min / sweet-spot / over-max. The
+  // sweet spot reads as positive ("good length"); the over-max state
+  // gates the form via aria-invalid + this destructive label.
+  if (length === 0) {
+    return (
+      <span className="text-muted-foreground">
+        Aim for {META_DESCRIPTION_SEO_MIN}–{META_DESCRIPTION_SEO_MAX} chars.
+      </span>
+    );
+  }
+  if (length > META_DESCRIPTION_SEO_MAX) {
+    return (
+      <span data-testid="post-meta-description-length-hint" className="text-destructive">
+        {length}/{META_DESCRIPTION_SEO_MAX} · search will truncate
+      </span>
+    );
+  }
+  if (length < META_DESCRIPTION_SEO_MIN) {
+    return (
+      <span data-testid="post-meta-description-length-hint" className="text-muted-foreground">
+        {length}/{META_DESCRIPTION_SEO_MAX} · aim for {META_DESCRIPTION_SEO_MIN}+
+      </span>
+    );
+  }
+  return (
+    <span data-testid="post-meta-description-length-hint" className="text-success">
+      {length}/{META_DESCRIPTION_SEO_MAX} · good length
+    </span>
   );
 }
 
