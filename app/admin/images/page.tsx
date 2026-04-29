@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ImagesTable } from "@/components/ImagesTable";
-import { H1 } from "@/components/ui/typography";
+import { Alert } from "@/components/ui/alert";
+import { H1, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
@@ -126,12 +127,9 @@ export default async function AdminImagesPage({
 
   if (!result.ok) {
     return (
-      <div
-        role="alert"
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-      >
-        Failed to load images: {result.error.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load images">
+        {result.error.message}
+      </Alert>
     );
   }
 
@@ -146,15 +144,15 @@ export default async function AdminImagesPage({
       <div className="flex items-start justify-between gap-4">
         <div>
           <H1>Image library</H1>
-          <p className="text-sm text-muted-foreground">
+          <Lead className="mt-0.5">
             {parsed.deleted
-              ? "Archived images (soft-deleted). Restore from the detail view."
-              : "Images available to the chat builder. Filter by caption, tags, or source."}
-          </p>
+              ? `${total} archived ${total === 1 ? "image" : "images"} (soft-deleted). Restore from the detail view.`
+              : `${total} ${total === 1 ? "image" : "images"} available to the chat builder. Filter by caption, tag, or source.`}
+          </Lead>
         </div>
         <Link
           href={buildHref(parsed, { deleted: !parsed.deleted, page: 1 })}
-          className="text-xs text-muted-foreground hover:text-foreground"
+          className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           {parsed.deleted ? "← Active images" : "View archived →"}
         </Link>
