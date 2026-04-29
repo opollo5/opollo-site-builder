@@ -24,6 +24,14 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
+
+    /* A-2 — Semantic status tokens. See documentation block below. */
+    --success: 142 71% 36%;          /* emerald-700 territory */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 36%;           /* amber-700 territory */
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 38%;             /* sky-700 territory */
+    --info-foreground: 0 0% 100%;
   }
 
   .dark {
@@ -46,6 +54,15 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* A-2 — Semantic status tokens, dark variants. Bumped luminance so
+       badges remain legible against the dark background. */
+    --success: 142 71% 50%;          /* emerald-500 area */
+    --success-foreground: 222 47% 11%;
+    --warning: 38 92% 60%;           /* amber-400 area */
+    --warning-foreground: 222 47% 11%;
+    --info: 199 89% 60%;             /* sky-400 area */
+    --info-foreground: 222 47% 11%;
   }
 }
 
@@ -57,6 +74,42 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * A-2 — Semantic color palette (documentation block).
+ *
+ * Five status intents — every pill, badge, and tinted-background block on
+ * an admin surface picks one. Hand-rolled `bg-emerald-500/10 text-emerald-700`
+ * patterns are forbidden going forward; consume the StatusPill primitive
+ * from A-4 (which maps these intents → token classes below).
+ *
+ *   neutral     — default / unscoped state                  bg-muted text-muted-foreground
+ *   active      — running, healthy, in-progress             bg-primary/10 text-primary
+ *   success     — succeeded, complete, OK                   bg-success/10 text-success
+ *   warning     — paused, awaiting review, soft caution     bg-warning/10 text-warning
+ *   info        — informational, scheduled, queued          bg-info/10 text-info
+ *   error       — failed, destructive, hard stop            bg-destructive/10 text-destructive
+ *
+ * Token semantics:
+ *
+ *   --success       hue rooted at emerald-700 (light) / emerald-500 (dark).
+ *                   Light-mode value chosen so `text-success` against a
+ *                   white background passes WCAG AA (4.5:1).
+ *   --warning       amber-700 (light) / amber-400 (dark). Yellow shifted
+ *                   to amber so it doesn't read as "neon caution sign".
+ *   --info          sky-700 (light) / sky-400 (dark). Cooler than primary
+ *                   so an info badge doesn't compete with an active state.
+ *
+ * Foreground variants (e.g. `text-success-foreground`) are reserved for
+ * solid-fill badges (`bg-success text-success-foreground`). The default
+ * pill pattern uses the muted-bg + bold-text convention because solid
+ * fills crowd information-dense lists. Keep solid fills for one-off
+ * marketing-style accent rows.
+ *
+ * Hand-rolled `text-emerald-700` / `bg-yellow-500/10` literals across the
+ * codebase will be folded into these tokens during the A-4 sweep. Do not
+ * add new ones in the meantime.
+ * --------------------------------------------------------------------- */
 
 /* ---------------------------------------------------------------------------
  * A-1 — Typography scale (documentation block).
