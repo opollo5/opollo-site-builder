@@ -364,7 +364,7 @@ Body of second post.`}
             </button>
           </div>
           <ul className="space-y-2">
-            {allCandidates.map((c) => (
+            {allCandidates.map((c, idx) => (
               <BulkCandidateCard
                 key={c.id}
                 candidate={c}
@@ -375,6 +375,7 @@ Body of second post.`}
                     : undefined
                 }
                 runDisabled={running}
+                staggerIndex={idx}
               />
             ))}
           </ul>
@@ -508,11 +509,13 @@ function BulkCandidateCard({
   onChange,
   onRemove,
   runDisabled,
+  staggerIndex,
 }: {
   candidate: BulkCandidate;
   onChange: (patch: Partial<BulkCandidate>) => void;
   onRemove?: () => void;
   runDisabled?: boolean;
+  staggerIndex?: number;
 }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const slugIsValid =
@@ -527,10 +530,19 @@ function BulkCandidateCard({
     candidate.rejected || candidate.status === "saving" || runDisabled === true;
   const savedReadOnly = candidate.status === "saved";
 
+  // BL-9 — stagger-fade the first 6 cards as they appear, capped to
+  // avoid a long sweep that delays the operator. Cards beyond the 6th
+  // fall back to opollo-fade-in with no stagger.
+  const staggerClass =
+    staggerIndex !== undefined && staggerIndex > 0 && staggerIndex <= 6
+      ? `opollo-stagger-in-${staggerIndex}`
+      : "";
+
   return (
     <li
       className={cn(
-        "rounded-md border bg-background transition-smooth",
+        "opollo-fade-in rounded-md border bg-background transition-smooth",
+        staggerClass,
         candidate.rejected && "opacity-50",
         candidate.status === "saved" && "border-success/40",
         candidate.status === "failed" && "border-destructive/40",
@@ -688,7 +700,10 @@ function CandidateStatusBadge({ candidate }: { candidate: BulkCandidate }) {
           href={candidate.editUrl ?? "#"}
           target="_blank"
           rel="noreferrer"
-          className="rounded border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-success transition-smooth hover:bg-success/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          // BL-9 — pop-in lands the saved state with a small bounce
+          // so the operator's eye registers the success without
+          // needing to read the badge.
+          className="opollo-pop-in rounded border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-success transition-smooth hover:bg-success/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="bulk-candidate-saved-link"
         >
           Saved · open
