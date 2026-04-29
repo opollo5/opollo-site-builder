@@ -7,6 +7,7 @@ import {
   Globe,
   Image as ImageIcon,
   KeyRound,
+  PenSquare,
   Plus,
   Settings,
   Sparkles,
@@ -79,6 +80,13 @@ const NAVIGATE_ITEMS: readonly NavigateItem[] = [
     href: "/admin/sites",
     icon: Globe,
     keywords: "sites wordpress wp manage",
+  },
+  {
+    label: "Post a blog",
+    description: "Start a new post — single or bulk",
+    href: "/admin/posts/new",
+    icon: PenSquare,
+    keywords: "post blog new draft compose write bulk upload",
   },
   {
     label: "Batches",

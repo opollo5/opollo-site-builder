@@ -395,6 +395,27 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     parentPage !== null &&
     featuredImage !== null;
 
+  // BL-8 — ⌘S / Ctrl+S triggers Save Draft from anywhere on the form.
+  // The browser's "save page" dialog interception is the standard
+  // shortcut operators expect from prose tools.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const isCmdS =
+        (e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key === "s";
+      if (!isCmdS) return;
+      if (!canSaveDraft) return;
+      e.preventDefault();
+      // Submit via the form so React's onSubmit handler runs (we
+      // ride the same path Save Draft button takes).
+      const formEl = document.getElementById(
+        `blog-post-composer-form-${siteId}`,
+      ) as HTMLFormElement | null;
+      formEl?.requestSubmit();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [canSaveDraft, siteId]);
+
   async function handleSaveDraft(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormError(null);
@@ -446,7 +467,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   }
 
   return (
-    <form onSubmit={handleSaveDraft} className="space-y-6">
+    <form
+      id={`blog-post-composer-form-${siteId}`}
+      onSubmit={handleSaveDraft}
+      className="space-y-6"
+    >
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <label
@@ -695,6 +720,17 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       </div>
 
       <div className="flex flex-wrap items-center justify-end gap-2">
+        <span
+          aria-hidden
+          className="hidden items-center gap-0.5 text-xs text-muted-foreground sm:inline-flex"
+        >
+          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
+            ⌘
+          </kbd>
+          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
+            S
+          </kbd>
+        </span>
         <Button type="submit" disabled={!canSaveDraft}>
           {submitting ? "Saving…" : "Save draft"}
         </Button>
