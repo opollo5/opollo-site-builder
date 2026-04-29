@@ -2,11 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Plus } from "lucide-react";
 
 import { AddSiteModal } from "@/components/AddSiteModal";
 import { MenuProvider } from "@/components/SiteActionsMenu";
 import { SitesTable } from "@/components/SitesTable";
 import { Button } from "@/components/ui/button";
+import { H1, Lead } from "@/components/ui/typography";
 import type { SiteListItem } from "@/lib/tool-schemas";
 
 // Client island for /admin/sites. The server component renders the
@@ -22,19 +24,24 @@ export function SitesListClient({ sites }: { sites: SiteListItem[] }) {
 
   return (
     <>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">Manage sites</h1>
-          <p className="text-sm text-muted-foreground">
-            WordPress sites connected to this builder.
-          </p>
+          <H1>Sites</H1>
+          <Lead className="mt-0.5">
+            {sites.length === 0
+              ? "No WordPress sites connected yet."
+              : `${sites.length} WordPress ${sites.length === 1 ? "site" : "sites"} connected to this builder.`}
+          </Lead>
         </div>
-        <Button onClick={() => setModalOpen(true)}>Add new site</Button>
+        <Button onClick={() => setModalOpen(true)} data-testid="add-site-button">
+          <Plus aria-hidden className="h-4 w-4" />
+          New site
+        </Button>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         <MenuProvider>
-          <SitesTable sites={sites} />
+          <SitesTable sites={sites} onCreateClick={() => setModalOpen(true)} />
         </MenuProvider>
       </div>
 
