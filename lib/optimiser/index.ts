@@ -68,3 +68,28 @@ export type { LandingPage } from "./landing-pages";
 
 export { planPageImport } from "./page-import";
 export type { ImportPlan } from "./page-import";
+
+// Slice 4 surface
+export { rollupForPage } from "./metrics-aggregation";
+export type { PageMetricsRollup } from "./metrics-aggregation";
+
+export { computeReliability } from "./data-reliability";
+export type {
+  ReliabilityChecks,
+  ReliabilityResult,
+  ReliabilityThresholds,
+} from "./data-reliability";
+
+export {
+  evaluateHealthyState,
+  persistEvaluation,
+  evaluateAndPersistPage,
+} from "./healthy-state";
+export type {
+  HealthyStateInputs,
+  HealthyStateResult,
+  DataThresholds,
+} from "./healthy-state";
+
+export { runEvaluatePagesForAllClients } from "./evaluate-pages-job";
+export type { EvaluatePagesOutcome } from "./evaluate-pages-job";
