@@ -35,7 +35,8 @@ export type LimiterName =
   | "auth_callback"
   | "invite"
   | "register"
-  | "password_reset";
+  | "password_reset"
+  | "test_connection";
 
 type LimiterConfig = {
   requests: number;
@@ -59,6 +60,11 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // shouldn't be throttled because of an unrelated user on the same
   // IP, and an attacker rotating IPs wouldn't be slowed by it.
   password_reset: { requests: 5,   window: "1 h" },
+  // AUTH-FOUNDATION P2.1: pre-save WP credential test. Burns when an
+  // operator iterates on a wrong app password during /admin/sites/new
+  // or /admin/sites/[id]/edit; 60/hour comfortably covers that without
+  // letting a logged-in admin scan arbitrary WP installs at scale.
+  test_connection: { requests: 60, window: "1 h" },
 };
 
 export type RateLimitResult =

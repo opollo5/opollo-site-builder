@@ -912,6 +912,10 @@ export type WpGetMeResult =
       ok: true;
       user_id: number;
       username: string;
+      /** Display name from WP (`name` field). Empty string if unset. AUTH-FOUNDATION P2: shown back to the operator on a successful test-connection. */
+      display_name: string;
+      /** Role slugs from WP. Typical values: administrator, editor, author, contributor, subscriber. AUTH-FOUNDATION P2: capability check accepts admin/editor by role too. */
+      roles: string[];
       capabilities: WpUserCapabilities;
     }
   | WpError;
@@ -935,6 +939,8 @@ export async function wpGetMe(cfg: WpConfig): Promise<WpGetMeResult> {
     id?: number;
     username?: string;
     slug?: string;
+    name?: string;
+    roles?: string[];
     capabilities?: Record<string, boolean>;
   }>(res);
   if (!parsed.ok) return parsed;
@@ -944,6 +950,8 @@ export async function wpGetMe(cfg: WpConfig): Promise<WpGetMeResult> {
     ok: true,
     user_id: Number(body?.id ?? 0),
     username: (body?.username ?? body?.slug ?? "") as string,
+    display_name: (body?.name ?? "") as string,
+    roles: Array.isArray(body?.roles) ? (body.roles as string[]) : [],
     capabilities: (body?.capabilities ?? {}) as WpUserCapabilities,
   };
 }
