@@ -959,17 +959,109 @@ function SaveStatus({
 }
 
 // ---------------------------------------------------------------------------
-// BP-8 — WP parent-page combobox.
+// BP-8 / BL-4 — WP parent-page combobox.
 //
 // Backed by /api/sites/[id]/wp-pages. Search is forwarded to WP's
-// `search` param (full-text against title + slug). Fetches once on
-// open then on debounced query change.
+// `search` param (full-text against title + slug).
+//
+// BL-4 layered caching + prefetch on top of the BP-8 fetch loop:
+//   - Module-level Map keyed by `${siteId}:${query}` with 60s TTL. Two
+//     opens of the same combobox within a minute reuse the result so
+//     the dropdown opens instantly. Cache invalidates per-site (a real
+//     wp-pages mutation would need a manual `invalidateWpPagesCache`
+//     call — none today).
+//   - `onFocus` on the trigger button kicks off the empty-query fetch
+//     before the operator clicks, so the popover usually has data
+//     ready by the time it renders.
+//   - `onPointerEnter` on the trigger does the same, for mouse users.
 // ---------------------------------------------------------------------------
 
 export interface WpPageOption {
   page_id: number;
   title: string;
   slug: string;
+}
+
+const WP_PAGES_CACHE_TTL_MS = 60_000;
+
+interface CacheEntry {
+  pages: WpPageOption[];
+  fetchedAt: number;
+}
+
+const wpPagesCache = new Map<string, CacheEntry>();
+const wpPagesInflight = new Map<string, Promise<WpPageOption[] | null>>();
+
+function wpPagesCacheKey(siteId: string, query: string): string {
+  return `${siteId}:${query.trim().toLowerCase()}`;
+}
+
+async function fetchWpPages(
+  siteId: string,
+  query: string,
+  signal: AbortSignal,
+): Promise<WpPageOption[]> {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set("q", query.trim());
+  const res = await fetch(
+    `/api/sites/${siteId}/wp-pages?${params.toString()}`,
+    { signal, cache: "no-store" },
+  );
+  const payload = (await res.json().catch(() => null)) as
+    | {
+        ok: true;
+        data: {
+          pages: { page_id: number; title: string; slug: string }[];
+        };
+      }
+    | { ok: false; error: { code: string; message: string } }
+    | null;
+  if (!payload?.ok) {
+    const msg =
+      payload?.ok === false
+        ? payload.error.message
+        : `Failed to load WP pages (HTTP ${res.status}).`;
+    throw new Error(msg);
+  }
+  return payload.data.pages.map((p) => ({
+    page_id: p.page_id,
+    title: p.title,
+    slug: p.slug,
+  }));
+}
+
+// Cache-aware fetcher. Returns immediately on a fresh hit; otherwise
+// dedupes inflight requests so a focus + open + query-change trio
+// doesn't trigger three identical fetches in flight at once.
+async function loadWpPages(
+  siteId: string,
+  query: string,
+  signal: AbortSignal,
+): Promise<{ pages: WpPageOption[]; fromCache: boolean }> {
+  const key = wpPagesCacheKey(siteId, query);
+  const cached = wpPagesCache.get(key);
+  if (cached && Date.now() - cached.fetchedAt < WP_PAGES_CACHE_TTL_MS) {
+    return { pages: cached.pages, fromCache: true };
+  }
+  let inflight = wpPagesInflight.get(key);
+  if (!inflight) {
+    inflight = (async () => {
+      try {
+        const pages = await fetchWpPages(siteId, query, signal);
+        wpPagesCache.set(key, { pages, fetchedAt: Date.now() });
+        return pages;
+      } catch (err) {
+        if (signal.aborted) return null;
+        throw err;
+      } finally {
+        wpPagesInflight.delete(key);
+      }
+    })();
+    wpPagesInflight.set(key, inflight);
+  }
+  const pages = await inflight;
+  if (pages === null) throw new DOMException("Aborted", "AbortError");
+  return { pages, fromCache: false };
 }
 
 function WpPageCombobox({
@@ -987,9 +1079,33 @@ function WpPageCombobox({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const [pages, setPages] = useState<WpPageOption[]>([]);
+  const [pages, setPages] = useState<WpPageOption[]>(() => {
+    // Seed from cache so an immediately-opened popover isn't blank
+    // for one render tick.
+    const cached = wpPagesCache.get(wpPagesCacheKey(siteId, ""));
+    return cached?.pages ?? [];
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // BL-4 — prefetch on focus / hover. No-op if cache is fresh; the
+  // dedupe map blocks redundant concurrent fetches.
+  const prefetchEmpty = useCallback(() => {
+    if (disabled) return;
+    const ctrl = new AbortController();
+    void loadWpPages(siteId, "", ctrl.signal)
+      .then((res) => {
+        // Only seed component state if no operator-typed query has
+        // landed in the meantime; otherwise we'd flash unsearched
+        // results into a search context.
+        setPages((prev) =>
+          prev.length === 0 || res.fromCache ? res.pages : prev,
+        );
+      })
+      .catch(() => {
+        // Silent — the open-time fetch will surface errors loud.
+      });
+  }, [siteId, disabled]);
 
   useEffect(() => {
     if (!open) return;
@@ -998,38 +1114,9 @@ function WpPageCombobox({
       setLoading(true);
       setError(null);
       try {
-        const params = new URLSearchParams();
-        if (query.trim()) params.set("q", query.trim());
-        const res = await fetch(
-          `/api/sites/${siteId}/wp-pages?${params.toString()}`,
-          { signal: ctrl.signal, cache: "no-store" },
-        );
+        const { pages: next } = await loadWpPages(siteId, query, ctrl.signal);
         if (ctrl.signal.aborted) return;
-        const payload = (await res.json().catch(() => null)) as
-          | {
-              ok: true;
-              data: {
-                pages: { page_id: number; title: string; slug: string }[];
-              };
-            }
-          | { ok: false; error: { code: string; message: string } }
-          | null;
-        if (!payload?.ok) {
-          setError(
-            payload?.ok === false
-              ? payload.error.message
-              : `Failed to load WP pages (HTTP ${res.status}).`,
-          );
-          setPages([]);
-          return;
-        }
-        setPages(
-          payload.data.pages.map((p) => ({
-            page_id: p.page_id,
-            title: p.title,
-            slug: p.slug,
-          })),
-        );
+        setPages(next);
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return;
         setError(e instanceof Error ? e.message : String(e));
@@ -1050,6 +1137,9 @@ function WpPageCombobox({
           id={triggerId}
           type="button"
           disabled={disabled}
+          onFocus={prefetchEmpty}
+          onPointerEnter={prefetchEmpty}
+          data-testid="post-parent-page-trigger"
           className="mt-1 flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-sm transition-smooth focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
           aria-haspopup="listbox"
           aria-expanded={open}
