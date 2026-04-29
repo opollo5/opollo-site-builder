@@ -3,6 +3,8 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { ChevronDown } from "lucide-react";
+
 import type { SessionUser } from "@/lib/auth";
 
 type NavLink = {
@@ -78,7 +80,10 @@ export function AdminNav({ user, showUsersLink }: { user: SessionUser | null; sh
             data-testid="admin-user-menu-button"
           >
             {user?.email ?? "Admin"}
-            <span className={`transition-transform ${userMenuOpen ? "rotate-180" : ""}`}>▼</span>
+            <ChevronDown
+              aria-hidden
+              className={`h-4 w-4 transition-transform ${userMenuOpen ? "rotate-180" : ""}`}
+            />
           </button>
 
           {userMenuOpen && (

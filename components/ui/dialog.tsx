@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -66,7 +67,7 @@ const DialogContent = React.forwardRef<
         )}
         aria-label="Close"
       >
-        <span aria-hidden className="text-lg leading-none">×</span>
+        <X aria-hidden className="h-5 w-5" />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>

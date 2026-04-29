@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -565,7 +566,8 @@ function QualityFlagBadge({ flag }: { flag: BriefPageQualityFlag }) {
       title={QUALITY_FLAG_HINT[flag]}
       label={
         <>
-          <span aria-hidden>⚠</span> {flag === "cost_ceiling" ? "Cost ceiling hit" : "Capped with issues"}
+          <TriangleAlert aria-hidden className="h-3 w-3" />
+          {flag === "cost_ceiling" ? "Cost ceiling hit" : "Capped with issues"}
         </>
       }
     />
