@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Composer, type ComposerValue } from "@/components/Composer";
 import {
@@ -453,14 +454,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         )}
       </div>
 
-      {formError && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {formError}
-        </div>
-      )}
+      {formError && <Alert variant="destructive">{formError}</Alert>}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button type="submit" disabled={!canSaveDraft}>
