@@ -44,8 +44,9 @@ export type GenerateProposalInputs = {
   triggerEvidence: Array<{
     metric: string;
     op: string;
-    threshold: number | boolean;
-    observed: number | boolean | null;
+    // Phase 2 Slice 20 widened to allow string thresholds (intent_class).
+    threshold: number | boolean | string;
+    observed: number | boolean | string | null;
     passed: boolean;
   }>;
   metricSeries?: number[];
@@ -261,9 +262,10 @@ function buildBeforeSnapshot(
   };
 }
 
-function formatBoundary(v: number | boolean | null): string {
+function formatBoundary(v: number | boolean | string | null): string {
   if (v == null) return "—";
   if (typeof v === "boolean") return String(v);
+  if (typeof v === "string") return v;
   return Number.isFinite(v) ? String(round3(v)) : String(v);
 }
 
