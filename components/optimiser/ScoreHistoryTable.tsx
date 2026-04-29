@@ -3,17 +3,22 @@ import {
   classificationLabel,
 } from "@/lib/optimiser/scoring/classify";
 import type { ScoreHistoryRow } from "@/lib/optimiser/scoring/score-history";
+import { RollbackButton } from "@/components/optimiser/RollbackButton";
 
 // §4.2 Score history view — full timeline of every score evaluation
-// for a page. Slice 12 ships the table; Slice 13 wires the rollback
-// action via the placeholder button. Tooltip explains the placeholder.
+// for a page. Slice 13 replaces the Slice 12 placeholder with the
+// real rollback action.
 
 export function ScoreHistoryTable({
+  pageId,
   history,
   causalDeltas,
 }: {
+  /** Required for the rollback action button on prior-version rows. */
+  pageId: string;
   history: ScoreHistoryRow[];
-  /** Slice 13 populates this; Slice 12 always passes an empty array. */
+  /** Map of triggering_proposal_id → causal-delta summary, populated by
+   * the Slice 13 server-side fetch on the page detail view. */
   causalDeltas?: Map<
     string,
     { actual_impact_cr?: number | null; actual_impact_score?: number | null }
@@ -48,7 +53,9 @@ export function ScoreHistoryTable({
           {history.map((row, idx) => {
             const colours = classificationBadgeColor(row.classification);
             const isCurrent = idx === 0;
-            const delta = causalDeltas?.get(row.id);
+            const delta =
+              causalDeltas?.get(row.triggering_proposal_id ?? "") ??
+              causalDeltas?.get(row.id);
             return (
               <tr
                 key={row.id}
@@ -99,14 +106,13 @@ export function ScoreHistoryTable({
                 </td>
                 <td className="px-3 py-2">
                   {!isCurrent && (
-                    <button
-                      type="button"
-                      disabled
-                      title="Rollback ships in the next update"
-                      className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs text-muted-foreground"
-                    >
-                      Roll back
-                    </button>
+                    <RollbackButton
+                      pageId={pageId}
+                      historyId={row.id}
+                      versionLabel={new Date(row.evaluated_at).toLocaleString()}
+                      classification={row.classification}
+                      composite={row.composite_score}
+                    />
                   )}
                 </td>
               </tr>

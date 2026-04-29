@@ -5,6 +5,10 @@ import { Button } from "@/components/ui/button";
 import { ScoreBreakdownPanel } from "@/components/optimiser/ScoreBreakdownPanel";
 import { ScoreHistoryTable } from "@/components/optimiser/ScoreHistoryTable";
 import { ScoreSparkline } from "@/components/optimiser/ScoreSparkline";
+import {
+  buildDeltaMapByProposal,
+  listCausalDeltasForPage,
+} from "@/lib/optimiser/causal/read-deltas";
 import { getClient } from "@/lib/optimiser/clients";
 import { getLandingPage } from "@/lib/optimiser/landing-pages";
 import { computeReliability } from "@/lib/optimiser/data-reliability";
@@ -98,6 +102,8 @@ export default async function OptimiserPageDetail({
     limit: 10,
   });
   const history = await listScoreHistory({ landingPageId: page.id, limit: 30 });
+  const causalDeltaRows = await listCausalDeltasForPage(page.id);
+  const causalDeltas = buildDeltaMapByProposal(causalDeltaRows);
 
   return (
     <div className="space-y-6">
@@ -158,7 +164,11 @@ export default async function OptimiserPageDetail({
             />
           )}
         </header>
-        <ScoreHistoryTable history={history} />
+        <ScoreHistoryTable
+          pageId={page.id}
+          history={history}
+          causalDeltas={causalDeltas}
+        />
       </section>
     </div>
   );
