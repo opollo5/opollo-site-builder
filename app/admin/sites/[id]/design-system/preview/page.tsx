@@ -3,8 +3,10 @@
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { H1 } from "@/components/ui/typography";
+import { TableSkeleton } from "@/components/ui/skeleton";
+import { H1, Lead } from "@/components/ui/typography";
 import { PreviewGallery } from "@/components/PreviewGallery";
 import {
   resolveSelectedDesignSystem,
@@ -88,30 +90,25 @@ export default function DesignSystemPreviewPage() {
     <>
       <div>
         <H1>Preview</H1>
-        <p className="text-sm text-muted-foreground">
+        <Lead className="mt-0.5">
           Read-only metadata view of design system v{selectedDs.version} (
           {selectedDs.status}). Live component rendering lands with M3 — this
           page shows raw templates + CSS + field schemas + composition chains.
-        </p>
+        </Lead>
       </div>
 
       <div className="mt-6">
-        {state.status === "loading" && (
-          <div className="rounded-md border p-8 text-center">
-            <p className="text-sm text-muted-foreground">Loading preview…</p>
-          </div>
-        )}
+        {state.status === "loading" && <TableSkeleton rows={6} cols={3} />}
 
         {state.status === "error" && (
-          <div
-            className="flex items-center justify-between rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            role="alert"
-          >
-            <span>{state.message}</span>
-            <Button variant="outline" size="sm" onClick={() => void load()}>
-              Retry
-            </Button>
-          </div>
+          <Alert variant="destructive" title="Failed to load preview">
+            <div className="flex items-center justify-between gap-3">
+              <span>{state.message}</span>
+              <Button variant="outline" size="sm" onClick={() => void load()}>
+                Retry
+              </Button>
+            </div>
+          </Alert>
         )}
 
         {state.status === "ready" && (
