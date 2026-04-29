@@ -2,12 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BatchDetailClient } from "@/components/BatchDetailClient";
+import { Alert } from "@/components/ui/alert";
 import {
   StatusPill,
   jobStatusKind,
   slotStateKind,
 } from "@/components/ui/status-pill";
-import { H1 } from "@/components/ui/typography";
+import { H1, H3 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -63,12 +64,9 @@ export default async function BatchDetailPage({
 
   if (jobErr) {
     return (
-      <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        role="alert"
-      >
-        Failed to load batch: {jobErr.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load batch">
+        {jobErr.message}
+      </Alert>
     );
   }
   if (!job) {
@@ -159,7 +157,7 @@ export default async function BatchDetailPage({
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
-          <h2 className="text-sm font-semibold">Slots</h2>
+          <H3>Slots</H3>
           <div className="mt-2 overflow-x-auto rounded-md border">
             <table className="w-full text-xs">
               <thead>
@@ -221,7 +219,7 @@ export default async function BatchDetailPage({
         </div>
 
         <div>
-          <h2 className="text-sm font-semibold">Recent events</h2>
+          <H3>Recent events</H3>
           <div className="mt-2 flex flex-col gap-2">
             {(recentEvents ?? []).map((e) => (
               <div
