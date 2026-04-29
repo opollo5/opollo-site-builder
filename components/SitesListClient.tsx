@@ -1,10 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { Plus } from "lucide-react";
 
-import { AddSiteModal } from "@/components/AddSiteModal";
 import { MenuProvider } from "@/components/SiteActionsMenu";
 import { SitesTable } from "@/components/SitesTable";
 import { Button } from "@/components/ui/button";
@@ -12,15 +11,16 @@ import { H1, Lead } from "@/components/ui/typography";
 import type { SiteListItem } from "@/lib/tool-schemas";
 
 // Client island for /admin/sites. The server component renders the
-// initial list; this shell owns the "Add new site" button + modal
-// state and refreshes the route on successful create via
-// router.refresh(). Paired with the revalidatePath call inside
-// /api/sites/register, the modal's success path is guaranteed to
-// present the new row without a full-page reload.
+// initial list; this shell owns the "Add new site" CTA.
+//
+// AUTH-FOUNDATION P2.2: the modal-based AddSiteModal flow was
+// replaced with a single-page guided form at /admin/sites/new (the
+// guided flow needs the test-connection round-trip + capability
+// check, which doesn't fit the snappy modal pattern). The "New site"
+// button is now a Link.
 
 export function SitesListClient({ sites }: { sites: SiteListItem[] }) {
   const router = useRouter();
-  const [modalOpen, setModalOpen] = useState(false);
 
   return (
     <>
@@ -33,28 +33,22 @@ export function SitesListClient({ sites }: { sites: SiteListItem[] }) {
               : `${sites.length} WordPress ${sites.length === 1 ? "site" : "sites"} connected to this builder.`}
           </Lead>
         </div>
-        <Button onClick={() => setModalOpen(true)} data-testid="add-site-button">
-          <Plus aria-hidden className="h-4 w-4" />
-          New site
+        <Button asChild data-testid="add-site-button">
+          <Link href="/admin/sites/new">
+            <Plus aria-hidden className="h-4 w-4" />
+            New site
+          </Link>
         </Button>
       </div>
 
       <div className="mt-4">
         <MenuProvider>
-          <SitesTable sites={sites} onCreateClick={() => setModalOpen(true)} />
+          <SitesTable
+            sites={sites}
+            onCreateClick={() => router.push("/admin/sites/new")}
+          />
         </MenuProvider>
       </div>
-
-      <AddSiteModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSuccess={() => {
-          // revalidatePath in /api/sites/register already busted the
-          // page's cache; router.refresh() re-fetches the server
-          // component tree so the new row appears immediately.
-          router.refresh();
-        }}
-      />
     </>
   );
 }
