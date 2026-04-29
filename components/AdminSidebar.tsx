@@ -11,6 +11,7 @@ import {
   KeyRound,
   LogOut,
   Menu,
+  PenSquare,
   Settings,
   Users,
   Workflow,
@@ -112,6 +113,12 @@ export function AdminSidebar({
 
   const navLinks: NavLink[] = [
     { label: "Sites", href: "/admin/sites", icon: Globe, testId: "nav-sites" },
+    {
+      label: "Post a blog",
+      href: "/admin/posts/new",
+      icon: PenSquare,
+      testId: "nav-post-blog",
+    },
     {
       label: "Batches",
       href: "/admin/batches",
