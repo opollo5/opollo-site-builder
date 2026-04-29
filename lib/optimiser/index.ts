@@ -228,3 +228,16 @@ export {
   listScoreSparkline,
   type ScoreHistoryRow,
 } from "./scoring/score-history";
+
+// Slice 13 surface — v1.6 causal deltas + rollback
+export {
+  runCausalDeltaEvaluationForAllClients,
+  type CausalDeltaOutcome,
+} from "./causal/evaluate-deltas";
+export {
+  listCausalDeltasForPage,
+  listRecentCausalDeltasForPlaybook,
+  buildDeltaMapByProposal,
+  summariseDeltasForReviewPanel,
+  type CausalDeltaRow,
+} from "./causal/read-deltas";

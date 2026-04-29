@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { RepromptForm } from "@/components/optimiser/RepromptForm";
 
 export type ProposalReviewProps = {
   proposal: {
@@ -180,12 +181,7 @@ export function ProposalReview({
         </Section>
 
         <Section title="Pre-build reprompt (optional)">
-          <Textarea
-            value={reprompt}
-            onChange={(e) => setReprompt(e.target.value)}
-            rows={3}
-            placeholder="Augment the brief: 'keep the existing testimonial component' / 'use the centred hero variant' / etc."
-          />
+          <RepromptForm value={reprompt} onChange={setReprompt} />
           <p className="mt-1 text-xs text-muted-foreground">
             Appended to the change set on approve. Phase 1.5 forwards this into the Site Builder brief.
           </p>

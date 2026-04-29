@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PastCausalDeltasPanel } from "@/components/optimiser/PastCausalDeltasPanel";
 import { ProposalReview } from "@/components/optimiser/ProposalReview";
+import { listRecentCausalDeltasForPlaybook } from "@/lib/optimiser/causal/read-deltas";
 import { getProposalWithEvidence } from "@/lib/optimiser/proposals";
 import { getLandingPage } from "@/lib/optimiser/landing-pages";
 
@@ -18,6 +20,16 @@ export default async function OptimiserProposalReviewPage({
   if (!proposal) notFound();
   const page = await getLandingPage(proposal.landing_page_id);
 
+  // Past causal deltas for the same playbook on this client — drives
+  // the §4.3 "what happened last time we did this" panel.
+  const pastDeltas = proposal.triggering_playbook_id
+    ? await listRecentCausalDeltasForPlaybook({
+        clientId: proposal.client_id,
+        playbookId: proposal.triggering_playbook_id,
+        limit: 5,
+      })
+    : [];
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -28,6 +40,10 @@ export default async function OptimiserProposalReviewPage({
           Status: <code>{proposal.status}</code>
         </span>
       </div>
+      <PastCausalDeltasPanel
+        deltas={pastDeltas}
+        playbookId={proposal.triggering_playbook_id}
+      />
       <ProposalReview
         proposal={{
           id: proposal.id,
