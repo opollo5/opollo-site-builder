@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { Badge } from "@/components/ui/badge";
 import { H1 } from "@/components/ui/typography";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { ImageArchiveButton } from "@/components/ImageArchiveButton";
@@ -67,20 +68,13 @@ function formatBytes(bytes: number | null): string {
 }
 
 function usageStateBadge(state: string) {
-  const palette: Record<string, string> = {
-    transferred: "bg-emerald-500/10 text-emerald-700",
-    pending_transfer: "bg-muted text-muted-foreground",
-    failed: "bg-destructive/10 text-destructive",
-  };
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
-        palette[state] ?? "bg-muted"
-      }`}
-    >
-      {state.replace(/_/g, " ")}
-    </span>
-  );
+  const tone: "success" | "neutral" | "error" =
+    state === "transferred"
+      ? "success"
+      : state === "failed"
+        ? "error"
+        : "neutral";
+  return <Badge tone={tone}>{state.replace(/_/g, " ")}</Badge>;
 }
 
 function formatJsonValue(value: unknown): string {

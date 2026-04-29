@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H1 } from "@/components/ui/typography";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
@@ -65,16 +66,6 @@ function buildHref(
   const qs = params.toString();
   const root = `/admin/sites/${siteId}/posts`;
   return qs.length > 0 ? `${root}?${qs}` : root;
-}
-
-function statusPill(status: PostStatus): { label: string; cls: string } {
-  if (status === "published") {
-    return { label: "Published", cls: "bg-emerald-500/10 text-emerald-700" };
-  }
-  if (status === "scheduled") {
-    return { label: "Scheduled", cls: "bg-primary/10 text-primary" };
-  }
-  return { label: "Draft", cls: "bg-muted text-muted-foreground" };
 }
 
 export default async function SitePostsList({
@@ -230,7 +221,6 @@ export default async function SitePostsList({
       ) : (
         <ol className="mt-6 space-y-3">
           {items.map((post) => {
-            const pill = statusPill(post.status);
             return (
               <li
                 key={post.id}
@@ -257,11 +247,7 @@ export default async function SitePostsList({
                         : ""}
                     </p>
                   </div>
-                  <span
-                    className={`inline-flex shrink-0 rounded px-2 py-0.5 text-xs font-medium ${pill.cls}`}
-                  >
-                    {pill.label}
-                  </span>
+                  <StatusPill kind={postStatusKind(post.status)} className="shrink-0 capitalize" />
                 </div>
               </li>
             );

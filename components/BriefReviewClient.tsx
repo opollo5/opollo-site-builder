@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  StatusPill as UIStatusPill,
+  briefStatusKind,
+} from "@/components/ui/status-pill";
 import { Textarea } from "@/components/ui/textarea";
 import type { BriefPageRow, BriefRow } from "@/lib/briefs";
 import { DEFAULT_MODEL_ID, MODEL_OPTIONS } from "@/lib/anthropic-models";
@@ -660,20 +664,11 @@ export function BriefReviewClient({
 }
 
 function StatusPill({ status }: { status: BriefRow["status"] }) {
-  const labels: Record<BriefRow["status"], { label: string; cls: string }> = {
-    parsing: { label: "Parsing", cls: "bg-muted text-muted-foreground" },
-    parsed: { label: "Awaiting review", cls: "bg-primary/10 text-primary" },
-    committed: { label: "Committed", cls: "bg-emerald-500/10 text-emerald-700" },
-    failed_parse: { label: "Parse failed", cls: "bg-destructive/10 text-destructive" },
-  };
-  const l = labels[status];
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${l.cls}`}
-    >
-      {l.label}
-    </span>
-  );
+  // Folded to the A-4 primitive — kept as a thin local wrapper because
+  // the component file references `<StatusPill status={...} />` in a
+  // dozen places and the pattern reads more naturally than spelling
+  // out briefStatusKind() at every call site.
+  return <UIStatusPill kind={briefStatusKind(status)} />;
 }
 
 function ModePill({

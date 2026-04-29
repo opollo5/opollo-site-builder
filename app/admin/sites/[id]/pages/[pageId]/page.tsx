@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
+import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H1 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
@@ -50,18 +51,11 @@ function resolveBackHref(
 }
 
 function statusBadge(status: string) {
-  const palette: Record<string, string> = {
-    draft: "bg-muted text-muted-foreground",
-    published: "bg-emerald-500/10 text-emerald-700",
-  };
   return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${
-        palette[status] ?? "bg-muted"
-      }`}
-    >
-      {status}
-    </span>
+    <StatusPill
+      kind={postStatusKind(status as Parameters<typeof postStatusKind>[0])}
+      className="capitalize"
+    />
   );
 }
 

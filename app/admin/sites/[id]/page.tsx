@@ -5,6 +5,13 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
+import {
+  StatusPill,
+  briefStatusKind,
+  dsStatusKind,
+  jobStatusKind,
+  siteStatusKind,
+} from "@/components/ui/status-pill";
 import { H1 } from "@/components/ui/typography";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -31,29 +38,8 @@ type TemplateRow = {
   is_default: boolean;
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const palette: Record<string, string> = {
-    active: "bg-emerald-500/10 text-emerald-700",
-    pending_pairing: "bg-muted text-muted-foreground",
-    paused: "bg-yellow-500/10 text-yellow-700",
-    removed: "bg-destructive/10 text-destructive",
-    queued: "bg-muted text-muted-foreground",
-    running: "bg-primary/10 text-primary",
-    partial: "bg-yellow-500/10 text-yellow-700",
-    succeeded: "bg-emerald-500/10 text-emerald-700",
-    failed: "bg-destructive/10 text-destructive",
-    cancelled: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
-        palette[status] ?? "bg-muted"
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
+// StatusBadge folded to A-4's StatusPill primitive. Per-call-site
+// mappers below pick the right domain (site / job / brief / ds).
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -160,7 +146,7 @@ export default async function SiteDetailPage({
           />
           <H1 className="mt-1">{site.name}</H1>
           <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <StatusBadge status={site.status} />
+            <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
             <a
               href={site.wp_url}
               target="_blank"
@@ -232,7 +218,7 @@ export default async function SiteDetailPage({
                           </Link>
                         </td>
                         <td className="px-3 py-2">
-                          <StatusBadge status={b.status as string} />
+                          <StatusPill kind={jobStatusKind(b.status as Parameters<typeof jobStatusKind>[0])} />
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">
                           {b.succeeded_count as number} ok ·{" "}
@@ -289,7 +275,7 @@ export default async function SiteDetailPage({
                         </Link>
                       </td>
                       <td className="px-3 py-2">
-                        <StatusBadge status={b.status} />
+                        <StatusPill kind={briefStatusKind(b.status as Parameters<typeof briefStatusKind>[0])} />
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {b.parser_mode ?? "—"}
@@ -332,7 +318,7 @@ export default async function SiteDetailPage({
               <>
                 <div className="flex items-center justify-between">
                   <span className="font-medium">Version {String(ds.version)}</span>
-                  <StatusBadge status={ds.status as string} />
+                  <StatusPill kind={dsStatusKind(ds.status as Parameters<typeof dsStatusKind>[0])} />
                 </div>
                 <p className="mt-1 text-muted-foreground">
                   Activated {formatDate(ds.activated_at as string | null)}

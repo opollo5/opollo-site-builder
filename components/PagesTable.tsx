@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import type { PageListItem } from "@/lib/pages";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -11,17 +12,6 @@ import { formatRelativeTime } from "@/lib/utils";
 // column is reserved for M6-3 (edit) and a future "Open in WP admin"
 // shortcut.
 // ---------------------------------------------------------------------------
-
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case "published":
-      return "bg-emerald-500/10 text-emerald-700";
-    case "draft":
-      return "bg-muted text-muted-foreground";
-    default:
-      return "bg-muted";
-  }
-}
 
 type PagesTableProps = {
   items: PageListItem[];
@@ -87,11 +77,8 @@ export function PagesTable({ items, siteId, backHref }: PagesTableProps) {
                 {p.page_type.replace(/_/g, " ")}
               </td>
               <td className="px-4 py-3 align-top">
-                <span
-                  className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(p.status)}`}
-                >
-                  {p.status}
-                </span>
+                {/* page status taxonomy is identical to post (draft / published) */}
+                <StatusPill kind={postStatusKind(p.status as Parameters<typeof postStatusKind>[0])} className="capitalize" />
               </td>
               <td className="px-4 py-3 align-top text-xs text-muted-foreground">
                 v{p.design_system_version}

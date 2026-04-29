@@ -1,3 +1,4 @@
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import type { RegenJobRow } from "@/lib/regeneration-publisher";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -9,21 +10,19 @@ import { formatRelativeTime } from "@/lib/utils";
 // rows via listRegenJobsForPage and passes them in.
 // ---------------------------------------------------------------------------
 
-function statusBadgeClass(status: string): string {
+function statusTone(status: string): NonNullable<BadgeProps["tone"]> {
   switch (status) {
-    case "pending":
-      return "bg-muted text-muted-foreground";
     case "running":
-      return "bg-sky-100 text-sky-900";
+      return "info";
     case "succeeded":
-      return "bg-emerald-500/10 text-emerald-700";
+      return "success";
     case "failed":
     case "failed_gates":
-      return "bg-destructive/10 text-destructive";
+      return "error";
+    case "pending":
     case "cancelled":
-      return "bg-muted text-muted-foreground";
     default:
-      return "bg-muted";
+      return "neutral";
   }
 }
 
@@ -71,11 +70,9 @@ export function RegenHistoryPanel({ jobs }: { jobs: RegenJobRow[] }) {
               data-status={job.status}
             >
               <td className="px-4 py-3 align-top">
-                <span
-                  className={`inline-flex rounded px-2 py-0.5 text-xs font-medium capitalize ${statusBadgeClass(job.status)}`}
-                >
+                <Badge tone={statusTone(job.status)} className="capitalize">
                   {job.status.replace(/_/g, " ")}
-                </span>
+                </Badge>
               </td>
               <td className="px-4 py-3 align-top text-xs text-muted-foreground">
                 {job.attempts}

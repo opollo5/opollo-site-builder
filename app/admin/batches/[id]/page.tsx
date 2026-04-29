@@ -2,6 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BatchDetailClient } from "@/components/BatchDetailClient";
+import {
+  StatusPill,
+  jobStatusKind,
+  slotStateKind,
+} from "@/components/ui/status-pill";
 import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -16,47 +21,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-function StatusBadge({ status }: { status: string }) {
-  const palette: Record<string, string> = {
-    queued: "bg-muted text-muted-foreground",
-    running: "bg-primary/10 text-primary",
-    partial: "bg-yellow-500/10 text-yellow-700",
-    succeeded: "bg-emerald-500/10 text-emerald-700",
-    failed: "bg-destructive/10 text-destructive",
-    cancelled: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
-        palette[status] ?? "bg-muted"
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function SlotStateBadge({ state }: { state: string }) {
-  const palette: Record<string, string> = {
-    pending: "bg-muted text-muted-foreground",
-    leased: "bg-primary/10 text-primary",
-    generating: "bg-primary/10 text-primary",
-    validating: "bg-primary/10 text-primary",
-    publishing: "bg-primary/10 text-primary",
-    succeeded: "bg-emerald-500/10 text-emerald-700",
-    failed: "bg-destructive/10 text-destructive",
-    skipped: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-sm font-medium ${
-        palette[state] ?? "bg-muted"
-      }`}
-    >
-      {state}
-    </span>
-  );
-}
+// StatusBadge + SlotStateBadge folded to A-4's StatusPill primitive.
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -172,7 +137,7 @@ export default async function BatchDetailPage({
             {site.name} · {tmpl.name}
           </H1>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-            <StatusBadge status={job.status as string} />
+            <StatusPill kind={jobStatusKind(job.status as Parameters<typeof jobStatusKind>[0])} />
             <span>
               {job.succeeded_count} ok · {job.failed_count} fail ·{" "}
               {job.requested_count} total
@@ -222,7 +187,7 @@ export default async function BatchDetailPage({
                       </td>
                       <td className="px-3 py-2 font-mono">{slug}</td>
                       <td className="px-3 py-2">
-                        <SlotStateBadge state={s.state as string} />
+                        <StatusPill kind={slotStateKind(s.state as Parameters<typeof slotStateKind>[0])} />
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {s.attempts as number}

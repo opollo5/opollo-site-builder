@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 
 import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
+import {
+  StatusPill,
+  jobStatusKind,
+} from "@/components/ui/status-pill";
 import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -31,25 +35,7 @@ type BatchRow = {
   total_cost_usd_cents: number;
 };
 
-function StatusBadge({ status }: { status: string }) {
-  const palette: Record<string, string> = {
-    queued: "bg-muted text-muted-foreground",
-    running: "bg-primary/10 text-primary",
-    partial: "bg-yellow-500/10 text-yellow-700",
-    succeeded: "bg-emerald-500/10 text-emerald-700",
-    failed: "bg-destructive/10 text-destructive",
-    cancelled: "bg-muted text-muted-foreground",
-  };
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
-        palette[status] ?? "bg-muted"
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
+// StatusBadge folded to A-4's StatusPill primitive. See call site below.
 
 function formatDate(iso: string): string {
   try {
@@ -252,7 +238,7 @@ export default async function AdminBatchesPage({
                       </div>
                     </td>
                     <td className="px-3 py-2">
-                      <StatusBadge status={r.status} />
+                      <StatusPill kind={jobStatusKind(r.status as Parameters<typeof jobStatusKind>[0])} />
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {r.succeeded_count} ok · {r.failed_count} fail ·{" "}
