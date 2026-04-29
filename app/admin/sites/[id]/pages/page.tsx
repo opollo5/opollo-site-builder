@@ -3,7 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PagesTable } from "@/components/PagesTable";
-import { H1 } from "@/components/ui/typography";
+import { Alert } from "@/components/ui/alert";
+import { H1, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_PAGES_DEFAULT_LIMIT,
@@ -95,12 +96,9 @@ export default async function SitePagesList({
   if (!siteRes.ok) {
     if (siteRes.error.code === "NOT_FOUND") notFound();
     return (
-      <div
-        role="alert"
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-      >
-        Failed to load site: {siteRes.error.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load site">
+        {siteRes.error.message}
+      </Alert>
     );
   }
   const site = siteRes.data.site;
@@ -119,12 +117,9 @@ export default async function SitePagesList({
 
   if (!result.ok) {
     return (
-      <div
-        role="alert"
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-      >
-        Failed to load pages: {result.error.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load pages">
+        {result.error.message}
+      </Alert>
     );
   }
 
@@ -146,15 +141,16 @@ export default async function SitePagesList({
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div>
-          <H1>Pages for {site.name}</H1>
-          <p className="text-sm text-muted-foreground">
-            Every page generated for this site. Click a row for the detail
-            view. Editing content itself still happens in WordPress admin.
-          </p>
+          <H1>Pages</H1>
+          <Lead className="mt-0.5">
+            {total === 0
+              ? `No pages generated for ${site.name} yet.`
+              : `${total} ${total === 1 ? "page" : "pages"} generated for ${site.name}.`}
+          </Lead>
         </div>
         <Link
           href={`/admin/sites/${params.id}`}
-          className="text-xs text-muted-foreground hover:text-foreground"
+          className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           ← Site detail
         </Link>
