@@ -1,6 +1,9 @@
 "use client";
 
+import { Badge, type BadgeProps } from "@/components/ui/badge";
 import type { AppearanceEventRow } from "@/lib/appearance-events";
+
+type Tone = NonNullable<BadgeProps["tone"]>;
 
 // ---------------------------------------------------------------------------
 // M13-5d — audit-event log section for the Appearance panel.
@@ -12,11 +15,11 @@ import type { AppearanceEventRow } from "@/lib/appearance-events";
 
 const EVENT_PRESENTATION: Record<
   string,
-  { label: string; cls: string; summary: (details: Record<string, unknown>) => string }
+  { label: string; tone: Tone; summary: (details: Record<string, unknown>) => string }
 > = {
   preflight_run: {
     label: "Preflight",
-    cls: "bg-muted text-muted-foreground",
+    tone: "neutral" as Tone,
     summary: (details) => {
       const outcome = (details.outcome as string | undefined) ?? "ran";
       if (outcome === "blocked") {
@@ -35,7 +38,7 @@ const EVENT_PRESENTATION: Record<
   },
   globals_dry_run: {
     label: "Dry-run",
-    cls: "bg-primary/10 text-primary",
+    tone: "primary" as Tone,
     summary: (details) => {
       const note = details.note as string | undefined;
       if (note) return note;
@@ -45,7 +48,7 @@ const EVENT_PRESENTATION: Record<
   },
   globals_confirmed: {
     label: "Sync intent",
-    cls: "bg-primary/10 text-primary",
+    tone: "primary" as Tone,
     summary: (details) => {
       const slots = (details.changed_slots as string[] | undefined) ?? [];
       return slots.length > 0
@@ -55,7 +58,7 @@ const EVENT_PRESENTATION: Record<
   },
   globals_completed: {
     label: "Synced",
-    cls: "bg-emerald-500/10 text-emerald-700",
+    tone: "success" as Tone,
     summary: (details) => {
       const roundTrip = (details.round_trip_ok as boolean | undefined) ?? true;
       return roundTrip
@@ -65,7 +68,7 @@ const EVENT_PRESENTATION: Record<
   },
   globals_failed: {
     label: "Sync failed",
-    cls: "bg-destructive/10 text-destructive",
+    tone: "error" as Tone,
     summary: (details) => {
       const stage = (details.stage as string | undefined) ?? "unknown";
       const wp = details.wp_code as string | undefined;
@@ -74,7 +77,7 @@ const EVENT_PRESENTATION: Record<
   },
   rollback_requested: {
     label: "Rollback intent",
-    cls: "bg-primary/10 text-primary",
+    tone: "primary" as Tone,
     summary: (details) => {
       const outcome = (details.outcome as string | undefined) ?? "will_write";
       return outcome === "already_rolled_back"
@@ -84,21 +87,21 @@ const EVENT_PRESENTATION: Record<
   },
   rollback_completed: {
     label: "Rolled back",
-    cls: "bg-emerald-500/10 text-emerald-700",
+    tone: "success" as Tone,
     summary: () => "Palette restored to prior snapshot",
   },
   rollback_failed: {
     label: "Rollback failed",
-    cls: "bg-destructive/10 text-destructive",
+    tone: "error" as Tone,
     summary: (details) => {
       const reason = (details.reason as string | undefined) ?? "unknown";
       return `Failed: ${reason}`;
     },
   },
-  install_dry_run: { label: "Install dry-run", cls: "bg-muted text-muted-foreground", summary: () => "—" },
-  install_confirmed: { label: "Install confirmed", cls: "bg-muted text-muted-foreground", summary: () => "—" },
-  install_completed: { label: "Install completed", cls: "bg-muted text-muted-foreground", summary: () => "—" },
-  install_failed: { label: "Install failed", cls: "bg-destructive/10 text-destructive", summary: () => "—" },
+  install_dry_run: { label: "Install dry-run", tone: "neutral" as Tone, summary: () => "—" },
+  install_confirmed: { label: "Install confirmed", tone: "neutral" as Tone, summary: () => "—" },
+  install_completed: { label: "Install completed", tone: "neutral" as Tone, summary: () => "—" },
+  install_failed: { label: "Install failed", tone: "error" as Tone, summary: () => "—" },
 };
 
 function formatTimestamp(iso: string): string {
@@ -136,7 +139,7 @@ export function AppearanceEventLog({
 function EventRow({ event }: { event: AppearanceEventRow }) {
   const present = EVENT_PRESENTATION[event.event] ?? {
     label: event.event,
-    cls: "bg-muted text-muted-foreground",
+    tone: "neutral" as Tone,
     summary: () => "(unknown event)",
   };
   const summary = present.summary(
@@ -146,11 +149,7 @@ function EventRow({ event }: { event: AppearanceEventRow }) {
     <li className="rounded border p-3">
       <details className="group">
         <summary className="flex cursor-pointer flex-wrap items-center gap-2 text-sm">
-          <span
-            className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${present.cls}`}
-          >
-            {present.label}
-          </span>
+          <Badge tone={present.tone}>{present.label}</Badge>
           <span className="flex-1 text-foreground">{summary}</span>
           <time
             className="text-xs text-muted-foreground"

@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { StatusPill, imageSourceKind } from "@/components/ui/status-pill";
 import { deliveryUrl } from "@/lib/cloudflare-images";
 import type { ImageListItem } from "@/lib/image-library";
 import { formatRelativeTime } from "@/lib/utils";
@@ -24,19 +25,6 @@ function formatDimensions(
 ): string {
   if (!width || !height) return "—";
   return `${width}×${height}`;
-}
-
-function sourceBadgeClass(source: string): string {
-  switch (source) {
-    case "istock":
-      return "bg-sky-100 text-sky-900";
-    case "upload":
-      return "bg-amber-100 text-amber-900";
-    case "generated":
-      return "bg-purple-100 text-purple-900";
-    default:
-      return "bg-muted text-muted-foreground";
-  }
 }
 
 function Thumbnail({ item }: { item: ImageListItem }) {
@@ -156,11 +144,7 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
                 </div>
               </td>
               <td className="px-4 py-3 align-top">
-                <span
-                  className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${sourceBadgeClass(item.source)}`}
-                >
-                  {item.source}
-                </span>
+                <StatusPill kind={imageSourceKind(item.source)} />
               </td>
               <td className="px-4 py-3 align-top text-xs text-muted-foreground">
                 {formatDimensions(item.width_px, item.height_px)}

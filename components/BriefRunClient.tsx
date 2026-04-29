@@ -3,6 +3,11 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  StatusPill,
+  pageStatusKind,
+  runStatusKind,
+} from "@/components/ui/status-pill";
 import { Textarea } from "@/components/ui/textarea";
 import { RunCostTicker } from "@/components/RunCostTicker";
 import type {
@@ -58,58 +63,23 @@ function centsToUsd(cents: number): string {
 
 type ControlState = "idle" | "starting" | "confirming" | "cancelling" | "acting";
 
-const STATUS_LABELS: Record<
-  BriefPageStatus,
-  { label: string; cls: string }
-> = {
-  pending: { label: "Pending", cls: "bg-muted text-muted-foreground" },
-  generating: {
-    label: "Generating",
-    cls: "bg-primary/10 text-primary animate-pulse",
-  },
-  awaiting_review: {
-    label: "Awaiting review",
-    cls: "bg-yellow-500/10 text-yellow-900 dark:text-yellow-200",
-  },
-  approved: { label: "Approved", cls: "bg-emerald-500/10 text-emerald-700" },
-  failed: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
-  skipped: { label: "Skipped", cls: "bg-muted text-muted-foreground" },
+// STATUS_LABELS / QUALITY_FLAG_COPY / RUN_STATUS_LABELS folded to A-4's
+// StatusPill primitive. Hint text for quality flags is now passed via
+// the title attribute below at the call site.
+
+const QUALITY_FLAG_HINT: Record<BriefPageQualityFlag, string> = {
+  cost_ceiling:
+    "The visual review halted before converging because this page hit its per-page cost ceiling. The current draft is the best version the runner produced within budget.",
+  capped_with_issues:
+    "The 2-iteration visual review cap was reached while the critique still flagged severity-high issues. Review the critique notes below before approving.",
 };
 
-const QUALITY_FLAG_COPY: Record<
+const QUALITY_FLAG_KIND: Record<
   BriefPageQualityFlag,
-  { label: string; hint: string; cls: string }
+  "quality_cost_ceiling" | "quality_capped_with_issues"
 > = {
-  cost_ceiling: {
-    label: "Cost ceiling hit",
-    hint:
-      "The visual review halted before converging because this page hit its per-page cost ceiling. The current draft is the best version the runner produced within budget.",
-    cls: "bg-orange-500/10 text-orange-900 dark:text-orange-200",
-  },
-  capped_with_issues: {
-    label: "Capped with issues",
-    hint:
-      "The 2-iteration visual review cap was reached while the critique still flagged severity-high issues. Review the critique notes below before approving.",
-    cls: "bg-orange-500/10 text-orange-900 dark:text-orange-200",
-  },
-};
-
-const RUN_STATUS_LABELS: Record<
-  BriefRunSnapshot["status"],
-  { label: string; cls: string }
-> = {
-  queued: { label: "Queued", cls: "bg-primary/10 text-primary" },
-  running: {
-    label: "Running",
-    cls: "bg-primary/10 text-primary animate-pulse",
-  },
-  paused: {
-    label: "Awaiting your review",
-    cls: "bg-yellow-500/10 text-yellow-900 dark:text-yellow-200",
-  },
-  succeeded: { label: "Complete", cls: "bg-emerald-500/10 text-emerald-700" },
-  failed: { label: "Failed", cls: "bg-destructive/10 text-destructive" },
-  cancelled: { label: "Cancelled", cls: "bg-muted text-muted-foreground" },
+  cost_ceiling: "quality_cost_ceiling",
+  capped_with_issues: "quality_capped_with_issues",
 };
 
 const ERROR_TRANSLATIONS: Record<string, string> = {
@@ -371,14 +341,26 @@ export function BriefRunClient({
                     is blocking. Falls back to the static pill when no
                     page is awaiting (defensive). */}
                 {activeRun.status === "paused" && firstAwaitingReview ? (
-                  <button
-                    type="button"
+                  <StatusPill
+                    kind="run_paused"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => scrollToPageCard(firstAwaitingReview.id)}
-                    className="inline-flex h-7 items-center rounded px-2 text-xs font-medium bg-yellow-500/10 text-yellow-900 hover:bg-yellow-500/20 focus:outline-none focus:ring-2 focus:ring-ring transition-smooth dark:text-yellow-200"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        scrollToPageCard(firstAwaitingReview.id);
+                      }
+                    }}
+                    className="cursor-pointer hover:bg-warning/20 focus:outline-none focus:ring-2 focus:ring-ring"
                     aria-label={`Page ${firstAwaitingReview.ordinal + 1} (${firstAwaitingReview.title}) awaiting your review — jump to card`}
-                  >
-                    Page {firstAwaitingReview.ordinal + 1} awaiting your review →
-                  </button>
+                    label={
+                      <>
+                        Page {firstAwaitingReview.ordinal + 1} awaiting your
+                        review →
+                      </>
+                    }
+                  />
                 ) : (
                   <RunStatusPill status={activeRun.status} />
                 )}
@@ -569,36 +551,24 @@ function RunStatusPill({
 }: {
   status: BriefRunSnapshot["status"];
 }) {
-  const l = RUN_STATUS_LABELS[status];
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${l.cls}`}
-    >
-      {l.label}
-    </span>
-  );
+  return <StatusPill kind={runStatusKind(status)} />;
 }
 
 function PageStatusPill({ status }: { status: BriefPageStatus }) {
-  const l = STATUS_LABELS[status];
-  return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${l.cls}`}
-    >
-      {l.label}
-    </span>
-  );
+  return <StatusPill kind={pageStatusKind(status)} />;
 }
 
 function QualityFlagBadge({ flag }: { flag: BriefPageQualityFlag }) {
-  const c = QUALITY_FLAG_COPY[flag];
   return (
-    <span
-      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${c.cls}`}
-      title={c.hint}
-    >
-      ⚠ {c.label}
-    </span>
+    <StatusPill
+      kind={QUALITY_FLAG_KIND[flag]}
+      title={QUALITY_FLAG_HINT[flag]}
+      label={
+        <>
+          <span aria-hidden>⚠</span> {flag === "cost_ceiling" ? "Cost ceiling hit" : "Capped with issues"}
+        </>
+      }
+    />
   );
 }
 

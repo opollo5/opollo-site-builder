@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import type { PostDetail } from "@/lib/posts";
 import type { PreflightResult } from "@/lib/site-preflight";
 
@@ -30,15 +31,6 @@ import type { PreflightResult } from "@/lib/site-preflight";
 // ---------------------------------------------------------------------------
 
 type ActionState = "idle" | "publishing" | "unpublishing";
-
-const STATUS_LABELS: Record<
-  PostDetail["status"],
-  { label: string; cls: string }
-> = {
-  draft: { label: "Draft", cls: "bg-muted text-muted-foreground" },
-  published: { label: "Published", cls: "bg-emerald-500/10 text-emerald-700" },
-  scheduled: { label: "Scheduled", cls: "bg-primary/10 text-primary" },
-};
 
 export function PostDetailClient({
   siteId,
@@ -143,8 +135,6 @@ export function PostDetailClient({
     }
   }
 
-  const statusPill = STATUS_LABELS[post.status];
-
   return (
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -153,11 +143,7 @@ export function PostDetailClient({
           <p className="mt-1 text-sm text-muted-foreground">
             <code className="text-xs">/{post.slug}</code>
             {" · "}
-            <span
-              className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${statusPill.cls}`}
-            >
-              {statusPill.label}
-            </span>
+            <StatusPill kind={postStatusKind(post.status)} className="capitalize" />
             {post.wp_post_id && (
               <>
                 {" · "}
