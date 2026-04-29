@@ -10,7 +10,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 // ---------------------------------------------------------------------------
 // B-2 — Sites list polish.
 //
-// Density: row height tightened to ~44px (px-3 py-2.5). Status cell
+// Density: row height tightened to ~44px (px-3 py-2). Status cell
 // keeps the dot + text pattern (distinct from StatusPill — chosen for
 // the list-density, single-state context).
 // Empty state folded to A-6's EmptyState primitive.
@@ -104,7 +104,7 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
               key={s.id}
               className="group border-b transition-smooth last:border-b-0 hover:bg-muted/40"
             >
-              <td className="px-3 py-2.5 font-medium">
+              <td className="px-3 py-2 font-medium">
                 <Link
                   href={`/admin/sites/${s.id}`}
                   className="block transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
@@ -113,7 +113,7 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
                   {s.name}
                 </Link>
               </td>
-              <td className="px-3 py-2.5 text-muted-foreground">
+              <td className="px-3 py-2 text-muted-foreground">
                 <a
                   href={s.wp_url}
                   target="_blank"
@@ -124,16 +124,16 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
                   {s.wp_url}
                 </a>
               </td>
-              <td className="px-3 py-2.5">
+              <td className="px-3 py-2">
                 <StatusCell status={s.status} />
               </td>
-              <td className="px-3 py-2.5 text-xs text-muted-foreground">
+              <td className="px-3 py-2 text-xs text-muted-foreground">
                 <span data-screenshot-mask>
                   {formatRelativeTime(s.updated_at)}
                 </span>
               </td>
               <td
-                className="px-2 py-2.5 text-right"
+                className="px-2 py-2 text-right"
                 onClick={(e) => e.stopPropagation()}
               >
                 <SiteActionsMenu

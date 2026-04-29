@@ -53,12 +53,16 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6">
-      <div className="text-center">
-        <H1>Opollo Site Builder</H1>
-        <Lead className="mt-1">Sign in to continue.</Lead>
+    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center">
+          <H1>Opollo Site Builder</H1>
+          <Lead className="mt-1">Sign in to continue.</Lead>
+        </div>
+        <div className="rounded-lg border bg-background p-6 shadow-sm">
+          <LoginForm next={next} />
+        </div>
       </div>
-      <LoginForm next={next} />
     </main>
   );
 }
