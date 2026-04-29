@@ -3,11 +3,14 @@ import { redirect } from "next/navigation";
 
 import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
+import { Alert } from "@/components/ui/alert";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   StatusPill,
   jobStatusKind,
 } from "@/components/ui/status-pill";
-import { H1 } from "@/components/ui/typography";
+import { H1, Lead } from "@/components/ui/typography";
+import { Workflow } from "lucide-react";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -95,12 +98,9 @@ export default async function AdminBatchesPage({
 
   if (error) {
     return (
-      <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        role="alert"
-      >
-        Failed to load batches: {error.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load batches">
+        {error.message}
+      </Alert>
     );
   }
 
@@ -181,18 +181,18 @@ export default async function AdminBatchesPage({
 
   return (
     <>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <H1>Batches</H1>
-          <p className="text-sm text-muted-foreground">
+          <Lead className="mt-0.5">
             {siteForButton
-              ? `Batches for ${siteForButton.name}.`
-              : "Every batch-generation run. Click a row for slot-level detail and cancellation."}
-          </p>
+              ? `${rows.length} ${rows.length === 1 ? "batch" : "batches"} for ${siteForButton.name}.`
+              : `${rows.length} ${rows.length === 1 ? "batch" : "batches"} across every site. Click a row for slot-level detail.`}
+          </Lead>
           {siteForButton && (
             <Link
               href="/admin/batches"
-              className="mt-1 inline-block text-xs text-muted-foreground hover:text-foreground"
+              className="mt-1 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               ← All batches
             </Link>
@@ -205,11 +205,19 @@ export default async function AdminBatchesPage({
         />
       </div>
 
-      <div className="mt-6">
+      <div className="mt-4">
         {rows.length === 0 ? (
-          <div className="rounded-md border p-8 text-center">
-            <p className="text-sm text-muted-foreground">No batches yet.</p>
-          </div>
+          <EmptyState
+            icon={Workflow}
+            iconLabel="No batches"
+            title="No batches yet"
+            body={
+              <>
+                Run a batch to generate multiple pages from a template
+                against the active design system.
+              </>
+            }
+          />
         ) : (
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
