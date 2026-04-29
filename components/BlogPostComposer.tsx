@@ -789,7 +789,10 @@ function ReadingChip({ text }: { text: string }) {
   return (
     <span
       data-testid="post-reading-chip"
-      className="text-xs text-muted-foreground"
+      // BL-9 — fade-in the first time the chip surfaces. Re-runs on
+      // remount only (text changes don't re-trigger because React
+      // doesn't add the class on re-render of an already-mounted node).
+      className="opollo-fade-in text-xs text-muted-foreground"
     >
       {words.toLocaleString()} {words === 1 ? "word" : "words"} ·{" "}
       {minutes} min read
@@ -929,7 +932,7 @@ function AdvancedDisclosure({
       {open && (
         <div
           data-testid="post-advanced-panel"
-          className="border-t p-4"
+          className="opollo-slide-up border-t p-4"
         >
           {children}
         </div>
