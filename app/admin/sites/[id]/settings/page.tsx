@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SiteVoiceSettingsForm } from "@/components/SiteVoiceSettingsForm";
-import { H1 } from "@/components/ui/typography";
+import { Alert } from "@/components/ui/alert";
+import { H1, H2, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -32,20 +33,15 @@ export default async function SiteSettingsPage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <main className="mx-auto max-w-3xl p-6">
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        >
-          {result.error.message}
-        </div>
-      </main>
+      <div className="mx-auto max-w-3xl">
+        <Alert variant="destructive">{result.error.message}</Alert>
+      </div>
     );
   }
   const site = result.data.site;
 
   return (
-    <main className="mx-auto max-w-3xl p-6">
+    <div className="mx-auto max-w-3xl">
       <Breadcrumbs
         crumbs={[
           { label: "Admin", href: "/admin/sites" },
@@ -55,18 +51,16 @@ export default async function SiteSettingsPage({
         ]}
       />
       <H1 className="mt-2">{site.name} — Settings</H1>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <Lead className="mt-1">
         These values pre-populate every new brief. Each brief can still
         override at commit time without changing the site default.
-      </p>
+      </Lead>
 
       <section
         aria-labelledby="voice-heading"
         className="mt-6 rounded-lg border p-4"
       >
-        <h2 id="voice-heading" className="text-base font-semibold">
-          Brand voice &amp; design direction
-        </h2>
+        <H2 id="voice-heading">Brand voice &amp; design direction</H2>
         <p className="mt-1 text-xs text-muted-foreground">
           Set once for the site; the brief commit form inherits these as
           defaults.
@@ -80,6 +74,6 @@ export default async function SiteSettingsPage({
           />
         </div>
       </section>
-    </main>
+    </div>
   );
 }

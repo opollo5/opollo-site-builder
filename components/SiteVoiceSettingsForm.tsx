@@ -2,17 +2,16 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 // ---------------------------------------------------------------------------
 // RS-2 — site-level brand voice & design direction editor.
-//
-// Reads/writes /api/admin/sites/[id]/voice with optimistic version_lock.
-// Operator sets the values once; brief commit forms inherit them as
-// defaults. Per-brief override still wins at commit time — those values
-// live on the briefs row, not here.
+// B-4 polish: Alert primitive for inline errors, sonner toast for save
+// confirmation, label folded to <Label>-tier semantics.
 // ---------------------------------------------------------------------------
 
 const ERROR_TRANSLATIONS: Record<string, string> = {
@@ -45,13 +44,11 @@ export function SiteVoiceSettingsForm({
   );
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [savedAt, setSavedAt] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setSubmitting(true);
     setFormError(null);
-    setSavedAt(null);
     try {
       const res = await fetch(`/api/admin/sites/${siteId}/voice`, {
         method: "PATCH",
@@ -59,9 +56,6 @@ export function SiteVoiceSettingsForm({
         body: JSON.stringify({
           expected_version_lock: initialVersionLock,
           patch: {
-            // Empty string = clear the value (null) so "operator opened
-            // the field, typed, then cleared" is treated the same as
-            // "explicitly empty".
             brand_voice: brandVoice.trim() === "" ? null : brandVoice,
             design_direction:
               designDirection.trim() === "" ? null : designDirection,
@@ -72,7 +66,10 @@ export function SiteVoiceSettingsForm({
         | { ok: true; data: { brand_voice: string | null } }
         | { ok: false; error: { code: string; message: string } };
       if (payload.ok) {
-        setSavedAt(new Date().toLocaleTimeString());
+        toast.success("Voice settings saved", {
+          description:
+            "New briefs on this site will inherit the updated defaults.",
+        });
         router.refresh();
         return;
       }
@@ -89,14 +86,17 @@ export function SiteVoiceSettingsForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label htmlFor="site-brand-voice" className="block text-sm font-medium">
+        <label
+          htmlFor="site-brand-voice"
+          className="block text-sm font-medium"
+        >
           Brand voice
         </label>
         <Textarea
           id="site-brand-voice"
-          className="mt-1"
+          className="mt-1.5"
           rows={5}
           value={brandVoice}
           onChange={(e) => setBrandVoice(e.target.value)}
@@ -104,9 +104,13 @@ export function SiteVoiceSettingsForm({
           maxLength={FIELD_MAX_BYTES}
           placeholder="e.g. Warm, confident, plain language. Avoid jargon. Second-person (you / your) by default."
         />
-        <p className="mt-1 text-xs text-muted-foreground">
-          How every page on this site should sound. New briefs inherit this as
-          a default. {FIELD_MAX_BYTES.toLocaleString()} characters max.
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          How every page on this site should sound. New briefs inherit
+          this as a default.{" "}
+          <span className="font-mono">
+            {brandVoice.length.toLocaleString()}/
+            {FIELD_MAX_BYTES.toLocaleString()}
+          </span>
         </p>
       </div>
 
@@ -119,7 +123,7 @@ export function SiteVoiceSettingsForm({
         </label>
         <Textarea
           id="site-design-direction"
-          className="mt-1"
+          className="mt-1.5"
           rows={5}
           value={designDirection}
           onChange={(e) => setDesignDirection(e.target.value)}
@@ -127,30 +131,16 @@ export function SiteVoiceSettingsForm({
           maxLength={FIELD_MAX_BYTES}
           placeholder="e.g. Generous white space. Hero with photo background. Single CTA per section, accent color for emphasis."
         />
-        <p className="mt-1 text-xs text-muted-foreground">
-          Visual constraints for the anchor cycle on every brief. New briefs
-          inherit this as a default. {FIELD_MAX_BYTES.toLocaleString()}{" "}
-          characters max.
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Visual constraints for the anchor cycle on every brief.{" "}
+          <span className="font-mono">
+            {designDirection.length.toLocaleString()}/
+            {FIELD_MAX_BYTES.toLocaleString()}
+          </span>
         </p>
       </div>
 
-      {formError && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-        >
-          {formError}
-        </div>
-      )}
-
-      {savedAt && !formError && (
-        <div
-          role="status"
-          className="rounded-md border border-emerald-500/40 bg-emerald-500/5 p-3 text-sm text-emerald-700"
-        >
-          Saved at {savedAt}. Reload to see version_lock advance.
-        </div>
-      )}
+      {formError && <Alert variant="destructive">{formError}</Alert>}
 
       <div className="flex items-center justify-end">
         <Button type="submit" disabled={submitting}>
