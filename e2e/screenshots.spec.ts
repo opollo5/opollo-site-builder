@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { signInAsAdmin } from "./helpers";
+import { auditA11y, signInAsAdmin } from "./helpers";
 import { E2E_TEST_SITE_PREFIX } from "./fixtures";
 import { createClient } from "@supabase/supabase-js";
 
@@ -175,6 +175,16 @@ test.describe("A-0 visual regression screenshot harness", () => {
             mask: masks,
             animations: "disabled",
           });
+          // C-3 — run axe-core on every captured route. Findings
+          // attach to the test result; non-blocking by design (the
+          // harness still produces screenshots even if axe surfaces
+          // violations) but visible in the CI run output for triage.
+          // Desktop-viewport pass only — running on both viewports
+          // doubles audit time and rarely finds viewport-specific
+          // a11y issues.
+          if (viewport.name === "desktop") {
+            await auditA11y(page, testInfo);
+          }
           // eslint-disable-next-line no-console
           console.log(
             `  [${viewport.name}] ${route.slug} → ${path.relative(process.cwd(), filePath)}`,
