@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
@@ -8,6 +9,13 @@ import { checkAdminAccess } from "@/lib/admin-gate";
 // Same auth posture as /admin: admin + operator may write, viewer may
 // read. Reuses checkAdminAccess so the role gate stays defined in one
 // place.
+
+const NAV = [
+  { href: "/optimiser", label: "Pages" },
+  { href: "/optimiser/proposals", label: "Proposals" },
+  { href: "/optimiser/change-log", label: "Change log" },
+  { href: "/optimiser/onboarding", label: "Onboarding" },
+];
 
 export default async function OptimiserLayout({
   children,
@@ -25,6 +33,34 @@ export default async function OptimiserLayout({
       >
         Skip to main content
       </a>
+      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+        <nav className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3 text-sm">
+          <span className="font-semibold tracking-tight">
+            Opollo · Optimiser
+          </span>
+          <span className="text-muted-foreground">·</span>
+          <ul className="flex items-center gap-2">
+            {NAV.map((item) => (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className="rounded-md px-2 py-1 hover:bg-muted"
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <span className="ml-auto">
+            <Link
+              href="/admin"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              ↗ Admin
+            </Link>
+          </span>
+        </nav>
+      </header>
       <main
         id="optimiser-main"
         tabIndex={-1}

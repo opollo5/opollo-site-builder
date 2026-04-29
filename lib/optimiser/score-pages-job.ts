@@ -4,6 +4,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
 import { scoreAlignment } from "./alignment-scoring";
+import { suppressedPlaybooksFor } from "./client-memory";
 import { computeReliability } from "./data-reliability";
 import { evaluateAndPersistPage } from "./healthy-state";
 import { rollupForPage } from "./metrics-aggregation";
@@ -57,6 +58,7 @@ export async function runScorePagesForAllClients(): Promise<{
   }
 
   const byClient = new Map<string, ScorePagesOutcome>();
+  const suppressedByClient = new Map<string, Set<string>>();
   let total_pages = 0;
 
   for (const page of pages ?? []) {
@@ -68,6 +70,10 @@ export async function runScorePagesForAllClients(): Promise<{
         proposals_generated: 0,
         errors: 0,
       });
+      suppressedByClient.set(
+        clientId,
+        await suppressedPlaybooksFor(clientId),
+      );
     }
     const outcome = byClient.get(clientId)!;
     try {
@@ -79,6 +85,7 @@ export async function runScorePagesForAllClients(): Promise<{
           | "read_only"
           | "full_automation",
         playbooks,
+        suppressed: suppressedByClient.get(clientId) ?? new Set(),
       });
       outcome.pages_scored += 1;
       outcome.proposals_generated += generated;
@@ -102,6 +109,7 @@ async function scoreAndProposeForPage(args: {
   url: string;
   managementMode: "read_only" | "full_automation";
   playbooks: Awaited<ReturnType<typeof listPhase1ContentPlaybooks>>;
+  suppressed: Set<string>;
 }): Promise<number> {
   const supabase = getServiceRoleClient();
 
@@ -229,6 +237,7 @@ async function scoreAndProposeForPage(args: {
         alignmentSubscores,
         triggerEvidence: evaluation.reasons,
         triggerMagnitude: evaluation.magnitude,
+        suppressed: args.suppressed,
       });
       if (r.inserted) proposalsGenerated += 1;
     } catch (err) {
