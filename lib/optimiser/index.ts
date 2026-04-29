@@ -1,7 +1,5 @@
 // Re-export hub for the optimiser module. Slices add re-exports here as
-// they ship their public surface. Keep imports in app/optimiser and
-// app/api/optimiser routed through "@/lib/optimiser" rather than deep
-// paths so the module's internal layout can change without churn.
+// they ship their public surface.
 
 export * from "./types";
 export { checkOptimiserSchema } from "./health";
@@ -35,3 +33,38 @@ export {
   exchangeCodeForRefreshToken,
 } from "./oauth";
 export type { OAuthSource, OAuthState } from "./oauth";
+
+// Slice 3 surface
+export {
+  listClients,
+  getClient,
+  createClient as createOptClient,
+  updateClient as updateOptClient,
+  markOnboarded,
+} from "./clients";
+export type { OptClient, CreateClientInput, UpdateClientInput } from "./clients";
+
+export {
+  getConnectorStatus,
+  bannerForConnector,
+} from "./connector-status";
+export type {
+  ConnectorStatus,
+  ConnectorBanner,
+  ConnectorBannerKind,
+} from "./connector-status";
+
+export { verifyAds, verifyClarity, verifyGa4 } from "./verify-connector";
+export type { VerifyResult } from "./verify-connector";
+
+export {
+  listLandingPagesForClient,
+  getLandingPage,
+  defaultCheckedForBulk,
+  setManagedFlag,
+  addPageManually,
+} from "./landing-pages";
+export type { LandingPage } from "./landing-pages";
+
+export { planPageImport } from "./page-import";
+export type { ImportPlan } from "./page-import";
