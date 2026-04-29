@@ -2,18 +2,17 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
-import { AdminNav } from "@/components/AdminNav";
+import { AdminSidebar } from "@/components/AdminSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Toaster } from "@/components/ui/toaster";
 
 // Shared shell for every page under /admin.
 //
-// M2c-2 added the auth gate: when FEATURE_SUPABASE_AUTH is on (and the
-// kill switch is off), only admin/operator roles reach here; viewers
-// get bounced to the chat builder, no-session callers to /login. The
-// gate is defence-in-depth — middleware is the primary redirect path —
-// but the layout is also where we need the user to render the header
-// strip, so we call the same helper in one place.
+// R1-1 — Switched from a top horizontal AdminNav to a left sidebar
+// (AdminSidebar). Sidebar is pinned 240px on desktop, collapsible to
+// 64px icon-only, and off-canvas on mobile. Page background is the
+// canvas tint (--canvas) so the white card surfaces register against
+// the rail.
 
 export default async function AdminLayout({
   children,
@@ -32,34 +31,26 @@ export default async function AdminLayout({
   const showUsersLink = !user || user.role === "admin";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      {/* C-3 — skip-to-content link. Visually hidden until focused
-          (Tab from the address bar lands here first), then snaps to
-          the top-left so keyboard / screen-reader users can jump
-          past the AdminNav into the page content. */}
+    <div className="min-h-screen bg-canvas text-foreground sm:flex">
+      {/* C-3 — skip-to-content link. Visually hidden until focused. */}
       <a
         href="#admin-main"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
       >
         Skip to main content
       </a>
-      <AdminNav user={user} showUsersLink={showUsersLink} />
+      <AdminSidebar user={user} showUsersLink={showUsersLink} />
       <main
         id="admin-main"
-        // tabIndex=-1 + scroll-mt-16 so the skip-link target is
-        // focusable + lands below the sticky 56px nav header.
         tabIndex={-1}
-        className="mx-auto max-w-5xl p-6 scroll-mt-16 focus:outline-none"
+        // R1-3 — content gutters: px-8 desktop / px-4 mobile per the
+        // Linear pattern. py-8 desktop matches. min-w-0 prevents flex
+        // children from forcing horizontal overflow.
+        className="min-w-0 flex-1 px-4 py-6 scroll-mt-16 focus:outline-none sm:px-8 sm:py-8"
       >
-        {children}
+        <div className="mx-auto max-w-6xl">{children}</div>
       </main>
-      {/* A-6 — admin-wide toaster mount. Consumers call
-          `toast.success("…")` / `toast.error("…")` from anywhere in
-          the admin tree. */}
       <Toaster />
-      {/* C-1 — global ⌘K command palette. Listens for the keyboard
-          shortcut anywhere in the admin tree; static admin nav +
-          lazy-loaded site list + recent-sites localStorage. */}
       <CommandPalette />
     </div>
   );

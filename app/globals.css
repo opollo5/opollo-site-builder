@@ -32,6 +32,11 @@
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 38%;             /* sky-700 territory */
     --info-foreground: 0 0% 100%;
+
+    /* R1 — Canvas tint. Page background sits one notch off the card
+       background so card edges register. Linear / Vercel pattern:
+       cards stay white, canvas wash provides separation. */
+    --canvas: 220 14% 96%;           /* cool grey */
   }
 
   .dark {
@@ -54,6 +59,10 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* R1 — Canvas tint, dark variant. One notch deeper than the
+       --background card surface so cards still pop. */
+    --canvas: 222 47% 7%;
 
     /* A-2 — Semantic status tokens, dark variants. Bumped luminance so
        badges remain legible against the dark background. */
