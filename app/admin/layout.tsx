@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { AdminNav } from "@/components/AdminNav";
+import { Toaster } from "@/components/ui/toaster";
 
 // Shared shell for every page under /admin.
 //
@@ -33,6 +34,10 @@ export default async function AdminLayout({
     <div className="min-h-screen bg-background text-foreground">
       <AdminNav user={user} showUsersLink={showUsersLink} />
       <main className="mx-auto max-w-5xl p-6">{children}</main>
+      {/* A-6 — admin-wide toaster mount. Consumers call
+          `toast.success("…")` / `toast.error("…")` from anywhere in
+          the admin tree. */}
+      <Toaster />
     </div>
   );
 }
