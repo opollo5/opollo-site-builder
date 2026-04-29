@@ -164,3 +164,11 @@ export type { EmailPayload, SendResult } from "./email/send";
 
 export { planDigests, sendDigest } from "./email/digests";
 export type { DigestKind, DigestDecision, DigestSendResult } from "./email/digests";
+
+// Slice 8 surface
+export { scoreAlignmentLlm } from "./llm-alignment";
+export type {
+  LlmAlignmentInputs,
+  LlmAlignmentResult,
+  LlmSubscoreResult,
+} from "./llm-alignment";

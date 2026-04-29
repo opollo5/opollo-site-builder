@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 
 import { scoreAlignment } from "./alignment-scoring";
 import { suppressedPlaybooksFor } from "./client-memory";
+import { scoreAlignmentLlm } from "./llm-alignment";
 import { computeReliability } from "./data-reliability";
 import { evaluateAndPersistPage } from "./healthy-state";
 import { rollupForPage } from "./metrics-aggregation";
@@ -159,46 +160,119 @@ async function scoreAndProposeForPage(args: {
   const adGroupId = adsForPage?.[0]?.ad_group_id as string | null;
   let alignmentScore: number | null = null;
   let alignmentSubscores: Record<string, number> | null = null;
+  let llmFallbackEngaged = false;
 
   if (adGroupId) {
-    const { data: keywordRows } = await supabase
-      .from("opt_keywords")
-      .select("text, match_type")
-      .eq("ad_group_id", adGroupId)
-      .is("deleted_at", null)
-      .limit(20);
+    const [{ data: keywordRows }, { data: adGroupRow }] = await Promise.all([
+      supabase
+        .from("opt_keywords")
+        .select("text, match_type")
+        .eq("ad_group_id", adGroupId)
+        .is("deleted_at", null)
+        .limit(20),
+      supabase
+        .from("opt_ad_groups")
+        .select("raw")
+        .eq("id", adGroupId)
+        .maybeSingle(),
+    ]);
     const headlines: string[] = [];
     const descriptions: string[] = [];
     for (const ad of adsForPage ?? []) {
       headlines.push(...((ad.headlines ?? []) as string[]));
       descriptions.push(...((ad.descriptions ?? []) as string[]));
     }
-    const result = scoreAlignment({
+    const topSearchTerms = extractTopSearchTerms(adGroupRow?.raw);
+    const rulesResult = scoreAlignment({
       snapshot,
       keywords: (keywordRows ?? []) as Array<{ text: string; match_type?: string }>,
       ad_headlines: headlines,
       ad_descriptions: descriptions,
+      search_terms: topSearchTerms,
     });
-    alignmentScore = result.composite;
-    alignmentSubscores = result.subscores as unknown as Record<string, number>;
 
-    await supabase.from("opt_alignment_scores").upsert(
-      {
-        client_id: args.clientId,
-        ad_group_id: adGroupId,
-        landing_page_id: args.landingPageId,
-        score: result.composite,
-        keyword_relevance: result.subscores.keyword_relevance,
-        ad_to_page_match: result.subscores.ad_to_page_match,
-        cta_consistency: result.subscores.cta_consistency,
-        offer_clarity: result.subscores.offer_clarity,
-        intent_match: result.subscores.intent_match,
-        rationale: result.rationale,
-        input_fingerprint: result.input_fingerprint,
-        computed_at: new Date().toISOString(),
-      },
-      { onConflict: "ad_group_id,landing_page_id" },
-    );
+    // Cache check: if the existing row's input_fingerprint matches and
+    // it's < 24h old, reuse the row and skip the LLM call entirely.
+    const { data: existing } = await supabase
+      .from("opt_alignment_scores")
+      .select("score, ad_to_page_match, intent_match, input_fingerprint, computed_at, rationale")
+      .eq("ad_group_id", adGroupId)
+      .eq("landing_page_id", args.landingPageId)
+      .maybeSingle();
+    const cacheFresh =
+      existing &&
+      existing.input_fingerprint === rulesResult.input_fingerprint &&
+      existing.computed_at &&
+      Date.now() - new Date(existing.computed_at as string).getTime() <
+        24 * 60 * 60 * 1000;
+
+    if (cacheFresh && existing) {
+      alignmentScore = existing.score as number;
+      alignmentSubscores = {
+        keyword_relevance: rulesResult.subscores.keyword_relevance,
+        ad_to_page_match: existing.ad_to_page_match as number,
+        cta_consistency: rulesResult.subscores.cta_consistency,
+        offer_clarity: rulesResult.subscores.offer_clarity,
+        intent_match: existing.intent_match as number,
+      };
+      // No LLM call → no fallback flag; the cached row already
+      // captured whatever the original LLM verdict was.
+    } else {
+      // Fresh inputs (or no prior row). Run the LLM hybrid pass on
+      // ad_to_page_match + intent_match only; keep keyword_relevance,
+      // cta_consistency, and offer_clarity as rules-based.
+      const llm = await scoreAlignmentLlm({
+        clientId: args.clientId,
+        adGroupId,
+        landingPageId: args.landingPageId,
+        snapshot,
+        adHeadlines: headlines,
+        adDescriptions: descriptions,
+        searchTerms: topSearchTerms,
+        rulesAdToPageMatch: rulesResult.subscores.ad_to_page_match,
+        rulesIntentMatch: rulesResult.subscores.intent_match,
+      });
+      llmFallbackEngaged = llm.fallback_engaged;
+
+      const merged = {
+        ...rulesResult.subscores,
+        ad_to_page_match: llm.ad_to_page_match.score,
+        intent_match: llm.intent_match.score,
+      };
+      const composite = recomputeComposite(merged);
+      alignmentScore = composite;
+      alignmentSubscores = merged as unknown as Record<string, number>;
+
+      const augmentedRationale = [
+        ...rulesResult.rationale,
+        {
+          subscore: "ad_to_page_match",
+          note: `LLM (${llm.ad_to_page_match.source}): ${llm.ad_to_page_match.rationale}`,
+        },
+        {
+          subscore: "intent_match",
+          note: `LLM (${llm.intent_match.source}): ${llm.intent_match.rationale}`,
+        },
+      ];
+
+      await supabase.from("opt_alignment_scores").upsert(
+        {
+          client_id: args.clientId,
+          ad_group_id: adGroupId,
+          landing_page_id: args.landingPageId,
+          score: composite,
+          keyword_relevance: merged.keyword_relevance,
+          ad_to_page_match: merged.ad_to_page_match,
+          cta_consistency: merged.cta_consistency,
+          offer_clarity: merged.offer_clarity,
+          intent_match: merged.intent_match,
+          rationale: augmentedRationale,
+          input_fingerprint: rulesResult.input_fingerprint,
+          computed_at: new Date().toISOString(),
+        },
+        { onConflict: "ad_group_id,landing_page_id" },
+      );
+    }
   }
 
   // 3. Rollup + reliability + healthy state.
@@ -227,6 +301,12 @@ async function scoreAndProposeForPage(args: {
     if (!evaluation.fired) continue;
     firedPlaybookIds.push(playbook.id);
     try {
+      // §8 LLM hybrid: when the LLM call fell back to rules, penalise
+      // the confidence signal sub-factor by 0.7 so the proposal
+      // priority reflects the lower-quality signal.
+      const adjustedMagnitude = llmFallbackEngaged
+        ? evaluation.magnitude * 0.7
+        : evaluation.magnitude;
       const r = await generateProposal({
         clientId: args.clientId,
         landingPageId: args.landingPageId,
@@ -236,7 +316,7 @@ async function scoreAndProposeForPage(args: {
         alignmentScore,
         alignmentSubscores,
         triggerEvidence: evaluation.reasons,
-        triggerMagnitude: evaluation.magnitude,
+        triggerMagnitude: adjustedMagnitude,
         suppressed: args.suppressed,
       });
       if (r.inserted) proposalsGenerated += 1;
@@ -297,4 +377,45 @@ function inferAdCtaVerb(
     }
   }
   return null;
+}
+
+const SUBSCORE_WEIGHTS = {
+  keyword_relevance: 0.25,
+  ad_to_page_match: 0.25,
+  cta_consistency: 0.15,
+  offer_clarity: 0.2,
+  intent_match: 0.15,
+} as const;
+
+function recomputeComposite(s: {
+  keyword_relevance: number;
+  ad_to_page_match: number;
+  cta_consistency: number;
+  offer_clarity: number;
+  intent_match: number;
+}): number {
+  return Math.round(
+    s.keyword_relevance * SUBSCORE_WEIGHTS.keyword_relevance +
+      s.ad_to_page_match * SUBSCORE_WEIGHTS.ad_to_page_match +
+      s.cta_consistency * SUBSCORE_WEIGHTS.cta_consistency +
+      s.offer_clarity * SUBSCORE_WEIGHTS.offer_clarity +
+      s.intent_match * SUBSCORE_WEIGHTS.intent_match,
+  );
+}
+
+function extractTopSearchTerms(raw: unknown): string[] {
+  if (!raw || typeof raw !== "object") return [];
+  const top = (raw as { top_search_terms?: unknown }).top_search_terms;
+  if (!Array.isArray(top)) return [];
+  return top
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (entry && typeof entry === "object") {
+        const t = (entry as { term?: unknown }).term;
+        if (typeof t === "string") return t;
+      }
+      return null;
+    })
+    .filter((s): s is string => typeof s === "string" && s.length > 0)
+    .slice(0, 30);
 }
