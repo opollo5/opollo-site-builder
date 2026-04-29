@@ -3,8 +3,11 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
-import { H1 } from "@/components/ui/typography";
+import { H1, Lead } from "@/components/ui/typography";
+import { FileText, Plus } from "lucide-react";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
   listPostsForSite,
@@ -134,21 +137,24 @@ export default async function SitePostsList({
         ]}
       />
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <H1>Posts</H1>
-        <div className="flex items-center gap-3">
-          <p className="text-xs text-muted-foreground">
-            {total} total{total > 0 ? ` · showing ${rangeStart}–${rangeEnd}` : ""}
-          </p>
-          {/* BP-3 — entry-point for single-post creation. */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <H1>Posts</H1>
+          <Lead className="mt-0.5">
+            {total === 0
+              ? "No posts on this site yet."
+              : `${total} ${total === 1 ? "post" : "posts"}${total > 0 && items.length < total ? ` · showing ${rangeStart}–${rangeEnd}` : ""}`}
+          </Lead>
+        </div>
+        <Button asChild>
           <Link
             href={`/admin/sites/${site.id}/posts/new`}
-            className="inline-flex h-9 items-center rounded-md border bg-background px-3 text-sm font-medium hover:bg-muted transition-smooth"
             data-testid="new-post-button"
           >
+            <Plus aria-hidden className="h-4 w-4" />
             New post
           </Link>
-        </div>
+        </Button>
       </div>
 
       <form
@@ -210,44 +216,78 @@ export default async function SitePostsList({
       </form>
 
       {items.length === 0 ? (
-        <div
-          role="status"
-          className="mt-6 rounded-md border border-muted-foreground/20 bg-muted/20 p-6 text-center text-sm text-muted-foreground"
-        >
-          No posts match the current filters. Posts are created by the brief
-          runner when a post-mode brief commits + an operator approves its
-          pages.
+        <div className="mt-4">
+          <EmptyState
+            icon={FileText}
+            iconLabel="No posts"
+            title={
+              parsed.status || parsed.query
+                ? "No posts match the current filters"
+                : "No posts on this site yet"
+            }
+            body={
+              parsed.status || parsed.query ? (
+                <>
+                  Adjust the filters above, or clear them to see every post.
+                </>
+              ) : (
+                <>
+                  Create your first single-post draft, or generate a batch
+                  of posts via a post-mode brief.
+                </>
+              )
+            }
+            cta={
+              !parsed.status && !parsed.query ? (
+                <Button asChild>
+                  <Link href={`/admin/sites/${site.id}/posts/new`}>
+                    <Plus aria-hidden className="h-4 w-4" />
+                    New post
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline">
+                  <Link href={`/admin/sites/${site.id}/posts`}>
+                    Clear filters
+                  </Link>
+                </Button>
+              )
+            }
+          />
         </div>
       ) : (
-        <ol className="mt-6 space-y-3">
+        <ol className="mt-4 space-y-2">
           {items.map((post) => {
             return (
               <li
                 key={post.id}
-                className="rounded-lg border p-4"
+                className="rounded-lg border p-3 transition-smooth hover:bg-muted/40"
                 aria-labelledby={`post-${post.id}-title`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex-1">
+                  <div className="min-w-0 flex-1">
                     <h2
                       id={`post-${post.id}-title`}
-                      className="text-base font-medium"
+                      className="text-sm font-semibold"
                     >
                       <Link
                         href={`/admin/sites/${site.id}/posts/${post.id}`}
-                        className="hover:underline"
+                        className="transition-smooth hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                       >
                         {post.title}
                       </Link>
                     </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       <code className="text-[11px]">/{post.slug}</code>
                       {post.wp_post_id
                         ? ` · WP id ${post.wp_post_id}`
                         : ""}
                     </p>
                   </div>
-                  <StatusPill kind={postStatusKind(post.status)} className="shrink-0 capitalize" />
+                  <StatusPill
+                    kind={postStatusKind(post.status)}
+                    className="shrink-0 capitalize"
+                  />
                 </div>
               </li>
             );
