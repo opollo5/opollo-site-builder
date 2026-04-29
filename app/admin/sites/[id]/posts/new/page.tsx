@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BlogPostComposer } from "@/components/BlogPostComposer";
+import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -51,7 +52,7 @@ export default async function BlogPostEntryPage({
           { label: "New post" },
         ]}
       />
-      <h1 className="mt-2 text-xl font-semibold">New blog post</h1>
+      <H1 className="mt-2">New blog post</H1>
       <p className="mt-1 text-sm text-muted-foreground">
         Paste a markdown / HTML / YAML-fronted post. We&apos;ll parse the
         metadata into the fields below — every value is editable before

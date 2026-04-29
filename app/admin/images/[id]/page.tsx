@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { H1 } from "@/components/ui/typography";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { ImageArchiveButton } from "@/components/ImageArchiveButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -141,9 +142,9 @@ export default async function AdminImageDetailPage({
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">
+          <H1>
             {image.filename ?? "Untitled image"}
-          </h1>
+          </H1>
           <p className="text-sm text-muted-foreground">
             Imported {formatDate(image.created_at)}
             {image.deleted_at && (

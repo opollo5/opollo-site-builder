@@ -59,6 +59,29 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * A-1 — Typography scale (documentation block).
+ *
+ * Five tiers via the components/ui/typography.tsx primitives. Tailwind
+ * sizes locked deliberately; do not introduce text-2xl/text-3xl on any
+ * admin surface — those are marketing-page energy and pushed every list
+ * below the operator's fold.
+ *
+ *   <H1>      page heading             text-xl   font-semibold tracking-tight
+ *   <H2>      section heading          text-base font-semibold tracking-tight
+ *   <H3>      sub-section / card       text-sm   font-semibold
+ *   <Eyebrow> small uppercase label    text-xs   font-medium uppercase tracking-wide
+ *                                                 text-muted-foreground
+ *   <Lead>    intro / context line     text-sm   text-muted-foreground
+ *
+ * Body text defaults to text-sm. Metadata + table cells + pills sit at
+ * text-xs. font-mono is reserved for literal data (cloudflare ids,
+ * cost values, code tokens) — not for stylistic accent.
+ *
+ * Reference quality bar: matches Linear's issue view + Vercel's
+ * deployment header. Do not introduce a 6th tier without revisiting.
+ * --------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
  * RS-0 — Motion primitives.
  *
  * Shared vocabulary for animated state changes (RS-4 status pills, RS-5

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { ImagesTable } from "@/components/ImagesTable";
+import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
@@ -144,7 +145,7 @@ export default async function AdminImagesPage({
     <>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Image library</h1>
+          <H1>Image library</H1>
           <p className="text-sm text-muted-foreground">
             {parsed.deleted
               ? "Archived images (soft-deleted). Restore from the detail view."

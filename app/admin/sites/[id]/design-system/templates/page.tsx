@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { H1 } from "@/components/ui/typography";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { TemplateFormModal, type TemplateFormMode } from "@/components/TemplateFormModal";
 import { TemplatesTable } from "@/components/TemplatesTable";
@@ -95,7 +96,7 @@ export default function DesignSystemTemplatesPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Templates</h1>
+          <H1>Templates</H1>
           <p className="text-sm text-muted-foreground">
             Page-type templates on design system v{selectedDs.version} (
             {selectedDs.status}).

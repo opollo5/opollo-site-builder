@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BatchDetailClient } from "@/components/BatchDetailClient";
+import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -167,9 +168,9 @@ export default async function BatchDetailPage({
               ← Batches
             </Link>
           </div>
-          <h1 className="mt-1 text-xl font-semibold">
+          <H1 className="mt-1">
             {site.name} · {tmpl.name}
-          </h1>
+          </H1>
           <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
             <StatusBadge status={job.status as string} />
             <span>

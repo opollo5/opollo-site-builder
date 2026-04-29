@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { InviteUserButton } from "@/components/InviteUserButton";
+import { H1 } from "@/components/ui/typography";
 import { UsersTable } from "@/components/UsersTable";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -43,7 +44,7 @@ export default async function AdminUsersPage() {
     <>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Users</h1>
+          <H1>Users</H1>
           <p className="text-sm text-muted-foreground">
             Everyone with access to this builder. Change a role inline; the
             server blocks self-modification and last-admin demotions.

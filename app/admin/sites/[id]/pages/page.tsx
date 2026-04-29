@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PagesTable } from "@/components/PagesTable";
+import { H1 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_PAGES_DEFAULT_LIMIT,
@@ -145,7 +146,7 @@ export default async function SitePagesList({
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Pages for {site.name}</h1>
+          <H1>Pages for {site.name}</H1>
           <p className="text-sm text-muted-foreground">
             Every page generated for this site. Click a row for the detail
             view. Editing content itself still happens in WordPress admin.
