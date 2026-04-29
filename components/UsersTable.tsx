@@ -1,4 +1,7 @@
+import { Users } from "lucide-react";
+
 import type { AdminUserRow } from "@/app/api/admin/users/list/route";
+import { EmptyState } from "@/components/ui/empty-state";
 import { UserRoleActionCell } from "@/components/UserRoleActionCell";
 import { UserStatusActionCell } from "@/components/UserStatusActionCell";
 
@@ -33,12 +36,18 @@ export function UsersTable({
 }) {
   if (users.length === 0) {
     return (
-      <div className="rounded-md border p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No users yet. The `first_admin_email` bootstrap promotes the first
-          Supabase signup to admin; everyone else starts as viewer.
-        </p>
-      </div>
+      <EmptyState
+        icon={Users}
+        iconLabel="No users"
+        title="No users yet"
+        body={
+          <>
+            The <code className="font-mono text-xs">first_admin_email</code>{" "}
+            bootstrap promotes the first Supabase signup to admin; everyone
+            else starts as viewer.
+          </>
+        }
+      />
     );
   }
 
