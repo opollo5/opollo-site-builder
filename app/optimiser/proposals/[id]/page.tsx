@@ -2,11 +2,14 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { CreateVariantButton } from "@/components/optimiser/CreateVariantButton";
 import { PastCausalDeltasPanel } from "@/components/optimiser/PastCausalDeltasPanel";
 import { ProposalReview } from "@/components/optimiser/ProposalReview";
+import { getClient } from "@/lib/optimiser/clients";
 import { listRecentCausalDeltasForPlaybook } from "@/lib/optimiser/causal/read-deltas";
 import { getProposalWithEvidence } from "@/lib/optimiser/proposals";
 import { getLandingPage } from "@/lib/optimiser/landing-pages";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 export const metadata = { title: "Optimiser · Proposal review" };
 export const dynamic = "force-dynamic";
@@ -19,6 +22,7 @@ export default async function OptimiserProposalReviewPage({
   const { proposal, evidence } = await getProposalWithEvidence(params.id);
   if (!proposal) notFound();
   const page = await getLandingPage(proposal.landing_page_id);
+  const client = await getClient(proposal.client_id);
 
   // Past causal deltas for the same playbook on this client — drives
   // the §4.3 "what happened last time we did this" panel.
@@ -29,6 +33,20 @@ export default async function OptimiserProposalReviewPage({
         limit: 5,
       })
     : [];
+
+  // Phase 2 Slice 18: surface "Create A/B variant" only when the
+  // proposal is approved/applied AND no test currently exists for the
+  // page in queued/running state.
+  const supabase = getServiceRoleClient();
+  const { data: existingTest } = await supabase
+    .from("opt_tests")
+    .select("id, status")
+    .eq("landing_page_id", proposal.landing_page_id)
+    .in("status", ["queued", "running"])
+    .maybeSingle();
+  const canCreateVariant =
+    !existingTest &&
+    (proposal.status === "approved" || proposal.status === "applied");
 
   return (
     <div className="space-y-4">
@@ -44,6 +62,17 @@ export default async function OptimiserProposalReviewPage({
         deltas={pastDeltas}
         playbookId={proposal.triggering_playbook_id}
       />
+      {canCreateVariant && client && (
+        <CreateVariantButton
+          proposalId={proposal.id}
+          hostingMode={
+            client.hosting_mode as
+              | "opollo_subdomain"
+              | "opollo_cname"
+              | "client_slice"
+          }
+        />
+      )}
       <ProposalReview
         proposal={{
           id: proposal.id,
