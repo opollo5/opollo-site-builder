@@ -103,8 +103,17 @@ export function AdminNav({ user, showUsersLink }: { user: SessionUser | null; sh
           </nav>
         </div>
 
-        {/* Right: mobile-nav button + user menu */}
+        {/* Right: ⌘K hint + mobile-nav + user menu */}
         <div className="flex items-center gap-2">
+          {/* ⌘K hint — desktop only, indicates the global command palette. */}
+          <span
+            className="hidden items-center gap-1 rounded-md border bg-muted/40 px-2 py-1 text-xs text-muted-foreground sm:inline-flex"
+            aria-hidden
+            title="Open command palette"
+          >
+            <kbd className="font-mono">⌘</kbd>
+            <kbd className="font-mono">K</kbd>
+          </span>
           {/* Mobile-only hamburger */}
           <button
             type="button"
