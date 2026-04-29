@@ -15,6 +15,7 @@ const NAV = [
   { href: "/optimiser/proposals", label: "Proposals" },
   { href: "/optimiser/change-log", label: "Change log" },
   { href: "/optimiser/onboarding", label: "Onboarding" },
+  { href: "/optimiser/diagnostics", label: "Diagnostics" },
 ];
 
 export default async function OptimiserLayout({
