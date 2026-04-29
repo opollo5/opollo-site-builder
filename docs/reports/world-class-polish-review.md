@@ -1,7 +1,7 @@
 # World-class polish pass — operator review
 
-> **Status:** Phase 2 + Round-1 review feedback complete. Awaiting operator review.
-> **Workstream:** parent plan PR #229. Sub-slices PR #230 → PR #268 (31 PRs total).
+> **Status:** Phase 2 + Round-1 + Round-2 review feedback complete. Ready to merge.
+> **Workstream:** parent plan PR #229. Sub-slices PR #230 → PR #273 (32 PRs total).
 
 ## Summary
 
@@ -14,9 +14,10 @@ The world-class polish pass shipped in three waves:
 | Screenshot CI wiring | 1 | #253 | ✅ merged |
 | Phase C — Cross-cutting | 3 | #254, #255, #256 | ✅ all merged |
 | **Round 1 review feedback** | **3** | **#264, #266, #268** | **✅ all merged** |
-| R — Operator review | 1 | _this PR_ | ⏸ awaiting review |
+| **Round 2 review feedback** | **1** | **#273** | **✅ merged** |
+| R — Operator review | 1 | _this PR_ | ✅ ready to merge |
 
-**Total: 31 PRs.**
+**Total: 32 PRs.**
 
 ## Round 1 review — what changed since the first review
 
@@ -38,6 +39,19 @@ The first review surfaced 11 items grouped into Layout (1-3), Buttons (4), Image
 - **Frontend** (ImagePickerModal): 3-tab segmented control replaces the old border-bottom tabs. **Suggested** default-selected when caller passes `forPostId` or `suggestionContext`; otherwise opens to **Browse**. Suggested panel: 5-image grid with skeletons during load + context banner ("Suggested for: <title>" or fallback copy).
 - **Composer wiring** (BlogPostComposer): passes `suggestionContext={\`${title} ${title} ${title} ${body-snippet-400}\`}` so the picker's Suggested tab works pre-save (composer doesn't have a post id yet).
 - **URL fetch** retained as a sub-mode under Upload ("Or paste a URL instead" disclosure) so BP-6 functionality isn't lost in the 3-tab restructure.
+
+## Round 2 review — what changed since round 1
+
+Round 1 closed with a self-identified list of four risks I had not audited (#264 sidebar hydration window, button `--secondary` contrast, image picker segmented focus ring, paste-URL sub-mode regression). All four addressed in **#273 — fix(r2): r1-review feedback**:
+
+### #273 — sidebar hydration / segmented focus / url polish / contrast verification
+
+- **`--secondary` contrast (item R2-1)** — verified, no code change. Computed contrast against the bumped 87% lightness token: light mode 13:1, dark mode 10:1 — both pass WCAG AAA. Also confirmed via grep that no live consumer renders `variant="secondary"` today, so the audit was forward-looking only. The eyeball call from R1 was correct.
+- **Sidebar hydration flash (item R2-2)** — server now reads `opollo_sidebar_collapsed` cookie in `app/admin/layout.tsx` via `next/headers cookies()` and threads `initialCollapsed` down to `AdminSidebar`. SSR + first client paint render the same width — no more snap-narrow on first useEffect tick. Toggle dual-writes cookie + localStorage so legacy readers stay live and the cookie is the source of truth on next page load.
+- **Segmented control focus ring (item R2-3)** — `SegmentedTab` in `ImagePickerModal` now applies `relative` + `focus-visible:z-10` so the focused tab lifts above neighbours, plus `focus-visible:ring-offset-2 focus-visible:ring-offset-background` so the ring has breathing room and doesn't clip against the parent segmented container's border.
+- **Paste-URL sub-mode (item R2-4)** — added a Cancel affordance in the URL panel header (resets `open=false`, `url=""`, `error=null`) and `data-testid` hooks (`picker-url-disclosure`, `picker-url-input`, `picker-url-fetch`) so the next E2E covering this surface has stable selectors. The disclosure works correctly; the cancel + testids close the affordance gap.
+
+**Honest call:** none of the four R2 items moved a quality dimension to a new score. The sidebar fix was visible polish (flash → no flash), the contrast audit was a measurement that confirmed an earlier eyeball, and the focus-ring + cancel adjustments are small UX hygiene. R2 was about converting "I haven't measured" into "I've measured and confirmed/fixed."
 
 ## How to review
 
@@ -200,11 +214,11 @@ R1 didn't touch any of these — Phase C shipped at the polish bar.
 
 5. **Dark mode rollout still incomplete.** A-2 added dark-variant tokens including the new `--canvas` (222 47% 7%) and the bumped `--secondary` (217.2 32.6% 25%), but per-component `dark:` variants remain spotty. The CSS custom properties swap correctly on `.dark`; consumers don't always opt in.
 
-6. **R1 introduced new risks I haven't audited:**
-   - `--secondary` at 87% lightness might break contrast on existing `secondary` button consumers I didn't sweep — `text-secondary-foreground` is 222.2 47.4% 11.2%, contrast against 220 13% 87% should be ~9:1 (passes AAA easily) but I didn't measure each consumer.
-   - The sidebar's `useState(false)` + `useEffect`-restores-from-localStorage pattern has a hydration flash window where the rail renders expanded then snaps to collapsed if persisted. ~50ms, probably imperceptible, but I haven't measured.
-   - The image picker's segmented control sits inside the dialog; I didn't verify the focus ring on the active segment doesn't clip against the dialog's rounded corners.
-   - The R1 image picker PR removed the standalone "Paste URL" tab and made it a disclosure under Upload. If any e2e spec or operator muscle-memory relied on the old tab, this is a regression — none observed in CI but worth a manual smoke.
+6. ~~**R1 introduced new risks I haven't audited:**~~ **All four R1-introduced risks audited in R2 (#273):**
+   - ✅ `--secondary` contrast verified — light 13:1 / dark 10:1, both pass WCAG AAA. No live consumer uses `variant="secondary"` today (grep-confirmed); audit was forward-looking only.
+   - ✅ Sidebar hydration flash fixed — server reads `opollo_sidebar_collapsed` cookie via `next/headers cookies()` and passes `initialCollapsed` so SSR + client first paint match. No more snap-narrow on first useEffect tick.
+   - ✅ Segmented focus ring — `SegmentedTab` got `relative + focus-visible:z-10 + ring-offset-2 + ring-offset-background` so the keyboard ring has breathing room and lifts above neighbour tabs without clipping against the dialog's rounded corners.
+   - ✅ Paste-URL sub-mode — disclosure works correctly; gap closed by adding a Cancel affordance in the URL panel header (resets local state) plus stable `data-testid` selectors for future E2E coverage.
 
 ### Deliberately deferred (out of scope per parent plan + R1)
 
@@ -221,7 +235,7 @@ R1 didn't touch any of these — Phase C shipped at the polish bar.
 
 ## Iteration budget
 
-Soft cap was 30 PRs for the original polish workstream. Final count for that workstream: **28 PRs** (within budget). R1 review feedback added 3 more PRs (separate cycle, not counted against the 30-PR cap). **Combined total: 31 PRs.**
+Soft cap was 30 PRs for the original polish workstream. Final count for that workstream: **28 PRs** (within budget). R1 review feedback added 3 more PRs and R2 review feedback added 1 more (both separate cycles, not counted against the 30-PR cap). **Combined total: 32 PRs.**
 
 ## What "done" looks like (verification)
 
@@ -241,9 +255,12 @@ Soft cap was 30 PRs for the original polish workstream. Final count for that wor
   - Item 9 magenta blocks fix ✅ (#266)
   - Item 10 forgot password / auth shells ✅ (#266)
   - Item 11 sparse-data density ✅ (#266)
+- ✅ **Round 2 review feedback all 4 self-identified risks resolved (#273):**
+  - R2-1 `--secondary` contrast verified (AAA pass) ✅
+  - R2-2 sidebar hydration flash fixed via cookie-driven SSR ✅
+  - R2-3 segmented control focus ring lifted + offset ✅
+  - R2-4 paste-URL sub-mode polished (cancel + test IDs) ✅
 
 ## Halt point
 
-Per the brief: **Round 1 review items complete. PR #257 ready for re-review.**
-
-Send Round-2 feedback as PR comments. I'll iterate.
+**Round 1 + Round 2 review items complete.** PR #257 ready to merge.
