@@ -447,8 +447,8 @@ export function BriefRunClient({
                 tabIndex={-1}
                 className={
                   isAwaitingReview
-                    ? "rounded-lg border-2 border-yellow-500/60 bg-yellow-500/5 p-4 ring-2 ring-yellow-500/20 transition-smooth focus:outline-none focus:ring-yellow-500/40"
-                    : "rounded-lg border p-4 transition-smooth focus:outline-none"
+                    ? "rounded-lg border-2 border-warning/60 bg-warning/5 p-4 ring-2 ring-warning/20 transition-smooth focus-visible:outline-none focus-visible:ring-warning/40"
+                    : "rounded-lg border p-4 transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 }
                 aria-labelledby={`page-${page.id}-title`}
               >

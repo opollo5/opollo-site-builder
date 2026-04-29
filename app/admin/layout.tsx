@@ -33,8 +33,26 @@ export default async function AdminLayout({
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* C-3 — skip-to-content link. Visually hidden until focused
+          (Tab from the address bar lands here first), then snaps to
+          the top-left so keyboard / screen-reader users can jump
+          past the AdminNav into the page content. */}
+      <a
+        href="#admin-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+      >
+        Skip to main content
+      </a>
       <AdminNav user={user} showUsersLink={showUsersLink} />
-      <main className="mx-auto max-w-5xl p-6">{children}</main>
+      <main
+        id="admin-main"
+        // tabIndex=-1 + scroll-mt-16 so the skip-link target is
+        // focusable + lands below the sticky 56px nav header.
+        tabIndex={-1}
+        className="mx-auto max-w-5xl p-6 scroll-mt-16 focus:outline-none"
+      >
+        {children}
+      </main>
       {/* A-6 — admin-wide toaster mount. Consumers call
           `toast.success("…")` / `toast.error("…")` from anywhere in
           the admin tree. */}
