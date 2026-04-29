@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Composer, type ComposerValue } from "@/components/Composer";
@@ -591,9 +592,10 @@ function WpPageCombobox({
           <span className={value ? "" : "text-muted-foreground"}>
             {value ? `${value.title} (${value.slug})` : "Pick a parent page…"}
           </span>
-          <span aria-hidden className="ml-2 text-xs text-muted-foreground">
-            ▾
-          </span>
+          <ChevronDown
+            aria-hidden
+            className="ml-2 h-4 w-4 text-muted-foreground"
+          />
         </button>
       </PopoverTrigger>
       <PopoverContent

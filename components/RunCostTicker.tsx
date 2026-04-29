@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Info, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { BriefPageRow } from "@/lib/briefs";
@@ -136,9 +137,11 @@ export function RunCostTicker({
               "transition-smooth",
             )}
           >
-            <span aria-hidden className="text-base leading-none">
-              {expanded ? "×" : "ⓘ"}
-            </span>
+            {expanded ? (
+              <X aria-hidden className="h-5 w-5" />
+            ) : (
+              <Info aria-hidden className="h-5 w-5" />
+            )}
             <span className="sr-only">
               {expanded ? "Close run details" : "Open run details"}
             </span>

@@ -12,6 +12,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { Paperclip, X } from "lucide-react";
+
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -214,7 +216,7 @@ export function Composer({
                 "disabled:pointer-events-none",
               )}
             >
-              <span aria-hidden className="text-base leading-none">×</span>
+              <X aria-hidden className="h-4 w-4" />
             </button>
           </span>
         </div>
@@ -234,7 +236,7 @@ export function Composer({
             "transition-smooth disabled:pointer-events-none",
           )}
         >
-          <span aria-hidden className="text-xl leading-none">+</span>
+          <Paperclip aria-hidden className="h-5 w-5" />
         </button>
         <input
           ref={fileInputRef}
