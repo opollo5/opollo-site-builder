@@ -449,6 +449,90 @@ export async function updateSiteBasics(
 }
 
 // ---------------------------------------------------------------------------
+// updateSiteCredentials (AUTH-FOUNDATION P2.3)
+// ---------------------------------------------------------------------------
+
+export async function updateSiteCredentials(
+  id: string,
+  patch: { wp_user?: string; wp_app_password?: string },
+): Promise<ApiResponse<{ updated: boolean }>> {
+  try {
+    if (patch.wp_user === undefined && patch.wp_app_password === undefined) {
+      return { ok: true, data: { updated: false }, timestamp: now() };
+    }
+
+    const supabase = getServiceRoleClient();
+
+    // Confirm the site exists + isn't archived before mutating creds.
+    const siteCheck = await supabase
+      .from("sites")
+      .select("id")
+      .eq("id", id)
+      .neq("status", "removed")
+      .maybeSingle();
+    if (siteCheck.error) {
+      return internalError("Failed to look up site.", {
+        supabase_error: siteCheck.error,
+      });
+    }
+    if (!siteCheck.data) {
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No active site found with id ${id}.`,
+          details: { id },
+          retryable: false,
+          suggested_action:
+            "Verify the site id; removed sites are excluded from credential updates.",
+        },
+        timestamp: now(),
+      };
+    }
+
+    const update: Record<string, unknown> = {};
+    if (patch.wp_user !== undefined) {
+      update.wp_user = patch.wp_user;
+    }
+    if (patch.wp_app_password !== undefined) {
+      try {
+        const enc = encrypt(patch.wp_app_password);
+        update.site_secret_encrypted = toByteaLiteral(enc.ciphertext);
+        update.iv = toByteaLiteral(enc.iv);
+        update.key_version = enc.keyVersion;
+      } catch (err) {
+        return internalError(
+          `Encryption failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    }
+
+    const { error } = await supabase
+      .from("site_credentials")
+      .update(update)
+      .eq("site_id", id);
+    if (error) {
+      return internalError("Failed to update site credentials.", {
+        supabase_error: error,
+      });
+    }
+
+    // Bump the parent sites.updated_at so the list page's "updated"
+    // column reflects the credential rotation.
+    await supabase
+      .from("sites")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", id);
+
+    return { ok: true, data: { updated: true }, timestamp: now() };
+  } catch (err) {
+    return internalError(
+      `Unhandled error in updateSiteCredentials: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // updateSiteVoice (RS-2 — site-level brand voice & design direction)
 // ---------------------------------------------------------------------------
 //

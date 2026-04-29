@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { createContext, useContext, useState, useRef, useEffect, ReactNode } from "react";
 
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
-import { EditSiteModal } from "@/components/EditSiteModal";
+
+// AUTH-FOUNDATION P2.3: the per-row Edit action used to open the
+// EditSiteModal (name + wp_url only). It now navigates to
+// /admin/sites/[id]/edit, the unified guided form that supports
+// credential rotation alongside basics. EditSiteModal.tsx is left in
+// place pending a separate cleanup PR once grep confirms no other
+// surface imports it.
 
 type MenuContextType = {
   openMenuId: string | null;
@@ -56,7 +62,6 @@ export function SiteActionsMenu({
 }) {
   const router = useRouter();
   const { openMenuId, setOpenMenuId } = useMenuContext();
-  const [editOpen, setEditOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
 
   const menuId = `site-actions-${siteId}`;
@@ -91,9 +96,10 @@ export function SiteActionsMenu({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                setEditOpen(true);
+                router.push(`/admin/sites/${encodeURIComponent(siteId)}/edit`);
                 handleAction();
               }}
+              data-testid="site-edit-action"
             >
               Edit
             </button>
@@ -122,11 +128,6 @@ export function SiteActionsMenu({
         )}
       </div>
 
-      <EditSiteModal
-        open={editOpen}
-        onClose={() => setEditOpen(false)}
-        site={{ id: siteId, name, wp_url: wpUrl }}
-      />
       {archiveOpen && (
         <ConfirmActionModal
           open

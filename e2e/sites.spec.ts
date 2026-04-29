@@ -111,6 +111,57 @@ test.describe("sites CRUD", () => {
     await expect(page.getByTestId("site-create-save")).toBeDisabled();
   });
 
+  test("edit page rotates the WordPress username via the unified form", async ({
+    page,
+  }) => {
+    const seedName = `Edit Target ${Date.now()}`;
+    await createSiteViaForm(page, {
+      name: seedName,
+      url: "https://edit-me.test",
+      user: "wp-old",
+      password: "password-1234",
+    });
+
+    // Navigate via the URL — the actions-menu Edit button on the
+    // sites list lands on the same route.
+    const detailUrl = page.url();
+    const editUrl = `${detailUrl}/edit`;
+    await page.goto(editUrl);
+
+    // Form pre-seeds with the existing values.
+    await expect(page.getByTestId("site-name")).toHaveValue(seedName);
+    await expect(page.getByTestId("site-wp-user")).toHaveValue("wp-old");
+    // Password renders the placeholder, value stays empty.
+    await expect(page.getByTestId("site-wp-password")).toHaveValue("");
+    await expect(page.getByTestId("site-wp-password")).toHaveAttribute(
+      "placeholder",
+      /unchanged/i,
+    );
+
+    // Editing only the name doesn't require a connection test.
+    await page.getByTestId("site-name").fill(`${seedName} (renamed)`);
+    await expect(page.getByTestId("site-edit-save")).toBeEnabled();
+
+    // Now rotate the username — that touches the credential set, so
+    // Save should disable until a passing test for the new key.
+    await page.getByTestId("site-wp-user").fill("wp-new");
+    await page.getByTestId("site-wp-password").fill("rotated-password");
+    await expect(page.getByTestId("site-edit-save")).toBeDisabled();
+
+    await page.getByTestId("site-test-connection").click();
+    await expect(page.getByTestId("site-test-result")).toContainText(
+      /Connected as/i,
+    );
+    await expect(page.getByTestId("site-edit-save")).toBeEnabled();
+
+    await page.getByTestId("site-edit-save").click();
+    // Lands back on the detail page after save.
+    await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}$/);
+    await expect(
+      page.getByRole("heading", { name: `${seedName} (renamed)` }),
+    ).toBeVisible();
+  });
+
   test("archive flow removes the site from the default list", async ({
     page,
   }) => {
