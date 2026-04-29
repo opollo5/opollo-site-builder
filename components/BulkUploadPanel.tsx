@@ -1,11 +1,21 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
-import { FileText, Upload, X } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { ChevronDown, ChevronRight, FileText, Upload, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { parseBlogPostMetadata } from "@/lib/blog-post-parser";
+import {
+  parseBlogPostMetadata,
+  slugify,
+} from "@/lib/blog-post-parser";
 import {
   splitBulkPaste,
   type SplitDocument,
@@ -37,11 +47,14 @@ export interface BulkCandidate {
   source: string;
   /** Display name — file name for drops, "Pasted post #N" otherwise. */
   origin: string;
+  /** Operator-editable title. Defaults to the parser's detected title. */
+  title: string;
+  /** Operator-editable slug. Defaults to the parser's detected slug. */
+  slug: string;
   detectedTitle: string | null;
   detectedSlug: string | null;
   wordCount: number;
-  // Operator can flag a candidate to reject before publish. BL-6
-  // surfaces the toggle; BL-5 stores the field.
+  /** Operator can flag a candidate to skip publishing. */
   rejected: boolean;
 }
 
@@ -52,14 +65,21 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
 
   const [pasted, setPasted] = useState("");
   const [files, setFiles] = useState<BulkCandidate[]>([]);
+  const [pastedCandidates, setPastedCandidates] = useState<BulkCandidate[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Pasted candidates derive on every keystroke (cheap — pure logic).
-  const pastedCandidates = useMemo<BulkCandidate[]>(() => {
+  // BL-6 — pasted candidates rebuild from `pasted` whenever the
+  // operator changes the paste textarea. Per-card edits live on the
+  // pastedCandidates state and don't trigger this effect.
+  useEffect(() => {
     const docs = splitBulkPaste(pasted);
-    return docs.map((d) => candidateFromSource(d.source, `Pasted post #${d.index + 1}`));
+    setPastedCandidates(
+      docs.map((d) =>
+        candidateFromSource(d.source, `Pasted post #${d.index + 1}`),
+      ),
+    );
   }, [pasted]);
 
   const allCandidates = useMemo<BulkCandidate[]>(() => {
@@ -69,6 +89,18 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
   const acceptedCount = useMemo(
     () => allCandidates.filter((c) => !c.rejected).length,
     [allCandidates],
+  );
+
+  const updateCandidate = useCallback(
+    (id: string, patch: Partial<BulkCandidate>) => {
+      setFiles((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      );
+      setPastedCandidates((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      );
+    },
+    [],
   );
 
   const onFilesChosen = useCallback(async (chosen: FileList | File[]) => {
@@ -226,42 +258,22 @@ Body of second post.`}
               Clear all
             </button>
           </div>
-          <ul className="divide-y rounded-md border bg-background">
+          <ul className="space-y-2">
             {allCandidates.map((c) => (
-              <li
+              <BulkCandidateCard
                 key={c.id}
-                className="flex items-center gap-3 px-3 py-2"
-                data-testid="bulk-candidate-row"
-              >
-                <FileText
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 text-muted-foreground"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {c.detectedTitle ?? c.origin}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {c.origin} · {c.wordCount.toLocaleString()} words
-                    {c.detectedSlug ? ` · /${c.detectedSlug}` : ""}
-                  </p>
-                </div>
-                {c.id.startsWith("file-") && (
-                  <button
-                    type="button"
-                    onClick={() => removeFileCandidate(c.id)}
-                    aria-label={`Remove ${c.origin}`}
-                    className="rounded-md p-1 text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <X aria-hidden className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </li>
+                candidate={c}
+                onChange={(patch) => updateCandidate(c.id, patch)}
+                onRemove={
+                  c.id.startsWith("file-")
+                    ? () => removeFileCandidate(c.id)
+                    : undefined
+                }
+              />
             ))}
           </ul>
           <p className="text-xs text-muted-foreground">
-            BL-6 will turn these rows into editable preview cards. BL-7 will
-            plumb the publish orchestrator.
+            BL-7 will plumb the publish orchestrator into the Continue button.
           </p>
         </div>
       )}
@@ -291,11 +303,163 @@ function candidateFromSource(source: string, origin: string): BulkCandidate {
     id: `${origin.startsWith("Pasted") ? "paste" : "file"}-${candidateCounter}`,
     source,
     origin,
+    title: parsed.title ?? "",
+    slug: parsed.slug ?? "",
     detectedTitle: parsed.title,
     detectedSlug: parsed.slug,
     wordCount: countWords(source),
     rejected: false,
   };
+}
+
+// ---------------------------------------------------------------------------
+// BL-6 — Per-candidate editable preview card.
+//
+// Replaces the BL-5 row layout. Title + slug are inline-editable;
+// rejected toggle dims the card and decrements the "ready" count;
+// preview disclosure shows the first ~600 chars of the parsed body.
+// ---------------------------------------------------------------------------
+
+const BODY_PREVIEW_CHARS = 600;
+
+function BulkCandidateCard({
+  candidate,
+  onChange,
+  onRemove,
+}: {
+  candidate: BulkCandidate;
+  onChange: (patch: Partial<BulkCandidate>) => void;
+  onRemove?: () => void;
+}) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const slugIsValid =
+    candidate.slug.length === 0 || /^[a-z0-9-]+$/.test(candidate.slug);
+
+  const bodyPreview = useMemo(
+    () => extractBodyPreview(candidate.source),
+    [candidate.source],
+  );
+  const bodyTruncated = bodyPreview.length > BODY_PREVIEW_CHARS;
+
+  return (
+    <li
+      className={cn(
+        "rounded-md border bg-background transition-smooth",
+        candidate.rejected && "opacity-50",
+      )}
+      data-testid="bulk-candidate-card"
+      data-rejected={candidate.rejected ? "true" : "false"}
+    >
+      <div className="flex items-start gap-3 p-3">
+        <FileText
+          aria-hidden
+          className="mt-2 h-4 w-4 shrink-0 text-muted-foreground"
+        />
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-[2fr_1fr]">
+            <Input
+              aria-label={`Title for ${candidate.origin}`}
+              value={candidate.title}
+              placeholder="Title"
+              maxLength={200}
+              disabled={candidate.rejected}
+              onChange={(e) => onChange({ title: e.target.value })}
+              data-testid="bulk-candidate-title"
+              className="h-8 text-sm"
+            />
+            <Input
+              aria-label={`Slug for ${candidate.origin}`}
+              value={candidate.slug}
+              placeholder="slug"
+              maxLength={100}
+              disabled={candidate.rejected}
+              onChange={(e) =>
+                onChange({ slug: e.target.value.toLowerCase() })
+              }
+              onBlur={() => {
+                if (candidate.slug && !slugIsValid) {
+                  onChange({ slug: slugify(candidate.slug) });
+                }
+              }}
+              aria-invalid={!slugIsValid}
+              data-testid="bulk-candidate-slug"
+              className="h-8 font-mono text-xs"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {candidate.origin} · {candidate.wordCount.toLocaleString()} words
+            {!slugIsValid && (
+              <span className="ml-2 text-destructive">
+                Slug needs lowercase letters, numbers, dashes only.
+              </span>
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => setPreviewOpen((v) => !v)}
+            aria-expanded={previewOpen}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            data-testid="bulk-candidate-preview-toggle"
+          >
+            {previewOpen ? (
+              <ChevronDown aria-hidden className="h-3 w-3" />
+            ) : (
+              <ChevronRight aria-hidden className="h-3 w-3" />
+            )}
+            Preview body
+          </button>
+          {previewOpen && (
+            <div
+              className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground whitespace-pre-wrap"
+              data-testid="bulk-candidate-preview"
+            >
+              {bodyPreview.slice(0, BODY_PREVIEW_CHARS)}
+              {bodyTruncated && (
+                <span className="text-muted-foreground/70">
+                  {" "}…
+                  <span className="ml-1 italic">
+                    ({bodyPreview.length - BODY_PREVIEW_CHARS} more chars)
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => onChange({ rejected: !candidate.rejected })}
+            aria-pressed={candidate.rejected}
+            data-testid="bulk-candidate-reject"
+            className={cn(
+              "rounded border px-2 py-0.5 text-xs transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              candidate.rejected
+                ? "border-success/40 bg-success/10 text-success hover:bg-success/20"
+                : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            {candidate.rejected ? "Restore" : "Reject"}
+          </button>
+          {onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              aria-label={`Remove ${candidate.origin}`}
+              className="rounded-md p-1 text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X aria-hidden className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function extractBodyPreview(source: string): string {
+  // Strip leading YAML front-matter, then collapse whitespace runs.
+  const stripped = source.replace(/^---[\s\S]*?\n---\n/, "").trim();
+  return stripped.replace(/\n{3,}/g, "\n\n");
 }
 
 function countWords(text: string): number {
