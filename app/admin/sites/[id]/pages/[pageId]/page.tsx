@@ -3,8 +3,9 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
+import { Alert } from "@/components/ui/alert";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
-import { H1 } from "@/components/ui/typography";
+import { H1, H3 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
 import { RegenerateButton } from "@/components/RegenerateButton";
@@ -92,12 +93,9 @@ export default async function PageDetail({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <div
-        role="alert"
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-      >
-        Failed to load page: {result.error.message}
-      </div>
+      <Alert variant="destructive" title="Failed to load page">
+        {result.error.message}
+      </Alert>
     );
   }
 
@@ -224,12 +222,12 @@ export default async function PageDetail({
       </section>
 
       <section className="mt-8">
-        <h2 className="text-sm font-semibold">
+        <H3>
           Re-generation history{" "}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-xs font-normal text-muted-foreground">
             ({regenJobs.length})
           </span>
-        </h2>
+        </H3>
         <p className="text-xs text-muted-foreground">
           Each row is one operator-triggered re-run against the current design
           system. Cost + tokens come from Anthropic; failures carry their
