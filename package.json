@@ -41,6 +41,7 @@
     "react-dom": "^18.3.1",
     "server-only": "^0.0.1",
     "sonner": "^2.0.7",
+    "ssh2-sftp-client": "^12.1.1",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
     "zod": "^4.0.0"
@@ -56,6 +57,7 @@
     "@types/pg": "^8.20.0",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
+    "@types/ssh2-sftp-client": "^9.0.6",
     "@vitest/coverage-v8": "^4.1.5",
     "@vitest/ui": "^4.1.4",
     "autoprefixer": "^10.4.20",
