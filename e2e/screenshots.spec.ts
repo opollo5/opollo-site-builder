@@ -168,11 +168,17 @@ test.describe("A-0 visual regression screenshot harness", () => {
           }
           // Mask "updated N minutes ago" style relative timestamps so a
           // clock tick between PRs doesn't reorder the diff.
+          // R1-9 — override Playwright's default magenta maskColor (which
+          // appeared on the Sites list UPDATED column as bright pink
+          // blocks in operator review). Use a subtle muted gray that
+          // blends with the canvas tint so the screenshot reads as
+          // "this column has dynamic text" rather than "broken styling."
           const masks = await page.locator("[data-screenshot-mask]").all();
           await page.screenshot({
             path: filePath,
             fullPage: true,
             mask: masks,
+            maskColor: "#e5e7eb",
             animations: "disabled",
           });
           // C-3 — run axe-core on every captured route. Findings

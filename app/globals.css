@@ -12,7 +12,11 @@
     --popover-foreground: 222.2 84% 4.9%;
     --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
+    /* R1-4 — bumped from 210 40% 96.1% so secondary buttons read
+       against the bg-canvas (220 14% 96%) wash. Now sits ~9 percentage
+       points darker than canvas — visible but still subordinate to
+       primary. */
+    --secondary: 220 13% 87%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
@@ -48,7 +52,9 @@
     --popover-foreground: 210 40% 98%;
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    /* R1-4 — secondary in dark mode lifted slightly so it reads
+       against the dark --background. */
+    --secondary: 217.2 32.6% 25%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
