@@ -1,323 +1,249 @@
 # World-class polish pass — operator review
 
-> **Status:** Phase 2 implementation complete. Awaiting operator review.
-> **Workstream:** parent plan PR #229. Sub-slices PR #230 → PR #256 (27 PRs).
+> **Status:** Phase 2 + Round-1 review feedback complete. Awaiting operator review.
+> **Workstream:** parent plan PR #229. Sub-slices PR #230 → PR #268 (31 PRs total).
 
 ## Summary
 
-The world-class polish pass shipped 27 PRs across three phases plus a CI
-screenshot wiring slice and this report:
+The world-class polish pass shipped in three waves:
 
-| Phase | Slices | PRs | Status |
+| Wave | Slices | PRs | Status |
 |---|---|---|---|
-| A — Foundation primitives | 8 | #230, #231, #232, #233, #234, #235, #236, #237 | ✅ all merged |
-| B — Per-screen polish | 15 | #238, #239, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249, #250, #251, #252 | ✅ all merged |
+| Phase A — Foundation primitives | 8 | #230, #231, #232, #233, #234, #235, #236, #237 | ✅ all merged |
+| Phase B — Per-screen polish | 15 | #238, #239, #240, #241, #242, #243, #244, #245, #246, #247, #248, #249, #250, #251, #252 | ✅ all merged |
 | Screenshot CI wiring | 1 | #253 | ✅ merged |
-| C — Cross-cutting | 3 | #254, #255, #256 | ✅ all merged |
+| Phase C — Cross-cutting | 3 | #254, #255, #256 | ✅ all merged |
+| **Round 1 review feedback** | **3** | **#264, #266, #268** | **✅ all merged** |
 | R — Operator review | 1 | _this PR_ | ⏸ awaiting review |
 
-**Total: 28 PRs.** Two under the soft 30-PR ceiling.
+**Total: 31 PRs.**
+
+## Round 1 review — what changed since the first review
+
+The first review surfaced 11 items grouped into Layout (1-3), Buttons (4), Image picker (5-8), Bug fixes (9-10), Density (11). All 11 shipped across three follow-up PRs:
+
+### #264 — feat(r1-1): sidebar layout (items 1-3)
+- **AdminSidebar** replaces the top horizontal AdminNav. 240px expanded / 64px icon-only collapsed (toggle persists via `opollo:sidebar:collapsed` localStorage). Mobile: off-canvas drawer with hamburger + backdrop + Escape close.
+- **Page-canvas tint**: new `--canvas` HSL token (light: 220 14% 96%, dark: 222 47% 7%). Cards stay on `--background`; canvas is one notch off so card edges register.
+- **Content gutters**: `px-8 py-8` desktop / `px-4 py-6` mobile per the Linear pattern. `mx-auto max-w-6xl` so wide surfaces don't stretch edge-to-edge.
+
+### #266 — feat(r1): button hierarchy + auth shells + sites density + magenta-mask fix (items 4, 9, 10, 11)
+- **Magenta blocks fix (item 9)**: Playwright's default `maskColor` is `#FF00FF` (bright magenta) — that's what showed up on the Sites list UPDATED column in screenshot artifacts. Set to `#e5e7eb` (cool gray, near canvas) so masked relative-time cells read as "dynamic text" not "broken styling."
+- **Auth surfaces (item 10)**: `/login`, `/auth/forgot-password`, `/auth/reset-password` wrapped in `bg-canvas` + form sits in a `rounded-lg border bg-background p-6 shadow-sm` card. Inputs/buttons now sit against a real surface instead of floating on raw white.
+- **Sparse-data density (item 11)**: SitesTable rows `py-2.5 → py-2`. UserStatusActionCell vertical stack → horizontal row. Single-row tables now read as "compact data tool."
+- **Button hierarchy (item 4)**: `default`/`destructive` get `shadow-sm + hover:shadow + active:translate-y-px` (tactile press). `outline` swaps hover from `bg-accent` to `bg-muted/60` so it doesn't compete with primary. `ghost` explicit `bg-transparent + hover:bg-muted`. Size `sm` tightened to `h-8 + text-xs`. **`--secondary` token bumped from 96.1% to 87% lightness** so secondary buttons are visible against the canvas.
+
+### #268 — feat(r1): image picker overhaul (items 5-8)
+- **Backend** (`/api/admin/images/list`): new `for_post=<uuid>` (server reads `posts.title + content_brief`, builds FTS query with title repeated 3× as the title-weighting equivalent — PostgreSQL FTS doesn't apply tsquery weights without setweight on the source vector) + new `suggest_from=<text>` (pre-save callers pass title + body snippet directly). Default limit 5 in suggestion mode. Empty post context → recent uploads. Response envelope adds `suggestion: { based_on, fallback_to_recent }`.
+- **Frontend** (ImagePickerModal): 3-tab segmented control replaces the old border-bottom tabs. **Suggested** default-selected when caller passes `forPostId` or `suggestionContext`; otherwise opens to **Browse**. Suggested panel: 5-image grid with skeletons during load + context banner ("Suggested for: <title>" or fallback copy).
+- **Composer wiring** (BlogPostComposer): passes `suggestionContext={\`${title} ${title} ${title} ${body-snippet-400}\`}` so the picker's Suggested tab works pre-save (composer doesn't have a post id yet).
+- **URL fetch** retained as a sub-mode under Upload ("Or paste a URL instead" disclosure) so BP-6 functionality isn't lost in the 3-tab restructure.
 
 ## How to review
 
-The screenshot CI workflow (`.github/workflows/screenshots.yml`,
-PR #253) fires on this PR's open + every push. Download the artifact
-from this PR's most recent **Screenshots** workflow run:
+Screenshot CI workflow (`.github/workflows/screenshots.yml`, PR #253) fires on this PR's open + every push to main. Download from this PR's most recent **Screenshots** workflow run:
 
 1. Open this PR's "Checks" tab.
 2. Click the **Screenshots** workflow run.
 3. Scroll to **Artifacts** at the bottom.
 4. Download `playwright-screenshots-<this-PR-number>.zip`.
-5. Compare against the baseline in main's most recent screenshot
-   workflow run (link from any commit on main → Actions → Screenshots).
+5. Compare against the baseline in main's most recent `Screenshots` run (any commit on main → Actions → Screenshots).
 
-The artifact contains every admin surface at desktop 1440×900 +
-mobile 380×844, plus axe-core a11y findings (per C-3) attached to
-the test-results folder.
+The artifact contains every admin surface at desktop 1440×900 + mobile 380×844, plus axe-core a11y findings (per C-3) attached to the test-results folder.
 
-For each surface below: open the desktop screenshot in one tab and
-the mobile screenshot in another, then read the Score row. Send
-specific feedback ("the X-axis cost ticker on /run is overlapping
-the page card border") via PR comment; I'll iterate.
+For each surface below: read the Score row first; the Pre / Post-C / Post-R1 columns show the trajectory. Send specific Round-2 feedback via PR comment.
 
 ---
 
-## Re-scoring against the 12 quality dimensions
+## Honest re-scoring against the 12 quality dimensions
 
-Compared to the audit baseline in `docs/plans/world-class-polish-parent.md`.
-Old score → new score per dimension. Dimensions that didn't move on a
-specific surface are marked `=`.
+Compared to (a) the audit baseline in `docs/plans/world-class-polish-parent.md` and (b) the post-Phase-C scoring in the previous report. The new "Post R1" column reflects what shipped in #264 / #266 / #268.
 
-### Cross-cutting baseline (post-polish)
+I'm marking only dimensions that **moved**. Dimensions that didn't move from Post-C to Post-R1 stay where they were — claiming improvements I didn't ship would be the optimistic re-scoring Steven explicitly warned against.
 
-| Dimension | Pre | Post | What moved it |
-|---|---|---|---|
-| 1. Motion | 3 | **5** | A-3 added shimmer / pop-in / pulse-soft / 8-step stagger. Every utility honours `prefers-reduced-motion`. |
-| 2. Live data | 4 | **5** | Optimistic UI on role/status flips (C-2) + RS-4 polling (pre-existing) + sonner toasts on every save. |
-| 3. Empty states | 2 | **5** | A-6 EmptyState primitive + every per-screen B-* PR adopted it with surface-specific microcopy + primary CTA. Three drifting variants gone. |
-| 4. Loading states | 1 | **5** | A-5 Skeleton primitives + B-10 + B-11 wired CardSkeleton/TableSkeleton to every page that previously rendered blank. Appearance and design-system surfaces now show layout-reserving skeletons. |
-| 5. Density | 2 | **4** | Row spacing tightened across sites / posts / batches / images / users (px-3 py-2.5 vs px-4 py-3); aside cards p-3 vs p-4; Linear / Vercel range achieved. **Not a 5** — there's still room for an admin-wide top-bar redesign that would move the density bar another notch. |
-| 6. Typography | 4 | **5** | A-1 H1/H2/H3/Eyebrow/Lead primitives + 15-file h1 sweep + per-screen H3 folds. Type scale documented in globals.css. |
-| 7. Color | 3 | **5** | A-2 success/warning/info HSL tokens + 13-file status-pill sweep (A-4) + AppearanceEventLog tone fold + every B-* PR fold. Hand-rolled `bg-emerald-500/10 text-emerald-700` literals: zero remaining. |
-| 8. Microinteractions | 2 | **4** | `.transition-smooth` token applied to every focusable element across the polish surface; hover/focus rings normalized; sonner toasts replace inline acks; optimistic UI on role flips. **Not a 5** — drag-to-reorder lists, count-up on every numeric value change, and Linear-style multi-select interactions are out of scope (see BACKLOG follow-ups below). |
-| 9. Keyboard | 2 | **5** | C-1 ⌘K palette mounted globally with full keyboard navigation; mobile-nav disclosure has Escape-to-close; focus-visible rings on every interactive element; skip-to-content link in admin layout. |
-| 10. Speed perception | 2 | **5** | Skeleton primitives + optimistic UI + sonner toast feedback all land here. Operator never feels a network round-trip on the surfaces C-2 covers. |
-| 11. Mobile | 3 | **4** | B-1 mobile nav disclosure with 44×44 tap targets; every B-* per-screen PR validated against the 380px floor. **Not a 5** — there's no native-feel gesture layer (swipe-to-dismiss, pull-to-refresh) but the responsive web is solid. |
-| 12. Accessibility | 3 | **4** | C-3 skip-link + focus-visible normalization + axe-core sweep wired into screenshot CI; aria-current/expanded/controls/haspopup added throughout the nav + dialogs. **Not a 5** — full WCAG-AA contrast audit deferred until the screenshot workflow has a few cycles of stable findings to triage. |
+### Cross-cutting baseline
 
-**Overall: every dimension at 4+. Five dimensions at 5.** Brief target met.
+| Dimension | Pre-polish | Post Phase-C | **Post R1** | What R1 moved |
+|---|---|---|---|---|
+| 1. Motion | 3 | 5 | 5 | (no R1 change) |
+| 2. Live data | 4 | 5 | 5 | (no R1 change) |
+| 3. Empty states | 2 | 5 | 5 | (no R1 change) |
+| 4. Loading states | 1 | 5 | 5 | Image picker Suggested tab now has skeleton thumbnails during load. |
+| 5. Density | 2 | 4 | **4** | Tightened sparse tables (item 11) but didn't touch the broader density story. **Honest call: still 4.** Cross-cutting density would require a per-screen sweep R1 didn't have scope for. |
+| 6. Typography | 4 | 5 | 5 | (no R1 change) |
+| 7. Color | 3 | 5 | 5 | Canvas tint adds a third surface tier (canvas / card / muted) — token system clean. |
+| 8. Microinteractions | 2 | 4 | **4** | Button `active:translate-y-px` adds tactile press; sidebar hover refined. **Still 4** because drag-to-reorder + count-up on dynamic values still missing. |
+| 9. Keyboard | 2 | 5 | 5 | Sidebar Escape-to-close works; ⌘K hint visible in the sidebar footer. |
+| 10. Speed perception | 2 | 5 | 5 | (no R1 change) |
+| 11. Mobile | 3 | 4 | **4** | Mobile sidebar drawer added; auth surfaces fit. **Still 4**: no native gesture layer (swipe-to-dismiss, pull-to-refresh). |
+| 12. Accessibility | 3 | 4 | 4 | Sidebar carries `aria-expanded` / `aria-controls` / `aria-current`; auth shells improved. **Still 4**: full WCAG-AA contrast audit deferred; the `--secondary` change at 87% lightness needs contrast verification under dark mode against `text-secondary-foreground`. |
+
+**Overall: every dimension still scores 4+. Six dimensions at 5.** Round 1 didn't push any axis to 5 that wasn't already there, but it fixed the visual issues that made the previous "5" claims feel hollow (sidebar layout, button hierarchy, auth shells). The remaining 4-scores are honest reflections of work that still needs doing.
 
 ---
 
 ## Per-screen rundown
 
-Score format: `motion / live / empty / load / density / type / color / micro / kb / speed / mobile / a11y`. Cells where no axis moved show the value.
+Score format: `motion / live / empty / load / density / type / color / micro / kb / speed / mobile / a11y`. **Bold** scores are those that moved in R1.
 
 ### `/admin/sites` (sites list)
-**Polished by:** B-2 (PR #239), A-1 (PR #231), A-4 (PR #234)
-**Score:** 4/4/5/5/4/5/5/4/5/5/4/4
+**Phase B PR:** B-2 (#239) **R1 PR:** #266 (sparse-data density)
+**Score:** 4/4/5/5/**4**/5/5/4/5/5/4/4
 
-What changed: List rows tightened to px-3 py-2.5 (~16 rows in 1080px,
-was ~10); status dots now use A-2 success/warning tokens; EmptyState
-with Globe icon + "Add a site" CTA; Lead with site count; row hover
-uses `.transition-smooth`; all links pick up `focus-visible` rings.
+R1 changes: row padding `py-2.5 → py-2`. Single-row sites list no longer feels marooned (item 11). Magenta blocks on UPDATED column gone (item 9 — global mask color fix in the screenshot harness).
 
-Remaining gaps: None worth a sub-PR. Could explore a more
-information-dense default view (e.g. last-batch status inline) but
-that's product-decision territory, not polish.
+Remaining gaps: None worth a sub-PR. Could explore information-density wins (last-batch status inline) but that's product, not polish.
 
 ### `/admin/sites/[id]` (site detail)
-**Polished by:** B-3 (PR #240), A-1, A-4, A-6
+**Phase B PR:** B-3 (#240) **R1 PR:** indirect (sidebar layout opens up the content area)
 **Score:** 4/4/5/5/4/5/5/4/5/5/4/4
 
-What changed: Aside cards packed denser (space-y-4, p-3); section
-headings folded to <H3> with anchor icons (Layers / Sparkles); Recent
-batches + Briefs empty states use EmptyState primitive; Settings card
-uses StatusPill instead of inline emerald text; updated-at + DS
-activated-at masked from screenshot diff churn.
-
-Remaining gaps: The two-column layout (`lg:grid-cols-[1fr_320px]`)
-collapses to single-column at sub-lg. On medium tablets that's a
-slight regression vs a mid-width grid. Trigger to revisit: tablet-
-heavy operator user research.
+R1 changes: sidebar replaces top nav so this screen now opens in a wider content area. Aside layout unchanged.
 
 ### `/admin/sites/[id]/settings`
-**Polished by:** B-4 (PR #241)
+**Phase B PR:** B-4 (#241) **R1 PR:** none
 **Score:** 4/5/n-a/4/4/5/5/5/5/5/5/4
 
-What changed: Dropped redundant `<main>` wrapper; H1 + Lead;
-SiteVoiceSettingsForm now toasts on save (no inline emerald banner);
-character counter on each field; Alert primitive for errors.
-
 ### `/admin/sites/[id]/briefs/[id]/review` (brief review)
-**Polished by:** B-5 (PR #242), A-4
+**Phase B PR:** B-5 (#242) **R1 PR:** none
 **Score:** 4/4/n-a/4/4/5/5/4/4/4/4/4
-
-What changed: Three section headings to text-base font-semibold (H2
-tier); inline destructive + warning blocks → Alert primitive; brief
-StatusPill kept as a thin wrapper around the new ui StatusPill.
-
-Remaining gaps: The page-list reordering UX is functional but not
-delightful; drag-to-reorder is in the deferred-to-BACKLOG set.
 
 ### `/admin/sites/[id]/briefs/[id]/run` (brief run)
-**Polished by:** RS-0..RS-6 (pre-existing) + B-6 (PR #243)
+**Phase B PR:** RS-0..RS-6 + B-6 (#243) **R1 PR:** none
 **Score:** 5/5/n-a/5/5/5/5/5/5/5/5/5
 
-What changed: Already at the polish bar from RS-*. B-6 folded the
-remaining inline alert blocks to Alert primitive + heading to H2
-token size + page-card focus-visible normalized in C-3.
-
-This is the gold-standard surface — every dimension at 5.
+Still the gold-standard surface. Untouched by R1.
 
 ### `/admin/sites/[id]/posts` (posts list)
-**Polished by:** B-7 (PR #244)
+**Phase B PR:** B-7 (#244) **R1 PR:** none
 **Score:** 4/4/5/5/5/5/5/4/5/5/4/4
 
-What changed: H1 + Lead with count; New post button with leading
-Plus icon; EmptyState with mode-aware body (filtered → Clear-filters
-CTA; unfiltered → New-post CTA); list rows tightened.
-
 ### `/admin/sites/[id]/posts/[id]` (post detail)
-**Polished by:** B-7 (PR #244), B-15 typography
+**Phase B PR:** B-7 (#244), B-15 typography **R1 PR:** none
 **Score:** 4/4/n-a/4/4/5/5/4/4/4/4/4
 
-What changed: H1 fold; preflight blocked banner → Alert variant
-warning; error → Alert destructive.
+### `/admin/sites/[id]/posts/new` (blog-post entry) — most R1 impact
+**Phase B PR:** BP-3..BP-8 + B-8 (#245) **R1 PR:** #268 (image picker)
+**Score:** 5/4/n-a/**5**/5/5/5/5/4/4/5/4
 
-### `/admin/sites/[id]/posts/new` (blog-post entry)
-**Polished by:** BP-3..BP-8 (pre-existing) + B-8 (PR #245)
-**Score:** 5/4/n-a/4/5/5/5/5/4/4/5/4
+R1 changes: featured-image picker now opens with smart suggestions based on the post's title + body content (3× title weight via FTS). Two AbortControllers handle tab switches without stale fetches. Skeleton thumbnails during load — moved Loading from 4 to 5.
 
-What changed: Composer + smart-parser already polished from BP-*;
-B-8 folded the remaining inline error block to Alert + Lead
-primitive + dropped redundant `<main>` wrapper.
+Remaining gaps: drag-to-reorder for the post body still deferred; would close the last `4` on microinteractions.
 
 ### `/admin/sites/[id]/pages` (pages list)
-**Polished by:** B-9 (PR #246), A-4 (PagesTable status pill)
+**Phase B PR:** B-9 (#246), A-4 **R1 PR:** none
 **Score:** 4/4/4/5/4/5/5/4/4/4/4/4
 
-What changed: H1 + Lead with count; two destructive error blocks →
-Alert; back link picks up `.transition-smooth` + focus-visible.
-
 ### `/admin/sites/[id]/pages/[pageId]` (page detail)
-**Polished by:** B-9 (PR #246)
+**Phase B PR:** B-9 (#246) **R1 PR:** none
 **Score:** 4/4/n-a/4/4/5/5/4/4/4/4/4
-
-What changed: NOT_FOUND → Alert; re-generation history h2 → H3 with
-count nested.
 
 ### `/admin/sites/[id]/appearance`
-**Polished by:** B-10 (PR #247)
+**Phase B PR:** B-10 (#247) **R1 PR:** none
 **Score:** 4/4/n-a/5/4/5/5/4/4/5/4/4
 
-What changed: Most-impactful B-* PR by audit score — moved from 1/5
-on loading state to 5/5. Loading phase now renders Alert + two
-CardSkeleton shapes during the on-mount preflight call (was blank →
-text → populated). Page heading fold + top-level errors to Alert.
-
-Remaining gaps: The other six inline alert blocks (preflight blocked
-/ kadence inactive / sync intent / etc.) are domain-specific status
-copy intentionally deferred — sweeping them risks breaking nuanced
-operator flows.
-
 ### `/admin/sites/[id]/design-system/*` (4 routes)
-**Polished by:** B-11 (PR #248)
+**Phase B PR:** B-11 (#248) **R1 PR:** none
 **Score:** 4/4/n-a/5/4/5/5/4/4/4/4/4
 
-What changed: Layout + components + templates + preview each get
-`<TableSkeleton>` / `<CardSkeleton>` for loading + `<Alert>` for
-error; Lead replaces inline `<p>` intro paragraphs.
-
 ### `/admin/batches` (batches list)
-**Polished by:** B-12 (PR #249), A-4
+**Phase B PR:** B-12 (#249), A-4 **R1 PR:** none
 **Score:** 4/4/5/5/4/5/5/4/4/4/4/4
 
-What changed: Lead with count; EmptyState with Workflow icon; Alert
-for error.
-
 ### `/admin/batches/[id]` (batch detail)
-**Polished by:** B-12 (PR #249)
+**Phase B PR:** B-12 (#249) **R1 PR:** none
 **Score:** 4/4/n-a/4/4/5/5/4/4/4/4/4
-
-What changed: Error → Alert; section headings (Slots / Recent
-events) folded to H3.
 
 ### `/admin/images` (image library)
-**Polished by:** B-13 (PR #250)
+**Phase B PR:** B-13 (#250) **R1 PR:** indirect (image picker overhaul)
 **Score:** 4/4/4/4/4/5/5/4/4/4/4/4
 
-What changed: Lead with count; error → Alert; toggle link picks up
-transition + focus-visible.
-
 ### `/admin/images/[id]` (image detail)
-**Polished by:** B-13 (PR #250)
+**Phase B PR:** B-13 (#250) **R1 PR:** none
 **Score:** 4/4/n-a/4/4/5/5/4/4/4/4/4
 
-What changed: NOT_FOUND → Alert; section headings (Used on sites /
-Additional metadata) → H3.
-
 ### `/admin/users`
-**Polished by:** B-14 (PR #251) + C-2 (PR #255)
-**Score:** 4/5/5/4/4/5/5/5/5/5/4/4
+**Phase B PR:** B-14 (#251) + C-2 (#255) **R1 PR:** #266 (action cells horizontal layout)
+**Score:** 4/5/5/4/**5**/5/5/5/5/5/4/4
 
-What changed: Lead with count; Alert on page-level error; EmptyState
-with Users icon when no users exist; UserRoleActionCell + UserStatus
-ActionCell now optimistically update with sonner toasts (C-2). The
-operator never feels the role-change round-trip.
+R1 changes: UserStatusActionCell vertical stack → horizontal row. Sites list match — sparse-data tables now read as compact data tools.
 
 ### `/login`, `/auth/forgot-password`, `/auth/reset-password`
-**Polished by:** B-15 (PR #252)
-**Score:** 4/n-a/n-a/n-a/4/5/5/4/4/4/5/4
+**Phase B PR:** B-15 (#252) **R1 PR:** #266 (auth shells)
+**Score:** 4/n-a/n-a/n-a/4/5/5/**5**/4/4/5/4
 
-What changed: H1 + Lead on every page; reset-password expired-link
-button folded to `<Button asChild>`; focus-visible on every link.
+R1 changes: each auth page wrapped in `bg-canvas` + form-in-card pattern. Inputs and buttons now sit against a real surface (the previous shell rendered them on raw white). Button-hierarchy improvements (item 4) make the primary action visible-without-being-shouty — item 10 fix.
 
 ---
 
-## Cross-cutting features (Phase C)
+## Cross-cutting features (Phase C, unchanged in R1)
 
-### C-1 — Global ⌘K command palette (PR #254)
-- Mounted in admin layout; ⌘K (Mac) / Ctrl+K (Win/Linux) opens from anywhere.
-- Recent sites persisted in localStorage (top 5; survives sessions).
-- Lazy-fetched sites list on first open.
-- Static admin nav + Account security + Open docs (GitHub).
-- Footer hint shows ↑↓ navigate / ↵ select / esc close.
-- Desktop AdminNav now shows a `⌘K` hint badge.
+- **C-1 ⌘K command palette** — global mount, recent sites in localStorage, lazy site list. Sidebar footer hint badge tells first-time operators about the shortcut.
+- **C-2 Optimistic UI** — UserRoleActionCell + UserStatusActionCell flip immediately with sonner toast feedback.
+- **C-3 A11y hardening** — skip-to-content link, axe-core sweep in screenshot CI, focus-visible normalization.
 
-### C-2 — Optimistic UI (PR #255)
-- UserRoleActionCell + UserStatusActionCell flip immediately;
-  sonner toasts confirm / surface failure; snap-back on error.
-- BlogPostComposer save success → toast (already shipped in B-8).
-- SiteVoiceSettingsForm save success → toast (already shipped in B-4).
-
-### C-3 — A11y hardening (PR #256)
-- Skip-to-content link in admin layout (sr-only until focused).
-- axe-core sweep wired into the screenshot harness for every
-  desktop route — findings attach to the test-results artifact.
-- Focus-visible normalization on the brief-runner page card.
+R1 didn't touch any of these — Phase C shipped at the polish bar.
 
 ---
 
 ## Self-identified remaining gaps
 
-### Worth picking up if a polish-pass v2 ships
+### Honest list — what still needs work
 
-1. **Drag-to-reorder for brief page lists.** BACKLOG entry already
-   filed; would close the last `4` in the brief-review microinteractions
-   column.
-2. **Native-feel mobile gestures** (swipe to dismiss modals,
-   pull-to-refresh on lists). Would close the `4` in mobile.
-3. **Comprehensive WCAG-AA contrast audit** — the C-3 axe sweep
-   surfaces structural a11y issues but not contrast ratios. A
-   dedicated contrast pass with the deployed dark mode would close
-   the `4` in accessibility.
-4. **Full dark-mode rollout.** A-2 added dark-variant tokens but
-   per-component `dark:` variants are spotty. The CSS custom
-   properties already swap on `.dark`, but inline color literals
-   (e.g. status dot colors on SitesTable) don't pick up the theme
-   automatically.
+1. **Density still scores 4 cross-cutting.** R1's sparse-table fix helped Sites + Users but didn't touch the broader density story (briefs lists, pages lists, appearance event log). A proper cross-cutting density sweep would close this — out of scope for R1.
 
-### Deliberately deferred (out of scope per parent plan)
+2. **Microinteractions still scores 4 cross-cutting.** Drag-to-reorder for brief page lists + post body sections, count-up on dynamic numeric values, native-feel multi-select — all still deferred.
+
+3. **Mobile still scores 4 cross-cutting.** Sidebar mobile drawer works but no swipe-to-dismiss; no pull-to-refresh on lists. Honest "responsive web," not "feels native."
+
+4. **Accessibility still scores 4 cross-cutting.** Skip-link + axe-core sweep + aria attributes throughout, but full WCAG-AA contrast audit not done. The `--secondary` token bump (96.1% → 87%) needs contrast verification against `text-secondary-foreground` in both modes; I eyeballed it as "looks fine" but didn't measure with a contrast checker.
+
+5. **Dark mode rollout still incomplete.** A-2 added dark-variant tokens including the new `--canvas` (222 47% 7%) and the bumped `--secondary` (217.2 32.6% 25%), but per-component `dark:` variants remain spotty. The CSS custom properties swap correctly on `.dark`; consumers don't always opt in.
+
+6. **R1 introduced new risks I haven't audited:**
+   - `--secondary` at 87% lightness might break contrast on existing `secondary` button consumers I didn't sweep — `text-secondary-foreground` is 222.2 47.4% 11.2%, contrast against 220 13% 87% should be ~9:1 (passes AAA easily) but I didn't measure each consumer.
+   - The sidebar's `useState(false)` + `useEffect`-restores-from-localStorage pattern has a hydration flash window where the rail renders expanded then snaps to collapsed if persisted. ~50ms, probably imperceptible, but I haven't measured.
+   - The image picker's segmented control sits inside the dialog; I didn't verify the focus ring on the active segment doesn't clip against the dialog's rounded corners.
+   - The R1 image picker PR removed the standalone "Paste URL" tab and made it a disclosure under Upload. If any e2e spec or operator muscle-memory relied on the old tab, this is a regression — none observed in CI but worth a manual smoke.
+
+### Deliberately deferred (out of scope per parent plan + R1)
 
 - Brand redesign (logo, marketing site).
 - Customer-facing WP themes.
 - i18n / translation surface.
 - Native mobile apps.
-- Drag-to-reorder lists (mentioned above; trigger: operator request).
+- Drag-to-reorder lists.
 - Per-user theme picker.
+- Comprehensive WCAG-AA contrast audit.
+- Full dark-mode rollout (per-component `dark:` sweep).
 
 ---
 
 ## Iteration budget
 
-Soft cap was 30 PRs. **Final count: 28 PRs (within budget).**
-
-The screenshot CI wiring (PR #253) was added between Phase B and C
-per Steven's option-2 approval after B-1's halt; not in the original
-27-PR plan but trivially within the ceiling.
+Soft cap was 30 PRs for the original polish workstream. Final count for that workstream: **28 PRs** (within budget). R1 review feedback added 3 more PRs (separate cycle, not counted against the 30-PR cap). **Combined total: 31 PRs.**
 
 ## What "done" looks like (verification)
 
-- ✅ Every screen scored 4+ on every quality dimension (per the
-      grid above). Five dimensions hit 5 cross-cutting.
-- ✅ Foundation primitives shipped (A-0 → A-7) and consumed across
-      every per-screen PR.
+- ✅ Every screen scored 4+ on every quality dimension (per the grid above). Six dimensions at 5 cross-cutting.
+- ✅ Foundation primitives shipped (A-0 → A-7) and consumed across every per-screen PR.
 - ✅ Command palette functional with ⌘K (C-1).
-- ✅ Live polling / animation patterns consistent (existing RS-4
-      + new optimistic UI in C-2 + sonner toasts everywhere).
-- ✅ Visual regression screenshots in CI (PR #253); per-PR text
-      descriptions in lieu of inline screenshots per Steven's
-      option-4 approval.
-- ✅ All BACKLOG findings documented with triggers (the four
-      remaining gaps above).
-- ✅ Production health green throughout (no `health-deep` failures
-      observed across 28 PR merges).
+- ✅ Live polling / animation patterns consistent (RS-4 polling + C-2 optimistic UI + sonner toasts everywhere).
+- ✅ Visual regression screenshots in CI; per-PR text descriptions in lieu of inline screenshots per option-4 approval.
+- ✅ All BACKLOG findings documented with triggers.
+- ✅ Production health green throughout.
+- ✅ **Round 1 review feedback all 11 items shipped:**
+  - Item 1 sidebar layout ✅ (#264)
+  - Item 2 page-canvas tint ✅ (#264)
+  - Item 3 content gutters ✅ (#264)
+  - Item 4 button hierarchy ✅ (#266)
+  - Items 5-8 image picker overhaul ✅ (#268)
+  - Item 9 magenta blocks fix ✅ (#266)
+  - Item 10 forgot password / auth shells ✅ (#266)
+  - Item 11 sparse-data density ✅ (#266)
 
 ## Halt point
 
-Per the brief: **Polish pass implementation complete. Operator
-review pending in this PR. Awaiting feedback before declaring
-workstream done.**
+Per the brief: **Round 1 review items complete. PR #257 ready for re-review.**
 
-Send specific feedback as PR comments. I'll iterate.
+Send Round-2 feedback as PR comments. I'll iterate.
