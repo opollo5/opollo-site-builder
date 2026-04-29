@@ -5,6 +5,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   StatusPill,
   briefStatusKind,
@@ -12,7 +13,8 @@ import {
   jobStatusKind,
   siteStatusKind,
 } from "@/components/ui/status-pill";
-import { H1 } from "@/components/ui/typography";
+import { H1, H3 } from "@/components/ui/typography";
+import { FileText, Layers, Sparkles, Workflow } from "lucide-react";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -144,25 +146,25 @@ export default async function SiteDetailPage({
               { label: site.name },
             ]}
           />
-          <H1 className="mt-1">{site.name}</H1>
-          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <H1 className="mt-2">{site.name}</H1>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
             <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
             <a
               href={site.wp_url}
               target="_blank"
               rel="noreferrer"
-              className="hover:underline"
+              className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               {site.wp_url}
             </a>
             <Link
               href={`/admin/sites/${site.id}/pages`}
-              className="hover:text-foreground hover:underline"
+              className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
               data-testid="site-pages-link"
             >
               Pages →
             </Link>
-            <span>updated {formatDate(site.updated_at)}</span>
+            <span data-screenshot-mask>updated {formatDate(site.updated_at)}</span>
           </div>
         </div>
         <SiteDetailActions
@@ -172,22 +174,33 @@ export default async function SiteDetailPage({
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-8">
+        <div className="space-y-6">
          <section>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Recent batches</h2>
+            <H3>Recent batches</H3>
             <Link
               href={`/admin/batches?site_id=${encodeURIComponent(site.id)}`}
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               View all →
             </Link>
           </div>
           <div className="mt-2 overflow-x-auto rounded-md border">
             {(batches ?? []).length === 0 ? (
-              <p className="p-6 text-center text-xs text-muted-foreground">
-                No batches yet. Click &ldquo;Run batch&rdquo; to generate your first.
-              </p>
+              <div className="p-3">
+                <EmptyState
+                  density="compact"
+                  icon={Workflow}
+                  iconLabel="No batches"
+                  title="No batches yet"
+                  body={
+                    <>
+                      Run a batch to generate multiple pages from a template
+                      against the active design system.
+                    </>
+                  }
+                />
+              </div>
             ) : (
               <table className="w-full text-xs">
                 <thead>
@@ -244,14 +257,25 @@ export default async function SiteDetailPage({
 
         <section>
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Briefs</h2>
+            <H3>Briefs</H3>
             <UploadBriefButton siteId={site.id} />
           </div>
           <div className="mt-2 overflow-x-auto rounded-md border">
             {briefs.length === 0 ? (
-              <p className="p-6 text-center text-xs text-muted-foreground">
-                No briefs yet. Upload a document to generate a whole site from a single brief.
-              </p>
+              <div className="p-3">
+                <EmptyState
+                  density="compact"
+                  icon={FileText}
+                  iconLabel="No briefs"
+                  title="No briefs yet"
+                  body={
+                    <>
+                      Upload a single markdown / text document and Opollo
+                      parses it into a list of pages, then generates each one.
+                    </>
+                  }
+                />
+              </div>
             ) : (
               <table className="w-full text-xs">
                 <thead>
@@ -292,10 +316,10 @@ export default async function SiteDetailPage({
         </section>
         </div>
 
-        <aside className="space-y-6">
-          <div>
+        <aside className="space-y-4">
+          <div className="rounded-lg border p-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Budget</h2>
+              <H3>Budget</H3>
               {isAdmin && tenantBudget && (
                 <EditTenantBudgetButton
                   budget={{
@@ -312,87 +336,100 @@ export default async function SiteDetailPage({
             </div>
           </div>
 
-          <h2 className="text-sm font-semibold">Design system</h2>
-          <div className="mt-2 rounded-md border p-3 text-xs">
-            {ds ? (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Version {String(ds.version)}</span>
-                  <StatusPill kind={dsStatusKind(ds.status as Parameters<typeof dsStatusKind>[0])} />
-                </div>
-                <p className="mt-1 text-muted-foreground">
-                  Activated {formatDate(ds.activated_at as string | null)}
-                </p>
-                <div className="mt-2 flex flex-col gap-1">
+          <div className="rounded-lg border p-3">
+            <H3>Design system</H3>
+            <div className="mt-2 text-xs">
+              {ds ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Version {String(ds.version)}</span>
+                    <StatusPill kind={dsStatusKind(ds.status as Parameters<typeof dsStatusKind>[0])} />
+                  </div>
+                  <p className="mt-1 text-muted-foreground" data-screenshot-mask>
+                    Activated {formatDate(ds.activated_at as string | null)}
+                  </p>
+                  <div className="mt-2 flex flex-col gap-0.5">
+                    <Link
+                      href={`/admin/sites/${site.id}/design-system`}
+                      className="text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                    >
+                      Overview →
+                    </Link>
+                    <Link
+                      href={`/admin/sites/${site.id}/design-system/components`}
+                      className="text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                    >
+                      Components{templates.length === 0 ? " (none)" : ""} →
+                    </Link>
+                    <Link
+                      href={`/admin/sites/${site.id}/design-system/templates`}
+                      className="text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                    >
+                      Templates ({templates.length}) →
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-muted-foreground">
+                    No active design system. Create one before running batches.
+                  </p>
                   <Link
                     href={`/admin/sites/${site.id}/design-system`}
-                    className="text-muted-foreground hover:text-foreground"
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
                   >
-                    Overview →
+                    Set up design system →
                   </Link>
-                  <Link
-                    href={`/admin/sites/${site.id}/design-system/components`}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Components ({templates.length > 0 ? "" : "none"}) →
-                  </Link>
-                  <Link
-                    href={`/admin/sites/${site.id}/design-system/templates`}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Templates ({templates.length}) →
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <p className="text-muted-foreground">
-                  No active design system. Create one before running batches.
-                </p>
-                <Link
-                  href={`/admin/sites/${site.id}/design-system`}
-                  className="mt-2 inline-block text-muted-foreground hover:text-foreground"
-                >
-                  Set up design system →
-                </Link>
-              </>
-            )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* M13-5d — Appearance panel link. */}
-          <div className="rounded-lg border p-4 text-sm">
-            <h2 className="text-base font-medium">Appearance</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Sync the active DS palette to Kadence on this site&apos;s
-              WordPress install.
-            </p>
-            <Link
-              href={`/admin/sites/${site.id}/appearance`}
-              className="mt-2 inline-block text-muted-foreground hover:text-foreground"
-            >
-              Open Appearance panel →
-            </Link>
+          <div className="rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <Layers aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <H3>Appearance</H3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Sync the active DS palette to Kadence on this site&apos;s
+                  WordPress install.
+                </p>
+                <Link
+                  href={`/admin/sites/${site.id}/appearance`}
+                  className="mt-2 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                  Open Appearance panel →
+                </Link>
+              </div>
+            </div>
           </div>
 
           {/* RS-2 — Settings (brand voice + design direction defaults). */}
-          <div className="rounded-lg border p-4 text-sm">
-            <h2 className="text-base font-medium">Settings</h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Brand voice &amp; design direction defaults that every new brief
-              inherits.
-              {(site.brand_voice || site.design_direction) && (
-                <span className="ml-1 text-emerald-700">Configured.</span>
-              )}
-              {!site.brand_voice && !site.design_direction && (
-                <span className="ml-1 text-muted-foreground">Not set.</span>
-              )}
-            </p>
-            <Link
-              href={`/admin/sites/${site.id}/settings`}
-              className="mt-2 inline-block text-muted-foreground hover:text-foreground"
-            >
-              Open Settings →
-            </Link>
+          <div className="rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <Sparkles aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <H3>Settings</H3>
+                  {(site.brand_voice || site.design_direction) ? (
+                    <StatusPill kind="brief_committed" label="Configured" />
+                  ) : (
+                    <StatusPill kind="brief_parsing" label="Not set" />
+                  )}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Brand voice &amp; design direction defaults that every new
+                  brief inherits.
+                </p>
+                <Link
+                  href={`/admin/sites/${site.id}/settings`}
+                  className="mt-2 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                  Open Settings →
+                </Link>
+              </div>
+            </div>
           </div>
         </aside>
       </div>
