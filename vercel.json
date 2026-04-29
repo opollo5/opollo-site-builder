@@ -19,6 +19,46 @@
     {
       "path": "/api/cron/budget-reset",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-ads",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-clarity",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-ga4",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-sync-pagespeed",
+      "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/optimiser-evaluate-pages",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-score-pages",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-email-digest",
+      "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-expire-proposals",
+      "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-evaluate-scores",
+      "schedule": "45 7 * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-evaluate-causal-deltas",
+      "schedule": "15 8 * * *"
     }
   ]
 }
