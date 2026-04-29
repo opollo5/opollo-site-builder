@@ -58,14 +58,40 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await auditA11y(page, testInfo);
   });
 
-  test("bulk-upload tab shows the BL-5 placeholder", async ({
+  test("bulk-upload tab renders the dropzone after a site is picked", async ({
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
     await page.goto("/admin/posts/new");
 
+    // Pre-pick is required — bulk panel needs a siteId.
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
     await page.getByTestId("posts-new-tab-bulk").click();
-    await expect(page.getByText(/bulk upload is coming soon/i)).toBeVisible();
+
+    await expect(page.getByTestId("bulk-dropzone")).toBeVisible();
+    await expect(page.getByTestId("bulk-paste-textarea")).toBeVisible();
+
+    // Paste a stacked-YAML blob and confirm the count surfaces.
+    await page.getByTestId("bulk-paste-textarea").fill(
+      [
+        "---",
+        "title: First",
+        "---",
+        "Body of first.",
+        "---",
+        "title: Second",
+        "---",
+        "Body of second.",
+      ].join("\n"),
+    );
+    await expect(page.getByTestId("bulk-summary")).toContainText(
+      /2 posts? ready/i,
+    );
 
     await auditA11y(page, testInfo);
   });

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, FileText, Layers } from "lucide-react";
 
 import { BlogPostComposer } from "@/components/BlogPostComposer";
+import { BulkUploadPanel } from "@/components/BulkUploadPanel";
 import {
   Command,
   CommandEmpty,
@@ -59,11 +60,12 @@ export function PostsNewClient({ sites }: PostsNewClientProps) {
         ) : (
           <EmptyShell label="Pick a site to start drafting your post." />
         )
+      ) : selectedSite ? (
+        <div className="rounded-md border bg-background p-6">
+          <BulkUploadPanel siteId={selectedSite.id} />
+        </div>
       ) : (
-        <EmptyShell
-          label="Bulk upload is coming soon."
-          description="Drop multiple markdown / HTML files at once and review them as a batch before publishing."
-        />
+        <EmptyShell label="Pick a site to start a bulk upload." />
       )}
     </div>
   );
