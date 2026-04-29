@@ -31,15 +31,20 @@ import { cn } from "@/lib/utils";
 // in-page mobile header.
 //
 // Persistence:
-//   - localStorage key `opollo:sidebar:collapsed` survives across
-//     sessions so an operator who collapses the rail keeps the
-//     denser layout on their next visit.
-//   - Mobile drawer opens fresh each time (no persistence) — a
-//     remembered open-state on a fresh page-load would interfere
-//     with the touch-to-content focus rhythm.
+//   - Cookie `opollo_sidebar_collapsed` (1 / 0). Server reads via
+//     next/headers cookies() in app/admin/layout.tsx and passes the
+//     state as `initialCollapsed` so SSR + first client paint match.
+//     This kills the hydration flash where the rail rendered expanded
+//     then snapped narrow on first useEffect tick. (R2 fix.)
+//   - localStorage mirror keeps the legacy key live so other tabs
+//     reading it don't see stale state. Cookie is the source of truth
+//     for SSR; localStorage is a convenience for any client-only code
+//     that wants to read without a roundtrip.
+//   - Mobile drawer opens fresh each time (no persistence).
 // ---------------------------------------------------------------------------
 
 const SIDEBAR_COLLAPSED_LS_KEY = "opollo:sidebar:collapsed";
+export const SIDEBAR_COLLAPSED_COOKIE = "opollo_sidebar_collapsed";
 
 type NavLink = {
   label: string;
@@ -51,23 +56,20 @@ type NavLink = {
 interface AdminSidebarProps {
   user: SessionUser | null;
   showUsersLink: boolean;
+  /** R2 fix — cookie-driven initial state from the server layout so
+   *  SSR matches the first client render and there's no flash. */
+  initialCollapsed?: boolean;
 }
 
-export function AdminSidebar({ user, showUsersLink }: AdminSidebarProps) {
+export function AdminSidebar({
+  user,
+  showUsersLink,
+  initialCollapsed = false,
+}: AdminSidebarProps) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  // Cookie value drives SSR + first paint. No useEffect-based load.
+  const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(SIDEBAR_COLLAPSED_LS_KEY);
-      if (raw === "1") setCollapsed(true);
-    } catch {
-      // localStorage disabled — stay expanded.
-    }
-    setHydrated(true);
-  }, []);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -79,6 +81,15 @@ export function AdminSidebar({ user, showUsersLink }: AdminSidebarProps) {
         );
       } catch {
         // localStorage disabled — change still applies in-memory.
+      }
+      // Write cookie so the server layout picks up the new state on
+      // the next request. 1-year max-age; sidebar pref isn't sensitive.
+      // SameSite=Lax is the default for first-party admin requests.
+      try {
+        document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${next ? "1" : "0"}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+      } catch {
+        // document.cookie write blocked (cookieless context) —
+        // change still applies in-memory.
       }
       return next;
     });
@@ -175,7 +186,9 @@ export function AdminSidebar({ user, showUsersLink }: AdminSidebarProps) {
           "sm:sticky sm:top-0 sm:h-screen sm:translate-x-0",
           collapsed ? "sm:w-16" : "sm:w-60",
         )}
-        aria-hidden={!hydrated ? undefined : !mobileOpen ? undefined : false}
+        // aria-hidden left undefined: the sidebar is always part of
+        // the page tab order on desktop; on mobile it's translated
+        // off-canvas which already removes it from interaction.
       >
         <div className="flex h-full flex-col">
           {/* Wordmark + collapse toggle (desktop) / close button (mobile) */}

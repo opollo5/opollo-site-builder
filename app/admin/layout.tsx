@@ -1,8 +1,12 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
-import { AdminSidebar } from "@/components/AdminSidebar";
+import {
+  AdminSidebar,
+  SIDEBAR_COLLAPSED_COOKIE,
+} from "@/components/AdminSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Toaster } from "@/components/ui/toaster";
 
@@ -13,6 +17,11 @@ import { Toaster } from "@/components/ui/toaster";
 // 64px icon-only, and off-canvas on mobile. Page background is the
 // canvas tint (--canvas) so the white card surfaces register against
 // the rail.
+//
+// R2-fix — read the SIDEBAR_COLLAPSED_COOKIE here so SSR + client first
+// paint render the same width. Kills the hydration flash where the
+// rail rendered expanded then snapped to collapsed on first useEffect
+// tick.
 
 export default async function AdminLayout({
   children,
@@ -30,6 +39,11 @@ export default async function AdminLayout({
   // surface during a break-glass outage.
   const showUsersLink = !user || user.role === "admin";
 
+  // Cookie value drives initial collapse state. Default false (expanded)
+  // when the cookie is absent — first-time operators get the full rail.
+  const initialCollapsed =
+    cookies().get(SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
+
   return (
     <div className="min-h-screen bg-canvas text-foreground sm:flex">
       {/* C-3 — skip-to-content link. Visually hidden until focused. */}
@@ -39,7 +53,11 @@ export default async function AdminLayout({
       >
         Skip to main content
       </a>
-      <AdminSidebar user={user} showUsersLink={showUsersLink} />
+      <AdminSidebar
+        user={user}
+        showUsersLink={showUsersLink}
+        initialCollapsed={initialCollapsed}
+      />
       <main
         id="admin-main"
         tabIndex={-1}
