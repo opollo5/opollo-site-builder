@@ -2,8 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
+
+// ---------------------------------------------------------------------------
+// C-2 — Optimistic UI on reinstate. Revoke flows through
+// ConfirmActionModal which already toasts on success/failure; the
+// reinstate path was the inline-button gap.
+// ---------------------------------------------------------------------------
 
 export function UserStatusActionCell({
   userId,
@@ -16,14 +23,16 @@ export function UserStatusActionCell({
 }) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [revokeOpen, setRevokeOpen] = useState(false);
+  // Optimistic local mirror — flips to "active" on reinstate request,
+  // rolls back to "revoked" on failure.
+  const [optimisticRevoked, setOptimisticRevoked] = useState(revoked);
 
   const isSelf = selfUserId !== null && selfUserId === userId;
 
   async function reinstate() {
     setSubmitting(true);
-    setError(null);
+    setOptimisticRevoked(false);
     try {
       const res = await fetch(
         `/api/admin/users/${encodeURIComponent(userId)}/reinstate`,
@@ -31,21 +40,27 @@ export function UserStatusActionCell({
       );
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.ok) {
-        setError(
-          payload?.error?.message ??
-            `reinstate failed (HTTP ${res.status}).`,
-        );
-        setSubmitting(false);
+        setOptimisticRevoked(true);
+        toast.error("Couldn't reinstate user", {
+          description:
+            payload?.error?.message ??
+            `Reinstate failed (HTTP ${res.status}). Status restored to revoked.`,
+        });
         return;
       }
+      toast.success("User reinstated");
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setOptimisticRevoked(true);
+      toast.error("Network error reinstating user", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
       setSubmitting(false);
     }
   }
 
-  if (revoked) {
+  if (optimisticRevoked) {
     return (
       <div className="flex flex-col gap-1">
         <span className="text-xs text-destructive">revoked</span>
@@ -53,15 +68,10 @@ export function UserStatusActionCell({
           type="button"
           onClick={() => void reinstate()}
           disabled={submitting}
-          className="self-start rounded border px-2 py-0.5 text-sm hover:bg-muted disabled:opacity-60"
+          className="self-start rounded border px-2 py-0.5 text-sm transition-smooth hover:bg-muted disabled:opacity-60"
         >
           {submitting ? "…" : "Reinstate"}
         </button>
-        {error && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
       </div>
     );
   }
@@ -74,15 +84,10 @@ export function UserStatusActionCell({
         onClick={() => setRevokeOpen(true)}
         disabled={isSelf || submitting}
         title={isSelf ? "You cannot revoke your own access." : undefined}
-        className="self-start rounded border px-2 py-0.5 text-sm text-destructive hover:bg-destructive/10 disabled:opacity-60"
+        className="self-start rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
       >
         {submitting ? "…" : "Revoke"}
       </button>
-      {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
       {revokeOpen && (
         <ConfirmActionModal
           open
@@ -95,6 +100,8 @@ export function UserStatusActionCell({
           onClose={() => setRevokeOpen(false)}
           onSuccess={() => {
             setRevokeOpen(false);
+            setOptimisticRevoked(true);
+            toast.success("User revoked");
             router.refresh();
           }}
         />
