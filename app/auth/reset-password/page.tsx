@@ -1,4 +1,6 @@
 import { ResetPasswordForm } from "@/components/ResetPasswordForm";
+import { Button } from "@/components/ui/button";
+import { H1, Lead } from "@/components/ui/typography";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -23,21 +25,18 @@ export default async function ResetPasswordPage() {
     return (
       <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6">
         <div className="w-full text-center">
-          <h1 className="text-xl font-semibold">Reset link expired</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            This reset link has expired or was already used. Request a new link
-            to continue.
-          </p>
+          <H1>Reset link expired</H1>
+          <Lead className="mt-2">
+            This reset link has expired or was already used. Request a new
+            link to continue.
+          </Lead>
         </div>
-        <a
-          href="/auth/forgot-password"
-          className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Request a new link
-        </a>
+        <Button asChild>
+          <a href="/auth/forgot-password">Request a new link</a>
+        </Button>
         <a
           href="/login"
-          className="text-xs text-muted-foreground underline hover:no-underline"
+          className="text-xs text-muted-foreground underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           Back to sign in
         </a>
@@ -48,10 +47,10 @@ export default async function ResetPasswordPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6">
       <div className="w-full text-center">
-        <h1 className="text-xl font-semibold">Set a new password</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <H1>Set a new password</H1>
+        <Lead className="mt-2">
           Choose a strong password. Minimum 12 characters.
-        </p>
+        </Lead>
       </div>
       <ResetPasswordForm userEmail={user.email} />
     </main>

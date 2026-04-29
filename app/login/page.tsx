@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/LoginForm";
+import { H1, Lead } from "@/components/ui/typography";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
 
@@ -54,8 +55,8 @@ export default async function LoginPage({
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6">
       <div className="text-center">
-        <h1 className="text-xl font-semibold">Opollo Site Builder</h1>
-        <p className="text-sm text-muted-foreground">Sign in to continue.</p>
+        <H1>Opollo Site Builder</H1>
+        <Lead className="mt-1">Sign in to continue.</Lead>
       </div>
       <LoginForm next={next} />
     </main>
