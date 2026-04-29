@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { AbTestStatusBanner } from "@/components/optimiser/AbTestStatusBanner";
 import { ScoreBreakdownPanel } from "@/components/optimiser/ScoreBreakdownPanel";
 import { ScoreHistoryTable } from "@/components/optimiser/ScoreHistoryTable";
 import { ScoreSparkline } from "@/components/optimiser/ScoreSparkline";
@@ -105,6 +106,18 @@ export default async function OptimiserPageDetail({
   const causalDeltaRows = await listCausalDeltasForPage(page.id);
   const causalDeltas = buildDeltaMapByProposal(causalDeltaRows);
 
+  // Phase 2 Slice 19: surface the most recent A/B test status (running
+  // or just-decided) on the page detail view.
+  const { data: latestTest } = await getServiceRoleClient()
+    .from("opt_tests")
+    .select(
+      "id, client_id, landing_page_id, source_proposal_id, variant_a_id, variant_b_id, traffic_split_percent, status, min_sessions, min_conversions, winner_probability_a, winner_probability_b, last_metrics_snapshot, last_evaluated_at, started_at, ended_at, ended_reason, created_at, updated_at",
+    )
+    .eq("landing_page_id", page.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -128,6 +141,8 @@ export default async function OptimiserPageDetail({
           </Link>
         </Button>
       </header>
+
+      <AbTestStatusBanner test={latestTest as never} />
 
       {composite ? (
         <ScoreBreakdownPanel
