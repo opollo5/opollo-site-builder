@@ -753,7 +753,7 @@ function oauthErrorCopy(error: string): string {
     case "ads_oauth_not_configured":
       return "Ads OAuth env not provisioned. Contact ops to set GOOGLE_ADS_CLIENT_ID / _SECRET / _DEVELOPER_TOKEN.";
     case "ga4_oauth_not_configured":
-      return "GA4 OAuth env not provisioned. Contact ops to set GA4_CLIENT_ID / _SECRET.";
+      return "GA4 OAuth env not provisioned. Contact ops to set GOOGLE_ADS_CLIENT_ID / _SECRET (GA4 reuses the shared Google OAuth client).";
     case "ads_oauth_exchange_failed":
     case "ga4_oauth_exchange_failed":
       return "Token exchange failed. Try again; if it persists check the OAuth client config.";

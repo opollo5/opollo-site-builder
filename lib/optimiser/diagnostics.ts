@@ -101,15 +101,17 @@ const SOURCE_ENV: Record<
     ],
   },
   ga4: {
-    required: ["GA4_CLIENT_ID", "GA4_CLIENT_SECRET"],
-    optional: ["GOOGLE_OAUTH_CLIENT_ID", "GOOGLE_OAUTH_CLIENT_SECRET"],
+    // GA4 reuses the Google Ads OAuth client (single shared client across
+    // both flows). Listed here so the diagnostic surface still reports
+    // GA4-readiness independently — they happen to share names with Ads.
+    required: ["GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET"],
   },
   clarity: {
     // Clarity uses per-client tokens; no Opollo-wide env needed.
     required: [],
   },
   pagespeed: {
-    required: ["PAGESPEED_API_KEY"],
+    required: ["PSI_API_KEY"],
   },
   anthropic: {
     required: ["ANTHROPIC_API_KEY"],
@@ -122,21 +124,6 @@ function checkEnv(source: OptCredentialSource | "anthropic"): EnvCheck {
   for (const key of cfg.required) {
     const v = process.env[key];
     if (!v || v.trim().length === 0) missing.push(key);
-  }
-  // For GA4, accept the GOOGLE_OAUTH_* fallback pair as a substitute.
-  if (source === "ga4" && missing.length === cfg.required.length) {
-    const fallback = (cfg.optional ?? []).every(
-      (k) => (process.env[k] ?? "").trim().length > 0,
-    );
-    if (fallback) {
-      return {
-        name: source,
-        required: cfg.required,
-        optional: cfg.optional,
-        configured: true,
-        missing: [],
-      };
-    }
   }
   return {
     name: source,
