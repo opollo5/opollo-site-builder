@@ -4,14 +4,12 @@ import { z } from "zod";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderBaseEmail } from "@/lib/email/templates/base";
-import { isEmailTestAllowed } from "@/lib/email-test-gate";
 
-// AUTH-FOUNDATION P1.2 + P1-FIX — POST /api/admin/email-test.
+// AUTH-FOUNDATION P3.4 — POST /api/admin/email-test.
 //
-// Backs /admin/email-test. Host-aware gate (allowed on local dev,
-// Vercel preview, and the staging *.vercel.app alias; blocked on prod
-// custom domains); admin/operator gate behind that. Phase 3 will
-// replace the host gate with a super_admin role check.
+// Backs /admin/email-test. Replaced the temporary host-aware gate
+// from P1-FIX with a super_admin-only role gate — proper trust
+// boundary now that P3 shipped the role tier.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,15 +34,7 @@ function deny(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (!isEmailTestAllowed()) {
-    return deny(
-      "NOT_AVAILABLE_ON_THIS_HOST",
-      "Email-test endpoint is not available on production custom domains.",
-      404,
-    );
-  }
-
-  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin"] });
   if (gate.kind === "deny") return gate.response;
 
   let parsed: z.infer<typeof BodySchema>;
