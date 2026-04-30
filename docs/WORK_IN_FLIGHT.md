@@ -6,34 +6,6 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
----
-## Session B
-- Started: 2026-04-30
-- Branch: feat/optimiser-phase-2 (and slice sub-branches)
-- Slice: Optimiser Phase 2 — A/B variants (Slice 18), winner detection (Slice 19), behaviour-driven triggers + Phase 2 playbooks (Slice 20), assisted approval (Slice 21)
-- Files claimed (only files unique to this work; existing Phase 1.5 / Phase 1 surfaces stay untouched):
-  - supabase/migrations/0057_optimiser_ab_variants_tests.sql (new)
-  - supabase/migrations/0058_optimiser_phase_2_playbooks.sql (new)
-  - supabase/migrations/0059_optimiser_assisted_approval.sql (new)
-  - supabase/rollbacks/0057_*.down.sql, 0058_*.down.sql, 0059_*.down.sql
-  - lib/optimiser/variants/* (new folder — Slice 18)
-  - lib/optimiser/ab-testing/* (new folder — Slice 19 monitor + Bayesian)
-  - lib/optimiser/behaviour-triggers.ts (new — Slice 20)
-  - lib/optimiser/assisted-approval.ts (new — Slice 21)
-  - app/api/optimiser/proposals/[id]/create-variant/route.ts (new — Slice 18)
-  - app/api/cron/optimiser-ab-monitor/route.ts (new — Slice 19)
-  - skills/optimiser/variant-generation/SKILL.md (new)
-  - skills/optimiser/winner-detection/SKILL.md (new)
-  - skills/optimiser/{trust-gap,intent-mismatch,stale-social-proof}/SKILL.md (new — Slice 20)
-  - vercel.json (additive — appends one cron entry only)
-  - components/optimiser/ProposalReview.tsx (Slice 18 — adds "Create A/B variant" affordance after approve)
-  - app/optimiser/clients/[id]/settings/page.tsx (Slice 21 — assisted-approval toggle)
-  - components/optimiser/PageBrowser.tsx, PageDetail.tsx (Slice 19 — A/B test status banner)
-- Migration numbers reserved: 0057, 0058, 0059
-- Expected completion: same session; auto-merge each slice on green CI per the user's Phase 2 brief
-- Notes: WORK_IN_FLIGHT had a stale Session A claim from 2026-04-24 (M12-6 work shipped long ago — the claim block is left in place per "removal protocol" since the Session A owner removes their own claim).
----
-
 ## ~~Session A~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; A's owner removes when they next push)
 - Started: 2026-04-24
 - Branch: feat/m12-6-save-draft-persistence
