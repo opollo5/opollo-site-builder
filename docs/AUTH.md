@@ -56,7 +56,14 @@ flowchart TD
 
 **No-enumeration contract:** `/api/auth/forgot-password` returns a success envelope whether or not the email is registered. Supabase failures are logged at warn but do not change the response shape.
 
-**Expired / invalid link:** if the user lands on `/auth/reset-password` with no active session (link expired, already used, PKCE mismatch), the page renders a "Reset link expired" state with a "Request a new link" CTA back to `/auth/forgot-password`. Invalid codes hitting `/api/auth/callback` redirect to `/auth-error?reason=exchange_failed`.
+**Expired / invalid link:** if the user lands on `/auth/reset-password` with no active session (link expired, already used, PKCE mismatch), the page renders a "Reset link expired" state with a "Request a new link" CTA back to `/auth/forgot-password`. Invalid codes hitting `/api/auth/callback` redirect to `/auth-error?reason=exchange_failed` (PKCE shape) or `/auth-error?reason=verify_failed` (OTP shape).
+
+**Callback supports both link shapes.** The default Supabase email templates emit `{{ .TokenHash }}` + `&type=recovery` (the OTP shape); projects on the PKCE flow emit `?code=...`. `/api/auth/callback` handles both:
+
+- `?code=<uuid>` → `supabase.auth.exchangeCodeForSession(code)`
+- `?token_hash=<hash>&type=<recovery|invite|signup|magiclink|email_change|email>` → `supabase.auth.verifyOtp({ token_hash, type })`
+
+If neither parameter is present the callback redirects to `/auth-error?reason=missing_code`. An OTP `token_hash` with a missing or unrecognised `type` redirects to `/auth-error?reason=invalid_type`. The dual-handling means a Supabase template / flow change does not require a code redeploy.
 
 ### Logged-in password change (M14-4)
 
