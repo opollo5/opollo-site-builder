@@ -249,6 +249,7 @@ function Step1({ siteId, status }: { siteId: string; status: SetupStatus }) {
             siteId={siteId}
             homepageHtml={status.homepage_concept_html}
             innerPageHtml={status.inner_page_concept_html}
+            toneAppliedHomepageHtml={status.tone_applied_homepage_html}
             tokens={status.design_tokens}
           />
         ) : (
@@ -474,39 +475,61 @@ function Step3({ siteId, status }: { siteId: string; status: SetupStatus }) {
         )
       }
       body={
-        <div className="grid gap-4 md:grid-cols-2">
-          <SummaryCard
-            heading="Design direction"
-            href={`/admin/sites/${siteId}/setup?step=1`}
-            state={status.design_direction_status}
-            details={
-              designApproved ? (
-                <DesignDirectionDetails tokens={status.design_tokens} />
-              ) : designSkipped ? (
-                <p className="text-xs text-muted-foreground">
-                  Using defaults.
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <SummaryCard
+              heading="Design direction"
+              href={`/admin/sites/${siteId}/setup?step=1`}
+              state={status.design_direction_status}
+              details={
+                designApproved ? (
+                  <DesignDirectionDetails tokens={status.design_tokens} />
+                ) : designSkipped ? (
+                  <p className="text-xs text-muted-foreground">
+                    Using defaults.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Not yet set.</p>
+                )
+              }
+            />
+            <SummaryCard
+              heading="Tone of voice"
+              href={`/admin/sites/${siteId}/setup?step=2`}
+              state={status.tone_of_voice_status}
+              details={
+                toneApproved ? (
+                  <ToneOfVoiceDetails tone={status.tone_of_voice} />
+                ) : toneSkipped ? (
+                  <p className="text-xs text-muted-foreground">
+                    Using defaults.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Not yet set.</p>
+                )
+              }
+            />
+          </div>
+          {designApproved &&
+            toneApproved &&
+            status.tone_applied_homepage_html && (
+              <div
+                className="rounded-md border bg-card p-3"
+                data-testid="setup-step-3-tone-applied"
+              >
+                <p className="text-xs font-medium">
+                  Your design with your voice applied
                 </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Not yet set.</p>
-              )
-            }
-          />
-          <SummaryCard
-            heading="Tone of voice"
-            href={`/admin/sites/${siteId}/setup?step=2`}
-            state={status.tone_of_voice_status}
-            details={
-              toneApproved ? (
-                <ToneOfVoiceDetails tone={status.tone_of_voice} />
-              ) : toneSkipped ? (
-                <p className="text-xs text-muted-foreground">
-                  Using defaults.
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Not yet set.</p>
-              )
-            }
-          />
+                <div className="mt-2 h-72 overflow-hidden rounded-md border bg-muted/20">
+                  <iframe
+                    title="Design + voice preview"
+                    srcDoc={status.tone_applied_homepage_html}
+                    sandbox=""
+                    className="block h-full w-full"
+                  />
+                </div>
+              </div>
+            )}
         </div>
       }
       footer={

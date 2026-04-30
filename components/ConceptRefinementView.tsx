@@ -311,12 +311,14 @@ export function ApprovedDesignReadout({
   siteId,
   homepageHtml,
   innerPageHtml,
+  toneAppliedHomepageHtml,
   tokens,
   onReset,
 }: {
   siteId: string;
   homepageHtml: string | null;
   innerPageHtml: string | null;
+  toneAppliedHomepageHtml?: string | null;
   tokens: Record<string, unknown> | null;
   onReset?: () => void;
 }) {
@@ -420,12 +422,20 @@ export function ApprovedDesignReadout({
         <div className="grid gap-3 md:grid-cols-2">
           <div>
             <p className="text-[10px] font-medium text-muted-foreground">
-              Homepage
+              {toneAppliedHomepageHtml
+                ? "Your design with your voice applied"
+                : "Homepage"}
             </p>
-            <div className="mt-1 h-72 overflow-hidden rounded-md border bg-muted/20">
+            <div
+              className="mt-1 h-72 overflow-hidden rounded-md border bg-muted/20"
+              data-testid="approved-design-homepage-frame"
+              data-tone-applied={
+                toneAppliedHomepageHtml ? "true" : "false"
+              }
+            >
               <iframe
                 title="Approved homepage"
-                srcDoc={homepageHtml}
+                srcDoc={toneAppliedHomepageHtml ?? homepageHtml}
                 sandbox=""
                 className="block h-full w-full"
               />
