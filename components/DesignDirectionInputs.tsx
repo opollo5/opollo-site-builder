@@ -32,10 +32,38 @@ import {
 // rendered immediately; URL extraction overlays its findings on top
 // when a URL is present and the operator clicks "Extract design".
 // The understanding panel shows what we've inferred + the confidence
-// signal + a "Generate concepts" CTA. PR 5 wires the actual concept
-// generation; for now Generate saves the brief and routes to the
-// generating-state intermediate screen.
+// signal + a "Generate concepts" CTA. The CTA persists the brief and
+// fires three parallel Claude calls server-side; the resulting
+// concepts surface in this component's state pending the rich review
+// UI from PR 6.
 // ---------------------------------------------------------------------------
+
+export interface ConceptResult {
+  direction: "minimal" | "dense" | "editorial";
+  label: string;
+  rationale: string;
+  design_tokens: {
+    primary: string;
+    secondary: string;
+    accent: string;
+    background: string;
+    text: string;
+    font_heading: string;
+    font_body: string;
+    border_radius: string;
+    spacing_unit: string;
+  };
+  homepage_html: string;
+  inner_page_html: string;
+  micro_ui: { button: string; card: string; input: string };
+  normalization_warnings: string[];
+}
+
+export interface ConceptError {
+  direction: "minimal" | "dense" | "editorial";
+  label: string;
+  message: string;
+}
 
 export interface DesignBriefDraft {
   industry: Industry;
@@ -80,6 +108,9 @@ export function DesignDirectionInputs({
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [concepts, setConcepts] = useState<ConceptResult[] | null>(null);
+  const [conceptErrors, setConceptErrors] = useState<ConceptError[]>([]);
+  const [generationFailed, setGenerationFailed] = useState<string | null>(null);
 
   const preset = useMemo(() => industryPreset(draft.industry), [draft.industry]);
 
@@ -160,42 +191,79 @@ export function DesignDirectionInputs({
       return;
     }
     setGenerating(true);
+    setConcepts(null);
+    setConceptErrors([]);
+    setGenerationFailed(null);
+    const brief = {
+      industry: draft.industry,
+      reference_url: draft.reference_url.trim() || null,
+      existing_site_url: draft.existing_site_url.trim() || null,
+      description: draft.description.trim() || null,
+      edited_understanding: draft.edited_understanding.trim() || null,
+      screenshots: [],
+      refinement_notes: [],
+      extracted: draft.extracted,
+    };
+    // Persist the brief first so the wizard's resume logic returns to
+    // Step 1 with the operator's inputs intact even if the generation
+    // call fails or the tab is closed.
     try {
-      const brief = {
-        industry: draft.industry,
-        reference_url: draft.reference_url.trim() || null,
-        existing_site_url: draft.existing_site_url.trim() || null,
-        description: draft.description.trim() || null,
-        edited_understanding: draft.edited_understanding.trim() || null,
-        screenshots: [],
-        refinement_notes: [],
-        extracted: draft.extracted,
-      };
-      const res = await fetch(`/api/admin/sites/${siteId}/setup/save-brief`, {
+      const saveRes = await fetch(`/api/admin/sites/${siteId}/setup/save-brief`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ brief, advance_status: true }),
       });
-      const payload = (await res.json().catch(() => null)) as
+      const savePayload = (await saveRes.json().catch(() => null)) as
         | { ok: true }
         | { ok: false; error: { message: string } }
         | null;
-      if (!payload?.ok) {
+      if (!savePayload?.ok) {
         toast.error(
-          payload?.ok === false ? payload.error.message : "Save failed.",
+          savePayload?.ok === false ? savePayload.error.message : "Save failed.",
         );
         setGenerating(false);
         return;
       }
-      router.refresh();
-      // Concept generation lands in the next change. For now we sit
-      // on Step 1 with the brief saved + status='in_progress' so the
-      // resume logic correctly returns the operator here.
-      toast.success("Brief saved. Concept generation lands in the next change.");
-      setGenerating(false);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Network error during save.",
+      );
+      setGenerating(false);
+      return;
+    }
+    // Now fire the actual concept generation. 3 parallel Anthropic
+    // calls server-side; ~30s upper bound. The route returns ok=true
+    // even when 1 of 3 fails (the concepts[] is partial); ok=false
+    // when all 3 failed → render the retry banner.
+    try {
+      const res = await fetch(
+        `/api/admin/sites/${siteId}/setup/generate-concepts`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ brief }),
+        },
+      );
+      const payload = (await res.json().catch(() => null)) as
+        | { ok: true; data: { concepts: ConceptResult[]; errors: ConceptError[] } }
+        | { ok: false; error: { code: string; message: string } }
+        | null;
+      if (!payload?.ok) {
+        setGenerationFailed(
+          payload?.ok === false
+            ? payload.error.message
+            : "Concept generation failed. Please try again.",
+        );
+        setGenerating(false);
+        return;
+      }
+      setConcepts(payload.data.concepts);
+      setConceptErrors(payload.data.errors);
+      router.refresh();
+      setGenerating(false);
+    } catch (err) {
+      setGenerationFailed(
+        err instanceof Error ? err.message : "Network error during generation.",
       );
       setGenerating(false);
     }
@@ -360,16 +428,136 @@ export function DesignDirectionInputs({
           {generating ? (
             <>
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-              Saving brief…
+              Generating…
             </>
           ) : (
             <>
               <Sparkles aria-hidden className="h-4 w-4" />
-              Generate concepts
+              {concepts && concepts.length > 0 ? "Regenerate concepts" : "Generate concepts"}
             </>
           )}
         </Button>
       </div>
+
+      {(generating || concepts || generationFailed) && (
+        <ConceptResultsBlock
+          generating={generating}
+          concepts={concepts}
+          conceptErrors={conceptErrors}
+          generationFailed={generationFailed}
+        />
+      )}
+    </div>
+  );
+}
+
+function ConceptResultsBlock({
+  generating,
+  concepts,
+  conceptErrors,
+  generationFailed,
+}: {
+  generating: boolean;
+  concepts: ConceptResult[] | null;
+  conceptErrors: ConceptError[];
+  generationFailed: string | null;
+}) {
+  if (generationFailed) {
+    return (
+      <div
+        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+        role="alert"
+        data-testid="dd-generation-failed"
+      >
+        <p className="font-medium">Generation failed.</p>
+        <p className="mt-1 text-xs">{generationFailed}</p>
+        <p className="mt-2 text-xs">
+          Click &quot;Generate concepts&quot; to try again.
+        </p>
+      </div>
+    );
+  }
+  if (generating) {
+    return (
+      <div
+        className="grid gap-3 md:grid-cols-3"
+        data-testid="dd-concepts-loading"
+      >
+        {(["Minimal", "Conversion", "Editorial"] as const).map((label) => (
+          <div
+            key={label}
+            className="animate-pulse rounded-md border bg-muted/30 p-4"
+          >
+            <div className="h-3 w-2/3 rounded bg-muted-foreground/30" />
+            <div className="mt-2 h-2 w-full rounded bg-muted-foreground/20" />
+            <div className="mt-1.5 h-2 w-5/6 rounded bg-muted-foreground/20" />
+            <div className="mt-4 h-32 w-full rounded bg-muted-foreground/10" />
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              Generating {label}…
+            </p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (!concepts) return null;
+  return (
+    <div className="space-y-3" data-testid="dd-concepts-ready">
+      <div className="rounded-md border bg-success/5 p-3 text-sm">
+        <p className="font-medium text-success">
+          {concepts.length} concept{concepts.length === 1 ? "" : "s"} generated.
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          The rich three-up review (iframes, micro-UI previews, before/after,
+          desktop-mobile toggle) lands in the next change. Until then, the
+          concepts are stored in this component&apos;s state and can be
+          inspected via the directions list below.
+        </p>
+      </div>
+      <ul className="grid gap-2 md:grid-cols-3">
+        {concepts.map((c) => (
+          <li
+            key={c.direction}
+            className="rounded-md border bg-card p-3 text-xs"
+            data-testid={`dd-concept-${c.direction}`}
+          >
+            <p className="font-semibold">{c.label}</p>
+            <p className="mt-1 text-muted-foreground">{c.rationale}</p>
+            <div className="mt-2 flex flex-wrap gap-1">
+              {Object.entries(c.design_tokens)
+                .filter(([k]) =>
+                  ["primary", "secondary", "accent", "background", "text"].includes(k),
+                )
+                .map(([k, v]) => (
+                  <span
+                    key={k}
+                    className="inline-flex items-center gap-1 rounded-md border bg-background px-1 py-0.5 text-[9px]"
+                    title={`${k}: ${v}`}
+                  >
+                    <span
+                      className="inline-block h-3 w-3 rounded-sm border"
+                      style={{ background: v as string }}
+                      aria-hidden
+                    />
+                    <span className="font-mono uppercase">{k}</span>
+                  </span>
+                ))}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {conceptErrors.length > 0 && (
+        <p
+          className="text-xs text-warning"
+          data-testid="dd-concept-errors"
+          role="alert"
+        >
+          {conceptErrors.length} concept
+          {conceptErrors.length === 1 ? "" : "s"} failed to generate:{" "}
+          {conceptErrors.map((e) => e.label).join(", ")}. The full review will
+          show the others alongside a retry button.
+        </p>
+      )}
     </div>
   );
 }
