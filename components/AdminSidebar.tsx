@@ -9,6 +9,7 @@ import {
   Globe,
   Image as ImageIcon,
   KeyRound,
+  Laptop,
   LogOut,
   Menu,
   PenSquare,
@@ -306,6 +307,23 @@ export function AdminSidebar({
                 <KeyRound aria-hidden className="h-4 w-4 shrink-0" />
                 {!collapsed && (
                   <span className="truncate">Account security</span>
+                )}
+              </Link>
+            )}
+            {user && (
+              <Link
+                href="/account/devices"
+                title={collapsed ? "Trusted devices" : undefined}
+                className={cn(
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-muted-foreground transition-smooth hover:bg-muted/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  isActiveRoute("/account/devices") &&
+                    "bg-muted font-medium text-foreground",
+                )}
+                data-testid="nav-devices"
+              >
+                <Laptop aria-hidden className="h-4 w-4 shrink-0" />
+                {!collapsed && (
+                  <span className="truncate">Trusted devices</span>
                 )}
               </Link>
             )}
