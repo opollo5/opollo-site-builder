@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AbTestStatusBanner } from "@/components/optimiser/AbTestStatusBanner";
 import { ScoreBreakdownPanel } from "@/components/optimiser/ScoreBreakdownPanel";
+import { StagedRolloutBanner } from "@/components/optimiser/StagedRolloutBanner";
 import { ScoreHistoryTable } from "@/components/optimiser/ScoreHistoryTable";
 import { ScoreSparkline } from "@/components/optimiser/ScoreSparkline";
 import {
@@ -29,6 +30,7 @@ import {
 } from "@/lib/optimiser/scoring/conversion-subscore";
 import { computeTechnicalSubscore } from "@/lib/optimiser/scoring/technical-subscore";
 import { listScoreHistory, listScoreSparkline } from "@/lib/optimiser/scoring/score-history";
+import { getLatestRolloutForLandingPage } from "@/lib/optimiser/staged-rollout/read";
 import {
   DEFAULT_CONVERSION_COMPONENTS,
   DEFAULT_SCORE_WEIGHTS,
@@ -118,6 +120,11 @@ export default async function OptimiserPageDetail({
     .limit(1)
     .maybeSingle();
 
+  // Phase 1.5 follow-up: surface the most recent staged-rollout state
+  // (live / promoted / auto_reverted / manually_promoted / failed) for
+  // proposals on this page.
+  const latestRollout = await getLatestRolloutForLandingPage(page.id);
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -143,6 +150,7 @@ export default async function OptimiserPageDetail({
       </header>
 
       <AbTestStatusBanner test={latestTest as never} />
+      <StagedRolloutBanner rollout={latestRollout} />
 
       {composite ? (
         <ScoreBreakdownPanel
