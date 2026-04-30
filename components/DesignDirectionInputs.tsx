@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { ConceptRefinementView } from "@/components/ConceptRefinementView";
 import { ConceptReviewCards } from "@/components/ConceptReviewCards";
 import { MoodBoardStrip } from "@/components/MoodBoardStrip";
 import { DesignUnderstandingPanel } from "@/components/DesignUnderstandingPanel";
@@ -112,6 +113,7 @@ export function DesignDirectionInputs({
   const [concepts, setConcepts] = useState<ConceptResult[] | null>(null);
   const [conceptErrors, setConceptErrors] = useState<ConceptError[]>([]);
   const [generationFailed, setGenerationFailed] = useState<string | null>(null);
+  const [refining, setRefining] = useState<ConceptResult | null>(null);
 
   const preset = useMemo(() => industryPreset(draft.industry), [draft.industry]);
 
@@ -440,14 +442,42 @@ export function DesignDirectionInputs({
         </Button>
       </div>
 
-      {(generating || concepts || generationFailed) && (
-        <ConceptResultsBlock
-          generating={generating}
-          concepts={concepts}
-          conceptErrors={conceptErrors}
-          generationFailed={generationFailed}
-          referenceScreenshotUrl={view.screenshot_url}
+      {refining ? (
+        <ConceptRefinementView
+          siteId={siteId}
+          brief={{
+            industry: draft.industry,
+            reference_url: draft.reference_url.trim() || null,
+            existing_site_url: draft.existing_site_url.trim() || null,
+            description: draft.description.trim() || null,
+            edited_understanding: draft.edited_understanding.trim() || null,
+            refinement_notes: [],
+            extracted: draft.extracted,
+          }}
+          initialConcept={refining}
+          onCancel={() => setRefining(null)}
+          onApproved={() => {
+            setRefining(null);
+            setConcepts(null);
+            // Step-1 server status flips to 'approved' on the
+            // route response; the wizard re-renders with the
+            // ApprovedDesignReadout banner.
+          }}
         />
+      ) : (
+        (generating || concepts || generationFailed) && (
+          <ConceptResultsBlock
+            generating={generating}
+            concepts={concepts}
+            conceptErrors={conceptErrors}
+            generationFailed={generationFailed}
+            referenceScreenshotUrl={view.screenshot_url}
+            onSelectDirection={(direction) => {
+              const c = concepts?.find((x) => x.direction === direction);
+              if (c) setRefining(c);
+            }}
+          />
+        )
       )}
     </div>
   );
@@ -459,12 +489,14 @@ function ConceptResultsBlock({
   conceptErrors,
   generationFailed,
   referenceScreenshotUrl,
+  onSelectDirection,
 }: {
   generating: boolean;
   concepts: ConceptResult[] | null;
   conceptErrors: ConceptError[];
   generationFailed: string | null;
   referenceScreenshotUrl: string | null;
+  onSelectDirection: (direction: ConceptResult["direction"]) => void;
 }) {
   if (generationFailed) {
     return (
@@ -511,10 +543,7 @@ function ConceptResultsBlock({
         concepts={concepts}
         errors={conceptErrors}
         referenceScreenshotUrl={referenceScreenshotUrl}
-        onSelect={() => {
-          // Refinement + approve flow lands in PR 7. For now we only
-          // highlight the selected card client-side.
-        }}
+        onSelect={(direction) => onSelectDirection(direction)}
       />
     </div>
   );

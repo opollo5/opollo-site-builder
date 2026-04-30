@@ -227,3 +227,20 @@ export async function generateConcepts(
   }
   return { concepts, errors };
 }
+
+// Single-direction regenerate path used by the refinement loop (PR 7).
+// Call site: operator selects a concept → writes feedback into
+// brief.refinement_notes → posts to /setup/refine-concept which fans
+// out to this function. We re-use the same prompt; the only delta is
+// that refinement_notes is non-empty so the user message includes
+// "Refinement notes (apply these): ..." and the model updates the
+// concept accordingly.
+export async function regenerateConcept(
+  brief: DesignBrief,
+  direction: ConceptDirection,
+  ctx: { siteId: string; siteName: string },
+  callOverride?: AnthropicCallFn,
+): Promise<ConceptResult | ConceptError> {
+  const call = callOverride ?? defaultAnthropicCall;
+  return generateOne(brief, direction, ctx.siteId, ctx.siteName, call);
+}

@@ -29,6 +29,8 @@ export interface SetupStatus {
   // the server page renders in one round trip.
   design_brief: Record<string, unknown> | null;
   design_tokens: Record<string, unknown> | null;
+  homepage_concept_html: string | null;
+  inner_page_concept_html: string | null;
   tone_of_voice: Record<string, unknown> | null;
 }
 
@@ -43,7 +45,7 @@ export async function getSetupStatus(
   const { data, error } = await supabase
     .from("sites")
     .select(
-      "design_direction_status, tone_of_voice_status, design_brief, design_tokens, tone_of_voice",
+      "design_direction_status, tone_of_voice_status, design_brief, design_tokens, homepage_concept_html, inner_page_concept_html, tone_of_voice",
     )
     .eq("id", siteId)
     .neq("status", "removed")
@@ -73,6 +75,8 @@ export async function getSetupStatus(
       tone_of_voice_status: data.tone_of_voice_status as SetupStepStatus,
       design_brief: (data.design_brief as Record<string, unknown> | null) ?? null,
       design_tokens: (data.design_tokens as Record<string, unknown> | null) ?? null,
+      homepage_concept_html: (data.homepage_concept_html as string | null) ?? null,
+      inner_page_concept_html: (data.inner_page_concept_html as string | null) ?? null,
       tone_of_voice: (data.tone_of_voice as Record<string, unknown> | null) ?? null,
     },
   };
