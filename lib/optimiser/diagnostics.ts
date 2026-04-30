@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getServiceRoleClient } from "@/lib/supabase";
+import { isPatternLibraryEnabled } from "./pattern-library/feature-flag";
 import type { OptCredentialSource } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -52,9 +53,25 @@ export type ModuleDiagnostic = {
   onboarded_count: number;
 };
 
+// Phase 3 Slice 24 — pattern library state for the diagnostics surface.
+// Reports whether the feature flag is on, how many clients consent
+// (contribution + application gate per §11.2.2), how many pattern rows
+// have been extracted, and when the most recent extraction ran. The
+// breakdown by confidence helps the operator see whether the cohort is
+// large enough to be useful — patterns at "low" confidence dominate
+// until the consenting-client pool grows past ~5.
+export type PatternLibraryDiagnostic = {
+  feature_flag_enabled: boolean;
+  consenting_client_count: number;
+  pattern_count: number;
+  pattern_by_confidence: { high: number; moderate: number; low: number };
+  last_extracted_at: string | null;
+};
+
 export type DiagnosticsReport = {
   module: ModuleDiagnostic;
   sources: SourceDiagnostic[];
+  pattern_library: PatternLibraryDiagnostic;
   generated_at: string;
 };
 
@@ -148,6 +165,8 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
     sources.push(await diagnoseSource(source));
   }
 
+  const patternLibrary = await diagnosePatternLibrary(schemaReachable);
+
   return {
     module: {
       schema_reachable: schemaReachable,
@@ -162,7 +181,57 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
       onboarded_count: onboardedCount,
     },
     sources,
+    pattern_library: patternLibrary,
     generated_at: new Date().toISOString(),
+  };
+}
+
+async function diagnosePatternLibrary(
+  schemaReachable: boolean,
+): Promise<PatternLibraryDiagnostic> {
+  const flagEnabled = isPatternLibraryEnabled();
+  if (!schemaReachable) {
+    return {
+      feature_flag_enabled: flagEnabled,
+      consenting_client_count: 0,
+      pattern_count: 0,
+      pattern_by_confidence: { high: 0, moderate: 0, low: 0 },
+      last_extracted_at: null,
+    };
+  }
+  const supabase = getServiceRoleClient();
+  let consenting = 0;
+  let total = 0;
+  const byConf = { high: 0, moderate: 0, low: 0 };
+  let lastExtractedAt: string | null = null;
+  try {
+    const { count: cConsent } = await supabase
+      .from("opt_clients")
+      .select("id", { count: "exact", head: true })
+      .eq("cross_client_learning_consent", true)
+      .is("deleted_at", null);
+    consenting = cConsent ?? 0;
+    const { data: patterns } = await supabase
+      .from("opt_pattern_library")
+      .select("id, confidence, last_extracted_at");
+    for (const row of patterns ?? []) {
+      total += 1;
+      const conf = row.confidence as keyof typeof byConf;
+      if (conf in byConf) byConf[conf] += 1;
+      const at = row.last_extracted_at as string | null;
+      if (at && (!lastExtractedAt || at > lastExtractedAt)) {
+        lastExtractedAt = at;
+      }
+    }
+  } catch {
+    // Best-effort; surface zeros if the read fails.
+  }
+  return {
+    feature_flag_enabled: flagEnabled,
+    consenting_client_count: consenting,
+    pattern_count: total,
+    pattern_by_confidence: byConf,
+    last_extracted_at: lastExtractedAt,
   };
 }
 

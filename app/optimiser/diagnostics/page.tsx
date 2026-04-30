@@ -63,6 +63,63 @@ export default async function OptimiserDiagnosticsPage() {
         </p>
       </section>
 
+      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-medium">
+          Cross-client pattern library (Phase 3)
+        </h2>
+        <ModuleRow
+          label="OPT_PATTERN_LIBRARY_ENABLED feature flag"
+          ok={report.pattern_library.feature_flag_enabled}
+          detail={
+            report.pattern_library.feature_flag_enabled
+              ? "Extraction cron and priors reader are active."
+              : "Flag is off — extraction cron is a no-op and priors reader returns []. Per spec §11.2.4, MSA-clause adoption gates the production flip."
+          }
+        />
+        <ul className="space-y-1 text-sm">
+          <li>
+            <span className="text-muted-foreground">Consenting clients: </span>
+            <span className="font-mono">
+              {report.pattern_library.consenting_client_count}
+            </span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              (gates BOTH contribution and application — §11.2.2)
+            </span>
+          </li>
+          <li>
+            <span className="text-muted-foreground">Pattern rows: </span>
+            <span className="font-mono">
+              {report.pattern_library.pattern_count}
+            </span>
+            {report.pattern_library.pattern_count > 0 && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                ({report.pattern_library.pattern_by_confidence.high} high
+                · {report.pattern_library.pattern_by_confidence.moderate}{" "}
+                moderate ·{" "}
+                {report.pattern_library.pattern_by_confidence.low} low)
+              </span>
+            )}
+          </li>
+          <li>
+            <span className="text-muted-foreground">
+              Last extraction:{" "}
+            </span>
+            <span className="font-mono">
+              {report.pattern_library.last_extracted_at
+                ? new Date(
+                    report.pattern_library.last_extracted_at,
+                  ).toLocaleString()
+                : "(never)"}
+            </span>
+          </li>
+        </ul>
+        <p className="text-xs text-muted-foreground">
+          Pattern rows are anonymised by schema — no foreign keys to
+          client/page/proposal. The extractor cron runs daily at 10:00
+          UTC; per-client consent toggles on the client settings page.
+        </p>
+      </section>
+
       <section className="space-y-4">
         <h2 className="text-lg font-medium">Data sources</h2>
         {report.sources.map((s) => (

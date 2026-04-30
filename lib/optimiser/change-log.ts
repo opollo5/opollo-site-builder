@@ -23,7 +23,8 @@ export type ChangeLogEvent =
   | "staged_rollout_window_expired"
   | "ab_winner_promoted"
   | "ab_test_inconclusive"
-  | "assisted_approval_toggled";
+  | "assisted_approval_toggled"
+  | "cross_client_learning_consent_toggled";
 
 export type ChangeLogRow = {
   id: number;
