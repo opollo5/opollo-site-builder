@@ -225,6 +225,13 @@ export function ToneOfVoiceInputs({
         setApproving(false);
         return;
       }
+      // Fire the live tone application as a best-effort follow-up.
+      // Silent failure per the spec — if Claude can't produce
+      // tone_applied_homepage_html, we fall back to the original
+      // approved homepage on the Done screen.
+      void fetch(`/api/admin/sites/${siteId}/setup/apply-tone`, {
+        method: "POST",
+      }).catch(() => {});
       toast.success("Tone of voice approved.");
       router.push(`/admin/sites/${siteId}/setup?step=3`);
       router.refresh();
