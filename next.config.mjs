@@ -68,7 +68,32 @@ const nextConfig = {
     // reaches playwright-core through `await import("playwright-core")`
     // inside defaultVisualRender; tests inject a stub render fn so the
     // import is never evaluated at test time.
-    serverComponentsExternalPackages: ["playwright-core"],
+    //
+    // ssh2 / ssh2-sftp-client: ssh2 ships a native C++ addon
+    // (sshcrypto.node) that webpack cannot bundle. Without externalising
+    // these, the Vercel build fails on `./node_modules/ssh2/lib/protocol/
+    // crypto/build/Release/sshcrypto.node`. lib/static-hosting.ts
+    // additionally guards the require with a try/catch + dry-run fallback
+    // so a runtime load failure on serverless does not break the brief
+    // runner.
+    serverComponentsExternalPackages: [
+      "playwright-core",
+      "ssh2",
+      "ssh2-sftp-client",
+    ],
+  },
+  webpack: (config, { isServer }) => {
+    // Belt-and-braces with the experimental list above: native-addon
+    // packages must not be parsed by the webpack loader graph at all.
+    if (isServer) {
+      const externals = Array.isArray(config.externals)
+        ? config.externals
+        : config.externals
+          ? [config.externals]
+          : [];
+      config.externals = [...externals, "ssh2", "ssh2-sftp-client"];
+    }
+    return config;
   },
 };
 
