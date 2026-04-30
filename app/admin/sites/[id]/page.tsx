@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
+import { SetupReminderBanner } from "@/components/SetupReminderBanner";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,6 +19,7 @@ import { FileText, Layers, Sparkles, Workflow } from "lucide-react";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
+import { getSetupStatus } from "@/lib/site-setup";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { getTenantBudget } from "@/lib/tenant-budgets";
@@ -135,8 +137,18 @@ export default async function SiteDetailPage({
   const briefsResult = await listSiteBriefs(site.id);
   const briefs = briefsResult.ok ? briefsResult.data.briefs : [];
 
+  // DESIGN-DISCOVERY PR 12 — banner reminding the operator to run
+  // the setup wizard. Renders only when BOTH discovery statuses are
+  // 'pending'; the banner itself manages dismissal via localStorage.
+  const setupStatusResult = await getSetupStatus(site.id);
+  const needsSetupReminder =
+    setupStatusResult.ok &&
+    setupStatusResult.data.design_direction_status === "pending" &&
+    setupStatusResult.data.tone_of_voice_status === "pending";
+
   return (
     <>
+      {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
       <div className="flex items-start justify-between gap-4">
         <div>
           <Breadcrumbs
