@@ -22,7 +22,8 @@ export type ChangeLogEvent =
   | "staged_rollout_auto_reverted"
   | "staged_rollout_window_expired"
   | "ab_winner_promoted"
-  | "ab_test_inconclusive";
+  | "ab_test_inconclusive"
+  | "assisted_approval_toggled";
 
 export type ChangeLogRow = {
   id: number;
