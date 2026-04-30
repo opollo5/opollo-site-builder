@@ -6,11 +6,13 @@ import { CreateVariantButton } from "@/components/optimiser/CreateVariantButton"
 import { PastCausalDeltasPanel } from "@/components/optimiser/PastCausalDeltasPanel";
 import { PatternPriorsPanel } from "@/components/optimiser/PatternPriorsPanel";
 import { ProposalReview } from "@/components/optimiser/ProposalReview";
+import { ProposalRolloutLink } from "@/components/optimiser/ProposalRolloutLink";
 import { getClient } from "@/lib/optimiser/clients";
 import { listRecentCausalDeltasForPlaybook } from "@/lib/optimiser/causal/read-deltas";
 import { listRelevantPatterns } from "@/lib/optimiser/pattern-library/priors";
 import { getProposalWithEvidence } from "@/lib/optimiser/proposals";
 import { getLandingPage } from "@/lib/optimiser/landing-pages";
+import { getRolloutForProposal } from "@/lib/optimiser/staged-rollout/read";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 export const metadata = { title: "Optimiser · Proposal review" };
@@ -58,6 +60,12 @@ export default async function OptimiserProposalReviewPage({
     playbookId: proposal.triggering_playbook_id,
   });
 
+  // Phase 1.5 follow-up — surface the staged-rollout state for this
+  // proposal once it's been applied. Returns null until a rollout has
+  // been created (i.e. while the proposal is still pending/approved
+  // pre-apply).
+  const rollout = await getRolloutForProposal(proposal.id);
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -68,6 +76,10 @@ export default async function OptimiserProposalReviewPage({
           Status: <code>{proposal.status}</code>
         </span>
       </div>
+      <ProposalRolloutLink
+        rollout={rollout}
+        landingPageId={proposal.landing_page_id}
+      />
       <PastCausalDeltasPanel
         deltas={pastDeltas}
         playbookId={proposal.triggering_playbook_id}

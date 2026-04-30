@@ -75,6 +75,29 @@ export async function getLatestRolloutForLandingPage(
     .maybeSingle();
   if (!data) return null;
 
+  return shapeRolloutRow(data);
+}
+
+/** Returns the most recent rollout row for a specific proposal (any
+ * state), or null if no rollout was created for it. */
+export async function getRolloutForProposal(
+  proposalId: string,
+): Promise<RolloutRow | null> {
+  const supabase = getServiceRoleClient();
+  const { data } = await supabase
+    .from("opt_staged_rollouts")
+    .select(
+      "id, proposal_id, client_id, page_id, started_at, ended_at, end_reason, config_snapshot, traffic_split_percent, current_state, regression_check_results",
+    )
+    .eq("proposal_id", proposalId)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  return shapeRolloutRow(data);
+}
+
+function shapeRolloutRow(data: Record<string, unknown>): RolloutRow {
   const evaluations = Array.isArray(data.regression_check_results)
     ? (data.regression_check_results as Array<{
         evaluated_at: string;
