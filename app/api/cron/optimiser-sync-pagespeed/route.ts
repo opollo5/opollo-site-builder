@@ -10,8 +10,8 @@ import { syncPagespeedForClient } from "@/lib/optimiser/sync/pagespeed";
 import { logger } from "@/lib/logger";
 
 // PSI sync: weekly per landing page. PSI uses a single Opollo-wide API
-// key (PAGESPEED_API_KEY) rather than per-client credentials, so this
-// route iterates opt_clients directly rather than going through the
+// key (PSI_API_KEY) rather than per-client credentials, so this route
+// iterates opt_clients directly rather than going through the
 // credential-aware sync runner.
 
 export const runtime = "nodejs";

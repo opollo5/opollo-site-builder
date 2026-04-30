@@ -4,7 +4,7 @@ Read Google PageSpeed Insights Core Web Vitals into `opt_metrics_daily`.
 
 ## Inputs
 - `client_id`
-- `process.env.PAGESPEED_API_KEY` — single Opollo-wide free-tier key.
+- `process.env.PSI_API_KEY` — single Opollo-wide free-tier key.
 
 PSI is the only Phase 1 source that does not use per-client credentials. The credential-aware sync runner is bypassed; the cron iterates `opt_clients` directly.
 

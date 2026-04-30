@@ -38,19 +38,15 @@ GOOGLE_ADS_DEVELOPER_TOKEN=<from MCC>
 ## 2. GA4 (refresh-token OAuth)
 
 ### What you need
-1. **OAuth client.** Same Google Cloud project as the Ads OAuth client (or a separate one — both work). The optimiser accepts either `GA4_CLIENT_ID`/`_SECRET` or `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET` as a fallback so a single shared client can drive both flows.
+1. **OAuth client — same one as Ads.** Phase 1 mandates a single shared Google OAuth client across both Ads and GA4. The same Cloud OAuth client must have both `adwords` and `analytics.readonly` scopes authorised. (`GA4_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_ID` env-var fallbacks were removed — only `GOOGLE_ADS_CLIENT_ID` / `GOOGLE_ADS_CLIENT_SECRET` are read.)
 2. Enable **Google Analytics Data API v1beta** for the Cloud project (Console → Library → search "analyticsdata").
-3. Add `https://<deploy-host>/api/optimiser/oauth/ga4/callback` to the OAuth client's "Authorised redirect URIs".
+3. Add `https://<deploy-host>/api/optimiser/oauth/ga4/callback` to the OAuth client's "Authorised redirect URIs" (alongside the existing `/api/optimiser/oauth/ads/callback`).
 
-### Set the env vars
+### Env vars
+GA4 reads the same env vars Ads uses — no GA4-specific entries:
 ```
-GA4_CLIENT_ID=<from oauth client>
-GA4_CLIENT_SECRET=<from oauth client>
-```
-Or, if reusing the Ads OAuth client:
-```
-GOOGLE_OAUTH_CLIENT_ID=<shared>
-GOOGLE_OAUTH_CLIENT_SECRET=<shared>
+GOOGLE_ADS_CLIENT_ID=<shared with Ads>
+GOOGLE_ADS_CLIENT_SECRET=<shared with Ads>
 ```
 
 ### Verify
@@ -80,7 +76,7 @@ Click "Verify install" — the verifier calls Clarity's `project-live-insights` 
 
 ### Set the env var
 ```
-PAGESPEED_API_KEY=<from credentials>
+PSI_API_KEY=<from credentials>
 ```
 
 ### Verify

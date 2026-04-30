@@ -108,8 +108,8 @@ export function ga4ConsentUrl(args: {
   redirectUri: string;
   state: string;
 }): string | null {
-  const clientId =
-    process.env.GA4_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID;
+  // GA4 reuses the Google Ads OAuth client.
+  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
   if (!clientId) return null;
   const params = new URLSearchParams({
     client_id: clientId,
@@ -128,14 +128,9 @@ export async function exchangeCodeForRefreshToken(args: {
   redirectUri: string;
   source: OAuthSource;
 }): Promise<{ refresh_token: string; access_token: string } | null> {
-  const clientId =
-    args.source === "google_ads"
-      ? process.env.GOOGLE_ADS_CLIENT_ID
-      : process.env.GA4_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret =
-    args.source === "google_ads"
-      ? process.env.GOOGLE_ADS_CLIENT_SECRET
-      : process.env.GA4_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  // Both Ads and GA4 use the same Google OAuth client.
+  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
   const body = new URLSearchParams({
     client_id: clientId,
