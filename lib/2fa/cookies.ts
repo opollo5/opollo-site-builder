@@ -97,6 +97,57 @@ export function isCookieSigningSecretSet(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// 2fa_pending cookie — signed wrapper around a challenge_id.
+//
+// Set by the login server action after a password-valid sign-in that
+// needs an email approval (no matching trusted_devices). Read by
+// middleware to redirect any admin navigation back to
+// /login/check-email until cleared by complete-login.
+//
+// The cookie is the trigger; the canonical pending-state is the
+// login_challenges row. Middleware re-checks the row's status to
+// defend against a stale cookie (e.g. operator approved in another
+// browser).
+// ---------------------------------------------------------------------------
+
+export const PENDING_2FA_COOKIE = "opollo_2fa_pending";
+const PENDING_TTL_SECONDS = 20 * 60; // 20 minutes — > the 15-min challenge expiry
+
+export function getPending2faCookieMaxAgeSeconds(): number {
+  return PENDING_TTL_SECONDS;
+}
+
+export function encodePending2faCookie(challengeId: string): string {
+  return `${challengeId}.${sign(challengeId)}`;
+}
+
+export function decodePending2faCookie(
+  cookieValue: string | undefined,
+): string | null {
+  if (!cookieValue) return null;
+  const parts = cookieValue.split(".");
+  if (parts.length !== 2) return null;
+  const [challengeId, signature] = parts;
+  if (!challengeId || !signature) return null;
+  const expected = sign(challengeId);
+  const a = Buffer.from(signature, "utf8");
+  const b = Buffer.from(expected, "utf8");
+  if (a.length !== b.length) {
+    timingSafeEqual(a, Buffer.alloc(a.length));
+    return null;
+  }
+  if (!timingSafeEqual(a, b)) return null;
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      challengeId,
+    )
+  ) {
+    return null;
+  }
+  return challengeId;
+}
+
+// ---------------------------------------------------------------------------
 // IP hashing for ip_hash columns. Uses IP_HASH_PEPPER (per P1) so the
 // raw IP isn't recoverable from the stored hash.
 // ---------------------------------------------------------------------------
