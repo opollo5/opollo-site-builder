@@ -1,4 +1,10 @@
--- 0058 — AUTH-FOUNDATION P3.2: transactional invite + audit Postgres functions.
+-- 0064 — AUTH-FOUNDATION P3.2: transactional invite + audit Postgres functions.
+--
+-- Renumbered from 0058 to resolve a version-prefix collision with
+-- 0058_optimiser_phase_2_playbooks.sql. The collision caused supabase
+-- db push to silently skip this file on staging, leaving create_invite /
+-- revoke_invite / accept_invite missing from the DB and the invite flow
+-- failing with PGRST schema-cache errors.
 --
 -- The brief requires that every user-management action and its
 -- corresponding user_audit_log row land in a SINGLE TRANSACTION — so

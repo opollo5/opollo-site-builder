@@ -1,4 +1,4 @@
--- Rollback for 0057_auth_foundation_roles_and_invites.sql.
+-- Rollback for 0063_auth_foundation_roles_and_invites.sql.
 --
 -- Caveats:
 --   - The role rename viewer→user / operator→admin is data-lossy on

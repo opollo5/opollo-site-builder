@@ -1,4 +1,4 @@
--- Rollback for 0058_invite_audit_functions.sql.
+-- Rollback for 0064_invite_audit_functions.sql.
 
 DROP FUNCTION IF EXISTS public.accept_invite(uuid, uuid, text);
 DROP FUNCTION IF EXISTS public.revoke_invite(uuid, uuid);

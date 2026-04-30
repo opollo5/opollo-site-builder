@@ -13,6 +13,65 @@ env:
   RUN_CI: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
 
 jobs:
+  # Fails when two files in supabase/migrations/ or supabase/rollbacks/ share
+  # the same numeric version prefix (everything before the first underscore).
+  # supabase_migrations.schema_migrations enforces UNIQUE on version, so two
+  # files with the same prefix mean `supabase db push` silently skips one of
+  # them — the missing-create_invite staging incident was a real instance.
+  migration-versions:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for duplicate migration version prefixes
+        run: |
+          set -euo pipefail
+          # Versions present on main today that collide but cannot be
+          # renumbered without an ops migration (each affected migration
+          # is already applied to at least one environment, so renaming
+          # the file would make supabase db push try to re-apply it).
+          # Each entry here needs a tracked follow-up to renumber + run
+          # supabase migration repair across staging + prod.
+          #   - 0031: 0031_email_log.sql (#286) collides with
+          #           0031_optimiser_clients.sql (#293). One of the two
+          #           is silently missing from prod. Follow-up TBD.
+          allowlist="0031"
+          fail=0
+          for dir in supabase/migrations supabase/rollbacks; do
+            [ -d "$dir" ] || continue
+            all_dupes=$(ls "$dir" | grep -E '\.sql$' | awk -F_ '{print $1}' | sort | uniq -d || true)
+            dupes=""
+            while read -r v; do
+              [ -z "$v" ] && continue
+              if grep -qFx "$v" <<< "$allowlist"; then
+                echo "::warning::$dir: version $v collides but is allow-listed (historical)."
+                continue
+              fi
+              dupes+="$v"$'\n'
+            done <<< "$all_dupes"
+            if [ -n "$dupes" ]; then
+              echo "::error::Duplicate version prefixes in $dir:"
+              while read -r v; do
+                [ -z "$v" ] && continue
+                echo "  $v collides between:"
+                ls "$dir" | grep "^${v}_" | sed 's/^/    /'
+              done <<< "$dupes"
+              fail=1
+            fi
+          done
+          if [ "$fail" = "1" ]; then
+            echo
+            echo "Each migration must have a unique numeric version prefix."
+            echo "supabase_migrations.schema_migrations enforces UNIQUE on the"
+            echo "version, so two files sharing a prefix mean supabase db push"
+            echo "silently skips one. Renumber the newer file to the next free"
+            echo "slot, and reserve the number in docs/WORK_IN_FLIGHT.md so a"
+            echo "parallel session can't grab it again."
+            exit 1
+          fi
+          echo "OK — no duplicate version prefixes (or only allow-listed ones)."
+
   typecheck:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
