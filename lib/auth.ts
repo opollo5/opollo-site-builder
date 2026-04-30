@@ -32,7 +32,13 @@ import { getServiceRoleClient } from "@/lib/supabase";
 //     middleware path.
 // ---------------------------------------------------------------------------
 
-export type Role = "admin" | "operator" | "viewer";
+// AUTH-FOUNDATION P3 (2026-04-30): role enum migrated from
+// (admin, operator, viewer) to (super_admin, admin, user). Migration
+// 0057 maps existing rows: viewer→user, operator→admin, admin stays
+// admin (with hi@opollo.com promoted to super_admin via the same
+// migration). Trusted-operator gating that previously required
+// admin OR operator now requires super_admin OR admin.
+export type Role = "super_admin" | "admin" | "user";
 
 export type SessionUser = {
   id: string;

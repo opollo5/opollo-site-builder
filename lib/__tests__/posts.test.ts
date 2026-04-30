@@ -87,7 +87,7 @@ async function seedPost(
 describe("createPost", () => {
   it("creates a draft post with content_type='post' and version_lock=1", async () => {
     const site = await seedSite({ name: "C1", prefix: "cp1" });
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const res = await createPost({
       site_id: site.id,
       title: "Hello world",
@@ -244,8 +244,8 @@ describe("listPostsForSite — filter composition", () => {
 
   it("applies author_id filter", async () => {
     const site = await seedSite({ name: "LAu", prefix: "lau1" });
-    const alice = await seedAuthUser({ role: "operator" });
-    const bob = await seedAuthUser({ role: "operator" });
+    const alice = await seedAuthUser({ role: "admin" });
+    const bob = await seedAuthUser({ role: "admin" });
     const aliceId = await seedPost(site.id, {
       slug: "alice",
       title: "Alice",
@@ -441,7 +441,7 @@ describe("updatePostMetadata — happy path", () => {
       slug: "attrib",
       title: "Attrib",
     });
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const res = await updatePostMetadata(site.id, postId, {
       expected_version: 1,
       updated_by: user.id,
@@ -603,7 +603,7 @@ describe("updatePostMetadata — error paths", () => {
 describe("softDeletePost", () => {
   it("marks deleted_at + bumps version_lock and excludes from default reads", async () => {
     const site = await seedSite({ name: "S1", prefix: "s1p" });
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const postId = await seedPost(site.id, { slug: "rm", title: "Remove me" });
     const res = await softDeletePost(site.id, postId, {
       expected_version: 1,

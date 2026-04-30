@@ -18,7 +18,7 @@ import {
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const rlId = gate.user ? `user:${gate.user.id}` : `ip:${getClientIp(req)}`;

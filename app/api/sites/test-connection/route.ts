@@ -49,7 +49,7 @@ const StoredSchema = z.object({
 const BodySchema = z.union([ExplicitSchema, StoredSchema]);
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const rlId = gate.user ? `user:${gate.user.id}` : `ip:${getClientIp(req)}`;

@@ -31,7 +31,7 @@ const PatchBodySchema = UpdateDesignTemplateSchema.and(
 // elsewhere after a template already referenced it could otherwise leave a
 // dangling ref; this route refuses such writes at the admin layer.
 export async function PATCH(req: Request, ctx: RouteContext) {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const dsParam = validateUuidParam(ctx.params.id, "id");
@@ -59,7 +59,7 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 
 // DELETE /api/design-systems/[id]/templates/[tid]?expected_version_lock=N
 export async function DELETE(req: Request, ctx: RouteContext) {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const dsParam = validateUuidParam(ctx.params.id, "id");

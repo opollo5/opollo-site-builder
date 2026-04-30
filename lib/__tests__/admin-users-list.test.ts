@@ -104,7 +104,7 @@ describe("GET /api/admin/users/list: auth", () => {
 
   it("returns 403 when the caller is an operator (admin-only)", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "operator" });
+    const op = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(op.email);
 
     const res = await usersListGET();
@@ -115,7 +115,7 @@ describe("GET /api/admin/users/list: auth", () => {
 
   it("returns 403 when the caller is a viewer", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const viewer = await seedAuthUser({ role: "viewer" });
+    const viewer = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(viewer.email);
 
     const res = await usersListGET();
@@ -124,7 +124,7 @@ describe("GET /api/admin/users/list: auth", () => {
 
   it("returns 200 when the flag is off (Basic Auth path)", async () => {
     delete process.env.FEATURE_SUPABASE_AUTH;
-    await seedAuthUser({ role: "viewer" });
+    await seedAuthUser({ role: "user" });
     mockState.client = anonClient();
 
     const res = await usersListGET();
@@ -143,7 +143,7 @@ describe("GET /api/admin/users/list: payload", () => {
     // that ordering by created_at desc is still deterministic because
     // the second insert's now() > the first's.
     await new Promise((r) => setTimeout(r, 10));
-    const viewer = await seedAuthUser({ role: "viewer" });
+    const viewer = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await usersListGET();
@@ -163,7 +163,7 @@ describe("GET /api/admin/users/list: payload", () => {
 
   it("includes revoked_at on a revoked row", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "operator" });
+    const target = await seedAuthUser({ role: "admin" });
 
     const svc = getServiceRoleClient();
     const { error: updateErr } = await svc

@@ -40,7 +40,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
   const gate = await requireAdminForApi({
-    roles: ["admin", "operator"] as const,
+    roles: ["super_admin", "admin"] as const,
   });
   if (gate.kind === "deny") return gate.response;
 

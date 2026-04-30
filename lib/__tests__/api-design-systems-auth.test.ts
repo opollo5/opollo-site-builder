@@ -269,7 +269,7 @@ describe("role gate — FEATURE_SUPABASE_AUTH off (bypass)", () => {
 describe("role gate — viewer is denied on every mutating route", () => {
   beforeEach(async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const viewer = await seedAuthUser({ role: "viewer" });
+    const viewer = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(viewer.email);
   });
 
@@ -291,7 +291,7 @@ describe("role gate — operator is allowed (representative routes)", () => {
 
   beforeEach(async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
   });
 

@@ -22,7 +22,7 @@ export default async function BlogPostEntryPage({
   params: { id: string };
 }) {
   const access = await checkAdminAccess({
-    requiredRoles: ["admin", "operator"],
+    requiredRoles: ["super_admin", "admin"],
     insufficientRoleRedirectTo: "/",
   });
   if (access.kind === "redirect") redirect(access.to);

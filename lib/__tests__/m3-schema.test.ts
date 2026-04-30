@@ -406,12 +406,12 @@ describe("M3-1 — RLS policies", () => {
   beforeAll(async () => {
     creator = await seedAuthUser({
       email: "m3-creator@opollo.test",
-      role: "operator",
+      role: "admin",
       persistent: true,
     });
     otherOperator = await seedAuthUser({
       email: "m3-other@opollo.test",
-      role: "operator",
+      role: "admin",
       persistent: true,
     });
     admin = await seedAuthUser({
@@ -421,7 +421,7 @@ describe("M3-1 — RLS policies", () => {
     });
     viewer = await seedAuthUser({
       email: "m3-viewer@opollo.test",
-      role: "viewer",
+      role: "user",
       persistent: true,
     });
 

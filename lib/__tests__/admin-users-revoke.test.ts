@@ -131,7 +131,7 @@ afterEach(() => {
 describe("POST /api/admin/users/[id]/revoke: auth + validation", () => {
   it("returns 401 when flag on and no session", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = anonClient();
 
     const res = await revokePOST(makeRequest(target.id), {
@@ -142,8 +142,8 @@ describe("POST /api/admin/users/[id]/revoke: auth + validation", () => {
 
   it("returns 403 when caller is operator", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "operator" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const op = await seedAuthUser({ role: "admin" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 
     const res = await revokePOST(makeRequest(target.id), {
@@ -257,7 +257,7 @@ describe("POST /api/admin/users/[id]/revoke: effects", () => {
 
   it("stamps revoked_at, bans in auth.users, and sweeps sessions", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "operator" });
+    const target = await seedAuthUser({ role: "admin" });
     // Seed a refresh token so we can verify it gets swept.
     await signedInClient(target.email);
 
@@ -301,8 +301,8 @@ describe("POST /api/admin/users/[id]/reinstate", () => {
   });
 
   it("requires admin (403 operator)", async () => {
-    const op = await seedAuthUser({ role: "operator" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const op = await seedAuthUser({ role: "admin" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 
     const res = await reinstatePOST(
@@ -317,7 +317,7 @@ describe("POST /api/admin/users/[id]/reinstate", () => {
 
   it("clears revoked_at and unbans, restoring sign-in", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "operator" });
+    const target = await seedAuthUser({ role: "admin" });
     await signedInClient(target.email);
 
     mockState.client = await signedInClient(admin.email);
@@ -355,7 +355,7 @@ describe("POST /api/admin/users/[id]/reinstate", () => {
 
   it("is idempotent on an already-active user with changed: false", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await reinstatePOST(

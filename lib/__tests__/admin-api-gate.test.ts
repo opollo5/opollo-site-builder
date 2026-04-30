@@ -146,7 +146,7 @@ describe("requireAdminForApi: FEATURE_SUPABASE_AUTH on, kill switch off", () => 
   });
 
   it("returns 403 FORBIDDEN for an operator when admin is required", async () => {
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
     const gate = await requireAdminForApi();
@@ -158,7 +158,7 @@ describe("requireAdminForApi: FEATURE_SUPABASE_AUTH on, kill switch off", () => 
   });
 
   it("returns 403 FORBIDDEN for a viewer", async () => {
-    const viewer = await seedAuthUser({ role: "viewer" });
+    const viewer = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(viewer.email);
 
     const gate = await requireAdminForApi();
@@ -179,12 +179,12 @@ describe("requireAdminForApi: FEATURE_SUPABASE_AUTH on, kill switch off", () => 
   });
 
   it("honours a custom roles list (operator allowed when listed)", async () => {
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
-    const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+    const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
     expect(gate.kind).toBe("allow");
     if (gate.kind !== "allow") throw new Error("unreachable");
-    expect(gate.user?.role).toBe("operator");
+    expect(gate.user?.role).toBe("admin");
   });
 });

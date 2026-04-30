@@ -69,7 +69,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {

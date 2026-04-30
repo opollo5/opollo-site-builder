@@ -62,12 +62,12 @@ describe("M2b: user-scoped RLS policies", () => {
     });
     operator = await seedAuthUser({
       email: "m2b-operator@opollo.test",
-      role: "operator",
+      role: "admin",
       persistent: true,
     });
     viewer = await seedAuthUser({
       email: "m2b-viewer@opollo.test",
-      role: "viewer",
+      role: "user",
       persistent: true,
     });
 
@@ -84,8 +84,8 @@ describe("M2b: user-scoped RLS policies", () => {
     const svc = getServiceRoleClient();
     await svc.from("opollo_users").insert([
       { id: admin.id, email: admin.email, role: "admin" },
-      { id: operator.id, email: operator.email, role: "operator" },
-      { id: viewer.id, email: viewer.email, role: "viewer" },
+      { id: operator.id, email: operator.email, role: "admin" },
+      { id: viewer.id, email: viewer.email, role: "user" },
     ]);
   });
 
@@ -583,11 +583,11 @@ describe("M2b: user-scoped RLS policies", () => {
     it("admin UPDATE: can promote another user", async () => {
       const { data, error } = await adminClient
         .from("opollo_users")
-        .update({ role: "operator" })
+        .update({ role: "admin" })
         .eq("id", viewer.id)
         .select("id, role");
       expect(error).toBeNull();
-      expect(data?.[0]?.role).toBe("operator");
+      expect(data?.[0]?.role).toBe("admin");
     });
 
     it("operator UPDATE: filtered — no admin_write policy matches", async () => {

@@ -63,7 +63,7 @@ export async function GET(
   _req: Request,
   { params }: { params: { brief_id: string } },
 ): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const briefIdCheck = validateUuidParam(params.brief_id, "brief_id");

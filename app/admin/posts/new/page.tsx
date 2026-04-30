@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PostsNewPage() {
   const access = await checkAdminAccess({
-    requiredRoles: ["admin", "operator"],
+    requiredRoles: ["super_admin", "admin"],
     insufficientRoleRedirectTo: "/",
   });
   if (access.kind === "redirect") redirect(access.to);

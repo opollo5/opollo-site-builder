@@ -37,7 +37,7 @@ describe("M2a: handle_new_auth_user trigger", () => {
     const row = await readOpolloUser(user.id);
     expect(row).not.toBeNull();
     expect(row?.email).toBe(user.email);
-    expect(row?.role).toBe("viewer");
+    expect(row?.role).toBe("user");
   });
 
   it("promotes to 'admin' when email matches opollo_config.first_admin_email", async () => {
@@ -53,7 +53,7 @@ describe("M2a: handle_new_auth_user trigger", () => {
     await setFirstAdminEmail("boss@opollo.test");
     const user = await seedAuthUser({ email: "intern@opollo.test" });
     const row = await readOpolloUser(user.id);
-    expect(row?.role).toBe("viewer");
+    expect(row?.role).toBe("user");
   });
 });
 
@@ -107,7 +107,7 @@ describe("M2a: public.auth_role() helper", () => {
   // use a direct pg connection where we can SET LOCAL the claim to
   // simulate an authenticated session.
   it("returns the user's role when called as that user", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const pg = new Client({ connectionString: DB_URL });
     await pg.connect();
     try {
@@ -117,7 +117,7 @@ describe("M2a: public.auth_role() helper", () => {
       // but this is simpler from psql.
       await pg.query(`SET LOCAL "request.jwt.claim.sub" = '${user.id}'`);
       const res = await pg.query("SELECT public.auth_role() AS role");
-      expect(res.rows[0].role).toBe("operator");
+      expect(res.rows[0].role).toBe("admin");
       await pg.query("COMMIT");
     } finally {
       await pg.end();

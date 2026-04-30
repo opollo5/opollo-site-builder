@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 
-type Role = "admin" | "operator" | "viewer";
+// AUTH-FOUNDATION P3 — role enum migrated from
+// (admin, operator, viewer) to (super_admin, admin, user).
+// super_admin is the locked top tier; this dropdown only offers
+// admin and user since super_admin can't be assigned via this route
+// (and the row is disabled when the target is already super_admin).
+type Role = "super_admin" | "admin" | "user";
+type AssignableRole = Exclude<Role, "super_admin">;
 
 // ---------------------------------------------------------------------------
 // C-2 — Optimistic UI on role change.
@@ -37,9 +43,10 @@ export function UserRoleActionCell({
   const [submitting, setSubmitting] = useState(false);
 
   const isSelf = selfUserId !== null && selfUserId === userId;
+  const isSuperAdmin = currentRole === "super_admin";
 
   async function handleChange(e: ChangeEvent<HTMLSelectElement>) {
-    const newRole = e.target.value as Role;
+    const newRole = e.target.value as AssignableRole;
     if (newRole === optimisticRole) return;
     const previous = optimisticRole;
 
@@ -80,6 +87,21 @@ export function UserRoleActionCell({
     }
   }
 
+  // super_admin row: render the role as a static label, never a
+  // dropdown. The DB-level guard_super_admin trigger blocks role
+  // changes anyway; surfacing as a dropdown would mislead the
+  // operator into thinking they can demote.
+  if (isSuperAdmin) {
+    return (
+      <span
+        className="inline-flex items-center rounded border border-input bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground"
+        title="Super admin cannot be modified."
+      >
+        super_admin
+      </span>
+    );
+  }
+
   return (
     <select
       value={optimisticRole}
@@ -90,8 +112,7 @@ export function UserRoleActionCell({
       className="rounded border bg-background px-2 py-1 text-xs transition-smooth disabled:opacity-60"
     >
       <option value="admin">admin</option>
-      <option value="operator">operator</option>
-      <option value="viewer">viewer</option>
+      <option value="user">user</option>
     </select>
   );
 }

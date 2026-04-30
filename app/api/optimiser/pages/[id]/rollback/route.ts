@@ -27,7 +27,7 @@ export async function POST(
   req: NextRequest,
   ctx: { params: { id: string } },
 ): Promise<NextResponse> {
-  const access = await checkAdminAccess({ requiredRoles: ["admin", "operator"] });
+  const access = await checkAdminAccess({ requiredRoles: ["super_admin", "admin"] });
   if (access.kind === "redirect") {
     return NextResponse.json(
       {

@@ -143,7 +143,7 @@ describe("POST /api/admin/users/invite: auth", () => {
 
   it("returns 403 when caller is operator", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "operator" });
+    const op = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(op.email);
 
     const res = await invitePOST(
@@ -220,7 +220,7 @@ describe("POST /api/admin/users/invite: outcomes", () => {
       // Trigger fired → opollo_users row exists with role='viewer'.
       const row = await readOpolloUserByEmail(inviteEmail);
       expect(row).not.toBeNull();
-      expect(row?.role).toBe("viewer");
+      expect(row?.role).toBe("user");
     } finally {
       await deleteAuthUserByEmail(inviteEmail);
     }
@@ -231,7 +231,7 @@ describe("POST /api/admin/users/invite: outcomes", () => {
     // Seed a second user — that email is now registered in auth.users
     // via the admin API, matching what inviteUserByEmail would collide
     // against.
-    const existing = await seedAuthUser({ role: "viewer" });
+    const existing = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await invitePOST(

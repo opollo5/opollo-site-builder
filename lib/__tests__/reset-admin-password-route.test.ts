@@ -371,7 +371,7 @@ describe("POST /api/ops/reset-admin-password: target guard", () => {
 
   it("returns 403 when the matching user is an operator", async () => {
     mockState.lookupResult = {
-      data: { id: ADMIN_UUID, role: "operator", revoked_at: null },
+      data: { id: ADMIN_UUID, role: "admin", revoked_at: null },
       error: null,
     };
     const res = await resetAdminPasswordPOST(
@@ -388,7 +388,7 @@ describe("POST /api/ops/reset-admin-password: target guard", () => {
 
   it("returns 403 when the matching user is a viewer", async () => {
     mockState.lookupResult = {
-      data: { id: ADMIN_UUID, role: "viewer", revoked_at: null },
+      data: { id: ADMIN_UUID, role: "user", revoked_at: null },
       error: null,
     };
     const res = await resetAdminPasswordPOST(

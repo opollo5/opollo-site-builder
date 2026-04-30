@@ -44,7 +44,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   let parsed: z.infer<typeof BodySchema>;

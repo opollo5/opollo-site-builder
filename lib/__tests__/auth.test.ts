@@ -60,24 +60,24 @@ async function signedInClient(email: string): Promise<SupabaseClient> {
 
 describe("getCurrentUser", () => {
   it("returns id/email/role for a signed-in viewer", async () => {
-    const user = await seedAuthUser({ role: "viewer" });
+    const user = await seedAuthUser({ role: "user" });
     const client = await signedInClient(user.email);
     const result = await getCurrentUser(client);
     expect(result).not.toBeNull();
     expect(result?.id).toBe(user.id);
     expect(result?.email).toBe(user.email);
-    expect(result?.role).toBe("viewer");
+    expect(result?.role).toBe("user");
   });
 
   it("returns the promoted role for admins and operators", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
 
     const adminClient = await signedInClient(admin.email);
     const operatorClient = await signedInClient(operator.email);
 
     expect((await getCurrentUser(adminClient))?.role).toBe("admin");
-    expect((await getCurrentUser(operatorClient))?.role).toBe("operator");
+    expect((await getCurrentUser(operatorClient))?.role).toBe("admin");
   });
 
   it("returns null when the client has no session", async () => {
@@ -89,19 +89,19 @@ describe("getCurrentUser", () => {
 
 describe("requireRole", () => {
   it("returns the user when their role matches", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const client = await signedInClient(user.email);
-    const result = await requireRole(client, ["admin", "operator"]);
+    const result = await requireRole(client, ["super_admin", "admin"]);
     expect(result.id).toBe(user.id);
-    expect(result.role).toBe("operator");
+    expect(result.role).toBe("admin");
   });
 
   it("throws AuthError(403) when role does not match", async () => {
-    const user = await seedAuthUser({ role: "viewer" });
+    const user = await seedAuthUser({ role: "user" });
     const client = await signedInClient(user.email);
     let caught: unknown;
     try {
-      await requireRole(client, ["admin", "operator"]);
+      await requireRole(client, ["super_admin", "admin"]);
     } catch (err) {
       caught = err;
     }
@@ -113,7 +113,7 @@ describe("requireRole", () => {
     const client = anonClient();
     let caught: unknown;
     try {
-      await requireRole(client, ["viewer"]);
+      await requireRole(client, ["user"]);
     } catch (err) {
       caught = err;
     }
@@ -125,18 +125,18 @@ describe("requireRole", () => {
 describe("role changes are per-request fresh", () => {
   it("reflects a server-side role demotion on the next getCurrentUser call", async () => {
     // Set up: operator signs in, lib sees them as operator.
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const client = await signedInClient(user.email);
 
     const before = await getCurrentUser(client);
-    expect(before?.role).toBe("operator");
+    expect(before?.role).toBe("admin");
 
     // An admin (via M2d, via the trigger, via any service-role path)
     // demotes the user to viewer.
     const svc = getServiceRoleClient();
     const { error } = await svc
       .from("opollo_users")
-      .update({ role: "viewer" })
+      .update({ role: "user" })
       .eq("id", user.id);
     expect(error).toBeNull();
 
@@ -144,13 +144,13 @@ describe("role changes are per-request fresh", () => {
     // reflects the new role. No revocation, no re-login. This is the
     // promise that lets M2d skip the sign-out dance for role changes.
     const after = await getCurrentUser(client);
-    expect(after?.role).toBe("viewer");
+    expect(after?.role).toBe("user");
   });
 });
 
 describe("revokeUserSessions — hard revocation", () => {
   it("rejects the user's pre-revocation access token on the next call", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const client = await signedInClient(user.email);
 
     // Sanity: session is live before revocation.
@@ -173,7 +173,7 @@ describe("revokeUserSessions — hard revocation", () => {
   });
 
   it("allows a fresh sign-in after revocation", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     await revokeUserSessions(user.id);
 
     // revocation leaves the user enabled — a new sign-in produces a
@@ -183,13 +183,13 @@ describe("revokeUserSessions — hard revocation", () => {
     const client = await signedInClient(user.email);
     const result = await getCurrentUser(client);
     expect(result?.id).toBe(user.id);
-    expect(result?.role).toBe("operator");
+    expect(result?.role).toBe("admin");
   });
 });
 
 describe("signOutAuthUser — soft sweep", () => {
   it("deletes refresh_tokens so silent auto-refresh can't continue", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     await signedInClient(user.email);
 
     // Belt check: there's at least one refresh_token row for this user
@@ -210,7 +210,7 @@ describe("signOutAuthUser — soft sweep", () => {
       .select("id,role,revoked_at")
       .eq("id", user.id)
       .maybeSingle();
-    expect(row?.role).toBe("operator");
+    expect(row?.role).toBe("admin");
     expect(row?.revoked_at).toBeNull();
   });
 });

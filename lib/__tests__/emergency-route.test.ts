@@ -312,7 +312,7 @@ describe("POST /api/emergency: revoke_user", () => {
   });
 
   it("stamps opollo_users.revoked_at and sweeps refresh tokens", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     await signedInClient(user.email);
 
     // Sanity: refresh token exists before revoke.

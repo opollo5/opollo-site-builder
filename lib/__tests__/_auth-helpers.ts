@@ -5,7 +5,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // service-role supabase-js client — we want the same HTTP + trigger path
 // the admin API uses, not raw SQL inserts that skip the trigger.
 
-export type TestRole = "admin" | "operator" | "viewer";
+// AUTH-FOUNDATION P3 — role enum migrated to (super_admin, admin, user).
+export type TestRole = "super_admin" | "admin" | "user";
 
 export type SeededAuthUser = {
   id: string;
@@ -60,11 +61,11 @@ export async function cleanupTrackedAuthUsers(): Promise<void> {
 
 /**
  * Creates an auth.users row via the admin API. The
- * handle_new_auth_user trigger (0004 migration) inserts the matching
- * opollo_users row with role='viewer' (or 'admin' if opollo_config's
- * first_admin_email matches). When `overrides.role` is supplied and
- * differs from the trigger's choice, we UPDATE the opollo_users row
- * post-insert so the test gets the requested role.
+ * handle_new_auth_user trigger (0004 + 0057 migrations) inserts the
+ * matching opollo_users row with role='user' (or 'super_admin' if
+ * opollo_config's first_admin_email matches). When `overrides.role`
+ * is supplied and differs from the trigger's choice, we UPDATE the
+ * opollo_users row post-insert so the test gets the requested role.
  *
  * `email_confirm: true` skips Supabase Auth's confirmation flow — we
  * don't want the test harness dealing with inbucket / email links.
@@ -101,8 +102,8 @@ export async function seedAuthUser(overrides?: {
     createdAuthUserIds.add(userId);
   }
 
-  // If a role was requested, reconcile. Default case (viewer) is fine.
-  if (overrides?.role && overrides.role !== "viewer") {
+  // If a role was requested, reconcile. Default case (user) is fine.
+  if (overrides?.role && overrides.role !== "user") {
     const { error: updateErr } = await supabase
       .from("opollo_users")
       .update({ role: overrides.role })
@@ -117,7 +118,7 @@ export async function seedAuthUser(overrides?: {
   return {
     id: userId,
     email,
-    role: overrides?.role ?? "viewer",
+    role: overrides?.role ?? "user",
   };
 }
 

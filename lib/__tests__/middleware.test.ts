@@ -306,7 +306,7 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, valid session", () => {
     await clearKillSwitchRow();
     __resetAuthKillSwitchCacheForTests();
 
-    const user = await seedAuthUser({ role: "viewer" });
+    const user = await seedAuthUser({ role: "user" });
     const cookies = await buildSessionCookies(user.email);
 
     const res = await middleware(makeRequest("/admin/sites", { cookies }));

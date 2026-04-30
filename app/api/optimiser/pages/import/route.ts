@@ -32,7 +32,7 @@ const BodySchema = z
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const access = await checkAdminAccess({
-    requiredRoles: ["admin", "operator"],
+    requiredRoles: ["super_admin", "admin"],
   });
   if (access.kind === "redirect") {
     return NextResponse.json(

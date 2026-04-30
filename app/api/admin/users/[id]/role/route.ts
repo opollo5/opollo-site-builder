@@ -41,8 +41,11 @@ import { getServiceRoleClient } from "@/lib/supabase";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// AUTH-FOUNDATION P3 — role rename (operator/viewer → admin/user;
+// super_admin is the new top tier reserved for hi@opollo.com and
+// CANNOT be assigned via this route).
 const RoleSchema = z.object({
-  role: z.enum(["admin", "operator", "viewer"]),
+  role: z.enum(["admin", "user"]),
 });
 
 const UUID_RE =
@@ -93,7 +96,7 @@ export async function PATCH(
         ok: false,
         error: {
           code: "VALIDATION_FAILED",
-          message: "Body must be { role: 'admin' | 'operator' | 'viewer' }.",
+          message: "Body must be { role: 'admin' | 'user' }.",
           details: { issues: parsed.error.issues },
           retryable: false, // VALIDATION_FAILED is not retryable — same input loops forever (M15-4 #5)
         },
@@ -132,7 +135,18 @@ export async function PATCH(
     return errorJson("NOT_FOUND", "No user with that id.", 404);
   }
 
-  const currentRole = target.role as "admin" | "operator" | "viewer";
+  const currentRole = target.role as "super_admin" | "admin" | "user";
+
+  // The DB-level guard_super_admin trigger blocks demoting the
+  // hi@opollo.com row; surface a clean 409 here so the UI doesn't
+  // see a generic 500.
+  if (currentRole === "super_admin") {
+    return errorJson(
+      "SUPER_ADMIN_LOCKED",
+      "Super admin cannot be modified.",
+      409,
+    );
+  }
   if (currentRole === targetRole) {
     return NextResponse.json(
       {
