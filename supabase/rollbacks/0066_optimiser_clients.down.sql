@@ -1,4 +1,4 @@
--- Rollback for 0031_optimiser_clients.sql
+-- Rollback for 0066_optimiser_clients.sql
 DROP POLICY IF EXISTS opt_clients_write ON opt_clients;
 DROP POLICY IF EXISTS opt_clients_read ON opt_clients;
 DROP POLICY IF EXISTS service_role_all ON opt_clients;

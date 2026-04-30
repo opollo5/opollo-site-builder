@@ -1,4 +1,14 @@
--- 0031 — Optimiser: opt_clients (Slice 1 of feat/optimiser).
+-- 0066 — Optimiser: opt_clients (Slice 1 of feat/optimiser).
+--
+-- Renumbered from 0031 to resolve a version-prefix collision with
+-- 0031_email_log.sql (#286). On the first deploy-migrations run after
+-- the SUPABASE_DB_PASSWORD rotation (2026-04-30), 0031_email_log.sql
+-- successfully applied + recorded as version 0031, then this file's
+-- CREATE TABLE ran but the INSERT into schema_migrations hit the
+-- unique-version constraint. Production now has the opt_clients table
+-- created without a corresponding schema_migrations row, so this file
+-- is being marked applied via `supabase migration repair --status
+-- applied 0066` rather than re-applied.
 -- Reference: docs/Optimisation_Engine_Spec_v1.5.docx §5.1 + §3.6 + §4.6 + §11.2.
 --
 -- Design decisions encoded here:
