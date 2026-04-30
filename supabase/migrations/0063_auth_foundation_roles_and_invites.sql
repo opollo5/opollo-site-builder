@@ -1,4 +1,9 @@
--- 0057 — AUTH-FOUNDATION P3: super_admin tier + role rename + invites + audit log.
+-- 0063 — AUTH-FOUNDATION P3: super_admin tier + role rename + invites + audit log.
+--
+-- Renumbered from 0057 to resolve a version-prefix collision with
+-- 0057_optimiser_ab_variants_tests.sql. supabase_migrations.schema_migrations
+-- has a unique constraint on the version prefix, so two files sharing "0057"
+-- meant supabase db push silently skipped whichever one was applied second.
 --
 -- Replaces the legacy three-role enum (admin, operator, viewer) with the
 -- AUTH-FOUNDATION brief's three-role enum (super_admin, admin, user) and

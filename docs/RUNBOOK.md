@@ -434,6 +434,7 @@ Log the provisioning date + vendor account IDs somewhere persistent; each rotati
    ```
    This lists `Applied` + `Local`. Any migration present in `Local` but not `Applied` is pending.
 3. **Check the deploy workflow.** `.github/workflows/deploy-migrations.yml` runs on merge to main. Look at the run for the merge commit that introduced the new migration. A failure there is the root cause (not the missing migration itself — the workflow is the gap).
+4. **Rule out a version-prefix collision.** If `supabase migration list` shows the missing migration's version as `Applied` even though the schema isn't present, two files in `supabase/migrations/` share the same numeric prefix (everything before the first `_`). `supabase_migrations.schema_migrations` enforces UNIQUE on version, so `supabase db push` records whichever ran first and silently skips the other. Run `ls supabase/migrations/ | awk -F_ '{print $1}' | sort | uniq -d` to find collisions. The CI `migration-versions` job (added in `.github/workflows/ci.yml`) blocks new collisions, but historical ones live as allow-list entries. Resolve by renumbering the unapplied file to the next free slot **and** running `supabase migration repair --status applied <new-version>` against each environment that still has the orphan recorded under the old version.
 
 **Mitigate:**
 
