@@ -59,7 +59,7 @@ function validationError(message: string, details?: Record<string, unknown>): Ne
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   let form: FormData;

@@ -30,7 +30,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // Side effects: the call creates an auth.users row (email_confirmed_at
 // still null). The handle_new_auth_user trigger from migration 0004
 // fires immediately and inserts the matching opollo_users row with
-// role='viewer', so the invitee shows up in /admin/users as pending
+// role='user', so the invitee shows up in /admin/users as pending
 // before they click the link. After acceptance, the callback exchanges
 // the code for a session and lands them on `next` (default `/`).
 //

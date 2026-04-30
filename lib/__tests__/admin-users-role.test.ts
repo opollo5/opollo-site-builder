@@ -125,7 +125,7 @@ describe("PATCH /api/admin/users/[id]/role: auth", () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
     mockState.client = anonClient();
 
-    const user = await seedAuthUser({ role: "viewer" });
+    const user = await seedAuthUser({ role: "user" });
     const res = await roleRoutePATCH(
       makeRequest(user.id, { role: "admin" }),
       { params: { id: user.id } },
@@ -135,8 +135,8 @@ describe("PATCH /api/admin/users/[id]/role: auth", () => {
 
   it("returns 403 when caller is operator", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "operator" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const op = await seedAuthUser({ role: "admin" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 
     const res = await roleRoutePATCH(
@@ -161,7 +161,7 @@ describe("PATCH /api/admin/users/[id]/role: validation", () => {
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
-      makeRequest("not-a-uuid", { role: "viewer" }),
+      makeRequest("not-a-uuid", { role: "user" }),
       { params: { id: "not-a-uuid" } },
     );
     expect(res.status).toBe(400);
@@ -171,7 +171,7 @@ describe("PATCH /api/admin/users/[id]/role: validation", () => {
 
   it("returns 400 when role is missing", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
@@ -183,7 +183,7 @@ describe("PATCH /api/admin/users/[id]/role: validation", () => {
 
   it("returns 400 when role is an unknown string", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
@@ -195,7 +195,7 @@ describe("PATCH /api/admin/users/[id]/role: validation", () => {
 
   it("returns 400 when body is not JSON", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
@@ -233,7 +233,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
-      makeRequest(admin.id, { role: "viewer" }),
+      makeRequest(admin.id, { role: "user" }),
       { params: { id: admin.id } },
     );
     expect(res.status).toBe(409);
@@ -258,7 +258,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
     // still two admins at the moment of the check.
     mockState.client = await signedInClient(admin.email);
     const demote = await roleRoutePATCH(
-      makeRequest(secondAdmin.id, { role: "operator" }),
+      makeRequest(secondAdmin.id, { role: "admin" }),
       { params: { id: secondAdmin.id } },
     );
     expect(demote.status).toBe(200);
@@ -304,7 +304,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
     // State: `admin` is admin; `secondAdmin` is operator. `admin` is
     // the only admin row. Try to demote.
     const res = await roleRoutePATCH(
-      makeRequest(admin.id, { role: "operator" }),
+      makeRequest(admin.id, { role: "admin" }),
       { params: { id: admin.id } },
     );
     expect(res.status).toBe(409);
@@ -341,7 +341,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
       mockState.client = anonClient();
 
       const res = await roleRoutePATCH(
-        makeRequest(activeAdmin.id, { role: "operator" }),
+        makeRequest(activeAdmin.id, { role: "admin" }),
         { params: { id: activeAdmin.id } },
       );
       expect(res.status).toBe(409);
@@ -366,24 +366,24 @@ describe("PATCH /api/admin/users/[id]/role: success", () => {
 
   it("200 with changed:false on a no-op role assignment", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
-      makeRequest(target.id, { role: "viewer" }),
+      makeRequest(target.id, { role: "user" }),
       { params: { id: target.id } },
     );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.ok).toBe(true);
     expect(body.data.changed).toBe(false);
-    expect(body.data.role).toBe("viewer");
-    expect(await readRole(target.id)).toBe("viewer");
+    expect(body.data.role).toBe("user");
+    expect(await readRole(target.id)).toBe("user");
   });
 
   it("promotes viewer → admin", async () => {
     const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "viewer" });
+    const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
@@ -402,10 +402,10 @@ describe("PATCH /api/admin/users/[id]/role: success", () => {
     mockState.client = await signedInClient(admin.email);
 
     const res = await roleRoutePATCH(
-      makeRequest(target.id, { role: "operator" }),
+      makeRequest(target.id, { role: "admin" }),
       { params: { id: target.id } },
     );
     expect(res.status).toBe(200);
-    expect(await readRole(target.id)).toBe("operator");
+    expect(await readRole(target.id)).toBe("admin");
   });
 });

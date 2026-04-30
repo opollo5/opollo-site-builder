@@ -27,7 +27,9 @@ export type AdminUserRow = {
   id: string;
   email: string;
   display_name: string | null;
-  role: "admin" | "operator" | "viewer";
+  // AUTH-FOUNDATION P3 — role enum migrated from
+  // (admin, operator, viewer) to (super_admin, admin, user).
+  role: "super_admin" | "admin" | "user";
   created_at: string;
   revoked_at: string | null;
 };

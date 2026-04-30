@@ -18,7 +18,7 @@ const BodySchema = z.object({
 // archives any currently-active DS for the same site, atomically, via the
 // activate_design_system RPC from 0003_m1b_rpcs.sql.
 export async function POST(req: Request, ctx: { params: { id: string } }) {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const param = validateUuidParam(ctx.params.id, "id");

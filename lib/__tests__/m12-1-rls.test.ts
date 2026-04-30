@@ -61,11 +61,11 @@ describe("M12-1: RLS matrix for briefs + brief_pages + brief_runs + site_convent
 
   beforeAll(async () => {
     admin = await seedAuthUser({ email: "m12-1-rls-admin@opollo.test", role: "admin", persistent: true });
-    operator = await seedAuthUser({ email: "m12-1-rls-op@opollo.test", role: "operator", persistent: true });
-    viewer = await seedAuthUser({ email: "m12-1-rls-viewer@opollo.test", role: "viewer", persistent: true });
+    operator = await seedAuthUser({ email: "m12-1-rls-op@opollo.test", role: "admin", persistent: true });
+    viewer = await seedAuthUser({ email: "m12-1-rls-viewer@opollo.test", role: "user", persistent: true });
     // seedAuthUser creates an opollo_users row via trigger; for the "no role"
     // user we delete that row each test so public.auth_role() returns NULL.
-    noRole = await seedAuthUser({ email: "m12-1-rls-norole@opollo.test", role: "viewer", persistent: true });
+    noRole = await seedAuthUser({ email: "m12-1-rls-norole@opollo.test", role: "user", persistent: true });
 
     adminClient = buildClient(await signInAs(admin));
     operatorClient = buildClient(await signInAs(operator));
@@ -91,8 +91,8 @@ describe("M12-1: RLS matrix for briefs + brief_pages + brief_runs + site_convent
     // _setup.ts TRUNCATEs opollo_users — re-seed so auth_role() resolves.
     await svc.from("opollo_users").insert([
       { id: admin.id, email: admin.email, role: "admin" },
-      { id: operator.id, email: operator.email, role: "operator" },
-      { id: viewer.id, email: viewer.email, role: "viewer" },
+      { id: operator.id, email: operator.email, role: "admin" },
+      { id: viewer.id, email: viewer.email, role: "user" },
       // Intentionally skip noRole so auth_role() returns NULL for them.
     ]);
 

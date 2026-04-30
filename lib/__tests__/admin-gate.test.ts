@@ -150,7 +150,7 @@ describe("checkAdminAccess: FEATURE_SUPABASE_AUTH on, kill switch off", () => {
   });
 
   it("redirects viewers to /", async () => {
-    const viewer = await seedAuthUser({ role: "viewer" });
+    const viewer = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(viewer.email);
 
     const result = await checkAdminAccess();
@@ -158,13 +158,13 @@ describe("checkAdminAccess: FEATURE_SUPABASE_AUTH on, kill switch off", () => {
   });
 
   it("allows operators and threads the user through", async () => {
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
     const result = await checkAdminAccess();
     expect(result.kind).toBe("allow");
     if (result.kind === "allow") {
-      expect(result.user?.role).toBe("operator");
+      expect(result.user?.role).toBe("admin");
       expect(result.user?.email).toBe(operator.email);
     }
   });
@@ -188,7 +188,7 @@ describe("checkAdminAccess: custom options (M2d-1)", () => {
   });
 
   it("redirects an operator to the insufficientRoleRedirectTo target when admin is required", async () => {
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
     const result = await checkAdminAccess({
@@ -210,7 +210,7 @@ describe("checkAdminAccess: custom options (M2d-1)", () => {
   });
 
   it("falls back to the default '/' redirect when no target is supplied", async () => {
-    const operator = await seedAuthUser({ role: "operator" });
+    const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
     const result = await checkAdminAccess({ requiredRoles: ["admin"] });

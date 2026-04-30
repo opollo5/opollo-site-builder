@@ -72,7 +72,7 @@ describe("M12-1: briefs / brief_pages / brief_runs / site_conventions", () => {
   beforeAll(async () => {
     opUser = await seedAuthUser({
       email: "m12-1-schema-op@opollo.test",
-      role: "operator",
+      role: "admin",
       persistent: true,
     });
   });
@@ -364,7 +364,7 @@ describe("M12-1: briefs / brief_pages / brief_runs / site_conventions", () => {
     await svc.from("opollo_users").insert({
       id: opUser.id,
       email: opUser.email,
-      role: "operator",
+      role: "admin",
     });
 
     const { id: briefId } = await insertBrief({

@@ -74,7 +74,7 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {
@@ -163,7 +163,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {

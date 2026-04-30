@@ -123,7 +123,7 @@ describe("loginAction", () => {
   });
 
   it("returns generic invalid message on wrong password", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const result = await runAction(
       buildFormData({
         email: user.email,
@@ -146,7 +146,7 @@ describe("loginAction", () => {
   });
 
   it("redirects to next on successful sign-in", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const result = await runAction(
       buildFormData({
         email: user.email,
@@ -158,7 +158,7 @@ describe("loginAction", () => {
   });
 
   it("sanitises a malicious next to /admin/sites", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const result = await runAction(
       buildFormData({
         email: user.email,
@@ -170,7 +170,7 @@ describe("loginAction", () => {
   });
 
   it("sanitises a protocol-relative next to /admin/sites", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const result = await runAction(
       buildFormData({
         email: user.email,
@@ -182,7 +182,7 @@ describe("loginAction", () => {
   });
 
   it("defaults next to /admin/sites when omitted", async () => {
-    const user = await seedAuthUser({ role: "operator" });
+    const user = await seedAuthUser({ role: "admin" });
     const result = await runAction(
       buildFormData({
         email: user.email,

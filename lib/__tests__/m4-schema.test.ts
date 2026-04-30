@@ -79,12 +79,12 @@ describe("M4-1: image-library schema", () => {
     });
     operator = await seedAuthUser({
       email: "m4-operator@opollo.test",
-      role: "operator",
+      role: "admin",
       persistent: true,
     });
     viewer = await seedAuthUser({
       email: "m4-viewer@opollo.test",
-      role: "viewer",
+      role: "user",
       persistent: true,
     });
     adminClient = buildClient(await signInAs(admin));
@@ -105,8 +105,8 @@ describe("M4-1: image-library schema", () => {
     const svc = getServiceRoleClient();
     await svc.from("opollo_users").insert([
       { id: admin.id, email: admin.email, role: "admin" },
-      { id: operator.id, email: operator.email, role: "operator" },
-      { id: viewer.id, email: viewer.email, role: "viewer" },
+      { id: operator.id, email: operator.email, role: "admin" },
+      { id: viewer.id, email: viewer.email, role: "user" },
     ]);
   });
 

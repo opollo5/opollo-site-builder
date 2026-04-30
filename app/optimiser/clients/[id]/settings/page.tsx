@@ -46,9 +46,13 @@ export default async function ClientSettingsPage({
   const client = await getClient(params.id);
   if (!client) notFound();
   // Phase 2 Slice 21 — only admins can toggle assisted approval; the
-  // toggle component renders a read-only badge for operators / viewers.
-  const access = await checkAdminAccess({ requiredRoles: ["admin", "operator", "viewer"] });
-  const isAdmin = access.kind === "allow" && access.user?.role === "admin";
+  // toggle component renders a read-only badge for non-admin viewers.
+  // AUTH-FOUNDATION P3 — open to every authenticated role
+  // (super_admin, admin, user); permission is gated below by isAdmin.
+  const access = await checkAdminAccess({ requiredRoles: ["super_admin", "admin", "user"] });
+  const isAdmin =
+    access.kind === "allow" &&
+    (access.user?.role === "super_admin" || access.user?.role === "admin");
 
   const weights = (client.score_weights as ScoreWeights) ?? DEFAULT_SCORE_WEIGHTS;
   const componentsPresent =

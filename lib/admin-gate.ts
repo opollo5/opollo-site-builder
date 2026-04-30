@@ -49,7 +49,10 @@ import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
 // back to /admin/sites.
 // ---------------------------------------------------------------------------
 
-export const ADMIN_ROLES: readonly Role[] = ["admin", "operator"];
+// AUTH-FOUNDATION P3: trusted-operator surfaces require super_admin
+// OR admin. Migration 0057 mapped the legacy admin+operator pair to
+// super_admin+admin, preserving the same trusted-operator semantics.
+export const ADMIN_ROLES: readonly Role[] = ["super_admin", "admin"];
 
 export type AdminAccessOptions = {
   /** Which roles are allowed. Defaults to ADMIN_ROLES (admin + operator). */

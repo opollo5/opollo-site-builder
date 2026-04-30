@@ -80,7 +80,7 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string; post_id: string } },
 ): Promise<NextResponse> {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const siteIdCheck = validateUuidParam(params.id, "id");

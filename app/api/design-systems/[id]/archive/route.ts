@@ -18,7 +18,7 @@ const BodySchema = z.object({
 // When the target was the site's active DS, the success payload contains
 // warnings[] noting the site now has no active design system (per §M1b Q6).
 export async function POST(req: Request, ctx: { params: { id: string } }) {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const param = validateUuidParam(ctx.params.id, "id");

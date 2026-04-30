@@ -36,7 +36,7 @@ const CreateBodySchema = z.object({
 });
 
 export async function POST(req: Request, ctx: RouteContext) {
-  const gate = await requireAdminForApi({ roles: ["admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const param = validateUuidParam(ctx.params.id, "id");

@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const access = await checkAdminAccess({ requiredRoles: ["admin", "operator"] });
+  const access = await checkAdminAccess({ requiredRoles: ["super_admin", "admin"] });
   if (access.kind === "redirect") {
     return NextResponse.redirect(new URL(access.to, req.url));
   }

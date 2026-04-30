@@ -27,7 +27,7 @@ export default async function PostDetailPage({
   params: { id: string; post_id: string };
 }) {
   const access = await checkAdminAccess({
-    requiredRoles: ["admin", "operator"],
+    requiredRoles: ["super_admin", "admin"],
     insufficientRoleRedirectTo: "/admin/sites",
   });
   if (access.kind === "redirect") redirect(access.to);
