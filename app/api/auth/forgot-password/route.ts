@@ -98,8 +98,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return rateLimitExceeded(rl);
   }
 
+  // Land emails on the client-side /auth/callback page — it dispatches
+  // to /api/auth/callback for PKCE / OTP query shapes and handles
+  // implicit-flow URL fragments directly. Pre-fix, the email pointed
+  // at the API route, which couldn't read fragments → recovery clicks
+  // landed on /auth-error?reason=missing_code.
   const redirectTo = buildAuthRedirectUrl(
-    "/api/auth/callback?next=%2Fauth%2Freset-password",
+    "/auth/callback?next=%2Fauth%2Freset-password",
     req,
   );
 
