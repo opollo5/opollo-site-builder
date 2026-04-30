@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Check, ChevronRight, Loader2, Palette, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 
+import { ApprovedDesignReadout } from "@/components/ConceptRefinementView";
 import {
   DesignDirectionInputs,
   type DesignBriefDraft,
@@ -225,6 +226,7 @@ function SkipButton({
 
 function Step1({ siteId, status }: { siteId: string; status: SetupStatus }) {
   const initial = briefToInitialDraft(status.design_brief);
+  const approved = status.design_direction_status === "approved";
   return (
     <StepFrame
       testid="setup-step-1"
@@ -240,24 +242,51 @@ function Step1({ siteId, status }: { siteId: string; status: SetupStatus }) {
           .
         </>
       }
-      body={<DesignDirectionInputs siteId={siteId} initial={initial} />}
+      body={
+        approved ? (
+          <ApprovedDesignReadout
+            siteId={siteId}
+            homepageHtml={status.homepage_concept_html}
+            innerPageHtml={status.inner_page_concept_html}
+            tokens={status.design_tokens}
+          />
+        ) : (
+          <DesignDirectionInputs siteId={siteId} initial={initial} />
+        )
+      }
       footer={
-        <>
-          <Link
-            href={`/admin/sites/${siteId}`}
-            className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-          >
-            ← Back to site
-          </Link>
-          <div className="flex items-center gap-2">
-            <SkipButton
-              siteId={siteId}
-              step={1}
-              label="Skip for now"
-              testid="setup-step-1-skip"
-            />
-          </div>
-        </>
+        approved ? (
+          <>
+            <Link
+              href={`/admin/sites/${siteId}`}
+              className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            >
+              ← Back to site
+            </Link>
+            <Button asChild data-testid="setup-step-1-continue">
+              <Link href={`/admin/sites/${siteId}/setup?step=2`}>
+                Continue → Tone of voice
+              </Link>
+            </Button>
+          </>
+        ) : (
+          <>
+            <Link
+              href={`/admin/sites/${siteId}`}
+              className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            >
+              ← Back to site
+            </Link>
+            <div className="flex items-center gap-2">
+              <SkipButton
+                siteId={siteId}
+                step={1}
+                label="Skip for now"
+                testid="setup-step-1-skip"
+              />
+            </div>
+          </>
+        )
       }
     />
   );
