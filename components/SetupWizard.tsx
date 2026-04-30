@@ -12,6 +12,7 @@ import {
   type DesignBriefDraft,
   type ExtractedSnapshot,
 } from "@/components/DesignDirectionInputs";
+import { ToneOfVoiceInputs } from "@/components/ToneOfVoiceInputs";
 import { Button } from "@/components/ui/button";
 import type { Industry } from "@/lib/design-discovery/industry-defaults";
 import type { SetupStatus, SetupStep, SetupStepStatus } from "@/lib/site-setup";
@@ -331,32 +332,44 @@ function briefToInitialDraft(
 }
 
 function Step2({ siteId, status }: { siteId: string; status: SetupStatus }) {
+  // Industry from the design brief drives the default voice seed
+  // (industry-defaults.ts default_voice_seed). When the design step
+  // was skipped, fall back to MSP — the same default the design
+  // step ships with.
+  const industry =
+    typeof status.design_brief?.industry === "string"
+      ? (status.design_brief.industry as string)
+      : "msp";
+  const tone =
+    status.tone_of_voice && typeof status.tone_of_voice === "object"
+      ? (status.tone_of_voice as Record<string, unknown>)
+      : null;
+  const initialTone = toneFromStatus(tone);
+  const initialSamples = samplesFromStatus(tone);
+
   return (
     <StepFrame
       testid="setup-step-2"
       title="Tone of voice"
       intro={
         <>
-          How should the site talk to clients? Paste sample copy, share a
-          reference URL, or answer the guided questions and we&apos;ll
-          extract a tone profile that feeds every page and post we
-          generate.
+          How should the site talk to clients? Paste sample copy, share an
+          existing content URL, or answer the guided questions — we&apos;ll
+          extract a tone profile and three sample snippets you can edit.
+          Status:{" "}
+          <span className="font-medium text-foreground">
+            {statusLabel(status.tone_of_voice_status)}
+          </span>
+          .
         </>
       }
       body={
-        <div className="rounded-md border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
-          <p>
-            Status:{" "}
-            <span className="font-medium text-foreground">
-              {statusLabel(status.tone_of_voice_status)}
-            </span>
-          </p>
-          <p className="mt-2">
-            The tone capture and sample preview land in a follow-up
-            change. Skip for now to land at Done with generic MSP defaults
-            applied to your generation prompts.
-          </p>
-        </div>
+        <ToneOfVoiceInputs
+          siteId={siteId}
+          industry={industry}
+          initialTone={initialTone}
+          initialSamples={initialSamples}
+        />
       }
       footer={
         <>
@@ -378,6 +391,65 @@ function Step2({ siteId, status }: { siteId: string; status: SetupStatus }) {
       }
     />
   );
+}
+
+function toneFromStatus(
+  raw: Record<string, unknown> | null,
+): Parameters<typeof ToneOfVoiceInputs>[0]["initialTone"] {
+  if (!raw) return null;
+  const isStr = (v: unknown): v is string => typeof v === "string";
+  const isNum = (v: unknown): v is number => typeof v === "number";
+  const formality = isNum(raw.formality_level) ? raw.formality_level : null;
+  const sentence = isStr(raw.sentence_length) ? raw.sentence_length : null;
+  const jargon = isStr(raw.jargon_usage) ? raw.jargon_usage : null;
+  const audience = isStr(raw.target_audience) ? raw.target_audience : null;
+  const style = isStr(raw.style_guide) ? raw.style_guide : null;
+  if (
+    formality === null ||
+    sentence === null ||
+    jargon === null ||
+    audience === null ||
+    style === null
+  ) {
+    return null;
+  }
+  if (sentence !== "short" && sentence !== "medium" && sentence !== "long") {
+    return null;
+  }
+  if (jargon !== "embraced" && jargon !== "neutral" && jargon !== "avoided") {
+    return null;
+  }
+  return {
+    formality_level: formality,
+    sentence_length: sentence,
+    jargon_usage: jargon,
+    personality_markers: Array.isArray(raw.personality_markers)
+      ? (raw.personality_markers.filter((s) => typeof s === "string") as string[])
+      : [],
+    avoid_markers: Array.isArray(raw.avoid_markers)
+      ? (raw.avoid_markers.filter((s) => typeof s === "string") as string[])
+      : [],
+    target_audience: audience,
+    style_guide: style,
+  };
+}
+
+function samplesFromStatus(
+  raw: Record<string, unknown> | null,
+): Parameters<typeof ToneOfVoiceInputs>[0]["initialSamples"] {
+  if (!raw) return [];
+  const arr = raw.approved_samples;
+  if (!Array.isArray(arr)) return [];
+  const out: Array<{ kind: "hero" | "service" | "blog"; text: string }> = [];
+  for (const item of arr) {
+    if (!item || typeof item !== "object") continue;
+    const k = (item as Record<string, unknown>).kind;
+    const t = (item as Record<string, unknown>).text;
+    if (typeof t !== "string") continue;
+    if (k !== "hero" && k !== "service" && k !== "blog") continue;
+    out.push({ kind: k, text: t });
+  }
+  return out;
 }
 
 function Step3({ siteId, status }: { siteId: string; status: SetupStatus }) {
