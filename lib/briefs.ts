@@ -132,7 +132,7 @@ export type BriefPageRow = {
   ordinal: number;
   title: string;
   slug_hint: string | null;
-  mode: "full_text" | "short_brief";
+  mode: "full_text" | "short_brief" | "import";
   source_span_start: number | null;
   source_span_end: number | null;
   source_text: string;

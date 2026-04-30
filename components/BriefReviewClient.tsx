@@ -548,15 +548,21 @@ export function BriefReviewClient({
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <ModePill
-                        mode={p.mode}
-                        disabled={isReadOnly}
-                        onToggle={() =>
-                          setPage(p.localKey, {
-                            mode: p.mode === "full_text" ? "short_brief" : "full_text",
-                          })
-                        }
-                      />
+                      {p.mode === "import" ? (
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-900">
+                          Import (mode locked)
+                        </span>
+                      ) : (
+                        <ModePill
+                          mode={p.mode}
+                          disabled={isReadOnly}
+                          onToggle={() =>
+                            setPage(p.localKey, {
+                              mode: p.mode === "full_text" ? "short_brief" : "full_text",
+                            })
+                          }
+                        />
+                      )}
                       <span className="text-xs text-muted-foreground">
                         {p.word_count} word{p.word_count === 1 ? "" : "s"}
                       </span>
