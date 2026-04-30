@@ -148,10 +148,10 @@ export function TryAutoImportPanel({
         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
           Import filed.{" "}
           <a
-            href={`/admin/sites/${result.site_id}/briefs/${result.brief_id}/run`}
+            href={`/optimiser/imports/${result.brief_id}`}
             className="underline-offset-4 hover:underline"
           >
-            Watch brief run →
+            Open side-by-side review →
           </a>
         </div>
       )}
