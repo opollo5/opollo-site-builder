@@ -189,6 +189,7 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, no session", () => {
       // the reset page's "expired link" state.
       "/auth/forgot-password",
       "/auth/reset-password",
+      "/auth/callback",
       "/api/auth/forgot-password",
       "/api/auth/reset-password",
     ]) {

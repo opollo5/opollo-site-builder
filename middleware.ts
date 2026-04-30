@@ -73,6 +73,11 @@ const PUBLIC_PATHS = new Set<string>([
   // covered by the prefix check below.
   "/auth/forgot-password",
   "/auth/reset-password",
+  // /auth/callback — client-side companion to /api/auth/callback that
+  // handles Supabase implicit-flow links (#access_token=... in the URL
+  // fragment). Reachable without a session because the whole point is
+  // to MINT the session from the fragment.
+  "/auth/callback",
 ]);
 
 function isPublicPath(pathname: string): boolean {

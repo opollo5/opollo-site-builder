@@ -39,14 +39,14 @@ flowchart TD
     C --> D[Submit email]
     D --> E[POST /api/auth/forgot-password]
     E -->|rate limiter| F{5/email/hour?}
-    F -->|OK| G[supabase.auth.resetPasswordForEmail<br/>redirectTo = NEXT_PUBLIC_SITE_URL/api/auth/callback<br/>?next=%2Fauth%2Freset-password]
+    F -->|OK| G[supabase.auth.resetPasswordForEmail<br/>redirectTo = NEXT_PUBLIC_SITE_URL/auth/callback<br/>?next=%2Fauth%2Freset-password]
     F -->|Denied| H["429 RATE_LIMITED → 'Too many reset requests'"]
     G --> I["Success envelope '(if an account exists, a link has been sent)'"]
     I --> J[User opens email]
     J --> K[Click recovery link]
     K --> L[Supabase /auth/v1/verify]
-    L --> M[/api/auth/callback?code=&lt;pkce&gt;]
-    M --> N[exchangeCodeForSession + set cookie]
+    L --> M[/auth/callback?code= or #access_token=]
+    M --> N[Hash → setSession in browser; query → /api/auth/callback exchange]
     N --> O[Redirect to /auth/reset-password]
     O --> P[Enter new password + confirm]
     P --> Q[POST /api/auth/reset-password]
@@ -58,12 +58,22 @@ flowchart TD
 
 **Expired / invalid link:** if the user lands on `/auth/reset-password` with no active session (link expired, already used, PKCE mismatch), the page renders a "Reset link expired" state with a "Request a new link" CTA back to `/auth/forgot-password`. Invalid codes hitting `/api/auth/callback` redirect to `/auth-error?reason=exchange_failed` (PKCE shape) or `/auth-error?reason=verify_failed` (OTP shape).
 
-**Callback supports both link shapes.** The default Supabase email templates emit `{{ .TokenHash }}` + `&type=recovery` (the OTP shape); projects on the PKCE flow emit `?code=...`. `/api/auth/callback` handles both:
+**Callback supports three link shapes.** Supabase emits one of three depending on the project's auth flow + email template configuration. All three land on `/auth/callback` (the client-side page) which dispatches:
 
-- `?code=<uuid>` → `supabase.auth.exchangeCodeForSession(code)`
-- `?token_hash=<hash>&type=<recovery|invite|signup|magiclink|email_change|email>` → `supabase.auth.verifyOtp({ token_hash, type })`
+- `?code=<uuid>` (PKCE) → forwarded to `/api/auth/callback` → `supabase.auth.exchangeCodeForSession(code)`
+- `?token_hash=<hash>&type=<recovery|invite|signup|magiclink|email_change|email>` (OTP) → forwarded to `/api/auth/callback` → `supabase.auth.verifyOtp({ token_hash, type })`
+- `#access_token=...&refresh_token=...&type=...` (implicit) → handled in-browser by `components/AuthCallbackClient.tsx` → `supabase.auth.setSession({ access_token, refresh_token })`
 
-If neither parameter is present the callback redirects to `/auth-error?reason=missing_code`. An OTP `token_hash` with a missing or unrecognised `type` redirects to `/auth-error?reason=invalid_type`. The dual-handling means a Supabase template / flow change does not require a code redeploy.
+The implicit shape is the one that broke pre-2026-05: the server-only `/api/auth/callback` couldn't read URL fragments, so recovery clicks landed on `/auth-error?reason=missing_code` with the tokens stranded in the unreachable fragment. The new client page reads `window.location.hash`, sets the cookie session, and redirects.
+
+Failure routing:
+- Missing both query and fragment → `/auth-error?reason=missing_code`
+- OTP `token_hash` with unknown `type` → `/auth-error?reason=invalid_type`
+- PKCE exchange error → `/auth-error?reason=exchange_failed`
+- OTP verify error → `/auth-error?reason=verify_failed`
+- `setSession` error or `error=` in fragment → `/auth-error?reason=set_session_failed` (or the supabase-supplied reason)
+
+The dual-path (page + API route) means template / flow changes on the Supabase side don't require a code redeploy. The decision logic lives in `lib/auth-callback.ts::planAuthCallback` as a pure function for unit-testing without a browser.
 
 ### Logged-in password change (M14-4)
 
