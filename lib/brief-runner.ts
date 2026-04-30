@@ -2371,6 +2371,7 @@ export async function approveBriefPage(
       page,
       nowIso,
     );
+    await publishApprovedPageAsFullPageSafe(page.id, nowIso);
     return {
       ok: true,
       pageStatus: "approved",
@@ -2381,6 +2382,7 @@ export async function approveBriefPage(
   }
   if (!runRes.data) {
     const bridgeNoRun = await bridgeApprovedPageToPostIfNeeded(page, nowIso);
+    await publishApprovedPageAsFullPageSafe(page.id, nowIso);
     return {
       ok: true,
       pageStatus: "approved",
@@ -2425,6 +2427,7 @@ export async function approveBriefPage(
       error: runUpd.error,
     });
     const bridgeEarly = await bridgeApprovedPageToPostIfNeeded(page, nowIso);
+    await publishApprovedPageAsFullPageSafe(page.id, nowIso);
     return {
       ok: true,
       pageStatus: "approved",
@@ -2435,6 +2438,7 @@ export async function approveBriefPage(
   }
 
   const bridge = await bridgeApprovedPageToPostIfNeeded(page, nowIso);
+  await publishApprovedPageAsFullPageSafe(page.id, nowIso);
   return {
     ok: true,
     pageStatus: "approved",
@@ -2442,6 +2446,47 @@ export async function approveBriefPage(
     post_id: bridge.post_id,
     failed_bridge_reason: bridge.failed_bridge_reason,
   };
+}
+
+// Wrapper around publishApprovedPageAsFullPage that swallows errors —
+// publishing failures must NEVER roll back the approval. The bridge
+// records its own failure to opt_change_log on dry-run / write paths,
+// and we log here for any unexpected throw.
+async function publishApprovedPageAsFullPageSafe(
+  briefPageId: string,
+  nowIso: string,
+): Promise<void> {
+  try {
+    const { publishApprovedPageAsFullPage } = await import(
+      "@/lib/optimiser/site-builder-bridge/publish-full-page"
+    );
+    const r = await publishApprovedPageAsFullPage(briefPageId, nowIso);
+    if (r.published) {
+      logger.info("approve.full_page_publish.ok", {
+        brief_page_id: briefPageId,
+        dry_run: r.dry_run,
+        path: "path" in r ? r.path : r.target_path,
+      });
+    } else if (
+      r.reason !== "not_full_page_mode" &&
+      r.reason !== "client_slice_mode" &&
+      r.reason !== "no_proposal_link" &&
+      r.reason !== "not_a_landing_page"
+    ) {
+      // Surface only unexpected reasons. The four above are normal
+      // no-op paths (slice mode / non-optimiser brief / etc).
+      logger.warn("approve.full_page_publish.skipped", {
+        brief_page_id: briefPageId,
+        reason: r.reason,
+        message: r.message,
+      });
+    }
+  } catch (err) {
+    logger.error("approve.full_page_publish.threw", {
+      brief_page_id: briefPageId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
