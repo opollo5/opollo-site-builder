@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { AssistedApprovalToggle } from "@/components/optimiser/AssistedApprovalToggle";
+import { CrossClientConsentToggle } from "@/components/optimiser/CrossClientConsentToggle";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getClient } from "@/lib/optimiser/clients";
+import { isPatternLibraryEnabled } from "@/lib/optimiser/pattern-library/feature-flag";
 import {
   DEFAULT_CONVERSION_COMPONENTS,
   DEFAULT_SCORE_WEIGHTS,
@@ -151,6 +153,18 @@ export default async function ClientSettingsPage({
           clientId={client.id}
           enabled={client.assisted_approval_enabled}
           isAdmin={isAdmin}
+        />
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-medium">
+          Cross-client learning (Phase 3)
+        </h2>
+        <CrossClientConsentToggle
+          clientId={client.id}
+          enabled={client.cross_client_learning_consent}
+          isAdmin={isAdmin}
+          patternLibraryEnabled={isPatternLibraryEnabled()}
         />
       </section>
     </div>
