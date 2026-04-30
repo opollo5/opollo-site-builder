@@ -231,6 +231,36 @@ async function supabaseAuthGate(req: NextRequest): Promise<NextResponse> {
     return unauthenticatedResponse(req);
   }
 
+  // AUTH-FOUNDATION P4.2 — 2FA-pending gate. When the login server
+  // action issues an email-approval challenge, it sets the
+  // opollo_2fa_pending cookie. Until complete-login clears it, every
+  // navigation (other than the check-email + approve pages + their
+  // APIs) bounces back to /login/check-email so the operator can't
+  // reach admin surfaces with a half-authenticated session.
+  //
+  // The cookie value is signed; full HMAC validation lives on the
+  // page/API consumers. Middleware just checks presence + redirects —
+  // a forged cookie still blocks the attacker, just at a different
+  // page (the check-email page would 404 the lookup).
+  const pending2faCookie = req.cookies.get("opollo_2fa_pending")?.value;
+  if (pending2faCookie) {
+    const path = req.nextUrl.pathname;
+    const allowedDuringPending =
+      path === "/login/check-email" ||
+      path === "/auth/approve" ||
+      path === "/logout" ||
+      path.startsWith("/api/auth/") ||
+      path.startsWith("/_next/");
+    if (!allowedDuringPending) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login/check-email";
+      // Preserve any pre-existing challenge_id query param through
+      // the redirect; the page also reads the cookie as the source of
+      // truth so this is just for tab consistency.
+      return NextResponse.redirect(url);
+    }
+  }
+
   return response;
 }
 
