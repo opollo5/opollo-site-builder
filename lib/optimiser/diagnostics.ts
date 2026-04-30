@@ -68,10 +68,24 @@ export type PatternLibraryDiagnostic = {
   last_extracted_at: string | null;
 };
 
+// Phase 1.5 follow-up slice D — 5xx feed from Vercel logs. Reports
+// whether the env vars are configured, when the last sync wrote rows,
+// and how many landing pages saw 5xx in the most recent window. The
+// staged-rollout monitor's error_rate threshold is dormant when this
+// feed is unconfigured — operators rely on the diagnostic to know.
+export type ServerErrorFeedDiagnostic = {
+  env_configured: boolean;
+  missing: string[];
+  last_synced_at: string | null;
+  pages_with_errors_24h: number;
+  total_5xx_24h: number;
+};
+
 export type DiagnosticsReport = {
   module: ModuleDiagnostic;
   sources: SourceDiagnostic[];
   pattern_library: PatternLibraryDiagnostic;
+  server_error_feed: ServerErrorFeedDiagnostic;
   generated_at: string;
 };
 
@@ -166,6 +180,7 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
   }
 
   const patternLibrary = await diagnosePatternLibrary(schemaReachable);
+  const serverErrorFeed = await diagnoseServerErrorFeed(schemaReachable);
 
   return {
     module: {
@@ -182,7 +197,59 @@ export async function runDiagnostics(): Promise<DiagnosticsReport> {
     },
     sources,
     pattern_library: patternLibrary,
+    server_error_feed: serverErrorFeed,
     generated_at: new Date().toISOString(),
+  };
+}
+
+async function diagnoseServerErrorFeed(
+  schemaReachable: boolean,
+): Promise<ServerErrorFeedDiagnostic> {
+  const required = ["VERCEL_API_TOKEN", "VERCEL_PROJECT_ID"];
+  const missing = required.filter(
+    (k) => (process.env[k] ?? "").trim().length === 0,
+  );
+  const envConfigured = missing.length === 0;
+  if (!schemaReachable) {
+    return {
+      env_configured: envConfigured,
+      missing,
+      last_synced_at: null,
+      pages_with_errors_24h: 0,
+      total_5xx_24h: 0,
+    };
+  }
+  const supabase = getServiceRoleClient();
+  let lastSyncedAt: string | null = null;
+  let pagesWithErrors = 0;
+  let total5xx = 0;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const { data } = await supabase
+      .from("opt_metrics_daily")
+      .select("metrics, ingested_at")
+      .eq("source", "server_errors")
+      .in("metric_date", [today, yesterday]);
+    for (const row of data ?? []) {
+      const m = (row.metrics ?? {}) as Record<string, unknown>;
+      const errs = typeof m.errors_5xx === "number" ? m.errors_5xx : 0;
+      if (errs > 0) pagesWithErrors += 1;
+      total5xx += errs;
+      const at = row.ingested_at as string | null;
+      if (at && (!lastSyncedAt || at > lastSyncedAt)) lastSyncedAt = at;
+    }
+  } catch {
+    // Best-effort.
+  }
+  return {
+    env_configured: envConfigured,
+    missing,
+    last_synced_at: lastSyncedAt,
+    pages_with_errors_24h: pagesWithErrors,
+    total_5xx_24h: total5xx,
   };
 }
 
