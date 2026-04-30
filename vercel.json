@@ -71,6 +71,10 @@
     {
       "path": "/api/cron/optimiser-assisted-approval",
       "schedule": "30 * * * *"
+    },
+    {
+      "path": "/api/cron/optimiser-extract-patterns",
+      "schedule": "0 10 * * *"
     }
   ]
 }
