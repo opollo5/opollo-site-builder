@@ -36,7 +36,8 @@ export type LimiterName =
   | "invite"
   | "register"
   | "password_reset"
-  | "test_connection";
+  | "test_connection"
+  | "auth_2fa";
 
 type LimiterConfig = {
   requests: number;
@@ -65,6 +66,12 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // or /admin/sites/[id]/edit; 60/hour comfortably covers that without
   // letting a logged-in admin scan arbitrary WP installs at scale.
   test_connection: { requests: 60, window: "1 h" },
+  // AUTH-FOUNDATION P4.1: email-2FA challenge issuance. Per the brief
+  // §4: max 5 challenges per email per rolling hour. The recently-
+  // active count is also enforced via a Postgres count (which sees
+  // every challenge regardless of which Redis bucket fired); this
+  // limiter is the IP-side belt-and-braces.
+  auth_2fa: { requests: 5, window: "1 h" },
 };
 
 export type RateLimitResult =
