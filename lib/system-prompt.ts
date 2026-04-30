@@ -6,6 +6,7 @@ import {
 } from "@/lib/design-systems";
 import { listComponents, type DesignComponent } from "@/lib/components";
 import { listTemplates, type DesignTemplate } from "@/lib/templates";
+import { buildDesignContextPrefix } from "@/lib/design-discovery/build-injection";
 import { renderRegistryBlock } from "@/lib/design-system-prompt";
 import { logger } from "@/lib/logger";
 
@@ -178,7 +179,7 @@ export async function buildSystemPromptForSite(
     design_system_updated,
   } = await resolveDesignSystemSlot(site);
 
-  return buildSystemPrompt({
+  const base = buildSystemPrompt({
     site_name: site.site_name,
     prefix: site.prefix,
     design_system_version,
@@ -191,6 +192,13 @@ export async function buildSystemPromptForSite(
     templates_list: "[]",
     session_recent_pages: "[]",
   });
+
+  // DESIGN-DISCOVERY (PR 10) — prepend the design + voice context
+  // when DESIGN_CONTEXT_ENABLED and the site has approved either
+  // step. Empty string when off or unapproved; existing behaviour
+  // preserved. Loads from the `sites` row directly.
+  const ddPrefix = site.id ? await buildDesignContextPrefix(site.id) : "";
+  return ddPrefix ? `${ddPrefix}${base}` : base;
 }
 
 // Picks which content fills {{design_system_html_full_file}} and how the
