@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, HelpCircle, Loader2 } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert } from "@/components/ui/alert";
@@ -237,12 +237,8 @@ export function SiteCreateForm() {
       </div>
 
       <div>
-        <label
-          htmlFor="site-wp-password"
-          className="flex items-center gap-1 text-sm font-medium"
-        >
+        <label htmlFor="site-wp-password" className="block text-sm font-medium">
           WordPress Application Password
-          <ApplicationPasswordTooltip />
         </label>
         <div className="relative mt-1">
           <Input
@@ -265,10 +261,13 @@ export function SiteCreateForm() {
             {showPassword ? "hide" : "show"}
           </button>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Application Passwords are 24 characters with spaces (e.g.
-          <code className="ml-1 font-mono text-xs">abcd efgh ijkl mnop qrst uvwx</code>).
-          Paste them as shown — the system strips the spaces.
+        <p className="mt-1 text-xs font-semibold text-foreground">
+          This is NOT your WordPress login password.
+        </p>
+        <ApplicationPasswordHelp />
+        <p className="mt-2 text-xs text-muted-foreground">
+          You need an Administrator or Editor account. Subscriber or
+          Contributor accounts will fail the connection test.
         </p>
       </div>
 
@@ -386,28 +385,50 @@ function TestResultPanel({
   );
 }
 
-function ApplicationPasswordTooltip() {
+function ApplicationPasswordHelp() {
+  const [open, setOpen] = useState(false);
   return (
-    <span
-      className="group relative inline-flex"
-      tabIndex={0}
-      aria-label="Where to generate a WordPress Application Password"
-    >
-      <HelpCircle
-        aria-hidden
-        className="h-3.5 w-3.5 text-muted-foreground transition-smooth group-hover:text-foreground group-focus:text-foreground"
-      />
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-5 z-10 w-72 -translate-x-1/2 rounded-md border bg-popover p-3 text-xs text-popover-foreground opacity-0 shadow-lg transition-smooth group-hover:opacity-100 group-focus:opacity-100"
+    <div className="mt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
+        aria-expanded={open}
+        aria-controls="app-password-help-body"
+        data-testid="site-wp-password-help-toggle"
       >
-        Generate at{" "}
-        <strong>wp-admin → Users → Profile → Application Passwords</strong>.
-        Name it &quot;Opollo Site Builder&quot;. Paste the generated token
-        here — <strong>not</strong> your WordPress login password.
-        Application Passwords are 24 characters with spaces; the system
-        strips them.
-      </span>
-    </span>
+        {open ? (
+          <ChevronDown aria-hidden className="h-3.5 w-3.5" />
+        ) : (
+          <ChevronRight aria-hidden className="h-3.5 w-3.5" />
+        )}
+        <Info aria-hidden className="h-3.5 w-3.5" />
+        <span>How do I get this?</span>
+      </button>
+      {open && (
+        <ol
+          id="app-password-help-body"
+          className="mt-2 list-decimal space-y-1 rounded-md border bg-muted/30 p-3 pl-6 text-xs text-muted-foreground"
+          data-testid="site-wp-password-help-body"
+        >
+          <li>Log in to WordPress Admin</li>
+          <li>
+            Go to Users → Profile (or Users → All Users → edit your admin
+            account)
+          </li>
+          <li>Scroll down to &quot;Application Passwords&quot;</li>
+          <li>Type &quot;Opollo Site Builder&quot; in the name field</li>
+          <li>Click &quot;Add New Application Password&quot;</li>
+          <li>
+            Copy the password shown — it appears only once (24 characters
+            with spaces)
+          </li>
+          <li>
+            Paste it here exactly as shown — spaces are fine, the system
+            strips them
+          </li>
+        </ol>
+      )}
+    </div>
   );
 }
