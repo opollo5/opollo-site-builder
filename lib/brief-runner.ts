@@ -11,6 +11,7 @@ import {
   computeCostCents,
   isAllowedAnthropicModel,
 } from "@/lib/anthropic-pricing";
+import { buildDesignContextPrefix } from "@/lib/design-discovery/build-injection";
 import type {
   BriefPageCritiqueEntry,
   BriefPagePassKind,
@@ -551,6 +552,10 @@ type PageContext = {
   // before insert, or hard-fail if ds version is required).
   sitePrefix: string;
   designSystemVersion: string;
+  // DESIGN-DISCOVERY (PR 10) — when DESIGN_CONTEXT_ENABLED and the
+  // site has approved design + tone, this is the prefix to prepend
+  // to the system prompt. Empty string when off or unapproved.
+  designContextPrefix: string;
 };
 
 function systemPromptFor(ctx: PageContext): string {
@@ -563,6 +568,11 @@ function systemPromptFor(ctx: PageContext): string {
   // docs/INTEGRATION_MODEL_DECISION.md and
   // docs/plans/path-b-migration-parent.md.
   const parts = [
+    // DESIGN-DISCOVERY (PR 10) — design + voice context, when present.
+    // Empty string when DESIGN_CONTEXT_ENABLED is off or neither step
+    // approved. Goes BEFORE the structural rules so the model has the
+    // brand frame in mind while the rules say what to emit.
+    ctx.designContextPrefix,
     "You are a website page generator. You produce one CONTENT FRAGMENT at a time. The fragment slots into a WordPress page's content area; the host theme provides the surrounding chrome (DOCTYPE, html, head, body, nav, header, footer) and base visual tokens (palette, fonts, spacing).",
     "",
     "OUTPUT FORMAT — STRICT REQUIREMENTS:",
@@ -1459,6 +1469,11 @@ async function processPagePassLoop(
       ? String(dsRowRes.rows[0].version)
       : "";
 
+  // DESIGN-DISCOVERY (PR 10) — load the design + voice context once
+  // per page-tick. Empty string when DESIGN_CONTEXT_ENABLED is off
+  // or neither step is approved; existing behaviour preserved.
+  const designContextPrefix = await buildDesignContextPrefix(brief.site_id);
+
   // Resume pointer.
   let kindToRun: TextSequencePassKind | null = null;
   let numberToRun = 0;
@@ -1517,6 +1532,7 @@ async function processPagePassLoop(
       previousVisualCritique: null,
       sitePrefix,
       designSystemVersion,
+      designContextPrefix,
     };
 
     const isAnchorFinalPass =
@@ -1778,6 +1794,7 @@ async function processPagePassLoop(
     visualRender,
     sitePrefix,
     designSystemVersion,
+    designContextPrefix,
   );
   if (visualOutcome.fatal) {
     return visualOutcome.fatal;
@@ -1905,6 +1922,7 @@ async function runVisualReviewLoop(
   visualRender: VisualRenderFn,
   sitePrefix: string,
   designSystemVersion: string,
+  designContextPrefix: string,
 ): Promise<VisualReviewOutcome> {
   // Resolve the per-page cost ceiling. Tenant override wins; else the
   // lib default from lib/visual-review.
@@ -2087,6 +2105,7 @@ async function runVisualReviewLoop(
           previousVisualCritique: critiqueText,
           sitePrefix,
           designSystemVersion,
+          designContextPrefix,
         },
         passKind: "visual_revise",
         passNumber: i,
