@@ -24,8 +24,10 @@ export type SetupStep = 1 | 2 | 3;
 export interface SetupStatus {
   design_direction_status: SetupStepStatus;
   tone_of_voice_status: SetupStepStatus;
-  // Snapshot of the artefacts the Step 3 done screen renders. Loaded
-  // here so the server page renders in one round trip.
+  // Snapshot of the artefacts the Step 3 done screen renders, plus
+  // the in-flight design_brief used to resume Step 1. Loaded here so
+  // the server page renders in one round trip.
+  design_brief: Record<string, unknown> | null;
   design_tokens: Record<string, unknown> | null;
   tone_of_voice: Record<string, unknown> | null;
 }
@@ -41,7 +43,7 @@ export async function getSetupStatus(
   const { data, error } = await supabase
     .from("sites")
     .select(
-      "design_direction_status, tone_of_voice_status, design_tokens, tone_of_voice",
+      "design_direction_status, tone_of_voice_status, design_brief, design_tokens, tone_of_voice",
     )
     .eq("id", siteId)
     .neq("status", "removed")
@@ -69,6 +71,7 @@ export async function getSetupStatus(
     data: {
       design_direction_status: data.design_direction_status as SetupStepStatus,
       tone_of_voice_status: data.tone_of_voice_status as SetupStepStatus,
+      design_brief: (data.design_brief as Record<string, unknown> | null) ?? null,
       design_tokens: (data.design_tokens as Record<string, unknown> | null) ?? null,
       tone_of_voice: (data.tone_of_voice as Record<string, unknown> | null) ?? null,
     },
