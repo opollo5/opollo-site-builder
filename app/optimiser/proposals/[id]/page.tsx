@@ -4,9 +4,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { CreateVariantButton } from "@/components/optimiser/CreateVariantButton";
 import { PastCausalDeltasPanel } from "@/components/optimiser/PastCausalDeltasPanel";
+import { PatternPriorsPanel } from "@/components/optimiser/PatternPriorsPanel";
 import { ProposalReview } from "@/components/optimiser/ProposalReview";
 import { getClient } from "@/lib/optimiser/clients";
 import { listRecentCausalDeltasForPlaybook } from "@/lib/optimiser/causal/read-deltas";
+import { listRelevantPatterns } from "@/lib/optimiser/pattern-library/priors";
 import { getProposalWithEvidence } from "@/lib/optimiser/proposals";
 import { getLandingPage } from "@/lib/optimiser/landing-pages";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -48,6 +50,14 @@ export default async function OptimiserProposalReviewPage({
     !existingTest &&
     (proposal.status === "approved" || proposal.status === "applied");
 
+  // Phase 3 Slice 23: cross-client pattern priors. Reader gates on
+  // OPT_PATTERN_LIBRARY_ENABLED flag + receiving client's
+  // cross_client_learning_consent — returns [] when either is off.
+  const relevantPatterns = await listRelevantPatterns({
+    clientId: proposal.client_id,
+    playbookId: proposal.triggering_playbook_id,
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -60,6 +70,10 @@ export default async function OptimiserProposalReviewPage({
       </div>
       <PastCausalDeltasPanel
         deltas={pastDeltas}
+        playbookId={proposal.triggering_playbook_id}
+      />
+      <PatternPriorsPanel
+        patterns={relevantPatterns}
         playbookId={proposal.triggering_playbook_id}
       />
       {canCreateVariant && client && (
