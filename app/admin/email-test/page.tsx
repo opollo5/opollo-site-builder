@@ -1,36 +1,23 @@
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import { EmailTestForm } from "@/components/EmailTestForm";
 import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
-import { isEmailTestAllowed } from "@/lib/email-test-gate";
 
-// AUTH-FOUNDATION P1.2 + P1-FIX — /admin/email-test.
+// AUTH-FOUNDATION P3.4 — /admin/email-test now gated on super_admin.
 //
-// Dev / staging diagnostic surface for the SendGrid wrapper. Operator
-// can fire a one-shot send through the same code path the runtime uses
-// (lib/email/sendgrid.ts) without dropping to the CLI. Phase 3 will
-// replace the host-aware gate with a super_admin role check and the
-// host check goes away.
-//
-// Defence in depth:
-//   1. Host-aware gate fronts the page (notFound on the prod custom
-//      domain; allowed on local dev, Vercel preview, and the staging
-//      *.vercel.app alias).
-//   2. Admin auth gate behind it (admin OR operator role).
-//   3. The API route /api/admin/email-test re-checks the same gate so
-//      a route-level fetch from a logged-in admin on the prod domain
-//      still 404s.
+// Replaces the temporary host-aware gate from P1-FIX. The role check
+// is the proper trust boundary: hi@opollo.com (super_admin) can fire
+// transactional sends from any host (staging OR prod). Other admins +
+// users get a clean redirect to /admin/sites.
 
 export const dynamic = "force-dynamic";
 
 export default async function EmailTestPage() {
-  if (!isEmailTestAllowed()) notFound();
-
   const access = await checkAdminAccess({
-    requiredRoles: ["super_admin", "admin"],
-    insufficientRoleRedirectTo: "/",
+    requiredRoles: ["super_admin"],
+    insufficientRoleRedirectTo: "/admin/sites",
   });
   if (access.kind === "redirect") redirect(access.to);
 
@@ -39,16 +26,15 @@ export default async function EmailTestPage() {
       <H1>SendGrid wrapper test</H1>
       <Lead className="mt-1">
         Fire a one-shot test email through{" "}
-        <code className="font-mono text-sm">lib/email/sendgrid.ts</code>. Same
-        code path as the runtime uses — invites, login challenges, every
-        transactional send.
+        <code className="font-mono text-sm">lib/email/sendgrid.ts</code>.
+        Same code path as the runtime uses — invites, login challenges,
+        every transactional send.
       </Lead>
 
       <Alert className="mt-6">
-        Reachable on local dev + the staging{" "}
-        <code className="font-mono text-xs">*.vercel.app</code> alias only.
-        Blocked on production custom domains. Phase 3 replaces this
-        host-aware gate with a super_admin role check.
+        Restricted to <strong>super_admin</strong>. Every send is
+        captured in <code className="font-mono text-xs">email_log</code>{" "}
+        for audit.
       </Alert>
 
       <div className="mt-6">
