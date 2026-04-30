@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { ConceptReviewCards } from "@/components/ConceptReviewCards";
 import { MoodBoardStrip } from "@/components/MoodBoardStrip";
 import { DesignUnderstandingPanel } from "@/components/DesignUnderstandingPanel";
 import { Button } from "@/components/ui/button";
@@ -445,6 +446,7 @@ export function DesignDirectionInputs({
           concepts={concepts}
           conceptErrors={conceptErrors}
           generationFailed={generationFailed}
+          referenceScreenshotUrl={view.screenshot_url}
         />
       )}
     </div>
@@ -456,11 +458,13 @@ function ConceptResultsBlock({
   concepts,
   conceptErrors,
   generationFailed,
+  referenceScreenshotUrl,
 }: {
   generating: boolean;
   concepts: ConceptResult[] | null;
   conceptErrors: ConceptError[];
   generationFailed: string | null;
+  referenceScreenshotUrl: string | null;
 }) {
   if (generationFailed) {
     return (
@@ -503,61 +507,15 @@ function ConceptResultsBlock({
   if (!concepts) return null;
   return (
     <div className="space-y-3" data-testid="dd-concepts-ready">
-      <div className="rounded-md border bg-success/5 p-3 text-sm">
-        <p className="font-medium text-success">
-          {concepts.length} concept{concepts.length === 1 ? "" : "s"} generated.
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          The rich three-up review (iframes, micro-UI previews, before/after,
-          desktop-mobile toggle) lands in the next change. Until then, the
-          concepts are stored in this component&apos;s state and can be
-          inspected via the directions list below.
-        </p>
-      </div>
-      <ul className="grid gap-2 md:grid-cols-3">
-        {concepts.map((c) => (
-          <li
-            key={c.direction}
-            className="rounded-md border bg-card p-3 text-xs"
-            data-testid={`dd-concept-${c.direction}`}
-          >
-            <p className="font-semibold">{c.label}</p>
-            <p className="mt-1 text-muted-foreground">{c.rationale}</p>
-            <div className="mt-2 flex flex-wrap gap-1">
-              {Object.entries(c.design_tokens)
-                .filter(([k]) =>
-                  ["primary", "secondary", "accent", "background", "text"].includes(k),
-                )
-                .map(([k, v]) => (
-                  <span
-                    key={k}
-                    className="inline-flex items-center gap-1 rounded-md border bg-background px-1 py-0.5 text-[9px]"
-                    title={`${k}: ${v}`}
-                  >
-                    <span
-                      className="inline-block h-3 w-3 rounded-sm border"
-                      style={{ background: v as string }}
-                      aria-hidden
-                    />
-                    <span className="font-mono uppercase">{k}</span>
-                  </span>
-                ))}
-            </div>
-          </li>
-        ))}
-      </ul>
-      {conceptErrors.length > 0 && (
-        <p
-          className="text-xs text-warning"
-          data-testid="dd-concept-errors"
-          role="alert"
-        >
-          {conceptErrors.length} concept
-          {conceptErrors.length === 1 ? "" : "s"} failed to generate:{" "}
-          {conceptErrors.map((e) => e.label).join(", ")}. The full review will
-          show the others alongside a retry button.
-        </p>
-      )}
+      <ConceptReviewCards
+        concepts={concepts}
+        errors={conceptErrors}
+        referenceScreenshotUrl={referenceScreenshotUrl}
+        onSelect={() => {
+          // Refinement + approve flow lands in PR 7. For now we only
+          // highlight the selected card client-side.
+        }}
+      />
     </div>
   );
 }
