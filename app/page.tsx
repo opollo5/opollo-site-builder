@@ -1,16 +1,21 @@
-import { HomePageClient } from "@/components/HomePageClient";
+import { redirect } from "next/navigation";
+
 import { resolveCurrentUser } from "@/lib/current-user";
 
-// Server shell for the chat builder. Resolves the current user so the
-// header can render email + sign-out on non-admin surfaces too — the
-// admin layout already carries that strip; this brings the root page
-// to parity. Read is via the same flag / kill-switch walk used by the
-// admin gate; under flag-off / kill-switch modes the strip hides
-// itself because there's no Supabase identity to display.
+// ---------------------------------------------------------------------------
+// / — root route redirect.
+//
+// The root path used to render the chat builder (HomePageClient). With
+// the admin surfaces as the canonical product entry point, `/` now
+// short-circuits to either /admin/sites (signed-in operator) or /login
+// (anonymous). Middleware already gates non-public paths, so the
+// signed-out branch here is belt-and-suspenders for flag-off / kill-
+// switch modes where resolveCurrentUser returns null.
+// ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function HomePage(): Promise<never> {
   const user = await resolveCurrentUser();
-  return <HomePageClient userEmail={user?.email ?? null} />;
+  redirect(user ? "/admin/sites" : "/login");
 }
