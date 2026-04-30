@@ -46,11 +46,12 @@ async function createSiteAndOpenSetup(
     /Connected as/i,
   );
   await page.getByTestId("site-create-save").click();
-  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}$/);
-  const detailUrl = page.url();
-  const id = detailUrl.match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
-  if (!id) throw new Error(`Failed to extract site id from ${detailUrl}`);
-  await page.goto(`/admin/sites/${id}/setup`);
+  // PR 11 — fresh sites land on /setup?step=1 directly. Extract id
+  // from there; no need for a separate goto.
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
+  const url = page.url();
+  const id = url.match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
+  if (!id) throw new Error(`Failed to extract site id from ${url}`);
   return id;
 }
 

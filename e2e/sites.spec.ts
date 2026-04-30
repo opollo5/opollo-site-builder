@@ -46,7 +46,10 @@ async function createSiteViaForm(
 
   await expect(page.getByTestId("site-create-save")).toBeEnabled();
   await page.getByTestId("site-create-save").click();
-  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}$/);
+  // DESIGN-DISCOVERY (PR 11) — fresh sites now land on the setup
+  // wizard at Step 1 instead of the bare detail page. Tests that
+  // need the detail page navigate there explicitly afterwards.
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
 }
 
 test.describe("sites CRUD", () => {
@@ -85,8 +88,12 @@ test.describe("sites CRUD", () => {
       password: "abcd efgh ijkl mnop qrst uvwx",
     });
 
-    // Detail page renders the new site name.
-    await expect(page.getByRole("heading", { name: uniqueName })).toBeVisible();
+    // DESIGN-DISCOVERY (PR 11) — fresh sites land on the setup
+    // wizard at Step 1 instead of the bare detail page. The wizard
+    // heading reads "Set up <name>".
+    await expect(
+      page.getByRole("heading", { name: new RegExp(`Set up ${uniqueName}`) }),
+    ).toBeVisible();
 
     // Going back to the list shows the new row.
     await page.goto("/admin/sites");
@@ -123,9 +130,12 @@ test.describe("sites CRUD", () => {
     });
 
     // Navigate via the URL — the actions-menu Edit button on the
-    // sites list lands on the same route.
-    const detailUrl = page.url();
-    const editUrl = `${detailUrl}/edit`;
+    // sites list lands on the same route. PR 11 lands the create
+    // flow on /setup?step=1 so we extract the site id from there.
+    const wizardUrl = page.url();
+    const id = wizardUrl.match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
+    if (!id) throw new Error(`Failed to extract site id from ${wizardUrl}`);
+    const editUrl = `/admin/sites/${id}/edit`;
     await page.goto(editUrl);
 
     // Form pre-seeds with the existing values.

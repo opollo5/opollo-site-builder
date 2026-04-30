@@ -159,9 +159,14 @@ export function SiteCreateForm() {
         | null;
       if (payload?.ok) {
         toast.success("Site connected", {
-          description: `${form.name} is ready. Open it from the sites list.`,
+          description: `${form.name} — let's set up the design and tone next.`,
         });
-        router.push(`/admin/sites/${payload.data.id}`);
+        // DESIGN-DISCOVERY (PR 11) — fresh sites land on the setup
+        // wizard at Step 1 instead of the bare detail page so the
+        // operator captures design + tone before generating any
+        // pages. The wizard is skippable; resume logic returns to
+        // the right step on subsequent visits.
+        router.push(`/admin/sites/${payload.data.id}/setup?step=1`);
         return;
       }
       const message =
