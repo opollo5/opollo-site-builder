@@ -6,6 +6,30 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
+---
+## Session B
+- Started: 2026-04-30
+- Branch: feat/optimiser-phase-3 (and slice sub-branches)
+- Slice: Optimiser Phase 3 — cross-client pattern library schema + extraction (Slice 22), pattern application as priors (Slice 23), consent UI + diagnostics (Slice 24)
+- Files claimed (all new/optimiser-only; no Phase 1.5 / Phase 2 surfaces touched outside the optimiser module):
+  - supabase/migrations/0061_optimiser_pattern_library.sql (new)
+  - supabase/rollbacks/0061_*.down.sql
+  - lib/optimiser/pattern-library/* (new folder — Slices 22 + 23)
+  - app/api/cron/optimiser-extract-patterns/route.ts (new — Slice 22)
+  - app/api/optimiser/clients/[id]/cross-client-consent/route.ts (new — Slice 24)
+  - components/optimiser/CrossClientConsentToggle.tsx, PatternsAppliedPanel.tsx (new)
+  - app/optimiser/clients/[id]/settings/page.tsx (Slice 24 — consent toggle section)
+  - app/optimiser/proposals/[id]/page.tsx (Slice 23 — pattern-applied panel)
+  - app/optimiser/diagnostics/page.tsx (Slice 24 — pattern library state)
+  - lib/optimiser/proposal-generation.ts (Slice 23 — read priors from pattern library)
+  - lib/optimiser/diagnostics.ts (Slice 24 — extend report with pattern stats)
+  - skills/optimiser/{pattern-extraction,pattern-application}/SKILL.md (new)
+  - vercel.json (additive — appends one cron entry only)
+- Migration numbers reserved: 0061
+- Expected completion: same session; squash-merge each slice on green CI per the user's Phase 3 brief
+- Notes: Phase 3 is consent-gated per spec §11.2.2 — code ships behind feature-flag env var OPT_PATTERN_LIBRARY_ENABLED + per-client cross_client_learning_consent (already exists from Phase 1 schema, default false). Spec §11.2.4 requires MSA-clause adoption before flipping the flag in production; UI surfaces this constraint.
+---
+
 ## ~~Session A~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; A's owner removes when they next push)
 - Started: 2026-04-24
 - Branch: feat/m12-6-save-draft-persistence
