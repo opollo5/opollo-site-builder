@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { AssistedApprovalToggle } from "@/components/optimiser/AssistedApprovalToggle";
+import { checkAdminAccess } from "@/lib/admin-gate";
 import { getClient } from "@/lib/optimiser/clients";
 import {
   DEFAULT_CONVERSION_COMPONENTS,
@@ -43,6 +45,10 @@ export default async function ClientSettingsPage({
 }) {
   const client = await getClient(params.id);
   if (!client) notFound();
+  // Phase 2 Slice 21 — only admins can toggle assisted approval; the
+  // toggle component renders a read-only badge for operators / viewers.
+  const access = await checkAdminAccess({ requiredRoles: ["admin", "operator", "viewer"] });
+  const isAdmin = access.kind === "allow" && access.user?.role === "admin";
 
   const weights = (client.score_weights as ScoreWeights) ?? DEFAULT_SCORE_WEIGHTS;
   const componentsPresent =
@@ -133,6 +139,15 @@ export default async function ClientSettingsPage({
           the engine evaluates its actual impact and writes a row to
           opt_causal_deltas. Lower-traffic B2B clients may extend this; default 14 days.
         </p>
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-medium">Assisted approval (Phase 2)</h2>
+        <AssistedApprovalToggle
+          clientId={client.id}
+          enabled={client.assisted_approval_enabled}
+          isAdmin={isAdmin}
+        />
       </section>
     </div>
   );
