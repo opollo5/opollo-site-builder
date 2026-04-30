@@ -6,7 +6,13 @@ import { useState } from "react";
 import { Check, ChevronRight, Loader2, Palette, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  DesignDirectionInputs,
+  type DesignBriefDraft,
+  type ExtractedSnapshot,
+} from "@/components/DesignDirectionInputs";
 import { Button } from "@/components/ui/button";
+import type { Industry } from "@/lib/design-discovery/industry-defaults";
 import type { SetupStatus, SetupStep, SetupStepStatus } from "@/lib/site-setup";
 
 // ---------------------------------------------------------------------------
@@ -218,6 +224,7 @@ function SkipButton({
 }
 
 function Step1({ siteId, status }: { siteId: string; status: SetupStatus }) {
+  const initial = briefToInitialDraft(status.design_brief);
   return (
     <StepFrame
       testid="setup-step-1"
@@ -225,26 +232,15 @@ function Step1({ siteId, status }: { siteId: string; status: SetupStatus }) {
       intro={
         <>
           What should this site look like? Provide a reference URL, an
-          existing site, screenshots, or a written description and we&apos;ll
-          generate three creative directions to choose from.
+          existing site, or a written description and we&apos;ll work from
+          there. Status:{" "}
+          <span className="font-medium text-foreground">
+            {statusLabel(status.design_direction_status)}
+          </span>
+          .
         </>
       }
-      body={
-        <div className="rounded-md border border-dashed bg-muted/20 p-6 text-sm text-muted-foreground">
-          <p>
-            Status:{" "}
-            <span className="font-medium text-foreground">
-              {statusLabel(status.design_direction_status)}
-            </span>
-          </p>
-          <p className="mt-2">
-            The design direction input surface and concept review land in
-            the next batch of changes. Skip for now to land at Step 2 with
-            the generic MSP defaults applied — you can return here any
-            time from Site Settings.
-          </p>
-        </div>
-      }
+      body={<DesignDirectionInputs siteId={siteId} initial={initial} />}
       footer={
         <>
           <Link
@@ -265,6 +261,44 @@ function Step1({ siteId, status }: { siteId: string; status: SetupStatus }) {
       }
     />
   );
+}
+
+function briefToInitialDraft(
+  brief: Record<string, unknown> | null,
+): Partial<DesignBriefDraft> | undefined {
+  if (!brief) return undefined;
+  const get = <T,>(k: string, validate: (v: unknown) => v is T): T | undefined => {
+    const v = brief[k];
+    return validate(v) ? v : undefined;
+  };
+  const isString = (v: unknown): v is string => typeof v === "string";
+  const isIndustry = (v: unknown): v is Industry =>
+    typeof v === "string" &&
+    ["msp", "it_services", "cybersecurity", "general_b2b", "other"].includes(v);
+  const extractedRaw = brief.extracted;
+  let extracted: ExtractedSnapshot | null = null;
+  if (extractedRaw && typeof extractedRaw === "object") {
+    const e = extractedRaw as Record<string, unknown>;
+    extracted = {
+      swatches: Array.isArray(e.swatches) ? (e.swatches as string[]) : [],
+      fonts: Array.isArray(e.fonts) ? (e.fonts as string[]) : [],
+      layout_tags: Array.isArray(e.layout_tags) ? (e.layout_tags as string[]) : [],
+      visual_tone_tags: Array.isArray(e.visual_tone_tags)
+        ? (e.visual_tone_tags as string[])
+        : [],
+      screenshot_url: typeof e.screenshot_url === "string" ? e.screenshot_url : null,
+      source_url: typeof e.source_url === "string" ? e.source_url : null,
+      fetched_at: typeof e.fetched_at === "string" ? e.fetched_at : null,
+    };
+  }
+  return {
+    industry: get("industry", isIndustry) ?? "msp",
+    reference_url: get("reference_url", isString) ?? "",
+    existing_site_url: get("existing_site_url", isString) ?? "",
+    description: get("description", isString) ?? "",
+    edited_understanding: get("edited_understanding", isString) ?? "",
+    extracted,
+  };
 }
 
 function Step2({ siteId, status }: { siteId: string; status: SetupStatus }) {
