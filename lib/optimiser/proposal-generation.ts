@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 
 import { computeConfidence } from "./confidence";
 import type { PageMetricsRollup } from "./metrics-aggregation";
+import { applyPriorsToImpactRange } from "./pattern-library/priors";
 import type { PlaybookRow } from "./playbook-execution";
 
 // ---------------------------------------------------------------------------
@@ -96,9 +97,25 @@ export async function generateProposal(
     trigger_magnitude: inputs.triggerMagnitude,
   });
 
-  const seedMidpoint =
-    (inputs.playbook.seed_impact_min_pp + inputs.playbook.seed_impact_max_pp) /
-    2;
+  // Phase 3 Slice 23 — pull cross-client priors when the feature flag
+  // is on AND the receiving client has cross_client_learning_consent.
+  // Priors blend the playbook seed range with the matching pattern's
+  // 95% CI, weighted by pattern confidence. Falls through to
+  // seed-only when priors aren't applied.
+  const priors = await applyPriorsToImpactRange({
+    clientId: inputs.clientId,
+    playbookId: inputs.playbook.id,
+    seedMinPp: inputs.playbook.seed_impact_min_pp,
+    seedMaxPp: inputs.playbook.seed_impact_max_pp,
+  });
+
+  const effectiveMinPp = priors.applied
+    ? priors.expected_min_pp
+    : inputs.playbook.seed_impact_min_pp;
+  const effectiveMaxPp = priors.applied
+    ? priors.expected_max_pp
+    : inputs.playbook.seed_impact_max_pp;
+  const seedMidpoint = (effectiveMinPp + effectiveMaxPp) / 2;
   // Impact (0–100): a relative score in the client's pool. Phase 1
   // approximation: seed midpoint × log(sessions+1) / 8, clamped.
   // Slice 6 will normalise across the client's pending pool, but the
@@ -147,8 +164,8 @@ export async function generateProposal(
     confidence_freshness: confidence.freshness,
     confidence_stability: confidence.stability,
     confidence_signal: confidence.signal,
-    expected_impact_min_pp: inputs.playbook.seed_impact_min_pp,
-    expected_impact_max_pp: inputs.playbook.seed_impact_max_pp,
+    expected_impact_min_pp: effectiveMinPp,
+    expected_impact_max_pp: effectiveMaxPp,
     change_set: changeSet,
     before_snapshot: beforeSnapshot,
     after_snapshot: afterSnapshot,
