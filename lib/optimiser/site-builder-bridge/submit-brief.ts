@@ -242,7 +242,7 @@ async function loadProposalContext(
 
   const clientRes = await supabase
     .from("opt_clients")
-    .select("id, slug, hosting_mode")
+    .select("id, client_slug, hosting_mode")
     .eq("id", proposalRes.data.client_id as string)
     .maybeSingle();
   if (clientRes.error) throw new Error(clientRes.error.message);
@@ -280,7 +280,7 @@ async function loadProposalContext(
       | "opollo_subdomain"
       | "opollo_cname"
       | "client_slice",
-    client_slug: clientRes.data.slug as string,
+    client_slug: clientRes.data.client_slug as string,
     site_id: siteId,
   };
 }
