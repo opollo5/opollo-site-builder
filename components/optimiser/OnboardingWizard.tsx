@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TryAutoImportPanel } from "@/components/optimiser/TryAutoImportPanel";
 import type { ConnectorStatus } from "@/lib/optimiser/connector-status";
 import type { OptClient } from "@/lib/optimiser/clients";
 
@@ -739,6 +740,7 @@ function PagesStep({ client, stepStatus, setStatus, onComplete }: PagesStepProps
       <Button onClick={saveSelections} disabled={saving} variant="outline">
         {saving ? "Saving…" : "Save selections"}
       </Button>
+      <TryAutoImportPanel clientId={client.id} />
     </div>
   );
 }
