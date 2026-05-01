@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { extractJsonFromOutputTags } from "@/lib/design-discovery/generate-concepts";
+import {
+  briefHash,
+  extractJsonFromOutputTags,
+} from "@/lib/design-discovery/generate-concepts";
+import type { DesignBrief } from "@/lib/design-discovery/design-brief";
 import { normalizeConceptHtml } from "@/lib/design-discovery/normalize-html";
 
 // ---------------------------------------------------------------------------
@@ -73,5 +77,68 @@ describe("normalizeConceptHtml", () => {
     const r = normalizeConceptHtml(before);
     expect(r.changed).toBe(false);
     expect(r.html).toBe(before);
+  });
+});
+
+describe("briefHash", () => {
+  // Refinement loop bug fix (DESIGN-DISCOVERY-FOLLOWUP PR 2):
+  // refinement_notes MUST be part of the hash so the idempotency key
+  // changes between refinement rounds. Without this, Anthropic's 24h
+  // cache returns the previous concept and the loop is dead.
+  const baseBrief: DesignBrief = {
+    industry: "msp",
+    reference_url: null,
+    existing_site_url: null,
+    description: "Premium technical with whitespace.",
+    edited_understanding: null,
+    screenshots: [],
+    refinement_notes: [],
+    extracted: null,
+  };
+
+  it("produces different hashes when refinement_notes differ", () => {
+    const a = briefHash({
+      ...baseBrief,
+      refinement_notes: ["make the hero shorter"],
+    });
+    const b = briefHash({
+      ...baseBrief,
+      refinement_notes: ["denser card grid"],
+    });
+    expect(a).not.toEqual(b);
+  });
+
+  it("produces different hashes as more refinements accumulate", () => {
+    const round1 = briefHash({
+      ...baseBrief,
+      refinement_notes: ["make the hero shorter"],
+    });
+    const round2 = briefHash({
+      ...baseBrief,
+      refinement_notes: ["make the hero shorter", "tighter card grid"],
+    });
+    const round3 = briefHash({
+      ...baseBrief,
+      refinement_notes: [
+        "make the hero shorter",
+        "tighter card grid",
+        "muted accent",
+      ],
+    });
+    expect(new Set([round1, round2, round3]).size).toBe(3);
+  });
+
+  it("is stable for identical briefs", () => {
+    const brief: DesignBrief = {
+      ...baseBrief,
+      refinement_notes: ["one", "two"],
+    };
+    expect(briefHash(brief)).toEqual(briefHash(brief));
+  });
+
+  it("differs across operator-supplied fields too", () => {
+    const a = briefHash(baseBrief);
+    const b = briefHash({ ...baseBrief, description: "different" });
+    expect(a).not.toEqual(b);
   });
 });

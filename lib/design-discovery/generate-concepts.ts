@@ -109,17 +109,19 @@ export function extractJsonFromOutputTags(text: string): unknown | null {
   }
 }
 
-function briefHash(brief: DesignBrief): string {
-  // Cheap stable hash. Anthropic's idempotency-key requires < 64 chars.
-  // We hash only the operator-supplied fields, skipping refinement_notes
-  // (those need a fresh idempotency key per refinement to land a new
-  // generation — refinement is a separate code path in PR 7).
+export function briefHash(brief: DesignBrief): string {
+  // Cheap stable hash that drives Anthropic's idempotency-key. MUST
+  // include refinement_notes — without it, every round of refinement
+  // posts the same key as the previous round, and Anthropic's 24-hour
+  // idempotency cache returns the prior response. Operator types new
+  // feedback, sees the old concept, and the loop dies.
   const json = JSON.stringify({
     industry: brief.industry,
     reference_url: brief.reference_url ?? "",
     existing_site_url: brief.existing_site_url ?? "",
     description: brief.description ?? "",
     edited_understanding: brief.edited_understanding ?? "",
+    refinement_notes: brief.refinement_notes ?? [],
   });
   let h = 0;
   for (let i = 0; i < json.length; i++) {
