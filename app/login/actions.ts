@@ -99,13 +99,34 @@ export async function loginAction(
     return { error: "Sign-in failed. Please try again." };
   }
 
-  // Flag off → existing behaviour.
+  // Flag off → existing behaviour. No 2FA cookies are ever set when the
+  // flag is off, so there's nothing stale to clear on this path.
   if (!is2faEnabled()) {
     redirect(next);
   }
 
   // Flag on — check for a matching trusted device.
   const cookieJar = cookies();
+
+  // Any stale 2FA cookies from a prior aborted attempt must be cleared
+  // on every successful path that does NOT issue a new challenge —
+  // otherwise middleware sees the leftover opollo_2fa_pending cookie
+  // and bounces every admin navigation back to /login/check-email,
+  // looking like a "stuck after sign-in" bug. The challenge-issuing
+  // path below overwrites these cookies with fresh values, so the
+  // clears here only apply on the trusted-device shortcut.
+  function clearStale2faCookies() {
+    for (const name of [PENDING_2FA_COOKIE, "opollo_pending_device_id"]) {
+      cookieJar.set(name, "", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      });
+    }
+  }
+
   const cookieValue = cookieJar.get(DEVICE_ID_COOKIE)?.value;
   const deviceIdFromCookie = decodeDeviceCookie(cookieValue);
   if (deviceIdFromCookie) {
@@ -116,6 +137,7 @@ export async function loginAction(
     if (trusted) {
       // Skip the challenge — bump last_used_at + go.
       await touchTrustedDevice({ userId, deviceId: deviceIdFromCookie });
+      clearStale2faCookies();
       redirect(next);
     }
   }

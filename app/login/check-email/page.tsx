@@ -69,29 +69,33 @@ export default async function CheckEmailPage({ searchParams }: PageProps) {
   const next = searchParams.next ?? "/admin/sites";
 
   return (
-    <div className="mx-auto max-w-md">
-      <H1>Check your email</H1>
-      <Lead className="mt-1">
-        We sent an approval link to{" "}
-        <strong className="text-foreground">{userEmail}</strong>. Click
-        the link in the email and this page will sign you in
-        automatically.
-      </Lead>
+    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center">
+          <H1>Check your email</H1>
+          <Lead className="mt-1">
+            We sent an approval link to{" "}
+            <strong className="text-foreground">{userEmail}</strong>.
+            Click the link and this page will sign you in
+            automatically.
+          </Lead>
+        </div>
 
-      {emailSendFailed && (
-        <Alert variant="destructive" className="mt-4">
-          Email delivery failed. Use the Resend button below — it
-          skips the cooldown.
-        </Alert>
-      )}
+        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+          {emailSendFailed && (
+            <Alert variant="destructive">
+              Email delivery failed. Use the Resend button below — it
+              skips the cooldown.
+            </Alert>
+          )}
 
-      <div className="mt-6">
-        <CheckEmailPolling
-          challengeId={challenge.id}
-          next={next}
-          initialEmailFailed={emailSendFailed}
-        />
+          <CheckEmailPolling
+            challengeId={challenge.id}
+            next={next}
+            initialEmailFailed={emailSendFailed}
+          />
+        </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -78,6 +78,15 @@ const PUBLIC_PATHS = new Set<string>([
   // fragment). Reachable without a session because the whole point is
   // to MINT the session from the fragment.
   "/auth/callback",
+  // /auth/approve — 2FA email-approval landing page. The token IS the
+  // auth (server-component validates the random 32-byte token via a
+  // SHA-256 lookup against login_challenges.token_hash). The page must
+  // be reachable from any device, including ones with no Supabase
+  // session — the whole point of email approval is that the operator
+  // can click from a phone, hardware key, etc. Without this entry the
+  // middleware bounced unauthenticated callers to /login, breaking
+  // cross-device approval.
+  "/auth/approve",
 ]);
 
 function isPublicPath(pathname: string): boolean {
@@ -252,10 +261,11 @@ async function supabaseAuthGate(req: NextRequest): Promise<NextResponse> {
     const path = req.nextUrl.pathname;
     const allowedDuringPending =
       path === "/login/check-email" ||
-      path === "/auth/approve" ||
       path === "/logout" ||
       path.startsWith("/api/auth/") ||
       path.startsWith("/_next/");
+    // /auth/approve is now in PUBLIC_PATHS and short-circuits before
+    // here; listing it again would be dead code.
     if (!allowedDuringPending) {
       const url = req.nextUrl.clone();
       url.pathname = "/login/check-email";
