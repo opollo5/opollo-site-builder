@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +9,10 @@ import { ConceptRefinementView } from "@/components/ConceptRefinementView";
 import { ConceptReviewCards } from "@/components/ConceptReviewCards";
 import { MoodBoardStrip } from "@/components/MoodBoardStrip";
 import { DesignUnderstandingPanel } from "@/components/DesignUnderstandingPanel";
+import {
+  ScreenshotUploadZone,
+  type UploadedScreenshot,
+} from "@/components/ScreenshotUploadZone";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,12 +31,16 @@ import {
 //   - Free text description
 //   - Industry selector (loads sensible defaults)
 //
-// Screenshot upload is reserved in the design brief shape but the
-// upload UI lands in a follow-up — see PR description.
+// Screenshots: drop up to 5 inspiration images, the client base64s
+// them in memory and posts to /setup/extract-screenshots which fans
+// out to a Claude vision call. Extracted patterns merge into the
+// mood-board view alongside URL extraction. Image bytes never touch
+// DB or Storage.
 //
 // Live mood board updates as inputs arrive: industry preset is
-// rendered immediately; URL extraction overlays its findings on top
-// when a URL is present and the operator clicks "Extract design".
+// rendered immediately; URL + screenshot extraction overlays
+// findings on top when present (URL extraction wins when both are
+// available — operator typed it explicitly, screenshots are inferred).
 // The understanding panel shows what we've inferred + the confidence
 // signal + a "Generate concepts" CTA. The CTA persists the brief and
 // fires three parallel Claude calls server-side; the resulting
@@ -86,6 +94,13 @@ export interface ExtractedSnapshot {
   fetched_at: string | null;
 }
 
+export interface ScreenshotExtraction {
+  swatches: string[];
+  fonts: string[];
+  layout_tags: string[];
+  visual_tone_tags: string[];
+}
+
 const INITIAL_DRAFT: DesignBriefDraft = {
   industry: "msp",
   reference_url: "",
@@ -109,6 +124,11 @@ export function DesignDirectionInputs({
   });
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
+  const [screenshots, setScreenshots] = useState<UploadedScreenshot[]>([]);
+  const [screenshotExtraction, setScreenshotExtraction] =
+    useState<ScreenshotExtraction | null>(null);
+  const [analysingScreenshots, setAnalysingScreenshots] = useState(false);
+  const [screenshotError, setScreenshotError] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [concepts, setConcepts] = useState<ConceptResult[] | null>(null);
   const [conceptErrors, setConceptErrors] = useState<ConceptError[]>([]);
@@ -118,35 +138,122 @@ export function DesignDirectionInputs({
   const preset = useMemo(() => industryPreset(draft.industry), [draft.industry]);
 
   // The current "what we'll show in the mood board" view: industry
-  // preset overlaid by anything we extracted from the URL.
+  // preset, then screenshot extraction layered on top, then URL
+  // extraction wins when both are present (operator typed the URL
+  // explicitly).
   const view = useMemo(() => {
-    const ex = draft.extracted;
+    const url = draft.extracted;
+    const shots = screenshotExtraction;
+    const pickArr = (
+      a: string[] | undefined,
+      b: string[] | undefined,
+      fallback: string[],
+    ): string[] => {
+      if (a && a.length > 0) return a;
+      if (b && b.length > 0) return b;
+      return fallback;
+    };
     return {
-      swatches:
-        ex && ex.swatches.length > 0
-          ? ex.swatches
-          : Object.values(preset.swatches),
-      fonts: ex && ex.fonts.length > 0
-        ? ex.fonts
-        : [preset.font_heading, preset.font_body].filter(
-            (v, i, a) => a.indexOf(v) === i,
-          ),
-      layout_tags:
-        ex && ex.layout_tags.length > 0 ? ex.layout_tags : preset.layout_tags,
-      visual_tone_tags:
-        ex && ex.visual_tone_tags.length > 0
-          ? ex.visual_tone_tags
-          : preset.visual_tone_tags,
-      screenshot_url: ex?.screenshot_url ?? null,
+      swatches: pickArr(
+        url?.swatches,
+        shots?.swatches,
+        Object.values(preset.swatches),
+      ),
+      fonts: pickArr(
+        url?.fonts,
+        shots?.fonts,
+        [preset.font_heading, preset.font_body].filter(
+          (v, i, a) => a.indexOf(v) === i,
+        ),
+      ),
+      layout_tags: pickArr(
+        url?.layout_tags,
+        shots?.layout_tags,
+        preset.layout_tags,
+      ),
+      visual_tone_tags: pickArr(
+        url?.visual_tone_tags,
+        shots?.visual_tone_tags,
+        preset.visual_tone_tags,
+      ),
+      screenshot_url: url?.screenshot_url ?? null,
       visual_tone: preset.visual_tone,
     };
-  }, [draft.extracted, preset]);
+  }, [draft.extracted, screenshotExtraction, preset]);
 
   const hasAnyInput =
     draft.reference_url.trim().length > 0 ||
     draft.existing_site_url.trim().length > 0 ||
     draft.description.trim().length > 0 ||
+    screenshots.length > 0 ||
     draft.industry !== INITIAL_DRAFT.industry;
+
+  // Re-run vision extraction whenever the set of uploaded screenshots
+  // changes. Empty list → drop the cached extraction so the mood board
+  // falls back to URL/preset signals.
+  useEffect(() => {
+    if (screenshots.length === 0) {
+      setScreenshotExtraction(null);
+      setScreenshotError(null);
+      return;
+    }
+    let cancelled = false;
+    setAnalysingScreenshots(true);
+    setScreenshotError(null);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/sites/${siteId}/setup/extract-screenshots`,
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              screenshots: screenshots.map((s) => ({
+                data: s.base64,
+                media_type: s.media_type,
+              })),
+            }),
+          },
+        );
+        const payload = (await res.json().catch(() => null)) as
+          | { ok: true; data: ScreenshotExtraction }
+          | { ok: false; error: { message: string } }
+          | null;
+        if (cancelled) return;
+        if (!payload?.ok) {
+          setScreenshotError(
+            payload?.ok === false
+              ? payload.error.message
+              : "Could not read your screenshots. Try again or remove one.",
+          );
+          setAnalysingScreenshots(false);
+          return;
+        }
+        setScreenshotExtraction(payload.data);
+        setAnalysingScreenshots(false);
+      } catch (err) {
+        if (cancelled) return;
+        setScreenshotError(
+          err instanceof Error
+            ? err.message
+            : "Network error reading screenshots.",
+        );
+        setAnalysingScreenshots(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [screenshots, siteId]);
+
+  // Revoke object URLs when the component unmounts so the browser
+  // doesn't hold the raw bytes longer than necessary.
+  useEffect(() => {
+    return () => {
+      for (const s of screenshots) URL.revokeObjectURL(s.preview_url);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function setField<K extends keyof DesignBriefDraft>(
     key: K,
@@ -197,15 +304,22 @@ export function DesignDirectionInputs({
     setConcepts(null);
     setConceptErrors([]);
     setGenerationFailed(null);
+    // Merged extraction: URL signals win, screenshots fill gaps.
+    // Screenshot bytes themselves never persist; only the operator-
+    // visible filenames and the merged signals do.
+    const mergedExtracted = mergeExtractionForBrief(
+      draft.extracted,
+      screenshotExtraction,
+    );
     const brief = {
       industry: draft.industry,
       reference_url: draft.reference_url.trim() || null,
       existing_site_url: draft.existing_site_url.trim() || null,
       description: draft.description.trim() || null,
       edited_understanding: draft.edited_understanding.trim() || null,
-      screenshots: [],
+      screenshots: screenshots.map((s) => s.file_name),
       refinement_notes: [],
-      extracted: draft.extracted,
+      extracted: mergedExtracted,
     };
     // Persist the brief first so the wizard's resume logic returns to
     // Step 1 with the operator's inputs intact even if the generation
@@ -399,6 +513,13 @@ export function DesignDirectionInputs({
         </p>
       </div>
 
+      <ScreenshotUploadZone
+        screenshots={screenshots}
+        onChange={setScreenshots}
+        busy={analysingScreenshots}
+        errorMessage={screenshotError}
+      />
+
       <MoodBoardStrip view={view} />
 
       <DesignUnderstandingPanel
@@ -410,7 +531,8 @@ export function DesignDirectionInputs({
             (draft.reference_url.trim() || draft.existing_site_url.trim()
               ? 1
               : 0) +
-            (draft.description.trim() ? 1 : 0);
+            (draft.description.trim() ? 1 : 0) +
+            (screenshots.length > 0 ? 1 : 0);
           if (score >= 2) return "high";
           if (score === 1) return "medium";
           return "low";
@@ -452,7 +574,10 @@ export function DesignDirectionInputs({
             description: draft.description.trim() || null,
             edited_understanding: draft.edited_understanding.trim() || null,
             refinement_notes: [],
-            extracted: draft.extracted,
+            extracted: mergeExtractionForBrief(
+              draft.extracted,
+              screenshotExtraction,
+            ),
           }}
           initialConcept={refining}
           onCancel={() => setRefining(null)}
@@ -547,4 +672,33 @@ function ConceptResultsBlock({
       />
     </div>
   );
+}
+
+// URL-extracted signals win when present (operator typed the URL
+// explicitly). Screenshot signals fill any empty arrays so the
+// generation prompt + persisted brief reflect both inputs.
+function mergeExtractionForBrief(
+  url: ExtractedSnapshot | null,
+  shots: ScreenshotExtraction | null,
+): ExtractedSnapshot | null {
+  if (!url && !shots) return null;
+  const fillFrom = (
+    a: string[] | undefined,
+    b: string[] | undefined,
+  ): string[] => {
+    if (a && a.length > 0) return a;
+    return b ?? [];
+  };
+  return {
+    swatches: fillFrom(url?.swatches, shots?.swatches),
+    fonts: fillFrom(url?.fonts, shots?.fonts),
+    layout_tags: fillFrom(url?.layout_tags, shots?.layout_tags),
+    visual_tone_tags: fillFrom(
+      url?.visual_tone_tags,
+      shots?.visual_tone_tags,
+    ),
+    screenshot_url: url?.screenshot_url ?? null,
+    source_url: url?.source_url ?? null,
+    fetched_at: url?.fetched_at ?? null,
+  };
 }
