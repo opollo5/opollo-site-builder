@@ -94,12 +94,26 @@ export function ConceptRefinementView({
       );
       const payload = (await res.json().catch(() => null)) as
         | { ok: true; data: ConceptResult }
-        | { ok: false; error: { message: string } }
+        | { ok: false; error: { code?: string; message: string } }
         | null;
       if (!payload?.ok) {
         setError(
           payload?.ok === false ? payload.error.message : "Refinement failed.",
         );
+        // Server-side cap (DESIGN-DISCOVERY-FOLLOWUP PR 3): a 429
+        // means the operator has burned their 10-call budget on the
+        // server, even if local state thinks they have remaining.
+        // Snap the local counter forward so the Refine button locks.
+        if (
+          res.status === 429 ||
+          (payload?.ok === false && payload.error.code === "LIMIT_REACHED")
+        ) {
+          setRefinementNotes(
+            new Array(REFINE_CAP).fill("").map((_, i) =>
+              refinementNotes[i] ?? "(server-side cap)",
+            ),
+          );
+        }
         setRefining(false);
         return;
       }

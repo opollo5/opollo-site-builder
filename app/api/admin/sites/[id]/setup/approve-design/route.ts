@@ -8,6 +8,7 @@ import {
   resetDesignDirection,
 } from "@/lib/design-discovery/approve-design";
 import { DesignBriefSchema } from "@/lib/design-discovery/design-brief";
+import { resetRegenCount } from "@/lib/design-discovery/regen-caps";
 
 // ---------------------------------------------------------------------------
 // POST   /api/admin/sites/[id]/setup/approve-design
@@ -125,6 +126,12 @@ export async function DELETE(
       result.error.code === "NOT_FOUND" ? 404 : 500,
     );
   }
+
+  // "Reset and start over" zeros the concept_refinements bucket so
+  // the operator gets a fresh 10-call budget on the next pass.
+  // Tolerate a NOT_FOUND-after-reset by ignoring it; the design reset
+  // already succeeded and the site clearly exists.
+  await resetRegenCount(params.id, "concept_refinements");
 
   revalidatePath(`/admin/sites/${params.id}/setup`);
   return NextResponse.json(

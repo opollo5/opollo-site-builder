@@ -182,12 +182,21 @@ export function ToneOfVoiceInputs({
       );
       const payload = (await res.json().catch(() => null)) as
         | { ok: true; data: { samples: ToneSample[] } }
-        | { ok: false; error: { message: string } }
+        | { ok: false; error: { code?: string; message: string } }
         | null;
       if (!payload?.ok) {
         toast.error(
           payload?.ok === false ? payload.error.message : "Regeneration failed.",
         );
+        // Server-side cap (DESIGN-DISCOVERY-FOLLOWUP PR 3): a 429
+        // means the cap is exhausted on the server even if local
+        // state hasn't caught up. Lock the button.
+        if (
+          res.status === 429 ||
+          (payload?.ok === false && payload.error.code === "LIMIT_REACHED")
+        ) {
+          setRegenAttempts(REGEN_CAP);
+        }
         setRegenerating(false);
         return;
       }

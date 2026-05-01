@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { extractTone } from "@/lib/design-discovery/extract-tone";
+import { resetRegenCount } from "@/lib/design-discovery/regen-caps";
 import {
   AVOID_OPTIONS,
   PERSONALITY_OPTIONS,
@@ -98,6 +99,12 @@ export async function POST(
       { status: 200 },
     );
   }
+
+  // Re-extracting tone replaces the existing profile + samples on
+  // the client (ToneOfVoiceInputs.onExtract sets regenAttempts to 0
+  // locally). Mirror that on the server so the cap budget refreshes
+  // for the new tone run too.
+  await resetRegenCount(params.id, "tone_samples");
 
   return NextResponse.json(
     { ok: true, data: result.data, timestamp: new Date().toISOString() },
