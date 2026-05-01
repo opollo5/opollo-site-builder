@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { regenerateSamples } from "@/lib/design-discovery/extract-tone";
+import { incrementRegenCount } from "@/lib/design-discovery/regen-caps";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,32 @@ export async function POST(
         timestamp: new Date().toISOString(),
       },
       { status: 400 },
+    );
+  }
+
+  // Server-side cap (DESIGN-DISCOVERY-FOLLOWUP PR 3). Increment first
+  // so the bucket is debited the moment the call lands, regardless of
+  // whether the Anthropic call later succeeds.
+  const cap = await incrementRegenCount(params.id, "tone_samples");
+  if (!cap.ok) {
+    if (cap.error.code === "LIMIT_REACHED") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "LIMIT_REACHED",
+            message: cap.error.message,
+            retryable: false,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 429 },
+      );
+    }
+    return errorJson(
+      cap.error.code,
+      cap.error.message,
+      cap.error.code === "NOT_FOUND" ? 404 : 500,
     );
   }
 
