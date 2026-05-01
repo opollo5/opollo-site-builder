@@ -192,6 +192,11 @@ describe("middleware: FEATURE_SUPABASE_AUTH on, no session", () => {
       "/auth/callback",
       "/api/auth/forgot-password",
       "/api/auth/reset-password",
+      // AUTH-FOUNDATION P4 — /auth/approve is the email-link landing
+      // page. The token is the auth, so it must be reachable from a
+      // device with no Supabase session (the operator clicking the
+      // approve email on their phone).
+      "/auth/approve",
     ]) {
       const res = await middleware(makeRequest(p));
       expect(res.status).toBe(200);

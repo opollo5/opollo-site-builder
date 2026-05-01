@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { ApproveCompleteHere } from "@/components/ApproveCompleteHere";
 import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
@@ -9,22 +11,29 @@ import {
 // AUTH-FOUNDATION P4.3 — /auth/approve.
 //
 // The URL the "Approve sign-in" button in the email points at. Public
-// (no auth gate) — the token IS the auth. Server-component validates
-// the token + flips the challenge to approved, then renders one of:
+// (in middleware.ts PUBLIC_PATHS) — the token IS the auth. Server-
+// component validates the random 32-byte token via SHA-256 against
+// login_challenges.token_hash, flips the challenge from pending →
+// approved, and renders one of:
 //
-//   - "Sign-in approved. Return to your original tab to continue,
-//     or click below to complete sign-in here."
-//     With a "Complete sign-in here" button (the lost-tab fallback)
-//     that POSTs to /api/auth/approve-here, which signs the user in
-//     ON THIS DEVICE via a Supabase magic link.
+//   - "Sign-in approved." with a clear "Return to your original tab"
+//     instruction. The original tab's polling shell does the actual
+//     session work — this page intentionally does not try to set a
+//     session on the device that clicked the email link, because that
+//     device may be a phone or a different browser entirely.
 //
-//   - "This approval link has been used." (consumed already by the
-//     original tab's complete-login)
+//   - "Already used." (consumed already by the original tab's
+//     complete-login).
 //
-//   - "This link expired / is invalid" (typed reasons)
+//   - "Expired" / "Invalid" — typed reasons.
+//
+// Lost-tab fallback: a "Complete sign-in here" button is offered on
+// the approved/already-approved branches. POSTs to /api/auth/approve-
+// here, which mints a Supabase magic link the browser follows. This
+// is the path used when the original tab is closed.
 //
 // Single-use: the second visit to the same approval link sees the
-// 'consumed' state.
+// 'consumed' branch.
 
 export const dynamic = "force-dynamic";
 
@@ -77,53 +86,102 @@ async function resolveState(rawToken: string | undefined): Promise<RenderState> 
   };
 }
 
+function PageShell({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md space-y-6">
+        <div className="text-center">
+          <H1>{title}</H1>
+          {subtitle && <Lead className="mt-1">{subtitle}</Lead>}
+        </div>
+        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+          {children}
+        </div>
+      </div>
+    </main>
+  );
+}
+
+function StartOverLink() {
+  return (
+    <Link
+      href="/login"
+      className="inline-block text-sm font-medium underline underline-offset-4"
+    >
+      Back to sign in
+    </Link>
+  );
+}
+
 export default async function ApprovePage({ searchParams }: PageProps) {
   const state = await resolveState(searchParams.token);
 
   if (state.kind === "invalid") {
     return (
-      <div className="mx-auto max-w-md space-y-4">
-        <H1>Approval link</H1>
+      <PageShell title="Approval link">
         <Alert variant="destructive">
-          This approval link is invalid. Sign in again from your original
-          device or ask for a fresh attempt.
+          This approval link is invalid. Sign in again from your
+          original device to receive a fresh email.
         </Alert>
-      </div>
+        <StartOverLink />
+      </PageShell>
     );
   }
   if (state.kind === "expired") {
     return (
-      <div className="mx-auto max-w-md space-y-4">
-        <H1>Approval link expired</H1>
+      <PageShell title="Approval link expired">
         <Alert variant="destructive">
-          This approval link expired (15-minute window). Sign in again
-          from your original device to receive a fresh email.
+          This link expired (15-minute window). Sign in again to
+          receive a fresh email.
         </Alert>
-      </div>
+        <StartOverLink />
+      </PageShell>
     );
   }
   if (state.kind === "consumed") {
     return (
-      <div className="mx-auto max-w-md space-y-4">
-        <H1>Approval link used</H1>
+      <PageShell title="Approval link used">
         <Alert>
-          This approval link has been used. If you&apos;re already
-          signed in on the original device you can close this tab.
+          This sign-in has already been completed. If your original
+          tab is still open it should have advanced to the admin — you
+          can close this tab.
         </Alert>
-      </div>
+        <StartOverLink />
+      </PageShell>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md space-y-4">
-      <H1>Sign-in approved</H1>
-      <Lead className="mt-1">
-        {state.tokenWasJustApproved
-          ? "Return to your original tab — it'll finish signing you in automatically."
-          : "Already approved. If your original tab is gone, complete sign-in here."}
-      </Lead>
+    <PageShell
+      title="Sign-in approved"
+      subtitle={
+        state.tokenWasJustApproved
+          ? "Return to your original tab — it will sign you in automatically within a few seconds."
+          : "Sign-in already approved. Return to your original tab, or complete here if that tab is gone."
+      }
+    >
+      <Alert>
+        <strong>Done.</strong> You can close this tab now. The browser
+        you signed in from will pick up the approval and finish the
+        sign-in.
+      </Alert>
 
-      <ApproveCompleteHere challengeId={state.challengeId} />
-    </div>
+      <div className="border-t pt-4">
+        <p className="text-sm font-medium">Lost your original tab?</p>
+        <p className="text-xs text-muted-foreground mt-1 mb-3">
+          Use the button below to finish signing in on this device
+          instead.
+        </p>
+        <ApproveCompleteHere challengeId={state.challengeId} />
+      </div>
+    </PageShell>
   );
 }

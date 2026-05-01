@@ -1,7 +1,9 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/LoginForm";
 import { H1, Lead } from "@/components/ui/typography";
+import { PENDING_2FA_COOKIE } from "@/lib/2fa/cookies";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
 
@@ -37,6 +39,19 @@ export default async function LoginPage({
   searchParams: { next?: string };
 }) {
   const next = safeNext(searchParams.next);
+
+  // Recovery path: arriving at /login with a stale opollo_2fa_pending
+  // cookie means the user was mid-2FA, then either expired the
+  // challenge, navigated away, or had their /complete-login fail.
+  // Without an explicit reset they get stuck — the existing session is
+  // still valid, the page short-circuits to /admin/sites, middleware
+  // sees the pending cookie and bounces back to /login/check-email,
+  // and the loop never terminates. /logout clears both the Supabase
+  // session and the 2FA cookies and redirects back here, so a clean
+  // form is shown on the next request.
+  if (cookies().has(PENDING_2FA_COOKIE)) {
+    redirect("/logout");
+  }
 
   if (isSupabaseAuthOn()) {
     let killSwitch = false;
