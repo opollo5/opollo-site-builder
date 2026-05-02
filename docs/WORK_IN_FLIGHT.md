@@ -9,11 +9,12 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-1-social-posts-lib
-- Slice: S1-1 — L1 editorial layer foundation. Lib functions for social_post_master CRUD (create + list + get) on top of migration 0070's schema. No HTTP API yet; that lands with the UI in S1-2.
+- Branch: feat/s1-2-social-posts-api
+- Slice: S1-2 — HTTP API + customer-facing list page for social posts. POST/GET /api/platform/social/posts gated by canDo("create_post"/"view_calendar"). Customer page at /company/social/posts.
 - Files claimed:
-  - lib/platform/social/posts/{types,create,list,get,index}.ts (new)
-  - lib/__tests__/social-posts.test.ts (new)
+  - app/api/platform/social/posts/route.ts (new)
+  - app/company/social/posts/page.tsx (new)
+  - components/SocialPostsListClient.tsx (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.

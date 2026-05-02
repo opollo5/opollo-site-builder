@@ -615,16 +615,6 @@ export function readRegenDailyBudgetCents(): number {
  * Caller (the POST route) is responsible for the admin gate and UUID
  * validation. This helper assumes well-formed ids.
  */
-function requireDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by enqueueRegenJob for the budget reservation transaction.",
-    );
-  }
-  return url;
-}
-
 export async function enqueueRegenJob(
   input: EnqueueRegenJobInput,
 ): Promise<EnqueueRegenJobResult> {
@@ -692,7 +682,8 @@ export async function enqueueRegenJob(
   // concurrent enqueues against the same tenant serialise. Rollback
   // on any failure releases the lock without charging the budget.
   const jobId = crypto.randomUUID();
-  const client = new Client({ connectionString: requireDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const client = new Client(requireDbConfig());
   await client.connect();
   try {
     await client.query("BEGIN");
