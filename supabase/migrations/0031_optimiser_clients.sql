@@ -1,17 +1,30 @@
--- 0069 — Optimiser: opt_clients (Slice 1 of feat/optimiser).
+-- 0031 — Optimiser: opt_clients (Slice 1 of feat/optimiser).
 -- Reference: docs/Optimisation_Engine_Spec_v1.5.docx §5.1 + §3.6 + §4.6 + §11.2.
 --
--- Renumbered from 0031 → 0069 to resolve a version-prefix collision with
--- 0031_email_log.sql (PR #286). supabase_migrations.schema_migrations
--- enforces UNIQUE on the version column, so two files sharing prefix 0031
--- meant `supabase db push` succeeded for whichever file ran first and
--- silently failed (or partially applied) the other. On environments where
--- the original 0031_optimiser_clients.sql had already created opt_clients
--- without a tracking row, recover by triggering deploy-migrations.yml with
--- `repair_versions_applied=0069` — the workflow runs
--- `supabase migration repair --status applied 0069 --linked` before
--- db push, marking 0069 applied without re-running the CREATE TABLE.
--- Fresh environments apply this file normally as version 0069.
+-- Version-prefix collision history:
+--
+-- This file originally landed at 0031. A separate 0031_email_log.sql
+-- (PR #286) collided with it on the same prefix; supabase_migrations.
+-- schema_migrations enforces UNIQUE on version, so `supabase db push`
+-- recorded whichever file ran first and silently failed the other.
+--
+-- An earlier remediation renumbered this file 0031 → 0069 (PR #371) on
+-- the assumption production had opt_clients from the partial collision.
+-- That assumption was wrong on the actual prod state, AND putting
+-- opt_clients at 0069 broke FK ordering for fresh environments —
+-- 0032_optimiser_client_credentials.sql (and the rest of the optimiser
+-- chain through 0061) reference opt_clients via FK, so they apply
+-- before 0069 in version order and fail on `relation does not exist`.
+--
+-- The final fix swaps the slot ownership: opt_clients returns to 0031
+-- (which restores the correct FK-before-dependents order) and
+-- email_log moves to 0069 (it has no FK dependents, so trailing the
+-- chain is safe). Production recovery: dispatch deploy-migrations.yml
+-- with repair_versions_reverted=0031 repair_versions_applied=0069 —
+-- the revert clears the historical 0031 row (originally tracking
+-- email_log's apply); the apply marks 0069 as applied (matching the
+-- email_log table that already exists in prod). db push then runs
+-- this file's CREATE TABLE, then 0032 → 0068 in order.
 --
 -- Design decisions encoded here:
 --
