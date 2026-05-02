@@ -2,10 +2,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SiteVoiceSettingsForm } from "@/components/SiteVoiceSettingsForm";
+import { UseImageLibraryToggle } from "@/components/UseImageLibraryToggle";
 import { Alert } from "@/components/ui/alert";
 import { H1, H2, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // /admin/sites/[id]/settings — RS-2.
 //
@@ -40,6 +42,15 @@ export default async function SiteSettingsPage({
   }
   const site = result.data.site;
 
+  const svc = getServiceRoleClient();
+  const useImageLibraryRow = await svc
+    .from("sites")
+    .select("use_image_library")
+    .eq("id", site.id)
+    .maybeSingle();
+  const useImageLibrary =
+    (useImageLibraryRow.data?.use_image_library as boolean | undefined) ?? false;
+
   return (
     <div className="mx-auto max-w-3xl">
       <Breadcrumbs
@@ -71,6 +82,23 @@ export default async function SiteSettingsPage({
             initialBrandVoice={site.brand_voice}
             initialDesignDirection={site.design_direction}
             initialVersionLock={site.version_lock}
+          />
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="image-library-heading"
+        className="mt-6 rounded-lg border p-4"
+      >
+        <H2 id="image-library-heading">Image library</H2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          When enabled, brief generation can suggest images from the shared
+          library where the page topic matches.
+        </p>
+        <div className="mt-4">
+          <UseImageLibraryToggle
+            siteId={site.id}
+            initialEnabled={useImageLibrary}
           />
         </div>
       </section>

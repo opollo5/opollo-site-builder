@@ -12,6 +12,7 @@ import {
   isAllowedAnthropicModel,
 } from "@/lib/anthropic-pricing";
 import { buildDesignContextPrefix } from "@/lib/design-discovery/build-injection";
+import { buildImageLibraryContextPrefix } from "@/lib/image-library-context";
 import type {
   BriefPageCritiqueEntry,
   BriefPagePassKind,
@@ -1605,6 +1606,20 @@ async function processPagePassLoop(
   // or neither step is approved; existing behaviour preserved.
   const designContextPrefix = await buildDesignContextPrefix(brief.site_id);
 
+  // DESIGN-SYSTEM-OVERHAUL PR 11 — when sites.use_image_library is on,
+  // pull up to 5 captioned images keyed off the page title and append
+  // their URLs as suggestions. Off by default; the lib short-circuits
+  // when the toggle is off so the cost is one cheap row read per
+  // page-tick. Page title is the cheapest topic signal — search_tsv
+  // is GIN-indexed and websearch tolerant. Stitched onto the
+  // existing designContextPrefix so the prompt still receives a
+  // single string at this slot — no PageContext interface change.
+  const imageLibraryPrefix = await buildImageLibraryContextPrefix({
+    siteId: brief.site_id,
+    topic: page.title,
+  });
+  const combinedContextPrefix = designContextPrefix + imageLibraryPrefix;
+
   // Resume pointer.
   let kindToRun: TextSequencePassKind | null = null;
   let numberToRun = 0;
@@ -1663,7 +1678,7 @@ async function processPagePassLoop(
       previousVisualCritique: null,
       sitePrefix,
       designSystemVersion,
-      designContextPrefix,
+      designContextPrefix: combinedContextPrefix,
     };
 
     const isAnchorFinalPass =
@@ -1925,7 +1940,7 @@ async function processPagePassLoop(
     visualRender,
     sitePrefix,
     designSystemVersion,
-    designContextPrefix,
+    combinedContextPrefix,
   );
   if (visualOutcome.fatal) {
     return visualOutcome.fatal;
