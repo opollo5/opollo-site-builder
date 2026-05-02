@@ -557,6 +557,11 @@ type PageContext = {
   // site has approved design + tone, this is the prefix to prepend
   // to the system prompt. Empty string when off or unapproved.
   designContextPrefix: string;
+  // DESIGN-SYSTEM-OVERHAUL PR 13 — site_mode passes through so
+  // systemPromptFor can drop the <section> wrapper requirement for
+  // posts and tighten the inline-CSS budget further on copy_existing.
+  // Null when the site hasn't been onboarded yet (pre-PR-6 sites).
+  siteMode: "copy_existing" | "new_design" | null;
 };
 
 // Maximum source HTML to feed the model for mode='import' briefs.
@@ -605,6 +610,19 @@ export function systemPromptFor(ctx: PageContext): string {
       : "",
     ctx.contentSummary
       ? `\n<content_summary>\n${ctx.contentSummary}\n</content_summary>`
+      : "",
+    // DESIGN-SYSTEM-OVERHAUL PR 13 — blog-specific guidance. Posts are
+    // simpler than pages: editorial body markup, no page chrome
+    // anywhere. Mode-aware on inline-CSS budget (copy_existing = none,
+    // new_design = ~3 simple rules max). Appended to the existing
+    // page contract so the structural envelope (data-opollo,
+    // site-prefix classes) still applies.
+    ctx.brief.content_type === "post"
+      ? `\n<blog_post_guidance>\nThis is a blog post body. Prefer plain semantic markup (h1, h2, h3, p, ul, ol, li, blockquote, img with alt) over decorative wrappers. The page contract above still applies — the body is wrapped in a top-level <section data-opollo>, and CSS classes (when used) start with the site prefix. ${
+          ctx.siteMode === "copy_existing"
+            ? "Avoid inline CSS entirely — the host WordPress theme styles these tags natively. If you wrap an element in a class, use the extracted classes from <existing_theme_context> rather than inventing new ones."
+            : "Inline <style> is permitted but cap the entire fragment at 3 simple rules max (e.g. one for a featured-image wrapper, one for a pull-quote, one for a typography tweak). The 200-character total budget from the page contract still applies."
+        }\n</blog_post_guidance>`
       : "",
   ];
   return parts.join("\n");
@@ -1606,6 +1624,21 @@ async function processPagePassLoop(
   // or neither step is approved; existing behaviour preserved.
   const designContextPrefix = await buildDesignContextPrefix(brief.site_id);
 
+  // DESIGN-SYSTEM-OVERHAUL PR 13 — load sites.site_mode so the
+  // systemPromptFor branch for content_type='post' can drop the
+  // <section> wrapper and tighten the inline-CSS rules. Single-column
+  // pluck keeps this cheap.
+  const siteModeRowRes = await client.query<{ site_mode: string | null }>(
+    `SELECT site_mode FROM sites WHERE id = $1`,
+    [brief.site_id],
+  );
+  const siteMode =
+    (siteModeRowRes.rows[0]?.site_mode as
+      | "copy_existing"
+      | "new_design"
+      | null
+      | undefined) ?? null;
+
   // DESIGN-SYSTEM-OVERHAUL PR 11 — when sites.use_image_library is on,
   // pull up to 5 captioned images keyed off the page title and append
   // their URLs as suggestions. Off by default; the lib short-circuits
@@ -1679,6 +1712,7 @@ async function processPagePassLoop(
       sitePrefix,
       designSystemVersion,
       designContextPrefix: combinedContextPrefix,
+      siteMode,
     };
 
     const isAnchorFinalPass =
@@ -1941,6 +1975,7 @@ async function processPagePassLoop(
     sitePrefix,
     designSystemVersion,
     combinedContextPrefix,
+    siteMode,
   );
   if (visualOutcome.fatal) {
     return visualOutcome.fatal;
@@ -2069,6 +2104,7 @@ async function runVisualReviewLoop(
   sitePrefix: string,
   designSystemVersion: string,
   designContextPrefix: string,
+  siteMode: "copy_existing" | "new_design" | null,
 ): Promise<VisualReviewOutcome> {
   // Resolve the per-page cost ceiling. Tenant override wins; else the
   // lib default from lib/visual-review.
@@ -2252,6 +2288,7 @@ async function runVisualReviewLoop(
           sitePrefix,
           designSystemVersion,
           designContextPrefix,
+          siteMode,
         },
         passKind: "visual_revise",
         passNumber: i,
