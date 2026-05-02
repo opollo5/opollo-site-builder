@@ -56,10 +56,17 @@ export function parseDbUrl(raw: string): ClientConfig {
     ? decodeURIComponent(url.pathname.slice(1))
     : undefined;
 
-  // Supabase pooler requires TLS. We don't pin a CA — Supabase rotates
-  // their cert chain freely. rejectUnauthorized:false matches the
-  // pre-fix behaviour with sslmode=require.
-  const ssl = { rejectUnauthorized: false };
+  // SSL: hosted Supabase pooler/direct requires TLS; the local
+  // `supabase start` Docker image uses unencrypted Postgres on
+  // 127.0.0.1 (vitest's globalSetup spins this up for the CI test
+  // job + local dev). Detect by host. rejectUnauthorized:false on
+  // remote matches the pre-fix behaviour with sslmode=require.
+  const isLocal =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "host.docker.internal";
+  const ssl = isLocal ? false : { rejectUnauthorized: false };
 
   return { host, port, user, password, database, ssl };
 }
