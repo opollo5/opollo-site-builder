@@ -68,22 +68,13 @@ export type LeasedRegenJob = {
 
 export type ReaperResult = { reapedCount: number };
 
-function requireDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by the regeneration worker.",
-    );
-  }
-  return url;
-}
-
 async function withClient<T>(
   provided: Client | null,
   fn: (c: Client) => Promise<T>,
 ): Promise<T> {
   if (provided) return fn(provided);
-  const c = new Client({ connectionString: requireDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const c = new Client(requireDbConfig());
   await c.connect();
   try {
     return await fn(c);

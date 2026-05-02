@@ -48,18 +48,6 @@ import { getServiceRoleClient } from "@/lib/supabase";
 //                               departing employee).
 // ---------------------------------------------------------------------------
 
-function requireDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by signOutAuthUser to revoke " +
-        "auth.sessions / auth.refresh_tokens rows. In Supabase production, " +
-        "use the direct-connection string from Project Settings → Database.",
-    );
-  }
-  return url;
-}
-
 /**
  * Soft revocation. Deletes refresh tokens and sessions for `userId` via
  * a short-lived pg connection; idempotent if no rows exist. Does not
@@ -68,7 +56,8 @@ function requireDbUrl(): string {
  * token's natural TTL.
  */
 export async function signOutAuthUser(userId: string): Promise<void> {
-  const client = new Client({ connectionString: requireDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const client = new Client(requireDbConfig());
   await client.connect();
   try {
     // refresh_tokens references sessions via session_id with ON DELETE

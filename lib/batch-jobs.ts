@@ -214,16 +214,6 @@ async function assertTemplateForActiveSite(
 // Creator
 // ---------------------------------------------------------------------------
 
-function requireDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by createBatchJob for the job + slots transaction.",
-    );
-  }
-  return url;
-}
-
 export async function createBatchJob(
   input: CreateBatchInput,
 ): Promise<CreateBatchResult> {
@@ -243,7 +233,8 @@ export async function createBatchJob(
   };
   const body_hash = computeBodyHash(bodyForHash);
 
-  const client = new Client({ connectionString: requireDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const client = new Client(requireDbConfig());
   await client.connect();
 
   try {

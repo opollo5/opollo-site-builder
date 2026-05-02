@@ -83,7 +83,8 @@ async function runTick(): Promise<TickResult> {
   let reapedCount = 0;
   if (dbUrl) {
     const { Client } = await import("pg");
-    const client = new Client({ connectionString: dbUrl });
+    const { requireDbConfig } = await import("@/lib/db-direct");
+    const client = new Client(requireDbConfig());
     await client.connect();
     try {
       const reaped = await reapExpiredBriefRuns(client);
@@ -162,7 +163,27 @@ async function handle(req: NextRequest): Promise<NextResponse> {
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logger.error("cron.brief_runner.tick_failed", { error: message });
+    const stack = err instanceof Error ? err.stack : null;
+    const rawDbUrl = process.env.SUPABASE_DB_URL ?? "";
+    const dbUrlHost = (() => {
+      try {
+        return new URL(rawDbUrl.replace(/^postgres(ql)?:/, "http:")).host;
+      } catch (e) {
+        return `parse_failed:${e instanceof Error ? e.message : String(e)}`;
+      }
+    })();
+    const masked = rawDbUrl.replace(/:[^:@]+@/, ":***@");
+    logger.error("cron.brief_runner.tick_failed", {
+      error: message,
+      stack,
+      db_url_length: rawDbUrl.length,
+      db_url_first_30: rawDbUrl.slice(0, 30),
+      db_url_last_30: rawDbUrl.slice(-30),
+      db_url_parsed_host: dbUrlHost,
+      db_url_masked: masked,
+      pghost_env: process.env.PGHOST ?? null,
+      pgport_env: process.env.PGPORT ?? null,
+    });
     return NextResponse.json(
       {
         ok: false,
