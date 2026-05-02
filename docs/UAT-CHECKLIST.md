@@ -56,6 +56,11 @@ SELECT to_regclass('public.invites');
 SELECT to_regclass('public.login_challenges'), to_regclass('public.trusted_devices');
 -- Expected: both non-null.
 
+-- Audit log table from P3.1 (created in migration 0063_auth_foundation_roles_and_invites.sql).
+-- Note: actual table name is `user_audit_log`, NOT `audit_log` — consumed at app/admin/users/audit/page.tsx:37.
+SELECT to_regclass('public.user_audit_log');
+-- Expected: 'user_audit_log'.
+
 -- DESIGN-DISCOVERY columns from migration 0060/0066
 SELECT column_name FROM information_schema.columns
 WHERE table_name = 'sites'
@@ -70,7 +75,7 @@ ORDER BY column_name;
 ```
 
 - [ ] **0.2.1** super_admin row exists on the test account.
-- [ ] **0.2.2** All four AUTH-FOUNDATION tables exist (`invites`, `login_challenges`, `trusted_devices`, plus `audit_log` if not already).
+- [ ] **0.2.2** All four AUTH-FOUNDATION tables exist: `invites`, `login_challenges`, `trusted_devices`, `user_audit_log`.
 - [ ] **0.2.3** All 12 DESIGN-DISCOVERY + site_mode columns present on `sites`.
 
 ---
@@ -157,8 +162,9 @@ The site-add form gates "Save" on a successful WP REST capability check.
   **Fail →** raw 401 envelope = `lib/error-translations.ts` not wired into this surface.
 
 - [ ] **1.3.3** Correct the password → "Test connection" again.
-  **Expected:** green "Connection verified" with the detected user role + capability summary (`edit_posts`, `upload_files`).
-  **Fail →** all-good response without capability summary = capability check (P2-1) not run; runbook §`auth-capability-missing`.
+  **Expected:** green "Connection verified" with the detected user role displayed (e.g. `administrator`, `editor`). Save button becomes enabled.
+  **Fail →** if the response shows `INSUFFICIENT_ROLE` (or similar) for an account that does have publish capability, the capability gate is mis-firing — runbook §`auth-capability-missing`.
+  **Note:** the P2-1 capability check runs server-side (`publish_posts === true` OR role ∈ {administrator, editor}; see `lib/site-test-connection.ts:116–128`) but the response surfaces only `{display_name, username, roles}` — the capability map itself is consumed and discarded. A green "Connection verified" with a detected role IS evidence the capability gate fired and passed; a future enhancement could surface the full capability map for surfaces where the role alone is ambiguous (e.g. custom roles granted `publish_posts` directly).
 
 - [ ] **1.3.4** Click Save → site created, redirected to onboarding (per DD-11 / PR #334).
   **Expected:** lands at `/admin/sites/[id]/onboarding`, NOT directly at the site detail page.
