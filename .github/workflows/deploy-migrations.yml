@@ -27,6 +27,20 @@ on:
       - "supabase/migrations/**"
       - ".github/workflows/deploy-migrations.yml"
   workflow_dispatch:
+    inputs:
+      repair_versions_applied:
+        description: |
+          Space-separated list of migration versions to mark as APPLIED
+          (without re-running their SQL) before db push. Use when a
+          migration's SQL was applied out-of-band but the
+          schema_migrations row never landed (e.g. after a
+          version-prefix collision left the table created without the
+          tracking row). Each entry maps to:
+              supabase migration repair --status applied <version> --linked
+          To recover an environment mid 0031 collision, dispatch with
+          `repair_versions_applied=0069`. Leave blank for normal pushes.
+        required: false
+        default: ""
 
 concurrency:
   # Serialise runs against the same project — two concurrent
@@ -75,6 +89,17 @@ jobs:
 
       - name: Show pending migrations (diagnostic)
         run: supabase migration list --linked || true
+
+      - name: Repair flagged versions (mark applied without re-running SQL)
+        if: github.event_name == 'workflow_dispatch' && inputs.repair_versions_applied != ''
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for v in ${{ inputs.repair_versions_applied }}; do
+            echo "Marking version $v as applied..."
+            supabase migration repair --status applied "$v" --linked
+          done
 
       - name: Push pending migrations
         env:

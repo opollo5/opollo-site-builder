@@ -1,4 +1,5 @@
--- Rollback for 0031_optimiser_clients.sql
+-- Rollback for 0069_optimiser_clients.sql (renumbered from 0031 to resolve
+-- version-prefix collision with 0031_email_log.sql).
 DROP POLICY IF EXISTS opt_clients_write ON opt_clients;
 DROP POLICY IF EXISTS opt_clients_read ON opt_clients;
 DROP POLICY IF EXISTS service_role_all ON opt_clients;
