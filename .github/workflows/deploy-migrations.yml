@@ -37,8 +37,21 @@ on:
           version-prefix collision left the table created without the
           tracking row). Each entry maps to:
               supabase migration repair --status applied <version> --linked
-          To recover an environment mid 0031 collision, dispatch with
-          `repair_versions_applied=0069`. Leave blank for normal pushes.
+          Leave blank for normal pushes.
+        required: false
+        default: ""
+      repair_versions_reverted:
+        description: |
+          Space-separated list of migration versions to mark as REVERTED
+          (clear the schema_migrations row without dropping any objects)
+          before db push. Use to undo a stale or wrongly-applied tracking
+          row — e.g. when `repair_versions_applied` was used on a fresh
+          environment that didn't actually have the underlying schema,
+          leaving a row that points at nothing. Each entry maps to:
+              supabase migration repair --status reverted <version> --linked
+          Leave blank for normal pushes. Reverted runs before applied
+          when both are supplied, so a row can be cleared and re-marked
+          in a single dispatch if needed.
         required: false
         default: ""
 
@@ -89,6 +102,17 @@ jobs:
 
       - name: Show pending migrations (diagnostic)
         run: supabase migration list --linked || true
+
+      - name: Repair flagged versions (mark reverted — clear tracking row)
+        if: github.event_name == 'workflow_dispatch' && inputs.repair_versions_reverted != ''
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for v in ${{ inputs.repair_versions_reverted }}; do
+            echo "Marking version $v as reverted..."
+            supabase migration repair --status reverted "$v" --linked
+          done
 
       - name: Repair flagged versions (mark applied without re-running SQL)
         if: github.event_name == 'workflow_dispatch' && inputs.repair_versions_applied != ''
