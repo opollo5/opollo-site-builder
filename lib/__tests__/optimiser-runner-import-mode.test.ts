@@ -41,6 +41,7 @@ function makeContext(overrides: Partial<{
     sitePrefix: "test",
     designSystemVersion: "1",
     designContextPrefix: "",
+    siteMode: null,
   };
 }
 
