@@ -103,13 +103,16 @@ function relPath(file: string): string {
 
 function pageRouteFromFile(file: string): string {
   const rel = relPath(file);
-  return (
-    "/" +
-    rel
-      .replace(/^app\//, "")
-      .replace(/\/page\.tsx$/, "")
-      .replace(/\/route\.ts$/, "")
-  ).replace(/\/+$/, "") || "/";
+  // Strip the app/ prefix and the trailing page.tsx / route.ts segment.
+  // Handles both nested (app/foo/page.tsx → /foo) and root cases
+  // (app/page.tsx → /). The earlier version assumed the file always
+  // had a parent directory and produced "/page.tsx" for app/page.tsx.
+  const stripped = rel
+    .replace(/^app\//, "")
+    .replace(/(?:^|\/)page\.tsx$/, "")
+    .replace(/(?:^|\/)route\.ts$/, "");
+  if (stripped === "") return "/";
+  return "/" + stripped.replace(/\/+$/, "");
 }
 
 // ============================================================================
@@ -860,6 +863,101 @@ function check8_errorHandling(): Issue[] {
 }
 
 // ============================================================================
+// Check 9 — Dead routes (LOW)
+// ============================================================================
+
+/**
+ * Static-route reachability check. Walks `app/` for `page.tsx` and
+ * `route.ts` files, normalises each to its URL path, and greps the
+ * codebase for inbound references. Static routes (no `[param]` segments)
+ * with zero references outside the route directory itself are flagged
+ * as candidates.
+ *
+ * Severity is LOW because:
+ *   - Dynamic routes are excluded (template literals don't grep-match).
+ *   - External callers (OAuth providers, webhook senders, manual URL
+ *     bar entry) can't be detected statically.
+ *   - Routes referenced only by the deployed Vercel cron schedule live
+ *     in `vercel.json`, which we DO grep, but config formats can change.
+ *
+ * Surfacing as candidates — not as auto-deletes. Operator confirms each
+ * before removal.
+ */
+function check9_deadRoutes(): Issue[] {
+  const issues: Issue[] = [];
+  const appDir = join(REPO_ROOT, "app");
+  if (!existsSync(appDir)) return issues;
+
+  // Routes that are always reachable by some external means.
+  const ALWAYS_REACHABLE = new Set<string>([
+    "/",
+    "/login",
+    "/logout",
+    "/auth-error",
+    "/api/health",
+    "/api/emergency",
+    "/api/optimiser/health",
+  ]);
+  const ALWAYS_REACHABLE_PREFIXES = [
+    "/api/auth/",
+    "/api/cron/",
+    "/api/webhooks/",
+    "/auth/",
+    "/api/platform/invitations/",
+  ];
+
+  // Build the inverse index: read every .ts/.tsx in app/, components/,
+  // lib/ + JSON config files, and look for path-like string literals.
+  const referenceCorpus: string[] = [];
+  for (const root of ["app", "components", "lib"]) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".ts", ".tsx"])) {
+      referenceCorpus.push(readSafe(file));
+    }
+  }
+  // Vercel cron schedule + email templates often live as JSON or HTML.
+  const vercelJson = join(REPO_ROOT, "vercel.json");
+  if (existsSync(vercelJson)) referenceCorpus.push(readSafe(vercelJson));
+  const corpus = referenceCorpus.join("\n");
+
+  for (const file of walkFiles(appDir, [".tsx", ".ts"])) {
+    if (!file.endsWith("page.tsx") && !file.endsWith("route.ts")) continue;
+    const route = pageRouteFromFile(file);
+    // Skip dynamic routes — template literals don't grep-match.
+    if (/\[[^\]]+\]/.test(route)) continue;
+    if (ALWAYS_REACHABLE.has(route)) continue;
+    if (ALWAYS_REACHABLE_PREFIXES.some((p) => route.startsWith(p))) continue;
+
+    // Look for inbound references to the literal route string.
+    const escaped = route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const referenceRe = new RegExp(`["'\`]${escaped}(?:["'\`/?#])`, "g");
+    const matches = corpus.match(referenceRe) ?? [];
+
+    // Subtract the route's own self-references inside its own file.
+    // A typical page.tsx mentions its own path in a data-testid or
+    // a `redirect("/foo")` to itself; those don't count as inbound.
+    const ownContent = readSafe(file);
+    const ownReferences = (ownContent.match(referenceRe) ?? []).length;
+    const externalRefs = Math.max(0, matches.length - ownReferences);
+
+    // Flag only if there are ZERO external references. One self-reference
+    // alone is normal; one external reference is enough to reach the page.
+    if (externalRefs === 0) {
+      issues.push({
+        category: "dead-routes",
+        severity: "LOW",
+        file: relPath(file),
+        line: 1,
+        message: `Static route ${route} has 0 external inbound references in app/+components/+lib/+vercel.json — candidate for review (could still be reached via direct URL entry, OAuth callback, external caller, or Anthropic tool-use schema)`,
+      });
+    }
+  }
+
+  return issues;
+}
+
+// ============================================================================
 // Output
 // ============================================================================
 
@@ -939,6 +1037,7 @@ function main(): void {
     ...check6_envVars(),
     ...check7_unauthenticatedApi(),
     ...check8_errorHandling(),
+    ...check9_deadRoutes(),
   ];
 
   const failed = printResults(all);
