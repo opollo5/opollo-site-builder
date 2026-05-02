@@ -8,6 +8,7 @@ import {
   SIDEBAR_COLLAPSED_COOKIE,
 } from "@/components/AdminSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
+import { DebugFooter } from "@/components/DebugFooter";
 import { Toaster } from "@/components/ui/toaster";
 
 // Shared shell for every page under /admin.
@@ -79,6 +80,14 @@ export default async function AdminLayout({
       </main>
       <Toaster />
       <CommandPalette />
+      {isSuperAdmin && (
+        <DebugFooter
+          buildSha={process.env.VERCEL_GIT_COMMIT_SHA ?? null}
+          vercelEnv={process.env.VERCEL_ENV ?? null}
+          userEmail={user?.email ?? null}
+          userRole={user?.role ?? null}
+        />
+      )}
     </div>
   );
 }

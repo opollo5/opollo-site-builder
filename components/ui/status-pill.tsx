@@ -100,7 +100,7 @@ const STATUS_MAP: Record<StatusKind, StatusEntry> = {
   brief_failed_parse: { label: "Parse failed", tone: "error" },
 
   // Run
-  run_queued: { label: "Queued", tone: "primary" },
+  run_queued: { label: "Queued — waiting for runner", tone: "primary", pulse: true },
   run_running: { label: "Running", tone: "primary", pulse: true },
   run_paused: { label: "Awaiting your review", tone: "warning" },
   run_succeeded: { label: "Complete", tone: "success" },

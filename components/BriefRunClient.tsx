@@ -157,6 +157,10 @@ export function BriefRunClient({
     // After the smooth scroll begins, focus the card so screen-readers
     // jump along with the visual focus.
     el.focus({ preventScroll: true });
+    // Open the rendered-preview <details> so the operator sees the
+    // generated page immediately, not a collapsed panel.
+    const detailsEl = el.querySelector<HTMLDetailsElement>("details");
+    if (detailsEl) detailsEl.open = true;
   }
 
   const isRunTerminal =
@@ -368,10 +372,11 @@ export function BriefRunClient({
                 )}
               </>
             )}
-            {/* RS-4 — discreet stale indicator. Only renders when the
-                last successful poll is more than 8s old (intervalMs * 2),
-                so a single late tick doesn't flicker the badge. */}
-            {polled.isStale && (
+            {/* RS-4 — live-update indicator. Stale (>8s without a fresh
+                fetch) shows amber; healthy shows a faint pulsing green
+                so the operator sees the surface is wired up and doesn't
+                feel the urge to refresh. */}
+            {polled.isStale ? (
               <span
                 role="status"
                 className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-sm text-muted-foreground"
@@ -379,6 +384,18 @@ export function BriefRunClient({
               >
                 <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 Reconnecting…
+              </span>
+            ) : (
+              <span
+                role="status"
+                className="ml-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                title="This page auto-updates as the runner makes progress"
+              >
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
+                />
+                Live
               </span>
             )}
           </p>
@@ -608,9 +625,9 @@ function PagePreview({
   return (
     <div className="mt-4 space-y-3">
       {html ? (
-        <details className="group">
+        <details className="group" open={isCurrentAwaitingReview}>
           <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-            Show rendered preview
+            {isCurrentAwaitingReview ? "Hide rendered preview" : "Show rendered preview"}
           </summary>
           {looksTruncated && (
             <Alert

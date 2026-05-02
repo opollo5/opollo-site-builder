@@ -137,15 +137,22 @@ export function BriefReviewClient({
   const [voiceOverrideOpen, setVoiceOverrideOpen] = useState<boolean>(
     !hasSiteDefault || hasPerBriefOverride,
   );
-  // M12-5 — operator picks model tiers at commit time. Default to the
-  // value the server committed the brief with; fall back to the cheap
-  // default (Haiku) when a row has no value, so dev/UAT runs don't
-  // accidentally spend Sonnet/Opus money. Operator opts up explicitly.
+  // M12-5 — operator picks model tiers at commit time. Once committed,
+  // the brief carries the operator's choice and we display that. Pre-
+  // commit, default to DEFAULT_MODEL_ID (Sonnet 4.6) regardless of the
+  // DB column default — UAT (2026-05-02) showed Haiku's first-pass
+  // output reads thin on real briefs, and operators were slipping past
+  // the picker on the assumption that "default" meant "right". Cheap
+  // dev/test runs opt DOWN to Haiku explicitly.
   const [textModel, setTextModel] = useState<string>(
-    brief.text_model ?? DEFAULT_MODEL_ID,
+    brief.status === "committed" && brief.text_model
+      ? brief.text_model
+      : DEFAULT_MODEL_ID,
   );
   const [visualModel, setVisualModel] = useState<string>(
-    brief.visual_model ?? DEFAULT_MODEL_ID,
+    brief.status === "committed" && brief.visual_model
+      ? brief.visual_model
+      : DEFAULT_MODEL_ID,
   );
 
   const isReadOnly = brief.status === "committed";
