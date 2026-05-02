@@ -104,6 +104,7 @@ export async function POST(
   }
 
   const supabase = getServiceRoleClient();
+  // audit columns not yet on sites — DATA_CONVENTIONS rollout pending
   const upd = await supabase
     .from("sites")
     .update({
@@ -111,7 +112,6 @@ export async function POST(
       extracted_css_classes: parsed.data.extracted_css_classes,
       design_direction_status: "approved",
       updated_at: new Date().toISOString(),
-      updated_by: gate.user?.id ?? null,
     })
     .eq("id", params.id)
     .eq("site_mode", "copy_existing")
