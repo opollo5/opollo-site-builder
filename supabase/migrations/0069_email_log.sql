@@ -1,4 +1,15 @@
--- 0031 — AUTH-FOUNDATION P1: SendGrid email log.
+-- 0069 — AUTH-FOUNDATION P1: SendGrid email log.
+--
+-- Renumbered from 0031 → 0069 to resolve a version-prefix collision
+-- with 0031_optimiser_clients.sql. opt_clients (originally at 0031)
+-- has FK dependents at 0032+, so it must keep slot 0031. email_log
+-- has no FK dependents, so it tails the chain at 0069. Production
+-- recovery for environments where this file's content already
+-- applied as version 0031: dispatch deploy-migrations.yml with
+-- repair_versions_reverted=0031 (clears the historical row) and
+-- repair_versions_applied=0069 (marks this file applied without
+-- re-running the CREATE TABLE, since email_log already exists).
+-- Fresh environments apply this file normally as version 0069.
 --
 -- Every transactional email send (success and failure) writes a row
 -- here. Phases 2-4 attach to this for invite emails, login-challenge
