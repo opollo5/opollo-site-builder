@@ -62,6 +62,14 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ---
 
+## 8. Pre-merge checklist — `npm run audit:static` HIGH must be zero
+
+**Rule.** Every PR MUST pass the `static-audit` CI job — i.e. `npm run audit:static` exits with code 0 (no HIGH severity issues). The script lives at `scripts/audit.ts` and runs nine checks (HIGH severity: middleware-public-paths, migration-ordering, unauthenticated-api; MEDIUM: admin-api-gate, db-column-references, error-handling; LOW: typography-minimums, env-vars, dead-routes). HIGH severity gates the build; MEDIUM/LOW are advisory. If a HIGH hit is a genuine false positive, the fix is to refine the heuristic in the audit script itself — never bypass with `// audit:ignore` or similar (no such mechanism exists by design). If the audit reports a new MEDIUM or LOW class on a PR, address it in the same PR or open a follow-up; don't let the warning count drift up.
+
+**Incident (PLATFORM-AUDIT 2026-05-02).** UAT surfaced three logic-error classes that cost a half-day each to debug at runtime — middleware-public-path miss (invite acceptance link bounced to /login), admin API gate excluding super_admin (invite submit returned `Role 'super_admin' is not permitted`), and missing-column writes to `sites.updated_by` (mode save returned masked 500). All three would have been caught by static analysis. The PLATFORM-AUDIT workstream (PRs #386, #389, #392, #394, #396, #398, #400) shipped the audit script + CI integration + fixes for every HIGH finding the first run produced (38 → 0). Going forward, CI catches these classes at PR time, not at UAT time.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.
