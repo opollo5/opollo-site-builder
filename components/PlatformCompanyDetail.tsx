@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
+import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
 import { H1, Lead } from "@/components/ui/typography";
 import type { CompanyDetail } from "@/lib/platform/companies";
 
@@ -94,10 +96,12 @@ export function PlatformCompanyDetail({ detail }: { detail: CompanyDetail }) {
           <h2 id="company-members" className="text-base font-semibold">
             Members ({members.length})
           </h2>
+          <PlatformInviteUserModal companyId={company.id} />
         </header>
         {members.length === 0 ? (
           <div className="p-6 text-center text-sm text-muted-foreground">
-            No members yet — send an invitation to get started (P3-4).
+            No members yet — click <strong>Invite user</strong> to send the
+            first invitation.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -153,6 +157,7 @@ export function PlatformCompanyDetail({ detail }: { detail: CompanyDetail }) {
                 <th className="px-4 py-2 font-medium">Role</th>
                 <th className="px-4 py-2 font-medium">Sent</th>
                 <th className="px-4 py-2 font-medium">Expires</th>
+                <th className="px-4 py-2 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -169,6 +174,12 @@ export function PlatformCompanyDetail({ detail }: { detail: CompanyDetail }) {
                   </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground">
                     {formatDate(inv.expires_at)}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <PlatformRevokeInvitationButton
+                      invitationId={inv.id}
+                      email={inv.email}
+                    />
                   </td>
                 </tr>
               ))}

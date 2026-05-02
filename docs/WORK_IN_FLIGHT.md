@@ -8,17 +8,15 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 ---
 ## Session A
-- Started: 2026-05-02
-- Branch: feat/p3-3-company-detail
-- Slice: P3-3 — Company detail page (members + pending invitations). Server-rendered detail at /admin/companies/[id], lib helper loading company + members + invitations in parallel, read-only display.
+- Started: 2026-05-03
+- Branch: feat/p3-4-invite-from-detail
+- Slice: P3-4 — Invite-from-detail flow. Adds an "Invite user" button on the company detail page (modal wiring sendInvitation) and a "Revoke" action on each pending invitation row (DELETE /api/platform/invitations/[id]). Closes P3.
 - Files claimed:
-  - lib/platform/companies/get.ts (new)
-  - lib/platform/companies/index.ts (extend)
-  - app/admin/companies/[id]/page.tsx (new)
-  - components/PlatformCompanyDetail.tsx (new — read-only display)
-  - lib/__tests__/platform-companies-get.test.ts (new)
-  - e2e/platform-companies.spec.ts (extend with detail navigation)
-  - components/PlatformCompaniesListClient.tsx (wire row click to detail)
+  - components/PlatformCompanyDetail.tsx (modify — add invite button + revoke per-row)
+  - components/PlatformInviteUserModal.tsx (new)
+  - components/PlatformCompanyDetailClient.tsx (new — client wrapper holding modal + revoke state)
+  - app/admin/companies/[id]/page.tsx (modify — render new client wrapper)
+  - e2e/platform-companies.spec.ts (extend with invite + revoke)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
