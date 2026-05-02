@@ -9,8 +9,10 @@ import {
 
 import {
   createPostMaster,
+  deletePostMaster,
   getPostMaster,
   listPostMasters,
+  updatePostMaster,
 } from "@/lib/platform/social/posts";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -355,6 +357,201 @@ describe("lib/platform/social/posts", () => {
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(result.error.code).toBe("NOT_FOUND");
+    });
+  });
+
+  describe("updatePostMaster", () => {
+    it("happy path — partial update of master_text on a draft", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "initial",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const updated = await updatePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+        masterText: "edited",
+      });
+      expect(updated.ok).toBe(true);
+      if (!updated.ok) return;
+      expect(updated.data.master_text).toBe("edited");
+      expect(updated.data.link_url).toBeNull();
+      expect(updated.data.state).toBe("draft");
+    });
+
+    it("partial update leaves untouched fields unchanged", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "keep me",
+        linkUrl: "https://example.com/x",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const updated = await updatePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+        linkUrl: "https://example.com/y",
+      });
+      expect(updated.ok).toBe(true);
+      if (!updated.ok) return;
+      expect(updated.data.master_text).toBe("keep me");
+      expect(updated.data.link_url).toBe("https://example.com/y");
+    });
+
+    it("rejects edit on non-draft post with INVALID_STATE", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "submitted",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      // Promote directly to 'pending_client_approval' (state machine
+      // helper lands in a future slice; the test just needs a non-draft).
+      const svc = getServiceRoleClient();
+      await svc
+        .from("social_post_master")
+        .update({ state: "pending_client_approval" })
+        .eq("id", created.data.id);
+
+      const updated = await updatePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+        masterText: "should fail",
+      });
+      expect(updated.ok).toBe(false);
+      if (updated.ok) return;
+      expect(updated.error.code).toBe("INVALID_STATE");
+    });
+
+    it("rejects update that would clear both master_text and link_url", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "the only field",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const updated = await updatePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+        masterText: null,
+      });
+      expect(updated.ok).toBe(false);
+      if (updated.ok) return;
+      expect(updated.error.code).toBe("VALIDATION_FAILED");
+    });
+
+    it("returns NOT_FOUND when post is in a different company", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "scoped",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const updated = await updatePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_B_ID,
+        masterText: "edited",
+      });
+      expect(updated.ok).toBe(false);
+      if (updated.ok) return;
+      expect(updated.error.code).toBe("NOT_FOUND");
+    });
+
+    it("rejects empty patch with VALIDATION_FAILED", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "anything",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const updated = await updatePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(updated.ok).toBe(false);
+      if (updated.ok) return;
+      expect(updated.error.code).toBe("VALIDATION_FAILED");
+    });
+  });
+
+  describe("deletePostMaster", () => {
+    it("happy path — deletes a draft", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "delete me",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const deleted = await deletePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(deleted.ok).toBe(true);
+
+      const lookup = await getPostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(lookup.ok).toBe(false);
+      if (lookup.ok) return;
+      expect(lookup.error.code).toBe("NOT_FOUND");
+    });
+
+    it("rejects delete on non-draft with INVALID_STATE", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "approved-soon",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const svc = getServiceRoleClient();
+      await svc
+        .from("social_post_master")
+        .update({ state: "approved" })
+        .eq("id", created.data.id);
+
+      const deleted = await deletePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(deleted.ok).toBe(false);
+      if (deleted.ok) return;
+      expect(deleted.error.code).toBe("INVALID_STATE");
+    });
+
+    it("returns NOT_FOUND across company boundary", async () => {
+      const created = await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "scoped",
+        createdBy: creator.id,
+      });
+      expect(created.ok).toBe(true);
+      if (!created.ok) return;
+
+      const deleted = await deletePostMaster({
+        postId: created.data.id,
+        companyId: COMPANY_B_ID,
+      });
+      expect(deleted.ok).toBe(false);
+      if (deleted.ok) return;
+      expect(deleted.error.code).toBe("NOT_FOUND");
     });
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -241,16 +242,22 @@ export function SocialPostsListClient({
                   data-testid={`social-post-row-${p.id}`}
                 >
                   <td className="max-w-md truncate px-4 py-3">
-                    {p.master_text ?? (
-                      <span className="text-muted-foreground">—</span>
-                    )}
+                    <Link
+                      href={`/company/social/posts/${p.id}`}
+                      className="hover:underline"
+                      data-testid={`social-post-link-${p.id}`}
+                    >
+                      {p.master_text ?? (
+                        <span className="text-muted-foreground">— No copy —</span>
+                      )}
+                    </Link>
                   </td>
                   <td className="max-w-xs truncate px-4 py-3 text-sm text-muted-foreground">
                     {p.link_url ?? "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATE_PILL[p.state]}`}
+                      className={`rounded-full px-2 py-0.5 text-sm font-medium ${STATE_PILL[p.state]}`}
                     >
                       {STATE_LABEL[p.state]}
                     </span>
