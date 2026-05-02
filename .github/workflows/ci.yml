@@ -112,6 +112,36 @@ jobs:
       - run: npm run lint
       - run: npm run lint:css
 
+  static-audit:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # PLATFORM-AUDIT — runs scripts/audit.ts (eight static checks).
+      # Exit code 1 on any HIGH severity issue → fails the job.
+      # See scripts/audit.ts header for the full check list. Output is
+      # captured to /tmp/audit.out so the failing-run summary step can
+      # paste it back as a PR comment.
+      - name: Run audit:static
+        env:
+          NO_COLOR: "1"
+        run: |
+          set -o pipefail
+          npm run audit:static 2>&1 | tee /tmp/audit.out
+
   build:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
