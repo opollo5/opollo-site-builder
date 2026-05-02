@@ -128,6 +128,7 @@ export default function DesignSystemLayout({
   }, [load]);
 
   const dsParam = search.get("ds");
+  const advancedFlag = search.get("advanced") === "1";
   const selectedDs = useMemo(
     () =>
       state.status === "ready"
@@ -136,6 +137,12 @@ export default function DesignSystemLayout({
     [state, dsParam],
   );
   const tab = currentTab(pathname, siteId);
+  // DESIGN-SYSTEM-OVERHAUL PR 9 — the four-tab UI is power-user surface
+  // (audited as not load-bearing on generation). Show it only when the
+  // operator opts in via ?advanced=1 OR they're already deep-linked
+  // into a non-Versions tab. Default index page renders the simplified
+  // summary instead.
+  const showTabs = advancedFlag || tab !== "versions";
 
   function navigateToDs(newDsId: string) {
     const newParams = new URLSearchParams(search.toString());
@@ -145,8 +152,11 @@ export default function DesignSystemLayout({
 
   function tabHref(subpath: string): string {
     const base = `/admin/sites/${siteId}/design-system${subpath}`;
-    if (!selectedDs) return base;
-    return `${base}?ds=${selectedDs.id}`;
+    const params = new URLSearchParams();
+    if (selectedDs) params.set("ds", selectedDs.id);
+    if (advancedFlag && subpath === "") params.set("advanced", "1");
+    const qs = params.toString();
+    return qs.length > 0 ? `${base}?${qs}` : base;
   }
 
   const siteName = state.status === "ready" ? state.site.name : null;
@@ -185,22 +195,24 @@ export default function DesignSystemLayout({
           )}
         </div>
 
-        <nav className="flex gap-1 text-sm">
-          {TABS.map((t) => (
-            <Link
-              key={t.key}
-              href={tabHref(t.subpath)}
-              className={cn(
-                "rounded-md px-3 py-1.5",
-                tab === t.key
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {t.label}
-            </Link>
-          ))}
-        </nav>
+        {showTabs && (
+          <nav className="flex gap-1 text-sm" data-testid="design-system-tabs">
+            {TABS.map((t) => (
+              <Link
+                key={t.key}
+                href={tabHref(t.subpath)}
+                className={cn(
+                  "rounded-md px-3 py-1.5",
+                  tab === t.key
+                    ? "bg-muted font-medium text-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </Link>
+            ))}
+          </nav>
+        )}
       </div>
 
       <div className="mt-6">
