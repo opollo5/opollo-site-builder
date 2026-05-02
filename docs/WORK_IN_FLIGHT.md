@@ -9,14 +9,16 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-02
-- Branch: feat/p3-opollo-admin-companies
-- Slice: P3-1 — Opollo admin companies list page. First sub-slice of P3 (companies management UI). Splitting the parent slice into P3-1 (list — this PR), P3-2 (create), P3-3 (detail + members), P3-4 (invite modal/page) so each ships small and reviewable. P2-4 QStash still blocked on env.
+- Branch: feat/p3-2-create-company
+- Slice: P3-2 — Create company form. Second sub-slice of P3. Form at /admin/companies/new + POST /api/admin/companies + lib/platform/companies/create.ts.
 - Files claimed:
-  - lib/platform/companies/{list,types,index}.ts (new)
-  - app/admin/companies/page.tsx (new — list)
-  - components/PlatformCompaniesListClient.tsx (new — client shell)
-  - lib/__tests__/platform-companies.test.ts (new)
-  - e2e/platform-companies.spec.ts (new — happy path)
+  - lib/platform/companies/create.ts (new)
+  - lib/platform/companies/index.ts (extend)
+  - app/admin/companies/new/page.tsx (new — server-rendered form shell)
+  - components/PlatformCompanyCreateForm.tsx (new — client form)
+  - app/api/admin/companies/route.ts (new — POST)
+  - components/PlatformCompaniesListClient.tsx (wire "New company" button to route)
+  - lib/__tests__/platform-companies-create.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
