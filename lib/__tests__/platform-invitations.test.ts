@@ -290,7 +290,12 @@ describe("lib/platform/invitations — send + revoke against live Supabase", () 
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.invitation.expires_at).toBe(customExpiry);
+      // Postgres returns timestamptz as "2027-01-01T00:00:00+00:00";
+      // JS toISOString() produces "2027-01-01T00:00:00.000Z". Same instant,
+      // different lexical form — compare as numeric timestamps.
+      expect(new Date(result.invitation.expires_at).getTime()).toBe(
+        new Date(customExpiry).getTime(),
+      );
     });
   });
 
