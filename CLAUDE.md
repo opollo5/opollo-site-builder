@@ -120,6 +120,7 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - `npm run test` — Vitest
 - `npm run test:coverage` — Vitest with V8 coverage (60% line / 55% branch baseline)
 - `npm run test:e2e` — Playwright (requires `supabase start`)
+- `npm run audit:static` — static-analysis script (`scripts/audit.ts`) catching middleware/auth/db/migration/typography/env-var/error-handling/dead-route class errors before runtime. **HIGH severity gates CI.** Per `docs/RULES.md` rule #8 — see also the PLATFORM-AUDIT workstream PRs (#386, #389, #392, #394, #396, #398, #400, #402).
 - `npm run analyze` — production build with @next/bundle-analyzer reports
 
 ## DX hygiene

@@ -463,8 +463,24 @@ function check4_migrationOrdering(): Issue[] {
   const refRe =
     /REFERENCES\s+(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
 
+  // Reserved SQL keywords / common prose words that follow "REFERENCES"
+  // in comment text. Filtering by lowercase to catch any case mix.
+  const PROSE_TOKENS = new Set([
+    "the", "this", "that", "these", "those", "it", "its",
+    "resolve", "resolves", "table", "row", "column", "user",
+    "users", "to", "above", "below", "earlier", "later",
+  ]);
+
   for (const f of files) {
-    const src = readSafe(join(migDir, f));
+    let src = readSafe(join(migDir, f));
+
+    // Strip SQL comments before regex matching. Two flavours:
+    //   - line comments  `-- ...` to end of line
+    //   - block comments `/* ... */` (multi-line)
+    // Without this, prose references inside comments produce false
+    // positives (e.g. "REFERENCES the parent table" → "the" flagged).
+    src = src.replace(/\/\*[\s\S]*?\*\//g, "");
+    src = src.replace(/--[^\n]*/g, "");
 
     // Local creates first (a migration can self-reference within its own body).
     const localCreated = new Set<string>();
@@ -483,6 +499,10 @@ function check4_migrationOrdering(): Issue[] {
       // Self-references to auth.* or pg_catalog.* are out of scope.
       if (target === "auth" || target.startsWith("pg_")) continue;
       if (created.has(target) || localCreated.has(target)) continue;
+      // Filter out comment-prose false positives — even with comment
+      // stripping, "REFERENCES" can appear inline in DO-block strings or
+      // string literals where the next word is prose.
+      if (PROSE_TOKENS.has(target.toLowerCase())) continue;
       const lineIdx = src.slice(0, rm.index).split("\n").length;
       issues.push({
         category: "migration-ordering",
