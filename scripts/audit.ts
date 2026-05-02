@@ -615,32 +615,44 @@ function check6_envVars(): Issue[] {
     if (m) declared.add(m[1]);
   }
 
-  // Extract referenced env vars in app + lib.
+  // Extract referenced env vars in app + lib. Two access patterns:
+  //   - Direct: `process.env.X`
+  //   - Via helper: `requireEnv("X")` / `getEnv("X")` / `readEnv("X")`
+  // The helper-based path is what hard-throws on cold start when a
+  // critical env var is missing; both patterns count.
   const referenced = new Map<string, string>(); // name → first file:line
-  const envRe = /process\.env\.([A-Z][A-Z0-9_]*)/g;
+  const envPatterns = [
+    /process\.env\.([A-Z][A-Z0-9_]*)/g,
+    /(?:requireEnv|getEnv|readEnv)\(\s*["']([A-Z][A-Z0-9_]*)["']/g,
+  ];
   for (const root of ["app", "lib"]) {
     const dir = join(REPO_ROOT, root);
     if (!existsSync(dir)) continue;
     for (const file of walkFiles(dir, [".ts", ".tsx"])) {
       if (file.includes("__tests__")) continue;
       const src = readSafe(file);
-      let m;
-      while ((m = envRe.exec(src)) !== null) {
-        const name = m[1];
-        if (!referenced.has(name)) {
-          const lineIdx = src.slice(0, m.index).split("\n").length;
-          referenced.set(name, `${relPath(file)}:${lineIdx}`);
+      for (const re of envPatterns) {
+        re.lastIndex = 0;
+        let m;
+        while ((m = re.exec(src)) !== null) {
+          const name = m[1];
+          if (!referenced.has(name)) {
+            const lineIdx = src.slice(0, m.index).split("\n").length;
+            referenced.set(name, `${relPath(file)}:${lineIdx}`);
+          }
         }
       }
     }
   }
 
-  // Allow-list — these are framework / Vercel / Node built-ins that don't
-  // need declaring in .env.example.
+  // Allow-list — framework / Vercel / Node built-ins that don't need
+  // declaring in .env.example. Vercel injects these automatically.
   const ALLOWLIST = new Set([
     "NODE_ENV",
     "VERCEL_ENV",
     "VERCEL_URL",
+    "VERCEL_GIT_COMMIT_SHA",
+    "VERCEL_DEPLOYMENT_ID",
     "CI",
     "PORT",
     "NEXT_RUNTIME",
