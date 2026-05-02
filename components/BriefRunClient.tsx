@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
@@ -162,6 +162,27 @@ export function BriefRunClient({
     const detailsEl = el.querySelector<HTMLDetailsElement>("details");
     if (detailsEl) detailsEl.open = true;
   }
+
+  // Auto-scroll to the first awaiting-review page when the surface
+  // first lands on one. Tracks the page id so re-renders during the
+  // same review session don't yank scroll position around. Cleared
+  // when the operator approves / revises (page id changes or no page
+  // is awaiting). Honours prefers-reduced-motion via behavior:auto.
+  const lastScrolledToRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!firstAwaitingReview) {
+      lastScrolledToRef.current = null;
+      return;
+    }
+    if (lastScrolledToRef.current === firstAwaitingReview.id) return;
+    lastScrolledToRef.current = firstAwaitingReview.id;
+    // Defer one tick so the page card has rendered before we scroll.
+    const id = window.requestAnimationFrame(() => {
+      scrollToPageCard(firstAwaitingReview.id);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [firstAwaitingReview]);
 
   const isRunTerminal =
     activeRun?.status === "succeeded" ||
