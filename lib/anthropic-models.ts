@@ -35,14 +35,14 @@ export type ModelOption = {
 export const MODEL_OPTIONS: ReadonlyArray<ModelOption> = Object.freeze([
   {
     value: "claude-haiku-4-5-20251001",
-    label: "Haiku (fastest, cheapest — default)",
-    hint: "Default for dev / UAT / simple briefs. ~5× cheaper than Sonnet, ~25× cheaper than Opus.",
+    label: "Haiku (fastest, cheapest)",
+    hint: "Use for dev / UAT smoke-test runs. ~5× cheaper than Sonnet but produces noticeably thinner copy and flatter layouts on real briefs.",
     tier: "haiku",
   },
   {
     value: "claude-sonnet-4-6",
-    label: "Sonnet (balanced)",
-    hint: "Mid-tier. Use for production briefs where Haiku output reads thin.",
+    label: "Sonnet (balanced — default)",
+    hint: "Default for production briefs. Best ratio of quality to cost; substantially richer first-pass output than Haiku.",
     tier: "sonnet",
   },
   {
@@ -54,11 +54,12 @@ export const MODEL_OPTIONS: ReadonlyArray<ModelOption> = Object.freeze([
 ]);
 
 /**
- * Default model id for fresh brief runs. UAT-smoke-1: Haiku for
- * cost-control. Operators can opt up to Sonnet/Opus per-brief on the
- * review surface.
+ * Default model id for fresh brief runs. Sonnet 4.6 — UAT (2026-05-02)
+ * surfaced that Haiku output reads as generic / flat in real-use briefs.
+ * Operators opt DOWN to Haiku per-brief for cheap dev/test runs via the
+ * review-screen picker.
  */
-export const DEFAULT_MODEL_ID = "claude-haiku-4-5-20251001";
+export const DEFAULT_MODEL_ID = "claude-sonnet-4-6";
 
 // Defense-in-depth: every option in this UI list must be in the
 // allowlist exported by lib/anthropic-pricing.ts. A drift between the

@@ -60,7 +60,26 @@ export default async function BriefRunPage({
   if (briefResult.data.brief.site_id !== params.id) notFound();
 
   const site = siteResult.data.site;
-  const { brief, pages } = briefResult.data;
+  let { brief, pages } = briefResult.data;
+
+  // Read-after-write race: the commit POST returns 200, client pushes
+  // to /run, but the read here can hit a connection pool that hasn't
+  // yet seen the COMMIT. Retry briefly when the brief looks "almost
+  // committed" so the operator sees the run surface, not a misleading
+  // "isn't committed yet" panel. Capped at ~1.5s total — beyond that,
+  // it's a real not-committed brief and we fall through to the panel.
+  if (brief.status === "parsed") {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const retry = await getBriefWithPages(params.brief_id);
+      if (!retry.ok) break;
+      if (retry.data.brief.status === "committed") {
+        brief = retry.data.brief;
+        pages = retry.data.pages;
+        break;
+      }
+    }
+  }
 
   if (brief.status !== "committed") {
     // The run surface is only meaningful once the brief is committed.

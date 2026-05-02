@@ -136,6 +136,12 @@ export function UploadBriefModal({
       if (payload?.ok) {
         // Whether or not the parser succeeded, we land on the review
         // page — it surfaces the failure details and the re-upload CTA.
+        // refresh() before push() invalidates the site-detail RSC tree
+        // so a subsequent back-nav shows the new brief without a manual
+        // page reload (the upload route's revalidatePath flushes the
+        // server cache, but the client-side router cache also needs a
+        // poke for bfcache / soft-nav consistency).
+        router.refresh();
         router.push(payload.data.review_url);
         onClose();
         return;
