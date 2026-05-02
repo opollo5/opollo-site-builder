@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { ApproveAutoClose } from "@/components/ApproveAutoClose";
 import { ApproveCompleteHere } from "@/components/ApproveCompleteHere";
 import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
@@ -150,9 +151,7 @@ export default async function ApprovePage({ searchParams }: PageProps) {
     return (
       <PageShell title="Approval link used">
         <Alert>
-          This sign-in has already been completed. If your original
-          tab is still open it should have advanced to the admin — you
-          can close this tab.
+          This approval link has been used. You can close this tab.
         </Alert>
         <StartOverLink />
       </PageShell>
@@ -168,11 +167,7 @@ export default async function ApprovePage({ searchParams }: PageProps) {
           : "Sign-in already approved. Return to your original tab, or complete here if that tab is gone."
       }
     >
-      <Alert>
-        <strong>Done.</strong> You can close this tab now. The browser
-        you signed in from will pick up the approval and finish the
-        sign-in.
-      </Alert>
+      <ApproveAutoClose tokenWasJustApproved={state.tokenWasJustApproved} />
 
       <div className="border-t pt-4">
         <p className="text-sm font-medium">Lost your original tab?</p>
