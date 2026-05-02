@@ -684,17 +684,34 @@ function check7_unauthenticatedApi(): Issue[] {
   if (!existsSync(apiDir)) return issues;
 
   const PUBLIC_PREFIXES = ["/api/auth/", "/api/health", "/api/webhooks/"];
+
+  // Routes that the audit shouldn't flag, with rationale per entry.
+  // Two flavours bundled for simplicity:
+  //   - Token-is-auth public APIs: the link / token IS the proof of
+  //     identity, validated server-side via SHA-256 hash lookup or HMAC.
+  //     Mirrors middleware PUBLIC_PATHS pattern for HTML pages.
+  //   - Module-health endpoints: middleware-gated (any authed user) is
+  //     deliberate. They expose only liveness + schema-reachable signals,
+  //     no user data, no mutations. /api/health is already excluded via
+  //     the prefix check; /api/optimiser/health follows the same shape.
+  const ALLOWLIST_PUBLIC_API_PATHS = new Set<string>([
+    "/api/platform/invitations/accept", // P2-3 magic-link redemption (token-is-auth)
+    "/api/optimiser/health",            // module liveness probe (middleware-gated, no user data)
+  ]);
+
   // Auth markers — any of these in the file body indicates the route gates itself.
   const AUTH_PATTERNS = [
     /requireAdminForApi/,
+    /checkAdminAccess/, // Server-component-style gate, also used by some API routes (optimiser)
+    /authorisedCronRequest/, // CRON_SECRET wrapper for optimiser cron routes
     /CRON_SECRET/,
     /OPOLLO_EMERGENCY_KEY/,
     /getCurrentUser/,
     /getSession/,
     /verifyToken/,
     /verifyMagicLink/,
+    /requireCanDoForApi/, // Platform layer canDo gate
     /createHash/,
-    /getServiceRoleClient/,
     /\bauth\.getUser\b/,
   ];
 
@@ -707,6 +724,7 @@ function check7_unauthenticatedApi(): Issue[] {
     if (PUBLIC_PREFIXES.some((p) => cleanRoute.startsWith(p))) continue;
     if (cleanRoute === "/api/health" || cleanRoute === "/api/emergency")
       continue;
+    if (ALLOWLIST_PUBLIC_API_PATHS.has(cleanRoute)) continue;
 
     const src = readSafe(file);
     const hasAuth = AUTH_PATTERNS.some((p) => p.test(src));

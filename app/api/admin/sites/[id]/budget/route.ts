@@ -75,7 +75,7 @@ export async function PATCH(
   // current usage on the site detail page but cannot raise / lower
   // caps. Tightening this rule needs an explicit role-policy decision,
   // not a drive-by widening.
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {

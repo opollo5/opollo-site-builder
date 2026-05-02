@@ -42,7 +42,7 @@ function errJson(code: string, message: string, status: number): NextResponse {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   // Rate limit: per-actor when authenticated, per-IP otherwise. Reuses
