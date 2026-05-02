@@ -9,18 +9,11 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/p2-4-invitation-callbacks
-- Slice: P2-4 — invitation reminder + expiry callbacks via QStash. Day-3 reminder + day-14 expiry transitions, idempotent on duplicate webhook fires.
+- Branch: feat/s1-1-social-posts-lib
+- Slice: S1-1 — L1 editorial layer foundation. Lib functions for social_post_master CRUD (create + list + get) on top of migration 0070's schema. No HTTP API yet; that lands with the UI in S1-2.
 - Files claimed:
-  - lib/qstash.ts (new)
-  - lib/platform/invitations/callbacks.ts (new)
-  - lib/platform/invitations/index.ts (re-export)
-  - app/api/platform/invitations/route.ts (enqueue on send)
-  - app/api/platform/invitations/callbacks/reminder/route.ts (new webhook)
-  - app/api/platform/invitations/callbacks/expiry/route.ts (new webhook)
-  - lib/__tests__/platform-invitation-callbacks.test.ts (new)
-  - .env.example, .env.local.example (QStash env vars)
-  - package.json + package-lock.json (@upstash/qstash)
+  - lib/platform/social/posts/{types,create,list,get,index}.ts (new)
+  - lib/__tests__/social-posts.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
