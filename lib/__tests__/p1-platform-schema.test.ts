@@ -101,58 +101,131 @@ describe("0070 — platform foundation: schema, RLS, helpers, seed", () => {
 
   beforeEach(async () => {
     // _setup.ts TRUNCATEd platform_* / social_* tables. Re-seed the world.
+    // Each insert is error-checked + thrown — silent failures here cascade
+    // into FK and PGRST116 errors deep in the assertions, masking the root
+    // cause. PR #376's CI uncovered this; do not regress to silent inserts.
     const svc = getServiceRoleClient();
 
-    await svc.from("platform_companies").insert([
-      {
-        id: OPOLLO_INTERNAL_ID,
-        name: "Opollo",
-        slug: "opollo",
-        is_opollo_internal: true,
-        timezone: "Australia/Melbourne",
-      },
-      {
-        id: COMPANY_A_ID,
-        name: "Acme Co",
-        slug: "acme",
-        domain: "acme.test",
-        timezone: "Australia/Melbourne",
-      },
-      {
-        id: COMPANY_B_ID,
-        name: "Beta Inc",
-        slug: "beta",
-        domain: "beta.test",
-        timezone: "Australia/Melbourne",
-      },
-    ]);
+    // PostgREST batch insert takes the UNION of keys across rows — any row
+    // omitting a key the union mentions sends explicit NULL, violating
+    // NOT NULL columns. Spell every column on every row.
+    const companies = await svc
+      .from("platform_companies")
+      .insert([
+        {
+          id: OPOLLO_INTERNAL_ID,
+          name: "Opollo",
+          slug: "opollo",
+          domain: null,
+          is_opollo_internal: true,
+          timezone: "Australia/Melbourne",
+        },
+        {
+          id: COMPANY_A_ID,
+          name: "Acme Co",
+          slug: "acme",
+          domain: "acme.test",
+          is_opollo_internal: false,
+          timezone: "Australia/Melbourne",
+        },
+        {
+          id: COMPANY_B_ID,
+          name: "Beta Inc",
+          slug: "beta",
+          domain: "beta.test",
+          is_opollo_internal: false,
+          timezone: "Australia/Melbourne",
+        },
+      ])
+      .select("id");
+    if (companies.error) {
+      throw new Error(
+        `seed platform_companies: ${companies.error.code ?? "?"} ${companies.error.message}`,
+      );
+    }
+    if ((companies.data?.length ?? 0) !== 3) {
+      throw new Error(
+        `seed platform_companies: inserted ${companies.data?.length ?? 0}/3 rows`,
+      );
+    }
 
-    await svc.from("platform_users").insert([
-      {
-        id: opolloStaff.id,
-        email: opolloStaff.email,
-        full_name: "Opollo Staff",
-        is_opollo_staff: true,
-      },
-      { id: aAdmin.id, email: aAdmin.email, full_name: "A Admin" },
-      { id: aApprover.id, email: aApprover.email, full_name: "A Approver" },
-      { id: aEditor.id, email: aEditor.email, full_name: "A Editor" },
-      { id: aViewer.id, email: aViewer.email, full_name: "A Viewer" },
-      { id: bAdmin.id, email: bAdmin.email, full_name: "B Admin" },
-    ]);
+    const users = await svc
+      .from("platform_users")
+      .insert([
+        {
+          id: opolloStaff.id,
+          email: opolloStaff.email,
+          full_name: "Opollo Staff",
+          is_opollo_staff: true,
+        },
+        {
+          id: aAdmin.id,
+          email: aAdmin.email,
+          full_name: "A Admin",
+          is_opollo_staff: false,
+        },
+        {
+          id: aApprover.id,
+          email: aApprover.email,
+          full_name: "A Approver",
+          is_opollo_staff: false,
+        },
+        {
+          id: aEditor.id,
+          email: aEditor.email,
+          full_name: "A Editor",
+          is_opollo_staff: false,
+        },
+        {
+          id: aViewer.id,
+          email: aViewer.email,
+          full_name: "A Viewer",
+          is_opollo_staff: false,
+        },
+        {
+          id: bAdmin.id,
+          email: bAdmin.email,
+          full_name: "B Admin",
+          is_opollo_staff: false,
+        },
+      ])
+      .select("id");
+    if (users.error) {
+      throw new Error(
+        `seed platform_users: ${users.error.code ?? "?"} ${users.error.message}`,
+      );
+    }
+    if ((users.data?.length ?? 0) !== 6) {
+      throw new Error(
+        `seed platform_users: inserted ${users.data?.length ?? 0}/6 rows`,
+      );
+    }
 
-    await svc.from("platform_company_users").insert([
-      {
-        company_id: OPOLLO_INTERNAL_ID,
-        user_id: opolloStaff.id,
-        role: "admin",
-      },
-      { company_id: COMPANY_A_ID, user_id: aAdmin.id, role: "admin" },
-      { company_id: COMPANY_A_ID, user_id: aApprover.id, role: "approver" },
-      { company_id: COMPANY_A_ID, user_id: aEditor.id, role: "editor" },
-      { company_id: COMPANY_A_ID, user_id: aViewer.id, role: "viewer" },
-      { company_id: COMPANY_B_ID, user_id: bAdmin.id, role: "admin" },
-    ]);
+    const memberships = await svc
+      .from("platform_company_users")
+      .insert([
+        {
+          company_id: OPOLLO_INTERNAL_ID,
+          user_id: opolloStaff.id,
+          role: "admin",
+        },
+        { company_id: COMPANY_A_ID, user_id: aAdmin.id, role: "admin" },
+        { company_id: COMPANY_A_ID, user_id: aApprover.id, role: "approver" },
+        { company_id: COMPANY_A_ID, user_id: aEditor.id, role: "editor" },
+        { company_id: COMPANY_A_ID, user_id: aViewer.id, role: "viewer" },
+        { company_id: COMPANY_B_ID, user_id: bAdmin.id, role: "admin" },
+      ])
+      .select("id");
+    if (memberships.error) {
+      throw new Error(
+        `seed platform_company_users: ${memberships.error.code ?? "?"} ${memberships.error.message}`,
+      );
+    }
+    if ((memberships.data?.length ?? 0) !== 6) {
+      throw new Error(
+        `seed platform_company_users: inserted ${memberships.data?.length ?? 0}/6 rows`,
+      );
+    }
   });
 
   afterAll(async () => {
