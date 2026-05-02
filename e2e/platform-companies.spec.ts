@@ -58,5 +58,38 @@ test.describe("platform admin / companies", () => {
     await expect(page.getByTestId("company-members-section")).toBeVisible();
     await expect(page.getByTestId("company-pending-section")).toBeVisible();
     await auditA11y(page, testInfo);
+
+    // P3-4 — Invite-user modal opens, accepts input, submits via stubbed
+    // POST. SendGrid isn't reachable from CI; stub returns the same shape
+    // the route would return on success so the modal-close path runs.
+    await page.route("**/api/platform/invitations", async (route) => {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          data: {
+            invitation: {
+              id: "00000000-0000-0000-0000-00000000e2e1",
+              email: "stubbed@e2e.test",
+              role: "editor",
+              status: "pending",
+            },
+          },
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await page.getByTestId("invite-user-button").click();
+    await expect(
+      page.getByRole("heading", { name: /Invite a user/i }),
+    ).toBeVisible();
+    await page.getByTestId("invite-email").fill("stubbed@e2e.test");
+    await page.getByTestId("invite-role-editor").check();
+    await page.getByTestId("invite-submit").click();
+    await expect(
+      page.getByRole("heading", { name: /Invite a user/i }),
+    ).not.toBeVisible();
   });
 });
