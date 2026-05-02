@@ -1,10 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 
+import { PostApprovalSection } from "@/components/PostApprovalSection";
 import { PostVariantsSection } from "@/components/PostVariantsSection";
 import { SocialPostDetailClient } from "@/components/SocialPostDetailClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
+import { listRecipients } from "@/lib/platform/social/approvals";
 import { getPostMaster } from "@/lib/platform/social/posts";
 import { listVariants } from "@/lib/platform/social/variants";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // S1-3 — customer post detail at /company/social/posts/[id].
@@ -67,6 +70,38 @@ export default async function CompanySocialPostDetailPage({
     );
   }
 
+  // Resolve the open approval_request (if any) so the recipients
+  // section can render. Inlined here rather than wrapped in a lib
+  // helper because it's the only consumer in V1; can lift to
+  // lib/platform/social/approvals/get-open.ts when a second caller
+  // appears.
+  let approvalRequestId: string | null = null;
+  let initialRecipients: Awaited<
+    ReturnType<typeof listRecipients>
+  > | null = null;
+  const isPendingApproval = postResult.data.state === "pending_client_approval";
+  if (isPendingApproval) {
+    const svc = getServiceRoleClient();
+    const open = await svc
+      .from("social_approval_requests")
+      .select("id")
+      .eq("post_master_id", postResult.data.id)
+      .eq("company_id", companyId)
+      .is("revoked_at", null)
+      .is("final_approved_at", null)
+      .is("final_rejected_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!open.error && open.data) {
+      approvalRequestId = open.data.id as string;
+      initialRecipients = await listRecipients({
+        approvalRequestId,
+        companyId,
+      });
+    }
+  }
+
   return (
     <>
       <SocialPostDetailClient
@@ -81,6 +116,15 @@ export default async function CompanySocialPostDetailPage({
           initialResolved={variantsResult.data.resolved}
           masterText={variantsResult.data.masterText}
           canEdit={canEdit && postResult.data.state === "draft"}
+        />
+      ) : null}
+      {isPendingApproval && initialRecipients?.ok ? (
+        <PostApprovalSection
+          postId={postResult.data.id}
+          companyId={companyId}
+          initialRecipients={initialRecipients.data.recipients}
+          initialApprovalRequestId={approvalRequestId}
+          canManage={canSubmit && isPendingApproval}
         />
       ) : null}
     </>

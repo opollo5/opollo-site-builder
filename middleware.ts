@@ -108,6 +108,12 @@ function isPublicPath(pathname: string): boolean {
   // session yet — the whole point is to MINT one by setting their
   // password. Without this, the email link bounces to /login.
   if (pathname.startsWith("/invite/")) return true;
+  // /approve/<token> — social-approval magic link (S1-6). External
+  // reviewers may not be platform users at all; the token is the
+  // auth (server-component validates SHA-256 against
+  // social_approval_recipients.token_hash). Same rationale as
+  // /invite/<token> — the link must work pre-session.
+  if (pathname.startsWith("/approve/")) return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
