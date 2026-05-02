@@ -25,7 +25,7 @@ test.describe("platform admin / companies", () => {
     await auditA11y(page, testInfo);
   });
 
-  test("create form opens, submits, new row appears in list", async ({
+  test("create → row appears → click into detail page", async ({
     page,
   }, testInfo) => {
     await page.goto("/admin/companies");
@@ -47,5 +47,16 @@ test.describe("platform admin / companies", () => {
     await expect(
       page.getByTestId(`platform-company-row-${slug}`),
     ).toBeVisible();
+
+    // P3-3 — click the row name to land on the detail page.
+    await page.getByTestId(`platform-company-link-${slug}`).click();
+    await page.waitForURL(/\/admin\/companies\/[0-9a-f-]{36}/);
+    await expect(
+      page.getByRole("heading", { name: `E2E Test Co ${slug}` }),
+    ).toBeVisible();
+    await expect(page.getByTestId("company-detail-slug")).toHaveText(slug);
+    await expect(page.getByTestId("company-members-section")).toBeVisible();
+    await expect(page.getByTestId("company-pending-section")).toBeVisible();
+    await auditA11y(page, testInfo);
   });
 });
