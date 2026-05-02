@@ -147,12 +147,28 @@ export default async function SiteDetailPage({
   // hasn't picked between copy_existing / new_design yet. Render the
   // onboarding banner and suppress the design-discovery one (which
   // only applies to the new_design path).
+  // PR 12 — also pull the extracted profile and concept tokens so the
+  // "Design system" sidebar card can render a mode-aware preview
+  // (palette swatches for copy_existing, concept thumbnail for
+  // new_design) without a second round-trip.
   const { data: siteModeRow } = await svc
     .from("sites")
-    .select("site_mode")
+    .select(
+      "site_mode, extracted_design, design_tokens, homepage_concept_html, design_direction_status",
+    )
     .eq("id", site.id)
     .maybeSingle();
   const siteMode = (siteModeRow?.site_mode as string | null) ?? null;
+  const extractedDesign = (siteModeRow?.extracted_design ?? null) as
+    | { colors?: Record<string, string | null> }
+    | null;
+  const designTokens = (siteModeRow?.design_tokens ?? null) as
+    | Record<string, string>
+    | null;
+  const conceptHtml =
+    (siteModeRow?.homepage_concept_html as string | null) ?? null;
+  const designApproved =
+    (siteModeRow?.design_direction_status as string | null) === "approved";
   const needsOnboarding = siteMode === null;
   const needsSetupReminder =
     !needsOnboarding &&
@@ -366,8 +382,91 @@ export default async function SiteDetailPage({
 
           <div className="rounded-lg border p-3">
             <H3>Design system</H3>
-            <div className="mt-2 text-xs">
-              {ds ? (
+            <div className="mt-2 text-xs" data-testid="site-design-system-card">
+              {needsOnboarding ? (
+                <>
+                  <p className="text-muted-foreground">
+                    Not set up. Pick how you want to use this site to get going.
+                  </p>
+                  <Link
+                    href={`/admin/sites/${site.id}/onboarding`}
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
+                    data-testid="site-design-system-onboarding-link"
+                  >
+                    Set up now →
+                  </Link>
+                </>
+              ) : siteMode === "copy_existing" ? (
+                <>
+                  <p className="font-medium">Copy existing site</p>
+                  {extractedDesign?.colors ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(["primary", "secondary", "accent", "background", "text"] as const).map(
+                        (key) => {
+                          const color = extractedDesign.colors?.[key];
+                          if (!color) return null;
+                          return (
+                            <span
+                              key={key}
+                              className="h-5 w-5 rounded border"
+                              style={{ backgroundColor: color }}
+                              title={`${key}: ${color}`}
+                              aria-label={`${key} colour ${color}`}
+                            />
+                          );
+                        },
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      No design profile extracted yet.
+                    </p>
+                  )}
+                  <Link
+                    href={`/admin/sites/${site.id}/setup/extract`}
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
+                  >
+                    {extractedDesign ? "Edit profile →" : "Run extraction →"}
+                  </Link>
+                </>
+              ) : siteMode === "new_design" ? (
+                <>
+                  <p className="font-medium">New design</p>
+                  {designApproved && designTokens ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(["primary", "secondary", "accent", "background", "text"] as const).map(
+                        (key) => {
+                          const color = designTokens[key];
+                          if (!color) return null;
+                          return (
+                            <span
+                              key={key}
+                              className="h-5 w-5 rounded border"
+                              style={{ backgroundColor: color }}
+                              title={`${key}: ${color}`}
+                              aria-label={`${key} colour ${color}`}
+                            />
+                          );
+                        },
+                      )}
+                    </div>
+                  ) : conceptHtml ? (
+                    <p className="mt-1 text-muted-foreground">
+                      Concept drafted; setup not yet approved.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      Setup wizard not started.
+                    </p>
+                  )}
+                  <Link
+                    href={`/admin/sites/${site.id}/setup`}
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
+                  >
+                    {designApproved ? "Edit setup →" : "Continue setup →"}
+                  </Link>
+                </>
+              ) : ds ? (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Version {String(ds.version)}</span>
@@ -400,19 +499,13 @@ export default async function SiteDetailPage({
               ) : (
                 <>
                   <p className="text-muted-foreground">
-                    {needsOnboarding
-                      ? "Pick how you want to use this site to get going."
-                      : "No active design system. Create one before running batches."}
+                    No active design system. Create one before running batches.
                   </p>
                   <Link
-                    href={
-                      needsOnboarding
-                        ? `/admin/sites/${site.id}/onboarding`
-                        : `/admin/sites/${site.id}/design-system`
-                    }
+                    href={`/admin/sites/${site.id}/design-system`}
                     className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
                   >
-                    {needsOnboarding ? "Set up now →" : "Set up design system →"}
+                    Set up design system →
                   </Link>
                 </>
               )}
