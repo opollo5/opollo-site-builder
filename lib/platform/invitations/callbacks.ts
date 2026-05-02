@@ -203,18 +203,23 @@ export async function handleExpiryCallback(args: {
 
   const invitation = lookup.data as Invitation;
 
+  // Idempotency anchor first: expired_notified_at is only set by a
+  // previous successful expiry fire (which also flips status to
+  // 'expired'). Checking it before the status gate gives a precise
+  // "duplicate fire" signal rather than the looser noop_not_pending
+  // we'd return otherwise.
+  if (invitation.expired_notified_at) {
+    return {
+      outcome: "noop_already_handled",
+      invitationId: args.invitationId,
+    };
+  }
+
   if (invitation.status !== "pending") {
     return {
       outcome: "noop_not_pending",
       invitationId: args.invitationId,
       message: `status=${invitation.status}`,
-    };
-  }
-
-  if (invitation.expired_notified_at) {
-    return {
-      outcome: "noop_already_handled",
-      invitationId: args.invitationId,
     };
   }
 
