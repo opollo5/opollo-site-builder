@@ -60,6 +60,7 @@ describe("lib/platform/social/approvals/recipients", () => {
           domain: "s1-6-beta.test",
           is_opollo_internal: false,
           timezone: "Australia/Melbourne",
+          approval_default_rule: "any_one",
         },
       ])
       .select("id");
