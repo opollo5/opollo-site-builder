@@ -22,7 +22,7 @@ export async function DELETE(
   _req: Request,
   { params }: { params: { id: string } },
 ): Promise<NextResponse> {
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {

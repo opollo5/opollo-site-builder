@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { getDesignSystem } from "@/lib/design-systems";
 import { listComponents } from "@/lib/components";
 import { listTemplates } from "@/lib/templates";
@@ -12,6 +13,12 @@ export const runtime = "nodejs";
 // the DS row itself plus all components and templates. Any design system —
 // draft, active, or archived — is previewable.
 export async function GET(_req: Request, ctx: { params: { id: string } }) {
+  // PLATFORM-AUDIT PR3 — design system bodies aren't sensitive but the
+  // route was unauthed entirely. Gate to admin tier minimum (defense in
+  // depth; consistent with sibling /api/design-systems/[id] routes).
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
+  if (gate.kind === "deny") return gate.response;
+
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;
 
