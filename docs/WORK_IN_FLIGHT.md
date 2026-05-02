@@ -9,16 +9,16 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-02
-- Branch: feat/p3-2-create-company
-- Slice: P3-2 — Create company form. Second sub-slice of P3. Form at /admin/companies/new + POST /api/admin/companies + lib/platform/companies/create.ts.
+- Branch: feat/p3-3-company-detail
+- Slice: P3-3 — Company detail page (members + pending invitations). Server-rendered detail at /admin/companies/[id], lib helper loading company + members + invitations in parallel, read-only display.
 - Files claimed:
-  - lib/platform/companies/create.ts (new)
+  - lib/platform/companies/get.ts (new)
   - lib/platform/companies/index.ts (extend)
-  - app/admin/companies/new/page.tsx (new — server-rendered form shell)
-  - components/PlatformCompanyCreateForm.tsx (new — client form)
-  - app/api/admin/companies/route.ts (new — POST)
-  - components/PlatformCompaniesListClient.tsx (wire "New company" button to route)
-  - lib/__tests__/platform-companies-create.test.ts (new)
+  - app/admin/companies/[id]/page.tsx (new)
+  - components/PlatformCompanyDetail.tsx (new — read-only display)
+  - lib/__tests__/platform-companies-get.test.ts (new)
+  - e2e/platform-companies.spec.ts (extend with detail navigation)
+  - components/PlatformCompaniesListClient.tsx (wire row click to detail)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.

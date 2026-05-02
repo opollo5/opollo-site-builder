@@ -58,10 +58,18 @@ export function PlatformCompaniesListClient({
               {companies.map((c) => (
                 <tr
                   key={c.id}
-                  className="border-b last:border-b-0"
+                  className="border-b last:border-b-0 hover:bg-muted/20"
                   data-testid={`platform-company-row-${c.slug}`}
                 >
-                  <td className="px-4 py-3 font-medium">{c.name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <Link
+                      href={`/admin/companies/${c.id}`}
+                      className="hover:underline"
+                      data-testid={`platform-company-link-${c.slug}`}
+                    >
+                      {c.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
                     {c.slug}
                   </td>
