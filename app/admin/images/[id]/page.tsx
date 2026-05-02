@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { DownloadImageButton } from "@/components/DownloadImageButton";
+import { ReextractMetadataButton } from "@/components/ReextractMetadataButton";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { H1, H3 } from "@/components/ui/typography";
@@ -119,9 +121,13 @@ export default async function AdminImageDetailPage({
   const publicUrl = image.cloudflare_id
     ? deliveryUrl(image.cloudflare_id, "public")
     : null;
-  const thumbUrl = image.cloudflare_id
-    ? deliveryUrl(image.cloudflare_id, "thumbnail")
-    : null;
+  // Thumbnail intentionally reuses the `public` variant — Cloudflare
+  // accounts that haven't configured a named `thumbnail` variant 404 on
+  // its delivery URL, leaving the row blank for the operator. The
+  // browser scales the public bytes down for the 40px tile cheaply
+  // enough that a dedicated variant isn't worth the per-account setup
+  // burden.
+  const thumbUrl = publicUrl;
 
   return (
     <>
@@ -149,7 +155,7 @@ export default async function AdminImageDetailPage({
             )}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {!image.deleted_at && (
             <EditImageMetadataButton
               image={{
@@ -160,6 +166,15 @@ export default async function AdminImageDetailPage({
                 version_lock: image.version_lock,
               }}
             />
+          )}
+          {image.cloudflare_id && (
+            <DownloadImageButton
+              imageId={image.id}
+              filename={image.filename}
+            />
+          )}
+          {!image.deleted_at && (
+            <ReextractMetadataButton imageId={image.id} />
           )}
           <ImageArchiveButton
             image={{ id: image.id, deleted_at: image.deleted_at }}
