@@ -7,17 +7,19 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
 ---
-## Session A — fix/platform-invite-accept-page (BUILD-AUDIT P0)
+## Session A
 - Started: 2026-05-02
-- Branch: fix/platform-invite-accept-page
-- Slice: BUILD-AUDIT P0 — `/invite/[token]` page that renders the platform invitation accept form. P2-2 send emails point recipients here; without the page they 404. P2-3 (#385) explicitly deferred this page and merged the API route only.
+- Branch: feat/p3-opollo-admin-companies
+- Slice: P3-1 — Opollo admin companies list page. First sub-slice of P3 (companies management UI). Splitting the parent slice into P3-1 (list — this PR), P3-2 (create), P3-3 (detail + members), P3-4 (invite modal/page) so each ships small and reviewable. P2-4 QStash still blocked on env.
 - Files claimed:
-  - app/invite/[token]/page.tsx (new — server-component validates token via service-role, looks up platform_invitations row + company name)
-  - components/PlatformAcceptInviteForm.tsx (new — client form posting to POST /api/platform/invitations/accept)
-  - middleware.ts (add `/invite/` prefix to public-paths list — same pattern as `/auth/accept-invite`)
-  - docs/WORK_IN_FLIGHT.md (this claim; removed in next PR's first commit)
+  - lib/platform/companies/{list,types,index}.ts (new)
+  - app/admin/companies/page.tsx (new — list)
+  - components/PlatformCompaniesListClient.tsx (new — client shell)
+  - lib/__tests__/platform-companies.test.ts (new)
+  - e2e/platform-companies.spec.ts (new — happy path)
+  - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
-- Expected completion: same session; auto-merge on green CI.
+- Expected completion: same session.
 ---
 
 ## ~~Session A (stale)~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; previous owner removes when they next push)
