@@ -102,6 +102,12 @@ const PUBLIC_PATHS = new Set<string>([
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // /invite/<token> — platform-layer invitation accept page. Token IS
+  // the auth (server-component validates SHA-256 against
+  // platform_invitations.token_hash). Recipients have no Supabase
+  // session yet — the whole point is to MINT one by setting their
+  // password. Without this, the email link bounces to /login.
+  if (pathname.startsWith("/invite/")) return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
