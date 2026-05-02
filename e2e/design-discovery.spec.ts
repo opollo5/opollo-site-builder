@@ -222,9 +222,15 @@ async function createSiteAndOpenSetup(
     /Connected as/i,
   );
   await page.getByTestId("site-create-save").click();
-  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
+  // DESIGN-SYSTEM-OVERHAUL (PR 6) — fresh sites first land on the
+  // /onboarding mode-selection screen. Pick "Build a new website" to
+  // reach the design-discovery wizard.
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/onboarding/);
   const id = page.url().match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
   if (!id) throw new Error(`Failed to extract site id from ${page.url()}`);
+  await page.getByTestId("site-onboarding-option-new_design").click();
+  await page.getByTestId("site-onboarding-submit").click();
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
   return id;
 }
 

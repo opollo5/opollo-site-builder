@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
+import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { SetupReminderBanner } from "@/components/SetupReminderBanner";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
@@ -141,13 +142,28 @@ export default async function SiteDetailPage({
   // the setup wizard. Renders only when BOTH discovery statuses are
   // 'pending'; the banner itself manages dismissal via localStorage.
   const setupStatusResult = await getSetupStatus(site.id);
+
+  // DESIGN-SYSTEM-OVERHAUL PR 6 — site_mode gate. NULL = operator
+  // hasn't picked between copy_existing / new_design yet. Render the
+  // onboarding banner and suppress the design-discovery one (which
+  // only applies to the new_design path).
+  const { data: siteModeRow } = await svc
+    .from("sites")
+    .select("site_mode")
+    .eq("id", site.id)
+    .maybeSingle();
+  const siteMode = (siteModeRow?.site_mode as string | null) ?? null;
+  const needsOnboarding = siteMode === null;
   const needsSetupReminder =
+    !needsOnboarding &&
+    siteMode === "new_design" &&
     setupStatusResult.ok &&
     setupStatusResult.data.design_direction_status === "pending" &&
     setupStatusResult.data.tone_of_voice_status === "pending";
 
   return (
     <>
+      {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
       {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
       <div className="flex items-start justify-between gap-4">
         <div>

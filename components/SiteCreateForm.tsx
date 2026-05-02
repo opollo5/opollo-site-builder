@@ -159,14 +159,13 @@ export function SiteCreateForm() {
         | null;
       if (payload?.ok) {
         toast.success("Site connected", {
-          description: `${form.name} — let's set up the design and tone next.`,
+          description: `${form.name} — choose how you want to use this site next.`,
         });
-        // DESIGN-DISCOVERY (PR 11) — fresh sites land on the setup
-        // wizard at Step 1 instead of the bare detail page so the
-        // operator captures design + tone before generating any
-        // pages. The wizard is skippable; resume logic returns to
-        // the right step on subsequent visits.
-        router.push(`/admin/sites/${payload.data.id}/setup?step=1`);
+        // DESIGN-SYSTEM-OVERHAUL (PR 6) — fresh sites land on the
+        // mode-selection screen first; the existing copy / new-design
+        // branches diverge from there. The post-onboarding redirect
+        // sends the operator to the right wizard or extraction flow.
+        router.push(`/admin/sites/${payload.data.id}/onboarding`);
         return;
       }
       const message =
