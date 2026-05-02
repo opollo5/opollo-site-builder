@@ -9,16 +9,14 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-3-social-post-detail
-- Slice: S1-3 — post detail page + edit + delete. lib update.ts/delete.ts (draft-only), PATCH+DELETE+GET /api/platform/social/posts/[id], detail page /company/social/posts/[id].
+- Branch: feat/s1-4-post-variants
+- Slice: S1-4 — per-platform post variants. lib/platform/social/variants {list,upsert} (UNIQUE post_master_id+platform; draft-only edits). GET+PUT /api/platform/social/posts/[id]/variants. Detail page renders the variants section.
 - Files claimed:
-  - lib/platform/social/posts/{update,delete}.ts (new)
-  - lib/platform/social/posts/index.ts (re-exports)
-  - app/api/platform/social/posts/[id]/route.ts (new)
-  - app/company/social/posts/[id]/page.tsx (new)
-  - components/SocialPostDetailClient.tsx (new)
-  - components/SocialPostsListClient.tsx (link to detail page)
-  - lib/__tests__/social-posts.test.ts (extend with update/delete coverage)
+  - lib/platform/social/variants/{types,list,upsert,index}.ts (new)
+  - app/api/platform/social/posts/[id]/variants/route.ts (new)
+  - components/PostVariantsSection.tsx (new)
+  - app/company/social/posts/[id]/page.tsx (wire variants section)
+  - lib/__tests__/social-variants.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
