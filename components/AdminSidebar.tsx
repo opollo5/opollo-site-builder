@@ -4,16 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Building2,
   ChevronsLeft,
   ChevronsRight,
+  FileText,
   Globe,
   Image as ImageIcon,
   KeyRound,
   Laptop,
   LogOut,
+  Mail,
   Menu,
   PenSquare,
   Settings,
+  ShieldCheck,
   Users,
   Workflow,
   X,
@@ -57,7 +61,14 @@ type NavLink = {
 
 interface AdminSidebarProps {
   user: SessionUser | null;
-  showUsersLink: boolean;
+  /** Operator-tier roles (admin or super_admin) — sees the operator-
+   *  management surfaces (Users, Companies). PLATFORM-AUDIT PR7
+   *  replaced the old `showUsersLink` boolean with the richer
+   *  isAdminTier / isSuperAdmin pair. */
+  isAdminTier: boolean;
+  /** Top-tier role only — sees the super_admin-only surfaces
+   *  (Audit log, Email test). */
+  isSuperAdmin: boolean;
   /** R2 fix — cookie-driven initial state from the server layout so
    *  SSR matches the first client render and there's no flash. */
   initialCollapsed?: boolean;
@@ -65,7 +76,8 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({
   user,
-  showUsersLink,
+  isAdminTier,
+  isSuperAdmin,
   initialCollapsed = false,
 }: AdminSidebarProps) {
   const pathname = usePathname();
@@ -132,7 +144,7 @@ export function AdminSidebar({
       icon: ImageIcon,
       testId: "nav-images",
     },
-    ...(showUsersLink
+    ...(isAdminTier
       ? [
           {
             label: "Users",
@@ -140,9 +152,36 @@ export function AdminSidebar({
             icon: Users,
             testId: "nav-users",
           },
+          {
+            label: "Companies",
+            href: "/admin/companies",
+            icon: Building2,
+            testId: "nav-companies",
+          },
         ]
       : []),
   ];
+
+  // PLATFORM-AUDIT PR7 — super_admin-only "Admin" sub-section. These
+  // pages exist but had no nav entry, so they were unreachable except by
+  // typing the URL. Surface them as a separate tier in the rail rather
+  // than mixing them with the operator-management top-level links.
+  const adminLinks: NavLink[] = isSuperAdmin
+    ? [
+        {
+          label: "Audit log",
+          href: "/admin/users/audit",
+          icon: ShieldCheck,
+          testId: "nav-audit-log",
+        },
+        {
+          label: "Email test",
+          href: "/admin/email-test",
+          icon: Mail,
+          testId: "nav-email-test",
+        },
+      ]
+    : [];
 
   function isActiveRoute(href: string): boolean {
     return pathname === href || pathname.startsWith(href + "/");
@@ -271,6 +310,54 @@ export function AdminSidebar({
                 );
               })}
             </ul>
+
+            {/* Super_admin-only Admin sub-section. Separator label
+                hidden when the rail is collapsed. */}
+            {adminLinks.length > 0 && (
+              <>
+                <div className="mt-4 mb-1 px-2.5">
+                  {!collapsed && (
+                    <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+                      Admin
+                    </p>
+                  )}
+                </div>
+                <ul className="space-y-0.5">
+                  {adminLinks.map(({ label, href, icon: Icon, testId }) => {
+                    const active = isActiveRoute(href);
+                    return (
+                      <li key={href}>
+                        <Link
+                          href={href}
+                          data-testid={testId}
+                          aria-current={active ? "page" : undefined}
+                          title={collapsed ? label : undefined}
+                          className={cn(
+                            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            active
+                              ? "bg-muted font-medium text-foreground"
+                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+                          )}
+                        >
+                          <Icon
+                            aria-hidden
+                            className={cn(
+                              "h-4 w-4 shrink-0",
+                              active
+                                ? "text-foreground"
+                                : "text-muted-foreground group-hover:text-foreground",
+                            )}
+                          />
+                          {!collapsed && (
+                            <span className="truncate">{label}</span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            )}
           </nav>
 
           {/* Footer rail — ⌘K hint + user menu */}
