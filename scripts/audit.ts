@@ -424,6 +424,104 @@ function check3_dbColumnReferences(): Issue[] {
 // Check 4 — Migration ordering (HIGH)
 // ============================================================================
 
+/**
+ * Strip Postgres comments + single-quoted string literals from SQL source so
+ * the structural regexes don't match the word "references" inside `--` line
+ * comments, `/​* ... *​/` block comments, or `COMMENT ON ... IS '...'`
+ * strings. Preserves line breaks and total length so byte offsets used by
+ * `src.slice(0, m.index).split("\n").length` keep reporting the correct
+ * line number.
+ *
+ *   '...' — handles the doubled-quote escape (`''`) inside strings.
+ *   $$...$$ — Postgres dollar-quoted strings (with optional tag).
+ *
+ * Whitespace replacement is a single space per stripped char so column
+ * positions only matter for line counting; not pretty but accurate.
+ */
+function stripSqlCommentsAndStrings(src: string): string {
+  let i = 0;
+  const out: string[] = [];
+  const len = src.length;
+
+  while (i < len) {
+    const ch = src[i];
+    const next = src[i + 1];
+
+    // Line comment: `--` to end of line.
+    if (ch === "-" && next === "-") {
+      while (i < len && src[i] !== "\n") {
+        out.push(src[i] === "\n" ? "\n" : " ");
+        i++;
+      }
+      continue;
+    }
+
+    // Block comment: `/​* ... *​/` (no nesting handled — Postgres allows
+    // nesting but the migrations don't use it).
+    if (ch === "/" && next === "*") {
+      out.push("  ");
+      i += 2;
+      while (i < len) {
+        if (src[i] === "*" && src[i + 1] === "/") {
+          out.push("  ");
+          i += 2;
+          break;
+        }
+        out.push(src[i] === "\n" ? "\n" : " ");
+        i++;
+      }
+      continue;
+    }
+
+    // Single-quoted string: handle `''` doubled-quote escape.
+    if (ch === "'") {
+      out.push(" ");
+      i++;
+      while (i < len) {
+        if (src[i] === "'" && src[i + 1] === "'") {
+          out.push("  ");
+          i += 2;
+          continue;
+        }
+        if (src[i] === "'") {
+          out.push(" ");
+          i++;
+          break;
+        }
+        out.push(src[i] === "\n" ? "\n" : " ");
+        i++;
+      }
+      continue;
+    }
+
+    // Dollar-quoted string: `$tag$ ... $tag$` or `$$ ... $$`.
+    if (ch === "$") {
+      const tagMatch = src.slice(i).match(/^\$([A-Za-z_][A-Za-z0-9_]*)?\$/);
+      if (tagMatch) {
+        const tag = tagMatch[0];
+        const tagLen = tag.length;
+        out.push(" ".repeat(tagLen));
+        i += tagLen;
+        while (i < len) {
+          if (src.startsWith(tag, i)) {
+            out.push(" ".repeat(tagLen));
+            i += tagLen;
+            break;
+          }
+          out.push(src[i] === "\n" ? "\n" : " ");
+          i++;
+        }
+        continue;
+      }
+    }
+
+    out.push(ch);
+    i++;
+  }
+
+  return out.join("");
+}
+
 function check4_migrationOrdering(): Issue[] {
   const issues: Issue[] = [];
   const migDir = join(REPO_ROOT, "supabase", "migrations");
@@ -461,7 +559,13 @@ function check4_migrationOrdering(): Issue[] {
     /REFERENCES\s+(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
 
   for (const f of files) {
-    const src = readSafe(join(migDir, f));
+    const rawSrc = readSafe(join(migDir, f));
+    // Strip comments + string literals before structural matching. The
+    // word "references" appears in plenty of `-- ... references ...`
+    // doc comments and inside `COMMENT ON COLUMN ... IS '... references
+    // the opt_proposals row ...'`-style strings; without the strip the
+    // regex below false-positives on every one of those.
+    const src = stripSqlCommentsAndStrings(rawSrc);
 
     // Local creates first (a migration can self-reference within its own body).
     const localCreated = new Set<string>();
