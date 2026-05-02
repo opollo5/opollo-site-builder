@@ -33,10 +33,11 @@ jobs:
           # the file would make supabase db push try to re-apply it).
           # Each entry here needs a tracked follow-up to renumber + run
           # supabase migration repair across staging + prod.
-          #   - 0031: 0031_email_log.sql (#286) collides with
-          #           0031_optimiser_clients.sql (#293). One of the two
-          #           is silently missing from prod. Follow-up TBD.
-          allowlist="0031"
+          # Empty: the historical 0031 collision was resolved by
+          # renumbering 0031_optimiser_clients.sql → 0069. Production
+          # recovery for environments mid-collision is handled by
+          # deploy-migrations.yml's `repair_versions_applied` input.
+          allowlist=""
           fail=0
           for dir in supabase/migrations supabase/rollbacks; do
             [ -d "$dir" ] || continue

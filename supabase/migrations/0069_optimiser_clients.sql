@@ -1,5 +1,17 @@
--- 0031 — Optimiser: opt_clients (Slice 1 of feat/optimiser).
+-- 0069 — Optimiser: opt_clients (Slice 1 of feat/optimiser).
 -- Reference: docs/Optimisation_Engine_Spec_v1.5.docx §5.1 + §3.6 + §4.6 + §11.2.
+--
+-- Renumbered from 0031 → 0069 to resolve a version-prefix collision with
+-- 0031_email_log.sql (PR #286). supabase_migrations.schema_migrations
+-- enforces UNIQUE on the version column, so two files sharing prefix 0031
+-- meant `supabase db push` succeeded for whichever file ran first and
+-- silently failed (or partially applied) the other. On environments where
+-- the original 0031_optimiser_clients.sql had already created opt_clients
+-- without a tracking row, recover by triggering deploy-migrations.yml with
+-- `repair_versions_applied=0069` — the workflow runs
+-- `supabase migration repair --status applied 0069 --linked` before
+-- db push, marking 0069 applied without re-running the CREATE TABLE.
+-- Fresh environments apply this file normally as version 0069.
 --
 -- Design decisions encoded here:
 --
