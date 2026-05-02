@@ -9,12 +9,11 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/p4-customer-admin-users
-- Slice: P4 — Customer admin users page. /company/users — customer admin's view of their own company's members + pending invitations. Reuses the platform-side invite modal + revoke button. Gated on platform_company_users.role = 'admin' for the current user's company.
+- Branch: feat/p5-notifications-dispatcher
+- Slice: P5 — Notifications dispatcher. Single entry point lib/platform/notifications/dispatch.ts that writes platform_notifications + sends email per the trigger table in BUILD.md. Per-event recipient resolution (company admins, opollo admins, submitter, invitee). V1 ships dispatch + recipients + inline templates; the templates/ subfolder + queries.ts (unread/list/mark-read) land with the bell-icon UI in a later slice.
 - Files claimed:
-  - app/company/page.tsx (new — landing redirect)
-  - app/company/users/page.tsx (new — gated server component)
-  - components/CustomerCompanyUsersView.tsx (new — display)
+  - lib/platform/notifications/{types,recipients,dispatch,index}.ts (new)
+  - lib/__tests__/platform-notifications.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
