@@ -937,3 +937,25 @@ M15-2 schema polish (#4, #5, #8, #10, #12, #13, #14); M15-4 security/auth (#3, #
 Generic infra / product surface (all pre-existed this run, all explicitly trigger-gated): Stripe billing, Storybook, Feature flags, k6 load testing, chaos engineering, synthetic monitoring, property-based testing, size-limit budgets, admin de-jargoning, CHANGELOG, API ref, Next.js 14 → 16 framework upgrade, CSP enforce-mode, soft-delete schema hygiene, deferred dependency upgrades.
 
 **Production health throughout the sweep:** green. `scripts/diagnose-prod.ts health-deep` reported `overall: ok` at 3, 6, and 9 PRs. No new failed brief_runs, no stuck running runs, no budget-reset backlog.
+
+### BUILD-AUDIT autonomous run (2026-05-02, PR #388)
+
+Full logical-completeness sweep across the codebase ahead of UAT, scoped to anything broken / missing / incomplete that prior audits hadn't already triaged. One P0 closed; everything else already in BACKLOG with concrete triggers.
+
+| PR | What | Closes |
+|---|---|---|
+| #388 | `app/invite/[token]/page.tsx` + `PlatformAcceptInviteForm` + middleware allowlist for `/invite/` | "P2-3 deferred `/invite/[token]` UI page" — the platform-invitation send flow (P2-2 / #380) was emailing recipients a link to a 404. P2-3's PR description called this out as deferred; this run picked it up. |
+
+**What the audit confirmed already-fixed:**
+- AUDIT.md (2026-04-26) BLOCKER error codes (`PASSWORD_WEAK`, `SAME_PASSWORD`, etc.) — present in `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus.
+- AUDIT.md HIGH RLS NULL-safety on creator-scoped policies — `0023_audit_rls_null_safety.sql`.
+- AUDIT.md MEDIUM soft-delete leakage on 5 user-facing tables — `0024_audit_soft_delete_rls.sql`.
+- AUDIT.md HIGH `NEXT_PUBLIC_VERCEL_ENV` documentation — landed in #209 env-doc polish.
+- M15-3 `LANGFUSE_HOST` / runbook typo — landed in #127.
+
+**What stayed in BACKLOG (no auto-fix; trigger-gated):**
+All P1/P2 items the audit re-encountered are already documented above with concrete triggers — `CLOUDFLARE_IMAGES_HASH` hard-required promotion, M15-4 #8 defense-in-depth gates, M15-4 #6/#7/#9 observability hygiene + rate-limit coverage, M15-5 #1 `process-transfer` cron decision, M15-8 generated Supabase types, the seven migrations missing rollback files, and the standard Phase-2 product-surface set (Stripe / Next.js 16 / mu-plugin / Kadence typography).
+
+**`scripts/audit.ts` noise (PR #386, 2026-05-02):** the new heuristic static-audit job reports 39 HIGH issues. After classification this run: 33 are heuristic false positives (cron routes that use `CRON_SECRET` constant-time check, OAuth callbacks intentionally public, the `POST /api/platform/invitations/accept` route where the token IS the auth, four `migration-ordering` matches against English words like `it` / `the` / `these` / `resolve` in comment text). The remaining 2 (`/api/sites/list`, `/api/design-systems/[id]/preview`) are the existing M15-4 #8 defense-in-depth BACKLOG entry. CI's `static-audit` job is gating on these but main's branch protection doesn't require the check; merges proceed. Improving the script's heuristics is its own slice — out of scope for this run; flag if false-positive cleanup ever earns its keep.
+
+**Production health:** lint, typecheck, and build all green on main post-merge. Local `vitest run` requires Docker for `supabase start` — CI runs the full test suite (the same way prior runs verified the pre-existing m12-1-rls / m4-schema cells); `npm run test` was not exercised locally this run.
