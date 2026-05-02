@@ -92,7 +92,7 @@ export function SiteActionsMenu({
           <div className="absolute right-0 z-10 mt-1 w-44 rounded-md border bg-background shadow-md">
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+              className="w-full px-3 py-1.5 text-left text-sm hover:bg-muted"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -105,7 +105,7 @@ export function SiteActionsMenu({
             </button>
             <button
               type="button"
-              className="w-full px-3 py-1.5 text-left text-xs text-destructive hover:bg-destructive/10"
+              className="w-full px-3 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -119,7 +119,7 @@ export function SiteActionsMenu({
             <button
               type="button"
               disabled
-              className="w-full cursor-not-allowed px-3 py-1.5 text-left text-xs text-muted-foreground"
+              className="w-full cursor-not-allowed px-3 py-1.5 text-left text-sm text-muted-foreground"
               title="Coming in a follow-up slice"
             >
               Clone DS (soon)

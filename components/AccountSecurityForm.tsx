@@ -120,7 +120,7 @@ export function AccountSecurityForm({ userEmail }: { userEmail: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex w-full flex-col gap-5">
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Signed in as <span className="font-mono">{userEmail}</span>
       </p>
 
@@ -154,9 +154,9 @@ export function AccountSecurityForm({ userEmail }: { userEmail: string }) {
           onChange={(e) => setNext(e.target.value)}
           suppressHydrationWarning
         />
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        {hint && <p className="text-sm text-muted-foreground">{hint}</p>}
         {sameAsCurrent && (
-          <p className="text-xs text-destructive">
+          <p className="text-sm text-destructive">
             New password must differ from the current one.
           </p>
         )}
@@ -177,7 +177,7 @@ export function AccountSecurityForm({ userEmail }: { userEmail: string }) {
           suppressHydrationWarning
         />
         {mismatch && (
-          <p className="text-xs text-destructive">Passwords don&apos;t match.</p>
+          <p className="text-sm text-destructive">Passwords don&apos;t match.</p>
         )}
       </div>
 

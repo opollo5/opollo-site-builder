@@ -44,7 +44,7 @@ export default async function OptimiserOnboardingHome() {
               >
                 <div>
                   <p className="font-medium">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {c.client_slug} · created {new Date(c.created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -70,7 +70,7 @@ export default async function OptimiserOnboardingHome() {
               >
                 <div>
                   <p className="font-medium">{c.name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {c.client_slug} ·{" "}
                     {c.onboarded_at
                       ? `onboarded ${new Date(c.onboarded_at).toLocaleDateString()}`

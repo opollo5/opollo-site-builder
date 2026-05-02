@@ -76,12 +76,12 @@ export function ReextractMetadataButton({ imageId }: { imageId: string }) {
         {busy ? "Re-extracting…" : "Re-extract metadata"}
       </Button>
       {message && (
-        <p className="text-xs text-muted-foreground" role="status">
+        <p className="text-sm text-muted-foreground" role="status">
           {message}
         </p>
       )}
       {error && (
-        <p className="text-xs text-destructive" role="alert">
+        <p className="text-sm text-destructive" role="alert">
           {error}
         </p>
       )}

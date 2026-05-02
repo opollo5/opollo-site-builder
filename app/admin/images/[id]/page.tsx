@@ -181,7 +181,7 @@ export default async function AdminImageDetailPage({
           />
           <Link
             href={backHref}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             ← Back to library
           </Link>
@@ -206,7 +206,7 @@ export default async function AdminImageDetailPage({
             )}
           </div>
           {thumbUrl && (
-            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="flex items-center gap-3 text-sm text-muted-foreground">
               <span>Thumbnail:</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -251,7 +251,7 @@ export default async function AdminImageDetailPage({
                 {image.tags.map((tag) => (
                   <span
                     key={tag}
-                    className="rounded bg-muted px-2 py-0.5 text-xs"
+                    className="rounded bg-muted px-2 py-0.5 text-sm"
                   >
                     {tag}
                   </span>
@@ -263,7 +263,7 @@ export default async function AdminImageDetailPage({
           <dd className="capitalize">
             {image.source}
             {image.source_ref && (
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span className="ml-2 text-sm text-muted-foreground">
                 ({image.source_ref})
               </span>
             )}
@@ -282,11 +282,11 @@ export default async function AdminImageDetailPage({
       <section className="mt-8">
         <H3>
           Used on sites{" "}
-          <span className="text-xs font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-muted-foreground">
             ({usage.length})
           </span>
         </H3>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Every WP site this image has been mirrored to via the publish pipeline.
         </p>
         <div className="mt-3" data-testid="image-usage-list">
@@ -297,7 +297,7 @@ export default async function AdminImageDetailPage({
           ) : (
             <div className="overflow-hidden rounded-md border">
               <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="px-4 py-2 font-medium">Site</th>
                     <th className="px-4 py-2 font-medium">State</th>
@@ -320,13 +320,13 @@ export default async function AdminImageDetailPage({
                           {u.site_name}
                         </Link>
                         {u.wp_url && (
-                          <div className="text-xs text-muted-foreground">
+                          <div className="text-sm text-muted-foreground">
                             {u.wp_url}
                           </div>
                         )}
                       </td>
                       <td className="px-4 py-3">{usageStateBadge(u.state)}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
                         {u.wp_media_id !== null ? (
                           u.wp_source_url ? (
                             <a
@@ -344,7 +344,7 @@ export default async function AdminImageDetailPage({
                           "—"
                         )}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <td className="px-4 py-3 text-sm text-muted-foreground">
                         {u.transferred_at
                           ? formatRelativeTime(u.transferred_at)
                           : "—"}
@@ -361,11 +361,11 @@ export default async function AdminImageDetailPage({
       <section className="mt-8">
         <H3>
           Additional metadata{" "}
-          <span className="text-xs font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-muted-foreground">
             ({metadata.length})
           </span>
         </H3>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           EXIF, licensing notes, model info, and any other per-image attributes
           tracked outside the main row.
         </p>
@@ -378,10 +378,10 @@ export default async function AdminImageDetailPage({
             <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 rounded-md border p-4 text-sm">
               {metadata.map((m) => (
                 <Fragment key={m.key}>
-                  <dt className="font-mono text-xs text-muted-foreground">
+                  <dt className="font-mono text-sm text-muted-foreground">
                     {m.key}
                   </dt>
-                  <dd className="break-all font-mono text-xs">
+                  <dd className="break-all font-mono text-sm">
                     {formatJsonValue(m.value_jsonb)}
                   </dd>
                 </Fragment>

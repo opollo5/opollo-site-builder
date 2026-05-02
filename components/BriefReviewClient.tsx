@@ -330,7 +330,7 @@ export function BriefReviewClient({
           <ul className="mt-1 list-disc space-y-1 pl-5">
             {warnings.map((w: { code: string; detail?: string }, i: number) => (
               <li key={i}>
-                <code className="text-xs">{w.code}</code>
+                <code className="text-sm">{w.code}</code>
                 {w.detail ? <>: {w.detail}</> : null}
               </li>
             ))}
@@ -347,7 +347,7 @@ export function BriefReviewClient({
               <h2 id="voice-direction-heading" className="text-base font-semibold">
                 Brand voice &amp; design direction
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {hasSiteDefault && !voiceOverrideOpen
                   ? "Inheriting from site defaults. Expand to customize for this brief."
                   : hasSiteDefault
@@ -372,7 +372,7 @@ export function BriefReviewClient({
             <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
               {siteBrandVoiceDefault && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-sm font-medium text-muted-foreground">
                     Brand voice (site default)
                   </p>
                   <p className="mt-1 whitespace-pre-wrap">
@@ -382,7 +382,7 @@ export function BriefReviewClient({
               )}
               {siteDesignDirectionDefault && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-sm font-medium text-muted-foreground">
                     Design direction (site default)
                   </p>
                   <p className="mt-1 whitespace-pre-wrap">
@@ -400,7 +400,7 @@ export function BriefReviewClient({
             <div>
               <label
                 htmlFor="brand-voice-input"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Brand voice
               </label>
@@ -416,7 +416,7 @@ export function BriefReviewClient({
               />
               <p
                 id="brand-voice-hint"
-                className="mt-1 text-xs text-muted-foreground"
+                className="mt-1 text-sm text-muted-foreground"
               >
                 How every page should sound. 4 KB max.
               </p>
@@ -424,7 +424,7 @@ export function BriefReviewClient({
             <div>
               <label
                 htmlFor="design-direction-input"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Design direction
               </label>
@@ -440,7 +440,7 @@ export function BriefReviewClient({
               />
               <p
                 id="design-direction-hint"
-                className="mt-1 text-xs text-muted-foreground"
+                className="mt-1 text-sm text-muted-foreground"
               >
                 Constrains the anchor cycle on page 1, then re-used verbatim
                 for pages 2..N. 4 KB max.
@@ -456,7 +456,7 @@ export function BriefReviewClient({
             <h2 id="model-tier-heading" className="text-base font-semibold">
               Model tier
             </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Pick the Claude model for text generation and for the visual
               review critique. Sonnet is the default for both — Opus is
               reserved for complex-judgment briefs. See the cost estimate on
@@ -467,7 +467,7 @@ export function BriefReviewClient({
             <div>
               <label
                 htmlFor="text-model-select"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Text model (draft / critique / revise passes)
               </label>
@@ -484,14 +484,14 @@ export function BriefReviewClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {MODEL_OPTIONS.find((o) => o.value === textModel)?.hint ?? ""}
               </p>
             </div>
             <div>
               <label
                 htmlFor="visual-model-select"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Visual critique model
               </label>
@@ -508,7 +508,7 @@ export function BriefReviewClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {MODEL_OPTIONS.find((o) => o.value === visualModel)?.hint ?? ""}
               </p>
             </div>
@@ -520,7 +520,7 @@ export function BriefReviewClient({
         <section aria-label="Page list">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold">Page list</h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {sortedPages.length} page{sortedPages.length === 1 ? "" : "s"}
             </p>
           </div>
@@ -529,13 +529,13 @@ export function BriefReviewClient({
             {sortedPages.map((p) => (
               <li key={p.localKey} className="rounded-lg border p-4">
                 <div className="flex items-start gap-4">
-                  <div className="w-8 shrink-0 text-center text-xs text-muted-foreground pt-2">
+                  <div className="w-8 shrink-0 text-center text-sm text-muted-foreground pt-2">
                     {p.ordinal + 1}
                   </div>
 
                   <div className="flex-1 space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground">
+                      <label className="block text-sm font-medium text-muted-foreground">
                         Page title
                       </label>
                       <Input
@@ -549,7 +549,7 @@ export function BriefReviewClient({
 
                     <div className="flex items-center gap-4">
                       {p.mode === "import" ? (
-                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-900">
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-900">
                           Import (mode locked)
                         </span>
                       ) : (
@@ -563,17 +563,17 @@ export function BriefReviewClient({
                           }
                         />
                       )}
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {p.word_count} word{p.word_count === 1 ? "" : "s"}
                       </span>
                     </div>
 
                     <details className="group">
-                      <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                      <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
                         Show source excerpt
                       </summary>
                       <Textarea
-                        className="mt-2 text-xs"
+                        className="mt-2 text-sm"
                         value={p.source_text}
                         readOnly
                         rows={Math.min(12, Math.max(3, p.source_text.split("\n").length))}
@@ -683,7 +683,7 @@ function ModePill({
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+      className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
       onClick={onToggle}
       disabled={disabled}
       title={description}

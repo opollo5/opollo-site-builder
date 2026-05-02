@@ -415,7 +415,7 @@ export function DesignDirectionInputs({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Pre-loads sensible defaults. Stronger signals (URL,
             description) override.
           </p>
@@ -437,7 +437,7 @@ export function DesignDirectionInputs({
             data-testid="dd-existing-url"
             className="mt-1"
           />
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Establishes the brand baseline.
           </p>
         </div>
@@ -483,7 +483,7 @@ export function DesignDirectionInputs({
         </div>
         {extractError && (
           <p
-            className="mt-2 text-xs text-destructive"
+            className="mt-2 text-sm text-destructive"
             data-testid="dd-extract-error"
             role="alert"
           >
@@ -507,7 +507,7 @@ export function DesignDirectionInputs({
           data-testid="dd-description"
           className="mt-1"
         />
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Free text — describe the feeling, layout, density, anything that
           helps us understand what you want.
         </p>
@@ -540,7 +540,7 @@ export function DesignDirectionInputs({
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Estimated cost: ~$0.24 — includes homepage + inner page for each of
           3 concept directions. This is a full design pass.
         </p>
@@ -631,8 +631,8 @@ function ConceptResultsBlock({
         data-testid="dd-generation-failed"
       >
         <p className="font-medium">Generation failed.</p>
-        <p className="mt-1 text-xs">{generationFailed}</p>
-        <p className="mt-2 text-xs">
+        <p className="mt-1 text-sm">{generationFailed}</p>
+        <p className="mt-2 text-sm">
           Click &quot;Generate concepts&quot; to try again.
         </p>
       </div>

@@ -40,7 +40,7 @@ export function PreviewPane({ pageId }: { pageId: number | null }) {
         <p className="text-sm text-muted-foreground">
           NEXT_PUBLIC_LEADSOURCE_WP_URL is not configured.
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Set it in your deployment environment to enable the preview iframe.
         </p>
       </div>
@@ -78,7 +78,7 @@ export function PreviewPane({ pageId }: { pageId: number | null }) {
             Open in new tab
           </a>
         </Button>
-        <span className="ml-auto text-xs text-muted-foreground">
+        <span className="ml-auto text-sm text-muted-foreground">
           page_id: {pageId}
         </span>
       </div>

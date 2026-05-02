@@ -72,7 +72,7 @@ export function ImageArchiveButton({
       {error && (
         <p
           role="alert"
-          className="max-w-xs text-right text-xs text-destructive"
+          className="max-w-xs text-right text-sm text-destructive"
           data-testid="image-action-error"
         >
           {error}

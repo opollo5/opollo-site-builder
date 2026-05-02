@@ -278,7 +278,7 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
       >
         <Upload aria-hidden className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
         <p className="font-medium">Drop markdown, HTML, or text files here</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Each file becomes one post. Max 10 MB per file. Or
           <button
             type="button"
@@ -313,14 +313,14 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
         >
           Or paste multiple posts
         </label>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Separate documents with a <code className="font-mono">---</code>
           {" "}line on its own (between blank lines), or stack YAML front-
           matter blocks back-to-back.
         </p>
         <Textarea
           id="bulk-paste"
-          className="mt-2 font-mono text-xs"
+          className="mt-2 font-mono text-sm"
           rows={10}
           value={pasted}
           onChange={(e) => setPasted(e.target.value)}
@@ -342,7 +342,7 @@ Body of second post.`}
       {error && (
         <div
           role="alert"
-          className="whitespace-pre-line rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+          className="whitespace-pre-line rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
         >
           {error}
         </div>
@@ -358,7 +358,7 @@ Body of second post.`}
               type="button"
               onClick={clearAll}
               disabled={running}
-              className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+              className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground disabled:opacity-50"
             >
               Clear all
             </button>
@@ -385,7 +385,7 @@ Body of second post.`}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {summary.detail && (
           <p
-            className="text-xs text-muted-foreground"
+            className="text-sm text-muted-foreground"
             data-testid="bulk-run-detail"
           >
             {summary.detail}
@@ -393,7 +393,7 @@ Body of second post.`}
         )}
         <span
           aria-hidden
-          className="hidden items-center gap-0.5 text-xs text-muted-foreground sm:inline-flex"
+          className="hidden items-center gap-0.5 text-sm text-muted-foreground sm:inline-flex"
         >
           <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
             ⌘
@@ -591,10 +591,10 @@ function BulkCandidateCard({
               }}
               aria-invalid={!slugIsValid}
               data-testid="bulk-candidate-slug"
-              className="h-8 font-mono text-xs"
+              className="h-8 font-mono text-sm"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {candidate.origin} · {candidate.wordCount.toLocaleString()} words
             {!slugIsValid && (
               <span className="ml-2 text-destructive">
@@ -605,7 +605,7 @@ function BulkCandidateCard({
           {candidate.status === "failed" && candidate.error && (
             <p
               role="alert"
-              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
               data-testid="bulk-candidate-error"
             >
               {candidate.error}
@@ -615,7 +615,7 @@ function BulkCandidateCard({
             type="button"
             onClick={() => setPreviewOpen((v) => !v)}
             aria-expanded={previewOpen}
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             data-testid="bulk-candidate-preview-toggle"
           >
             {previewOpen ? (
@@ -627,7 +627,7 @@ function BulkCandidateCard({
           </button>
           {previewOpen && (
             <div
-              className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground whitespace-pre-wrap"
+              className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground whitespace-pre-wrap"
               data-testid="bulk-candidate-preview"
             >
               {bodyPreview.slice(0, BODY_PREVIEW_CHARS)}
@@ -652,7 +652,7 @@ function BulkCandidateCard({
               disabled={runDisabled || candidate.status === "saving"}
               data-testid="bulk-candidate-reject"
               className={cn(
-                "rounded border px-2 py-0.5 text-xs transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50",
+                "rounded border px-2 py-0.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50",
                 candidate.rejected
                   ? "border-success/40 bg-success/10 text-success hover:bg-success/20"
                   : "border-input text-muted-foreground hover:bg-muted hover:text-foreground",

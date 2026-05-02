@@ -35,7 +35,7 @@ export function RegenHistoryPanel({ jobs }: { jobs: RegenJobRow[] }) {
   if (jobs.length === 0) {
     return (
       <div
-        className="rounded-md border border-dashed p-6 text-center text-xs text-muted-foreground"
+        className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground"
         data-testid="regen-history-empty"
       >
         No regenerations yet. Click &ldquo;Re-generate&rdquo; to refresh this
@@ -50,7 +50,7 @@ export function RegenHistoryPanel({ jobs }: { jobs: RegenJobRow[] }) {
       data-testid="regen-history-panel"
     >
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Status</th>
             <th className="px-4 py-2 font-medium">Attempts</th>
@@ -74,21 +74,21 @@ export function RegenHistoryPanel({ jobs }: { jobs: RegenJobRow[] }) {
                   {job.status.replace(/_/g, " ")}
                 </Badge>
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {job.attempts}
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {formatCostCents(job.cost_usd_cents)}
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {job.input_tokens} / {job.output_tokens}
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {job.started_at
                   ? formatRelativeTime(job.started_at)
                   : formatRelativeTime(job.created_at)}
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {job.failure_code ? (
                   <span
                     className="text-destructive"

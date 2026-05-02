@@ -374,7 +374,7 @@ export function BriefRunClient({
             {polled.isStale && (
               <span
                 role="status"
-                className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-sm text-muted-foreground"
                 title="Live updates paused — retrying"
               >
                 <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -420,7 +420,7 @@ export function BriefRunClient({
           title={
             <>
               Run failed:{" "}
-              <code className="text-xs">{activeRun.failure_code}</code>
+              <code className="text-sm">{activeRun.failure_code}</code>
             </>
           }
         >
@@ -460,7 +460,7 @@ export function BriefRunClient({
                     >
                       {page.ordinal + 1}. {page.title}
                     </h3>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                       <PageStatusPill status={page.page_status} />
                       {page.quality_flag && (
                         <QualityFlagBadge flag={page.quality_flag} />
@@ -609,7 +609,7 @@ function PagePreview({
     <div className="mt-4 space-y-3">
       {html ? (
         <details className="group">
-          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+          <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
             Show rendered preview
           </summary>
           {looksTruncated && (
@@ -645,7 +645,7 @@ function PagePreview({
           />
         </details>
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           No draft HTML yet.
         </p>
       )}
@@ -656,10 +656,10 @@ function PagePreview({
 
       {page.operator_notes && page.operator_notes.trim() !== "" && (
         <details className="group">
-          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+          <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
             Your past notes
           </summary>
-          <pre className="mt-2 whitespace-pre-wrap rounded border bg-muted p-2 text-xs">
+          <pre className="mt-2 whitespace-pre-wrap rounded border bg-muted p-2 text-sm">
             {page.operator_notes}
           </pre>
         </details>
@@ -701,9 +701,9 @@ function VisualCritiqueBlock({ entry }: { entry: BriefPageCritiqueEntry }) {
     <div className="rounded border bg-muted/50 p-3 text-sm">
       <p className="font-medium">Visual critique</p>
       {critique.issues.length === 0 ? (
-        <p className="mt-1 text-xs text-muted-foreground">No issues flagged.</p>
+        <p className="mt-1 text-sm text-muted-foreground">No issues flagged.</p>
       ) : (
-        <ul className="mt-2 space-y-1 text-xs">
+        <ul className="mt-2 space-y-1 text-sm">
           {critique.issues.map((issue, i) => (
             <li key={i} className="flex gap-2">
               <span
@@ -724,7 +724,7 @@ function VisualCritiqueBlock({ entry }: { entry: BriefPageCritiqueEntry }) {
         </ul>
       )}
       {critique.overall_notes && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           {critique.overall_notes}
         </p>
       )}
@@ -828,7 +828,7 @@ function ReviseModal({
         <div className="mt-4">
           <label
             htmlFor="revise-note-input"
-            className="block text-xs font-medium text-muted-foreground"
+            className="block text-sm font-medium text-muted-foreground"
           >
             Note for the generator
           </label>
@@ -841,7 +841,7 @@ function ReviseModal({
             placeholder="e.g. The hero section is too dense. Break into a headline + single CTA with generous whitespace underneath."
             maxLength={2000}
           />
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             {note.length} / 2000 characters
           </p>
         </div>

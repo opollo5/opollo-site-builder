@@ -70,7 +70,7 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
         <>
           <div className="mt-6 rounded-md border">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-2 font-medium">When</th>
                   <th className="px-3 py-2 font-medium">Actor</th>
@@ -90,21 +90,21 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
                       className="border-b align-top last:border-b-0"
                       data-testid="audit-row"
                     >
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <td className="px-3 py-2 text-sm text-muted-foreground">
                         <span data-screenshot-mask>
                           {formatRelativeTime(row.created_at as string)}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-sm">
                         {actor?.email ?? "(deleted user)"}
                       </td>
-                      <td className="px-3 py-2 text-xs font-medium">
+                      <td className="px-3 py-2 text-sm font-medium">
                         {row.action as string}
                       </td>
-                      <td className="px-3 py-2 text-xs">
+                      <td className="px-3 py-2 text-sm">
                         {row.target_email as string}
                       </td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <td className="px-3 py-2 text-sm text-muted-foreground">
                         <code className="font-mono text-[11px]">
                           {JSON.stringify(row.metadata ?? {}, null, 0)}
                         </code>
@@ -135,7 +135,7 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
                 {pageNum > 1 && (
                   <Link
                     href={`/admin/users/audit?page=${pageNum - 1}`}
-                    className="rounded border px-3 py-1 text-xs hover:bg-muted"
+                    className="rounded border px-3 py-1 text-sm hover:bg-muted"
                   >
                     ← Previous
                   </Link>
@@ -143,7 +143,7 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
                 {pageNum < totalPages && (
                   <Link
                     href={`/admin/users/audit?page=${pageNum + 1}`}
-                    className="rounded border px-3 py-1 text-xs hover:bg-muted"
+                    className="rounded border px-3 py-1 text-sm hover:bg-muted"
                   >
                     Next →
                   </Link>

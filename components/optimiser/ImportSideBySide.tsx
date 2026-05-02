@@ -36,7 +36,7 @@ export function ImportSideBySide({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Cached snapshot (left) is what the runner will reproduce. Live
           URL (right) is the current state of the source — drift between
           the two is operator-visible signal that the page has changed
@@ -45,7 +45,7 @@ export function ImportSideBySide({
         <button
           type="button"
           onClick={() => setShowLive((v) => !v)}
-          className="rounded-md border border-border px-3 py-1 text-xs hover:bg-muted"
+          className="rounded-md border border-border px-3 py-1 text-sm hover:bg-muted"
         >
           {showLive ? "Hide live preview" : "Show live preview"}
         </button>
@@ -55,7 +55,7 @@ export function ImportSideBySide({
         <section className="space-y-2 rounded-lg border border-border bg-card p-3">
           <header className="flex items-center justify-between text-sm">
             <span className="font-medium">Cached snapshot</span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               capture-time HTML, sandboxed
             </span>
           </header>
@@ -76,7 +76,7 @@ export function ImportSideBySide({
                   href={liveUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-xs underline-offset-4 hover:underline"
+                  className="font-mono text-sm underline-offset-4 hover:underline"
                 >
                   open ↗
                 </a>
@@ -90,7 +90,7 @@ export function ImportSideBySide({
                   sandbox="allow-same-origin"
                   className="h-[640px] w-full rounded-md border border-border bg-white"
                 />
-                <p className="text-xs text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Many sites set X-Frame-Options to DENY/SAMEORIGIN — if
                   the iframe is blank, open the URL in a new tab using
                   the link above.
@@ -110,7 +110,7 @@ export function ImportSideBySide({
         {briefRunStatus ? (
           <p className="mt-1 text-muted-foreground">
             Brief run is{" "}
-            <code className="font-mono text-xs">{briefRunStatus}</code>
+            <code className="font-mono text-sm">{briefRunStatus}</code>
             {briefRunCreatedAt && (
               <>
                 {" "}· created {new Date(briefRunCreatedAt).toLocaleString()}
@@ -129,7 +129,7 @@ export function ImportSideBySide({
         ) : (
           <p className="mt-1 text-muted-foreground">No brief run yet.</p>
         )}
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           The brief-runner consumer of mode=&apos;import&apos; lands in a
           follow-up sub-slice. Once shipped, this panel will render the
           Site-Builder-native output alongside the source.

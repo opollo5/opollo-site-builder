@@ -40,7 +40,7 @@ export function ProposalRolloutLink({
     >
       <div>
         <p className="font-medium">Staged rollout: {label}</p>
-        <p className="text-xs opacity-80">
+        <p className="text-sm opacity-80">
           {rollout.traffic_split_percent}% traffic · started{" "}
           {new Date(rollout.started_at).toLocaleString()}
           {rollout.end_reason && (
@@ -53,7 +53,7 @@ export function ProposalRolloutLink({
       </div>
       <Link
         href={`/optimiser/pages/${landingPageId}`}
-        className="text-xs font-medium underline-offset-4 hover:underline"
+        className="text-sm font-medium underline-offset-4 hover:underline"
       >
         View on page →
       </Link>

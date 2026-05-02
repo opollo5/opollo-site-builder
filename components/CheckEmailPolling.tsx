@@ -291,7 +291,7 @@ export function CheckEmailPolling({
         />
         <span>
           <strong>Trust this device for 30 days.</strong>{" "}
-          <span className="text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground">
             Future sign-ins from this browser skip the email-approval
             step. Uncheck on a shared computer.
           </span>
@@ -299,7 +299,7 @@ export function CheckEmailPolling({
       </label>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground">
+        <div className="text-sm text-muted-foreground">
           Lost the email? You can retry below.
         </div>
         <Button
@@ -317,7 +317,7 @@ export function CheckEmailPolling({
         </Button>
       </div>
 
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Wrong email?{" "}
         <a href="/logout" className="underline">
           Sign in again

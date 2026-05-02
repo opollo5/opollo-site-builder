@@ -86,13 +86,13 @@ export default async function OptimiserProposalsList({
               <tr key={p.id} className="border-t border-border align-top">
                 <td className="px-3 py-2">
                   <div className="font-medium">{p.headline}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-sm text-muted-foreground">
                     {p.problem_summary ?? "—"}
                   </div>
                 </td>
                 <td className="px-3 py-2">
                   <span
-                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${RISK_PILL[p.risk_level]}`}
+                    className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${RISK_PILL[p.risk_level]}`}
                   >
                     {p.risk_level}
                   </span>
@@ -109,7 +109,7 @@ export default async function OptimiserProposalsList({
                     ? `+${p.expected_impact_min_pp.toFixed(1)}–${p.expected_impact_max_pp.toFixed(1)}pp`
                     : "—"}
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
+                <td className="px-3 py-2 text-sm text-muted-foreground">
                   {p.expires_at ? new Date(p.expires_at).toLocaleDateString() : "—"}
                 </td>
                 <td className="px-3 py-2">

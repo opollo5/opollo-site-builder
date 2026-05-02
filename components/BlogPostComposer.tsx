@@ -100,7 +100,7 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
 function SourceHint({ source }: { source: ParseSource }) {
   if (source === "none") return null;
   return (
-    <span className="text-xs text-muted-foreground">{SOURCE_HINTS[source]}</span>
+    <span className="text-sm text-muted-foreground">{SOURCE_HINTS[source]}</span>
   );
 }
 
@@ -553,7 +553,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           <div className="mt-1 flex items-center justify-between gap-2">
             <SourceHint source={slug.source} />
             {!slugIsValid && slug.value.length > 0 && (
-              <span className="text-xs text-destructive">
+              <span className="text-sm text-destructive">
                 Lowercase letters, numbers, dashes only.
               </span>
             )}
@@ -614,7 +614,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               disabled={submitting}
               triggerId="post-parent-page"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Where this post will live in the WP site tree (queries
               <code className="ml-1 font-mono">/wp/v2/pages</code>).
             </p>
@@ -646,7 +646,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 metaDescription.value.length > 0 && !metaDescriptionIsValid
               }
             />
-            <div className="mt-1 flex items-center justify-between gap-2 text-xs">
+            <div className="mt-1 flex items-center justify-between gap-2 text-sm">
               <SourceHint source={metaDescription.source} />
               <MetaDescriptionLengthHint
                 length={metaDescription.value.length}
@@ -659,7 +659,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="font-medium">Featured image</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Required at publish (enforced by BP-7&apos;s server-side
                 guard). Selecting here previews; persistence + WP attachment
                 ship in BP-7.
@@ -696,7 +696,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 <button
                   type="button"
                   onClick={() => setFeaturedImage(null)}
-                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                  className="text-sm text-muted-foreground underline hover:text-foreground"
                 >
                   Remove
                 </button>
@@ -711,7 +711,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       {/* BL-2 — saved indicator + restored draft notice + discard button.
           Sits flush above the action row so the operator catches the
           state change in their primary scan path. */}
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <SaveStatus
           autosave={autosave}
           restoredAt={draftRestoredAt}
@@ -722,7 +722,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       <div className="flex flex-wrap items-center justify-end gap-2">
         <span
           aria-hidden
-          className="hidden items-center gap-0.5 text-xs text-muted-foreground sm:inline-flex"
+          className="hidden items-center gap-0.5 text-sm text-muted-foreground sm:inline-flex"
         >
           <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
             ⌘
@@ -747,7 +747,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         </Button>
       </div>
       {!canStartRun && canSaveDraft && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Start run needs the SEO meta fields, parent page, and featured
           image — open <button
             type="button"
@@ -792,7 +792,7 @@ function ReadingChip({ text }: { text: string }) {
       // BL-9 — fade-in the first time the chip surfaces. Re-runs on
       // remount only (text changes don't re-trigger because React
       // doesn't add the class on re-render of an already-mounted node).
-      className="opollo-fade-in text-xs text-muted-foreground"
+      className="opollo-fade-in text-sm text-muted-foreground"
     >
       {words.toLocaleString()} {words === 1 ? "word" : "words"} ·{" "}
       {minutes} min read
@@ -809,7 +809,7 @@ function TitleLengthHint({
 }) {
   if (!valid) {
     return (
-      <span className="text-xs text-destructive">Title required.</span>
+      <span className="text-sm text-destructive">Title required.</span>
     );
   }
   if (length === 0) return null;
@@ -818,7 +818,7 @@ function TitleLengthHint({
     <span
       data-testid="post-title-length-hint"
       className={cn(
-        "text-xs",
+        "text-sm",
         overSeoCap ? "text-warning" : "text-muted-foreground",
       )}
     >
@@ -835,7 +835,7 @@ function MetaTitleLengthHint({ length }: { length: number }) {
     <span
       data-testid="post-meta-title-length-hint"
       className={cn(
-        "text-xs",
+        "text-sm",
         overSeoCap ? "text-warning" : "text-muted-foreground",
       )}
     >
@@ -927,7 +927,7 @@ function AdvancedDisclosure({
           <ChevronRight aria-hidden className="h-4 w-4 text-muted-foreground" />
         )}
         <span className="font-medium">More options</span>
-        <span className="truncate text-xs text-muted-foreground">{summary}</span>
+        <span className="truncate text-sm text-muted-foreground">{summary}</span>
       </button>
       {open && (
         <div
@@ -1207,7 +1207,7 @@ function WpPageCombobox({
             {error && (
               <div
                 role="alert"
-                className="px-3 py-2 text-xs text-destructive"
+                className="px-3 py-2 text-sm text-destructive"
               >
                 {error}
               </div>
@@ -1225,7 +1225,7 @@ function WpPageCombobox({
                 }}
               >
                 <span className="flex-1 truncate">{p.title}</span>
-                <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                <span className="ml-2 shrink-0 text-sm text-muted-foreground">
                   /{p.slug}
                 </span>
               </CommandItem>

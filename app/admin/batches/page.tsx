@@ -192,7 +192,7 @@ export default async function AdminBatchesPage({
           {siteForButton && (
             <Link
               href="/admin/batches"
-              className="mt-1 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              className="mt-1 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               ← All batches
             </Link>
@@ -222,7 +222,7 @@ export default async function AdminBatchesPage({
           <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+                <tr className="border-b bg-muted/40 text-left text-sm text-muted-foreground">
                   <th className="px-3 py-2 font-medium">Site / Template</th>
                   <th className="px-3 py-2 font-medium">Status</th>
                   <th className="px-3 py-2 font-medium">Progress</th>
@@ -241,24 +241,24 @@ export default async function AdminBatchesPage({
                       >
                         {r.site_name}
                       </Link>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         {r.template_name}
                       </div>
                     </td>
                     <td className="px-3 py-2">
                       <StatusPill kind={jobStatusKind(r.status as Parameters<typeof jobStatusKind>[0])} />
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
                       {r.succeeded_count} ok · {r.failed_count} fail ·{" "}
                       {r.requested_count} total
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
                       {formatCostCents(r.total_cost_usd_cents)}
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
                       {formatDate(r.created_at)}
                     </td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
                       {r.created_by_email ?? "—"}
                     </td>
                   </tr>

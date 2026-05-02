@@ -167,7 +167,7 @@ export default async function SitePostsList({
         <div>
           <label
             htmlFor="status-filter"
-            className="block text-xs font-medium text-muted-foreground"
+            className="block text-sm font-medium text-muted-foreground"
           >
             Status
           </label>
@@ -186,7 +186,7 @@ export default async function SitePostsList({
         <div className="flex-1">
           <label
             htmlFor="q-filter"
-            className="block text-xs font-medium text-muted-foreground"
+            className="block text-sm font-medium text-muted-foreground"
           >
             Search title / slug
           </label>
@@ -208,7 +208,7 @@ export default async function SitePostsList({
         {(parsed.status || parsed.query) && (
           <Link
             href={`/admin/sites/${site.id}/posts`}
-            className="text-xs text-muted-foreground underline hover:text-foreground"
+            className="text-sm text-muted-foreground underline hover:text-foreground"
           >
             Clear filters
           </Link>
@@ -277,7 +277,7 @@ export default async function SitePostsList({
                         {post.title}
                       </Link>
                     </h2>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-sm text-muted-foreground">
                       <code className="text-[11px]">/{post.slug}</code>
                       {post.wp_post_id
                         ? ` · WP id ${post.wp_post_id}`

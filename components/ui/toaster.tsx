@@ -38,7 +38,7 @@ export function Toaster() {
           toast:
             "rounded-md border bg-background text-foreground shadow-lg",
           title: "text-sm font-medium",
-          description: "text-xs text-muted-foreground",
+          description: "text-sm text-muted-foreground",
         },
       }}
     />

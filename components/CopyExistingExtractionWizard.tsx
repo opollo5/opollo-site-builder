@@ -183,11 +183,11 @@ export function CopyExistingExtractionWizard({
     <div className="mt-6 space-y-6" data-testid="copy-existing-wizard">
       <section className="rounded-md border bg-muted/20 p-4">
         <h2 className="text-sm font-semibold">1 · Run extraction</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Source URL: <code>{siteUrl}</code>
         </p>
         <div className="mt-3 flex flex-col gap-2">
-          <label className="text-xs text-muted-foreground">
+          <label className="text-sm text-muted-foreground">
             Extra pages (optional, one URL per line)
             <textarea
               value={extraPagesText}
@@ -208,7 +208,7 @@ export function CopyExistingExtractionWizard({
               {extracting ? "Extracting…" : hasResults ? "Re-extract" : "Run extraction"}
             </Button>
             {notes.length > 0 && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 {notes.join(" ")}
               </p>
             )}
@@ -222,14 +222,14 @@ export function CopyExistingExtractionWizard({
           data-testid="copy-existing-design-profile"
         >
           <h2 className="text-sm font-semibold">2 · Review the design profile</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Tweak any extracted value that looks wrong. Empty fields land as
             null and the generation prompt falls back to the site theme.
           </p>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Colours
               </h3>
               {(["primary", "secondary", "accent", "background", "text"] as const).map(
@@ -257,7 +257,7 @@ export function CopyExistingExtractionWizard({
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Fonts
               </h3>
               {(["heading", "body"] as const).map((key) => (
@@ -274,7 +274,7 @@ export function CopyExistingExtractionWizard({
                 </label>
               ))}
 
-              <h3 className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <h3 className="mt-4 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Tone
               </h3>
               <label className="flex items-center gap-2 text-sm">
@@ -309,7 +309,7 @@ export function CopyExistingExtractionWizard({
           </div>
 
           <div className="mt-6">
-            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
               Detected CSS classes
             </h3>
             <div className="mt-2 grid gap-2 md:grid-cols-2">
@@ -347,7 +347,7 @@ export function CopyExistingExtractionWizard({
 
           {design.screenshot_url && (
             <div className="mt-6">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                 Site snapshot
               </h3>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -370,7 +370,7 @@ export function CopyExistingExtractionWizard({
       {hasResults && (
         <div className="flex items-center justify-end gap-3">
           {savedAt && (
-            <span className="text-xs text-muted-foreground">Saved at {savedAt}</span>
+            <span className="text-sm text-muted-foreground">Saved at {savedAt}</span>
           )}
           <Button
             type="button"
@@ -403,7 +403,7 @@ function ClassInput({
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder="(none detected)"
-        className="flex-1 rounded border bg-background px-2 py-1 font-mono text-xs"
+        className="flex-1 rounded border bg-background px-2 py-1 font-mono text-sm"
         data-testid={`copy-existing-class-${label.toLowerCase()}`}
       />
     </label>

@@ -81,7 +81,7 @@ export function ConceptReviewCards({
 
       {errors.length > 0 && (
         <div
-          className="rounded-md border border-warning/40 bg-warning/5 p-3 text-xs text-warning"
+          className="rounded-md border border-warning/40 bg-warning/5 p-3 text-sm text-warning"
           role="alert"
           data-testid="concept-review-errors"
         >
@@ -140,7 +140,7 @@ function ConceptCard({
         </h3>
       </header>
       <p
-        className="mt-1 text-xs text-muted-foreground"
+        className="mt-1 text-sm text-muted-foreground"
         data-testid={`concept-rationale-${concept.direction}`}
       >
         {concept.rationale}
@@ -294,7 +294,7 @@ function BeforeAfterPanel({
       data-testid="concept-before-after"
     >
       <h3 className="text-sm font-semibold">Before vs after</h3>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         Your reference next to {DIRECTION_TITLES[concept.direction]}.
       </p>
       <div className="mt-3 grid gap-4 md:grid-cols-2">

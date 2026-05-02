@@ -100,7 +100,7 @@ export default async function SiteOnboardingPage({
           </ul>
           <Link
             href={`/admin/sites/${site.id}`}
-            className="mt-4 inline-block text-xs text-muted-foreground hover:text-foreground"
+            className="mt-4 inline-block text-sm text-muted-foreground hover:text-foreground"
           >
             ← Back to site
           </Link>

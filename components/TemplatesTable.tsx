@@ -41,7 +41,7 @@ export function TemplatesTable({
   return (
     <div className="overflow-hidden rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Page type</th>
             <th className="px-4 py-2 font-medium">Name</th>
@@ -53,12 +53,12 @@ export function TemplatesTable({
         <tbody>
           {sorted.map((t) => (
             <tr key={t.id} className="border-b last:border-b-0">
-              <td className="px-4 py-3 font-mono text-xs">{t.page_type}</td>
+              <td className="px-4 py-3 font-mono text-sm">{t.page_type}</td>
               <td className="px-4 py-3 font-medium">{t.name}</td>
-              <td className="px-4 py-3 text-xs text-muted-foreground">
+              <td className="px-4 py-3 text-sm text-muted-foreground">
                 {compositionPreview(t)}
               </td>
-              <td className="px-4 py-3 text-xs text-muted-foreground">
+              <td className="px-4 py-3 text-sm text-muted-foreground">
                 {t.is_default ? "Yes" : "—"}
               </td>
               <td className="px-4 py-3">

@@ -211,7 +211,7 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
                   <td className="px-3 py-2">
                     <Link
                       href={`/optimiser/pages/${p.id}`}
-                      className="font-mono text-xs text-primary underline-offset-4 hover:underline"
+                      className="font-mono text-sm text-primary underline-offset-4 hover:underline"
                     >
                       {p.url}
                     </Link>
@@ -220,7 +220,7 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
                         {(p.active_technical_alerts as string[]).map((alert) => (
                           <span
                             key={alert}
-                            className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs text-red-900"
+                            className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-sm text-red-900"
                           >
                             ⚠ {alert.replace(/_/g, " ")}
                           </span>
@@ -232,12 +232,12 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
                     {score != null && cls ? (
                       <ScoreBadge score={score} classification={cls} />
                     ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
+                      <span className="text-sm text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-3 py-2">
                     <span
-                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${STATE_PILL[p.state]}`}
+                      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${STATE_PILL[p.state]}`}
                     >
                       {STATE_LABEL[p.state]}
                     </span>
@@ -272,7 +272,7 @@ export function PageBrowser({ client, pages }: PageBrowserProps) {
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Client: <span className="font-medium">{client.name}</span> ·{" "}
         <Link
           href={`/optimiser/onboarding/${client.id}`}

@@ -134,16 +134,28 @@
  * admin surface — those are marketing-page energy and pushed every list
  * below the operator's fold.
  *
- *   <H1>      page heading             text-xl   font-semibold tracking-tight
- *   <H2>      section heading          text-base font-semibold tracking-tight
- *   <H3>      sub-section / card       text-sm   font-semibold
- *   <Eyebrow> small uppercase label    text-xs   font-medium uppercase tracking-wide
+ *   <H1>      page heading             text-xl   font-semibold tracking-tight  ~20px
+ *   <H2>      section heading          text-base font-semibold tracking-tight  ~16px
+ *   <H3>      sub-section / card       text-sm   font-semibold                 ~14px
+ *   <Eyebrow> small uppercase label    text-sm   font-medium uppercase tracking-wide  ~14px
  *                                                 text-muted-foreground
- *   <Lead>    intro / context line     text-sm   text-muted-foreground
+ *   <Lead>    intro / context line     text-base text-muted-foreground         ~16px
  *
- * Body text defaults to text-sm. Metadata + table cells + pills sit at
- * text-xs. font-mono is reserved for literal data (cloudflare ids,
- * cost values, code tokens) — not for stylistic accent.
+ * Type-size minimums (UAT 2026-05-02):
+ *   • Body text: text-base (1rem / 16px) is the floor. Paragraph copy,
+ *     form input values, page descriptions, modal body all sit at this
+ *     size or larger.
+ *   • Small text: text-sm (0.875rem / 14px) is the floor for helper
+ *     copy, captions, badges, eyebrows, breadcrumbs, status microcopy.
+ *   • text-xs (0.75rem / 12px) is FORBIDDEN on every operator surface.
+ *
+ * Per-callsite uses of text-sm for primary reading copy (paragraphs,
+ * descriptions) are a known follow-up sweep — see docs/BACKLOG.md
+ * "Typography minimums Phase 2" — but no new text-xs is permitted in the
+ * meantime.
+ *
+ * font-mono is reserved for literal data (cloudflare ids, cost values,
+ * code tokens) — not for stylistic accent.
  *
  * Reference quality bar: matches Linear's issue view + Vercel's
  * deployment header. Do not introduce a 6th tier without revisiting.

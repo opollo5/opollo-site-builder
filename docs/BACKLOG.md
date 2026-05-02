@@ -6,6 +6,24 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Typography minimums Phase 2 — `text-sm`-as-body callsite sweep (opened 2026-05-02 during UAT)
+
+**Tags:** `ux`, `typography`, `tech-debt`
+
+**What:** Phase 1 (this PR) eliminated `text-xs` site-wide (530 occurrences across 122 files → uplifted to `text-sm`) and bumped the `Lead` typography primitive from `text-sm` to `text-base`. Phase 2 walks every remaining `text-sm` usage and re-classifies: if the role is body copy (paragraph, description, form input value, modal body), bump to `text-base`; if it's small text (helper, caption, badge, eyebrow, breadcrumb, status microcopy), keep at `text-sm`. Per `docs/RULES.md` rule #7, body text floor is 1rem and small text floor is 0.875rem.
+
+**Why deferred:** Phase 1 was a mechanical bulk replace — safe, scoped, reviewable. Phase 2 needs per-callsite judgment ("is this paragraph or a caption?") which scales worse and risks visual hierarchy drift if done in one shot. Doing it as its own slice lets the review focus on the role-classification calls instead of mixing them with the bulk uplift.
+
+**Also deferred from Phase 2:**
+- The `H3` primitive sits at `text-sm` (14px) as a sub-section heading. Bumping it to `text-base` collides with `H2` (also 16px) and collapses the H1/H2/H3 visual hierarchy. A redesign that introduces `text-lg` for `H2` (or similar tier shift) is a separate design call. Steven's intent for "body ≥ 1rem" is about reading copy, not heading hierarchy — leaving `H3` at `text-sm` is consistent with that interpretation.
+- ESLint rule blocking `text-xs` in JSX className attributes. Would catch regressions automatically. Needs `eslint-plugin-tailwindcss` or a custom rule and a config plumbing step.
+
+**Trigger:** the next per-screen polish PR (e.g. when a slice naturally touches the affected component), OR proactively when Phase 1 stabilises and operators report any remaining "text too small" feedback.
+
+**Rough scope:** Medium (~half a day). Visual diff review across the admin surfaces, per-component classname audit, layout adjustments where the bump causes overflow / truncation. Manual visual pass on `/admin/sites/[id]`, brief review surface, post detail surface, image library, audit log, settings.
+
+---
+
 ## DATA_CONVENTIONS rollout — add audit columns to `sites` (opened 2026-05-02 during UAT §3.1.2)
 
 **Tags:** `schema`, `data-conventions`, `tech-debt`

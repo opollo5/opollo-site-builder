@@ -36,7 +36,7 @@ export function AbTestStatusBanner({ test }: { test: TestRow | null }) {
         <h3 className="text-sm font-semibold">
           A/B test ({test.status.replace("_", " ")})
         </h3>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Split: B {test.traffic_split_percent}% / A {100 - test.traffic_split_percent}%
           {test.started_at && (
             <>
@@ -72,7 +72,7 @@ export function AbTestStatusBanner({ test }: { test: TestRow | null }) {
         />
       </div>
       {snapshot.evaluated_at && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           Last evaluated: {new Date(snapshot.evaluated_at).toLocaleString()}
         </p>
       )}
@@ -105,7 +105,7 @@ function VariantPanel({
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium">{label}</span>
         {isWinner && (
-          <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+          <span className="text-sm font-semibold uppercase tracking-wide text-emerald-700">
             winner
           </span>
         )}

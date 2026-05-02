@@ -485,11 +485,11 @@ function Step3({ siteId, status }: { siteId: string; status: SetupStatus }) {
                 designApproved ? (
                   <DesignDirectionDetails tokens={status.design_tokens} />
                 ) : designSkipped ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Using defaults.
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Not yet set.</p>
+                  <p className="text-sm text-muted-foreground">Not yet set.</p>
                 )
               }
             />
@@ -501,11 +501,11 @@ function Step3({ siteId, status }: { siteId: string; status: SetupStatus }) {
                 toneApproved ? (
                   <ToneOfVoiceDetails tone={status.tone_of_voice} />
                 ) : toneSkipped ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Using defaults.
                   </p>
                 ) : (
-                  <p className="text-xs text-muted-foreground">Not yet set.</p>
+                  <p className="text-sm text-muted-foreground">Not yet set.</p>
                 )
               }
             />
@@ -517,7 +517,7 @@ function Step3({ siteId, status }: { siteId: string; status: SetupStatus }) {
                 className="rounded-md border bg-card p-3"
                 data-testid="setup-step-3-tone-applied"
               >
-                <p className="text-xs font-medium">
+                <p className="text-sm font-medium">
                   Your design with your voice applied
                 </p>
                 <div className="mt-2 h-72 overflow-hidden rounded-md border bg-muted/20">
@@ -568,14 +568,14 @@ function SummaryCard({
     <div className="rounded-md border bg-muted/20 p-4">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold">{heading}</h3>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-sm text-muted-foreground">
           {statusLabel(state)}
         </span>
       </div>
       <div className="mt-3">{details}</div>
       <Link
         href={href}
-        className="mt-4 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        className="mt-4 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
       >
         Go back and edit →
       </Link>
@@ -590,7 +590,7 @@ function DesignDirectionDetails({
 }) {
   if (!tokens) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Approved direction has no captured tokens yet.
       </p>
     );
@@ -607,7 +607,7 @@ function DesignDirectionDetails({
   const fontBody =
     typeof tokens.font_body === "string" ? tokens.font_body : null;
   return (
-    <div className="space-y-2 text-xs">
+    <div className="space-y-2 text-sm">
       {swatches.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           {swatches.map((s) => (
@@ -652,7 +652,7 @@ function ToneOfVoiceDetails({
 }) {
   if (!tone) {
     return (
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Approved tone has no captured profile yet.
       </p>
     );
@@ -670,7 +670,7 @@ function ToneOfVoiceDetails({
       typeof (s as { text: unknown }).text === "string",
   );
   return (
-    <div className="space-y-2 text-xs">
+    <div className="space-y-2 text-sm">
       {styleGuide && (
         <p className="text-muted-foreground">
           <span className="font-medium text-foreground">Style: </span>

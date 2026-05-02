@@ -54,7 +54,7 @@ function Row({
   const paused = cap === 0;
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between text-sm">
         <span className="font-medium">{label}</span>
         <span className="text-muted-foreground">
           {paused ? (
@@ -84,7 +84,7 @@ export function TenantBudgetBadge({ budget }: { budget: TenantBudget | null }) {
   if (!budget) {
     return (
       <div
-        className="rounded-md border border-dashed p-3 text-xs text-muted-foreground"
+        className="rounded-md border border-dashed p-3 text-sm text-muted-foreground"
         data-testid="tenant-budget-missing"
       >
         No budget row. Every enqueue will self-heal via the tenant-budget

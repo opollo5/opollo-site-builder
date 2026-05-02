@@ -88,7 +88,7 @@ export function CrossClientConsentToggle({
         shapes (e.g. <em>cta_position above-fold vs below-fold</em>), not
         copy, URLs, testimonials, or pricing.
       </p>
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
         <p className="font-medium">Legal precondition (spec §11.2.4)</p>
         <p className="mt-1">
           An MSA cross-client-learning clause must be signed before flipping
@@ -96,7 +96,7 @@ export function CrossClientConsentToggle({
         </p>
       </div>
       {!patternLibraryEnabled && (
-        <div className="rounded-md border border-muted bg-muted/40 p-3 text-xs text-muted-foreground">
+        <div className="rounded-md border border-muted bg-muted/40 p-3 text-sm text-muted-foreground">
           The <code className="font-mono">OPT_PATTERN_LIBRARY_ENABLED</code>{" "}
           feature flag is currently off. Even with consent on, no
           contribution or application will happen until the flag is set.
@@ -116,7 +116,7 @@ export function CrossClientConsentToggle({
               : "Enable cross-client learning"}
         </Button>
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Only admins can toggle this setting.
         </p>
       )}

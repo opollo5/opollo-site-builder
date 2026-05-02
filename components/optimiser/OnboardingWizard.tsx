@@ -77,7 +77,7 @@ export function OnboardingWizard({
                     </span>
                     <StatusDot state={state} />
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {step.description}
                   </p>
                 </button>
@@ -242,7 +242,7 @@ function ClientDetailsStep({
           value={budget}
           onChange={(e) => setBudget(Number(e.target.value))}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Soft warning at 75%, hard cutoff at 100%. Default: $50.
         </p>
       </div>
@@ -453,7 +453,7 @@ function ClarityStep({
       </div>
       <div>
         <p className="text-sm font-medium">JS snippet</p>
-        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
+        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 text-sm">
 {snippet}
         </pre>
       </div>
@@ -717,7 +717,7 @@ function PagesStep({ client, stepStatus, setStatus, onComplete }: PagesStepProps
                     }
                   />
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">{p.url}</td>
+                <td className="px-3 py-2 font-mono text-sm">{p.url}</td>
                 <td className="px-3 py-2 text-right">
                   ${(p.spend_30d_usd_cents / 100).toFixed(0)}
                 </td>

@@ -207,7 +207,7 @@ export function UploadBriefModal({
                   Post brief
                 </label>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Page briefs build site pages with anchor + revise cycles. Post
                 briefs build blog posts (no anchor cycle).
               </p>

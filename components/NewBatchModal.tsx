@@ -172,7 +172,7 @@ export function NewBatchModal({
               disabled={submitting}
               className="font-mono min-h-[140px]"
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               One slug per line. Up to 100 per batch.
             </p>
           </div>

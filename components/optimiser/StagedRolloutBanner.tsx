@@ -49,7 +49,7 @@ export function StagedRolloutBanner({ rollout }: { rollout: RolloutRow | null })
         <h3 className="text-sm font-semibold">
           Staged rollout ({label})
         </h3>
-        <p className="text-xs opacity-80">
+        <p className="text-sm opacity-80">
           Split: {rollout.traffic_split_percent}%
           {" · "}
           started {new Date(rollout.started_at).toLocaleString()}
@@ -64,7 +64,7 @@ export function StagedRolloutBanner({ rollout }: { rollout: RolloutRow | null })
       </header>
 
       {observed && (
-        <ul className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+        <ul className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
           <li>
             <span className="opacity-70">CR (new): </span>
             <span className="font-mono tabular-nums">
@@ -118,14 +118,14 @@ export function StagedRolloutBanner({ rollout }: { rollout: RolloutRow | null })
       )}
 
       {trips.length > 0 && (
-        <ul className="mt-3 list-disc space-y-0.5 pl-5 text-xs">
+        <ul className="mt-3 list-disc space-y-0.5 pl-5 text-sm">
           {trips.map((t, i) => (
             <li key={i} className="font-mono">{t}</li>
           ))}
         </ul>
       )}
 
-      <p className="mt-3 text-xs opacity-70">
+      <p className="mt-3 text-sm opacity-70">
         {rollout.evaluation_count > 0 ? (
           <>
             {rollout.evaluation_count} monitor evaluation

@@ -167,7 +167,7 @@ export default function DesignSystemIndexPage() {
         </p>
         <Link
           href={`/admin/sites/${site.id}/design-system?advanced=1`}
-          className="mt-3 inline-block text-xs font-medium underline-offset-2 hover:underline"
+          className="mt-3 inline-block text-sm font-medium underline-offset-2 hover:underline"
           data-testid="design-system-advanced-link"
         >
           Show versions, components, templates →

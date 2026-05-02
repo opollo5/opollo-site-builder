@@ -94,7 +94,7 @@ export function UserRoleActionCell({
   if (isSuperAdmin) {
     return (
       <span
-        className="inline-flex items-center rounded border border-input bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground"
+        className="inline-flex items-center rounded border border-input bg-muted/50 px-2 py-0.5 text-sm text-muted-foreground"
         title="Super admin cannot be modified."
       >
         super_admin
@@ -109,7 +109,7 @@ export function UserRoleActionCell({
       disabled={isSelf || submitting}
       aria-label={`Change role for user ${userId}`}
       title={isSelf ? "You cannot change your own role." : undefined}
-      className="rounded border bg-background px-2 py-1 text-xs transition-smooth disabled:opacity-60"
+      className="rounded border bg-background px-2 py-1 text-sm transition-smooth disabled:opacity-60"
     >
       <option value="admin">admin</option>
       <option value="user">user</option>

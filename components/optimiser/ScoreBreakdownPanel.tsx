@@ -58,7 +58,7 @@ export function ScoreBreakdownPanel({
     <section className="space-y-5 rounded-lg border border-border bg-card p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          <p className="text-sm uppercase tracking-wide text-muted-foreground">
             Composite score
           </p>
           <p className="mt-1 flex items-center gap-3">
@@ -127,7 +127,7 @@ export function ScoreBreakdownPanel({
       )}
 
       {result.redistribution_applied && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Note: weights redistributed because some sub-scores didn&apos;t
           have enough data or the page is flagged conversion_n_a.
         </p>

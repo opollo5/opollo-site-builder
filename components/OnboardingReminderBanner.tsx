@@ -20,14 +20,14 @@ export function OnboardingReminderBanner({ siteId }: { siteId: string }) {
       <Sparkles aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
         <p className="font-medium">Finish setting up this site.</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           Pick whether we&apos;re uploading content to an existing WordPress
           theme or building a fresh design. Generation styling and the
           rest of setup follow from this choice.
         </p>
         <Link
           href={`/admin/sites/${siteId}/onboarding`}
-          className="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="mt-2 inline-block text-sm font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           data-testid="onboarding-reminder-banner-cta"
         >
           Set up now →

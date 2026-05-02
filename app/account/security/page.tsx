@@ -37,7 +37,7 @@ export default async function AccountSecurityPage() {
         </p>
       </div>
       <AccountSecurityForm userEmail={user.email} />
-      <div className="text-xs text-muted-foreground">
+      <div className="text-sm text-muted-foreground">
         <a href="/admin/sites" className="underline hover:no-underline">
           ← Back to admin
         </a>

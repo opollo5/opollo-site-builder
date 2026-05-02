@@ -301,7 +301,7 @@ export function ToneOfVoiceInputs({
             className="mt-1"
             data-testid="tov-url"
           />
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             We fetch the homepage prose and infer tone from it.
           </p>
         </div>
@@ -342,7 +342,7 @@ export function ToneOfVoiceInputs({
       <div className="grid gap-4 md:grid-cols-2">
         <div>
           <p className="block text-sm font-medium">Personality</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Pick everything that fits — these become positive voice rules.
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -356,7 +356,7 @@ export function ToneOfVoiceInputs({
                     setField("personality", toggleMulti(inputs.personality, opt))
                   }
                   className={[
-                    "rounded-full border px-2.5 py-0.5 text-xs transition-smooth",
+                    "rounded-full border px-2.5 py-0.5 text-sm transition-smooth",
                     on
                       ? "border-foreground bg-foreground text-background"
                       : "border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50",
@@ -372,7 +372,7 @@ export function ToneOfVoiceInputs({
         </div>
         <div>
           <p className="block text-sm font-medium">Never sound like</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             Pick anti-patterns — these become avoidance rules.
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -386,7 +386,7 @@ export function ToneOfVoiceInputs({
                     setField("avoid", toggleMulti(inputs.avoid, opt))
                   }
                   className={[
-                    "rounded-full border px-2.5 py-0.5 text-xs transition-smooth",
+                    "rounded-full border px-2.5 py-0.5 text-sm transition-smooth",
                     on
                       ? "border-destructive bg-destructive text-background"
                       : "border-muted bg-muted/30 text-muted-foreground hover:bg-muted/50",
@@ -418,7 +418,7 @@ export function ToneOfVoiceInputs({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Estimated cost: ~$0.02 — extracts tone JSON + three preview
           samples in a single call.
         </p>
@@ -444,7 +444,7 @@ export function ToneOfVoiceInputs({
 
       {extractError && (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           role="alert"
           data-testid="tov-extract-error"
         >
@@ -470,7 +470,7 @@ export function ToneOfVoiceInputs({
 
       {approveError && (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           role="alert"
         >
           {approveError}
@@ -516,7 +516,7 @@ export function ToneOfVoiceInputs({
 function ToneSummary({ tone }: { tone: ToneOfVoice }) {
   return (
     <div
-      className="rounded-md border bg-muted/20 p-3 text-xs"
+      className="rounded-md border bg-muted/20 p-3 text-sm"
       data-testid="tov-summary"
     >
       <p className="font-medium">Tone profile</p>
@@ -588,7 +588,7 @@ function SamplesEditor({
               value={s.text}
               onChange={(e) => onChange(i, e.target.value)}
               maxLength={800}
-              className="mt-1 text-xs"
+              className="mt-1 text-sm"
             />
           </div>
         ))}
@@ -596,7 +596,7 @@ function SamplesEditor({
       <div className="rounded-md border bg-muted/20 p-3">
         <label
           htmlFor="tov-regen-feedback"
-          className="text-xs font-medium"
+          className="text-sm font-medium"
         >
           Regenerate samples
         </label>
@@ -608,9 +608,9 @@ function SamplesEditor({
           value={regenFeedback}
           onChange={(e) => onRegenFeedbackChange(e.target.value)}
           disabled={regenerating || atCap}
-          className="mt-1 text-xs"
+          className="mt-1 text-sm"
         />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
           <span data-testid="tov-regen-counter">
             {regenAttempts}/{REGEN_CAP} regenerations used
             {atCap && (

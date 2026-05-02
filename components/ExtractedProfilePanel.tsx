@@ -97,7 +97,7 @@ export function ExtractedProfilePanel({
             <H3>Design profile</H3>
             <div className="mt-3 grid gap-6 md:grid-cols-2">
               <div>
-                <h4 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <h4 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
                   Colours
                 </h4>
                 <ul className="mt-2 space-y-1 text-sm">
@@ -115,7 +115,7 @@ export function ExtractedProfilePanel({
                             aria-hidden
                           />
                           <span className="w-24 text-muted-foreground">{key}</span>
-                          <code className="font-mono text-xs">
+                          <code className="font-mono text-sm">
                             {value ?? "—"}
                           </code>
                         </li>
@@ -124,7 +124,7 @@ export function ExtractedProfilePanel({
                   )}
                 </ul>
 
-                <h4 className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <h4 className="mt-4 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                   Fonts
                 </h4>
                 <ul className="mt-2 space-y-1 text-sm">
@@ -141,7 +141,7 @@ export function ExtractedProfilePanel({
                   })}
                 </ul>
 
-                <h4 className="mt-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <h4 className="mt-4 text-sm font-medium uppercase tracking-wide text-muted-foreground">
                   Tone
                 </h4>
                 <p className="mt-1 text-sm">
@@ -164,7 +164,7 @@ export function ExtractedProfilePanel({
                   </p>
                 )}
                 {design.source_pages && design.source_pages.length > 0 && (
-                  <p className="mt-3 text-xs text-muted-foreground">
+                  <p className="mt-3 text-sm text-muted-foreground">
                     Source pages:{" "}
                     {design.source_pages.map((p, i) => (
                       <span key={p}>
@@ -188,7 +188,7 @@ export function ExtractedProfilePanel({
           {classes && (
             <section className="rounded-md border bg-background p-5">
               <H3>Detected CSS classes</H3>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 Generated content reuses these class names so it picks up the
                 existing theme&apos;s styling without injecting new CSS.
               </p>
@@ -219,10 +219,10 @@ export function ExtractedProfilePanel({
 function ClassRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex items-center justify-between rounded border bg-muted/20 px-3 py-1.5">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <span className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </span>
-      <code className="font-mono text-xs">{value ?? "(none detected)"}</code>
+      <code className="font-mono text-sm">{value ?? "(none detected)"}</code>
     </div>
   );
 }

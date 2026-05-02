@@ -106,7 +106,7 @@ export function ResetPasswordForm({ userEmail }: { userEmail: string | null }) {
   return (
     <form onSubmit={handleSubmit} className="flex w-full flex-col gap-4">
       {userEmail && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Signed in as <span className="font-mono">{userEmail}</span>
         </p>
       )}
@@ -127,7 +127,7 @@ export function ResetPasswordForm({ userEmail }: { userEmail: string | null }) {
           suppressHydrationWarning
         />
         {hint && (
-          <p className="text-xs text-muted-foreground">{hint}</p>
+          <p className="text-sm text-muted-foreground">{hint}</p>
         )}
       </div>
 
@@ -146,7 +146,7 @@ export function ResetPasswordForm({ userEmail }: { userEmail: string | null }) {
           suppressHydrationWarning
         />
         {mismatch && (
-          <p className="text-xs text-destructive">Passwords don&apos;t match.</p>
+          <p className="text-sm text-destructive">Passwords don&apos;t match.</p>
         )}
       </div>
 

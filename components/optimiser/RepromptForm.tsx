@@ -83,7 +83,7 @@ export function RepromptForm({
         >
           Free reprompt
         </button>
-        <span className="ml-2 text-xs text-muted-foreground">
+        <span className="ml-2 text-sm text-muted-foreground">
           {mode === "controlled"
             ? "Pick what to preserve and what to change. Recommended."
             : "Freeform — lower precision, useful when the structured form doesn't fit."}
@@ -126,7 +126,7 @@ export function RepromptForm({
               className="mt-1"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Generated brief:{" "}
             <code className="font-mono">
               {controlledSerialised || "(nothing yet)"}
@@ -144,7 +144,7 @@ export function RepromptForm({
             rows={3}
             placeholder="Augment the brief: 'keep the existing testimonial component' / 'use the centred hero variant' / etc."
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Both modes route through the Site Builder generation engine —
             never direct edits.
           </p>

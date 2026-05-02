@@ -10,9 +10,9 @@ import { cn } from "@/lib/utils";
 //   <H1>      page heading             text-xl font-semibold     ~20px
 //   <H2>      section heading          text-base font-semibold   ~16px
 //   <H3>      sub-section / card title text-sm font-semibold     ~14px
-//   <Eyebrow> small uppercase label    text-xs font-medium       ~12px
+//   <Eyebrow> small uppercase label    text-sm font-medium       ~14px
 //                                      uppercase tracking-wide
-//   <Lead>    intro / context line     text-sm                   ~14px
+//   <Lead>    intro / context line     text-base                 ~16px
 //                                      text-muted-foreground
 //
 // Why these tiers (Linear / Vercel / Stripe alignment):
@@ -40,7 +40,7 @@ import { cn } from "@/lib/utils";
 //   • <h2 className="text-base font-medium">  → <H2>
 //   • <p className="text-sm text-muted-foreground"> beneath a heading
 //     → <Lead>
-//   • <span className="text-xs font-medium uppercase tracking-wide
+//   • <span className="text-sm font-medium uppercase tracking-wide
 //     text-muted-foreground"> → <Eyebrow>
 //
 // A-1 sweeps the page-heading <h1> pattern. Per-screen <h2> + Lead +
@@ -101,7 +101,7 @@ export const Eyebrow = React.forwardRef<HTMLSpanElement, SpanProps>(
       <span
         ref={ref}
         className={cn(
-          "text-xs font-medium uppercase tracking-wide text-muted-foreground",
+          "text-sm font-medium uppercase tracking-wide text-muted-foreground",
           className,
         )}
         {...props}
@@ -117,7 +117,7 @@ export const Lead = React.forwardRef<HTMLParagraphElement, ParagraphProps>(
     return (
       <p
         ref={ref}
-        className={cn("text-sm text-muted-foreground", className)}
+        className={cn("text-base text-muted-foreground", className)}
         {...props}
       />
     );

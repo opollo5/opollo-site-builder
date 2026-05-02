@@ -165,7 +165,7 @@ export default function DesignSystemLayout({
     <>
       <div className="flex flex-col gap-2 border-b pb-4">
         <div className="flex items-center justify-between gap-4">
-          <div className="text-xs text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             <Link href="/admin/sites" className="hover:underline">
               Sites
             </Link>
@@ -175,12 +175,12 @@ export default function DesignSystemLayout({
             <span>Design system</span>
           </div>
           {state.status === "ready" && state.versions.length > 0 && (
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground">
               Version
               <select
                 value={selectedDs?.id ?? ""}
                 onChange={(e) => navigateToDs(e.target.value)}
-                className="rounded-md border bg-background px-2 py-1 text-xs"
+                className="rounded-md border bg-background px-2 py-1 text-sm"
               >
                 {state.versions
                   .slice()

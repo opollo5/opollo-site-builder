@@ -32,7 +32,7 @@ function Label({
 
 function FieldError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return <p className="mt-1 text-sm text-destructive">{message}</p>;
 }
 
 export function CreateDesignSystemModal({
@@ -168,13 +168,13 @@ export function CreateDesignSystemModal({
         <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>
             <Label htmlFor="ds-tokens">tokens.css</Label>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Design tokens (colours, spacing, typography) as CSS custom
               properties on the scope wrapper.
             </p>
             <textarea
               id="ds-tokens"
-              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.tokens_css}
               onChange={(e) => setField("tokens_css", e.target.value)}
               placeholder=".ls-scope {\n  --ls-blue: #185FA5;\n  /* ... */\n}"
@@ -187,13 +187,13 @@ export function CreateDesignSystemModal({
 
           <div>
             <Label htmlFor="ds-base-styles">base-styles.css</Label>
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-sm text-muted-foreground">
               Baseline component styles (containers, typography reset,
               primitives) that every page inherits.
             </p>
             <textarea
               id="ds-base-styles"
-              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.base_styles}
               onChange={(e) => setField("base_styles", e.target.value)}
               placeholder=".ls-container { max-width: 1160px; }"

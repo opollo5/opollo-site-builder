@@ -323,7 +323,7 @@ export function AppearancePanelClient({
       {/* Scope clarifier — what Opollo owns vs what the operator owns. */}
       <div
         role="note"
-        className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground"
+        className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground"
       >
         <p>
           <strong className="text-foreground">Opollo owns palette only.</strong>{" "}
@@ -374,7 +374,7 @@ export function AppearancePanelClient({
           description={
             <>
               <p>{errorMessage}</p>
-              <p className="mt-1 text-xs">
+              <p className="mt-1 text-sm">
                 If this happens repeatedly, the WordPress site or Kadence
                 plugin may be down. Re-checking sometimes helps after a
                 brief pause.
@@ -482,7 +482,7 @@ function PreflightBlockedBanner({
     >
       <p className="font-medium">{blocker.title}</p>
       <p className="mt-1">{blocker.detail}</p>
-      <p className="mt-2 text-xs">
+      <p className="mt-2 text-sm">
         <strong>What to do:</strong> {blocker.nextAction}
       </p>
       <Button
@@ -520,20 +520,20 @@ function KadenceInactiveBanner({
       <p className="font-medium">Kadence isn&apos;t the active theme.</p>
       <p className="mt-1">
         The currently-active theme on{" "}
-        <span className="font-mono text-xs">{siteWpUrl}</span> is{" "}
-        <span className="font-mono text-xs">{activeSlug}</span>.{" "}
+        <span className="font-mono text-sm">{siteWpUrl}</span> is{" "}
+        <span className="font-mono text-sm">{activeSlug}</span>.{" "}
         {installed
           ? "Kadence is installed but not active."
           : "Kadence isn't installed yet."}
       </p>
-      <p className="mt-2 text-xs">
+      <p className="mt-2 text-sm">
         <strong>What to do:</strong>{" "}
         {installed
           ? "In WP Admin → Appearance → Themes, hover over Kadence and click Activate."
           : "In WP Admin → Appearance → Themes → Add New, search 'kadence', click Install + Activate."}{" "}
         Then come back here and click Re-check.
       </p>
-      <p className="mt-2 text-xs">
+      <p className="mt-2 text-sm">
         <a
           href={`${siteWpUrl}/wp-admin/themes.php`}
           target="_blank"
@@ -587,16 +587,16 @@ function ReadyState({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-sm">
-              <span className="inline-flex rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <span className="inline-flex rounded bg-emerald-500/10 px-2 py-0.5 text-sm font-medium text-emerald-700">
                 Kadence active
               </span>
               {ctx.install.kadence_version && (
-                <span className="ml-2 text-xs text-muted-foreground">
+                <span className="ml-2 text-sm text-muted-foreground">
                   v{ctx.install.kadence_version}
                 </span>
               )}
             </p>
-            <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+            <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-sm text-muted-foreground sm:grid-cols-2">
               <div>
                 <dt className="inline">Detected:</dt>{" "}
                 <dd className="inline">
@@ -656,18 +656,18 @@ function ReadyState({
               Proposed palette
             </h2>
             {ctx.already_synced ? (
-              <span className="inline-flex rounded bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <span className="inline-flex rounded bg-emerald-500/10 px-2 py-0.5 text-sm font-medium text-emerald-700">
                 Already synced
               </span>
             ) : (
-              <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-900 dark:text-yellow-200">
+              <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-sm font-medium text-yellow-900 dark:text-yellow-200">
                 {ctx.diff.entries.filter((e) => e.changed).length} slot
                 {ctx.diff.entries.filter((e) => e.changed).length === 1 ? "" : "s"} pending
               </span>
             )}
           </div>
           <KadencePaletteDiffTable diff={ctx.diff} />
-          <p className="mt-2 text-xs text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Source:{" "}
             <span className="font-mono">{ctx.proposal.source}</span>
             {ctx.proposal.source === "explicit" &&
@@ -762,7 +762,7 @@ function SyncConfirmModal({
         </div>
 
         <div className="mt-5">
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <h3 className="mb-2 text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Slot-by-slot changes
           </h3>
           <KadencePaletteDiffTable diff={diff} />

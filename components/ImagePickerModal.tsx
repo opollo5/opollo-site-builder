@@ -304,7 +304,7 @@ export function ImagePickerModal({
               </div>
             )}
             <ImageGrid items={browseItems} onSelect={handleSelect} />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>
                 {browseTotal > 0
                   ? `Showing ${browseItems.length} of ${browseTotal}`
@@ -354,7 +354,7 @@ function SuggestedPanel({
 }) {
   return (
     <div className="mt-4 space-y-3">
-      <div className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+      <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
         {fallbackToRecent ? (
           <>No post content yet — showing your recent uploads.</>
         ) : basedOn ? (
@@ -486,7 +486,7 @@ function UploadTab({
         }}
       >
         <p className="font-medium text-foreground">Upload an image</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Drag-drop a file here, or click the button below. JPEG / PNG /
           GIF / WebP. Max 10 MB. Captioning runs in the background.
         </p>
@@ -510,7 +510,7 @@ function UploadTab({
             {uploading ? "Uploading…" : "Pick file"}
           </Button>
           {uploading && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               Pushing to Cloudflare…
             </span>
           )}
@@ -518,7 +518,7 @@ function UploadTab({
         {error && (
           <div
             role="alert"
-            className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+            className="mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
           >
             {error}
           </div>
@@ -585,7 +585,7 @@ function UrlSubMode({
         type="button"
         onClick={() => setOpen(true)}
         data-testid="picker-url-disclosure"
-        className="inline-flex items-center gap-1 text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
       >
         <Link2 aria-hidden className="h-3 w-3" />
         Or paste a URL instead
@@ -598,7 +598,7 @@ function UrlSubMode({
       {/* R2-fix — header row with a cancel affordance so the operator
           can collapse the disclosure if they opened it accidentally. */}
       <div className="flex items-start justify-between gap-2">
-        <p className="text-xs font-medium">Fetch image from URL</p>
+        <p className="text-sm font-medium">Fetch image from URL</p>
         <button
           type="button"
           onClick={() => {
@@ -607,12 +607,12 @@ function UrlSubMode({
             setError(null);
           }}
           aria-label="Cancel URL fetch"
-          className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           Cancel
         </button>
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         Server fetches, validates type + size, and uploads to the library.
         30s timeout; 10 MB cap. Internal IPs blocked.
       </p>
@@ -640,7 +640,7 @@ function UrlSubMode({
       {error && (
         <div
           role="alert"
-          className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive"
+          className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-sm text-destructive"
         >
           {error}
         </div>
@@ -728,14 +728,14 @@ function ImageGrid({
                   className="h-full w-full object-cover transition-smooth group-hover:scale-105"
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">
                   No preview
                 </div>
               )}
             </div>
             {img.caption && (
               <p
-                className="truncate px-2 py-1 text-xs text-muted-foreground"
+                className="truncate px-2 py-1 text-sm text-muted-foreground"
                 title={img.caption}
               >
                 {img.caption}

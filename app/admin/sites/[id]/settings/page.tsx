@@ -72,7 +72,7 @@ export default async function SiteSettingsPage({
         className="mt-6 rounded-lg border p-4"
       >
         <H2 id="voice-heading">Brand voice &amp; design direction</H2>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Set once for the site; the brief commit form inherits these as
           defaults.
         </p>
@@ -91,7 +91,7 @@ export default async function SiteSettingsPage({
         className="mt-6 rounded-lg border p-4"
       >
         <H2 id="image-library-heading">Image library</H2>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           When enabled, brief generation can suggest images from the shared
           library where the page topic matches.
         </p>

@@ -30,7 +30,7 @@ export default async function OptimiserImportReviewPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             <Link
               href="/optimiser"
               className="text-primary underline-offset-4 hover:underline"
@@ -43,13 +43,13 @@ export default async function OptimiserImportReviewPage({
           </h1>
           <p className="text-sm text-muted-foreground">
             Brief status:{" "}
-            <code className="font-mono text-xs">{details.brief.status}</code>
+            <code className="font-mono text-sm">{details.brief.status}</code>
             {" · "}
             {details.brief_page.word_count.toLocaleString()} words captured
             {details.brief_page.import_source_url && (
               <>
                 {" · "}
-                <span className="font-mono text-xs">
+                <span className="font-mono text-sm">
                   {details.brief_page.import_source_url}
                 </span>
               </>
