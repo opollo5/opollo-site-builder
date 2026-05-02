@@ -187,4 +187,40 @@ describe("requireAdminForApi: FEATURE_SUPABASE_AUTH on, kill switch off", () => 
     if (gate.kind !== "allow") throw new Error("unreachable");
     expect(gate.user?.role).toBe("admin");
   });
+
+  // Regression — UAT §1.1.3 surfaced that the no-arg gate defaulted to
+  // ["admin"] only, which 403'd super_admin on every admin route called
+  // with no args. Default now permits both super_admin and admin.
+  it("allows a super_admin via the no-arg default gate", async () => {
+    const superAdmin = await seedAuthUser({ role: "super_admin" });
+    mockState.client = await signedInClient(superAdmin.email);
+
+    const gate = await requireAdminForApi();
+    expect(gate.kind).toBe("allow");
+    if (gate.kind !== "allow") throw new Error("unreachable");
+    expect(gate.user?.role).toBe("super_admin");
+    expect(gate.user?.email).toBe(superAdmin.email);
+  });
+
+  it("allows a super_admin via an explicit super_admin-only roles list", async () => {
+    const superAdmin = await seedAuthUser({ role: "super_admin" });
+    mockState.client = await signedInClient(superAdmin.email);
+
+    const gate = await requireAdminForApi({ roles: ["super_admin"] });
+    expect(gate.kind).toBe("allow");
+    if (gate.kind !== "allow") throw new Error("unreachable");
+    expect(gate.user?.role).toBe("super_admin");
+  });
+
+  it("denies an admin when only super_admin is required", async () => {
+    const admin = await seedAuthUser({ role: "admin" });
+    mockState.client = await signedInClient(admin.email);
+
+    const gate = await requireAdminForApi({ roles: ["super_admin"] });
+    expect(gate.kind).toBe("deny");
+    if (gate.kind !== "deny") throw new Error("unreachable");
+    expect(gate.response.status).toBe(403);
+    const body = await gate.response.json();
+    expect(body.error.code).toBe("FORBIDDEN");
+  });
 });
