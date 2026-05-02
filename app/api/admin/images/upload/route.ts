@@ -8,6 +8,7 @@ import {
   deliveryUrl,
   uploadImageFromBytes,
 } from "@/lib/cloudflare-images";
+import { readImageDimensions } from "@/lib/image-dimensions";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -81,6 +82,39 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const cloudflareId = `opollo/upload/${randomUUID()}`;
   const filename = file.name || `${cloudflareId}.bin`;
   const bytes = new Uint8Array(await file.arrayBuffer());
+  const dims = readImageDimensions(bytes);
+
+  // Optional duplicate-handling: ?replace=1 archives any active row with
+  // the same filename before the new upload lands so the new row can
+  // own the (filename) namespace. Skip mode is enforced client-side via
+  // /api/admin/images/check-existing — by the time we reach this
+  // endpoint the operator already chose to upload this file.
+  const url = new URL(req.url);
+  const replaceExisting = url.searchParams.get("replace") === "1";
+  if (replaceExisting && filename) {
+    const supabaseLookup = getServiceRoleClient();
+    const dup = await supabaseLookup
+      .from("image_library")
+      .select("id")
+      .eq("filename", filename)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (dup.data?.id) {
+      const archived = await supabaseLookup
+        .from("image_library")
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: gate.user?.id ?? null,
+        })
+        .eq("id", dup.data.id);
+      if (archived.error) {
+        logger.error("image.upload.replace_archive_failed", {
+          existing_id: dup.data.id,
+          error: archived.error.message,
+        });
+      }
+    }
+  }
 
   let cfRecord;
   try {
@@ -122,6 +156,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     source: "upload" as const,
     source_ref: filename,
     bytes: file.size,
+    width_px: dims?.width ?? null,
+    height_px: dims?.height ?? null,
     created_by: gate.user?.id ?? null,
   };
   const ins = await supabase
