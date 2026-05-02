@@ -100,6 +100,8 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
 export function BriefRunClient({
   siteId,
   siteName,
+  siteMode = null,
+  siteWpUrl = null,
   brief: initialBrief,
   pages: initialPages,
   activeRun: initialActiveRun,
@@ -108,6 +110,8 @@ export function BriefRunClient({
 }: {
   siteId: string;
   siteName: string;
+  siteMode?: "copy_existing" | "new_design" | null;
+  siteWpUrl?: string | null;
   brief: BriefRow;
   pages: BriefPageRow[];
   activeRun: BriefRunSnapshot | null;
@@ -533,6 +537,9 @@ export function BriefRunClient({
                     controlState={controlState}
                     onApprove={() => handleApprove(page)}
                     onRevise={() => setReviseOpen(page.id)}
+                    themeOriginUrl={
+                      siteMode === "copy_existing" ? siteWpUrl : null
+                    }
                   />
                 )}
               </li>
@@ -612,6 +619,7 @@ function PagePreview({
   controlState,
   onApprove,
   onRevise,
+  themeOriginUrl = null,
 }: {
   page: BriefPageRow;
   briefId: string;
@@ -619,6 +627,9 @@ function PagePreview({
   controlState: ControlState;
   onApprove: () => void;
   onRevise: () => void;
+  /** When set (copy_existing sites), inject Elementor / theme stylesheets
+      into the iframe so the preview renders with the source theme's CSS. */
+  themeOriginUrl?: string | null;
 }) {
   const html = page.generated_html ?? page.draft_html ?? "";
   // Belt-and-suspenders: even after the runner's structural gate (PR
@@ -665,19 +676,22 @@ function PagePreview({
             </Alert>
           )}
           <iframe
-            // Sandbox prevents scripts, plugins, forms, popups from the
-            // preview. draft_html is Claude-generated and already passes
-            // the runner's quality gates, but belt-and-suspenders: render
-            // it in a constrained frame.
+            // Sandbox: allow-same-origin lifted so the iframe's own doc
+            // can pull cross-origin theme stylesheets from the WP source
+            // (copy_existing path). Scripts / forms / popups stay
+            // disallowed by leaving sandbox="" defaults intact.
             //
             // PB-3 (2026-04-29): wrapForPreview wraps path-B fragments in
             // a synthetic doc with a shim stylesheet that approximates
-            // WP/Kadence defaults so the operator sees STYLED content
-            // for visual review rather than unstyled raw HTML. Path-A
-            // documents (claim completeness via DOCTYPE / <html opener)
-            // are passed through unchanged. See lib/preview-iframe-wrapper.ts.
+            // WP/Kadence defaults. UAT-2026-05-02 follow-up: when the
+            // site is in copy_existing mode, we additionally inject
+            // <link rel="stylesheet"> entries for the source site's
+            // Elementor / theme bundles so the preview renders with the
+            // actual theme styling, not just the bare shim.
             sandbox=""
-            srcDoc={wrapForPreview(html)}
+            srcDoc={wrapForPreview(html, {
+              themeOriginUrl,
+            })}
             className="mt-2 h-96 w-full rounded border"
             title={`Preview of ${page.title}`}
           />

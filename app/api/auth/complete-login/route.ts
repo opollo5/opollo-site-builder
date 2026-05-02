@@ -192,23 +192,44 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Trust-device path: upsert a trusted_devices row + set the signed
   // device_id cookie. The device_id was captured into a separate
   // pending cookie at challenge-issue time; read it back here.
+  let trustDeviceOutcome:
+    | "skipped_no_request"
+    | "skipped_no_device_id"
+    | "registered"
+    | "register_failed" = "skipped_no_request";
   if (parsed.data.trust_device) {
     const pendingDeviceCookie = cookieJar.get("opollo_pending_device_id")?.value;
     const deviceId =
       decodePending2faCookie(pendingDeviceCookie) ?? challenge.device_id;
-    await registerTrustedDevice({
-      userId,
-      deviceId,
-      ip: getClientIp(headersList),
-      userAgent: headersList.get("user-agent"),
-    });
-    cookieJar.set(DEVICE_ID_COOKIE, encodeDeviceCookie(deviceId), {
-      httpOnly: true,
-      secure: true,
-      sameSite: "lax",
-      path: "/",
-      maxAge: getCookieMaxAgeSeconds(),
-    });
+    if (!deviceId || deviceId.length === 0) {
+      // Edge case: neither the pending cookie (cleared / never set) nor
+      // the challenge row carries a device_id. Without one we can't write
+      // a trusted_devices row keyed to anything — log loudly so it's
+      // greppable when an operator hits the empty /account/devices list
+      // we saw during UAT (2026-05-02).
+      trustDeviceOutcome = "skipped_no_device_id";
+      logger.warn("auth.2fa.trust_device.skipped_no_device_id", {
+        user_id: userId,
+        challenge_id: parsed.data.challenge_id,
+        had_pending_cookie: Boolean(pendingDeviceCookie),
+        challenge_device_id_present: Boolean(challenge.device_id),
+      });
+    } else {
+      const ok = await registerTrustedDevice({
+        userId,
+        deviceId,
+        ip: getClientIp(headersList),
+        userAgent: headersList.get("user-agent"),
+      });
+      trustDeviceOutcome = ok ? "registered" : "register_failed";
+      cookieJar.set(DEVICE_ID_COOKIE, encodeDeviceCookie(deviceId), {
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+        path: "/",
+        maxAge: getCookieMaxAgeSeconds(),
+      });
+    }
   }
 
   clearPendingCookies(cookieJar);
@@ -217,10 +238,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     user_id: userId,
     challenge_id: parsed.data.challenge_id,
     trust_device: parsed.data.trust_device,
+    trust_device_outcome: trustDeviceOutcome,
   });
 
   return NextResponse.json({
     ok: true,
-    data: { redirect_to: "/admin/sites" },
+    data: {
+      redirect_to: "/admin/sites",
+      trust_device_outcome: trustDeviceOutcome,
+    },
   });
 }

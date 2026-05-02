@@ -57,6 +57,12 @@ export function UploadBriefModal({
   onClose: () => void;
 }) {
   const router = useRouter();
+  // Persist the in-progress brief in localStorage so a refresh / accidental
+  // close doesn't wipe what the operator just typed. Keyed by site so two
+  // sites don't clobber each other. Cleared on successful submit. Files
+  // can't be persisted (no FileSystem-Access on a fresh tab) — only text +
+  // title + content_type survive.
+  const draftKey = `opollo:brief-upload-draft:${siteId}`;
   const [title, setTitle] = useState("");
   const [composerValue, setComposerValue] = useState<ComposerValue>({
     text: "",
@@ -65,15 +71,68 @@ export function UploadBriefModal({
   const [contentType, setContentType] = useState<ContentType>("page");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
 
+  // Hydrate from draft when the modal opens.
   useEffect(() => {
     if (!open) return;
-    setTitle("");
-    setComposerValue({ text: "", file: null });
-    setContentType("page");
     setFormError(null);
     setSubmitting(false);
-  }, [open]);
+    if (typeof window === "undefined") return;
+    try {
+      const raw = window.localStorage.getItem(draftKey);
+      if (!raw) {
+        setTitle("");
+        setComposerValue({ text: "", file: null });
+        setContentType("page");
+        setDraftRestored(false);
+        return;
+      }
+      const draft = JSON.parse(raw) as {
+        title?: string;
+        text?: string;
+        contentType?: ContentType;
+      };
+      setTitle(draft.title ?? "");
+      setComposerValue({ text: draft.text ?? "", file: null });
+      setContentType(draft.contentType === "post" ? "post" : "page");
+      setDraftRestored(
+        Boolean(draft.title) || Boolean(draft.text && draft.text.length > 0),
+      );
+    } catch {
+      // Corrupt localStorage value — fall back to a clean form.
+      setTitle("");
+      setComposerValue({ text: "", file: null });
+      setContentType("page");
+      setDraftRestored(false);
+    }
+  }, [open, draftKey]);
+
+  // Persist on every change (debounced via the natural state batching).
+  useEffect(() => {
+    if (!open) return;
+    if (typeof window === "undefined") return;
+    const draft = {
+      title,
+      text: composerValue.text,
+      contentType,
+    };
+    try {
+      window.localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      // Quota exceeded / private mode — silently ignore.
+    }
+  }, [open, draftKey, title, composerValue.text, contentType]);
+
+  function clearDraft() {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      // ignore
+    }
+    setDraftRestored(false);
+  }
 
   const hasContent =
     composerValue.file !== null || composerValue.text.trim().length > 0;
@@ -141,6 +200,7 @@ export function UploadBriefModal({
         // page reload (the upload route's revalidatePath flushes the
         // server cache, but the client-side router cache also needs a
         // poke for bfcache / soft-nav consistency).
+        clearDraft();
         router.refresh();
         router.push(payload.data.review_url);
         onClose();
@@ -187,6 +247,29 @@ export function UploadBriefModal({
           </DialogHeader>
 
           <div className="mt-4 space-y-4">
+            {draftRestored && (
+              <div
+                role="status"
+                className="flex items-start justify-between gap-3 rounded-md border border-blue-500/40 bg-blue-500/5 p-3 text-sm text-blue-900 dark:text-blue-200"
+              >
+                <span>
+                  We restored what you were working on. Pick up where you left
+                  off, or start fresh.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTitle("");
+                    setComposerValue({ text: "", file: null });
+                    setContentType("page");
+                    clearDraft();
+                  }}
+                  className="shrink-0 rounded border bg-background px-2 py-0.5 text-xs"
+                >
+                  Discard draft
+                </button>
+              </div>
+            )}
             <fieldset>
               <legend className="block text-sm font-medium">Content type</legend>
               <div className="mt-1 flex items-center gap-4">

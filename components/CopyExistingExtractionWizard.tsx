@@ -192,9 +192,9 @@ export function CopyExistingExtractionWizard({
             <textarea
               value={extraPagesText}
               onChange={(e) => setExtraPagesText(e.target.value)}
-              placeholder={`https://example.com/about\nhttps://example.com/services`}
-              rows={2}
-              className="mt-1 w-full rounded border bg-background px-2 py-1 text-sm"
+              placeholder={`https://example.com/about\nhttps://example.com/services\nhttps://example.com/contact`}
+              rows={6}
+              className="mt-1 min-h-[160px] w-full resize-y rounded border bg-background px-2 py-1 text-sm"
               disabled={extracting}
             />
           </label>

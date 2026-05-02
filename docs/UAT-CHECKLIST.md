@@ -102,9 +102,10 @@ The custom invite flow replaces Supabase's built-in `inviteUserByEmail`. Invite 
   **Expected:** sets-password form with the invite's email pre-filled (read-only).
   **Fail →** if "Invite expired or already used" on first click, runbook §`Invite token redemption`. Check `invites.consumed_at` for the row.
 
-- [ ] **1.1.5** Set a password → land on `/admin/sites`.
-  **Expected:** signed in as the invited role. The role widget on `/admin/users` for this user no longer shows "Pending invite".
-  **Fail →** if redirected to `/login` after submission, the redemption hop didn't establish a session — runbook §`PKCE callback`.
+- [ ] **1.1.5** Set a password.
+  **Expected (when `AUTH_2FA_ENABLED=true`):** redirect to `/login` then immediately to `/login/check-email?challenge=…` — the accept-invite flow signs the user out post-redemption (`app/api/auth/accept-invite/route.ts:16-17`) so the next login goes through the standard 2FA email gate. After approving the email, land on `/admin/sites`.
+  **Expected (when `AUTH_2FA_ENABLED` unset/false):** sign in immediately and land on `/admin/sites`.
+  **Fail →** if redirected to `/login` and stuck there with no challenge query, the redemption hop didn't establish a session correctly — runbook §`PKCE callback`.
 
 - [ ] **1.1.6** From the invited admin account: navigate to `/admin/users`.
   **Expected:** users list renders WITHOUT the "View audit log" link (super_admin-gated).
@@ -387,8 +388,9 @@ Use a `new_design` site whose DESIGN-DISCOVERY is approved (so the design contex
 
 ### 4.1 Upload + parse + commit (M12-1, M12-2)
 
-- [ ] **4.1.1** **URL:** `/admin/sites/[id]/briefs` → "Upload brief".
-  **Expected:** modal with file-upload + paste-text tabs (PR #180), `content_type` selector (page / post). Brief size cap rejects >45k-word docs with `BRIEF_TOO_LARGE` (per m12-parent §Whole-document context).
+- [ ] **4.1.1** **URL:** `/admin/sites/[id]` → scroll to the **Briefs** section → click "Upload brief".
+  (Note: there is no `/admin/sites/[id]/briefs` index route — the briefs list + upload button live on the site detail page directly. See `app/admin/sites/[id]/page.tsx:302-306`.)
+  **Expected:** modal with file-upload + paste-text composer, `content_type` selector (page / post), draft persistence (refresh the page mid-typing — your input survives). Brief size cap rejects >45k-word docs with `BRIEF_TOO_LARGE` (per m12-parent §Whole-document context).
 
 - [ ] **4.1.2** Upload a 3-page markdown brief with `content_type=page`. Provide brand voice + design direction in the form (M12-2 first-class fields).
   **Expected:** parse runs (structural-first, falls back to Claude inference). Redirect to `/admin/sites/[id]/briefs/[brief_id]/review`.

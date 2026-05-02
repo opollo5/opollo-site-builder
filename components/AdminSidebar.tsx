@@ -7,6 +7,7 @@ import {
   Building2,
   ChevronsLeft,
   ChevronsRight,
+  Activity,
   FileText,
   Globe,
   Image as ImageIcon,
@@ -173,6 +174,12 @@ export function AdminSidebar({
           href: "/admin/users/audit",
           icon: ShieldCheck,
           testId: "nav-audit-log",
+        },
+        {
+          label: "System jobs",
+          href: "/admin/system/jobs",
+          icon: Activity,
+          testId: "nav-system-jobs",
         },
         {
           label: "Email test",

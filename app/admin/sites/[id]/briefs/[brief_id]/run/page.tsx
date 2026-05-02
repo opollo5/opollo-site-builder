@@ -151,6 +151,8 @@ export default async function BriefRunPage({
       <BriefRunClient
         siteId={site.id}
         siteName={site.name}
+        siteMode={site.site_mode}
+        siteWpUrl={site.wp_url}
         brief={brief}
         pages={pages}
         activeRun={activeRun}

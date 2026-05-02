@@ -10,6 +10,10 @@ export type Industry =
   | "msp"
   | "it_services"
   | "cybersecurity"
+  | "saas"
+  | "fintech"
+  | "finance"
+  | "general_technology"
   | "general_b2b"
   | "other";
 
@@ -84,6 +88,94 @@ export const INDUSTRY_PRESETS: Record<Industry, IndustryPreset> = {
     font_body: "Inter",
     default_voice_seed:
       "Authoritative, calm, evidence-based. Avoid fear-based copy; lead with concrete capabilities and outcomes.",
+  },
+  saas: {
+    label: "SaaS",
+    visual_tone: "Modern, product-led, conversion-focused",
+    layout_tags: [
+      "Hero with product screenshot",
+      "Feature blocks",
+      "Pricing table",
+      "Logo bar",
+    ],
+    visual_tone_tags: ["Modern", "Product-led", "Conversion-focused"],
+    swatches: {
+      primary: "#0F172A",
+      secondary: "#475569",
+      accent: "#7C3AED",
+      background: "#FFFFFF",
+      text: "#0F172A",
+    },
+    font_heading: "Inter",
+    font_body: "Inter",
+    default_voice_seed:
+      "Confident, product-led, outcome-oriented. Lead with the user's job-to-be-done; reserve technical detail for feature pages.",
+  },
+  fintech: {
+    label: "Fintech",
+    visual_tone: "Confident, modern, trustworthy",
+    layout_tags: [
+      "Hero with social proof",
+      "Stats strip",
+      "Feature grid",
+      "Compliance band",
+    ],
+    visual_tone_tags: ["Confident", "Trustworthy", "Modern"],
+    swatches: {
+      primary: "#0E1A2B",
+      secondary: "#3B5266",
+      accent: "#06B6D4",
+      background: "#FFFFFF",
+      text: "#0E1A2B",
+    },
+    font_heading: "Inter",
+    font_body: "Inter",
+    default_voice_seed:
+      "Authoritative, plainspoken, evidence-led. Cite numbers where they exist; avoid hype words like 'revolutionary' or 'disruptive'.",
+  },
+  finance: {
+    label: "Finance / Wealth",
+    visual_tone: "Reserved, polished, premium",
+    layout_tags: [
+      "Editorial hero",
+      "Long-form sections",
+      "Team band",
+      "Subtle CTA",
+    ],
+    visual_tone_tags: ["Reserved", "Polished", "Premium"],
+    swatches: {
+      primary: "#1A2B3C",
+      secondary: "#6B7B8C",
+      accent: "#B59B6E",
+      background: "#FBF8F4",
+      text: "#1A2B3C",
+    },
+    font_heading: "Playfair Display",
+    font_body: "Inter",
+    default_voice_seed:
+      "Considered, confident, never breathless. Long sentences are allowed; assume a financially literate reader.",
+  },
+  general_technology: {
+    label: "General Technology",
+    visual_tone: "Clean, modern, capable",
+    layout_tags: [
+      "Hero with CTA",
+      "Capability grid",
+      "Case-study band",
+      "Footer with logo lockup",
+    ],
+    visual_tone_tags: ["Modern", "Capable", "Neutral"],
+    swatches: {
+      primary: "#111827",
+      secondary: "#4B5563",
+      accent: "#2563EB",
+      background: "#F9FAFB",
+      text: "#111827",
+    },
+    font_heading: "Inter",
+    font_body: "Inter",
+    default_voice_seed:
+      "Professional, clear, outcome-focused. Lead with what the technology does for the customer, not how it works under the hood.",
   },
   general_b2b: {
     label: "General B2B",

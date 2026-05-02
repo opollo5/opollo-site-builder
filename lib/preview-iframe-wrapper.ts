@@ -97,6 +97,29 @@ const SHIM_STYLESHEET = `
   }
 `;
 
+export interface PreviewWrapOptions {
+  /**
+   * For copy_existing sites, pointing the iframe at the source WP origin
+   * lets us pull the live theme stylesheet via <link rel="stylesheet">.
+   * The browser will only honour same-origin relative URLs in the
+   * iframe srcdoc, so we inject a <base href> and a small list of
+   * known stylesheet entry points (style.css + Elementor common bundles).
+   * Cross-origin CSS is permitted by the browser; CSP comes from our
+   * site, not the iframe srcdoc, so it doesn't apply to the iframe doc.
+   *
+   * The supplied URL should be the site's wp_url (or any URL on the
+   * same origin as the published page). Paths typically don't matter —
+   * we only use the origin.
+   */
+  themeOriginUrl?: string | null;
+  /**
+   * Direct stylesheet URLs to inject as <link rel="stylesheet"> tags.
+   * Used by the extraction pass to forward known stylesheet hrefs the
+   * site advertises (Elementor's frontend.css + theme style.css).
+   */
+  themeStylesheetUrls?: string[] | null;
+}
+
 /**
  * Returns the html string ready to feed into an iframe srcdoc.
  *
@@ -104,11 +127,18 @@ const SHIM_STYLESHEET = `
  *   the input unchanged. Legacy / evidence pages render as before.
  * - For path-B fragments: wraps in a synthetic doc with the shim
  *   stylesheet. The fragment becomes the iframe body's content.
+ * - When `themeOriginUrl` or `themeStylesheetUrls` is supplied (per
+ *   the copy_existing extraction), an additional <base href> + theme
+ *   stylesheets are injected so Elementor / Kadence classes light up
+ *   in the preview iframe instead of rendering as unstyled text.
  *
  * Empty / nullish input returns an empty string so the caller can
  * branch on truthiness.
  */
-export function wrapForPreview(html: string | null | undefined): string {
+export function wrapForPreview(
+  html: string | null | undefined,
+  options: PreviewWrapOptions = {},
+): string {
   if (!html) return "";
   const trimmed = html.trim();
   if (trimmed.length === 0) return "";
@@ -120,6 +150,43 @@ export function wrapForPreview(html: string | null | undefined): string {
     return html;
   }
 
+  // Build a list of <link rel="stylesheet"> tags for the iframe head.
+  // 1. Operator-supplied themeStylesheetUrls (preferred — populated by
+  //    the copy_existing extraction)
+  // 2. Otherwise: when themeOriginUrl is set, attempt the canonical
+  //    Elementor + theme bundles. These 404 silently if the site
+  //    doesn't have them; cost is one wasted request per slot.
+  const stylesheetTags: string[] = [];
+  const seen = new Set<string>();
+  function pushLink(href: string) {
+    if (!href) return;
+    if (seen.has(href)) return;
+    seen.add(href);
+    stylesheetTags.push(
+      `<link rel="stylesheet" href="${href.replace(/"/g, "&quot;")}">`,
+    );
+  }
+  for (const href of options.themeStylesheetUrls ?? []) {
+    pushLink(href);
+  }
+  if (options.themeOriginUrl) {
+    try {
+      const u = new URL(options.themeOriginUrl);
+      const origin = u.origin;
+      pushLink(`${origin}/wp-content/plugins/elementor/assets/css/frontend.min.css`);
+      pushLink(
+        `${origin}/wp-content/plugins/elementor-pro/assets/css/frontend.min.css`,
+      );
+      // theme style.css fallback — tries the parent theme. WordPress
+      // serves the stub stylesheet at /wp-content/themes/<theme>/style.css
+      // but we don't know the theme slug; the catch-all rest endpoint
+      // hint isn't exposed on every site. Skip for now — Elementor's
+      // bundle covers most of the visual chrome.
+    } catch {
+      // invalid URL → skip
+    }
+  }
+
   // Path-B: synthetic wrapper around the fragment.
   return [
     "<!DOCTYPE html>",
@@ -127,6 +194,10 @@ export function wrapForPreview(html: string | null | undefined): string {
     "<head>",
     '<meta charset="UTF-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    options.themeOriginUrl
+      ? `<base href="${new URL(options.themeOriginUrl).origin}/">`
+      : "",
+    ...stylesheetTags,
     "<style>",
     SHIM_STYLESHEET,
     "</style>",
@@ -135,5 +206,7 @@ export function wrapForPreview(html: string | null | undefined): string {
     html,
     "</body>",
     "</html>",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
