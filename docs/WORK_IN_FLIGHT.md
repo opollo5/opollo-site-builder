@@ -6,7 +6,23 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
-## ~~Session A~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; A's owner removes when they next push)
+---
+## Session A
+- Started: 2026-05-02
+- Branch: feat/platform-p1-schema
+- Slice: P1 — Platform Foundation: schema + RLS for companies, users, roles, invitations, notifications. Migration also lands the full N-Series social schema in one shot per Steven's instruction (BUILD.md scope is platform; social schema rides along, social feature code lands in S1+).
+- Files claimed:
+  - supabase/migrations/0070_platform_foundation.sql (new)
+  - supabase/rollbacks/0070_platform_foundation.down.sql (new)
+  - lib/__tests__/p1-platform-schema.test.ts (new)
+  - lib/__tests__/_setup.ts (extend TRUNCATE list with platform_*/social_* tables)
+  - docs/WORK_IN_FLIGHT.md (this claim block; removed in next PR's first commit)
+- Migration number reserved: 0070
+- Expected completion: same session; auto-merge on green CI
+- Notes: Replaces an untracked supabase/migrations/20260502000000_platform_and_social_v1.sql draft Steven had sitting in the working tree. Renumbered to 0070 to fit the sequential pattern. Recovery preamble in 0070 handles environments where the 20260502 draft was applied locally.
+---
+
+## ~~Session A (stale)~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; previous owner removes when they next push)
 - Started: 2026-04-24
 - Branch: feat/m12-6-save-draft-persistence
 - Slice: M12-6 — Save-Draft persistence for briefs review; PATCH endpoint + button + re-enable fixme'd E2E test
@@ -53,6 +69,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - 0017 — M12-2 brand_voice + design_direction columns on briefs. Executing on `feat/m12-2-brand-voice-site-conventions`.
 - ~~0019 — M13-1 posts schema.~~ Shipped in #142.
 - ~~0021 — M13-3 briefs.content_type column.~~ Shipped in #145.
+- 0070 — P1 Platform Foundation (platform_* + social_* schema + RLS). Executing on `feat/platform-p1-schema`.
 
 ## Claim block template
 
