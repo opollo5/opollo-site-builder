@@ -7,19 +7,17 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
 ---
-## Session A
+## Session A — fix/platform-invite-accept-page (BUILD-AUDIT P0)
 - Started: 2026-05-02
-- Branch: feat/p2-3-invitation-accept
-- Slice: P2-3 — Accept invitation flow. Public POST endpoint validates the raw token, creates auth.users + platform_users + platform_company_users, marks the invitation accepted. P2-4 QStash callbacks still blocked on env.
+- Branch: fix/platform-invite-accept-page
+- Slice: BUILD-AUDIT P0 — `/invite/[token]` page that renders the platform invitation accept form. P2-2 send emails point recipients here; without the page they 404. P2-3 (#385) explicitly deferred this page and merged the API route only.
 - Files claimed:
-  - lib/platform/invitations/accept.ts (new)
-  - lib/platform/invitations/index.ts (extend exports)
-  - lib/platform/invitations/types.ts (extend with AcceptResult)
-  - app/api/platform/invitations/accept/route.ts (new — public POST)
-  - lib/__tests__/platform-invitations-accept.test.ts (new)
-  - docs/WORK_IN_FLIGHT.md (claim block; removed in next PR's first commit)
+  - app/invite/[token]/page.tsx (new — server-component validates token via service-role, looks up platform_invitations row + company name)
+  - components/PlatformAcceptInviteForm.tsx (new — client form posting to POST /api/platform/invitations/accept)
+  - middleware.ts (add `/invite/` prefix to public-paths list — same pattern as `/auth/accept-invite`)
+  - docs/WORK_IN_FLIGHT.md (this claim; removed in next PR's first commit)
 - Migration number reserved: none
-- Expected completion: same session.
+- Expected completion: same session; auto-merge on green CI.
 ---
 
 ## ~~Session A (stale)~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; previous owner removes when they next push)
