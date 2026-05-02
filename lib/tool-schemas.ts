@@ -188,6 +188,8 @@ export type SiteRecord = {
   brand_voice: string | null;
   design_direction: string | null;
   version_lock: number;
+  // DESIGN-SYSTEM-OVERHAUL — null when onboarding hasn't picked a mode yet.
+  site_mode: "copy_existing" | "new_design" | null;
 };
 
 export type SiteListItem = {

@@ -359,8 +359,22 @@ export function BriefReviewClient({
                   ? "Inheriting from site defaults. Expand to customize for this brief."
                   : hasSiteDefault
                     ? "Override values for this brief only. The site defaults below stay unchanged."
-                    : "These guide every page the generator produces. Set once on Site Settings to inherit on every brief."}
+                    : "These guide every page the generator produces."}
               </p>
+              {!hasSiteDefault && !isReadOnly && (
+                <div className="mt-2 rounded-md border border-blue-500/40 bg-blue-500/5 p-2 text-xs text-blue-900 dark:text-blue-200">
+                  <strong>Tip:</strong> brand voice is a property of the
+                  whole site — set it once on{" "}
+                  <a
+                    href={`/admin/sites/${siteId}/settings`}
+                    className="underline hover:no-underline"
+                  >
+                    Site Settings
+                  </a>{" "}
+                  and every brief inherits it. Saves retyping it on each
+                  upload.
+                </div>
+              )}
             </div>
             {hasSiteDefault && !isReadOnly && (
               <Button

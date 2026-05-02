@@ -28,8 +28,10 @@ export default async function AccountSecurityPage() {
     redirect("/login");
   }
 
+  // Nested <main> would be invalid HTML — the /account layout already
+  // owns the outer <main>. Use a section wrapper here instead.
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col gap-6 p-6 pt-20">
+    <section className="mx-auto flex max-w-md flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">Account security</h1>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -37,11 +39,6 @@ export default async function AccountSecurityPage() {
         </p>
       </div>
       <AccountSecurityForm userEmail={user.email} />
-      <div className="text-sm text-muted-foreground">
-        <a href="/admin/sites" className="underline hover:no-underline">
-          ← Back to admin
-        </a>
-      </div>
-    </main>
+    </section>
   );
 }
