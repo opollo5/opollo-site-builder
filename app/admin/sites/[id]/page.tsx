@@ -400,13 +400,19 @@ export default async function SiteDetailPage({
               ) : (
                 <>
                   <p className="text-muted-foreground">
-                    No active design system. Create one before running batches.
+                    {needsOnboarding
+                      ? "Pick how you want to use this site to get going."
+                      : "No active design system. Create one before running batches."}
                   </p>
                   <Link
-                    href={`/admin/sites/${site.id}/design-system`}
+                    href={
+                      needsOnboarding
+                        ? `/admin/sites/${site.id}/onboarding`
+                        : `/admin/sites/${site.id}/design-system`
+                    }
                     className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
                   >
-                    Set up design system →
+                    {needsOnboarding ? "Set up now →" : "Set up design system →"}
                   </Link>
                 </>
               )}
