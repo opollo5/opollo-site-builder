@@ -48,30 +48,47 @@ export async function sendInvitation(
 
   // 1. Reject if a platform user with this email is already a member of
   // any company (V1: one user, one company).
-  const memberCheck = await svc
+  //
+  // Two separate queries instead of an embedded join. platform_company_users
+  // has TWO FKs to platform_users (user_id + added_by); PostgREST embed
+  // refuses to disambiguate ("Could not embed because more than one
+  // relationship was found"). Two queries also keep the lib resilient if
+  // a future migration adds another FK between these tables.
+  const userCheck = await svc
     .from("platform_users")
-    .select("id, platform_company_users(company_id)")
+    .select("id")
     .eq("email", email)
     .maybeSingle();
-  if (memberCheck.error) {
-    logger.error("invitations.send.member_lookup_failed", {
-      err: memberCheck.error.message,
+  if (userCheck.error) {
+    logger.error("invitations.send.user_lookup_failed", {
+      err: userCheck.error.message,
     });
-    return internal(`Member lookup failed: ${memberCheck.error.message}`);
+    return internal(`User lookup failed: ${userCheck.error.message}`);
   }
-  if (
-    memberCheck.data &&
-    Array.isArray(memberCheck.data.platform_company_users) &&
-    memberCheck.data.platform_company_users.length > 0
-  ) {
-    return {
-      ok: false,
-      error: {
-        code: "ACTIVE_MEMBERSHIP_EXISTS",
-        message:
-          "This email is already a member of a company on the platform.",
-      },
-    };
+  if (userCheck.data) {
+    const membershipCheck = await svc
+      .from("platform_company_users")
+      .select("company_id")
+      .eq("user_id", userCheck.data.id)
+      .limit(1);
+    if (membershipCheck.error) {
+      logger.error("invitations.send.membership_lookup_failed", {
+        err: membershipCheck.error.message,
+      });
+      return internal(
+        `Membership lookup failed: ${membershipCheck.error.message}`,
+      );
+    }
+    if ((membershipCheck.data?.length ?? 0) > 0) {
+      return {
+        ok: false,
+        error: {
+          code: "ACTIVE_MEMBERSHIP_EXISTS",
+          message:
+            "This email is already a member of a company on the platform.",
+        },
+      };
+    }
   }
 
   // 2. Reject if a pending invitation already exists for this
