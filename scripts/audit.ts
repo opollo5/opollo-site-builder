@@ -500,6 +500,53 @@ function check4_migrationOrdering(): Issue[] {
 // Check 5 — Typography minimums (LOW)
 // ============================================================================
 
+/**
+ * Strip comments from a source line so checks don't false-positive on doc
+ * mentions of forbidden patterns. Tracks block-comment state across lines.
+ *
+ *   - Block comments `/* ... *​/` (multi-line) — stripped, state carried.
+ *   - Line comments `//` (TS/JS/JSX, not CSS) — everything after stripped.
+ *   - JSX comments are wrapped `{/* ... *​/}` but the inner block-comment
+ *     pattern is the same; the regex strip handles them naturally.
+ *
+ * Crude on string literals (`'//'` would be stripped) but acceptable for
+ * the typography check since the false-positive risk on string-literal
+ * `text-xs` is low (test fixtures already excluded via SKIP_DIRS).
+ */
+function stripComments(
+  line: string,
+  state: { inBlock: boolean },
+  isCss: boolean,
+): string {
+  let result = line;
+
+  if (state.inBlock) {
+    const endIdx = result.indexOf("*/");
+    if (endIdx === -1) return ""; // entire line is in a block comment
+    result = result.slice(endIdx + 2);
+    state.inBlock = false;
+  }
+
+  while (true) {
+    const startIdx = result.indexOf("/*");
+    if (startIdx === -1) break;
+    const endIdx = result.indexOf("*/", startIdx + 2);
+    if (endIdx === -1) {
+      result = result.slice(0, startIdx);
+      state.inBlock = true;
+      break;
+    }
+    result = result.slice(0, startIdx) + result.slice(endIdx + 2);
+  }
+
+  if (!isCss) {
+    const lineCommentIdx = result.indexOf("//");
+    if (lineCommentIdx !== -1) result = result.slice(0, lineCommentIdx);
+  }
+
+  return result;
+}
+
 function check5_typography(): Issue[] {
   const issues: Issue[] = [];
   const roots = ["app", "components", "lib"];
@@ -516,8 +563,11 @@ function check5_typography(): Issue[] {
     for (const file of walkFiles(dir, [".ts", ".tsx", ".css"])) {
       const lines = readSafe(file).split(/\r?\n/);
       const rel = relPath(file);
+      const isCss = file.endsWith(".css");
+      const state = { inBlock: false };
       lines.forEach((ln, i) => {
-        if (textXsRe.test(ln)) {
+        const stripped = stripComments(ln, state, isCss);
+        if (textXsRe.test(stripped)) {
           issues.push({
             category: "typography-minimums",
             severity: "LOW",
@@ -526,7 +576,7 @@ function check5_typography(): Issue[] {
             message: "text-xs (12px) is below the 0.875rem / 14px floor — uplift to text-sm (RULES.md #7)",
           });
         }
-        if (fsPxRe.test(ln)) {
+        if (fsPxRe.test(stripped)) {
           issues.push({
             category: "typography-minimums",
             severity: "LOW",
