@@ -9,16 +9,19 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-4-post-variants
-- Slice: S1-4 — per-platform post variants. lib/platform/social/variants {list,upsert} (UNIQUE post_master_id+platform; draft-only edits). GET+PUT /api/platform/social/posts/[id]/variants. Detail page renders the variants section.
+- Branch: feat/s1-5-submit-for-approval
+- Slice: S1-5 — submit-for-approval state transition (write-safety hotspot). Migration 0071 adds a transactional submit_post_for_approval(post_id, company_id, snapshot, expires_at) Postgres function so the state-machine flip + approval_request snapshot insert happen atomically. Lib + route + detail page button.
 - Files claimed:
-  - lib/platform/social/variants/{types,list,upsert,index}.ts (new)
-  - app/api/platform/social/posts/[id]/variants/route.ts (new)
-  - components/PostVariantsSection.tsx (new)
-  - app/company/social/posts/[id]/page.tsx (wire variants section)
-  - lib/__tests__/social-variants.test.ts (new)
+  - supabase/migrations/0071_submit_post_for_approval_fn.sql (new)
+  - supabase/rollbacks/0071_submit_post_for_approval_fn.down.sql (new)
+  - lib/platform/social/posts/transitions.ts (new)
+  - lib/platform/social/posts/index.ts (re-export)
+  - app/api/platform/social/posts/[id]/submit/route.ts (new)
+  - components/SocialPostDetailClient.tsx (Submit-for-approval button + canSubmit prop)
+  - app/company/social/posts/[id]/page.tsx (canSubmit gate)
+  - lib/__tests__/social-post-transitions.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: none
+- Migration number reserved: 0071 — see Reserved migration numbers list.
 - Expected completion: same session.
 ---
 
@@ -70,6 +73,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0019 — M13-1 posts schema.~~ Shipped in #142.
 - ~~0021 — M13-3 briefs.content_type column.~~ Shipped in #145.
 - ~~0070 — P1 Platform Foundation (platform_* + social_* schema + RLS).~~ Shipped in #376 + #377.
+- 0071 — Session A — S1-5 submit_post_for_approval transactional function (branch: feat/s1-5-submit-for-approval)
 
 ## Claim block template
 

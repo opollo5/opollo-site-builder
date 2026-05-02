@@ -24,6 +24,7 @@ import type {
 type Props = {
   post: PostMaster;
   canEdit: boolean;
+  canSubmit: boolean;
 };
 
 const STATE_LABEL: Record<SocialPostState, string> = {
@@ -39,17 +40,19 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   failed: "Failed",
 };
 
-export function SocialPostDetailClient({ post, canEdit }: Props) {
+export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
   const router = useRouter();
   const [masterText, setMasterText] = useState(post.master_text ?? "");
   const [linkUrl, setLinkUrl] = useState(post.link_url ?? "");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isDraft = post.state === "draft";
   const editable = canEdit && isDraft;
+  const submittable = canSubmit && isDraft;
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -106,6 +109,43 @@ export function SocialPostDetailClient({ post, canEdit }: Props) {
     }
   }
 
+  async function handleSubmitForApproval() {
+    if (
+      !confirm(
+        "Submit this post for approval? You won't be able to edit it again until the reviewer responds.",
+      )
+    ) {
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/platform/social/posts/${post.id}/submit`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company_id: post.company_id }),
+        },
+      );
+      const json = (await res.json()) as
+        | { ok: true; data: { approvalRequestId: string } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        const msg = !json.ok
+          ? json.error.message
+          : "Failed to submit for approval.";
+        setError(msg);
+        setSubmitting(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setSubmitting(false);
+    }
+  }
+
   return (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -126,22 +166,35 @@ export function SocialPostDetailClient({ post, canEdit }: Props) {
             </span>
           </Lead>
         </div>
-        {editable && !editing ? (
-          <div className="flex gap-2">
-            <Button
-              onClick={() => setEditing(true)}
-              data-testid="edit-post-button"
-            >
-              Edit
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleting}
-              data-testid="delete-post-button"
-            >
-              {deleting ? "Deleting…" : "Delete"}
-            </Button>
+        {!editing ? (
+          <div className="flex flex-wrap gap-2">
+            {editable ? (
+              <Button
+                onClick={() => setEditing(true)}
+                data-testid="edit-post-button"
+              >
+                Edit
+              </Button>
+            ) : null}
+            {submittable ? (
+              <Button
+                onClick={handleSubmitForApproval}
+                disabled={submitting}
+                data-testid="submit-post-button"
+              >
+                {submitting ? "Submitting…" : "Submit for approval"}
+              </Button>
+            ) : null}
+            {editable ? (
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={deleting}
+                data-testid="delete-post-button"
+              >
+                {deleting ? "Deleting…" : "Delete"}
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </div>

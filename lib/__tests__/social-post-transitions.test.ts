@@ -1,0 +1,316 @@
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+} from "vitest";
+
+import {
+  createPostMaster,
+  submitForApproval,
+} from "@/lib/platform/social/posts";
+import { upsertVariant } from "@/lib/platform/social/variants";
+import { getServiceRoleClient } from "@/lib/supabase";
+
+import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
+
+// ---------------------------------------------------------------------------
+// S1-5: lib-layer tests for submitForApproval.
+//
+// Exercises migration 0071's submit_post_for_approval Postgres function
+// end-to-end against the live Supabase stack. Concurrency invariant
+// covered explicitly: two parallel submits → exactly one
+// social_approval_requests row.
+// ---------------------------------------------------------------------------
+
+const COMPANY_A_ID = "abcdef00-0000-0000-0000-eeeeeeeeeeee";
+const COMPANY_B_ID = "abcdef00-0000-0000-0000-ffffffffffff";
+
+describe("lib/platform/social/posts/submitForApproval", () => {
+  let creator: SeededAuthUser;
+
+  beforeAll(async () => {
+    creator = await seedAuthUser({
+      email: "s1-5-creator@opollo.test",
+      persistent: true,
+    });
+  });
+
+  beforeEach(async () => {
+    const svc = getServiceRoleClient();
+
+    const companies = await svc
+      .from("platform_companies")
+      .insert([
+        {
+          id: COMPANY_A_ID,
+          name: "Acme Co",
+          slug: "s1-5-acme",
+          domain: "s1-5-acme.test",
+          is_opollo_internal: false,
+          timezone: "Australia/Melbourne",
+          approval_default_rule: "any_one",
+        },
+        {
+          id: COMPANY_B_ID,
+          name: "Beta Inc",
+          slug: "s1-5-beta",
+          domain: "s1-5-beta.test",
+          is_opollo_internal: false,
+          timezone: "Australia/Melbourne",
+          approval_default_rule: "all_must",
+        },
+      ])
+      .select("id");
+    if (companies.error) {
+      throw new Error(
+        `seed companies: ${companies.error.code ?? "?"} ${companies.error.message}`,
+      );
+    }
+
+    const user = await svc
+      .from("platform_users")
+      .insert({
+        id: creator.id,
+        email: creator.email,
+        full_name: "Creator",
+        is_opollo_staff: false,
+      })
+      .select("id");
+    if (user.error) {
+      throw new Error(
+        `seed creator: ${user.error.code ?? "?"} ${user.error.message}`,
+      );
+    }
+
+    const membership = await svc
+      .from("platform_company_users")
+      .insert({
+        company_id: COMPANY_A_ID,
+        user_id: creator.id,
+        role: "editor",
+      })
+      .select("id");
+    if (membership.error) {
+      throw new Error(
+        `seed membership: ${membership.error.code ?? "?"} ${membership.error.message}`,
+      );
+    }
+  });
+
+  afterAll(async () => {
+    const svc = getServiceRoleClient();
+    if (creator) await svc.auth.admin.deleteUser(creator.id);
+  });
+
+  async function createDraft(text = "ready to submit") {
+    const created = await createPostMaster({
+      companyId: COMPANY_A_ID,
+      masterText: text,
+      createdBy: creator.id,
+    });
+    if (!created.ok) {
+      throw new Error(`createDraft: ${created.error.code}`);
+    }
+    return created.data;
+  }
+
+  it("happy path — flips state to pending_client_approval AND inserts approval_request", async () => {
+    const post = await createDraft("hello reviewers");
+
+    const result = await submitForApproval({
+      postId: post.id,
+      companyId: COMPANY_A_ID,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.approvalRequestId).toMatch(/^[0-9a-f-]{36}$/);
+
+    const svc = getServiceRoleClient();
+    const after = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", post.id)
+      .single();
+    expect(after.error).toBeNull();
+    expect(after.data?.state).toBe("pending_client_approval");
+
+    const requests = await svc
+      .from("social_approval_requests")
+      .select("id, post_master_id, company_id, approval_rule, snapshot_payload, expires_at")
+      .eq("post_master_id", post.id);
+    expect(requests.error).toBeNull();
+    expect(requests.data?.length).toBe(1);
+    const req = requests.data?.[0];
+    expect(req?.approval_rule).toBe("any_one");
+    expect(req?.company_id).toBe(COMPANY_A_ID);
+    expect(req?.snapshot_payload).toMatchObject({
+      master_text: "hello reviewers",
+      link_url: null,
+    });
+  });
+
+  it("snapshot freezes per-platform variants at submit time", async () => {
+    const post = await createDraft("master");
+    await upsertVariant({
+      postMasterId: post.id,
+      companyId: COMPANY_A_ID,
+      platform: "linkedin_personal",
+      variantText: "linked-in flavour",
+    });
+    await upsertVariant({
+      postMasterId: post.id,
+      companyId: COMPANY_A_ID,
+      platform: "x",
+      variantText: "x flavour",
+    });
+
+    const result = await submitForApproval({
+      postId: post.id,
+      companyId: COMPANY_A_ID,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const svc = getServiceRoleClient();
+    const reqRow = await svc
+      .from("social_approval_requests")
+      .select("snapshot_payload")
+      .eq("post_master_id", post.id)
+      .single();
+    expect(reqRow.error).toBeNull();
+    const snap = reqRow.data?.snapshot_payload as {
+      variants: Array<{ platform: string; variant_text: string | null; is_custom: boolean }>;
+    };
+    const li = snap.variants.find((v) => v.platform === "linkedin_personal");
+    const x = snap.variants.find((v) => v.platform === "x");
+    const fb = snap.variants.find((v) => v.platform === "facebook_page");
+    expect(li).toMatchObject({ variant_text: "linked-in flavour", is_custom: true });
+    expect(x).toMatchObject({ variant_text: "x flavour", is_custom: true });
+    expect(fb).toMatchObject({ variant_text: null, is_custom: false });
+  });
+
+  it("two concurrent submits produce exactly one approval_request (atomic)", async () => {
+    const post = await createDraft("race target");
+
+    const [a, b] = await Promise.all([
+      submitForApproval({ postId: post.id, companyId: COMPANY_A_ID }),
+      submitForApproval({ postId: post.id, companyId: COMPANY_A_ID }),
+    ]);
+
+    // One must succeed, one must lose.
+    const successes = [a, b].filter((r) => r.ok);
+    const failures = [a, b].filter((r) => !r.ok);
+    expect(successes.length).toBe(1);
+    expect(failures.length).toBe(1);
+    expect(failures[0]?.ok).toBe(false);
+    if (!failures[0]?.ok) {
+      expect(failures[0]?.error.code).toBe("INVALID_STATE");
+    }
+
+    const svc = getServiceRoleClient();
+    const requests = await svc
+      .from("social_approval_requests")
+      .select("id")
+      .eq("post_master_id", post.id);
+    expect(requests.error).toBeNull();
+    expect(requests.data?.length).toBe(1);
+  });
+
+  it("rejects submit on non-draft post with INVALID_STATE", async () => {
+    const post = await createDraft();
+    const svc = getServiceRoleClient();
+    await svc
+      .from("social_post_master")
+      .update({ state: "approved" })
+      .eq("id", post.id);
+
+    const result = await submitForApproval({
+      postId: post.id,
+      companyId: COMPANY_A_ID,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("INVALID_STATE");
+  });
+
+  it("returns NOT_FOUND for cross-company access", async () => {
+    const post = await createDraft();
+    const result = await submitForApproval({
+      postId: post.id,
+      companyId: COMPANY_B_ID,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  it("returns NOT_FOUND for missing post id", async () => {
+    const result = await submitForApproval({
+      postId: "00000000-0000-0000-0000-000000000fff",
+      companyId: COMPANY_A_ID,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("NOT_FOUND");
+  });
+
+  it("rejects submit when post has neither master_text nor link_url", async () => {
+    const svc = getServiceRoleClient();
+    // Insert a post directly with both null (validates the lib-side
+    // guard on the submit path; createPostMaster wouldn't allow this).
+    const inserted = await svc
+      .from("social_post_master")
+      .insert({
+        company_id: COMPANY_A_ID,
+        state: "draft",
+        source_type: "manual",
+        master_text: null,
+        link_url: null,
+      })
+      .select("id")
+      .single();
+    expect(inserted.error).toBeNull();
+
+    const result = await submitForApproval({
+      postId: inserted.data!.id as string,
+      companyId: COMPANY_A_ID,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("VALIDATION_FAILED");
+  });
+
+  it("uses approval_default_rule from the company", async () => {
+    // Create a post in company B (default rule = all_must per beforeEach
+    // setup). Insert directly because creator isn't a member of B.
+    const svc = getServiceRoleClient();
+    const inserted = await svc
+      .from("social_post_master")
+      .insert({
+        company_id: COMPANY_B_ID,
+        state: "draft",
+        source_type: "manual",
+        master_text: "post in beta",
+      })
+      .select("id")
+      .single();
+    expect(inserted.error).toBeNull();
+
+    const result = await submitForApproval({
+      postId: inserted.data!.id as string,
+      companyId: COMPANY_B_ID,
+    });
+    expect(result.ok).toBe(true);
+
+    const reqRow = await svc
+      .from("social_approval_requests")
+      .select("approval_rule")
+      .eq("post_master_id", inserted.data!.id)
+      .single();
+    expect(reqRow.error).toBeNull();
+    expect(reqRow.data?.approval_rule).toBe("all_must");
+  });
+});

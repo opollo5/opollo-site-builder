@@ -1,0 +1,227 @@
+import "server-only";
+
+import { logger } from "@/lib/logger";
+import { listVariants } from "@/lib/platform/social/variants";
+import { getServiceRoleClient } from "@/lib/supabase";
+import type { ApiResponse } from "@/lib/tool-schemas";
+
+// ---------------------------------------------------------------------------
+// S1-5 — submit-for-approval state transition.
+//
+// Calls the Postgres function submit_post_for_approval (migration 0071)
+// which performs the state flip + approval_request snapshot insert in
+// a single transaction. The function uses SECURITY DEFINER so the
+// service-role client can call it.
+//
+// The snapshot is built application-side from the post + variant
+// rows, then passed in. We could read inside the SQL function, but
+// that adds branching in plpgsql and obscures the snapshot shape from
+// the application contract. Building it here also lets the lib unit-
+// test the snapshot shape independently.
+//
+// Caller is responsible for canDo("submit_for_approval", company_id).
+// ---------------------------------------------------------------------------
+
+const APPROVAL_TTL_DAYS = 14;
+
+export type SubmitForApprovalResult = {
+  approvalRequestId: string;
+  // Echo the snapshot so the route can return it for client display
+  // (or log it for audit).
+  snapshot: ApprovalSnapshot;
+};
+
+export type ApprovalSnapshot = {
+  // V1 schema. The approval-flow consumer (snapshot reader) reads
+  // these keys directly; do NOT rename without coordinating.
+  master_text: string | null;
+  link_url: string | null;
+  variants: ReadonlyArray<{
+    platform: string;
+    variant_text: string | null;
+    is_custom: boolean;
+  }>;
+  // Captured at submit time so the reviewer sees what was asked of them.
+  submitted_at: string;
+};
+
+export async function submitForApproval(args: {
+  postId: string;
+  companyId: string;
+  // Caller-provided expiry override (test plumbing); production
+  // defaults to +14 days.
+  expiresAt?: string;
+}): Promise<ApiResponse<SubmitForApprovalResult>> {
+  if (!args.postId) return validation("Post id is required.");
+  if (!args.companyId) return validation("Company id is required.");
+
+  const svc = getServiceRoleClient();
+
+  // Read the parent post + variants to build the snapshot. We do this
+  // BEFORE the RPC so the snapshot we send is exactly what we're
+  // committing. The atomic transition inside the function still
+  // catches concurrent edits via the state='draft' predicate; if
+  // someone else flips the state in the window between our read and
+  // the RPC, the function returns INVALID_STATE.
+  const post = await svc
+    .from("social_post_master")
+    .select("id, state, master_text, link_url")
+    .eq("id", args.postId)
+    .eq("company_id", args.companyId)
+    .maybeSingle();
+  if (post.error) {
+    logger.error("social.posts.submit.post_lookup_failed", {
+      err: post.error.message,
+      post_id: args.postId,
+    });
+    return internal(`Failed to read post: ${post.error.message}`);
+  }
+  if (!post.data) return notFound();
+
+  if (post.data.state !== "draft") {
+    return invalidState(
+      `Post is in '${post.data.state}', not 'draft'.`,
+    );
+  }
+
+  if (!post.data.master_text && !post.data.link_url) {
+    return validation(
+      "Cannot submit a post with neither master_text nor link_url.",
+    );
+  }
+
+  const variants = await listVariants({
+    postMasterId: args.postId,
+    companyId: args.companyId,
+  });
+  if (!variants.ok) {
+    // listVariants already returns the standard envelope shape; bubble
+    // it up unchanged.
+    return variants;
+  }
+
+  const snapshot: ApprovalSnapshot = {
+    master_text: (post.data.master_text as string | null) ?? null,
+    link_url: (post.data.link_url as string | null) ?? null,
+    variants: variants.data.resolved.map((r) => ({
+      platform: r.platform,
+      variant_text: r.variant?.is_custom
+        ? (r.variant.variant_text ?? null)
+        : null,
+      is_custom: r.variant?.is_custom === true,
+    })),
+    submitted_at: new Date().toISOString(),
+  };
+
+  const expiresAt =
+    args.expiresAt ??
+    new Date(
+      Date.now() + APPROVAL_TTL_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+  const rpc = await svc.rpc("submit_post_for_approval", {
+    p_post_id: args.postId,
+    p_company_id: args.companyId,
+    p_snapshot: snapshot,
+    p_expires_at: expiresAt,
+  });
+
+  if (rpc.error) {
+    // The function raises P0001 (INVALID_STATE) and P0002 (NOT_FOUND)
+    // with the precise error in the message. PostgREST surfaces these
+    // as { code: 'P0001' | 'P0002', message: 'INVALID_STATE: ...' }.
+    if (rpc.error.code === "P0001") {
+      return invalidState(stripPrefix(rpc.error.message, "INVALID_STATE: "));
+    }
+    if (rpc.error.code === "P0002") {
+      return notFoundWith(stripPrefix(rpc.error.message, "NOT_FOUND: "));
+    }
+    logger.error("social.posts.submit.rpc_failed", {
+      err: rpc.error.message,
+      code: rpc.error.code,
+      post_id: args.postId,
+    });
+    return internal(`Submit RPC failed: ${rpc.error.message}`);
+  }
+
+  // The function returns the new approval_request id as the scalar
+  // result. supabase-js rpc() with a scalar function returns it on
+  // `data` directly.
+  const approvalRequestId = rpc.data as unknown as string;
+  if (!approvalRequestId) {
+    return internal("Submit RPC returned no approval_request id.");
+  }
+
+  return {
+    ok: true,
+    data: { approvalRequestId, snapshot },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function stripPrefix(message: string, prefix: string): string {
+  return message.startsWith(prefix) ? message.slice(prefix.length) : message;
+}
+
+function validation(
+  message: string,
+): ApiResponse<SubmitForApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "VALIDATION_FAILED",
+      message,
+      retryable: false,
+      suggested_action: "Fix the input and resubmit.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function invalidState(
+  message: string,
+): ApiResponse<SubmitForApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_STATE",
+      message,
+      retryable: false,
+      suggested_action:
+        "Reload the page; another user may have already submitted or moved this post.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function notFound(): ApiResponse<SubmitForApprovalResult> {
+  return notFoundWith("No post with that id in this company.");
+}
+
+function notFoundWith(
+  message: string,
+): ApiResponse<SubmitForApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "NOT_FOUND",
+      message,
+      retryable: false,
+      suggested_action: "Check the post id.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function internal(message: string): ApiResponse<SubmitForApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message,
+      retryable: false,
+      suggested_action: "Retry. If the error persists, contact support.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
