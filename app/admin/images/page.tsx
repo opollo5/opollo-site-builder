@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { BulkImageUpload } from "@/components/BulkImageUpload";
 import { ImagesTable } from "@/components/ImagesTable";
 import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
@@ -157,6 +158,8 @@ export default async function AdminImagesPage({
           {parsed.deleted ? "← Active images" : "View archived →"}
         </Link>
       </div>
+
+      {!parsed.deleted && <BulkImageUpload />}
 
       <form
         method="GET"
