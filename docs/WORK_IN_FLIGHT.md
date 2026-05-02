@@ -9,14 +9,12 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/p3-4-invite-from-detail
-- Slice: P3-4 — Invite-from-detail flow. Adds an "Invite user" button on the company detail page (modal wiring sendInvitation) and a "Revoke" action on each pending invitation row (DELETE /api/platform/invitations/[id]). Closes P3.
+- Branch: feat/p4-customer-admin-users
+- Slice: P4 — Customer admin users page. /company/users — customer admin's view of their own company's members + pending invitations. Reuses the platform-side invite modal + revoke button. Gated on platform_company_users.role = 'admin' for the current user's company.
 - Files claimed:
-  - components/PlatformCompanyDetail.tsx (modify — add invite button + revoke per-row)
-  - components/PlatformInviteUserModal.tsx (new)
-  - components/PlatformCompanyDetailClient.tsx (new — client wrapper holding modal + revoke state)
-  - app/admin/companies/[id]/page.tsx (modify — render new client wrapper)
-  - e2e/platform-companies.spec.ts (extend with invite + revoke)
+  - app/company/page.tsx (new — landing redirect)
+  - app/company/users/page.tsx (new — gated server component)
+  - components/CustomerCompanyUsersView.tsx (new — display)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
