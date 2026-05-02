@@ -66,8 +66,8 @@ export function AssistedApprovalToggle({
       </p>
       <p className="text-sm text-muted-foreground">
         When enabled, proposals with{" "}
-        <code className="font-mono text-xs">risk_level=low</code> AND{" "}
-        <code className="font-mono text-xs">effort_bucket=1</code> auto-approve after 48 hours of being unreviewed. Staff get an email notification when auto-approval fires.
+        <code className="font-mono text-sm">risk_level=low</code> AND{" "}
+        <code className="font-mono text-sm">effort_bucket=1</code> auto-approve after 48 hours of being unreviewed. Staff get an email notification when auto-approval fires.
       </p>
       <p className="text-sm text-muted-foreground">
         High-risk proposals always require manual approval, regardless of this setting. Enforced at the API level, not just UI.
@@ -82,7 +82,7 @@ export function AssistedApprovalToggle({
           {submitting ? "Saving…" : enabled ? "Disable assisted approval" : "Enable assisted approval"}
         </Button>
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Only admins can toggle this setting.
         </p>
       )}

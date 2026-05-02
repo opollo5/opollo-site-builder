@@ -64,7 +64,7 @@ export function RollbackButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-muted"
+        className="rounded-md border border-border bg-background px-2 py-1 text-sm hover:bg-muted"
       >
         Roll back
       </button>
@@ -85,7 +85,7 @@ export function RollbackButton({
               </h2>
               <p className="text-sm text-muted-foreground">
                 Restoring this version will mark the latest applied proposal
-                as <code className="font-mono text-xs">applied_then_reverted</code>{" "}
+                as <code className="font-mono text-sm">applied_then_reverted</code>{" "}
                 and re-evaluate the score against the restored content. The
                 full audit trail goes into opt_change_log.
               </p>
@@ -94,13 +94,13 @@ export function RollbackButton({
               <li>
                 <span className="text-muted-foreground">Target composite: </span>
                 <span className="font-mono font-semibold">{composite}</span>{" "}
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   ({classification.replace("_", " ")})
                 </span>
               </li>
               <li>
                 <span className="text-muted-foreground">When: </span>
-                <span className="font-mono text-xs">{versionLabel}</span>
+                <span className="font-mono text-sm">{versionLabel}</span>
               </li>
             </ul>
             <div className="space-y-2">

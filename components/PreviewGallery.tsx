@@ -53,7 +53,7 @@ function compositionChain(t: DesignTemplate): string[] {
 function Block({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <div className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </div>
       <div className="mt-1">{children}</div>
@@ -63,7 +63,7 @@ function Block({ label, children }: { label: string; children: React.ReactNode }
 
 function CodeBlock({ text }: { text: string }) {
   return (
-    <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-xs leading-relaxed">
+    <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-3 font-mono text-sm leading-relaxed">
       {text.length > 0 ? text : <em className="text-muted-foreground">(empty)</em>}
     </pre>
   );
@@ -104,11 +104,11 @@ export function PreviewGallery({
                   <header className="flex items-center justify-between border-b pb-3">
                     <div>
                       <div className="text-sm font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         {c.variant ? `${c.category} · ${c.variant}` : c.category}
                       </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       v<span className="font-mono">{c.version_lock}</span>
                     </div>
                   </header>
@@ -125,7 +125,7 @@ export function PreviewGallery({
                   <div className="mt-4">
                     <Block label={`Fields (${fields.length})`}>
                       {fields.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           content_schema has no properties.
                         </p>
                       ) : (
@@ -135,13 +135,13 @@ export function PreviewGallery({
                               key={f.name}
                               className="flex items-center justify-between px-3 py-2"
                             >
-                              <span className="font-mono text-xs">
+                              <span className="font-mono text-sm">
                                 {f.name}
                                 {f.required && (
                                   <span className="ml-1 text-destructive">*</span>
                                 )}
                               </span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-sm text-muted-foreground">
                                 {f.type}
                                 {f.constraint ? ` · ${f.constraint}` : ""}
                               </span>
@@ -185,23 +185,23 @@ export function PreviewGallery({
                   <header className="flex items-center justify-between border-b pb-3">
                     <div>
                       <div className="text-sm font-medium">{t.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         {t.page_type}
                         {t.is_default ? " · default" : ""}
                       </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-sm text-muted-foreground">
                       v<span className="font-mono">{t.version_lock}</span>
                     </div>
                   </header>
                   <div className="pt-3">
                     <Block label={`Composition (${chain.length})`}>
                       {chain.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           (empty composition)
                         </p>
                       ) : (
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm text-muted-foreground">
                           <span className="font-mono">{chain.join(" → ")}</span>
                         </p>
                       )}

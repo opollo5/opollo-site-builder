@@ -61,7 +61,7 @@ export function ApproveCompleteHere({ challengeId }: { challengeId: string }) {
       >
         {submitting ? "Signing you in…" : "Complete sign-in here"}
       </Button>
-      <p className="text-xs text-muted-foreground">
+      <p className="text-sm text-muted-foreground">
         Use this if you can&apos;t get back to your original tab. This
         device won&apos;t be trusted automatically — you&apos;ll be
         challenged again next time.

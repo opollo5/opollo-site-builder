@@ -54,6 +54,14 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ---
 
+## 7. Typography minimums — body ≥ 1rem, small ≥ 0.875rem, no text-xs
+
+**Rule.** Operator-facing UI text has two floors. Body text (paragraph copy, form input values, page descriptions, modal body, table cells used as primary reading content) sits at `text-base` (1rem / 16px) minimum. Small text (helper copy, captions, badges, eyebrows, breadcrumbs, status microcopy) sits at `text-sm` (0.875rem / 14px) minimum. `text-xs` (0.75rem / 12px) is forbidden on every operator surface; do not introduce it in new code, and uplift any encountered to `text-sm`. The two floors map directly to Tailwind's existing utilities — no custom font-size values, no inline `style={{ fontSize: ... }}` below 14px. Reference: A-1 typography-scale doc block in `app/globals.css`.
+
+**Incident (UAT 2026-05-02).** Steven flagged during UAT that the admin UI had "a lot of text that is too small to read" — 530+ `text-xs` (12px) usages across 122 files lived in the operator surfaces, plus the A-1 typography primitives' `Lead` ("intro / context line") sat at `text-sm` despite being the body-copy companion to `H1`. Phase 1 sweep eliminated `text-xs` site-wide and bumped `Lead` to `text-base`. Phase 2 — auditing each `text-sm` callsite where the role is body copy rather than helper / caption — is captured in `docs/BACKLOG.md`.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.

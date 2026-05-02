@@ -191,7 +191,7 @@ export default async function SiteDetailPage({
             ]}
           />
           <H1 className="mt-2">{site.name}</H1>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
             <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
             <a
               href={site.wp_url}
@@ -224,7 +224,7 @@ export default async function SiteDetailPage({
             <H3>Recent batches</H3>
             <Link
               href={`/admin/batches?site_id=${encodeURIComponent(site.id)}`}
-              className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               View all →
             </Link>
@@ -246,7 +246,7 @@ export default async function SiteDetailPage({
                 />
               </div>
             ) : (
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Template</th>
@@ -321,7 +321,7 @@ export default async function SiteDetailPage({
                 />
               </div>
             ) : (
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Title</th>
@@ -382,7 +382,7 @@ export default async function SiteDetailPage({
 
           <div className="rounded-lg border p-3">
             <H3>Design system</H3>
-            <div className="mt-2 text-xs" data-testid="site-design-system-card">
+            <div className="mt-2 text-sm" data-testid="site-design-system-card">
               {needsOnboarding ? (
                 <>
                   <p className="text-muted-foreground">
@@ -518,13 +518,13 @@ export default async function SiteDetailPage({
               <Layers aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Appearance</H3>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Sync the active DS palette to Kadence on this site&apos;s
                   WordPress install.
                 </p>
                 <Link
                   href={`/admin/sites/${site.id}/appearance`}
-                  className="mt-2 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                 >
                   Open Appearance panel →
                 </Link>
@@ -545,13 +545,13 @@ export default async function SiteDetailPage({
                     <StatusPill kind="brief_parsing" label="Not set" />
                   )}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Brand voice &amp; design direction defaults that every new
                   brief inherits.
                 </p>
                 <Link
                   href={`/admin/sites/${site.id}/settings`}
-                  className="mt-2 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                 >
                   Open Settings →
                 </Link>

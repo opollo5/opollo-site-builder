@@ -18,14 +18,14 @@ export function MoodBoardStrip({ view }: { view: View }) {
       data-testid="mood-board-strip"
     >
       <h3 className="text-sm font-semibold">Mood board</h3>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 text-sm text-muted-foreground">
         What we&apos;re hearing so far. Updates as you add inputs.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Colour swatches
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -47,13 +47,13 @@ export function MoodBoardStrip({ view }: { view: View }) {
                   </span>
                 ))
               ) : (
-                <span className="text-xs text-muted-foreground">—</span>
+                <span className="text-sm text-muted-foreground">—</span>
               )}
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Typography
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-3">
@@ -65,18 +65,18 @@ export function MoodBoardStrip({ view }: { view: View }) {
                     style={{ fontFamily: `${f}, system-ui, sans-serif` }}
                   >
                     <span className="text-base">Aa Bb Cc 123</span>
-                    <span className="text-xs text-muted-foreground">{f}</span>
+                    <span className="text-sm text-muted-foreground">{f}</span>
                   </span>
                 ))
               ) : (
-                <span className="text-xs text-muted-foreground">—</span>
+                <span className="text-sm text-muted-foreground">—</span>
               )}
             </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 Layout
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -90,12 +90,12 @@ export function MoodBoardStrip({ view }: { view: View }) {
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-sm text-muted-foreground">—</span>
                 )}
               </div>
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
+              <p className="text-sm font-medium text-muted-foreground">
                 Visual tone
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -109,7 +109,7 @@ export function MoodBoardStrip({ view }: { view: View }) {
                     </span>
                   ))
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-sm text-muted-foreground">—</span>
                 )}
               </div>
             </div>
@@ -118,7 +118,7 @@ export function MoodBoardStrip({ view }: { view: View }) {
 
         {view.screenshot_url && (
           <div className="hidden md:block">
-            <p className="text-xs font-medium text-muted-foreground">
+            <p className="text-sm font-medium text-muted-foreground">
               Reference
             </p>
             {/* eslint-disable-next-line @next/next/no-img-element */}

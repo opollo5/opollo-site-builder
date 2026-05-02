@@ -42,7 +42,7 @@ export function UseImageLibraryToggle({
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
       <div>
         <p className="text-sm font-medium">Use images from the library</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           Suggest up to 5 captioned images per page based on the page title.
           Only images with caption + alt text are included; off by default
           until you&apos;ve verified the metadata quality.
@@ -59,7 +59,7 @@ export function UseImageLibraryToggle({
         {enabled ? "Enabled" : "Disabled"}
       </Button>
       {error && (
-        <p className="basis-full text-xs text-destructive" role="alert">
+        <p className="basis-full text-sm text-destructive" role="alert">
           {error}
         </p>
       )}

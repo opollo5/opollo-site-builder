@@ -153,7 +153,7 @@ function SitePicker({
         className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
       >
         No sites available. Pair a WordPress install in
-        <code className="mx-1 font-mono text-xs">/admin/sites</code>
+        <code className="mx-1 font-mono text-sm">/admin/sites</code>
         before posting.
       </div>
     );
@@ -206,7 +206,7 @@ function SitePicker({
                   data-testid={`posts-new-site-option-${s.id}`}
                 >
                   <span className="flex-1 truncate">{s.name}</span>
-                  <span className="ml-2 shrink-0 truncate text-xs text-muted-foreground">
+                  <span className="ml-2 shrink-0 truncate text-sm text-muted-foreground">
                     {hostnameOf(s.wp_url)}
                   </span>
                 </CommandItem>
@@ -216,7 +216,7 @@ function SitePicker({
         </PopoverContent>
       </Popover>
       {value && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Posting to <span className="font-medium text-foreground">{value.name}</span>{" "}
           ({hostnameOf(value.wp_url)}).
         </p>
@@ -236,7 +236,7 @@ function EmptyShell({
     <div className="rounded-md border border-dashed bg-muted/20 px-6 py-12 text-center text-sm">
       <p className="font-medium">{label}</p>
       {description && (
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       )}
     </div>
   );

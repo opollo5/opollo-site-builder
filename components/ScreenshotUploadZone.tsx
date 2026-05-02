@@ -162,7 +162,7 @@ export function ScreenshotUploadZone({
               (optional, up to {MAX_FILES})
             </span>
           </label>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Drag-and-drop or browse. JPG / PNG / WebP / GIF up to 5MB
             each. Used only to extract patterns — files aren&apos;t
             saved.
@@ -170,7 +170,7 @@ export function ScreenshotUploadZone({
         </div>
         {busy && (
           <span
-            className="inline-flex items-center gap-1 text-xs text-muted-foreground"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground"
             data-testid="screenshot-upload-busy"
             aria-live="polite"
           >
@@ -223,7 +223,7 @@ export function ScreenshotUploadZone({
             ? "Drop images here, or click to browse"
             : `${MAX_FILES} images uploaded — remove one to add another`}
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           {remaining > 0
             ? `${screenshots.length} of ${MAX_FILES} uploaded`
             : "Maximum reached"}
@@ -243,7 +243,7 @@ export function ScreenshotUploadZone({
 
       {message && (
         <p
-          className="text-xs text-destructive"
+          className="text-sm text-destructive"
           role="alert"
           data-testid="screenshot-upload-error"
         >

@@ -111,7 +111,7 @@ export function RunCostTicker({
       >
         <div className="flex items-center justify-between gap-3 p-3 sm:min-w-[280px]">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs uppercase tracking-wide text-muted-foreground">
+            <span className="text-sm uppercase tracking-wide text-muted-foreground">
               Run cost
             </span>
             <span
@@ -120,7 +120,7 @@ export function RunCostTicker({
             >
               {centsToUsd(animatedSpent)}
             </span>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-sm text-muted-foreground">
               of {centsToUsd(estimateCents)} est
             </span>
           </div>
@@ -151,7 +151,7 @@ export function RunCostTicker({
         {expanded && (
           <div
             id="run-cost-details"
-            className="border-t px-3 pb-3 pt-2 text-xs"
+            className="border-t px-3 pb-3 pt-2 text-sm"
           >
             <dl className="grid grid-cols-2 gap-x-3 gap-y-1">
               <dt className="text-muted-foreground">Remaining this month</dt>

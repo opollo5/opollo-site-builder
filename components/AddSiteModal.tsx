@@ -36,7 +36,7 @@ function Label({
 
 function FieldError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return <p className="mt-1 text-sm text-destructive">{message}</p>;
 }
 
 export function AddSiteModal({
@@ -233,7 +233,7 @@ export function AddSiteModal({
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground hover:text-foreground"
                 tabIndex={-1}
               >
                 {showPassword ? "hide" : "show"}

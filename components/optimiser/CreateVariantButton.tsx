@@ -66,7 +66,7 @@ export function CreateVariantButton({
     <div className="rounded-lg border border-border bg-card p-4 space-y-3">
       <header>
         <h3 className="text-sm font-semibold">A/B test (Phase 2)</h3>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Generate a structurally distinct alternative and route a slice of traffic to it.
           Winner detection runs hourly via the §6 feature 8 Bayesian monitor.
         </p>

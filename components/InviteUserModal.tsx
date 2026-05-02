@@ -151,7 +151,7 @@ export function InviteUserModal({
               <span className="font-medium">{status.email}</span> as{" "}
               <span className="font-medium">{status.role}</span>.
               {!status.emailSent && (
-                <p className="mt-1 text-xs">
+                <p className="mt-1 text-sm">
                   Email delivery failed — copy the link below to share
                   out of band.
                 </p>
@@ -161,7 +161,7 @@ export function InviteUserModal({
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="invite-accept-url"
-                  className="text-xs font-medium text-muted-foreground"
+                  className="text-sm font-medium text-muted-foreground"
                 >
                   Acceptance URL (copy + share if email delivery is broken)
                 </label>
@@ -170,7 +170,7 @@ export function InviteUserModal({
                   readOnly
                   value={status.acceptUrl}
                   onFocus={(e) => e.currentTarget.select()}
-                  className="font-mono text-xs"
+                  className="font-mono text-sm"
                 />
               </div>
             )}
@@ -220,7 +220,7 @@ export function InviteUserModal({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {allowedRoles.length === 1
                   ? "Admins can only invite role=user. Ask a super_admin to invite admins."
                   : "Choose admin to grant invite + remove powers; user otherwise."}

@@ -277,11 +277,11 @@ export function AdminSidebar({
           <div className="border-t p-2">
             {!collapsed && (
               <div className="mb-2 flex items-center justify-between rounded-md bg-muted/40 px-2 py-1.5">
-                <span className="text-xs text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   Command palette
                 </span>
                 <span
-                  className="flex items-center gap-0.5 text-xs text-muted-foreground"
+                  className="flex items-center gap-0.5 text-sm text-muted-foreground"
                   aria-hidden
                 >
                   <kbd className="rounded border bg-background px-1 font-mono text-[10px]">

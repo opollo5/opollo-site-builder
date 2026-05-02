@@ -72,7 +72,7 @@ export default async function OptimiserProposalReviewPage({
         <Button asChild variant="outline" size="sm">
           <Link href="/optimiser/proposals">← All proposals</Link>
         </Button>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-sm text-muted-foreground">
           Status: <code>{proposal.status}</code>
         </span>
       </div>

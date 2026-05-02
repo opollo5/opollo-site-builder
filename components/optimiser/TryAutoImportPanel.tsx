@@ -106,7 +106,7 @@ export function TryAutoImportPanel({
         <p className="text-sm font-medium">
           Try auto-import (§7.5)
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Fetch the live URL, file an import-mode brief, and reverse-engineer
           the page into the Site Builder. The brief run runs through
           M12/M13 in full_page mode using the destination site&apos;s
@@ -161,7 +161,7 @@ export function TryAutoImportPanel({
         </div>
       )}
       {sites.length === 0 && !loadingSites && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           No Site Builder sites are registered yet — register one under{" "}
           <a
             href="/admin/sites"

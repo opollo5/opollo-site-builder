@@ -44,7 +44,7 @@ export function PagesTable({ items, siteId, backHref }: PagesTableProps) {
   return (
     <div className="overflow-hidden rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Title</th>
             <th className="px-4 py-2 font-medium">Type</th>
@@ -69,21 +69,21 @@ export function PagesTable({ items, siteId, backHref }: PagesTableProps) {
                 >
                   {p.title}
                 </Link>
-                <div className="mt-1 text-xs text-muted-foreground">
+                <div className="mt-1 text-sm text-muted-foreground">
                   /{p.slug}
                 </div>
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {p.page_type.replace(/_/g, " ")}
               </td>
               <td className="px-4 py-3 align-top">
                 {/* page status taxonomy is identical to post (draft / published) */}
                 <StatusPill kind={postStatusKind(p.status as Parameters<typeof postStatusKind>[0])} className="capitalize" />
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 v{p.design_system_version}
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {formatRelativeTime(p.updated_at)}
               </td>
             </tr>

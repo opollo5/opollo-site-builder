@@ -106,7 +106,7 @@ export function TrustedDevicesList({
 
       <div className="rounded-md border">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+          <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-3 py-2 font-medium">Device</th>
               <th className="px-3 py-2 font-medium">Last used</th>
@@ -132,12 +132,12 @@ export function TrustedDevicesList({
                       </span>
                     )}
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
                     <span data-screenshot-mask>
                       {formatRelativeTime(d.last_used_at)}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-muted-foreground">
+                  <td className="px-3 py-2 text-sm text-muted-foreground">
                     <span data-screenshot-mask>
                       {formatRelativeTime(d.trusted_until)}
                     </span>
@@ -147,7 +147,7 @@ export function TrustedDevicesList({
                       type="button"
                       onClick={() => void revokeOne(d.id, label)}
                       disabled={revokingId === d.id}
-                      className="rounded border px-2 py-0.5 text-xs text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
+                      className="rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
                       data-testid="revoke-device"
                     >
                       {revokingId === d.id ? "…" : "Sign out"}

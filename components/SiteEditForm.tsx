@@ -324,13 +324,13 @@ export function SiteEditForm({
           <button
             type="button"
             onClick={() => setShowPassword((v) => !v)}
-            className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm px-1"
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-sm text-muted-foreground hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm px-1"
             tabIndex={-1}
           >
             {showPassword ? "hide" : "show"}
           </button>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {form.passwordTouched
             ? "Submitting saves this new Application Password."
             : "Leave empty to keep the stored Application Password."}
@@ -341,7 +341,7 @@ export function SiteEditForm({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-medium">Connection test</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {isExplicit
                 ? "Tests the credentials in the form."
                 : hasStoredCredentials
@@ -432,7 +432,7 @@ function TestResultPanel({
                 ? `Connected as ${result.user.display_name}`
                 : "Credentials changed since last successful test"}
             </p>
-            <p className="mt-0.5 text-xs">
+            <p className="mt-0.5 text-sm">
               {matchesCurrent
                 ? `WordPress username: ${result.user.username}. Roles: ${
                     result.user.roles.join(", ") || "(none)"
@@ -452,7 +452,7 @@ function TestResultPanel({
       data-testid="site-test-result"
     >
       <p className="font-medium">Connection test failed</p>
-      <p className="mt-0.5 text-xs">{result.message}</p>
+      <p className="mt-0.5 text-sm">{result.message}</p>
     </div>
   );
 }
@@ -470,7 +470,7 @@ function ApplicationPasswordTooltip() {
       />
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-1/2 top-5 z-10 w-72 -translate-x-1/2 rounded-md border bg-popover p-3 text-xs text-popover-foreground opacity-0 shadow-lg transition-smooth group-hover:opacity-100 group-focus:opacity-100"
+        className="pointer-events-none absolute left-1/2 top-5 z-10 w-72 -translate-x-1/2 rounded-md border bg-popover p-3 text-sm text-popover-foreground opacity-0 shadow-lg transition-smooth group-hover:opacity-100 group-focus:opacity-100"
       >
         Generate at{" "}
         <strong>wp-admin → Users → Profile → Application Passwords</strong>.

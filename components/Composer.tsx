@@ -201,7 +201,7 @@ export function Composer({
           >
             <span aria-hidden className="text-base leading-none">📎</span>
             <span className="truncate font-medium">{value.file.name}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
+            <span className="shrink-0 text-sm text-muted-foreground">
               {Math.round(value.file.size / 1024).toLocaleString()} KB
             </span>
             <button
@@ -271,7 +271,7 @@ export function Composer({
       </div>
 
       {acceptHint && (
-        <p className="px-3 pb-2 text-xs text-muted-foreground">{acceptHint}</p>
+        <p className="px-3 pb-2 text-sm text-muted-foreground">{acceptHint}</p>
       )}
     </div>
   );

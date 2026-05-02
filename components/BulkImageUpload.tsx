@@ -243,17 +243,17 @@ export function BulkImageUpload() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold">Bulk upload</h2>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Drag images here, or click to pick. Up to 10 MB each. JPEG / PNG / WebP / GIF.
           </p>
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
           On duplicate
           <select
             value={policy}
             onChange={(e) => setPolicy(e.target.value as DupePolicy)}
             disabled={running}
-            className="h-7 rounded border bg-background px-2 text-xs"
+            className="h-7 rounded border bg-background px-2 text-sm"
             data-testid="bulk-upload-policy"
           >
             <option value="skip">Skip all</option>
@@ -299,7 +299,7 @@ export function BulkImageUpload() {
         />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <Button
           type="button"
           size="sm"
@@ -331,7 +331,7 @@ export function BulkImageUpload() {
 
       {rows.length > 0 && (
         <ul
-          className="mt-3 space-y-1 text-xs"
+          className="mt-3 space-y-1 text-sm"
           data-testid="bulk-upload-list"
         >
           {rows.map((row) => (

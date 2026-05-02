@@ -126,7 +126,7 @@ export default async function BatchDetailPage({
           <div className="flex items-center gap-2">
             <Link
               href="/admin/batches"
-              className="text-xs text-muted-foreground hover:text-foreground"
+              className="text-sm text-muted-foreground hover:text-foreground"
             >
               ← Batches
             </Link>
@@ -134,7 +134,7 @@ export default async function BatchDetailPage({
           <H1 className="mt-1">
             {site.name} · {tmpl.name}
           </H1>
-          <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+          <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
             <StatusPill kind={jobStatusKind(job.status as Parameters<typeof jobStatusKind>[0])} />
             <span>
               {job.succeeded_count} ok · {job.failed_count} fail ·{" "}
@@ -159,7 +159,7 @@ export default async function BatchDetailPage({
         <div>
           <H3>Slots</H3>
           <div className="mt-2 overflow-x-auto rounded-md border">
-            <table className="w-full text-xs">
+            <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                   <th className="px-3 py-2 font-medium">#</th>
@@ -224,7 +224,7 @@ export default async function BatchDetailPage({
             {(recentEvents ?? []).map((e) => (
               <div
                 key={String(e.id)}
-                className="rounded-md border p-2 text-xs"
+                className="rounded-md border p-2 text-sm"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{e.event as string}</span>
@@ -238,7 +238,7 @@ export default async function BatchDetailPage({
               </div>
             ))}
             {(recentEvents ?? []).length === 0 && (
-              <p className="text-xs text-muted-foreground">No events yet.</p>
+              <p className="text-sm text-muted-foreground">No events yet.</p>
             )}
           </div>
         </div>

@@ -152,7 +152,7 @@ function EventRow({ event }: { event: AppearanceEventRow }) {
           <Badge tone={present.tone}>{present.label}</Badge>
           <span className="flex-1 text-foreground">{summary}</span>
           <time
-            className="text-xs text-muted-foreground"
+            className="text-sm text-muted-foreground"
             dateTime={event.created_at}
           >
             {formatTimestamp(event.created_at)}

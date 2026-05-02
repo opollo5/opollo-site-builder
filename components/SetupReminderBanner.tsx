@@ -53,13 +53,13 @@ export function SetupReminderBanner({ siteId }: { siteId: string }) {
           Set up your design direction and tone of voice to improve
           generated content quality.
         </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
+        <p className="mt-0.5 text-sm text-muted-foreground">
           Two skippable steps. Sets the look and voice every page we
           generate is styled around.
         </p>
         <Link
           href={`/admin/sites/${siteId}/setup`}
-          className="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="mt-2 inline-block text-sm font-medium underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           data-testid="setup-reminder-banner-cta"
         >
           Set up now →

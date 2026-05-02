@@ -153,7 +153,7 @@ export default async function AdminImagesPage({
         </div>
         <Link
           href={buildHref(parsed, { deleted: !parsed.deleted, page: 1 })}
-          className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           {parsed.deleted ? "← Active images" : "View archived →"}
         </Link>
@@ -169,7 +169,7 @@ export default async function AdminImagesPage({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="images-q"
-            className="text-xs font-medium text-muted-foreground"
+            className="text-sm font-medium text-muted-foreground"
           >
             Search
           </label>
@@ -185,7 +185,7 @@ export default async function AdminImagesPage({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="images-tag"
-            className="text-xs font-medium text-muted-foreground"
+            className="text-sm font-medium text-muted-foreground"
           >
             Tags (comma-separated, all must match)
           </label>
@@ -202,7 +202,7 @@ export default async function AdminImagesPage({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="images-source"
-            className="text-xs font-medium text-muted-foreground"
+            className="text-sm font-medium text-muted-foreground"
           >
             Source
           </label>
@@ -233,14 +233,14 @@ export default async function AdminImagesPage({
               { ...parsed, query: null, tags: [], source: null },
               { page: 1 },
             )}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             Clear
           </Link>
         )}
       </form>
 
-      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <div data-testid="images-range">
           {total === 0
             ? "0 images"

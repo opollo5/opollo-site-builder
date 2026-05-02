@@ -60,7 +60,7 @@ export default async function AccountDevicesPage() {
         <Alert className="mt-6">
           Email-2FA is not currently enabled on this environment.
           Trusted-device tracking starts when{" "}
-          <code className="font-mono text-xs">AUTH_2FA_ENABLED</code>{" "}
+          <code className="font-mono text-sm">AUTH_2FA_ENABLED</code>{" "}
           is flipped to <code>true</code> in env.
         </Alert>
       )}

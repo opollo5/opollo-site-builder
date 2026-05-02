@@ -171,7 +171,7 @@ export default async function ApprovePage({ searchParams }: PageProps) {
 
       <div className="border-t pt-4">
         <p className="text-sm font-medium">Lost your original tab?</p>
-        <p className="text-xs text-muted-foreground mt-1 mb-3">
+        <p className="text-sm text-muted-foreground mt-1 mb-3">
           Use the button below to finish signing in on this device
           instead.
         </p>

@@ -66,7 +66,7 @@ export function ErrorFallback({
               )}
             </div>
           )}
-          <p className="pt-1 text-xs text-muted-foreground">
+          <p className="pt-1 text-sm text-muted-foreground">
             Still stuck?{" "}
             <a
               href={supportHref}

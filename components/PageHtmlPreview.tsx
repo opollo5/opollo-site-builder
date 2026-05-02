@@ -40,7 +40,7 @@ export function PageHtmlPreview({ html }: { html: string | null }) {
           Generated HTML is larger than {HTML_SIZE_MAX_BYTES / 1024}KB — inline
           preview skipped to keep the admin page responsive.
         </p>
-        <p className="text-xs">
+        <p className="text-sm">
           Open the page in WordPress admin to view it rendered.
         </p>
       </div>
@@ -49,7 +49,7 @@ export function PageHtmlPreview({ html }: { html: string | null }) {
 
   return (
     <div className="rounded-md border bg-white">
-      <div className="flex items-center justify-between border-b px-3 py-2 text-xs text-muted-foreground">
+      <div className="flex items-center justify-between border-b px-3 py-2 text-sm text-muted-foreground">
         <span>Preview (static, design-system CSS only)</span>
         <span className="font-mono">
           {(estimateHtmlBytes(html) / 1024).toFixed(1)} KB

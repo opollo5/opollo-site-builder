@@ -55,7 +55,7 @@ export function PendingInvitesTable({
   return (
     <div className="rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Email</th>
             <th className="px-3 py-2 font-medium">Role</th>
@@ -77,19 +77,19 @@ export function PendingInvitesTable({
               >
                 <td className="px-3 py-2 font-medium">{inv.email}</td>
                 <td className="px-3 py-2">
-                  <span className="inline-flex items-center rounded border border-input px-2 py-0.5 text-xs">
+                  <span className="inline-flex items-center rounded border border-input px-2 py-0.5 text-sm">
                     {inv.role}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
+                <td className="px-3 py-2 text-sm text-muted-foreground">
                   {inv.invited_by_email ?? "(deleted user)"}
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
+                <td className="px-3 py-2 text-sm text-muted-foreground">
                   <span data-screenshot-mask>
                     {formatRelativeTime(inv.created_at)}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs">
+                <td className="px-3 py-2 text-sm">
                   <span
                     className={
                       expiringSoon
@@ -106,7 +106,7 @@ export function PendingInvitesTable({
                     type="button"
                     onClick={() => void revoke(inv.id, inv.email)}
                     disabled={revoking === inv.id}
-                    className="rounded border px-2 py-0.5 text-xs text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
+                    className="rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
                     data-testid="invite-revoke-button"
                   >
                     {revoking === inv.id ? "…" : "Revoke"}
