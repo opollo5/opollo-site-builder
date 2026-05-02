@@ -451,7 +451,7 @@ function TestResultPanel({
       role="alert"
       data-testid="site-test-result"
     >
-      <p className="font-medium">{result.code}</p>
+      <p className="font-medium">Connection test failed</p>
       <p className="mt-0.5 text-xs">{result.message}</p>
     </div>
   );
