@@ -87,6 +87,17 @@ const PUBLIC_PATHS = new Set<string>([
   // middleware bounced unauthenticated callers to /login, breaking
   // cross-device approval.
   "/auth/approve",
+  // /auth/accept-invite — invite redemption landing page (P3.2). Same
+  // rationale as /auth/approve: the token IS the auth (server-component
+  // validates a SHA-256 hash against invites.token_hash). The whole
+  // point is that an invitee — who has no Supabase session yet because
+  // they don't have an account — clicks the link from their email and
+  // sets a password. Without this entry the middleware bounced them to
+  // /login, where they had no credentials, so invites were unredeemable
+  // (UAT §1.1.4 surfaced this 2026-05-02). The /api/auth/accept-invite
+  // POST counterpart that the form submits to is already covered by
+  // the /api/auth/* prefix check below.
+  "/auth/accept-invite",
 ]);
 
 function isPublicPath(pathname: string): boolean {
