@@ -42,7 +42,7 @@ export function PlatformCompaniesListClient({
           </div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b bg-muted/30 text-left text-sm uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 font-medium">Name</th>
                 <th className="px-4 py-2 font-medium">Slug</th>
@@ -59,7 +59,7 @@ export function PlatformCompaniesListClient({
                   data-testid={`platform-company-row-${c.slug}`}
                 >
                   <td className="px-4 py-3 font-medium">{c.name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
                     {c.slug}
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">
@@ -68,7 +68,7 @@ export function PlatformCompaniesListClient({
                   <td className="px-4 py-3 text-right tabular-nums">
                     {c.member_count}
                   </td>
-                  <td className="px-4 py-3 text-xs">
+                  <td className="px-4 py-3 text-sm">
                     {c.is_opollo_internal ? (
                       <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
                         Opollo internal
