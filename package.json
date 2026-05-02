@@ -30,6 +30,7 @@
     "@sendgrid/mail": "^8.1.6",
     "@sentry/nextjs": "^10.49.0",
     "@supabase/supabase-js": "^2.104.0",
+    "@upstash/qstash": "^2.10.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "class-variance-authority": "^0.7.0",
