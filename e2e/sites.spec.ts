@@ -46,10 +46,10 @@ async function createSiteViaForm(
 
   await expect(page.getByTestId("site-create-save")).toBeEnabled();
   await page.getByTestId("site-create-save").click();
-  // DESIGN-DISCOVERY (PR 11) — fresh sites now land on the setup
-  // wizard at Step 1 instead of the bare detail page. Tests that
-  // need the detail page navigate there explicitly afterwards.
-  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
+  // DESIGN-SYSTEM-OVERHAUL (PR 6) — fresh sites now land on the
+  // /onboarding mode-selection screen first; the design-discovery
+  // wizard sits behind the new_design branch.
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/onboarding/);
 }
 
 test.describe("sites CRUD", () => {
@@ -88,11 +88,12 @@ test.describe("sites CRUD", () => {
       password: "abcd efgh ijkl mnop qrst uvwx",
     });
 
-    // DESIGN-DISCOVERY (PR 11) — fresh sites land on the setup
-    // wizard at Step 1 instead of the bare detail page. The wizard
-    // heading reads "Set up <name>".
+    // DESIGN-SYSTEM-OVERHAUL (PR 6) — fresh sites land on the
+    // mode-selection screen first.
     await expect(
-      page.getByRole("heading", { name: new RegExp(`Set up ${uniqueName}`) }),
+      page.getByRole("heading", {
+        name: /How would you like to use this site\?/i,
+      }),
     ).toBeVisible();
 
     // Going back to the list shows the new row.
