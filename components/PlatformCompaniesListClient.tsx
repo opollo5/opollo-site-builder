@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -26,9 +27,11 @@ export function PlatformCompaniesListClient({
               : `${companies.length} ${companies.length === 1 ? "company" : "companies"} on the platform.`}
           </Lead>
         </div>
-        <Button data-testid="add-company-button" disabled>
-          <Plus aria-hidden className="h-4 w-4" />
-          New company (P3-2)
+        <Button asChild data-testid="add-company-button">
+          <Link href="/admin/companies/new">
+            <Plus aria-hidden className="h-4 w-4" />
+            New company
+          </Link>
         </Button>
       </div>
 
