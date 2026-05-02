@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 
+import { PostVariantsSection } from "@/components/PostVariantsSection";
 import { SocialPostDetailClient } from "@/components/SocialPostDetailClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getPostMaster } from "@/lib/platform/social/posts";
+import { listVariants } from "@/lib/platform/social/variants";
 
 // ---------------------------------------------------------------------------
 // S1-3 — customer post detail at /company/social/posts/[id].
@@ -46,8 +48,9 @@ export default async function CompanySocialPostDetailPage({
 
   const companyId = session.company.companyId;
 
-  const [postResult, canEdit] = await Promise.all([
+  const [postResult, variantsResult, canEdit] = await Promise.all([
     getPostMaster({ postId: id, companyId }),
+    listVariants({ postMasterId: id, companyId }),
     canDo(companyId, "edit_post"),
   ]);
 
@@ -64,6 +67,17 @@ export default async function CompanySocialPostDetailPage({
   }
 
   return (
-    <SocialPostDetailClient post={postResult.data} canEdit={canEdit} />
+    <>
+      <SocialPostDetailClient post={postResult.data} canEdit={canEdit} />
+      {variantsResult.ok ? (
+        <PostVariantsSection
+          postId={postResult.data.id}
+          companyId={companyId}
+          initialResolved={variantsResult.data.resolved}
+          masterText={variantsResult.data.masterText}
+          canEdit={canEdit && postResult.data.state === "draft"}
+        />
+      ) : null}
+    </>
   );
 }
