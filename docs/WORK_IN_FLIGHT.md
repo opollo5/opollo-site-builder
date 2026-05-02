@@ -9,16 +9,18 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-02
-- Branch: feat/p2-1-platform-auth-helpers
-- Slice: P2-1 — TypeScript helpers wrapping the SQL helpers from migration 0070. Unblocks platform-customer routes (P2 invitations onwards). Pure lib code, no schema.
+- Branch: feat/p2-2-invitations
+- Slice: P2-2 — Send + revoke invitation flow. API routes + lib helpers + email template. Accept-flow (lib + public route) deferred to P2-3 (smaller, complex enough to deserve its own PR). QStash callbacks (day-3 reminder + day-14 expiry) deferred to P2-4 (blocked on QSTASH_* env).
 - Files claimed:
-  - lib/platform/auth/permissions.ts (new)
-  - lib/platform/auth/current-user.ts (new)
-  - lib/platform/auth/helpers.ts (new)
-  - lib/__tests__/platform-auth.test.ts (new)
+  - lib/platform/auth/api-gate.ts (new — requireCanDoForApi route gate)
+  - lib/platform/invitations/{types,tokens,send,revoke,index}.ts (new)
+  - lib/email/templates/platform-invite.ts (new)
+  - app/api/platform/invitations/route.ts (new — POST send)
+  - app/api/platform/invitations/[id]/route.ts (new — DELETE revoke)
+  - lib/__tests__/platform-invitations.test.ts (new)
   - docs/WORK_IN_FLIGHT.md (claim block; removed in next PR's first commit)
 - Migration number reserved: none
-- Expected completion: same session; PR opened then await CI green explicitly before squash (no --auto in this repo — branch protection doesn't gate, see project memory).
+- Expected completion: same session; PR opened then await CI green explicitly before squash (no --auto in this repo).
 ---
 
 ## ~~Session A (stale)~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; previous owner removes when they next push)
