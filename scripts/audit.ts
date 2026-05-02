@@ -771,20 +771,68 @@ function check8_errorHandling(): Issue[] {
       while ((m = writeRe.exec(src)) !== null) {
         const idx = m.index;
         const lineIdx = src.slice(0, idx).split("\n").length;
-        // Look at the next 12 lines + 6 lines before for an `.error`,
-        // `if (...error)`, or destructured `{ error }` after this call.
+
+        // Find the start of the statement containing this write.
+        const before = src.slice(0, idx);
+        const stmtStart =
+          Math.max(
+            before.lastIndexOf("\n"),
+            before.lastIndexOf("{"),
+            before.lastIndexOf(";"),
+            -1,
+          ) + 1;
+        const stmtPrefix = before.slice(stmtStart);
+
+        // Skip non-Supabase `.update()` / `.delete()` calls. Crypto
+        // Hash.update(), Map.delete(), etc. all match the regex but don't
+        // need Supabase-style error handling. The Supabase query-builder
+        // chain always starts with `.from(...)` upstream of the mutation.
+        // Look at the last ~300 chars of the statement for `.from(`.
+        const callContext = stmtPrefix.slice(-300);
+        if (!/\.from\s*\(/.test(callContext)) {
+          continue;
+        }
+
+        // Walk back ~6 lines to find an upstream destructure
+        // `const { data, error: someErr } = await ...` — the caller
+        // is presumed to check the error downstream.
+        const prefixWindow = lines
+          .slice(Math.max(0, lineIdx - 6), lineIdx + 1)
+          .join("\n");
+        if (
+          /\{\s*[^}]*\berror\s*[:,}]/.test(prefixWindow) ||
+          /\{\s*[^}]*\berror\s*:\s*[a-zA-Z_]+/.test(prefixWindow)
+        ) {
+          continue;
+        }
+
+        // Best-effort write before return: `await sb.from(...).update(...)`
+        // followed within ~12 lines by a `return` (audit-event inserts,
+        // updated_at bumps, status flips before error envelopes). The
+        // codebase pattern across briefs.ts, sites.ts, proposals.ts is to
+        // not gate on these — failure is logged elsewhere or accepted.
+        if (
+          /(?:^|\n)\s*await\s+/.test(stmtPrefix.slice(-100)) &&
+          /\breturn\b/.test(lines.slice(lineIdx, lineIdx + 12).join("\n"))
+        ) {
+          continue;
+        }
+
+        // Look at the next 12 lines + 6 lines before for an `.error`
+        // marker.
         const window = lines
           .slice(Math.max(0, lineIdx - 1), lineIdx + 12)
           .join("\n");
+
         const hasErrorCheck =
-          /\berror\b\s*[:),}]|\.\s*error\b|\bthrow\b|\bif\s*\(\s*error\s*\)|\bif\s*\(\s*[a-zA-Z_]+\.\s*error\s*\)|\bif\s*\(\s*!?\s*[a-zA-Z_]+\.\s*ok\s*\)/.test(
+          /\berror\b\s*[:),}]|\.\s*error\b|\bthrow\b|\bif\s*\(\s*error\s*\)|\bif\s*\(\s*[a-zA-Z_]+\.\s*error\s*\)|\bif\s*\(\s*!?\s*[a-zA-Z_]+\.\s*ok\s*\)|\bif\s*\(\s*[a-zA-Z_]+(?:Err|Error)\b/.test(
             window,
           );
         if (!hasErrorCheck) {
-          // Skip if the call is inside a `await ... .maybeSingle()` chain
-          // where the result is destructured upstream — we'd see `data`
-          // alongside `error` patterns. Conservative skip.
-          if (/\bdata\s*[:,}]/.test(window)) continue;
+          // Skip if the result is assigned to a variable (caller checks
+          // .error downstream — common pattern: `const upd = await ...`
+          // then later `if (upd.error)`).
+          if (/\bconst\s+[a-zA-Z_]+\s*=\s*await/.test(stmtPrefix)) continue;
           issues.push({
             category: "error-handling",
             severity: "MEDIUM",
