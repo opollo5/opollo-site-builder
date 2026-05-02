@@ -4,7 +4,10 @@ import { z } from "zod";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderPlatformInviteEmail } from "@/lib/email/templates/platform-invite";
 import { logger } from "@/lib/logger";
-import { sendInvitation } from "@/lib/platform/invitations";
+import {
+  enqueueInvitationCallbacks,
+  sendInvitation,
+} from "@/lib/platform/invitations";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -192,6 +195,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { status: 502 },
     );
   }
+
+  // Schedule the day-3 reminder + day-14 expiry callbacks via QStash.
+  // No-op when QSTASH_TOKEN is unset (local dev / unprovisioned envs).
+  // Failures are logged but never fail the parent request — the
+  // invitation row + initial email already succeeded.
+  await enqueueInvitationCallbacks({
+    invitationId: result.invitation.id,
+    rawToken: result.rawToken,
+    expiresAt: result.invitation.expires_at,
+    origin,
+  });
 
   // Strip token-related fields from the response — token_hash isn't
   // included in the select but stay defensive on the shape.

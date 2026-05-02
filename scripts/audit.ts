@@ -746,6 +746,7 @@ function check7_unauthenticatedApi(): Issue[] {
     /verifyToken/,
     /verifyMagicLink/,
     /requireCanDoForApi/, // Platform layer canDo gate
+    /verifyQstashSignature/, // QStash webhook signature verification (HMAC)
     /createHash/,
     /\bauth\.getUser\b/,
   ];

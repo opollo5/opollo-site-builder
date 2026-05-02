@@ -9,11 +9,18 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/p5-notifications-dispatcher
-- Slice: P5 — Notifications dispatcher. Single entry point lib/platform/notifications/dispatch.ts that writes platform_notifications + sends email per the trigger table in BUILD.md. Per-event recipient resolution (company admins, opollo admins, submitter, invitee). V1 ships dispatch + recipients + inline templates; the templates/ subfolder + queries.ts (unread/list/mark-read) land with the bell-icon UI in a later slice.
+- Branch: feat/p2-4-invitation-callbacks
+- Slice: P2-4 — invitation reminder + expiry callbacks via QStash. Day-3 reminder + day-14 expiry transitions, idempotent on duplicate webhook fires.
 - Files claimed:
-  - lib/platform/notifications/{types,recipients,dispatch,index}.ts (new)
-  - lib/__tests__/platform-notifications.test.ts (new)
+  - lib/qstash.ts (new)
+  - lib/platform/invitations/callbacks.ts (new)
+  - lib/platform/invitations/index.ts (re-export)
+  - app/api/platform/invitations/route.ts (enqueue on send)
+  - app/api/platform/invitations/callbacks/reminder/route.ts (new webhook)
+  - app/api/platform/invitations/callbacks/expiry/route.ts (new webhook)
+  - lib/__tests__/platform-invitation-callbacks.test.ts (new)
+  - .env.example, .env.local.example (QStash env vars)
+  - package.json + package-lock.json (@upstash/qstash)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none
 - Expected completion: same session.
