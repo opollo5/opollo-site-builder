@@ -6,6 +6,28 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## DATA_CONVENTIONS rollout — add audit columns to `sites` (opened 2026-05-02 during UAT §3.1.2)
+
+**Tags:** `schema`, `data-conventions`, `tech-debt`
+
+**What:** Migration adds `created_by uuid` and `updated_by uuid` columns to the `sites` table (both nullable, FK to `opollo_users(id)` with `ON DELETE SET NULL`). After the migration lands, restore the `updated_by: gate.user?.id ?? null` writes in three routes that drop them today:
+- `app/api/admin/sites/[id]/onboarding/route.ts`
+- `app/api/admin/sites/[id]/use-image-library/route.ts`
+- `app/api/admin/sites/[id]/setup/extract/save/route.ts`
+
+**Why deferred:** UAT was blocked when those three routes returned 500 (`column "updated_by" of relation "sites" does not exist`). The surgical fix dropped the column writes to unblock. Per `docs/DATA_CONVENTIONS.md`, audit columns are forward-facing — existing tables fold in on the next natural migration. The fold-in for `sites` deserves its own slice with a backfill plan, not a UAT-blocker drive-by.
+
+**Trigger:** any future slice that wants per-row authorship on `sites` (e.g. an admin audit-log surface that filters site changes by actor). Or proactive cleanup once the schema migration backlog is light.
+
+**Rough scope:**
+- Migration: `ALTER TABLE sites ADD COLUMN created_by uuid REFERENCES opollo_users(id) ON DELETE SET NULL, ADD COLUMN updated_by uuid REFERENCES opollo_users(id) ON DELETE SET NULL;`. Existing rows: NULL (no historical attribution available — that's fine).
+- Restore the three writes (revert the surgical drop). Cite this PR's commit when restoring.
+- Optional: backfill `created_by` for newly-onboarded sites going forward via the `OnboardingReminderBanner` flow's saving step (out of scope unless authorship is a hard product requirement).
+
+**Size:** Small (~30 min for the migration + 10 min to restore the three writes + tests).
+
+---
+
 ## Component test infra — jsdom + @testing-library/react (opened 2026-04-27 by RS-1 / RS-4)
 
 **What:** Add `jsdom` (or `happy-dom`), `@testing-library/react`, and a vitest project split (or `environmentMatchGlobs`) so we can run hook + component tests under `lib/__tests__/` (or a new `components/__tests__/`).
