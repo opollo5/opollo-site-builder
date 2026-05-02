@@ -23,6 +23,17 @@
 -- Forward-only. RLS service-role-only on both tables; the auth
 -- pipeline reads + writes via lib/2fa/* with the service-role
 -- client.
+--
+-- Recovery preamble: the 0031 version-prefix collision (resolved in
+-- #371/#372/#373) blocked this migration from being recorded. On
+-- environments where an earlier `supabase db push` got far enough to
+-- create these tables before failing on a later statement, the
+-- tables now exist with no schema_migrations row. Drop them up front
+-- so the CREATE statements below can run cleanly. Auth flows weren't
+-- functional pre-recovery, so these tables are empty in every
+-- affected environment — nothing to preserve.
+DROP TABLE IF EXISTS trusted_devices CASCADE;
+DROP TABLE IF EXISTS login_challenges CASCADE;
 
 -- ----------------------------------------------------------------------------
 -- login_challenges
