@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AppearanceEventLog } from "@/components/AppearanceEventLog";
+import { ErrorFallback } from "@/components/ErrorFallback";
 import { KadencePaletteDiffTable } from "@/components/KadencePaletteDiffTable";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -368,23 +369,23 @@ export function AppearancePanelClient({
       )}
 
       {phase === "error" && (
-        <div
-          role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        >
-          <p className="font-medium">Something went wrong.</p>
-          <p className="mt-1">{errorMessage}</p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="mt-3"
-            onClick={runPreflight}
-            disabled={actionState !== "idle"}
-          >
-            {actionState === "rechecking" ? "Re-checking…" : "Re-check"}
-          </Button>
-        </div>
+        <ErrorFallback
+          title="Couldn't load the appearance panel"
+          description={
+            <>
+              <p>{errorMessage}</p>
+              <p className="mt-1 text-xs">
+                If this happens repeatedly, the WordPress site or Kadence
+                plugin may be down. Re-checking sometimes helps after a
+                brief pause.
+              </p>
+            </>
+          }
+          action={{
+            label: actionState === "rechecking" ? "Re-checking…" : "Re-check",
+            onClick: runPreflight,
+          }}
+        />
       )}
 
       {/* Ready state — full panel. */}
