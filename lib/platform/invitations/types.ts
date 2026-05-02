@@ -60,3 +60,32 @@ export type RevokeErrorCode =
 export type RevokeInvitationResult =
   | { ok: true; invitation: Invitation }
   | { ok: false; error: { code: RevokeErrorCode; message: string } };
+
+export type AcceptInvitationInput = {
+  rawToken: string;
+  email: string;
+  password: string;
+  fullName: string;
+};
+
+export type AcceptErrorCode =
+  | "INVALID_TOKEN"
+  | "EXPIRED"
+  | "REVOKED"
+  | "ALREADY_ACCEPTED"
+  | "EMAIL_MISMATCH"
+  | "AUTH_USER_EXISTS"
+  | "VALIDATION_FAILED"
+  | "INTERNAL_ERROR";
+
+export type AcceptInvitationResult =
+  | {
+      ok: true;
+      userId: string;
+      companyId: string;
+      role: CompanyRole;
+    }
+  | {
+      ok: false;
+      error: { code: AcceptErrorCode; message: string };
+    };

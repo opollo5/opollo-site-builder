@@ -34,6 +34,7 @@ export type LimiterName =
   | "login"
   | "auth_callback"
   | "invite"
+  | "invite_accept"
   | "register"
   | "password_reset"
   | "test_connection"
@@ -52,6 +53,10 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   login:          { requests: 10,  window: "60 s" },
   auth_callback:  { requests: 10,  window: "60 s" },
   invite:         { requests: 20,  window: "1 h" },
+  // P2-3: public POST /api/platform/invitations/accept. Per-IP cap on
+  // brute-force attempts against random tokens. 32-byte SHA-256 keyspace
+  // is computationally safe; this is defence in depth.
+  invite_accept:  { requests: 20,  window: "1 h" },
   register:       { requests: 20,  window: "1 h" },
   // M14-3: forgot-password per-email bucket. 5 requests per email per
   // hour caps both accidental user mashing and a compromised sender

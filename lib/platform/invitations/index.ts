@@ -1,5 +1,6 @@
 export { sendInvitation } from "./send";
 export { revokeInvitation } from "./revoke";
+export { acceptInvitation } from "./accept";
 export {
   generateRawToken,
   hashToken,
@@ -14,4 +15,7 @@ export type {
   SendErrorCode,
   RevokeInvitationResult,
   RevokeErrorCode,
+  AcceptInvitationInput,
+  AcceptInvitationResult,
+  AcceptErrorCode,
 } from "./types";
