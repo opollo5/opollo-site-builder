@@ -28,7 +28,7 @@ export default async function CompanyUsersPage() {
 
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-base">
         <p className="font-medium">Account not provisioned to a company.</p>
         <p className="mt-1 text-muted-foreground">
           Your account isn&apos;t a member of any company on the platform
@@ -42,7 +42,7 @@ export default async function CompanyUsersPage() {
     session.isOpolloStaff || session.company.role === "admin";
   if (!isAdmin) {
     return (
-      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive">
         <p className="font-medium">Admins only.</p>
         <p className="mt-1">
           Only admins can manage company users. Ask an admin in your
@@ -56,7 +56,7 @@ export default async function CompanyUsersPage() {
   if (!detailResult.ok) {
     return (
       <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
         role="alert"
       >
         Failed to load company: {detailResult.error.message}

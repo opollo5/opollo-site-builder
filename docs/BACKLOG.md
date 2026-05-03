@@ -6,7 +6,7 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## Typography minimums Phase 2 — `text-sm`-as-body callsite sweep (opened 2026-05-02 during UAT)
+## ~~Typography minimums Phase 2 — `text-sm`-as-body callsite sweep~~ (shipped 2026-05-03, PR #492)
 
 **Tags:** `ux`, `typography`, `tech-debt`
 

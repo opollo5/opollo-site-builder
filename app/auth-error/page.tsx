@@ -20,7 +20,7 @@ export default function AuthErrorPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
       <h1 className="text-xl font-semibold">Authentication error</h1>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-base text-muted-foreground">
         We couldn&rsquo;t verify your session. Try signing in again — if this
         keeps happening, contact an operator.
       </p>

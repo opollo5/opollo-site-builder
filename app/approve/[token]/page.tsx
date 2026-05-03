@@ -79,7 +79,7 @@ export default async function ApproveViewerPage({
         <h1 className="text-2xl font-semibold">
           {company.name} — approval request
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-base text-muted-foreground">
           {recipient.name?.trim() ? `Hi ${recipient.name},` : "Hi,"}{" "}
           {company.name} would like your decision on the social post
           below. {snapshot.submitted_at
@@ -107,13 +107,13 @@ function SnapshotReadOnly({ snapshot }: { snapshot: Snapshot }) {
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Master copy
       </h2>
-      <p className="mt-2 whitespace-pre-wrap text-sm">
+      <p className="mt-2 whitespace-pre-wrap text-base">
         {snapshot.master_text ?? (
           <span className="text-muted-foreground">— No copy —</span>
         )}
       </p>
       {snapshot.link_url ? (
-        <p className="mt-3 text-sm">
+        <p className="mt-3 text-base">
           <span className="text-muted-foreground">Link: </span>
           <a
             href={snapshot.link_url}
@@ -135,7 +135,7 @@ function SnapshotReadOnly({ snapshot }: { snapshot: Snapshot }) {
             {snapshot.variants.map((v) => (
               <li
                 key={v.platform}
-                className="p-3 text-sm"
+                className="p-3 text-base"
                 data-testid={`approval-variant-${v.platform}`}
               >
                 <div className="font-medium">

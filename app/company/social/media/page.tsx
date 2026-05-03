@@ -25,7 +25,7 @@ export default async function CompanySocialMediaPage() {
   }
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-base">
         <p className="font-medium">Account not provisioned to a company.</p>
         <p className="mt-1 text-muted-foreground">
           Your account isn&apos;t a member of any company on the platform
@@ -59,7 +59,7 @@ export default async function CompanySocialMediaPage() {
           />
         ) : (
           <div
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
             role="alert"
           >
             Failed to load media: {listResult.error.message}
