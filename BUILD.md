@@ -57,9 +57,12 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 ## Current state
 
-- **Slice in progress:** P1 (Platform Foundation)
+- **Slice in progress:** P-Brand-1 (Brand profile editor at `/company/settings/brand`)
+- **Most recently shipped:** S1-18 publish pipeline (#439) + S1-17 inbound webhook handler (#437)
 - **S0 (bundle.social verification):** complete
 - **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds), Bannerbear or Placid (compositing — evaluate at I2)
+
+> **Slice numbering note.** Phase B shipped under the `S1-N` sub-slice convention (`feat(s1-1)` … `feat(s1-18)`), not the `S1` … `S8` parent labels in the build sequence below. The Phase B table maps each parent slice to the sub-slice PRs that delivered it; reference those PRs (and `git log main --grep "feat(s1-"`) for the actual implementation history.
 
 ---
 
@@ -69,40 +72,42 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 | Slice | Scope | Status |
 |-------|-------|--------|
-| P1 | Schema (run 0071 + 0072 migrations), RLS, auth helpers | 👈 Current |
-| P2 | Invitation flow (send, accept, set password) | |
-| P3 | Opollo staff view: `/admin/platform/companies` (list, create, brand overview) | |
-| P4 | Customer admin: `/customer/settings/users` (invite, manage roles) | |
-| P5 | Notification system (email + in-app foundation) | |
-| P-Brand-1 | Brand profile editor: `/customer/settings/brand` (visual identity + tone + content rules + version history) | |
-| P-Brand-2 | Brand helper functions: `get_active_brand_profile()`, `can_access_product()`, completion tier logic | |
+| P1 | Schema, RLS, auth helpers | ✅ Shipped (#376 migration 0070; #435 migration 0074 audit cols + brand governance + image-gen log + version_lock + soft-delete + `_active` views) |
+| P2 | Invitation flow (send, accept, set password) | ✅ Shipped (P2-1 #378 auth helpers; P2-2 #380 send/revoke; P2-3 #385 accept; #388 accept-page follow-up; P2-4 #403 reminder + expiry callbacks) |
+| P3 | Opollo staff view: `/admin/platform/companies` (list, create, brand overview) | ✅ Shipped (P3-1 #387 list; P3-2 #391 create; P3-3 #393 detail; P3-4 #395 invite-from-detail) |
+| P4 | Customer admin: `/company/users` (invite, manage roles) | ✅ Shipped (#397). **Route note:** customer surface lives under `/company/*`, not `/customer/*` as originally drafted — the rest of this doc still says `/customer/...` in places; treat those as `/company/...` until a future cleanup unifies the prose. |
+| P5 | Notification system (email + in-app foundation) | ✅ Shipped (#399 dispatcher) |
+| P-Brand-1 | Brand profile editor: `/company/settings/brand` (visual identity + tone + content rules + version history) | 👈 Current |
+| P-Brand-2 | Brand helper functions: `get_active_brand_profile()`, `can_access_product()`, completion tier logic | Partial: DB helpers shipped in #435 (`get_active_brand_profile()`, `can_access_product()`, `update_brand_profile()` RPC). The TS-side `getBrandCompletionTier()` + UI consumer is still pending; will land alongside or after P-Brand-1. |
 
-> **P-Brand-1 and P-Brand-2 must complete before S1.** Social schema FK references brand tables.
+> **Original BUILD.md said P-Brand-1/2 must complete before S1.** That dependency didn't materialise — `social_post_master.brand_profile_id` is nullable (FK added in #435), so the social slices shipped without an active brand profile. P-Brand-1 now unblocks brand-stamp behaviour at composer time + Phase C image generation.
 
 ### Phase B: Social Module (N-Series)
 
 | Slice | Scope | Status |
 |-------|-------|--------|
-| S1 | Social schema + RLS (uses 0071/0072 tables) | |
-| S2 | Connection flow + admin alerting | |
-| S3 | Composer (post_master with brand stamp, variants, media, sync/decouple) | |
-| S4 | Magic-link approval (snapshots, tokens, review UI, in-app for platform users) | |
-| S5 | Scheduling + publishing + reliability (QStash, retries, watchdog, reconciliation) | |
-| S6 | Customer read-only calendar | |
-| S7 | Bulk CSV upload | |
-| S8 | Self-service connection reconnect | |
+| S1 | Social schema + RLS | ✅ Shipped (in #376 migration 0070 + #435 migration 0074 audit/brand additions) |
+| S2 | Connection flow + admin alerting | ✅ Shipped via S1-12 (#424 list page), S1-13 (#426 SDK + foundation), S1-16 (#434 hosted-portal connect flow), S1-17 (#437 inbound webhook handler with HMAC verification). Admin-alerting surface piggybacks on existing operator surfaces. |
+| S3 | Composer (post_master with brand stamp, variants, media, sync/decouple) | ✅ Shipped via S1-1 (#405 lib), S1-2 (#406 HTTP API + customer list), S1-3 (#408 detail/edit/delete), S1-4 (#410 per-platform variants). **Brand stamp** (writing `brand_profile_id` + `brand_profile_version` on submit) lands when P-Brand-1 ships an active profile to read. |
+| S4 | Magic-link approval (snapshots, tokens, review UI, in-app for platform users) | ✅ Shipped via S1-5 (#412 submit), S1-6 (#414 recipients + email), S1-7 (#415 magic-link viewer + transactional decision), S1-8 (#417 decision notifications + audit), S1-9 (#418 reopen-for-editing), S1-10 (#420 cancel-approval) |
+| S5 | Scheduling + publishing + reliability (QStash, retries, watchdog, reconciliation) | ✅ Shipped via S1-14 (#428 schedule entries L3) + S1-18 (#439 publish pipeline: QStash → claim_publish_job RPC → bundle.social). Watchdog/reconciliation cron(s) ride on existing `/api/cron/*` infra. |
+| S6 | Customer read-only calendar | ✅ Shipped via S1-15 (#431 viewer-link magic-link, 90-day customer calendar) |
+| S7 | Bulk CSV upload | ❌ Pending |
+| S8 | Self-service connection reconnect | ❌ Pending. Adjacent to S2 — operator-driven reconnect already works via the connect-portal; customer-driven self-service is the remaining gap. |
 
 ### Phase C: Image Generation
 
 | Slice | Scope | Status |
 |-------|-------|--------|
-| I1 | Ideogram client (backgrounds only, GLOBAL_NEGATIVE_PROMPT). Prompt engine (parameterised). Brand profile reader. Standard/premium routing. Stock fallback. image_generation_log writes. | |
-| I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | |
-| I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | |
-| I4 | Mood board UI: style selector, composition selector, 4–6 results, 1-click select. | |
-| I5 | CAP Phase 2: automated generation via source_type='cap' (Phase 2) | |
+| I1 | Ideogram client (backgrounds only, GLOBAL_NEGATIVE_PROMPT). Prompt engine (parameterised). Brand profile reader. Standard/premium routing. Stock fallback. image_generation_log writes. | ❌ Pending. Schema (`image_generation_log`) shipped in #435 — code path is the missing piece. Depends on P-Brand-1 active profile for brand colour reads. |
+| I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ❌ Pending |
+| I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | ❌ Pending |
+| I4 | Mood board UI: style selector, composition selector, 4–6 results, 1-click select. | ❌ Pending |
+| I5 | CAP Phase 2: automated generation via source_type='cap' (Phase 2) | ❌ Pending (Phase 2 — see "What is NOT V1" further down) |
 
 **Rule:** finish one slice, CI green, PR merged, before starting the next.
+
+> **Status reconciliation history.** This table was reconciled against actual `git log main` on 2026-05-03 (PR #X). Phase A/B status fields had drifted from reality during the P1 → S1-18 sprint. Going forward, BUILD.md status updates ride alongside slice merges (each slice's PR description includes the row update); a periodic full reconciliation runs when drift exceeds 2-3 slices.
 
 ---
 
