@@ -44,7 +44,12 @@ export interface UsePollResult<T> {
   refresh: () => Promise<void>;
 }
 
-const DEFAULT_INTERVAL_MS = 4000;
+// UAT (2026-05-03 round-3): bumped from 4000ms to 2000ms so the run
+// page reflects state changes faster. The snapshot endpoint is cheap
+// (one PostgREST read + one Supabase row count); 2s is well within the
+// budget for an admin-facing surface and operators noticed the prior
+// 4s cadence as a perceptible lag.
+const DEFAULT_INTERVAL_MS = 2000;
 
 export function usePoll<T>(
   url: string | null,
