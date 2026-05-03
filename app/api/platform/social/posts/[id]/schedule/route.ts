@@ -143,12 +143,17 @@ export async function POST(
   const gate = await requireCanDoForApi(parsed.data.company_id, "schedule_post");
   if (gate.kind === "deny") return gate.response;
 
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
+    new URL(req.url).origin;
+
   const result = await createScheduleEntry({
     postMasterId: id,
     companyId: parsed.data.company_id,
     platform: parsed.data.platform,
     scheduledAt: parsed.data.scheduled_at,
     scheduledBy: gate.userId,
+    origin,
   });
   if (!result.ok) {
     return errorJson(
