@@ -8,16 +8,12 @@ import {
 } from "@/lib/platform/social/variants/types";
 
 // ---------------------------------------------------------------------------
-// S1-25 — calendar list view.
+// S1-25/S1-32 — calendar list view with 30-day window navigation.
 //
-// Server fetches a 30-day window of non-cancelled schedule entries.
-// The component groups by date (YYYY-MM-DD in the company's timezone
-// — for V1 we fall back to the operator's browser timezone since
-// platform_companies.timezone isn't threaded through the page yet),
-// and offers a platform filter chip-row.
-//
-// Each entry links to /company/social/posts/[post_master_id] for
-// detail + edit + retry.
+// The server page passes fromIso/toIso. Prev/Next nav links update the
+// ?from= query param (full page reload — server re-fetches the window).
+// Platform filter chips are client-only state over the already-fetched
+// entries.
 // ---------------------------------------------------------------------------
 
 type Entry = {
@@ -30,7 +26,11 @@ type Entry = {
 
 type Props = {
   entries: Entry[];
+  fromIso: string;
+  toIso: string;
 };
+
+const WINDOW_DAYS = 30;
 
 const PLATFORMS: SocialPlatform[] = [
   "linkedin_personal",
@@ -57,6 +57,16 @@ function timeLabel(iso: string): string {
   });
 }
 
+function toFromParam(iso: string): string {
+  return iso.slice(0, 10); // YYYY-MM-DD
+}
+
+function shiftDays(iso: string, days: number): string {
+  const d = new Date(iso);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString();
+}
+
 const PLATFORM_PILL: Record<SocialPlatform, string> = {
   linkedin_personal: "bg-blue-100 text-blue-900",
   linkedin_company: "bg-blue-100 text-blue-900",
@@ -65,8 +75,19 @@ const PLATFORM_PILL: Record<SocialPlatform, string> = {
   gbp: "bg-emerald-100 text-emerald-900",
 };
 
-export function SocialCalendarClient({ entries }: Props) {
+export function SocialCalendarClient({ entries, fromIso, toIso }: Props) {
   const [filter, setFilter] = useState<SocialPlatform | "all">("all");
+
+  const from = new Date(fromIso);
+  const to = new Date(toIso);
+
+  const prevFrom = shiftDays(fromIso, -WINDOW_DAYS);
+  const nextFrom = shiftDays(fromIso, WINDOW_DAYS);
+  const todayFrom = new Date().toISOString();
+  const isToday =
+    toFromParam(fromIso) === toFromParam(todayFrom);
+
+  const windowLabel = `${from.toLocaleDateString("en-AU", { day: "numeric", month: "short" })} – ${to.toLocaleDateString("en-AU", { day: "numeric", month: "short", year: "numeric" })}`;
 
   const visible = useMemo(
     () => entries.filter((e) => filter === "all" || e.platform === filter),
@@ -86,6 +107,41 @@ export function SocialCalendarClient({ entries }: Props) {
 
   return (
     <div data-testid="social-calendar">
+      {/* Window navigation */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <a
+            href={`?from=${toFromParam(prevFrom)}`}
+            className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+            aria-label="Previous period"
+            data-testid="calendar-prev"
+          >
+            ‹ Prev
+          </a>
+          {!isToday && (
+            <a
+              href="/company/social/calendar"
+              className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+              data-testid="calendar-today"
+            >
+              Today
+            </a>
+          )}
+          <a
+            href={`?from=${toFromParam(nextFrom)}`}
+            className="rounded-md border px-3 py-1.5 text-sm hover:bg-muted"
+            aria-label="Next period"
+            data-testid="calendar-next"
+          >
+            Next ›
+          </a>
+        </div>
+        <span className="text-sm text-muted-foreground" data-testid="calendar-window-label">
+          {windowLabel}
+        </span>
+      </div>
+
+      {/* Platform filter chips */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -121,7 +177,7 @@ export function SocialCalendarClient({ entries }: Props) {
           className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground"
           data-testid="calendar-empty"
         >
-          Nothing scheduled in the next 30 days
+          Nothing scheduled in this window
           {filter === "all" ? "" : ` for ${PLATFORM_LABEL[filter]}`}.
         </div>
       ) : (
