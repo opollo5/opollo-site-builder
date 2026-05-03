@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState } from "react";
 
 import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { Button } from "@/components/ui/button";
@@ -19,12 +20,18 @@ import type {
 // reloads on success. V1 keeps the create form inline + minimal
 // (master_text + link_url); a richer modal lands when variant /
 // scheduling slices arrive and the form needs more inputs.
+//
+// S1-37 — adds server-side text search via ?q= param. Submitting the
+// search form navigates to ?q=<term> which the page component passes
+// into listPostMasters (ILIKE on master_text). Client-side state
+// filters still apply on top of the server-filtered result set.
 // ---------------------------------------------------------------------------
 
 type Props = {
   companyId: string;
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
+  initialQ?: string;
 };
 
 const STATE_PILL: Record<SocialPostState, string> = {
@@ -69,7 +76,9 @@ export function SocialPostsListClient({
   companyId,
   initialPosts,
   canCreate,
+  initialQ = "",
 }: Props) {
+  const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
   const [filter, setFilter] = useState<(typeof FILTER_TABS)[number]["key"]>("all");
   const [showCreate, setShowCreate] = useState(false);
@@ -77,11 +86,27 @@ export function SocialPostsListClient({
   const [linkUrl, setLinkUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchInput, setSearchInput] = useState(initialQ);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const visible = useMemo(
     () => (filter === "all" ? posts : posts.filter((p) => p.state === filter)),
     [posts, filter],
   );
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    const term = searchInput.trim();
+    const url = term
+      ? `/company/social/posts?q=${encodeURIComponent(term)}`
+      : "/company/social/posts";
+    router.push(url);
+  }
+
+  function clearSearch() {
+    setSearchInput("");
+    router.push("/company/social/posts");
+  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -122,9 +147,11 @@ export function SocialPostsListClient({
         <div>
           <H1>Social posts</H1>
           <Lead className="mt-0.5">
-            {posts.length === 0
-              ? "No posts yet."
-              : `${posts.length} ${posts.length === 1 ? "post" : "posts"}.`}
+            {initialQ
+              ? `${posts.length} ${posts.length === 1 ? "result" : "results"} for "${initialQ}".`
+              : posts.length === 0
+                ? "No posts yet."
+                : `${posts.length} ${posts.length === 1 ? "post" : "posts"}.`}
           </Lead>
         </div>
         {canCreate ? (
@@ -144,6 +171,37 @@ export function SocialPostsListClient({
           </div>
         ) : null}
       </div>
+
+      {/* Search bar */}
+      <form
+        onSubmit={handleSearch}
+        className="mt-4 flex items-center gap-2"
+        role="search"
+        aria-label="Search posts"
+      >
+        <input
+          ref={searchRef}
+          type="search"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="Search post copy…"
+          className="flex-1 rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          data-testid="posts-search-input"
+        />
+        <Button type="submit" variant="outline" data-testid="posts-search-submit">
+          Search
+        </Button>
+        {initialQ ? (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={clearSearch}
+            data-testid="posts-search-clear"
+          >
+            Clear
+          </Button>
+        ) : null}
+      </form>
 
       {showCreate && canCreate ? (
         <form
@@ -232,9 +290,11 @@ export function SocialPostsListClient({
       >
         {visible.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
-            {posts.length === 0
-              ? "No posts yet — click New post to draft your first one."
-              : "No posts match this filter."}
+            {initialQ
+              ? `No posts found matching "${initialQ}".`
+              : posts.length === 0
+                ? "No posts yet — click New post to draft your first one."
+                : "No posts match this filter."}
           </div>
         ) : (
           <table className="w-full text-sm">

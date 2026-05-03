@@ -20,7 +20,9 @@ import { listPostMasters } from "@/lib/platform/social/posts";
 
 export const dynamic = "force-dynamic";
 
-export default async function CompanySocialPostsPage() {
+type Props = { searchParams: Promise<{ q?: string }> };
+
+export default async function CompanySocialPostsPage({ searchParams }: Props) {
   const session = await getCurrentPlatformSession();
   if (!session) {
     redirect(`/login?next=${encodeURIComponent("/company/social/posts")}`);
@@ -39,9 +41,11 @@ export default async function CompanySocialPostsPage() {
   }
 
   const companyId = session.company.companyId;
+  const { q } = await searchParams;
+  const searchTerm = q?.trim() ?? "";
 
   const [postsResult, canCreate] = await Promise.all([
-    listPostMasters({ companyId }),
+    listPostMasters({ companyId, q: searchTerm || undefined }),
     canDo(companyId, "create_post"),
   ]);
 
@@ -61,6 +65,7 @@ export default async function CompanySocialPostsPage() {
       companyId={companyId}
       initialPosts={postsResult.data.posts}
       canCreate={canCreate}
+      initialQ={searchTerm}
     />
   );
 }
