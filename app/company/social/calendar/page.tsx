@@ -6,18 +6,29 @@ import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
 
 // ---------------------------------------------------------------------------
-// S1-25 — customer calendar view at /company/social/calendar.
+// S1-25/S1-32 — customer calendar view at /company/social/calendar.
 //
-// Server-rendered. Fetches a 30-day forward window of non-cancelled
-// schedule entries, hands to the client component for filtering +
-// rendering. Re-fetch on navigation (force-dynamic).
+// Server-rendered. Accepts ?from=YYYY-MM-DD to set the window start
+// (defaults to today). Always shows a 30-day forward window.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 
 const WINDOW_DAYS = 30;
 
-export default async function CompanySocialCalendarPage() {
+type Props = {
+  searchParams: Promise<{ from?: string }>;
+};
+
+function parseFromParam(raw: string | undefined): Date {
+  if (!raw) return new Date();
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? new Date() : d;
+}
+
+export default async function CompanySocialCalendarPage({ searchParams }: Props) {
+  const { from: fromParam } = await searchParams;
+
   const session = await getCurrentPlatformSession();
   if (!session) {
     redirect(`/login?next=${encodeURIComponent("/company/social/calendar")}`);
@@ -34,12 +45,12 @@ export default async function CompanySocialCalendarPage() {
     );
   }
 
-  const now = new Date();
-  const windowEnd = new Date(now.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const windowStart = parseFromParam(fromParam);
+  const windowEnd = new Date(windowStart.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const result = await listCompanyScheduleEntries({
     companyId: session.company.companyId,
-    fromIso: now.toISOString(),
+    fromIso: windowStart.toISOString(),
     toIso: windowEnd.toISOString(),
   });
 
@@ -48,8 +59,7 @@ export default async function CompanySocialCalendarPage() {
       <header>
         <H1>Calendar</H1>
         <Lead className="mt-0.5">
-          Everything queued for the next {WINDOW_DAYS} days. Click an entry
-          to open the post.
+          {WINDOW_DAYS}-day window. Use Prev / Next to navigate.
         </Lead>
       </header>
       <div className="mt-6">
@@ -62,6 +72,8 @@ export default async function CompanySocialCalendarPage() {
               scheduled_at: e.scheduled_at,
               preview: e.preview,
             }))}
+            fromIso={windowStart.toISOString()}
+            toIso={windowEnd.toISOString()}
           />
         ) : (
           <div
