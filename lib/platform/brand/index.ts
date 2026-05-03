@@ -4,6 +4,12 @@
 
 export { getActiveBrandProfile } from "./get";
 export {
+  updateBrandProfile,
+  type BrandProfilePatch,
+  type BrandUpdateError,
+  type BrandUpdateResult,
+} from "./update";
+export {
   brandTierDescription,
   brandTierLabel,
   getBrandTier,

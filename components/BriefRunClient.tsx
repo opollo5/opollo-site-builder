@@ -379,7 +379,15 @@ export function BriefRunClient({
                     the ordinal so the operator knows exactly which page
                     is blocking. Falls back to the static pill when no
                     page is awaiting (defensive). */}
-                {activeRun.status === "paused" && firstAwaitingReview ? (
+                {activeRun.status === "paused" &&
+                firstAwaitingReview &&
+                sortedPages.length > 1 ? (
+                  // UAT (2026-05-03 round-3): only show the "Page N
+                  // awaiting your review →" clickable shortcut on
+                  // multi-page briefs. With a single page the operator
+                  // is already looking at the only card; the shortcut
+                  // is a no-op that adds visual noise. Single-page
+                  // briefs fall through to the static run pill.
                   <StatusPill
                     kind="run_paused"
                     role="button"
@@ -412,7 +420,7 @@ export function BriefRunClient({
             {polled.isStale ? (
               <span
                 role="status"
-                className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-sm text-muted-foreground"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-muted px-2 py-0.5 font-medium text-sm text-muted-foreground"
                 title="Live updates paused — retrying"
               >
                 <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
@@ -421,7 +429,7 @@ export function BriefRunClient({
             ) : (
               <span
                 role="status"
-                className="ml-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
                 title="This page auto-updates as the runner makes progress"
               >
                 <span
@@ -523,7 +531,13 @@ export function BriefRunClient({
                       </span>
                     </div>
                   </div>
-                  {isAwaitingReview && (
+                  {isAwaitingReview && sortedPages.length > 1 && (
+                    // UAT (2026-05-03 round-3): only render the per-page
+                    // "Review now →" CTA on multi-page briefs. With a
+                    // single page the operator is already looking at it;
+                    // the button is a no-op that scrolls to the card the
+                    // operator is already on. The Show/Hide rendered
+                    // preview <details> on the card itself is enough.
                     <Button
                       type="button"
                       size="sm"
