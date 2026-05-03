@@ -16,11 +16,14 @@ import { logger } from "@/lib/logger";
 //   BUNDLE_SOCIAL_API                    — API key from the bundle.social
 //                                          dashboard (server only; never
 //                                          ship to the client).
-//   BUNDLE_SOCIAL_TEAM_ID                — required for create-portal-link
+//   BUNDLE_SOCIAL_TEAMID                 — required for create-portal-link
 //                                          and connect endpoints; bundle.
 //                                          social's API is team-scoped
 //                                          even though the SDK constructor
-//                                          only takes the API key.
+//                                          only takes the API key. Note
+//                                          the spelling: TEAMID, not
+//                                          TEAM_ID, to match the value
+//                                          provisioned in Vercel.
 //   BUNDLESOCIAL_WEBHOOK_SIGNING_SECRET  — verifies inbound webhook
 //                                          signatures (HMAC-SHA256 in
 //                                          x-signature header). Bundle's
@@ -47,7 +50,7 @@ export function getBundlesocialClient(): Bundlesocial | null {
 }
 
 export function getBundlesocialTeamId(): string | null {
-  return process.env.BUNDLE_SOCIAL_TEAM_ID ?? null;
+  return process.env.BUNDLE_SOCIAL_TEAMID ?? null;
 }
 
 export type WebhookVerifyResult =

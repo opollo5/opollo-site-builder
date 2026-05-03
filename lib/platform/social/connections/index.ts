@@ -1,4 +1,14 @@
+export {
+  initiateBundlesocialConnect,
+  type InitiateConnectInput,
+  type InitiateConnectResult,
+} from "./initiate-connect";
 export { listConnections } from "./list";
+export {
+  syncBundlesocialConnections,
+  type SyncConnectionsInput,
+  type SyncConnectionsResult,
+} from "./sync";
 export {
   PLATFORM_LABEL,
   STATUS_LABEL,

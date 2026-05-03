@@ -9,17 +9,20 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-15-viewer-links
-- Slice: S1-15 — customer viewer-link magic-link flow. lib/platform/social/viewer-links {create,list,resolve,revoke}.ts mints 90-day SHA-256 tokens. Admin POST/GET /api/platform/social/viewer-links + DELETE /[id] (canDo manage_invitations). Public /viewer/[token] renders read-only company calendar. Admin page /company/social/sharing.
+- Branch: feat/s1-16-bundlesocial-connect-portal
+- Slice: S1-16 — bundle.social hosted-portal connect flow. lib/platform/social/connections/{initiate-connect,sync}.ts wraps the SDK; POST /api/platform/social/connections/connect mints portal URL; GET /api/platform/social/connections/callback redirects back with attribution; POST /api/platform/social/connections/sync refreshes status/display_name; SocialConnectionsList wires real Connect/Reconnect/Refresh buttons; /company/social/connections surfaces ?connect= banner.
 - Files claimed:
-  - lib/platform/social/viewer-links/{types,create,list,resolve,revoke,index}.ts (new)
-  - app/api/platform/social/viewer-links/route.ts (new)
-  - app/api/platform/social/viewer-links/[id]/route.ts (new)
-  - app/viewer/[token]/page.tsx (new — public read-only calendar)
-  - app/company/social/sharing/page.tsx (new — admin manager)
-  - components/ViewerLinksManager.tsx (new)
-  - middleware.ts (allow /viewer/* unauthenticated)
-  - lib/__tests__/social-viewer-links.test.ts (new)
+  - lib/bundlesocial.ts (touched — env var name BUNDLE_SOCIAL_TEAMID)
+  - lib/platform/social/connections/initiate-connect.ts (new)
+  - lib/platform/social/connections/sync.ts (new)
+  - lib/platform/social/connections/index.ts (touched)
+  - app/api/platform/social/connections/connect/route.ts (new)
+  - app/api/platform/social/connections/callback/route.ts (new)
+  - app/api/platform/social/connections/sync/route.ts (new)
+  - components/SocialConnectionsList.tsx (rewritten with real wiring)
+  - app/company/social/connections/page.tsx (added searchParams + companyId prop)
+  - .env.example, .env.local.example (TEAM_ID → TEAMID)
+  - lib/__tests__/social-connections-bundlesocial.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none.
 - Expected completion: same session.
