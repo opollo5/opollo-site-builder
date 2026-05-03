@@ -26,10 +26,21 @@ export interface CompositeResult {
 }
 
 // Compositing abstraction — product code ONLY calls this function.
-// Provider implementations land in I2 (Bannerbear or Placid evaluation).
+// Provider is selected by COMPOSITING_PROVIDER env var (default: bannerbear).
+// New providers: add a case here + implement in a new file.
 export async function compositeImage(
-  _input: CompositeInput,
+  input: CompositeInput,
 ): Promise<CompositeResult> {
-  // I2: Bannerbear or Placid implementation selected via COMPOSITING_PROVIDER env var.
-  throw new Error("compositeImage: not implemented until I2");
+  const { compositeBannerbear } = await import("./bannerbear");
+  const { compositePlacid } = await import("./placid");
+
+  const provider = process.env.COMPOSITING_PROVIDER ?? "bannerbear";
+  switch (provider) {
+    case "bannerbear":
+      return compositeBannerbear(input);
+    case "placid":
+      return compositePlacid(input);
+    default:
+      throw new Error(`Unknown compositing provider: ${provider}`);
+  }
 }
