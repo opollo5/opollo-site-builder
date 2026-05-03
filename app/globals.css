@@ -350,3 +350,40 @@
     background: hsl(var(--muted)) !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * UAT (2026-05-03) — operator-readability floor.
+ *
+ * Steven flagged the admin surfaces as too small to read comfortably:
+ *   - "Body text 16px minimum, even where text-sm is used."
+ *   - "Helper text 15px minimum (was 12-14px in places)."
+ *   - "Lucide icons 25% larger so they're not a squint test."
+ *
+ * Implemented as a final-cascade override on Tailwind's text-* utilities
+ * + a min-width/min-height clamp on Lucide icon SVGs. We bump the *small*
+ * tiers up rather than touching `text-base` (already 16px). Surgical so
+ * H1/H2/H3 + form input sizing stays untouched.
+ *
+ * Lucide bump: every icon rendered by lucide-react carries a `.lucide`
+ * class. Targeting `svg.lucide` with min-width/min-height ensures any
+ * icon authored as h-3/w-3 (12px) or h-4/w-4 (16px) renders at >=20px,
+ * which is 25% larger than the prior most-common 16px default. Icons
+ * authored explicitly larger (h-5/w-5 = 20px, h-6/w-6 = 24px) keep their
+ * sizes via the height/width tailwind classes since min- only floors.
+ * --------------------------------------------------------------------- */
+
+.text-xs {
+  /* 12px → 15px */
+  font-size: 0.9375rem;
+  line-height: 1.375rem;
+}
+.text-sm {
+  /* 14px → 15px */
+  font-size: 0.9375rem;
+  line-height: 1.4rem;
+}
+
+svg.lucide {
+  min-width: 1.25rem; /* 20px */
+  min-height: 1.25rem;
+}

@@ -504,19 +504,80 @@ export async function parseBriefDocument(opts: {
   });
   warnings.push(...inference.warnings);
 
-  if (inference.pages.length === 0) {
+  if (inference.pages.length > 0) {
     return {
-      ok: false,
-      code: "INFERENCE_FALLBACK_FAILED",
-      detail: "Claude returned no valid page entries for this document.",
+      ok: true,
+      parser_mode: "claude_inference",
+      pages: inference.pages,
+      warnings,
+    };
+  }
+
+  // UAT (2026-05-03) — single-page fallback. Operators don't always type
+  // briefs with formal page boundaries; sometimes a brief is just three
+  // paragraphs of "build me a homepage about X for SMBs". When the
+  // structural parser AND the Claude-inference fallback both fail to
+  // find page boundaries, treat the entire document as a single page.
+  // The page title comes from a leading heading if one exists, else the
+  // first non-empty line trimmed to 60 chars, else "Untitled page".
+  // Mode is short_brief vs full_text per the same word-count threshold
+  // as the structural path.
+  const trimmed = source.trim();
+  if (trimmed.length > 0) {
+    const inferredTitle = inferTitleFromBlob(trimmed);
+    const wordCount = countWords(trimmed);
+    const mode: BriefPageMode =
+      wordCount >= FULL_TEXT_WORD_THRESHOLD ? "full_text" : "short_brief";
+    warnings.push({
+      code: "HEADING_HIERARCHY_SKIPPED",
+      detail:
+        "Structural parser + Claude inference both failed to find page boundaries. Treated the whole document as a single page.",
+    });
+    logger.info("brief-parser.single_page_fallback", {
+      brief_id: briefId,
+      word_count: wordCount,
+      title: inferredTitle,
+    });
+    return {
+      ok: true,
+      parser_mode: "claude_inference",
+      pages: [
+        {
+          ordinal: 0,
+          title: inferredTitle,
+          mode,
+          source_text: trimmed,
+          word_count: wordCount,
+          source_span_start: 0,
+          source_span_end: trimmed.length,
+        },
+      ],
       warnings,
     };
   }
 
   return {
-    ok: true,
-    parser_mode: "claude_inference",
-    pages: inference.pages,
+    ok: false,
+    code: "INFERENCE_FALLBACK_FAILED",
+    detail: "Claude returned no valid page entries for this document.",
     warnings,
   };
+}
+
+function inferTitleFromBlob(text: string): string {
+  // Prefer markdown headings: # / ## / ### lines anywhere in the doc.
+  const headingMatch = text.match(/^\s{0,3}#{1,3}\s+(.+)$/m);
+  if (headingMatch) {
+    const title = headingMatch[1].trim().slice(0, 60);
+    if (title.length > 0) return title;
+  }
+  // Fall back to the first non-empty line, trimmed.
+  const firstLine = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  if (firstLine && firstLine.length > 0) {
+    return firstLine.slice(0, 60);
+  }
+  return "Untitled page";
 }
