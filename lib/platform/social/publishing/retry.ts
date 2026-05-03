@@ -5,6 +5,7 @@ import {
   getBundlesocialTeamId,
 } from "@/lib/bundlesocial";
 import { logger } from "@/lib/logger";
+import { resolveBundleUploadIds } from "@/lib/platform/social/media";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -129,24 +130,63 @@ export async function retryPublishAttempt(
   }
 
   const text = (row.variant_text ?? row.master_text ?? "").trim();
-  if (!text) {
+
+  // S1-22: pull media from the variant. Same shape as fire.ts.
+  const variantMedia = await svc
+    .from("social_post_variant")
+    .select("media_asset_ids")
+    .eq("id", row.post_variant_id!)
+    .maybeSingle();
+  if (variantMedia.error) {
     await markAttemptFailed(svc, row.publish_attempt_id!, {
-      error_class: "content_rejected",
-      error_payload: { reason: "Empty post body" },
+      error_class: "platform_error",
+      error_payload: { reason: `media read failed: ${variantMedia.error.message}` },
     });
     await markMasterFailed(svc, row.post_master_id!);
-    return internal("Post has no body text.");
+    return internal(`Variant media read failed: ${variantMedia.error.message}`);
+  }
+  const assetIds = ((variantMedia.data?.media_asset_ids as string[] | null) ?? []).filter(
+    (s): s is string => typeof s === "string" && s.length > 0,
+  );
+
+  if (!text && assetIds.length === 0) {
+    await markAttemptFailed(svc, row.publish_attempt_id!, {
+      error_class: "content_rejected",
+      error_payload: { reason: "Empty post body and no media" },
+    });
+    await markMasterFailed(svc, row.post_master_id!);
+    return internal("Post has no body text and no media.");
+  }
+
+  let uploadIds: string[] = [];
+  if (assetIds.length > 0) {
+    const resolved = await resolveBundleUploadIds(assetIds, row.company_id!);
+    if (!resolved.ok) {
+      await markAttemptFailed(svc, row.publish_attempt_id!, {
+        error_class: "media_invalid",
+        error_payload: { reason: resolved.error.message, asset_ids: assetIds },
+      });
+      await markMasterFailed(svc, row.post_master_id!);
+      return ok({ outcome: "publish_failed" });
+    }
+    uploadIds = resolved.data.uploadIds;
   }
 
   const data: Record<string, unknown> = {};
+  const platformBlock: Record<string, unknown> = {
+    text: text || undefined,
+  };
+  if (uploadIds.length > 0) {
+    platformBlock.uploadIds = uploadIds;
+  }
   if (bundlePlatform === "LINKEDIN") {
-    data.LINKEDIN = { text, link: row.link_url ?? undefined };
+    data.LINKEDIN = { ...platformBlock, link: row.link_url ?? undefined };
   } else if (bundlePlatform === "FACEBOOK") {
-    data.FACEBOOK = { text, link: row.link_url ?? undefined };
+    data.FACEBOOK = { ...platformBlock, link: row.link_url ?? undefined };
   } else if (bundlePlatform === "TWITTER") {
-    data.TWITTER = { text };
+    data.TWITTER = platformBlock;
   } else if (bundlePlatform === "GOOGLE_BUSINESS") {
-    data.GOOGLE_BUSINESS = { text, link: row.link_url ?? undefined };
+    data.GOOGLE_BUSINESS = { ...platformBlock, link: row.link_url ?? undefined };
   }
 
   let bundlePostId: string | null = null;
