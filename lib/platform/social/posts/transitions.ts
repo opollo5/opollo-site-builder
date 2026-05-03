@@ -524,3 +524,121 @@ function cancelInternal(
     timestamp: new Date().toISOString(),
   };
 }
+
+// ---------------------------------------------------------------------------
+// S1-44 — MSP release: pending_msp_release → approved.
+//
+// Opollo staff (or a company admin) marks a post as approved after their
+// internal review. No SQL function needed — a single predicate-guarded
+// UPDATE is atomic and correct.
+//
+// Caller is responsible for canDo("release_post", company_id).
+// ---------------------------------------------------------------------------
+
+export type ReleasePostResult = {
+  postId: string;
+  postState: "approved";
+};
+
+export async function releasePost(args: {
+  postId: string;
+  companyId: string;
+}): Promise<ApiResponse<ReleasePostResult>> {
+  if (!args.postId) return releaseValidation("Post id is required.");
+  if (!args.companyId) return releaseValidation("Company id is required.");
+
+  const svc = getServiceRoleClient();
+
+  const update = await svc
+    .from("social_post_master")
+    .update({ state: "approved", state_changed_at: new Date().toISOString() })
+    .eq("id", args.postId)
+    .eq("company_id", args.companyId)
+    .eq("state", "pending_msp_release")
+    .select("id, state")
+    .maybeSingle();
+
+  if (update.error) {
+    logger.error("social.posts.release.failed", {
+      err: update.error.message,
+      code: update.error.code,
+      post_id: args.postId,
+    });
+    return releaseInternal(`Failed to release post: ${update.error.message}`);
+  }
+
+  if (!update.data) {
+    const lookup = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", args.postId)
+      .eq("company_id", args.companyId)
+      .maybeSingle();
+    if (lookup.error) {
+      return releaseInternal(`Lookup failed: ${lookup.error.message}`);
+    }
+    if (!lookup.data) return releaseNotFound();
+    return releaseInvalidState(
+      `Post is in '${lookup.data.state}', not 'pending_msp_release'.`,
+    );
+  }
+
+  return {
+    ok: true,
+    data: { postId: update.data.id as string, postState: "approved" },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function releaseValidation(message: string): ApiResponse<ReleasePostResult> {
+  return {
+    ok: false,
+    error: {
+      code: "VALIDATION_FAILED",
+      message,
+      retryable: false,
+      suggested_action: "Fix the input and resubmit.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function releaseInvalidState(message: string): ApiResponse<ReleasePostResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_STATE",
+      message,
+      retryable: false,
+      suggested_action:
+        "Reload the page; another user may have already moved this post.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function releaseNotFound(): ApiResponse<ReleasePostResult> {
+  return {
+    ok: false,
+    error: {
+      code: "NOT_FOUND",
+      message: "No post with that id in this company.",
+      retryable: false,
+      suggested_action: "Check the post id.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function releaseInternal(message: string): ApiResponse<ReleasePostResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message,
+      retryable: false,
+      suggested_action: "Retry. If the error persists, contact support.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
