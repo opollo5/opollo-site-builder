@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
 import type {
   PostMasterListItem,
+  SocialPostSource,
   SocialPostState,
 } from "@/lib/platform/social/posts";
 
@@ -26,6 +27,8 @@ import type {
 // S1-40 — state-filter tabs are now URL-driven via ?state=. Dashboard
 //          tiles that link to ?state=approved etc. now pre-select the
 //          correct tab and the server applies the filter server-side.
+// S1-43 — source badge (CSV / CAP / API) shown under the copy text
+//          for non-manual posts; manual posts show no badge.
 // ---------------------------------------------------------------------------
 
 type FilterKey = "all" | SocialPostState;
@@ -78,6 +81,18 @@ const FILTER_TABS: Array<{ key: "all" | SocialPostState; label: string }> = [
   { key: "failed", label: "Failed" },
   { key: "rejected", label: "Rejected" },
 ];
+
+const SOURCE_LABEL: Partial<Record<SocialPostSource, string>> = {
+  csv: "CSV",
+  cap: "CAP",
+  api: "API",
+};
+
+const SOURCE_PILL: Partial<Record<SocialPostSource, string>> = {
+  csv: "bg-violet-100 text-violet-900",
+  cap: "bg-teal-100 text-teal-900",
+  api: "bg-slate-100 text-slate-700",
+};
 
 function buildUrl({
   page,
@@ -352,16 +367,26 @@ export function SocialPostsListClient({
                   className="border-b last:border-b-0 hover:bg-muted/20"
                   data-testid={`social-post-row-${p.id}`}
                 >
-                  <td className="max-w-md truncate px-4 py-3">
-                    <Link
-                      href={`/company/social/posts/${p.id}`}
-                      className="hover:underline"
-                      data-testid={`social-post-link-${p.id}`}
-                    >
-                      {p.master_text ?? (
-                        <span className="text-muted-foreground">— No copy —</span>
-                      )}
-                    </Link>
+                  <td className="max-w-md px-4 py-3">
+                    <div className="flex flex-col gap-1">
+                      <Link
+                        href={`/company/social/posts/${p.id}`}
+                        className="truncate hover:underline"
+                        data-testid={`social-post-link-${p.id}`}
+                      >
+                        {p.master_text ?? (
+                          <span className="text-muted-foreground">— No copy —</span>
+                        )}
+                      </Link>
+                      {SOURCE_LABEL[p.source_type] ? (
+                        <span
+                          className={`inline-block w-fit rounded px-1.5 py-0.5 text-xs font-medium ${SOURCE_PILL[p.source_type]}`}
+                          data-testid={`social-post-source-${p.id}`}
+                        >
+                          {SOURCE_LABEL[p.source_type]}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="max-w-xs truncate px-4 py-3 text-sm text-muted-foreground">
                     {p.link_url ?? "—"}
