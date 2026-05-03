@@ -1,4 +1,11 @@
 export {
+  recordApprovalDecision,
+  resolveRecipientByToken,
+  type Decision,
+  type RecordDecisionInput,
+  type RecordDecisionResult,
+} from "./decisions";
+export {
   addRecipient,
   listRecipients,
   revokeRecipient,

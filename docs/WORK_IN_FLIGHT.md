@@ -9,21 +9,20 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-6-approval-recipients
-- Slice: S1-6 — approval recipients (magic-link delivery to reviewers). Lib add/list/revoke against social_approval_recipients with SHA-256 token storage. POST/GET /api/platform/social/posts/[id]/recipients + DELETE /[recipient_id]. Detail page renders the recipient list + add form when state=pending_client_approval. /approve/[token] stub landing page (viewer + decision flow lands in S1-7).
+- Branch: feat/s1-7-approval-viewer
+- Slice: S1-7 — magic-link viewer + decision events (write-safety hotspot). Migration 0072 adds a transactional record_approval_decision Postgres function that inserts the event row + finalises the request + flips post state in one txn. /approve/[token] becomes a real viewer; POST /api/approve/[token]/decision records the decision.
 - Files claimed:
-  - lib/platform/social/approvals/{types,index}.ts (new)
-  - lib/platform/social/approvals/recipients/{add,list,revoke,index}.ts (new)
-  - lib/email/templates/social-approval-request.ts (new)
-  - app/api/platform/social/posts/[id]/recipients/route.ts (new)
-  - app/api/platform/social/posts/[id]/recipients/[recipient_id]/route.ts (new)
-  - components/PostApprovalSection.tsx (new)
-  - app/company/social/posts/[id]/page.tsx (wire approval section)
-  - app/approve/[token]/page.tsx (new — stub)
-  - middleware.ts (add /approve/ to public paths)
-  - lib/__tests__/social-approval-recipients.test.ts (new)
+  - supabase/migrations/0072_record_approval_decision_fn.sql (new)
+  - supabase/rollbacks/0072_record_approval_decision_fn.down.sql (new)
+  - lib/platform/social/approvals/decisions/{record,index}.ts (new)
+  - lib/platform/social/approvals/index.ts (re-export)
+  - app/approve/[token]/page.tsx (real viewer; replaces stub)
+  - app/api/approve/[token]/decision/route.ts (new)
+  - components/ApprovalDecisionForm.tsx (new)
+  - middleware.ts (allow /api/approve/* unauthenticated)
+  - lib/__tests__/social-approval-decisions.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: none (existing 0070 schema covers it).
+- Migration number reserved: 0072.
 - Expected completion: same session.
 ---
 
@@ -75,6 +74,8 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0019 — M13-1 posts schema.~~ Shipped in #142.
 - ~~0021 — M13-3 briefs.content_type column.~~ Shipped in #145.
 - ~~0070 — P1 Platform Foundation (platform_* + social_* schema + RLS).~~ Shipped in #376 + #377.
+- ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
+- 0072 — Session A — S1-7 record_approval_decision transactional function (branch: feat/s1-7-approval-viewer)
 - 0071 — Session A — S1-5 submit_post_for_approval transactional function (branch: feat/s1-5-submit-for-approval)
 
 ## Claim block template
