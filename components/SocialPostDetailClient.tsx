@@ -48,11 +48,13 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reopening, setReopening] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isDraft = post.state === "draft";
   const editable = canEdit && isDraft;
   const submittable = canSubmit && isDraft;
+  const reopenable = canEdit && post.state === "changes_requested";
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -146,6 +148,43 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
     }
   }
 
+  async function handleReopen() {
+    if (
+      !confirm(
+        "Reopen this post for editing? The reviewer's response will stay in the audit trail; you'll need to re-submit for approval after editing.",
+      )
+    ) {
+      return;
+    }
+    setReopening(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/platform/social/posts/${post.id}/reopen`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company_id: post.company_id }),
+        },
+      );
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: "draft" } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        const msg = !json.ok
+          ? json.error.message
+          : "Failed to reopen post.";
+        setError(msg);
+        setReopening(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setReopening(false);
+    }
+  }
+
   return (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -183,6 +222,15 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
                 data-testid="submit-post-button"
               >
                 {submitting ? "Submitting…" : "Submit for approval"}
+              </Button>
+            ) : null}
+            {reopenable ? (
+              <Button
+                onClick={handleReopen}
+                disabled={reopening}
+                data-testid="reopen-post-button"
+              >
+                {reopening ? "Reopening…" : "Reopen for editing"}
               </Button>
             ) : null}
             {editable ? (

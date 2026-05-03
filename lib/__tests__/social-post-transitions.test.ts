@@ -9,6 +9,7 @@ import {
 
 import {
   createPostMaster,
+  reopenForEditing,
   submitForApproval,
 } from "@/lib/platform/social/posts";
 import { upsertVariant } from "@/lib/platform/social/variants";
@@ -312,5 +313,117 @@ describe("lib/platform/social/posts/submitForApproval", () => {
       .single();
     expect(reqRow.error).toBeNull();
     expect(reqRow.data?.approval_rule).toBe("all_must");
+  });
+
+  describe("reopenForEditing", () => {
+    async function makeChangesRequestedPost() {
+      const post = await createDraft("changes_requested target");
+      const svc = getServiceRoleClient();
+      // Force the post into changes_requested directly. The realistic
+      // path is submit + decision('changes_requested') but we don't
+      // need to exercise the full chain just to test reopenForEditing.
+      const update = await svc
+        .from("social_post_master")
+        .update({ state: "changes_requested" })
+        .eq("id", post.id)
+        .select("id, state")
+        .single();
+      expect(update.error).toBeNull();
+      expect(update.data?.state).toBe("changes_requested");
+      return post;
+    }
+
+    it("happy path — flips changes_requested → draft", async () => {
+      const post = await makeChangesRequestedPost();
+      const result = await reopenForEditing({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.postState).toBe("draft");
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.state).toBe("draft");
+    });
+
+    it("rejects reopen on a draft post with INVALID_STATE", async () => {
+      const post = await createDraft("already draft");
+      const result = await reopenForEditing({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("rejects reopen on an approved post with INVALID_STATE", async () => {
+      const post = await createDraft("approved one");
+      const svc = getServiceRoleClient();
+      await svc
+        .from("social_post_master")
+        .update({ state: "approved" })
+        .eq("id", post.id);
+
+      const result = await reopenForEditing({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("returns NOT_FOUND for cross-company access", async () => {
+      const post = await makeChangesRequestedPost();
+      const result = await reopenForEditing({
+        postId: post.id,
+        companyId: COMPANY_B_ID,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("returns NOT_FOUND for missing post id", async () => {
+      const result = await reopenForEditing({
+        postId: "00000000-0000-0000-0000-000000000fff",
+        companyId: COMPANY_A_ID,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("two parallel reopens converge — only one transitions, the other sees INVALID_STATE", async () => {
+      const post = await makeChangesRequestedPost();
+
+      const [a, b] = await Promise.all([
+        reopenForEditing({ postId: post.id, companyId: COMPANY_A_ID }),
+        reopenForEditing({ postId: post.id, companyId: COMPANY_A_ID }),
+      ]);
+
+      const successes = [a, b].filter((r) => r.ok);
+      const failures = [a, b].filter((r) => !r.ok);
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+      if (failures[0]?.ok === false) {
+        expect(failures[0].error.code).toBe("INVALID_STATE");
+      }
+
+      const svc = getServiceRoleClient();
+      const post_after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(post_after.data?.state).toBe("draft");
+    });
   });
 });

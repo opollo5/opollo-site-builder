@@ -3,8 +3,10 @@ export { deletePostMaster } from "./delete";
 export { getPostMaster } from "./get";
 export { listPostMasters } from "./list";
 export {
+  reopenForEditing,
   submitForApproval,
   type ApprovalSnapshot,
+  type ReopenForEditingResult,
   type SubmitForApprovalResult,
 } from "./transitions";
 export { updatePostMaster, type UpdatePostMasterInput } from "./update";
