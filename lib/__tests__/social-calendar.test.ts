@@ -21,7 +21,7 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 // S1-25 — listCompanyScheduleEntries (calendar view lib).
 // ---------------------------------------------------------------------------
 
-const COMPANY_CAL_ID = "caddd000-0000-0000-0000-ca1enda000001";
+const COMPANY_CAL_ID = "caddd000-0000-0000-0000-ca1eda000001";
 
 describe("lib/platform/social/scheduling/list-company", () => {
   let creator: SeededAuthUser;
