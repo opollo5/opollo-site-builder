@@ -351,7 +351,7 @@ async function handleAccountEvent(
 
   const conn = await svc
     .from("social_connections")
-    .select("id, company_id, status")
+    .select("id, company_id, status, platform")
     .eq("bundle_social_account_id", accountId)
     .maybeSingle();
   if (conn.error) {
@@ -390,6 +390,11 @@ async function handleAccountEvent(
         reason: `Connection healthy update failed: ${update.error.message}`,
       };
     }
+    void notifyDispatch({
+      event: "connection_restored",
+      companyId: conn.data.company_id as string,
+      platform: conn.data.platform as string,
+    });
     return { kind: "ok", webhookEventId, action: "account_connected" };
   }
 
@@ -436,6 +441,13 @@ async function handleAccountEvent(
       connection_id: conn.data.id,
     });
   }
+
+  void notifyDispatch({
+    event: "connection_lost",
+    companyId: conn.data.company_id as string,
+    platform: conn.data.platform as string,
+    reason: reasonText,
+  });
 
   return {
     kind: "ok",
