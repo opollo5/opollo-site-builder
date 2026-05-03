@@ -39,7 +39,10 @@ export type LimiterName =
   | "password_reset"
   | "test_connection"
   | "auth_2fa"
-  | "csv_upload";
+  | "csv_upload"
+  | "user_mgmt"
+  | "admin_write"
+  | "briefs_upload";
 
 type LimiterConfig = {
   requests: number;
@@ -82,6 +85,18 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // defaults. Keyed on "company:<uuid>" so different companies don't
   // share the bucket.
   csv_upload: { requests: 3, window: "1 h" },
+  // M15-4 #9: user-management mutations (revoke, reinstate, role change).
+  // Admin-only; 20/hour is generous for legitimate use (a team of 5
+  // churning through a user list) while blocking automated scanning.
+  user_mgmt: { requests: 20, window: "1 h" },
+  // M15-4 #9: miscellaneous admin writes (budget PATCH, design-system
+  // writes, sites/list). 60/hour per authenticated admin covers normal
+  // dashboard use without opening bulk-mutation paths.
+  admin_write: { requests: 60, window: "1 h" },
+  // M15-4 #9: brief file upload endpoint. Each call parses up to 10 MB
+  // of markdown; 10/hour prevents runaway re-uploads during a single
+  // session while leaving headroom for retries.
+  briefs_upload: { requests: 10, window: "1 h" },
 };
 
 export type RateLimitResult =

@@ -10,6 +10,7 @@ import {
   respond,
   validateUuidParam,
 } from "@/lib/http";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { validateCompositionRefs } from "./_helpers";
 
 export const runtime = "nodejs";
@@ -18,6 +19,10 @@ type RouteContext = { params: { id: string } };
 
 // GET /api/design-systems/[id]/templates
 export async function GET(_req: Request, ctx: RouteContext) {
+  // PLATFORM-AUDIT M15-4 #8: previously unguarded — matched by middleware only.
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
+  if (gate.kind === "deny") return gate.response;
+
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;
   return respond(await listTemplates(param.value));
@@ -36,6 +41,9 @@ const CreateBodySchema = CreateDesignTemplateSchema.omit({
 export async function POST(req: Request, ctx: RouteContext) {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { updateTenantBudget } from "@/lib/tenant-budgets";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
@@ -77,6 +78,9 @@ export async function PATCH(
   // not a drive-by widening.
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   if (!UUID_RE.test(params.id)) {
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);

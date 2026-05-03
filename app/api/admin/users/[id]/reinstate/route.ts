@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { logger } from "@/lib/logger";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -44,6 +45,9 @@ export async function POST(
 ): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("user_mgmt", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const userId = params.id;
   if (!UUID_RE.test(userId)) {
