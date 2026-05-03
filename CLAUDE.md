@@ -8,7 +8,7 @@ A chat interface that generates WordPress pages for Opollo's clients.
 - Work autonomously. Don't ask for permission for normal coding tasks.
 - **Before starting a task that matches a pattern, read `docs/patterns/<pattern-name>.md` first.** The patterns folder is the playbook for recurring shapes — files, tests, PR structure, known pitfalls. If no pattern matches, proceed from first principles and note whether the task is a candidate for a new pattern.
 - **For operations tasks** (deploy rollback, key rotation, stuck incident, missing migration, env-var provisioning) — consult `docs/RUNBOOK.md` before acting. Do not freelance on destructive or irreversible operations.
-- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline) — see `docs/RULES.md`. Each rule has the incident that taught it.
+- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline, secret-handling discipline) — see `docs/RULES.md`. Each rule has the incident that taught it.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
@@ -161,6 +161,7 @@ Supply-chain scanning runs server-side:
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
 - **RUNBOOK is load-bearing for incident response. Code that changes a blocker code, audit event name, or error envelope MUST update the matching `docs/RUNBOOK.md` entry in the same PR.**
+- **Never print env-var values or connection strings to tool output.** Any command that reads from `.env.local`, env, or another secret source runs with `2>$null` (PowerShell) / `2>/dev/null` (bash). Pass values via variables — never inline them into the visible command, never `Write-Output`/`Write-Host`/`echo` them, never paste a connection string into a chat update. If you need to confirm a value is set, print only its length or a hash prefix. Tool output that surfaces a secret (CLI parse errors, `--debug` flags, verbose logs) gets piped through a redactor before it reaches the conversation. Full rule + incident: `docs/RULES.md` #9.
 
 ## Performance standards
 - **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`

@@ -22,3 +22,12 @@ next-env.d.ts
 # upload logs (filenames + cloudflare_ids + per-row status). Resumable
 # state, not source.
 scripts/output/
+
+# Operator-local Claude Code config + ephemeral state. Per-developer;
+# not shared. `.claude/skills/` IS tracked (project-wide playbooks).
+.claude/settings.local.json
+.claude/settings.json.txt
+.claude/worktrees/
+
+# Supabase CLI temp dir (project ref cache, etc.). Ephemeral.
+supabase/.temp/
