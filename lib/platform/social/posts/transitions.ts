@@ -526,6 +526,220 @@ function cancelInternal(
 }
 
 // ---------------------------------------------------------------------------
+// S1-48 — Platform-user approver decisions: pending_client_approval → *
+//
+// Three transitions driven by internal platform users with the `approver`
+// role (or Opollo staff bypass). These are simple predicate-guarded UPDATEs
+// that bypass the `record_approval_decision` Postgres function which is
+// designed for external recipient-token flows. The state_changed_at trigger
+// (migration 0070) fires automatically on each UPDATE.
+//
+// Caller is responsible for canDo("approve_post" | "reject_post", company_id).
+// ---------------------------------------------------------------------------
+
+export type ApprovePostResult = {
+  postId: string;
+  postState: "approved";
+};
+
+export async function approvePost(args: {
+  postId: string;
+  companyId: string;
+}): Promise<ApiResponse<ApprovePostResult>> {
+  if (!args.postId) return approveValidation("Post id is required.");
+  if (!args.companyId) return approveValidation("Company id is required.");
+
+  const svc = getServiceRoleClient();
+
+  const update = await svc
+    .from("social_post_master")
+    .update({ state: "approved" })
+    .eq("id", args.postId)
+    .eq("company_id", args.companyId)
+    .eq("state", "pending_client_approval")
+    .select("id, state")
+    .maybeSingle();
+
+  if (update.error) {
+    logger.error("social.posts.approve.failed", {
+      err: update.error.message,
+      code: update.error.code,
+      post_id: args.postId,
+    });
+    return approveInternal(`Failed to approve post: ${update.error.message}`);
+  }
+
+  if (!update.data) {
+    const lookup = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", args.postId)
+      .eq("company_id", args.companyId)
+      .maybeSingle();
+    if (lookup.error) return approveInternal(`Lookup failed: ${lookup.error.message}`);
+    if (!lookup.data) return approveNotFound();
+    return approveInvalidState(
+      `Post is in '${lookup.data.state}', not 'pending_client_approval'.`,
+    );
+  }
+
+  return {
+    ok: true,
+    data: { postId: update.data.id as string, postState: "approved" },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function approveValidation(message: string): ApiResponse<ApprovePostResult> {
+  return { ok: false, error: { code: "VALIDATION_FAILED", message, retryable: false, suggested_action: "Fix the input and resubmit." }, timestamp: new Date().toISOString() };
+}
+function approveInvalidState(message: string): ApiResponse<ApprovePostResult> {
+  return { ok: false, error: { code: "INVALID_STATE", message, retryable: false, suggested_action: "Reload the page; another user may have already moved this post." }, timestamp: new Date().toISOString() };
+}
+function approveNotFound(): ApiResponse<ApprovePostResult> {
+  return { ok: false, error: { code: "NOT_FOUND", message: "No post with that id in this company.", retryable: false, suggested_action: "Check the post id." }, timestamp: new Date().toISOString() };
+}
+function approveInternal(message: string): ApiResponse<ApprovePostResult> {
+  return { ok: false, error: { code: "INTERNAL_ERROR", message, retryable: false, suggested_action: "Retry. If the error persists, contact support." }, timestamp: new Date().toISOString() };
+}
+
+// ---------------------------------------------------------------------------
+
+export type RejectPostResult = {
+  postId: string;
+  postState: "rejected";
+};
+
+export async function rejectPost(args: {
+  postId: string;
+  companyId: string;
+}): Promise<ApiResponse<RejectPostResult>> {
+  if (!args.postId) return rejectValidation("Post id is required.");
+  if (!args.companyId) return rejectValidation("Company id is required.");
+
+  const svc = getServiceRoleClient();
+
+  const update = await svc
+    .from("social_post_master")
+    .update({ state: "rejected" })
+    .eq("id", args.postId)
+    .eq("company_id", args.companyId)
+    .eq("state", "pending_client_approval")
+    .select("id, state")
+    .maybeSingle();
+
+  if (update.error) {
+    logger.error("social.posts.reject.failed", {
+      err: update.error.message,
+      code: update.error.code,
+      post_id: args.postId,
+    });
+    return rejectInternal(`Failed to reject post: ${update.error.message}`);
+  }
+
+  if (!update.data) {
+    const lookup = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", args.postId)
+      .eq("company_id", args.companyId)
+      .maybeSingle();
+    if (lookup.error) return rejectInternal(`Lookup failed: ${lookup.error.message}`);
+    if (!lookup.data) return rejectNotFound();
+    return rejectInvalidState(
+      `Post is in '${lookup.data.state}', not 'pending_client_approval'.`,
+    );
+  }
+
+  return {
+    ok: true,
+    data: { postId: update.data.id as string, postState: "rejected" },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function rejectValidation(message: string): ApiResponse<RejectPostResult> {
+  return { ok: false, error: { code: "VALIDATION_FAILED", message, retryable: false, suggested_action: "Fix the input and resubmit." }, timestamp: new Date().toISOString() };
+}
+function rejectInvalidState(message: string): ApiResponse<RejectPostResult> {
+  return { ok: false, error: { code: "INVALID_STATE", message, retryable: false, suggested_action: "Reload the page; another user may have already moved this post." }, timestamp: new Date().toISOString() };
+}
+function rejectNotFound(): ApiResponse<RejectPostResult> {
+  return { ok: false, error: { code: "NOT_FOUND", message: "No post with that id in this company.", retryable: false, suggested_action: "Check the post id." }, timestamp: new Date().toISOString() };
+}
+function rejectInternal(message: string): ApiResponse<RejectPostResult> {
+  return { ok: false, error: { code: "INTERNAL_ERROR", message, retryable: false, suggested_action: "Retry. If the error persists, contact support." }, timestamp: new Date().toISOString() };
+}
+
+// ---------------------------------------------------------------------------
+
+export type RequestChangesResult = {
+  postId: string;
+  postState: "changes_requested";
+};
+
+export async function requestChanges(args: {
+  postId: string;
+  companyId: string;
+}): Promise<ApiResponse<RequestChangesResult>> {
+  if (!args.postId) return requestChangesValidation("Post id is required.");
+  if (!args.companyId) return requestChangesValidation("Company id is required.");
+
+  const svc = getServiceRoleClient();
+
+  const update = await svc
+    .from("social_post_master")
+    .update({ state: "changes_requested" })
+    .eq("id", args.postId)
+    .eq("company_id", args.companyId)
+    .eq("state", "pending_client_approval")
+    .select("id, state")
+    .maybeSingle();
+
+  if (update.error) {
+    logger.error("social.posts.request_changes.failed", {
+      err: update.error.message,
+      code: update.error.code,
+      post_id: args.postId,
+    });
+    return requestChangesInternal(`Failed to request changes: ${update.error.message}`);
+  }
+
+  if (!update.data) {
+    const lookup = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", args.postId)
+      .eq("company_id", args.companyId)
+      .maybeSingle();
+    if (lookup.error) return requestChangesInternal(`Lookup failed: ${lookup.error.message}`);
+    if (!lookup.data) return requestChangesNotFound();
+    return requestChangesInvalidState(
+      `Post is in '${lookup.data.state}', not 'pending_client_approval'.`,
+    );
+  }
+
+  return {
+    ok: true,
+    data: { postId: update.data.id as string, postState: "changes_requested" },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function requestChangesValidation(message: string): ApiResponse<RequestChangesResult> {
+  return { ok: false, error: { code: "VALIDATION_FAILED", message, retryable: false, suggested_action: "Fix the input and resubmit." }, timestamp: new Date().toISOString() };
+}
+function requestChangesInvalidState(message: string): ApiResponse<RequestChangesResult> {
+  return { ok: false, error: { code: "INVALID_STATE", message, retryable: false, suggested_action: "Reload the page; another user may have already moved this post." }, timestamp: new Date().toISOString() };
+}
+function requestChangesNotFound(): ApiResponse<RequestChangesResult> {
+  return { ok: false, error: { code: "NOT_FOUND", message: "No post with that id in this company.", retryable: false, suggested_action: "Check the post id." }, timestamp: new Date().toISOString() };
+}
+function requestChangesInternal(message: string): ApiResponse<RequestChangesResult> {
+  return { ok: false, error: { code: "INTERNAL_ERROR", message, retryable: false, suggested_action: "Retry. If the error persists, contact support." }, timestamp: new Date().toISOString() };
+}
+
+// ---------------------------------------------------------------------------
 // S1-44 — MSP release: pending_msp_release → approved.
 //
 // Opollo staff (or a company admin) marks a post as approved after their
