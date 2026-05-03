@@ -36,7 +36,10 @@ const VALID_STATES: ReadonlySet<string> = new Set<SocialPostState>([
   "failed",
 ]);
 
-type Props = { searchParams: Promise<{ q?: string; page?: string; state?: string }> };
+const VALID_SORT_COLS = new Set(["state_changed_at", "created_at"]);
+const VALID_SORT_DIRS = new Set(["asc", "desc"]);
+
+type Props = { searchParams: Promise<{ q?: string; page?: string; state?: string; sort?: string; dir?: string }> };
 
 export default async function CompanySocialPostsPage({ searchParams }: Props) {
   const session = await getCurrentPlatformSession();
@@ -57,7 +60,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
   }
 
   const companyId = session.company.companyId;
-  const { q, page: pageParam, state: stateParam } = await searchParams;
+  const { q, page: pageParam, state: stateParam, sort: sortParam, dir: dirParam } = await searchParams;
   const searchTerm = q?.trim() ?? "";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
@@ -65,6 +68,14 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
     stateParam && VALID_STATES.has(stateParam)
       ? (stateParam as SocialPostState)
       : null;
+  const sortBy =
+    sortParam && VALID_SORT_COLS.has(sortParam)
+      ? (sortParam as "state_changed_at" | "created_at")
+      : "state_changed_at";
+  const sortDir =
+    dirParam && VALID_SORT_DIRS.has(dirParam)
+      ? (dirParam as "asc" | "desc")
+      : "desc";
 
   const [postsResult, canCreate] = await Promise.all([
     listPostMasters({
@@ -74,6 +85,8 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       limit: PAGE_SIZE,
       offset,
       withCount: true,
+      sortBy,
+      sortDir,
     }),
     canDo(companyId, "create_post"),
   ]);
@@ -99,6 +112,8 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       page={page}
       pageSize={PAGE_SIZE}
       totalCount={postsResult.data.totalCount}
+      sortBy={sortBy}
+      sortDir={sortDir}
     />
   );
 }
