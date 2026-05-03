@@ -30,9 +30,13 @@ import type {
 // S1-43 — source badge (CSV / CAP / API) shown under the copy text
 //          for non-manual posts; manual posts show no badge.
 // S1-45 — adds "Awaiting MSP release" tab to FILTER_TABS.
+// S1-46 — adds ?sort= + ?dir= URL params; sort-toggle buttons on
+//          Updated and Created column headers.
 // ---------------------------------------------------------------------------
 
 type FilterKey = "all" | SocialPostState;
+type SortCol = "state_changed_at" | "created_at";
+type SortDir = "asc" | "desc";
 
 type Props = {
   companyId: string;
@@ -43,6 +47,8 @@ type Props = {
   page?: number;
   pageSize?: number;
   totalCount?: number;
+  sortBy?: SortCol;
+  sortDir?: SortDir;
 };
 
 const STATE_PILL: Record<SocialPostState, string> = {
@@ -100,15 +106,21 @@ function buildUrl({
   page,
   q,
   state,
+  sort,
+  dir,
 }: {
   page: number;
   q: string;
   state: FilterKey;
+  sort: SortCol;
+  dir: SortDir;
 }): string {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
   if (state !== "all") params.set("state", state);
   if (page > 1) params.set("page", String(page));
+  if (sort !== "state_changed_at") params.set("sort", sort);
+  if (dir !== "desc") params.set("dir", dir);
   const qs = params.toString();
   return `/company/social/posts${qs ? `?${qs}` : ""}`;
 }
@@ -122,10 +134,14 @@ export function SocialPostsListClient({
   page = 1,
   pageSize = 25,
   totalCount,
+  sortBy: initialSortBy = "state_changed_at",
+  sortDir: initialSortDir = "desc",
 }: Props) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
   const [filter, setFilter] = useState<FilterKey>(initialState);
+  const [sortBy, setSortBy] = useState<SortCol>(initialSortBy);
+  const [sortDir, setSortDir] = useState<SortDir>(initialSortDir);
   const [showCreate, setShowCreate] = useState(false);
   const [masterText, setMasterText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -149,17 +165,25 @@ export function SocialPostsListClient({
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const term = searchInput.trim();
-    router.push(buildUrl({ page: 1, q: term, state: filter }));
+    router.push(buildUrl({ page: 1, q: term, state: filter, sort: sortBy, dir: sortDir }));
   }
 
   function clearSearch() {
     setSearchInput("");
-    router.push(buildUrl({ page: 1, q: "", state: filter }));
+    router.push(buildUrl({ page: 1, q: "", state: filter, sort: sortBy, dir: sortDir }));
   }
 
   function handleTabClick(key: FilterKey) {
     setFilter(key);
-    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: key }));
+    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: key, sort: sortBy, dir: sortDir }));
+  }
+
+  function handleSortClick(col: SortCol) {
+    const newDir: SortDir =
+      sortBy === col ? (sortDir === "desc" ? "asc" : "desc") : "desc";
+    setSortBy(col);
+    setSortDir(newDir);
+    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: filter, sort: col, dir: newDir }));
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -359,7 +383,28 @@ export function SocialPostsListClient({
                 <th className="px-4 py-2 font-medium">Copy</th>
                 <th className="px-4 py-2 font-medium">Link</th>
                 <th className="px-4 py-2 font-medium">State</th>
-                <th className="px-4 py-2 font-medium">Updated</th>
+                <th className="px-4 py-2 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick("state_changed_at")}
+                    className="flex items-center gap-1 hover:text-foreground transition"
+                    data-testid="sort-updated"
+                  >
+                    Updated
+                    {sortBy === "state_changed_at" ? (sortDir === "desc" ? " ↓" : " ↑") : " ↕"}
+                  </button>
+                </th>
+                <th className="px-4 py-2 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick("created_at")}
+                    className="flex items-center gap-1 hover:text-foreground transition"
+                    data-testid="sort-created"
+                  >
+                    Created
+                    {sortBy === "created_at" ? (sortDir === "desc" ? " ↓" : " ↑") : " ↕"}
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -408,6 +453,14 @@ export function SocialPostsListClient({
                       minute: "2-digit",
                     })}
                   </td>
+                  <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
+                    {new Date(p.created_at).toLocaleString("en-AU", {
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -427,7 +480,7 @@ export function SocialPostsListClient({
           <div className="flex gap-2">
             {hasPrev ? (
               <Link
-                href={buildUrl({ page: page - 1, q: initialQ, state: filter })}
+                href={buildUrl({ page: page - 1, q: initialQ, state: filter, sort: sortBy, dir: sortDir })}
                 className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
                 data-testid="posts-pagination-prev"
               >
@@ -436,7 +489,7 @@ export function SocialPostsListClient({
             ) : null}
             {hasNext ? (
               <Link
-                href={buildUrl({ page: page + 1, q: initialQ, state: filter })}
+                href={buildUrl({ page: page + 1, q: initialQ, state: filter, sort: sortBy, dir: sortDir })}
                 className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
                 data-testid="posts-pagination-next"
               >

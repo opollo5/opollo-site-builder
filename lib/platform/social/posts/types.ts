@@ -67,4 +67,8 @@ export type ListPostMastersInput = {
   // can render "X–Y of N" pagination. Opt-in so callers that don't need it
   // don't pay for the count round-trip.
   withCount?: boolean;
+  // Column to sort by. Defaults to state_changed_at.
+  sortBy?: "state_changed_at" | "created_at";
+  // Sort direction. Defaults to "desc".
+  sortDir?: "asc" | "desc";
 };

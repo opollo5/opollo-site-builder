@@ -34,6 +34,9 @@ export async function listPostMasters(
   const limit = clamp(input.limit ?? DEFAULT_LIMIT, 1, MAX_LIMIT);
   const offset = Math.max(0, input.offset ?? 0);
 
+  const sortCol = input.sortBy ?? "state_changed_at";
+  const ascending = input.sortDir === "asc";
+
   const svc = getServiceRoleClient();
   let query = svc
     .from("social_post_master")
@@ -42,7 +45,7 @@ export async function listPostMasters(
       input.withCount ? { count: "exact" } : {},
     )
     .eq("company_id", input.companyId)
-    .order("state_changed_at", { ascending: false })
+    .order(sortCol, { ascending })
     .range(offset, offset + limit - 1);
 
   if (input.states && input.states.length > 0) {
