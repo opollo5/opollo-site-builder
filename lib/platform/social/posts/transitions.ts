@@ -370,3 +370,157 @@ function reopenInternal(
     timestamp: new Date().toISOString(),
   };
 }
+
+// ---------------------------------------------------------------------------
+// S1-10 — admin cancel of a pending_client_approval request.
+//
+// Calls the migration-0073 cancel_post_approval Postgres function which
+// atomically:
+//   1. Flips post state pending_client_approval → draft
+//   2. Revokes the open approval_request (revoked_at = now())
+//   3. Inserts a 'revoked' social_approval_events row tied to the
+//      acting platform user with the supplied reason
+//
+// Caller is responsible for canDo("edit_post", company_id) AND for
+// passing the platform user's id as actorUserId (typically from
+// requireCanDoForApi's gate.userId).
+// ---------------------------------------------------------------------------
+
+export type CancelApprovalResult = {
+  postId: string;
+  postState: "draft";
+  // True when an open approval_request was revoked. False on the
+  // defensive "no open request" path (post somehow in pending state
+  // without one).
+  revoked: boolean;
+  // Audit event id from the FOR-UPDATE loop. null when no request was
+  // revoked.
+  eventId: string | null;
+};
+
+export async function cancelApprovalRequest(args: {
+  postId: string;
+  companyId: string;
+  actorUserId: string;
+  reason?: string | null;
+}): Promise<ApiResponse<CancelApprovalResult>> {
+  if (!args.postId) return cancelValidation("Post id is required.");
+  if (!args.companyId) return cancelValidation("Company id is required.");
+  if (!args.actorUserId) {
+    return cancelValidation("Actor user id is required.");
+  }
+
+  const svc = getServiceRoleClient();
+
+  const rpc = await svc.rpc("cancel_post_approval", {
+    p_post_id: args.postId,
+    p_company_id: args.companyId,
+    p_actor_user_id: args.actorUserId,
+    p_reason: args.reason ?? null,
+  });
+
+  if (rpc.error) {
+    if (rpc.error.code === "P0001") {
+      return cancelInvalidState(
+        cancelStripPrefix(rpc.error.message, "INVALID_STATE: "),
+      );
+    }
+    if (rpc.error.code === "P0002") {
+      return cancelNotFound(
+        cancelStripPrefix(rpc.error.message, "NOT_FOUND: "),
+      );
+    }
+    logger.error("social.posts.cancel_approval.rpc_failed", {
+      err: rpc.error.message,
+      code: rpc.error.code,
+      post_id: args.postId,
+    });
+    return cancelInternal(`Cancel RPC failed: ${rpc.error.message}`);
+  }
+
+  const payload = rpc.data as {
+    post_id: string;
+    post_state: string;
+    revoked: boolean;
+    event_id: string | null;
+  };
+  if (!payload?.post_id) {
+    return cancelInternal("Cancel RPC returned an empty payload.");
+  }
+
+  return {
+    ok: true,
+    data: {
+      postId: payload.post_id,
+      postState: "draft",
+      revoked: payload.revoked === true,
+      eventId: payload.event_id ?? null,
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function cancelStripPrefix(message: string, prefix: string): string {
+  return message.startsWith(prefix) ? message.slice(prefix.length) : message;
+}
+
+function cancelValidation(
+  message: string,
+): ApiResponse<CancelApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "VALIDATION_FAILED",
+      message,
+      retryable: false,
+      suggested_action: "Fix the input and resubmit.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function cancelInvalidState(
+  message: string,
+): ApiResponse<CancelApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_STATE",
+      message,
+      retryable: false,
+      suggested_action:
+        "Reload the page; another user may have already moved this post.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function cancelNotFound(
+  message: string,
+): ApiResponse<CancelApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "NOT_FOUND",
+      message,
+      retryable: false,
+      suggested_action: "Check the post id.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function cancelInternal(
+  message: string,
+): ApiResponse<CancelApprovalResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message,
+      retryable: false,
+      suggested_action: "Retry. If the error persists, contact support.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
