@@ -504,7 +504,7 @@ Reports live at:
 
 #### Schema + constraint polish (next migration slice)
 
-- **[M15-2 #4] Missing index on regen daily-budget query.** `lib/regeneration-worker.ts#checkDailyBudget` does `.select("cost_usd_cents").gte("created_at", startOfDay)` with no supporting index. Per-enqueue cost. Scope: either add `idx_regen_jobs_created_at` partial index or scope the query to `site_id` (existing composite index then covers it).
+- ~~**[M15-2 #4] Missing index on regen daily-budget query.**~~ Fixed 2026-05-03 — migration 0080 adds `idx_regen_jobs_created_at` index on `regeneration_jobs(created_at DESC)` supporting the `.gte("created_at", startOfDay)` range predicate in `lib/regeneration-publisher.ts#checkDailyBudget`.
 - **[M15-2 #5] No cancel endpoint for `transfer_jobs`.** Schema has `cancel_requested_at` column; no route uses it. Overlaps with [M15-5 #1] — if transfer cron is wired, add cancel; if cron is dead, drop the column.
 - **[M15-2 #8] Event-table PK type inconsistency.** `generation_events` + `regeneration_events` are `bigserial`; `transfer_events` is `uuid`. Cosmetic unless we build a unified event stream.
 - **[M15-2 #10] Lease-coherent CHECK asymmetry.** `transfer_job_items_lease_coherent` requires `worker_id IS NOT NULL` in leased states; `generation_job_pages_lease_coherent` + `regeneration_jobs_lease_coherent` don't. Scope: tighten M3/M7 CHECKs after verifying no orphan-leased rows in production.
