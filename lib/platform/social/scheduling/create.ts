@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
+import { enqueueScheduledPublish } from "@/lib/platform/social/publishing";
 import { SUPPORTED_PLATFORMS } from "@/lib/platform/social/variants/types";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
@@ -160,10 +161,37 @@ export async function createScheduleEntry(
     return internal(`Failed to create schedule entry: ${insert.error.message}`);
   }
 
+  const entry = insert.data as ScheduleEntryWithPlatform;
+
+  // S1-18 — enqueue the QStash callback. Best-effort: enqueue failure
+  // does NOT roll back the schedule entry. The row remains and can be
+  // re-enqueued by a backfill cron (future slice). Skipped silently when
+  // the caller didn't pass an origin (e.g. lib-only test paths).
+  if (input.origin) {
+    const enqueue = await enqueueScheduledPublish({
+      scheduleEntryId: entry.id,
+      scheduledAt: input.scheduledAt,
+      origin: input.origin,
+    });
+    if (!enqueue.ok) {
+      logger.warn("social.scheduling.create.enqueue_failed", {
+        err: enqueue.error.message,
+        schedule_entry_id: entry.id,
+      });
+      // Update the in-memory row with the message id we tried to set
+      // (still null) — the DB row was already updated by the lib.
+    } else if (enqueue.data.messageId) {
+      // enqueue lib already wrote the messageId back to the row; reflect
+      // it in the response without a re-read.
+      (entry as { qstash_message_id: string | null }).qstash_message_id =
+        enqueue.data.messageId;
+    }
+  }
+
   return {
     ok: true,
     data: {
-      ...(insert.data as ScheduleEntryWithPlatform),
+      ...entry,
       platform: input.platform,
     },
     timestamp: new Date().toISOString(),

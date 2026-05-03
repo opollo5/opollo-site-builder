@@ -25,6 +25,10 @@ export type CreateScheduleEntryInput = {
   scheduledAt: string;
   // The actor who scheduled (audit). Pass gate.userId from the route.
   scheduledBy: string | null;
+  // Absolute origin (e.g. https://app.opollo.com) used to mint the
+  // QStash callback URL. Optional — when omitted (or QStash unset),
+  // the schedule entry is created without enqueuing.
+  origin?: string;
 };
 
 export type ListScheduleEntriesInput = {
