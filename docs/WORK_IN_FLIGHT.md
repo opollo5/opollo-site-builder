@@ -9,20 +9,17 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-7-approval-viewer
-- Slice: S1-7 — magic-link viewer + decision events (write-safety hotspot). Migration 0072 adds a transactional record_approval_decision Postgres function that inserts the event row + finalises the request + flips post state in one txn. /approve/[token] becomes a real viewer; POST /api/approve/[token]/decision records the decision.
+- Branch: feat/s1-8-decision-notifications
+- Slice: S1-8 — close the loop on the approval flow. Dispatch approval_decided notification (email + in_app to submitter + admins) when a decision finalises the request. Sender-side audit trail of decisions on the post detail page when the post is in approved/rejected/changes_requested.
 - Files claimed:
-  - supabase/migrations/0072_record_approval_decision_fn.sql (new)
-  - supabase/rollbacks/0072_record_approval_decision_fn.down.sql (new)
-  - lib/platform/social/approvals/decisions/{record,index}.ts (new)
-  - lib/platform/social/approvals/index.ts (re-export)
-  - app/approve/[token]/page.tsx (real viewer; replaces stub)
-  - app/api/approve/[token]/decision/route.ts (new)
-  - components/ApprovalDecisionForm.tsx (new)
-  - middleware.ts (allow /api/approve/* unauthenticated)
-  - lib/__tests__/social-approval-decisions.test.ts (new)
+  - lib/platform/social/approvals/events/{list,index}.ts (new)
+  - lib/platform/social/approvals/index.ts (re-export listApprovalEvents)
+  - app/api/approve/[token]/decision/route.ts (best-effort dispatch on finalised=true)
+  - components/PostDecisionsAudit.tsx (new)
+  - app/company/social/posts/[id]/page.tsx (wire audit section)
+  - lib/__tests__/social-approval-events.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: 0072.
+- Migration number reserved: none.
 - Expected completion: same session.
 ---
 
