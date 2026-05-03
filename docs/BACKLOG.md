@@ -430,22 +430,9 @@ Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 st
 
 Captured during UAT prep in parallel with M15-7. Deferred to avoid collision in concurrent development; highest-priority UX fixes picked up once M15-7 ships.
 
-### Admin top navigation redesign
+### ~~Admin top navigation redesign~~ (shipped — AdminSidebar already live)
 
-**What:** Current top nav at `/admin` is functional but unpolished: links stretch wide across the full screen width, spacing between items is inconsistent, user email + Security + "Back to builder" + Sign out are all crammed into the right edge with no visual hierarchy. Feels like a prototype, not a product.
-
-**Why deferred:** Captured during UAT prep after being observed live. M15-7 is mid-flight.
-
-**Trigger:** After M15-7 Phase 4 completes, paired with the site actions menu fix (similar file surface, same review).
-
-**Desired end state (professional SaaS admin pattern):**
-- Left side: logo + primary nav (Sites, Batches, Images, Users) — compact, grouped, clear visual separation from right side
-- Right side: user menu as a single button (avatar or email with chevron) that opens a dropdown containing: Security, Back to builder, Sign out, any future account actions
-- Collapse the cluttered right-edge links into that dropdown
-- Add subtle visual treatment: border-bottom, slight background contrast, or shadow to separate nav from page content
-- Responsive: collapse nav items to hamburger on mobile widths
-- Active route indicator on the current page link (underline, bold, or background accent)
-- Consistent horizontal padding, max-width container so nav doesn't stretch edge-to-edge on wide screens
+`app/admin/layout.tsx` was switched from a horizontal `AdminNav` to a left-sidebar `AdminSidebar` (see R1-1 comment in that file). The desired end state — compact grouped nav, user menu, active route indicator, no edge-to-edge stretch — is delivered by the sidebar. No further work needed.
 
 **Inspiration patterns:** Vercel dashboard, Linear, Stripe Dashboard, Supabase dashboard top nav
 

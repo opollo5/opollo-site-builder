@@ -26,7 +26,7 @@ export default async function CompanySocialSharingPage() {
 
   if (!session.company) {
     return (
-      <main className="mx-auto max-w-3xl p-6 text-sm">
+      <main className="mx-auto max-w-3xl p-6">
         <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
           <p className="font-medium">Account not provisioned to a company.</p>
           <p className="mt-1 text-muted-foreground">
@@ -43,7 +43,7 @@ export default async function CompanySocialSharingPage() {
   const isAdmin = await canDo(companyId, "manage_invitations");
   if (!isAdmin) {
     return (
-      <main className="mx-auto max-w-3xl p-6 text-sm">
+      <main className="mx-auto max-w-3xl p-6">
         <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-destructive">
           <p className="font-medium">Admins only.</p>
           <p className="mt-1">
@@ -62,7 +62,7 @@ export default async function CompanySocialSharingPage() {
     <main className="mx-auto max-w-4xl p-6 space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Calendar sharing</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Mint 90-day read-only links to share the content calendar
           with clients or stakeholders. They don&apos;t need an Opollo
           account.
@@ -76,7 +76,7 @@ export default async function CompanySocialSharingPage() {
         />
       ) : (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
           role="alert"
           data-testid="viewer-links-load-error"
         >
