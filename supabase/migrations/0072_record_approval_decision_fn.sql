@@ -130,7 +130,11 @@ BEGIN
   -- 4. Decide if this event finalises the request.
   IF p_decision = 'rejected' OR p_decision = 'changes_requested' THEN
     v_finalise := true;
-    v_final_state := p_decision::social_post_state;
+    -- Cast via TEXT — Postgres won't auto-cast between two distinct
+    -- enum types even when their string values match. This is a
+    -- one-shot conversion: only 'rejected' and 'changes_requested'
+    -- exist in BOTH enums, and we've gated to those two values.
+    v_final_state := p_decision::text::social_post_state;
   ELSIF p_decision = 'approved' THEN
     IF v_request.approval_rule = 'any_one' THEN
       v_finalise := true;
