@@ -23,6 +23,7 @@ import type {
 } from "@/lib/briefs";
 import { logger } from "@/lib/logger";
 import { runGates } from "@/lib/quality-gates";
+import { stripHallucinatedImages } from "@/lib/strip-hallucinated-images";
 import {
   ANCHOR_EXTRA_CYCLES,
   SiteConventionsSchema,
@@ -452,6 +453,42 @@ function extractConventionsFromRevise(text: string): SiteConventions {
 // the old function deleted the HTML and left empty draft_html, OR
 // (when the closing fence was missing) returned the unwrapped text
 // with the leading ```html still present.
+/**
+ * Pipeline: extractHtmlFromAnthropicText → strip hallucinated <img> tags.
+ *
+ * The runner doesn't have a per-page image-grounding pass, so any
+ * <img src="..."> in the generator's output is suspect — Anthropic
+ * regularly synthesises plausible URLs (unsplash.com/photos/<random>,
+ * picsum.photos/<n>, /images/hero.jpg, example.com/team-1.jpg, ...)
+ * that 404 in the operator's preview iframe and on the published WP
+ * page. UAT (2026-05-02) flagged broken image placeholders in the
+ * preview as a confidence-shake.
+ *
+ * stripHallucinatedImages keeps tags whose src is from imagedelivery.net
+ * (Cloudflare — what we publish through) or a data: URI; everything
+ * else gets neutralised to a 1×1 placeholder + alt text noting the
+ * removal.
+ *
+ * Per-pass + per-revise: caller passes run id + page id for the log
+ * line so we can correlate stripped counts with operator complaints.
+ */
+function sanitizeGeneratedHtml(
+  passText: string,
+  runId: string,
+  pageId: string,
+): string {
+  const html = extractHtmlFromAnthropicText(passText);
+  const result = stripHallucinatedImages(html);
+  if (result.strippedCount > 0) {
+    logger.info("brief_runner.images_stripped", {
+      brief_run_id: runId,
+      page_id: pageId,
+      stripped_count: result.strippedCount,
+    });
+  }
+  return result.html;
+}
+
 export function extractHtmlFromAnthropicText(text: string): string {
   if (!text) return "";
   let working = text.trim();
@@ -1789,7 +1826,7 @@ async function processPagePassLoop(
         output:
           kindToRun === "self_critique"
             ? passText
-            : extractHtmlFromAnthropicText(passText),
+            : sanitizeGeneratedHtml(passText, run.id, page.id),
         usage: {
           input_tokens: response.usage.input_tokens,
           output_tokens: response.usage.output_tokens,
@@ -1802,7 +1839,9 @@ async function processPagePassLoop(
     ];
 
     const newDraftHtml =
-      kindToRun === "self_critique" ? page.draft_html : extractHtmlFromAnthropicText(passText);
+      kindToRun === "self_critique"
+        ? page.draft_html
+        : sanitizeGeneratedHtml(passText, run.id, page.id);
 
     const peek = nextPassAfter(kindToRun, numberToRun, isAnchor);
     const upd = await client.query(
@@ -2299,7 +2338,7 @@ async function runVisualReviewLoop(
     }
 
     const reviseCost = computeCostCents(brief.text_model, reviseResponse.usage).cents;
-    const newDraftHtml = extractHtmlFromAnthropicText(revisePassText);
+    const newDraftHtml = sanitizeGeneratedHtml(revisePassText, run.id, page.id);
     const updatedLog2: BriefPageCritiqueEntry[] = [
       ...(page.critique_log as BriefPageCritiqueEntry[]),
       {
