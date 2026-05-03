@@ -17,3 +17,9 @@ export const E2E_TEST_SITE_PREFIX = "e2e";
 // Never used in production — staging + prod cron secrets live in
 // deploy-time env.
 export const E2E_CRON_SECRET = "e2e-cron-secret-deterministic";
+
+// P-Brand-1d — customer-facing brand profile spec.
+// Credentials for a seeded company admin on the platform (not Opollo admin).
+export const E2E_CUSTOMER_EMAIL = "playwright-customer@opollo.test";
+export const E2E_CUSTOMER_PASSWORD = "playwright-password-1234";
+export const E2E_CUSTOMER_COMPANY_SLUG = "e2e-customer-co";
