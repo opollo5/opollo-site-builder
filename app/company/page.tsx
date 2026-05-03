@@ -77,7 +77,7 @@ export default async function CompanyLandingPage() {
       )}
 
       <nav
-        className="grid gap-3 sm:grid-cols-2"
+        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
         aria-label="Customer surfaces"
       >
         <Link
@@ -88,6 +88,36 @@ export default async function CompanyLandingPage() {
           <div className="font-medium">Social posts</div>
           <div className="mt-1 text-sm text-muted-foreground">
             Drafts, approvals, scheduling, audit trail.
+          </div>
+        </Link>
+        <Link
+          href="/company/social/calendar"
+          className="block rounded-md border bg-card p-4 hover:border-primary/40"
+          data-testid="dashboard-link-calendar"
+        >
+          <div className="font-medium">Calendar</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            30-day view of everything queued to publish.
+          </div>
+        </Link>
+        <Link
+          href="/company/social/connections"
+          className="block rounded-md border bg-card p-4 hover:border-primary/40"
+          data-testid="dashboard-link-connections"
+        >
+          <div className="font-medium">Connections</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            Linked social accounts and platform status.
+          </div>
+        </Link>
+        <Link
+          href="/company/social/media"
+          className="block rounded-md border bg-card p-4 hover:border-primary/40"
+          data-testid="dashboard-link-media"
+        >
+          <div className="font-medium">Media library</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            Images and videos attached to posts.
           </div>
         </Link>
         <Link
