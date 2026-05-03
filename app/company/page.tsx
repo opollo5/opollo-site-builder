@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { SocialPostsDashboardCard } from "@/components/SocialPostsDashboardCard";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
+import { getActiveBrandProfile, getBrandTier } from "@/lib/platform/brand";
 import { getSocialPostsStats } from "@/lib/platform/social/posts";
 
 // ---------------------------------------------------------------------------
@@ -53,7 +54,18 @@ export default async function CompanyLandingPage() {
     return <MinimalLanding role={session.company.role} />;
   }
 
-  const statsResult = await getSocialPostsStats({ companyId });
+  // Brand tier drives the completion banner. Read in parallel with stats
+  // so the page render isn't sequentialised; both are server-rendered
+  // and degrade gracefully on null.
+  const [statsResult, brand] = await Promise.all([
+    getSocialPostsStats({ companyId }),
+    getActiveBrandProfile(companyId),
+  ]);
+  const brandTier = getBrandTier(brand);
+  const showCompletionBanner =
+    brandTier === "none" || brandTier === "minimal";
+  const isAdmin =
+    session.isOpolloStaff || session.company.role === "admin";
 
   return (
     <main className="mx-auto max-w-5xl p-6 space-y-6">
@@ -63,6 +75,10 @@ export default async function CompanyLandingPage() {
           Here&apos;s where your social content sits today.
         </p>
       </header>
+
+      {showCompletionBanner && isAdmin ? (
+        <BrandCompletionBanner tier={brandTier} />
+      ) : null}
 
       {statsResult.ok ? (
         <SocialPostsDashboardCard stats={statsResult.data} />
@@ -130,8 +146,53 @@ export default async function CompanyLandingPage() {
             Manage team members and pending invitations.
           </div>
         </Link>
+        {isAdmin ? (
+          <Link
+            href="/company/settings/brand"
+            className="block rounded-md border bg-card p-4 hover:border-primary/40"
+            data-testid="dashboard-link-brand"
+          >
+            <div className="font-medium">Brand profile</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              Visual identity + tone + content rules. Drives every output.
+            </div>
+          </Link>
+        ) : null}
       </nav>
     </main>
+  );
+}
+
+function BrandCompletionBanner({ tier }: { tier: "none" | "minimal" }) {
+  const heading =
+    tier === "none"
+      ? "Set up your brand profile"
+      : "Finish setting up your brand";
+  const body =
+    tier === "none"
+      ? "Add a primary colour and logo so we can start tailoring posts and images to your brand."
+      : "Add industry, tone, and focus topics so we can write on-brand for you.";
+  return (
+    <div
+      className="rounded-md border border-primary/30 bg-primary/5 p-4"
+      data-testid="brand-completion-banner"
+      role="region"
+      aria-label="Brand profile setup"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-base font-semibold">{heading}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+        </div>
+        <Link
+          href="/company/settings/brand"
+          className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          data-testid="brand-completion-cta"
+        >
+          {tier === "none" ? "Get started" : "Continue setup"}
+        </Link>
+      </div>
+    </div>
   );
 }
 
