@@ -8,6 +8,7 @@ import {
   uploadBrief,
   type BriefMimeType,
 } from "@/lib/briefs";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 import {
   errorCodeToStatus,
@@ -61,6 +62,9 @@ function validationError(message: string, details?: Record<string, unknown>): Ne
 export async function POST(req: Request): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("briefs_upload", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   let form: FormData;
   try {

@@ -7,6 +7,7 @@ import {
   respond,
   validateUuidParam,
 } from "@/lib/http";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -20,6 +21,9 @@ const BodySchema = z.object({
 export async function POST(req: Request, ctx: { params: { id: string } }) {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;

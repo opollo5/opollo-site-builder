@@ -500,7 +500,7 @@ Reports live at:
 
 #### Rate-limiting coverage (next rate-limit slice)
 
-- **[M15-4 #9] 9 sensitive routes without a rate limit.** User-mgmt (revoke, reinstate, role), budget PATCH, briefs upload (10MB), design-system writes, `sites/list`, `design-systems/[id]/preview`. Scope: add named buckets in `lib/rate-limit.ts` (`user_mgmt`, `admin_write`, `briefs`); wire each route.
+- ~~**[M15-4 #9] 9 sensitive routes without a rate limit.**~~ Fixed 2026-05-03 — added `user_mgmt` (20/1h), `admin_write` (60/1h), `briefs_upload` (10/1h) buckets in `lib/rate-limit.ts`; wired into revoke, reinstate, role, budget PATCH, briefs upload, design-system activate/archive/components/templates, `sites/list`, and `design-systems/[id]/preview`.
 
 #### Schema + constraint polish (next migration slice)
 
