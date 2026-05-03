@@ -309,6 +309,100 @@ describe("lib/platform/social/posts", () => {
       ]);
       expect(ids.size).toBe(4);
     });
+
+    it("filters by q (case-insensitive ILIKE on master_text)", async () => {
+      await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "Hello LinkedIn world",
+        createdBy: creator.id,
+      });
+      await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "Facebook announcement post",
+        createdBy: creator.id,
+      });
+      await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "LINKEDIN exclusive content",
+        createdBy: creator.id,
+      });
+
+      const result = await listPostMasters({
+        companyId: COMPANY_A_ID,
+        q: "linkedin",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.posts.length).toBe(2);
+      result.data.posts.forEach((p) =>
+        expect(p.master_text?.toLowerCase()).toContain("linkedin"),
+      );
+    });
+
+    it("q with blank / whitespace-only term returns all posts", async () => {
+      for (let i = 0; i < 3; i++) {
+        await createPostMaster({
+          companyId: COMPANY_A_ID,
+          masterText: `post ${i}`,
+          createdBy: creator.id,
+        });
+      }
+      const result = await listPostMasters({
+        companyId: COMPANY_A_ID,
+        q: "   ",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.posts.length).toBe(3);
+    });
+
+    it("withCount returns accurate totalCount", async () => {
+      for (let i = 0; i < 6; i++) {
+        await createPostMaster({
+          companyId: COMPANY_A_ID,
+          masterText: `count post ${i}`,
+          createdBy: creator.id,
+        });
+      }
+      const page1 = await listPostMasters({
+        companyId: COMPANY_A_ID,
+        limit: 4,
+        offset: 0,
+        withCount: true,
+      });
+      expect(page1.ok).toBe(true);
+      if (!page1.ok) return;
+      expect(page1.data.posts.length).toBe(4);
+      expect(page1.data.totalCount).toBe(6);
+    });
+
+    it("withCount + q counts only matching rows", async () => {
+      await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "match me please",
+        createdBy: creator.id,
+      });
+      await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "ignore this one",
+        createdBy: creator.id,
+      });
+      await createPostMaster({
+        companyId: COMPANY_A_ID,
+        masterText: "match me also",
+        createdBy: creator.id,
+      });
+
+      const result = await listPostMasters({
+        companyId: COMPANY_A_ID,
+        q: "match",
+        withCount: true,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.posts.length).toBe(2);
+      expect(result.data.totalCount).toBe(2);
+    });
   });
 
   describe("getPostMaster", () => {
