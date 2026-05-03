@@ -27,6 +27,7 @@ type Props = {
   canSubmit: boolean;
   canCreate: boolean;
   canRelease: boolean;
+  canApprove: boolean;
 };
 
 const STATE_LABEL: Record<SocialPostState, string> = {
@@ -42,7 +43,7 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   failed: "Failed",
 };
 
-export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canRelease }: Props) {
+export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canRelease, canApprove }: Props) {
   const router = useRouter();
   const [masterText, setMasterText] = useState(post.master_text ?? "");
   const [linkUrl, setLinkUrl] = useState(post.link_url ?? "");
@@ -55,13 +56,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   const [error, setError] = useState<string | null>(null);
 
   const isDraft = post.state === "draft";
+  const isPendingApproval = post.state === "pending_client_approval";
   const editable = canEdit && isDraft;
   const submittable = canSubmit && isDraft;
   const reopenable = canEdit && post.state === "changes_requested";
-  const cancellable = canEdit && post.state === "pending_client_approval";
+  const cancellable = canEdit && isPendingApproval;
   const releasable = canRelease && post.state === "pending_msp_release";
+  const approvable = canApprove && isPendingApproval;
   const [cancelling, setCancelling] = useState(false);
   const [releasing, setReleasing] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [requestingChanges, setRequestingChanges] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -264,6 +270,81 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
+  async function handleApprove() {
+    if (!confirm("Approve this post? It will move to Approved and can then be scheduled.")) return;
+    setApproving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/platform/social/posts/${post.id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: post.company_id }),
+      });
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: "approved" } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : "Failed to approve post.");
+        setApproving(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setApproving(false);
+    }
+  }
+
+  async function handleReject() {
+    if (!confirm("Reject this post? The editor will be notified.")) return;
+    setRejecting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/platform/social/posts/${post.id}/reject`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: post.company_id }),
+      });
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: "rejected" } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : "Failed to reject post.");
+        setRejecting(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setRejecting(false);
+    }
+  }
+
+  async function handleRequestChanges() {
+    if (!confirm("Request changes? The post will be returned to the editor for revision.")) return;
+    setRequestingChanges(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/platform/social/posts/${post.id}/request-changes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: post.company_id }),
+      });
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: "changes_requested" } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : "Failed to request changes.");
+        setRequestingChanges(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setRequestingChanges(false);
+    }
+  }
+
   async function handleDuplicate() {
     setDuplicating(true);
     setError(null);
@@ -348,6 +429,35 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
                 data-testid="release-post-button"
               >
                 {releasing ? "Releasing…" : "Release"}
+              </Button>
+            ) : null}
+            {approvable ? (
+              <Button
+                onClick={handleApprove}
+                disabled={approving}
+                data-testid="approve-post-button"
+              >
+                {approving ? "Approving…" : "Approve"}
+              </Button>
+            ) : null}
+            {approvable ? (
+              <Button
+                variant="outline"
+                onClick={handleRequestChanges}
+                disabled={requestingChanges}
+                data-testid="request-changes-button"
+              >
+                {requestingChanges ? "Requesting…" : "Request changes"}
+              </Button>
+            ) : null}
+            {approvable ? (
+              <Button
+                variant="destructive"
+                onClick={handleReject}
+                disabled={rejecting}
+                data-testid="reject-post-button"
+              >
+                {rejecting ? "Rejecting…" : "Reject"}
               </Button>
             ) : null}
             {cancellable ? (

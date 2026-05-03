@@ -12,14 +12,20 @@ export { deletePostMaster } from "./delete";
 export { getPostMaster } from "./get";
 export { listPostMasters } from "./list";
 export {
+  approvePost,
   cancelApprovalRequest,
+  rejectPost,
   releasePost,
   reopenForEditing,
+  requestChanges,
   submitForApproval,
   type ApprovalSnapshot,
+  type ApprovePostResult,
   type CancelApprovalResult,
+  type RejectPostResult,
   type ReleasePostResult,
   type ReopenForEditingResult,
+  type RequestChangesResult,
   type SubmitForApprovalResult,
 } from "./transitions";
 export { updatePostMaster, type UpdatePostMasterInput } from "./update";
