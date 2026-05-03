@@ -1,4 +1,5 @@
 export { dispatch } from "./dispatch";
+export { getNotifications, markAllRead } from "./queries";
 export {
   resolveCompanyAdmins,
   resolveOpolloAdmins,
@@ -15,3 +16,4 @@ export type {
   ResolvedRecipient,
   RecipientKind,
 } from "./types";
+export type { InAppNotification } from "./queries";
