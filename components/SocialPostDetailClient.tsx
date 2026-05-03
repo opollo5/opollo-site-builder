@@ -25,6 +25,7 @@ type Props = {
   post: PostMaster;
   canEdit: boolean;
   canSubmit: boolean;
+  canCreate: boolean;
 };
 
 const STATE_LABEL: Record<SocialPostState, string> = {
@@ -40,7 +41,7 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   failed: "Failed",
 };
 
-export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
+export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate }: Props) {
   const router = useRouter();
   const [masterText, setMasterText] = useState(post.master_text ?? "");
   const [linkUrl, setLinkUrl] = useState(post.link_url ?? "");
@@ -49,6 +50,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
   const [deleting, setDeleting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reopening, setReopening] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isDraft = post.state === "draft";
@@ -225,6 +227,34 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
     }
   }
 
+  async function handleDuplicate() {
+    setDuplicating(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/platform/social/posts/${post.id}/duplicate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company_id: post.company_id }),
+        },
+      );
+      const json = (await res.json()) as
+        | { ok: true; data: { newPostId: string } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : "Failed to duplicate post.");
+        setDuplicating(false);
+        return;
+      }
+      router.push(`/company/social/posts/${json.data.newPostId}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setDuplicating(false);
+    }
+  }
+
   return (
     <>
       <div className="flex items-start justify-between gap-3">
@@ -281,6 +311,16 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
                 data-testid="cancel-approval-button"
               >
                 {cancelling ? "Cancelling…" : "Cancel approval"}
+              </Button>
+            ) : null}
+            {canCreate ? (
+              <Button
+                variant="outline"
+                onClick={handleDuplicate}
+                disabled={duplicating}
+                data-testid="duplicate-post-button"
+              >
+                {duplicating ? "Duplicating…" : "Duplicate"}
               </Button>
             ) : null}
             {editable ? (
