@@ -57,7 +57,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 ## Current state
 
-- **Slice in progress:** P-Brand-1 (Brand profile editor at `/company/settings/brand`)
+- **Slice in progress:** I1 (Ideogram client + prompt engine + routing + failure handler foundation)
 - **Most recently shipped:** S1-18 publish pipeline (#439) + S1-17 inbound webhook handler (#437)
 - **S0 (bundle.social verification):** complete
 - **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds), Bannerbear or Placid (compositing — evaluate at I2)
@@ -77,8 +77,8 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 | P3 | Opollo staff view: `/admin/platform/companies` (list, create, brand overview) | ✅ Shipped (P3-1 #387 list; P3-2 #391 create; P3-3 #393 detail; P3-4 #395 invite-from-detail) |
 | P4 | Customer admin: `/company/users` (invite, manage roles) | ✅ Shipped (#397). **Route note:** customer surface lives under `/company/*`, not `/customer/*` as originally drafted — the rest of this doc still says `/customer/...` in places; treat those as `/company/...` until a future cleanup unifies the prose. |
 | P5 | Notification system (email + in-app foundation) | ✅ Shipped (#399 dispatcher) |
-| P-Brand-1 | Brand profile editor: `/company/settings/brand` (visual identity + tone + content rules + version history) | 👈 Current |
-| P-Brand-2 | Brand helper functions: `get_active_brand_profile()`, `can_access_product()`, completion tier logic | Partial: DB helpers shipped in #435 (`get_active_brand_profile()`, `can_access_product()`, `update_brand_profile()` RPC). The TS-side `getBrandCompletionTier()` + UI consumer is still pending; will land alongside or after P-Brand-1. |
+| P-Brand-1 | Brand profile editor: `/company/settings/brand` (visual identity + tone + content rules + version history) | ✅ Shipped (P-Brand-1a/1b/1c #448 editor + API + landing integration; P-Brand-1d #453 E2E helper + spec) |
+| P-Brand-2 | Brand helper functions: `get_active_brand_profile()`, `can_access_product()`, completion tier logic | ✅ Shipped: DB helpers in #435; `getBrandTier()` + tier label/description in `lib/platform/brand/completion.ts` (P-Brand-1c). |
 
 > **Original BUILD.md said P-Brand-1/2 must complete before S1.** That dependency didn't materialise — `social_post_master.brand_profile_id` is nullable (FK added in #435), so the social slices shipped without an active brand profile. P-Brand-1 now unblocks brand-stamp behaviour at composer time + Phase C image generation.
 
@@ -99,7 +99,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 | Slice | Scope | Status |
 |-------|-------|--------|
-| I1 | Ideogram client (backgrounds only, GLOBAL_NEGATIVE_PROMPT). Prompt engine (parameterised). Brand profile reader. Standard/premium routing. Stock fallback. image_generation_log writes. | ❌ Pending. Schema (`image_generation_log`) shipped in #435 — code path is the missing piece. Depends on P-Brand-1 active profile for brand colour reads. |
+| I1 | Ideogram client (backgrounds only, GLOBAL_NEGATIVE_PROMPT). Prompt engine (parameterised). Brand profile reader. Standard/premium routing. Stock fallback. image_generation_log writes. | 👈 Current |
 | I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ❌ Pending |
 | I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | ❌ Pending |
 | I4 | Mood board UI: style selector, composition selector, 4–6 results, 1-click select. | ❌ Pending |
