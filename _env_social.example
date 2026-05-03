@@ -1,0 +1,70 @@
+# =============================================================================
+# Opollo Site Builder — Platform / Social / Image env vars
+# =============================================================================
+# Additive over .env.example / .env.local.example. Do NOT remove existing
+# variables — copy these alongside what you already have. Vercel pulls all
+# of these from the project env config; local dev pulls from .env.local.
+# =============================================================================
+
+# ----- Platform layer --------------------------------------------------------
+# Critical-failure recipients (comma-separated). Subscribed to digest +
+# escalation emails (image escalations, connection_lost, etc.).
+PLATFORM_ADMIN_ALERT_EMAILS=hi@opollo.com,scott@opollo.com
+# Base URL the invitation email links to. Must include scheme.
+PLATFORM_INVITE_BASE_URL=https://app.opollo.com/invite
+
+# ----- bundle.social ---------------------------------------------------------
+BUNDLE_SOCIAL_API_KEY=
+BUNDLE_SOCIAL_WEBHOOK_SECRET=
+# Where bundle.social returns the user after the OAuth-style connect flow.
+BUNDLE_SOCIAL_RETURN_URL=https://app.opollo.com/social/connections/return
+
+# ----- QStash (Upstash) ------------------------------------------------------
+# Token + signing keys are required for the publish-fire callback path.
+QSTASH_TOKEN=
+QSTASH_CURRENT_SIGNING_KEY=
+QSTASH_NEXT_SIGNING_KEY=
+# Callback URLs QStash dispatches to. All POSTs are signed; verify the
+# signature in the route handler against QSTASH_CURRENT_SIGNING_KEY.
+QSTASH_PUBLISH_CALLBACK_URL=https://app.opollo.com/api/social/publish/fire
+QSTASH_INVITATION_REMINDER_URL=https://app.opollo.com/api/platform/invitations/reminder
+QSTASH_INVITATION_EXPIRY_URL=https://app.opollo.com/api/platform/invitations/expire
+QSTASH_WATCHDOG_URL=https://app.opollo.com/api/social/publish/watchdog
+QSTASH_IMAGE_RETRY_URL=https://app.opollo.com/api/image/generate/retry
+
+# ----- Supabase Storage buckets ----------------------------------------------
+# Buckets are created out-of-band via the Supabase dashboard or `supabase
+# storage create-bucket`. App reads only the names from env.
+SOCIAL_MEDIA_BUCKET=social-media
+IMAGE_GENERATION_BUCKET=generated-images
+
+# ----- Ideogram (image backgrounds) ------------------------------------------
+IDEOGRAM_API_KEY=
+IDEOGRAM_STANDARD_MODEL=ideogram-ai/ideogram-v3-flash
+IDEOGRAM_PREMIUM_MODEL=ideogram-ai/ideogram-v3
+# Hard timeout per generation call. Stock fallback fires above this.
+IMAGE_GENERATION_TIMEOUT_MS=30000
+# Mood-board count: number of background candidates per request.
+MOOD_BOARD_COUNT=4
+
+# ----- Compositing (Bannerbear / Placid — pick at I2) ------------------------
+# Set COMPOSITING_PROVIDER to one of: bannerbear | placid. Only the
+# provider's keys are required at runtime; the other set can be blank.
+COMPOSITING_PROVIDER=bannerbear
+BANNERBEAR_API_KEY=
+BANNERBEAR_PROJECT_ID=
+PLACID_API_KEY=
+PLACID_PROJECT_ID=
+
+# ----- Magic-link base URLs --------------------------------------------------
+# Public-facing surfaces for approval / read-only calendar magic links.
+SOCIAL_REVIEW_BASE_URL=https://review.opollo.com
+SOCIAL_CALENDAR_BASE_URL=https://calendar.opollo.com
+
+# ----- Feature flags ---------------------------------------------------------
+# Each flag is read with strict equality to "true". Default off when unset.
+SOCIAL_FEATURE_BULK_CSV=true
+IMAGE_FEATURE_MOOD_BOARD=true
+IMAGE_FEATURE_PREMIUM_ROUTING=true
+IMAGE_FEATURE_STOCK_FALLBACK=true
+IMAGE_FEATURE_CAP_AUTO_GENERATE=false
