@@ -19,7 +19,7 @@ type Tile = {
   label: string;
   value: number;
   href: string;
-  emphasis?: "primary" | "amber" | "emerald" | "sky";
+  emphasis?: "primary" | "amber" | "emerald" | "sky" | "rose";
   testId: string;
 };
 
@@ -28,6 +28,7 @@ const EMPHASIS_BG: Record<NonNullable<Tile["emphasis"]>, string> = {
   amber: "bg-amber-100 text-amber-900",
   emerald: "bg-emerald-100 text-emerald-900",
   sky: "bg-sky-100 text-sky-900",
+  rose: "bg-rose-100 text-rose-900",
 };
 
 export function SocialPostsDashboardCard({ stats }: Props) {
@@ -72,6 +73,20 @@ export function SocialPostsDashboardCard({ stats }: Props) {
       href: "/company/social/posts?state=approved",
       emphasis: "emerald",
       testId: "stats-approved-this-week",
+    },
+    {
+      label: "Changes requested",
+      value: stats.changesRequested,
+      href: "/company/social/posts?state=changes_requested",
+      emphasis: "amber",
+      testId: "stats-changes-requested",
+    },
+    {
+      label: "Failed",
+      value: stats.failed,
+      href: "/company/social/posts?state=failed",
+      emphasis: "rose",
+      testId: "stats-failed",
     },
   ];
 
