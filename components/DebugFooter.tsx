@@ -194,10 +194,10 @@ export function DebugFooter({
               </button>
             </div>
           </div>
-          <pre className="max-h-[40vh] overflow-auto whitespace-pre-wrap break-all rounded border bg-muted/40 p-2 font-mono text-[11px]">
+          <pre className="max-h-[50vh] overflow-auto whitespace-pre-wrap break-all rounded border bg-muted/40 p-2 font-mono text-sm">
             {buildBlob()}
           </pre>
-          <p className="mt-2 text-[10px] text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Click <strong>Copy</strong>, paste into a chat with engineering, and
             include what you were trying to do.
           </p>
@@ -206,7 +206,7 @@ export function DebugFooter({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-popover px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-md hover:bg-muted hover:text-foreground"
+        className="pointer-events-auto inline-flex items-center gap-1.5 rounded-full border border-border bg-popover px-2.5 py-1 text-sm font-medium text-muted-foreground shadow-md hover:bg-muted hover:text-foreground"
         title={open ? "Hide debug panel" : "Open debug panel — click to copy diagnostic info"}
         aria-label={open ? "Hide debug panel" : "Show debug panel"}
       >
