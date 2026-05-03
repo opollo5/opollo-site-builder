@@ -26,6 +26,7 @@ type Props = {
   canEdit: boolean;
   canSubmit: boolean;
   canCreate: boolean;
+  canRelease: boolean;
 };
 
 const STATE_LABEL: Record<SocialPostState, string> = {
@@ -41,7 +42,7 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   failed: "Failed",
 };
 
-export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate }: Props) {
+export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canRelease }: Props) {
   const router = useRouter();
   const [masterText, setMasterText] = useState(post.master_text ?? "");
   const [linkUrl, setLinkUrl] = useState(post.link_url ?? "");
@@ -58,7 +59,9 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate }: 
   const submittable = canSubmit && isDraft;
   const reopenable = canEdit && post.state === "changes_requested";
   const cancellable = canEdit && post.state === "pending_client_approval";
+  const releasable = canRelease && post.state === "pending_msp_release";
   const [cancelling, setCancelling] = useState(false);
+  const [releasing, setReleasing] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -227,6 +230,40 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate }: 
     }
   }
 
+  async function handleRelease() {
+    if (
+      !confirm(
+        "Release this post? It will move to Approved and can then be scheduled for publishing.",
+      )
+    ) {
+      return;
+    }
+    setReleasing(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/platform/social/posts/${post.id}/release`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company_id: post.company_id }),
+        },
+      );
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: "approved" } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : "Failed to release post.");
+        setReleasing(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setReleasing(false);
+    }
+  }
+
   async function handleDuplicate() {
     setDuplicating(true);
     setError(null);
@@ -301,6 +338,16 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate }: 
                 data-testid="reopen-post-button"
               >
                 {reopening ? "Reopening…" : "Reopen for editing"}
+              </Button>
+            ) : null}
+            {releasable ? (
+              <Button
+                variant="outline"
+                onClick={handleRelease}
+                disabled={releasing}
+                data-testid="release-post-button"
+              >
+                {releasing ? "Releasing…" : "Release"}
               </Button>
             ) : null}
             {cancellable ? (

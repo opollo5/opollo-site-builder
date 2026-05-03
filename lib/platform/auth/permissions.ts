@@ -33,6 +33,9 @@ const ACTION_MIN_ROLE: Record<PermissionAction, CompanyRole> = {
   schedule_post: "approver",
   view_calendar: "viewer",
   receive_connection_alerts: "admin",
+  // S1-44: MSP (Opollo staff) release action. Admin is the customer-side
+  // minimum; Opollo staff bypass the role check entirely via isOpolloStaff.
+  release_post: "admin",
 };
 
 export function minRoleFor(action: PermissionAction): CompanyRole {
