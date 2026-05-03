@@ -23,13 +23,19 @@ import type {
 //
 // S1-37 — adds server-side text search via ?q= param.
 // S1-38 — adds ?page=N URL pagination (25 per page, prev/next links).
+// S1-40 — state-filter tabs are now URL-driven via ?state=. Dashboard
+//          tiles that link to ?state=approved etc. now pre-select the
+//          correct tab and the server applies the filter server-side.
 // ---------------------------------------------------------------------------
+
+type FilterKey = "all" | SocialPostState;
 
 type Props = {
   companyId: string;
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
   initialQ?: string;
+  initialState?: FilterKey;
   page?: number;
   pageSize?: number;
   totalCount?: number;
@@ -73,9 +79,18 @@ const FILTER_TABS: Array<{ key: "all" | SocialPostState; label: string }> = [
   { key: "rejected", label: "Rejected" },
 ];
 
-function buildPageUrl(page: number, q: string): string {
+function buildUrl({
+  page,
+  q,
+  state,
+}: {
+  page: number;
+  q: string;
+  state: FilterKey;
+}): string {
   const params = new URLSearchParams();
   if (q) params.set("q", q);
+  if (state !== "all") params.set("state", state);
   if (page > 1) params.set("page", String(page));
   const qs = params.toString();
   return `/company/social/posts${qs ? `?${qs}` : ""}`;
@@ -86,13 +101,14 @@ export function SocialPostsListClient({
   initialPosts,
   canCreate,
   initialQ = "",
+  initialState = "all",
   page = 1,
   pageSize = 25,
   totalCount,
 }: Props) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
-  const [filter, setFilter] = useState<(typeof FILTER_TABS)[number]["key"]>("all");
+  const [filter, setFilter] = useState<FilterKey>(initialState);
   const [showCreate, setShowCreate] = useState(false);
   const [masterText, setMasterText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -108,20 +124,25 @@ export function SocialPostsListClient({
   const hasPrev = page > 1;
   const hasNext = page < totalPages;
 
-  const visible = useMemo(
-    () => (filter === "all" ? posts : posts.filter((p) => p.state === filter)),
-    [posts, filter],
-  );
+  // State filter is now server-side: posts already contains only the
+  // rows matching the active state tab. `visible` is identical to `posts`.
+  // The memo is kept so existing data-testid consumers still work.
+  const visible = useMemo(() => posts, [posts]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const term = searchInput.trim();
-    router.push(buildPageUrl(1, term));
+    router.push(buildUrl({ page: 1, q: term, state: filter }));
   }
 
   function clearSearch() {
     setSearchInput("");
-    router.push("/company/social/posts");
+    router.push(buildUrl({ page: 1, q: "", state: filter }));
+  }
+
+  function handleTabClick(key: FilterKey) {
+    setFilter(key);
+    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: key }));
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -289,7 +310,7 @@ export function SocialPostsListClient({
           <button
             key={t.key}
             type="button"
-            onClick={() => setFilter(t.key)}
+            onClick={() => handleTabClick(t.key)}
             className={`rounded-full border px-3 py-1 text-sm transition ${
               filter === t.key
                 ? "border-primary bg-primary text-primary-foreground"
@@ -309,10 +330,10 @@ export function SocialPostsListClient({
         {visible.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             {initialQ
-              ? `No posts found matching "${initialQ}".`
-              : posts.length === 0
-                ? "No posts yet — click New post to draft your first one."
-                : "No posts match this filter."}
+              ? `No posts found matching "${initialQ}"${initialState !== "all" ? ` in this filter` : ""}.`
+              : initialState !== "all"
+                ? "No posts match this filter."
+                : "No posts yet — click New post to draft your first one."}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -379,7 +400,7 @@ export function SocialPostsListClient({
           <div className="flex gap-2">
             {hasPrev ? (
               <Link
-                href={buildPageUrl(page - 1, initialQ)}
+                href={buildUrl({ page: page - 1, q: initialQ, state: filter })}
                 className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
                 data-testid="posts-pagination-prev"
               >
@@ -388,7 +409,7 @@ export function SocialPostsListClient({
             ) : null}
             {hasNext ? (
               <Link
-                href={buildPageUrl(page + 1, initialQ)}
+                href={buildUrl({ page: page + 1, q: initialQ, state: filter })}
                 className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
                 data-testid="posts-pagination-next"
               >
