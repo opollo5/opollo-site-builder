@@ -5,6 +5,7 @@ import {
   getBundlesocialTeamId,
 } from "@/lib/bundlesocial";
 import { logger } from "@/lib/logger";
+import { resolveBundleUploadIds } from "@/lib/platform/social/media";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -152,26 +153,78 @@ export async function fireScheduledPublish(
   }
 
   const text = (claim.variant_text ?? claim.master_text ?? "").trim();
-  if (!text) {
+  // S1-22: pull media_asset_ids off the variant. Empty/null arrays
+  // mean text-only post, which is fine for every platform we support
+  // except platforms that require media (TikTok, Pinterest, etc) —
+  // not in our V1 set.
+  const variantMedia = await svc
+    .from("social_post_variant")
+    .select("media_asset_ids")
+    .eq("id", claim.post_variant_id!)
+    .maybeSingle();
+  if (variantMedia.error) {
     await markAttemptFailed(svc, claim.publish_attempt_id!, {
-      error_class: "content_rejected",
-      error_payload: { reason: "Empty post body" },
+      error_class: "platform_error",
+      error_payload: { reason: `media read failed: ${variantMedia.error.message}` },
     });
     await markMasterFailed(svc, claim.post_master_id!);
-    return internal("Post has no body text.");
+    return internal(`Variant media read failed: ${variantMedia.error.message}`);
+  }
+  const assetIds = ((variantMedia.data?.media_asset_ids as string[] | null) ?? []).filter(
+    (s): s is string => typeof s === "string" && s.length > 0,
+  );
+
+  // Either text or media must be present. A truly empty post is
+  // content_rejected.
+  if (!text && assetIds.length === 0) {
+    await markAttemptFailed(svc, claim.publish_attempt_id!, {
+      error_class: "content_rejected",
+      error_payload: { reason: "Empty post body and no media" },
+    });
+    await markMasterFailed(svc, claim.post_master_id!);
+    return internal("Post has no body text and no media.");
   }
 
-  // Compose the data block per bundle.social platform shape. V1: text
-  // only; media uploads are S1-19+.
+  // Resolve media_asset_ids → bundle.social uploadIds. Cached after
+  // first resolution per asset; retries are cheap.
+  let uploadIds: string[] = [];
+  if (assetIds.length > 0) {
+    const resolved = await resolveBundleUploadIds(assetIds, claim.company_id!);
+    if (!resolved.ok) {
+      await markAttemptFailed(svc, claim.publish_attempt_id!, {
+        error_class: "media_invalid",
+        error_payload: {
+          reason: resolved.error.message,
+          asset_ids: assetIds,
+        },
+      });
+      await markMasterFailed(svc, claim.post_master_id!);
+      return ok({ outcome: "publish_failed" });
+    }
+    uploadIds = resolved.data.uploadIds;
+  }
+
+  // Compose the data block per bundle.social platform shape.
+  // text is optional when media is present (some platforms allow
+  // image-only posts). uploadIds attached when populated.
   const data: Record<string, unknown> = {};
+  const platformBlock: Record<string, unknown> = {
+    text: text || undefined,
+  };
+  if (uploadIds.length > 0) {
+    platformBlock.uploadIds = uploadIds;
+  }
   if (bundlePlatform === "LINKEDIN") {
-    data.LINKEDIN = { text, link: claim.link_url ?? undefined };
+    data.LINKEDIN = { ...platformBlock, link: claim.link_url ?? undefined };
   } else if (bundlePlatform === "FACEBOOK") {
-    data.FACEBOOK = { text, link: claim.link_url ?? undefined };
+    data.FACEBOOK = { ...platformBlock, link: claim.link_url ?? undefined };
   } else if (bundlePlatform === "TWITTER") {
-    data.TWITTER = { text };
+    data.TWITTER = platformBlock;
   } else if (bundlePlatform === "GOOGLE_BUSINESS") {
-    data.GOOGLE_BUSINESS = { text, link: claim.link_url ?? undefined };
+    data.GOOGLE_BUSINESS = {
+      ...platformBlock,
+      link: claim.link_url ?? undefined,
+    };
   }
 
   let bundlePostId: string | null = null;
