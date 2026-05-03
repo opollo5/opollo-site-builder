@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
@@ -82,12 +83,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const rl = await checkRateLimit("invite", rlId);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = InviteSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

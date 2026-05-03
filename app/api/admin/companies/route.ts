@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { createPlatformCompany } from "@/lib/platform/companies";
 
@@ -49,12 +50,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireAdminForApi();
   if (gate.kind === "deny") return gate.response;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = CreateCompanySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody, validationError } from "@/lib/http";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // POST /api/admin/images/check-existing
@@ -31,12 +32,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
   if (gate.kind === "deny") return gate.response;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

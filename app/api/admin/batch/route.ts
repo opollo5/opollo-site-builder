@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { createBatchJob } from "@/lib/batch-jobs";
+import { readJsonBody } from "@/lib/http";
 import {
   checkRateLimit,
   getClientIp,
@@ -78,15 +79,8 @@ export async function POST(req: Request): Promise<NextResponse> {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return errorJson("VALIDATION_FAILED", "Body must be a JSON object.", 400);
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = body as {
     site_id?: unknown;
     template_id?: unknown;
