@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { PostApprovalSection } from "@/components/PostApprovalSection";
 import { PostDecisionsAudit } from "@/components/PostDecisionsAudit";
+import { PostPublishHistorySection } from "@/components/PostPublishHistorySection";
 import { PostScheduleSection } from "@/components/PostScheduleSection";
 import { PostVariantsSection } from "@/components/PostVariantsSection";
 import { SocialPostDetailClient } from "@/components/SocialPostDetailClient";
@@ -11,9 +12,16 @@ import {
   listRecipients,
 } from "@/lib/platform/social/approvals";
 import { getPostMaster } from "@/lib/platform/social/posts";
+import { listPublishAttempts } from "@/lib/platform/social/publishing";
 import { listScheduleEntries } from "@/lib/platform/social/scheduling";
 import { listVariants } from "@/lib/platform/social/variants";
 import { getServiceRoleClient } from "@/lib/supabase";
+
+const PUBLISH_VISIBLE_STATES = new Set([
+  "publishing",
+  "published",
+  "failed",
+]);
 
 const POST_DECISION_STATES = new Set([
   "approved",
@@ -175,7 +183,34 @@ export default async function CompanySocialPostDetailPage({
             canSchedule,
           })
         : null}
+      {PUBLISH_VISIBLE_STATES.has(postResult.data.state)
+        ? await renderPublishHistorySection({
+            postId: postResult.data.id,
+            companyId,
+            canRetry: canSchedule,
+          })
+        : null}
     </>
+  );
+}
+
+async function renderPublishHistorySection(args: {
+  postId: string;
+  companyId: string;
+  canRetry: boolean;
+}) {
+  const result = await listPublishAttempts({
+    postMasterId: args.postId,
+    companyId: args.companyId,
+  });
+  if (!result.ok) return null;
+  return (
+    <PostPublishHistorySection
+      postId={args.postId}
+      companyId={args.companyId}
+      initialAttempts={result.data.attempts}
+      canRetry={args.canRetry}
+    />
   );
 }
 
