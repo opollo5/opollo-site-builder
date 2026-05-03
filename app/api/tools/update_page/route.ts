@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { readJsonBody, validationError } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -25,6 +26,7 @@ export async function POST(req: Request) {
   if (body === undefined) return validationError("Request body must be valid JSON.");
 
   const result = await executeUpdatePage(body);
+  if (!result.ok) logger.error("executeUpdatePage failed", { code: result.error.code });
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
   return NextResponse.json(result, { status });
 }

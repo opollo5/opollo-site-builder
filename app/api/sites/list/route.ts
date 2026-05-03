@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { listSites } from "@/lib/sites";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
@@ -19,6 +20,7 @@ export async function GET() {
   if (!rl.ok) return rateLimitExceeded(rl);
 
   const result = await listSites();
+  if (!result.ok) logger.error("listSites failed", { code: result.error.code });
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
   return NextResponse.json(result, { status });
 }

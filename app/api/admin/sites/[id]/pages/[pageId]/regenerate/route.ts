@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -76,6 +77,7 @@ export async function POST(
   });
 
   if (!result.ok) {
+    logger.error("enqueueRegenJob failed", { code: result.code });
     const status = errorCodeToStatus(result.code);
     return errorJson(result.code, result.message, status, result.details);
   }

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { createBatchJob } from "@/lib/batch-jobs";
 import { readJsonBody } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -99,6 +100,7 @@ export async function POST(req: Request): Promise<NextResponse> {
   });
 
   if (!result.ok) {
+    logger.error("createBatchJob failed", { code: result.error.code });
     return errorJson(
       result.error.code,
       result.error.message,

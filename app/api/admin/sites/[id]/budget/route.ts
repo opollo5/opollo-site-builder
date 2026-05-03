@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { readJsonBody } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { updateTenantBudget } from "@/lib/tenant-budgets";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
@@ -114,6 +115,7 @@ export async function PATCH(
   );
 
   if (!result.ok) {
+    logger.error("updateTenantBudget failed", { code: result.code });
     const status = errorCodeToStatus(
       result.code === "VERSION_CONFLICT"
         ? "VERSION_CONFLICT"
