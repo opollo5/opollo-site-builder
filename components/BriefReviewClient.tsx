@@ -217,7 +217,7 @@ export function BriefReviewClient({
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          expected_version_lock: brief.version_lock,
+          expected_version_lock: latestBrief.version_lock,
           pages: pageUpdates,
         }),
       });
