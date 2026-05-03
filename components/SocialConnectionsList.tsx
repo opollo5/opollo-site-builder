@@ -29,14 +29,19 @@ import {
 type Props = {
   companyId: string;
   connections: SocialConnection[];
-  // Admin-or-Opollo-staff. Drives create/reconnect/sync visibility.
+  // Admin-or-Opollo-staff. Drives create-new / sync visibility.
   canManage: boolean;
+  // Editor+. Drives per-row Reconnect button for auth_required/disconnected
+  // connections. Admins already have this via canManage; editors can
+  // reconnect but not create new connections (S8).
+  canReconnect: boolean;
 };
 
 export function SocialConnectionsList({
   companyId,
   connections,
   canManage,
+  canReconnect,
 }: Props) {
   const [busyRow, setBusyRow] = useState<string | null>(null);
   const [busyTop, setBusyTop] = useState<"connect" | "sync" | null>(null);
@@ -72,12 +77,25 @@ export function SocialConnectionsList({
     }
   }
 
-  async function handleReconnect(rowId: string, platform: SocialPlatform) {
+  async function handleReconnect(rowId: string) {
     setBusyRow(rowId);
+    setError(null);
     try {
-      await initiateConnect([platform]);
+      const res = await fetch("/api/platform/social/connections/reconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, connection_id: rowId }),
+      });
+      const json = (await res.json()) as
+        | { ok: true; data: { url: string } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : "Failed to start reconnect.");
+        return;
+      }
+      window.location.href = json.data.url;
     } finally {
-      // No need to clear busyRow — the redirect happens on success.
+      // busyRow stays set until the redirect fires; clear on error path.
       setBusyRow(null);
     }
   }
@@ -215,13 +233,13 @@ export function SocialConnectionsList({
                     })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {canManage &&
+                    {(canManage || canReconnect) &&
                     (c.status === "auth_required" ||
                       c.status === "disconnected") ? (
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleReconnect(c.id, c.platform)}
+                        onClick={() => handleReconnect(c.id)}
                         disabled={busyRow === c.id || busyTop !== null}
                         data-testid={`connection-reconnect-${c.id}`}
                       >
