@@ -63,7 +63,7 @@ describe("lib/platform/auth — permissions logic (pure)", () => {
     expect(minRoleFor("manage_users")).toBe("admin");
     expect(minRoleFor("edit_company_settings")).toBe("admin");
     expect(minRoleFor("manage_connections")).toBe("admin");
-    expect(minRoleFor("reconnect_connection")).toBe("admin");
+    expect(minRoleFor("reconnect_connection")).toBe("editor");
     expect(minRoleFor("manage_invitations")).toBe("admin");
     expect(minRoleFor("receive_connection_alerts")).toBe("admin");
 
