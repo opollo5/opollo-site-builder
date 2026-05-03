@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { DesignBriefSchema } from "@/lib/design-discovery/design-brief";
 import { generateConcepts } from "@/lib/design-discovery/generate-concepts";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getSite } from "@/lib/sites";
 
@@ -55,12 +56,8 @@ export async function POST(
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const wrapper = body as { brief?: unknown };
   const parsed = DesignBriefSchema.safeParse(wrapper?.brief ?? null);
   if (!parsed.success) {
