@@ -13,7 +13,10 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const Schema = z.object({ company_id: z.string().uuid() });
+const Schema = z.object({
+  company_id: z.string().uuid(),
+  comment: z.string().max(1000).trim().nullish(),
+});
 
 function errorJson(code: string, message: string, status: number): NextResponse {
   return NextResponse.json(
@@ -46,7 +49,8 @@ export async function POST(
   const gate = await requireCanDoForApi(parsed.data.company_id, "reject_post");
   if (gate.kind === "deny") return gate.response;
 
-  const result = await rejectPost({ postId: id, companyId: parsed.data.company_id });
+  const comment = parsed.data.comment ?? null;
+  const result = await rejectPost({ postId: id, companyId: parsed.data.company_id, comment });
   if (!result.ok) return errorJson(result.error.code, result.error.message, statusForCode(result.error.code));
 
   if (result.data.createdBy) {
@@ -56,6 +60,7 @@ export async function POST(
       postMasterId: id,
       submitterUserId: result.data.createdBy,
       decision: "rejected",
+      comment: result.data.comment ?? undefined,
     });
   }
 

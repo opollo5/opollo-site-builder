@@ -236,13 +236,13 @@ export function SocialPostsListClient({
           ? "reject"
           : "request-changes";
 
-    // Prompt for an optional comment when requesting changes.
+    // Prompt for an optional comment when requesting changes or rejecting.
     let comment: string | null = null;
-    if (kind === "requesting") {
-      const input = prompt(
-        "Request changes? Enter a note for the editor (optional — leave blank to skip):",
-        "",
-      );
+    if (kind === "requesting" || kind === "rejecting") {
+      const promptText = kind === "rejecting"
+        ? "Reject this post? Enter a note for the editor (optional — leave blank to skip):"
+        : "Request changes? Enter a note for the editor (optional — leave blank to skip):";
+      const input = prompt(promptText, "");
       if (input === null) return; // user dismissed
       comment = input.trim() || null;
     }
