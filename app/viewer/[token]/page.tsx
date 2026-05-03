@@ -133,7 +133,7 @@ export default async function ViewerLinkPage({
         <h1 className="text-2xl font-semibold">
           {company.name} — content calendar
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-base text-muted-foreground">
           {grouped.length === 0
             ? "Nothing scheduled in the visible window. Check back soon."
             : `Showing posts from the last ${BACK_DAYS} days through the next ${FORWARD_DAYS}.`}
@@ -167,12 +167,12 @@ export default async function ViewerLinkPage({
                       </time>
                     </div>
                     {e.master_text ? (
-                      <p className="mt-2 whitespace-pre-wrap text-sm">
+                      <p className="mt-2 whitespace-pre-wrap text-base">
                         {e.master_text}
                       </p>
                     ) : null}
                     {e.link_url ? (
-                      <p className="mt-2 truncate text-sm">
+                      <p className="mt-2 truncate text-base">
                         <a
                           href={e.link_url}
                           target="_blank"

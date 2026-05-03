@@ -74,7 +74,7 @@ export default async function CompanyLandingPage() {
     <main className="mx-auto max-w-5xl p-6 space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Welcome back</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Here&apos;s where your social content sits today.
         </p>
       </header>
@@ -87,7 +87,7 @@ export default async function CompanyLandingPage() {
         <SocialPostsDashboardCard stats={statsResult.data} />
       ) : (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
           role="alert"
           data-testid="dashboard-stats-error"
         >
@@ -105,7 +105,7 @@ export default async function CompanyLandingPage() {
           data-testid="dashboard-link-posts"
         >
           <div className="font-medium">Social posts</div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-1 text-base text-muted-foreground">
             Drafts, approvals, scheduling, audit trail.
           </div>
         </Link>
@@ -115,7 +115,7 @@ export default async function CompanyLandingPage() {
           data-testid="dashboard-link-calendar"
         >
           <div className="font-medium">Calendar</div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-1 text-base text-muted-foreground">
             30-day view of everything queued to publish.
           </div>
         </Link>
@@ -125,7 +125,7 @@ export default async function CompanyLandingPage() {
           data-testid="dashboard-link-connections"
         >
           <div className="font-medium">Connections</div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-1 text-base text-muted-foreground">
             Linked social accounts and platform status.
           </div>
         </Link>
@@ -135,7 +135,7 @@ export default async function CompanyLandingPage() {
           data-testid="dashboard-link-media"
         >
           <div className="font-medium">Media library</div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-1 text-base text-muted-foreground">
             Images and videos attached to posts.
           </div>
         </Link>
@@ -145,7 +145,7 @@ export default async function CompanyLandingPage() {
           data-testid="dashboard-link-users"
         >
           <div className="font-medium">Users</div>
-          <div className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-1 text-base text-muted-foreground">
             Manage team members and pending invitations.
           </div>
         </Link>
@@ -156,7 +156,7 @@ export default async function CompanyLandingPage() {
             data-testid="dashboard-link-brand"
           >
             <div className="font-medium">Brand profile</div>
-            <div className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-1 text-base text-muted-foreground">
               Visual identity + tone + content rules. Drives every output.
             </div>
           </Link>
@@ -168,7 +168,7 @@ export default async function CompanyLandingPage() {
             data-testid="dashboard-link-image-generator"
           >
             <div className="font-medium">Image generator</div>
-            <div className="mt-1 text-sm text-muted-foreground">
+            <div className="mt-1 text-base text-muted-foreground">
               Generate mood board backgrounds for your social posts.
             </div>
           </Link>
@@ -197,7 +197,7 @@ function BrandCompletionBanner({ tier }: { tier: "none" | "minimal" }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-base font-semibold">{heading}</p>
-          <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+          <p className="mt-1 text-base text-muted-foreground">{body}</p>
         </div>
         <Link
           href="/company/settings/brand"
