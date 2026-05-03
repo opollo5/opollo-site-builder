@@ -9,19 +9,21 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-5-submit-for-approval
-- Slice: S1-5 — submit-for-approval state transition (write-safety hotspot). Migration 0071 adds a transactional submit_post_for_approval(post_id, company_id, snapshot, expires_at) Postgres function so the state-machine flip + approval_request snapshot insert happen atomically. Lib + route + detail page button.
+- Branch: feat/s1-6-approval-recipients
+- Slice: S1-6 — approval recipients (magic-link delivery to reviewers). Lib add/list/revoke against social_approval_recipients with SHA-256 token storage. POST/GET /api/platform/social/posts/[id]/recipients + DELETE /[recipient_id]. Detail page renders the recipient list + add form when state=pending_client_approval. /approve/[token] stub landing page (viewer + decision flow lands in S1-7).
 - Files claimed:
-  - supabase/migrations/0071_submit_post_for_approval_fn.sql (new)
-  - supabase/rollbacks/0071_submit_post_for_approval_fn.down.sql (new)
-  - lib/platform/social/posts/transitions.ts (new)
-  - lib/platform/social/posts/index.ts (re-export)
-  - app/api/platform/social/posts/[id]/submit/route.ts (new)
-  - components/SocialPostDetailClient.tsx (Submit-for-approval button + canSubmit prop)
-  - app/company/social/posts/[id]/page.tsx (canSubmit gate)
-  - lib/__tests__/social-post-transitions.test.ts (new)
+  - lib/platform/social/approvals/{types,index}.ts (new)
+  - lib/platform/social/approvals/recipients/{add,list,revoke,index}.ts (new)
+  - lib/email/templates/social-approval-request.ts (new)
+  - app/api/platform/social/posts/[id]/recipients/route.ts (new)
+  - app/api/platform/social/posts/[id]/recipients/[recipient_id]/route.ts (new)
+  - components/PostApprovalSection.tsx (new)
+  - app/company/social/posts/[id]/page.tsx (wire approval section)
+  - app/approve/[token]/page.tsx (new — stub)
+  - middleware.ts (add /approve/ to public paths)
+  - lib/__tests__/social-approval-recipients.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: 0071 — see Reserved migration numbers list.
+- Migration number reserved: none (existing 0070 schema covers it).
 - Expected completion: same session.
 ---
 
