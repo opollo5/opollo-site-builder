@@ -12,6 +12,7 @@ import {
   softDeleteImage,
   updateImageMetadata,
 } from "@/lib/image-library";
+import { logger } from "@/lib/logger";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
@@ -139,6 +140,7 @@ export async function PATCH(
   });
 
   if (!result.ok) {
+    logger.error("updateImageMetadata failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },
@@ -190,6 +192,7 @@ export async function DELETE(
   });
 
   if (!result.ok) {
+    logger.error("softDeleteImage failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },

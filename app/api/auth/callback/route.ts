@@ -1,6 +1,7 @@
 import type { EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
 import { createRouteAuthClient } from "@/lib/auth";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -92,16 +93,23 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) return authErrorRedirect(req, "exchange_failed");
+    if (error) {
+      logger.error("auth callback exchange failed", { reason: "exchange_failed" });
+      return authErrorRedirect(req, "exchange_failed");
+    }
   } else if (tokenHash) {
     if (!isOtpType(otpType)) {
+      logger.error("auth callback invalid type", { reason: "invalid_type", type: otpType });
       return authErrorRedirect(req, "invalid_type");
     }
     const { error } = await supabase.auth.verifyOtp({
       type: otpType,
       token_hash: tokenHash,
     });
-    if (error) return authErrorRedirect(req, "verify_failed");
+    if (error) {
+      logger.error("auth callback verify failed", { reason: "verify_failed" });
+      return authErrorRedirect(req, "verify_failed");
+    }
   }
 
   const dest = req.nextUrl.clone();

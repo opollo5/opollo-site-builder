@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { readJsonBody, validationError } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
   }
 
   const result = await createSite(parsed.data);
+  if (!result.ok) logger.error("createSite failed", { code: result.error.code });
   if (result.ok) {
     // Bust the cached server-component render of /admin/sites so the
     // list reflects the new row on the next navigation — without this

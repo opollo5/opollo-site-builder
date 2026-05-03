@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { readJsonBody } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   PAGE_SLUG_MAX,
   PAGE_SLUG_RE,
@@ -121,6 +122,7 @@ export async function PATCH(
   });
 
   if (!result.ok) {
+    logger.error("updatePageMetadata failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },

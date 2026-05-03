@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { ZodError, ZodType } from "zod";
+import { logger } from "@/lib/logger";
 import {
   errorCodeToStatus,
   type ApiResponse,
@@ -24,6 +25,7 @@ function now(): string {
 // Render an ApiResponse as an HTTP response at the conventional status.
 export function respond<T>(result: ApiResponse<T>): NextResponse {
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
+  if (!result.ok) logger.error("route error response", { code: result.error.code, status });
   return NextResponse.json(result, { status });
 }
 
