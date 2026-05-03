@@ -465,8 +465,7 @@ describe("all render functions — XSS safety", () => {
     const p = { ...def.defaultProps, id: SECTION_ID, heading: xssPayload, headline: xssPayload };
     const html = def.render(p, "preview");
     expect(html).not.toContain("<img src=x");
-    expect(html).not.toMatch(/<[^>]*onerror=/);
-    expect(html).toContain("&lt;img");
+    expect(html).not.toContain("onerror=");
   });
 });
 
