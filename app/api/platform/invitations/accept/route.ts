@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { acceptInvitation } from "@/lib/platform/invitations";
 import {
@@ -81,12 +82,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const rl = await checkRateLimit("invite_accept", `ip:${getClientIp(req)}`);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = AcceptSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

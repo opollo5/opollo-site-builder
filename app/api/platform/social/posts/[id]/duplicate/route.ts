@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { readJsonBody } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { duplicatePost } from "@/lib/platform/social/posts";
@@ -59,12 +60,8 @@ export async function POST(
     return errorJson("NOT_FOUND", "Post not found.", 404);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
     return errorJson("VALIDATION_FAILED", "company_id (UUID) required.", 400);

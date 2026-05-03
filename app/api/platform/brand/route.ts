@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { isOpolloStaff } from "@/lib/platform/auth";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
@@ -127,12 +128,8 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
