@@ -361,11 +361,19 @@ export function BriefRunClient({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{brief.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Run surface for <span className="font-medium">{siteName}</span>
+          {/* UAT (2026-05-03 round-3): converted the run-status line from
+              a <p> with inline pills to a flex row so the status pill +
+              Live badge baseline-align cleanly with the prose. The pills
+              have padding-y of their own; baseline alignment inside a
+              text-sm <p> dropped them ~1px below the text and read as
+              broken to operators. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              Run surface for <span className="font-medium">{siteName}</span>
+            </span>
             {activeRun && (
               <>
-                {" — "}
+                <span aria-hidden className="text-muted-foreground/60">—</span>
                 {/* RS-5 — when a specific page is awaiting review, the
                     run-level pill becomes a clickable shortcut showing
                     the ordinal so the operator knows exactly which page
@@ -423,7 +431,7 @@ export function BriefRunClient({
                 Live
               </span>
             )}
-          </p>
+          </div>
         </div>
         {isRunActive && (
           <Button
