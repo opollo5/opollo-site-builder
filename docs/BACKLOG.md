@@ -24,7 +24,7 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## DATA_CONVENTIONS rollout — add audit columns to `sites` (opened 2026-05-02 during UAT §3.1.2)
+## ~~DATA_CONVENTIONS rollout — add audit columns to `sites`~~ (shipped 2026-05-03, PR #491)
 
 **Tags:** `schema`, `data-conventions`, `tech-debt`
 
