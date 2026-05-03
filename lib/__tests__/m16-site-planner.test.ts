@@ -1,5 +1,7 @@
 import { describe, expect, it, vi, type MockedFunction } from "vitest";
 
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
 import type { AnthropicCallFn, AnthropicResponse } from "@/lib/anthropic-call";
 import { runSitePlanner } from "@/lib/site-planner";
 
