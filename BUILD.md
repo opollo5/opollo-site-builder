@@ -57,7 +57,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 ## Current state
 
-- **Slice in progress:** I1 (Ideogram client + prompt engine + routing + failure handler foundation)
+- **Slice in progress:** I3 (quality checks with sharp — luminance, safe zone, Laplacian variance)
 - **Most recently shipped:** S1-18 publish pipeline (#439) + S1-17 inbound webhook handler (#437)
 - **S0 (bundle.social verification):** complete
 - **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds), Bannerbear or Placid (compositing — evaluate at I2)
@@ -100,8 +100,8 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 | Slice | Scope | Status |
 |-------|-------|--------|
 | I1 | Ideogram client (backgrounds only, GLOBAL_NEGATIVE_PROMPT). Prompt engine (parameterised). Brand profile reader. Standard/premium routing. Stock fallback. image_generation_log writes. | 👈 Current |
-| I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ❌ Pending |
-| I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | ❌ Pending |
+| I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ✅ Shipped (#457 Bannerbear primary, Placid stub, TEXT_ZONE_MAP pixel conversion) |
+| I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | 👈 Current |
 | I4 | Mood board UI: style selector, composition selector, 4–6 results, 1-click select. | ❌ Pending |
 | I5 | CAP Phase 2: automated generation via source_type='cap' (Phase 2) | ❌ Pending (Phase 2 — see "What is NOT V1" further down) |
 
