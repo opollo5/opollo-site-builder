@@ -31,7 +31,7 @@ export async function getPostMaster(args: {
   const result = await svc
     .from("social_post_master")
     .select(
-      "id, company_id, state, source_type, master_text, link_url, created_by, created_at, updated_at, state_changed_at",
+      "id, company_id, state, source_type, master_text, link_url, created_by, created_at, updated_at, state_changed_at, reviewer_comment",
     )
     .eq("id", args.postId)
     .eq("company_id", args.companyId)

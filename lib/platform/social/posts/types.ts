@@ -27,6 +27,7 @@ export type PostMaster = {
   created_at: string;
   updated_at: string;
   state_changed_at: string;
+  reviewer_comment: string | null;
 };
 
 export type PostMasterListItem = {
