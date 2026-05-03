@@ -18,6 +18,7 @@ import {
   buildUserPrompt,
   PLATFORM_CHAR_LIMITS,
 } from "./prompt-builder";
+import { triggerCAPImageGen } from "./image-trigger";
 import type {
   CAPClaudeResponse,
   CAPGenerateInput,
@@ -172,6 +173,10 @@ export async function generateCAPPosts(
     }
 
     created.push({ postMasterId, masterText, variants: variantMap });
+
+    // I5 — fire-and-forget image generation. Runs after variants are
+    // upserted so the variant rows exist before the link step.
+    void triggerCAPImageGen({ companyId, postMasterId, brand });
   }
 
   if (created.length === 0) {
