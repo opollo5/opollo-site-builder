@@ -76,12 +76,12 @@ export async function POST(
   }
 
   const supabase = getServiceRoleClient();
-  // audit columns not yet on sites — DATA_CONVENTIONS rollout pending
   const upd = await supabase
     .from("sites")
     .update({
       site_mode: parsed.data.site_mode,
       updated_at: new Date().toISOString(),
+      updated_by: gate.user?.id ?? null,
     })
     .eq("id", params.id)
     .select("id, site_mode")
