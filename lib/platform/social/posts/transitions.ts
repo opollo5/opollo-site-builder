@@ -265,7 +265,7 @@ export async function reopenForEditing(args: {
   // the now-current state.
   const update = await svc
     .from("social_post_master")
-    .update({ state: "draft" })
+    .update({ state: "draft", reviewer_comment: null })
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "changes_requested")
@@ -700,9 +700,10 @@ export async function requestChanges(args: {
 
   const svc = getServiceRoleClient();
 
+  const comment = args.comment?.trim() || null;
   const update = await svc
     .from("social_post_master")
-    .update({ state: "changes_requested" })
+    .update({ state: "changes_requested", reviewer_comment: comment })
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "pending_client_approval")
@@ -738,7 +739,7 @@ export async function requestChanges(args: {
       postId: update.data.id as string,
       postState: "changes_requested",
       createdBy: (update.data.created_by as string | null) ?? null,
-      comment: args.comment?.trim() || null,
+      comment,
     },
     timestamp: new Date().toISOString(),
   };
