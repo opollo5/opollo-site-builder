@@ -48,6 +48,11 @@ export async function listPostMasters(
     query = query.in("state", input.states);
   }
 
+  const term = input.q?.trim();
+  if (term) {
+    query = query.ilike("master_text", `%${term}%`);
+  }
+
   const result = await query;
 
   if (result.error) {
