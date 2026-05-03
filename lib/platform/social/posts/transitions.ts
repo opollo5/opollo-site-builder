@@ -540,6 +540,7 @@ function cancelInternal(
 export type ApprovePostResult = {
   postId: string;
   postState: "approved";
+  createdBy: string | null;
 };
 
 export async function approvePost(args: {
@@ -557,7 +558,7 @@ export async function approvePost(args: {
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "pending_client_approval")
-    .select("id, state")
+    .select("id, state, created_by")
     .maybeSingle();
 
   if (update.error) {
@@ -585,7 +586,11 @@ export async function approvePost(args: {
 
   return {
     ok: true,
-    data: { postId: update.data.id as string, postState: "approved" },
+    data: {
+      postId: update.data.id as string,
+      postState: "approved",
+      createdBy: (update.data.created_by as string | null) ?? null,
+    },
     timestamp: new Date().toISOString(),
   };
 }
@@ -608,6 +613,7 @@ function approveInternal(message: string): ApiResponse<ApprovePostResult> {
 export type RejectPostResult = {
   postId: string;
   postState: "rejected";
+  createdBy: string | null;
 };
 
 export async function rejectPost(args: {
@@ -625,7 +631,7 @@ export async function rejectPost(args: {
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "pending_client_approval")
-    .select("id, state")
+    .select("id, state, created_by")
     .maybeSingle();
 
   if (update.error) {
@@ -653,7 +659,11 @@ export async function rejectPost(args: {
 
   return {
     ok: true,
-    data: { postId: update.data.id as string, postState: "rejected" },
+    data: {
+      postId: update.data.id as string,
+      postState: "rejected",
+      createdBy: (update.data.created_by as string | null) ?? null,
+    },
     timestamp: new Date().toISOString(),
   };
 }
@@ -676,6 +686,7 @@ function rejectInternal(message: string): ApiResponse<RejectPostResult> {
 export type RequestChangesResult = {
   postId: string;
   postState: "changes_requested";
+  createdBy: string | null;
 };
 
 export async function requestChanges(args: {
@@ -693,7 +704,7 @@ export async function requestChanges(args: {
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "pending_client_approval")
-    .select("id, state")
+    .select("id, state, created_by")
     .maybeSingle();
 
   if (update.error) {
@@ -721,7 +732,11 @@ export async function requestChanges(args: {
 
   return {
     ok: true,
-    data: { postId: update.data.id as string, postState: "changes_requested" },
+    data: {
+      postId: update.data.id as string,
+      postState: "changes_requested",
+      createdBy: (update.data.created_by as string | null) ?? null,
+    },
     timestamp: new Date().toISOString(),
   };
 }

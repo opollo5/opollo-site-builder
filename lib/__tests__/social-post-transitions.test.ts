@@ -609,6 +609,7 @@ describe("lib/platform/social/posts/submitForApproval", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.data.postState).toBe("approved");
+      expect(result.data.createdBy).toBe(creator.id);
 
       const svc = getServiceRoleClient();
       const after = await svc
@@ -678,6 +679,7 @@ describe("lib/platform/social/posts/submitForApproval", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.data.postState).toBe("rejected");
+      expect(result.data.createdBy).toBe(creator.id);
 
       const svc = getServiceRoleClient();
       const after = await svc
@@ -729,6 +731,7 @@ describe("lib/platform/social/posts/submitForApproval", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.data.postState).toBe("changes_requested");
+      expect(result.data.createdBy).toBe(creator.id);
 
       const svc = getServiceRoleClient();
       const after = await svc
