@@ -109,5 +109,32 @@ export async function POST(
     revalidatePath(`/admin/sites/${siteId}`);
   }
 
+  // UAT (2026-05-03 round-3): commit→/run race elimination.
+  //
+  // The COMMIT writes via lib/briefs.commitBrief which uses pg.Client (a
+  // direct connection). The /run server-render reads the brief via
+  // PostgREST (a separate connection pool). Even though the COMMIT has
+  // returned, PostgREST occasionally serves a stale read from a
+  // connection that hasn't yet seen the write. Operators land on /run
+  // and see "isn't committed yet" for several seconds.
+  //
+  // Fix: before this handler returns, re-read the brief via PostgREST
+  // (the same path /run will use) until status='committed' is visible
+  // OR a 5s ceiling expires. The retry adds latency to the commit POST
+  // but eliminates the misleading "not committed yet" panel that follows.
+  // Worth it — a 1s wait is invisible on a click; a "broken-looking
+  // page" on the next nav is jarring.
+  const visibilityCheckStartMs = Date.now();
+  const VISIBILITY_TIMEOUT_MS = 5000;
+  while (Date.now() - visibilityCheckStartMs < VISIBILITY_TIMEOUT_MS) {
+    const peek = await svc
+      .from("briefs")
+      .select("status")
+      .eq("id", idCheck.value)
+      .maybeSingle();
+    if (peek.data?.status === "committed") break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+
   return respond(result);
 }
