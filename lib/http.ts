@@ -114,3 +114,19 @@ function formatZodIssues(err: ZodError): Array<{
     message: i.message,
   }));
 }
+
+// Race a promise against a timeout; rejects with "Request timed out after Xms"
+// if the promise doesn't settle first. Use for external calls (Anthropic, WP,
+// Cloudflare) where a hanging request would drain the serverless function pool.
+// Suggested ceilings: Anthropic 60 s, WordPress 30 s, Cloudflare 30 s.
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Request timed out after ${ms}ms`)),
+        ms,
+      ),
+    ),
+  ]);
+}

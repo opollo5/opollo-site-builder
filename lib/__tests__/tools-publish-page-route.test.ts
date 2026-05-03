@@ -1,24 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// M15-7 Phase 3b — integration tests for app/api/tools/publish_page/route.ts
+// Integration tests for app/api/tools/publish_page/route.ts
 //
-// publish_page is a write route (draft → publish) that currently has no admin
-// gate (M15-4 finding #3).  Tests pin current session-optional behaviour as
-// an intentional drift signal for a future auth-tightening fix slice.
+// publish_page is a write route (draft → publish) gated by requireAdminForApi
+// (M15-4 #3 fix). Tests verify auth gate, rate limit, JSON parse guard, and
+// executor delegation.
 // ---------------------------------------------------------------------------
 
 const mockExecutePublishPage = vi.hoisted(() => vi.fn());
-const mockGetCurrentUser = vi.hoisted(() => vi.fn());
+const mockRequireAdminForApi = vi.hoisted(() => vi.fn());
 const mockCheckRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/publish-page", () => ({
   executePublishPage: mockExecutePublishPage,
 }));
 
-vi.mock("@/lib/auth", () => ({
-  createRouteAuthClient: () => ({}),
-  getCurrentUser: mockGetCurrentUser,
+vi.mock("@/lib/admin-api-gate", () => ({
+  requireAdminForApi: mockRequireAdminForApi,
 }));
 
 vi.mock("@/lib/rate-limit", async () => {
@@ -43,9 +42,11 @@ import {
   RATE_LIMIT_DENIED,
 } from "./_tools-route-helpers";
 
+const GATE_ALLOW = { kind: "allow" as const, user: { id: "user-1", email: "admin@test.com", role: "admin" as const } };
+
 beforeEach(() => {
   mockExecutePublishPage.mockReset();
-  mockGetCurrentUser.mockReset().mockResolvedValue(null);
+  mockRequireAdminForApi.mockReset().mockResolvedValue(GATE_ALLOW);
   mockCheckRateLimit.mockReset().mockResolvedValue({ ok: true, limit: 120, remaining: 119, reset: 0 });
 });
 
@@ -80,14 +81,26 @@ describe("POST /api/tools/publish_page", () => {
     expect(body).toEqual(envelope);
   });
 
-  it("malformed JSON body → executor receives {} fallback", async () => {
-    const envelope = makeSuccessEnvelope({ page_id: 0, status: "publish", published_url: "" });
-    mockExecutePublishPage.mockResolvedValue(envelope);
-
+  it("400 — malformed JSON body returns VALIDATION_FAILED; executor not called", async () => {
     const res = await POST(makeMalformedRequest());
 
-    expect(mockExecutePublishPage).toHaveBeenCalledWith({});
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("VALIDATION_FAILED");
+    expect(mockExecutePublishPage).not.toHaveBeenCalled();
+  });
+
+  it("401 — auth gate denial; executor is never called", async () => {
+    mockRequireAdminForApi.mockResolvedValue({
+      kind: "deny" as const,
+      response: new Response(JSON.stringify({ ok: false, error: { code: "UNAUTHORIZED" } }), { status: 401 }),
+    });
+
+    const res = await POST(makeJsonRequest(VALID_BODY));
+
+    expect(res.status).toBe(401);
+    expect(mockExecutePublishPage).not.toHaveBeenCalled();
   });
 
   it("429 — rate-limit denial; executor is never called", async () => {

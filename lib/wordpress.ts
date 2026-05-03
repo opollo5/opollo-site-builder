@@ -140,7 +140,7 @@ async function wpFetch(
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(url, { ...init, headers });
+      const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(30_000) });
       if (res.status >= 500 && attempt < MAX_RETRIES) {
         await sleep(BASE_DELAY_MS * Math.pow(2, attempt));
         continue;
