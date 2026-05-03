@@ -155,7 +155,14 @@ function detectUnclosedFence(source: string): ParserWarning | null {
 // ---------------------------------------------------------------------------
 
 function parseByH2(body: string, offset: number): BriefPageDraft[] {
-  const lineRegex = /^##\s+(.+?)\s*$/gm;
+  // UAT (2026-05-03 round-3): tolerate up to 3 spaces of leading
+  // whitespace on heading lines per CommonMark §4.2 (ATX headings).
+  // Operators frequently paste briefs from indented code blocks — the
+  // prior `^##` anchor required column 0, which silently turned every
+  // ## heading into body text and the parser dropped to single-page
+  // fallback. Tabs are normalised to spaces in pre-processing already
+  // so [ \t] is belt-and-suspenders.
+  const lineRegex = /^[ \t]{0,3}##\s+(.+?)\s*$/gm;
   const matches: Array<{ index: number; title: string; lineEnd: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = lineRegex.exec(body))) {
@@ -175,7 +182,9 @@ function parseByH2(body: string, offset: number): BriefPageDraft[] {
 // ---------------------------------------------------------------------------
 
 function parseByH1(body: string, offset: number): BriefPageDraft[] {
-  const lineRegex = /^#\s+(.+?)\s*$/gm;
+  // UAT (2026-05-03 round-3): same leading-whitespace tolerance as
+  // parseByH2. CommonMark §4.2 allows 0-3 spaces before an ATX heading.
+  const lineRegex = /^[ \t]{0,3}#\s+(.+?)\s*$/gm;
   const matches: Array<{ index: number; title: string; lineEnd: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = lineRegex.exec(body))) {
