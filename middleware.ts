@@ -131,6 +131,10 @@ function isPublicPath(pathname: string): boolean {
   // involved. Required so the Vercel cron tick can reach the worker
   // endpoint without a session.
   if (pathname.startsWith("/api/cron/")) return true;
+  // /api/webhooks/* carries its own HMAC signature verification (S1-17
+  // bundle.social). External services aren't platform users — the
+  // signature IS the auth. Without this, every webhook bounces to /login.
+  if (pathname.startsWith("/api/webhooks/")) return true;
   // /api/ops/* runs its own admin-OR-emergency-key auth. The
   // emergency-key path exists so verification works even if Supabase
   // Auth is the thing being debugged — we can't route the probe

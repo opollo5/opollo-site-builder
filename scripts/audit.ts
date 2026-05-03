@@ -747,6 +747,7 @@ function check7_unauthenticatedApi(): Issue[] {
     /verifyMagicLink/,
     /requireCanDoForApi/, // Platform layer canDo gate
     /verifyQstashSignature/, // QStash webhook signature verification (HMAC)
+    /verifyBundlesocialSignature/, // S1-17 bundle.social webhook signature verification (HMAC)
     /recordApprovalDecision/, // S1-7 magic-link token-is-auth (SHA-256 hash compare in the lib)
     /createHash/,
     /\bauth\.getUser\b/,
