@@ -680,6 +680,7 @@ describe("lib/platform/social/posts/submitForApproval", () => {
       if (!result.ok) return;
       expect(result.data.postState).toBe("rejected");
       expect(result.data.createdBy).toBe(creator.id);
+      expect(result.data.comment).toBeNull();
 
       const svc = getServiceRoleClient();
       const after = await svc
@@ -688,6 +689,38 @@ describe("lib/platform/social/posts/submitForApproval", () => {
         .eq("id", post.id)
         .single();
       expect(after.data?.state).toBe("rejected");
+    });
+
+    it("passes comment through to result when provided", async () => {
+      const { post } = await createPendingApprovalPost2("reject with comment");
+      const result = await rejectPost({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        comment: "  Not aligned with brand guidelines.  ",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.comment).toBe("Not aligned with brand guidelines.");
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("reviewer_comment")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.reviewer_comment).toBe("Not aligned with brand guidelines.");
+    });
+
+    it("returns comment: null when comment is empty or whitespace", async () => {
+      const { post } = await createPendingApprovalPost2("reject empty comment");
+      const result = await rejectPost({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        comment: "   ",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.comment).toBeNull();
     });
 
     it("rejects reject on a draft post with INVALID_STATE", async () => {

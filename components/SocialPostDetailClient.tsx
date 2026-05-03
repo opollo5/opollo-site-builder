@@ -296,14 +296,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   }
 
   async function handleReject() {
-    if (!confirm("Reject this post? The editor will be notified.")) return;
+    const comment = prompt(
+      "Reject this post? Enter a note for the editor (optional — leave blank to skip):",
+      "",
+    );
+    if (comment === null) return; // user dismissed
     setRejecting(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: post.company_id }),
+        body: JSON.stringify({ company_id: post.company_id, comment: comment.trim() || null }),
       });
       const json = (await res.json()) as
         | { ok: true; data: { postState: "rejected" } }
@@ -508,13 +512,15 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         </p>
       ) : null}
 
-      {post.state === "changes_requested" && post.reviewer_comment ? (
+      {(post.state === "changes_requested" || post.state === "rejected") && post.reviewer_comment ? (
         <div
           className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
           role="note"
           data-testid="reviewer-comment-banner"
         >
-          <p className="font-medium">Reviewer note</p>
+          <p className="font-medium">
+            {post.state === "rejected" ? "Rejection note" : "Reviewer note"}
+          </p>
           <p className="mt-0.5 whitespace-pre-wrap">{post.reviewer_comment}</p>
         </div>
       ) : null}

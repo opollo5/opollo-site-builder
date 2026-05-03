@@ -255,10 +255,10 @@ function renderInApp(
         title: `Your post was ${payload.decision}`,
         body: payload.decision === "approved"
           ? "Schedule it from the calendar when you're ready."
-          : payload.decision === "rejected"
-            ? "Open the post to see the feedback."
-            : payload.comment
-              ? payload.comment
+          : payload.comment
+            ? payload.comment
+            : payload.decision === "rejected"
+              ? "Open the post to see the feedback."
               : "Changes requested — review the post and resubmit.",
         actionUrl: `/company/social/posts/${payload.postMasterId}`,
       };
@@ -383,10 +383,10 @@ function renderEmailContent(
         lead:
           payload.decision === "approved"
             ? "Your post was approved and is ready to schedule."
-            : payload.decision === "rejected"
-              ? "Your post was rejected. Open it on Opollo to see the feedback."
-              : payload.comment
-                ? payload.comment
+            : payload.comment
+              ? payload.comment
+              : payload.decision === "rejected"
+                ? "Your post was rejected. Open it on Opollo to see the feedback."
                 : "Changes were requested on your post. Open it on Opollo to review.",
         action: {
           label: "Open post",

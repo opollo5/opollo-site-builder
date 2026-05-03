@@ -614,20 +614,23 @@ export type RejectPostResult = {
   postId: string;
   postState: "rejected";
   createdBy: string | null;
+  comment: string | null;
 };
 
 export async function rejectPost(args: {
   postId: string;
   companyId: string;
+  comment?: string | null;
 }): Promise<ApiResponse<RejectPostResult>> {
   if (!args.postId) return rejectValidation("Post id is required.");
   if (!args.companyId) return rejectValidation("Company id is required.");
 
   const svc = getServiceRoleClient();
 
+  const comment = args.comment?.trim() || null;
   const update = await svc
     .from("social_post_master")
-    .update({ state: "rejected" })
+    .update({ state: "rejected", reviewer_comment: comment })
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "pending_client_approval")
@@ -663,6 +666,7 @@ export async function rejectPost(args: {
       postId: update.data.id as string,
       postState: "rejected",
       createdBy: (update.data.created_by as string | null) ?? null,
+      comment,
     },
     timestamp: new Date().toISOString(),
   };
