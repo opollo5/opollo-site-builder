@@ -57,15 +57,18 @@ export default async function CompanyLandingPage() {
   // Brand tier drives the completion banner. Read in parallel with stats
   // so the page render isn't sequentialised; both are server-rendered
   // and degrade gracefully on null.
-  const [statsResult, brand] = await Promise.all([
+  const [statsResult, brand, canCreate] = await Promise.all([
     getSocialPostsStats({ companyId }),
     getActiveBrandProfile(companyId),
+    canDo(companyId, "create_post"),
   ]);
   const brandTier = getBrandTier(brand);
   const showCompletionBanner =
     brandTier === "none" || brandTier === "minimal";
   const isAdmin =
     session.isOpolloStaff || session.company.role === "admin";
+  const showImageGenerator =
+    process.env.IMAGE_FEATURE_MOOD_BOARD === "true" && canCreate;
 
   return (
     <main className="mx-auto max-w-5xl p-6 space-y-6">
@@ -155,6 +158,18 @@ export default async function CompanyLandingPage() {
             <div className="font-medium">Brand profile</div>
             <div className="mt-1 text-sm text-muted-foreground">
               Visual identity + tone + content rules. Drives every output.
+            </div>
+          </Link>
+        ) : null}
+        {showImageGenerator ? (
+          <Link
+            href="/company/image/generate"
+            className="block rounded-md border bg-card p-4 hover:border-primary/40"
+            data-testid="dashboard-link-image-generator"
+          >
+            <div className="font-medium">Image generator</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              Generate mood board backgrounds for your social posts.
             </div>
           </Link>
         ) : null}
