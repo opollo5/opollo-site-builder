@@ -63,6 +63,9 @@ export type DispatchPayload =
       postMasterId: string;
       submitterUserId: string;
       decision: "approved" | "rejected" | "changes_requested";
+      // Optional reviewer note; surfaced in the notification when decision is
+      // 'changes_requested'. Omitted (or null) for approve/reject.
+      comment?: string | null;
     }
   | {
       event: "connection_lost";

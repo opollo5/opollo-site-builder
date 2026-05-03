@@ -687,11 +687,13 @@ export type RequestChangesResult = {
   postId: string;
   postState: "changes_requested";
   createdBy: string | null;
+  comment: string | null;
 };
 
 export async function requestChanges(args: {
   postId: string;
   companyId: string;
+  comment?: string | null;
 }): Promise<ApiResponse<RequestChangesResult>> {
   if (!args.postId) return requestChangesValidation("Post id is required.");
   if (!args.companyId) return requestChangesValidation("Company id is required.");
@@ -736,6 +738,7 @@ export async function requestChanges(args: {
       postId: update.data.id as string,
       postState: "changes_requested",
       createdBy: (update.data.created_by as string | null) ?? null,
+      comment: args.comment?.trim() || null,
     },
     timestamp: new Date().toISOString(),
   };

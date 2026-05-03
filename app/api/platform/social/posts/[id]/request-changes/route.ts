@@ -9,12 +9,16 @@ import { requestChanges } from "@/lib/platform/social/posts";
 // Transitions pending_client_approval → changes_requested.
 // Gate: canDo("reject_post") — same minimum role as reject (approver+).
 // S1-51 — fires approval_decided notification to post creator + company admins.
+// S1-52 — optional comment field; surfaced in the notification body.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const Schema = z.object({ company_id: z.string().uuid() });
+const Schema = z.object({
+  company_id: z.string().uuid(),
+  comment: z.string().max(1000).trim().nullish(),
+});
 
 function errorJson(code: string, message: string, status: number): NextResponse {
   return NextResponse.json(
@@ -42,12 +46,13 @@ export async function POST(
   let body: unknown;
   try { body = await req.json(); } catch { body = {}; }
   const parsed = Schema.safeParse(body);
-  if (!parsed.success) return errorJson("VALIDATION_FAILED", "Body must be { company_id: uuid }.", 400);
+  if (!parsed.success) return errorJson("VALIDATION_FAILED", "Body must be { company_id: uuid, comment?: string }.", 400);
 
   const gate = await requireCanDoForApi(parsed.data.company_id, "reject_post");
   if (gate.kind === "deny") return gate.response;
 
-  const result = await requestChanges({ postId: id, companyId: parsed.data.company_id });
+  const comment = parsed.data.comment ?? null;
+  const result = await requestChanges({ postId: id, companyId: parsed.data.company_id, comment });
   if (!result.ok) return errorJson(result.error.code, result.error.message, statusForCode(result.error.code));
 
   if (result.data.createdBy) {
@@ -57,6 +62,7 @@ export async function POST(
       postMasterId: id,
       submitterUserId: result.data.createdBy,
       decision: "changes_requested",
+      comment: result.data.comment ?? undefined,
     });
   }
 
