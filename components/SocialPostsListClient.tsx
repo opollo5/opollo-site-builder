@@ -29,6 +29,7 @@ import type {
 //          correct tab and the server applies the filter server-side.
 // S1-43 — source badge (CSV / CAP / API) shown under the copy text
 //          for non-manual posts; manual posts show no badge.
+// S1-45 — adds "Awaiting MSP release" tab to FILTER_TABS.
 // ---------------------------------------------------------------------------
 
 type FilterKey = "all" | SocialPostState;
@@ -76,6 +77,7 @@ const FILTER_TABS: Array<{ key: "all" | SocialPostState; label: string }> = [
   { key: "pending_client_approval", label: "Awaiting approval" },
   { key: "changes_requested", label: "Changes requested" },
   { key: "approved", label: "Approved" },
+  { key: "pending_msp_release", label: "Awaiting MSP release" },
   { key: "scheduled", label: "Scheduled" },
   { key: "published", label: "Published" },
   { key: "failed", label: "Failed" },
