@@ -1,6 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
-
-vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+import { describe, expect, it } from "vitest";
 
 import {
   createSiteBlueprint,
