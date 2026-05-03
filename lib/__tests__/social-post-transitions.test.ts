@@ -8,6 +8,7 @@ import {
 } from "vitest";
 
 import {
+  cancelApprovalRequest,
   createPostMaster,
   reopenForEditing,
   submitForApproval,
@@ -424,6 +425,159 @@ describe("lib/platform/social/posts/submitForApproval", () => {
         .eq("id", post.id)
         .single();
       expect(post_after.data?.state).toBe("draft");
+    });
+  });
+
+  describe("cancelApprovalRequest", () => {
+    async function createPendingApprovalPost() {
+      const post = await createDraft("cancel target");
+      const submitted = await submitForApproval({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+      });
+      if (!submitted.ok) {
+        throw new Error(`createPendingApprovalPost: ${submitted.error.code}`);
+      }
+      return { post, requestId: submitted.data.approvalRequestId };
+    }
+
+    it("happy path — flips post to draft, revokes the open request, writes a 'revoked' event", async () => {
+      const { post, requestId } = await createPendingApprovalPost();
+
+      const result = await cancelApprovalRequest({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        actorUserId: creator.id,
+        reason: "we need to rework the copy",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.postState).toBe("draft");
+      expect(result.data.revoked).toBe(true);
+      expect(result.data.eventId).not.toBeNull();
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.state).toBe("draft");
+
+      const req = await svc
+        .from("social_approval_requests")
+        .select("revoked_at, final_approved_at, final_rejected_at")
+        .eq("id", requestId)
+        .single();
+      expect(req.data?.revoked_at).not.toBeNull();
+      expect(req.data?.final_approved_at).toBeNull();
+      expect(req.data?.final_rejected_at).toBeNull();
+
+      const events = await svc
+        .from("social_approval_events")
+        .select("event_type, comment_text, actor_user_id, recipient_id")
+        .eq("approval_request_id", requestId);
+      expect(events.data?.length).toBe(1);
+      const ev = events.data?.[0];
+      expect(ev?.event_type).toBe("revoked");
+      expect(ev?.comment_text).toBe("we need to rework the copy");
+      expect(ev?.actor_user_id).toBe(creator.id);
+      expect(ev?.recipient_id).toBeNull();
+    });
+
+    it("empty / whitespace reason becomes null in the audit", async () => {
+      const { post, requestId } = await createPendingApprovalPost();
+      const result = await cancelApprovalRequest({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        actorUserId: creator.id,
+        reason: "   ",
+      });
+      expect(result.ok).toBe(true);
+
+      const svc = getServiceRoleClient();
+      const ev = await svc
+        .from("social_approval_events")
+        .select("comment_text")
+        .eq("approval_request_id", requestId)
+        .single();
+      expect(ev.data?.comment_text).toBeNull();
+    });
+
+    it("rejects cancel on a draft post with INVALID_STATE", async () => {
+      const post = await createDraft("not yet pending");
+      const result = await cancelApprovalRequest({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        actorUserId: creator.id,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("rejects cancel on an approved post with INVALID_STATE", async () => {
+      const post = await createDraft("already approved");
+      const svc = getServiceRoleClient();
+      await svc
+        .from("social_post_master")
+        .update({ state: "approved" })
+        .eq("id", post.id);
+
+      const result = await cancelApprovalRequest({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        actorUserId: creator.id,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("returns NOT_FOUND for cross-company access", async () => {
+      const { post } = await createPendingApprovalPost();
+      const result = await cancelApprovalRequest({
+        postId: post.id,
+        companyId: COMPANY_B_ID,
+        actorUserId: creator.id,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("two parallel cancels — only one transitions, the other sees INVALID_STATE", async () => {
+      const { post, requestId } = await createPendingApprovalPost();
+
+      const [a, b] = await Promise.all([
+        cancelApprovalRequest({
+          postId: post.id,
+          companyId: COMPANY_A_ID,
+          actorUserId: creator.id,
+        }),
+        cancelApprovalRequest({
+          postId: post.id,
+          companyId: COMPANY_A_ID,
+          actorUserId: creator.id,
+        }),
+      ]);
+
+      const successes = [a, b].filter((r) => r.ok);
+      const failures = [a, b].filter((r) => !r.ok);
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+      if (failures[0]?.ok === false) {
+        expect(failures[0].error.code).toBe("INVALID_STATE");
+      }
+
+      // Exactly one revoke event landed.
+      const svc = getServiceRoleClient();
+      const events = await svc
+        .from("social_approval_events")
+        .select("id")
+        .eq("approval_request_id", requestId)
+        .eq("event_type", "revoked");
+      expect(events.data?.length).toBe(1);
     });
   });
 });

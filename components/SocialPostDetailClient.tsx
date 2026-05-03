@@ -55,6 +55,8 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
   const editable = canEdit && isDraft;
   const submittable = canSubmit && isDraft;
   const reopenable = canEdit && post.state === "changes_requested";
+  const cancellable = canEdit && post.state === "pending_client_approval";
+  const [cancelling, setCancelling] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -148,6 +150,44 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
     }
   }
 
+  async function handleCancelApproval() {
+    const reason = prompt(
+      "Cancel this approval request and bounce the post back to draft? Optional reason for the audit log:",
+      "",
+    );
+    if (reason === null) return; // user dismissed
+    setCancelling(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/platform/social/posts/${post.id}/cancel-approval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company_id: post.company_id,
+            reason: reason.trim() || null,
+          }),
+        },
+      );
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: "draft" } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        const msg = !json.ok
+          ? json.error.message
+          : "Failed to cancel approval.";
+        setError(msg);
+        setCancelling(false);
+        return;
+      }
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setCancelling(false);
+    }
+  }
+
   async function handleReopen() {
     if (
       !confirm(
@@ -231,6 +271,16 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit }: Props) {
                 data-testid="reopen-post-button"
               >
                 {reopening ? "Reopening…" : "Reopen for editing"}
+              </Button>
+            ) : null}
+            {cancellable ? (
+              <Button
+                variant="ghost"
+                onClick={handleCancelApproval}
+                disabled={cancelling}
+                data-testid="cancel-approval-button"
+              >
+                {cancelling ? "Cancelling…" : "Cancel approval"}
               </Button>
             ) : null}
             {editable ? (

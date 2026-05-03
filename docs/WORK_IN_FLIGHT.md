@@ -9,16 +9,18 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-9-reopen-for-editing
-- Slice: S1-9 — reopen-for-editing flow. lib reopenForEditing flips changes_requested → draft via atomic predicate-guarded UPDATE. Route POST /api/platform/social/posts/[id]/reopen gated by canDo(edit_post). Detail page Reopen button visible only when state=changes_requested + permission.
+- Branch: feat/s1-10-cancel-approval
+- Slice: S1-10 — admin cancel-approval flow (write-safety hotspot). Migration 0073 adds a transactional cancel_post_approval Postgres function: revoke open request + bounce post pending_client_approval → draft + write a 'revoked' event row, all atomic. Route POST /api/platform/social/posts/[id]/cancel-approval gated by canDo(edit_post). Detail page button visible when post in pending_client_approval + permission.
 - Files claimed:
-  - lib/platform/social/posts/transitions.ts (extend with reopenForEditing)
-  - lib/platform/social/posts/index.ts (re-export reopenForEditing)
-  - app/api/platform/social/posts/[id]/reopen/route.ts (new)
-  - components/SocialPostDetailClient.tsx (Reopen button)
-  - lib/__tests__/social-post-transitions.test.ts (extend with reopen coverage)
+  - supabase/migrations/0073_cancel_post_approval_fn.sql (new)
+  - supabase/rollbacks/0073_cancel_post_approval_fn.down.sql (new)
+  - lib/platform/social/posts/transitions.ts (extend with cancelApprovalRequest)
+  - lib/platform/social/posts/index.ts (re-export)
+  - app/api/platform/social/posts/[id]/cancel-approval/route.ts (new)
+  - components/SocialPostDetailClient.tsx (Cancel approval button + reason prompt)
+  - lib/__tests__/social-post-transitions.test.ts (extend with cancel coverage)
   - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: none.
+- Migration number reserved: 0073.
 - Expected completion: same session.
 ---
 
@@ -72,7 +74,9 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0070 — P1 Platform Foundation (platform_* + social_* schema + RLS).~~ Shipped in #376 + #377.
 - ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
 - 0072 — Session A — S1-7 record_approval_decision transactional function (branch: feat/s1-7-approval-viewer)
-- 0071 — Session A — S1-5 submit_post_for_approval transactional function (branch: feat/s1-5-submit-for-approval)
+- ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
+- ~~0072 — S1-7 record_approval_decision transactional function.~~ Shipped in #415.
+- 0073 — Session A — S1-10 cancel_post_approval transactional function (branch: feat/s1-10-cancel-approval)
 
 ## Claim block template
 
