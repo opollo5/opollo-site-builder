@@ -370,7 +370,10 @@ function renderEmailContent(
       return {
         subject: "A post needs your approval",
         lead: "A new post is waiting for your review on Opollo.",
-        action: null,
+        action: {
+          label: "Review post",
+          url: `${siteUrl()}/company/social/posts/${payload.postMasterId}`,
+        },
       };
     case "approval_decided":
       return {
@@ -381,13 +384,19 @@ function renderEmailContent(
             : payload.decision === "rejected"
               ? "Your post was rejected. Open it on Opollo to see the feedback."
               : "Changes were requested on your post. Open it on Opollo to review.",
-        action: null,
+        action: {
+          label: "Open post",
+          url: `${siteUrl()}/company/social/posts/${payload.postMasterId}`,
+        },
       };
     case "connection_lost":
       return {
         subject: `${payload.platform} connection lost`,
         lead: `Your ${payload.platform} connection on Opollo needs attention. Reason: ${payload.reason}.`,
-        action: null,
+        action: {
+          label: "View connections",
+          url: `${siteUrl()}/company/social/connections`,
+        },
       };
     case "connection_restored":
       // Email-only event isn't on the channel list for connection_restored;
@@ -396,27 +405,43 @@ function renderEmailContent(
       return {
         subject: `${payload.platform} connection restored`,
         lead: `Your ${payload.platform} connection is healthy again.`,
-        action: null,
+        action: {
+          label: "View connections",
+          url: `${siteUrl()}/company/social/connections`,
+        },
       };
     case "post_published":
       return {
         subject: `Published to ${payload.platform}`,
         lead: `Your post went live on ${payload.platform}: ${payload.postUrl}`,
-        action: null,
+        action: { label: "View post", url: payload.postUrl },
       };
     case "post_failed":
       return {
         subject: `Publish to ${payload.platform} failed`,
         lead: `Publishing to ${payload.platform} failed (${payload.errorClass}). Open Opollo to investigate.`,
-        action: null,
+        action: {
+          label: "View post",
+          url: `${siteUrl()}/company/social/posts/${payload.postMasterId}`,
+        },
       };
     case "changes_requested":
       return {
         subject: "Changes requested on your post",
         lead: payload.comment,
-        action: null,
+        action: {
+          label: "Open post",
+          url: `${siteUrl()}/company/social/posts/${payload.postMasterId}`,
+        },
       };
   }
+}
+
+function siteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "")
+  );
 }
 
 function formatDate(iso: string): string {
