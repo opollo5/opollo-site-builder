@@ -52,9 +52,13 @@ MOOD_BOARD_COUNT=4
 # provider's keys are required at runtime; the other set can be blank.
 COMPOSITING_PROVIDER=bannerbear
 BANNERBEAR_API_KEY=
-BANNERBEAR_PROJECT_ID=
+# Template UIDs — one per aspect ratio. Create in app.bannerbear.com; each
+# template needs 3 named layers: "background", "text_zone", "logo".
+BANNERBEAR_TEMPLATE_1080x1080=
+BANNERBEAR_TEMPLATE_1080x1350=
+BANNERBEAR_TEMPLATE_1920x1080=
+BANNERBEAR_TEMPLATE_1080x1920=
 PLACID_API_KEY=
-PLACID_PROJECT_ID=
 
 # ----- Magic-link base URLs --------------------------------------------------
 # Public-facing surfaces for approval / read-only calendar magic links.
