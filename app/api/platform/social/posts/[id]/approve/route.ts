@@ -2,11 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { dispatch } from "@/lib/platform/notifications";
 import { approvePost } from "@/lib/platform/social/posts";
 
 // S1-48 — POST /api/platform/social/posts/[id]/approve
 // Transitions pending_client_approval → approved for platform users with
 // the approver role (or Opollo staff bypass). Gate: canDo("approve_post").
+// S1-51 — fires approval_decided notification to post creator + company admins.
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +49,16 @@ export async function POST(
 
   const result = await approvePost({ postId: id, companyId: parsed.data.company_id });
   if (!result.ok) return errorJson(result.error.code, result.error.message, statusForCode(result.error.code));
+
+  if (result.data.createdBy) {
+    void dispatch({
+      event: "approval_decided",
+      companyId: parsed.data.company_id,
+      postMasterId: id,
+      submitterUserId: result.data.createdBy,
+      decision: "approved",
+    });
+  }
 
   return NextResponse.json({ ok: true, data: result.data, timestamp: new Date().toISOString() }, { status: 200 });
 }
