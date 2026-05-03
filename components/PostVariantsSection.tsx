@@ -39,6 +39,9 @@ export function PostVariantsSection({
   const [editingPlatform, setEditingPlatform] =
     useState<SocialPlatform | null>(null);
   const [draftText, setDraftText] = useState("");
+  // S1-24: newline-separated media asset ids. /company/social/media's
+  // Copy id button is the source. Empty textarea on save = clear.
+  const [draftMedia, setDraftMedia] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +50,7 @@ export function PostVariantsSection({
     // Seed editor with current override OR master text so the user can
     // tweak from where things stand.
     setDraftText(r.variant?.is_custom ? (r.variant.variant_text ?? "") : (masterText ?? ""));
+    setDraftMedia((r.variant?.media_asset_ids ?? []).join("\n"));
     setError(null);
   }
 
@@ -55,6 +59,10 @@ export function PostVariantsSection({
     setError(null);
     try {
       const trimmed = draftText.trim();
+      const mediaIds = draftMedia
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
       const res = await fetch(
         `/api/platform/social/posts/${postId}/variants`,
         {
@@ -64,6 +72,7 @@ export function PostVariantsSection({
             company_id: companyId,
             platform,
             variant_text: trimmed.length === 0 ? null : trimmed,
+            media_asset_ids: mediaIds,
           }),
         },
       );
@@ -91,6 +100,7 @@ export function PostVariantsSection({
       );
       setEditingPlatform(null);
       setDraftText("");
+      setDraftMedia("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -146,16 +156,27 @@ export function PostVariantsSection({
                     )}
                   </div>
                   {!editing ? (
-                    <p
-                      className="mt-2 whitespace-pre-wrap text-sm"
-                      data-testid={`variant-text-${r.platform}`}
-                    >
-                      {r.effective_text ?? (
-                        <span className="text-muted-foreground">
-                          — No copy —
-                        </span>
-                      )}
-                    </p>
+                    <>
+                      <p
+                        className="mt-2 whitespace-pre-wrap text-sm"
+                        data-testid={`variant-text-${r.platform}`}
+                      >
+                        {r.effective_text ?? (
+                          <span className="text-muted-foreground">
+                            — No copy —
+                          </span>
+                        )}
+                      </p>
+                      {(r.variant?.media_asset_ids?.length ?? 0) > 0 ? (
+                        <p
+                          className="mt-1 text-sm text-muted-foreground"
+                          data-testid={`variant-media-count-${r.platform}`}
+                        >
+                          {r.variant!.media_asset_ids.length} media
+                          asset{r.variant!.media_asset_ids.length === 1 ? "" : "s"} attached
+                        </p>
+                      ) : null}
+                    </>
                   ) : null}
                 </div>
                 {canEdit && !editing ? (
@@ -180,6 +201,17 @@ export function PostVariantsSection({
                     placeholder="Leave blank to clear the override and use the master copy."
                     data-testid={`variant-textarea-${r.platform}`}
                   />
+                  <label className="mt-2 block text-sm font-medium">
+                    Media asset ids
+                    <textarea
+                      className="mt-1 w-full rounded-md border bg-background p-2 text-sm font-mono"
+                      rows={3}
+                      value={draftMedia}
+                      onChange={(e) => setDraftMedia(e.target.value)}
+                      placeholder="One UUID per line. Copy from /company/social/media."
+                      data-testid={`variant-media-textarea-${r.platform}`}
+                    />
+                  </label>
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Button
                       size="sm"
@@ -195,6 +227,7 @@ export function PostVariantsSection({
                       onClick={() => {
                         setEditingPlatform(null);
                         setDraftText("");
+                        setDraftMedia("");
                         setError(null);
                       }}
                     >

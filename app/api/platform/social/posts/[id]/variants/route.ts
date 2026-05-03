@@ -36,6 +36,9 @@ const PutSchema = z.object({
     "gbp",
   ]),
   variant_text: z.string().max(10_000).nullable().optional(),
+  // S1-24: media attachments. Pass undefined to leave the existing
+  // array untouched; pass [] to clear; pass [uuid, ...] to overwrite.
+  media_asset_ids: z.array(z.string().uuid()).max(20).optional(),
 });
 
 function errorJson(
@@ -147,6 +150,7 @@ export async function PUT(
     companyId: parsed.data.company_id,
     platform: parsed.data.platform,
     variantText: parsed.data.variant_text ?? null,
+    mediaAssetIds: parsed.data.media_asset_ids,
   });
   if (!result.ok) {
     return errorJson(

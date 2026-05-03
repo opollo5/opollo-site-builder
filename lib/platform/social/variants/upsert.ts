@@ -49,6 +49,27 @@ export async function upsertVariant(
 
   const svc = getServiceRoleClient();
 
+  // S1-24: validate media_asset_ids belong to this company. We require
+  // every passed id to resolve before doing the upsert so a malicious
+  // payload can't attach assets the operator doesn't own.
+  if (input.mediaAssetIds && input.mediaAssetIds.length > 0) {
+    const assets = await svc
+      .from("social_media_assets")
+      .select("id")
+      .eq("company_id", input.companyId)
+      .in("id", input.mediaAssetIds);
+    if (assets.error) {
+      return internal(`Asset check failed: ${assets.error.message}`);
+    }
+    const foundIds = new Set((assets.data ?? []).map((a) => a.id as string));
+    const missing = input.mediaAssetIds.filter((id) => !foundIds.has(id));
+    if (missing.length > 0) {
+      return validation(
+        `Unknown media asset id(s) for this company: ${missing.join(", ")}.`,
+      );
+    }
+  }
+
   // Verify parent post exists in this company AND is still a draft.
   const parent = await svc
     .from("social_post_master")
@@ -83,17 +104,20 @@ export async function upsertVariant(
 
   // Postgres upsert: insert-or-update on the UNIQUE (post_master_id,
   // platform) constraint. Two concurrent calls converge to one row.
+  // media_asset_ids is included only when the caller passed it,
+  // preserving the existing array on text-only edits.
+  const row: Record<string, unknown> = {
+    post_master_id: input.postMasterId,
+    platform: input.platform,
+    variant_text: cleaned,
+    is_custom: isCustom,
+  };
+  if (input.mediaAssetIds !== undefined) {
+    row.media_asset_ids = input.mediaAssetIds;
+  }
   const upsert = await svc
     .from("social_post_variant")
-    .upsert(
-      {
-        post_master_id: input.postMasterId,
-        platform: input.platform,
-        variant_text: cleaned,
-        is_custom: isCustom,
-      },
-      { onConflict: "post_master_id,platform" },
-    )
+    .upsert(row, { onConflict: "post_master_id,platform" })
     .select(
       "id, post_master_id, platform, connection_id, variant_text, is_custom, scheduled_at, media_asset_ids, created_at, updated_at",
     )
