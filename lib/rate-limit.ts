@@ -42,7 +42,8 @@ export type LimiterName =
   | "csv_upload"
   | "user_mgmt"
   | "admin_write"
-  | "briefs_upload";
+  | "briefs_upload"
+  | "cap_generate";
 
 type LimiterConfig = {
   requests: number;
@@ -97,6 +98,10 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // of markdown; 10/hour prevents runaway re-uploads during a single
   // session while leaving headroom for retries.
   briefs_upload: { requests: 10, window: "1 h" },
+  // D2: CAP copy generation. Each trigger calls Claude + creates up to
+  // 5 posts; 10/company/24 h caps runaway spend while leaving headroom
+  // for daily editorial use. Keyed on "company:<uuid>".
+  cap_generate: { requests: 10, window: "24 h" },
 };
 
 export type RateLimitResult =
