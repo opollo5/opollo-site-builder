@@ -66,10 +66,12 @@ export default async function BriefRunPage({
   // to /run, but the read here can hit a connection pool that hasn't
   // yet seen the COMMIT. Retry briefly when the brief looks "almost
   // committed" so the operator sees the run surface, not a misleading
-  // "isn't committed yet" panel. Capped at ~1.5s total — beyond that,
-  // it's a real not-committed brief and we fall through to the panel.
+  // "isn't committed yet" panel. UAT (2026-05-03 round-3): bumped from
+  // 3 × 500ms (1.5s) to 8 × 500ms (4s) because PostgREST pool
+  // propagation occasionally takes >2s under load and operators were
+  // still hitting the panel.
   if (brief.status === "parsed") {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 8; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const retry = await getBriefWithPages(params.brief_id);
       if (!retry.ok) break;
