@@ -171,6 +171,7 @@ describe("generateCAPPosts", () => {
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
         state_changed_at: "2026-01-01T00:00:00Z",
+        reviewer_comment: null,
       },
       timestamp: "2026-01-01T00:00:00Z",
     });
@@ -221,6 +222,7 @@ describe("generateCAPPosts", () => {
         created_at: "2026-01-01T00:00:00Z",
         updated_at: "2026-01-01T00:00:00Z",
         state_changed_at: "2026-01-01T00:00:00Z",
+        reviewer_comment: null,
       },
       timestamp: "2026-01-01T00:00:00Z",
     });
@@ -283,6 +285,7 @@ describe("generateCAPPosts", () => {
         created_at: "",
         updated_at: "",
         state_changed_at: "",
+        reviewer_comment: null,
       },
       timestamp: "",
     });
@@ -321,6 +324,7 @@ describe("generateCAPPosts", () => {
         created_at: "",
         updated_at: "",
         state_changed_at: "",
+        reviewer_comment: null,
       },
       timestamp: "",
     });
