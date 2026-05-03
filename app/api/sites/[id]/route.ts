@@ -53,6 +53,11 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
+  // PLATFORM-AUDIT M15-4 #8: site data was previously readable by any caller
+  // relying only on middleware. Defence-in-depth gate matches PATCH/DELETE.
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
+  if (gate.kind === "deny") return gate.response;
+
   // Never include credentials in a response served over HTTP. Internal
   // consumers (chat route) must call getSite directly with includeCredentials.
   const result = await getSite(params.id, { includeCredentials: false });
