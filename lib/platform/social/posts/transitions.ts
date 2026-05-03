@@ -551,7 +551,7 @@ export async function releasePost(args: {
 
   const update = await svc
     .from("social_post_master")
-    .update({ state: "approved", state_changed_at: new Date().toISOString() })
+    .update({ state: "approved" })
     .eq("id", args.postId)
     .eq("company_id", args.companyId)
     .eq("state", "pending_msp_release")

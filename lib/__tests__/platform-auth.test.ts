@@ -70,6 +70,7 @@ describe("lib/platform/auth — permissions logic (pure)", () => {
     expect(minRoleFor("approve_post")).toBe("approver");
     expect(minRoleFor("reject_post")).toBe("approver");
     expect(minRoleFor("schedule_post")).toBe("approver");
+    expect(minRoleFor("release_post")).toBe("admin");
 
     expect(minRoleFor("create_post")).toBe("editor");
     expect(minRoleFor("edit_post")).toBe("editor");
