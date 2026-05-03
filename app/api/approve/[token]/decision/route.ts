@@ -130,13 +130,23 @@ export async function POST(
           post_id: result.data.postId,
         });
       } else if (post.data.created_by) {
-        await dispatch({
-          event: "approval_decided",
-          companyId: post.data.company_id as string,
-          postMasterId: result.data.postId,
-          submitterUserId: post.data.created_by as string,
-          decision: parsed.data.decision,
-        });
+        if (parsed.data.decision === "changes_requested") {
+          await dispatch({
+            event: "changes_requested",
+            companyId: post.data.company_id as string,
+            postMasterId: result.data.postId,
+            submitterUserId: post.data.created_by as string,
+            comment: parsed.data.comment ?? "",
+          });
+        } else {
+          await dispatch({
+            event: "approval_decided",
+            companyId: post.data.company_id as string,
+            postMasterId: result.data.postId,
+            submitterUserId: post.data.created_by as string,
+            decision: parsed.data.decision,
+          });
+        }
       }
     } catch (err) {
       logger.warn("social.approvals.decisions.notify.dispatch_failed", {
