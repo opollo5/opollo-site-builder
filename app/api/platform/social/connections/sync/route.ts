@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { readJsonBody } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
 
@@ -46,12 +47,8 @@ function errorJson(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = PostBodySchema.safeParse(body);
   if (!parsed.success) {
     return errorJson(

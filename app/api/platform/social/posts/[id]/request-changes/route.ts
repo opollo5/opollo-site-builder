@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { readJsonBody } from "@/lib/http";
 import { dispatch } from "@/lib/platform/notifications";
 import { requestChanges } from "@/lib/platform/social/posts";
 
@@ -43,8 +44,8 @@ export async function POST(
   const { id } = await params;
   if (!UUID_RE.test(id)) return errorJson("VALIDATION_FAILED", "id must be a UUID.", 400);
 
-  let body: unknown;
-  try { body = await req.json(); } catch { body = {}; }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = Schema.safeParse(body);
   if (!parsed.success) return errorJson("VALIDATION_FAILED", "Body must be { company_id: uuid, comment?: string }.", 400);
 

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { readJsonBody } from "@/lib/http";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderPlatformInviteEmail } from "@/lib/email/templates/platform-invite";
 import { logger } from "@/lib/logger";
@@ -67,12 +68,8 @@ function errorJson(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = SendInviteSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
