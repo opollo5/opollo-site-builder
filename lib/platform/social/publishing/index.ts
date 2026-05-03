@@ -1,4 +1,9 @@
 export {
+  backfillScheduledPublishes,
+  type BackfillInput,
+  type BackfillResult,
+} from "./backfill";
+export {
   cancelScheduledPublish,
   enqueueScheduledPublish,
   type EnqueuePublishInput,
