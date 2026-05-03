@@ -15,6 +15,7 @@ import {
 } from "@/lib/2fa/cookies";
 import { registerTrustedDevice } from "@/lib/2fa/devices";
 import { createRouteAuthClient } from "@/lib/auth";
+import { readJsonBody, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/rate-limit";
 
@@ -81,12 +82,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
   const userId = userRes.data.user.id;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = null;
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = Body.safeParse(body);
   if (!parsed.success) {
     logger.warn("auth.2fa.complete_login.validation_failed", {

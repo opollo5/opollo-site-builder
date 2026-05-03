@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { validatePassword } from "@/lib/password-policy";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
@@ -76,12 +77,8 @@ async function verifyCurrentPassword(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

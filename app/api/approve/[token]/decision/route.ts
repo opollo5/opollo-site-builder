@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { dispatch } from "@/lib/platform/notifications";
 import { recordApprovalDecision } from "@/lib/platform/social/approvals";
@@ -68,12 +69,8 @@ export async function POST(
     return errorJson("NOT_FOUND", "This approval link is invalid.", 404);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
     return errorJson(
