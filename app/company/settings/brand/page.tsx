@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
-import { CustomerBrandProfileView } from "@/components/CustomerBrandProfileView";
+import { CustomerBrandProfileEditor } from "@/components/CustomerBrandProfileEditor";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getActiveBrandProfile } from "@/lib/platform/brand";
 import { getPlatformCompany } from "@/lib/platform/companies";
 
-// P-Brand-1a — Customer brand profile (read-only). Edit form lands in
-// P-Brand-1b. Mirrors the gate pattern in app/company/users/page.tsx:
+// P-Brand-1c — Customer brand profile editor. Replaces the read-only
+// view from P-Brand-1a now that the PATCH API (P-Brand-1b) is in place.
+// Mirrors the gate pattern in app/company/users/page.tsx:
 //
 //   1. No session → redirect to /login.
 //   2. Authenticated but no platform_users row → "Not provisioned".
@@ -68,7 +69,7 @@ export default async function CompanyBrandPage() {
   }
 
   return (
-    <CustomerBrandProfileView
+    <CustomerBrandProfileEditor
       company={companyResult.data.company}
       brand={brand}
     />
