@@ -57,8 +57,8 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 ## Current state
 
-- **Slice in progress:** S8 (self-service connection reconnect — editor+ can reconnect auth_required/disconnected connections)
-- **Most recently shipped:** S1-18 publish pipeline (#439) + S1-17 inbound webhook handler (#437)
+- **Slice in progress:** none — V1 roadmap complete (Phase A + Phase B + Phase C I1-I4)
+- **Most recently shipped:** S8 self-service connection reconnect (#472)
 - **S0 (bundle.social verification):** complete
 - **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds), Bannerbear or Placid (compositing — evaluate at I2)
 
@@ -93,7 +93,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 | S5 | Scheduling + publishing + reliability (QStash, retries, watchdog, reconciliation) | ✅ Shipped via S1-14 (#428 schedule entries L3) + S1-18 (#439 publish pipeline: QStash → claim_publish_job RPC → bundle.social). Watchdog/reconciliation cron(s) ride on existing `/api/cron/*` infra. |
 | S6 | Customer read-only calendar | ✅ Shipped via S1-15 (#431 viewer-link magic-link, 90-day customer calendar) |
 | S7 | Bulk CSV upload | ✅ Shipped (#469) |
-| S8 | Self-service connection reconnect | 👈 Current |
+| S8 | Self-service connection reconnect | ✅ Shipped (#472) |
 
 ### Phase C: Image Generation
 
