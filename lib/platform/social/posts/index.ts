@@ -13,10 +13,12 @@ export { getPostMaster } from "./get";
 export { listPostMasters } from "./list";
 export {
   cancelApprovalRequest,
+  releasePost,
   reopenForEditing,
   submitForApproval,
   type ApprovalSnapshot,
   type CancelApprovalResult,
+  type ReleasePostResult,
   type ReopenForEditingResult,
   type SubmitForApprovalResult,
 } from "./transitions";
