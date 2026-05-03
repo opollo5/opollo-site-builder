@@ -20,7 +20,9 @@ import { listPostMasters } from "@/lib/platform/social/posts";
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ q?: string }> };
+const PAGE_SIZE = 25;
+
+type Props = { searchParams: Promise<{ q?: string; page?: string }> };
 
 export default async function CompanySocialPostsPage({ searchParams }: Props) {
   const session = await getCurrentPlatformSession();
@@ -41,11 +43,19 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
   }
 
   const companyId = session.company.companyId;
-  const { q } = await searchParams;
+  const { q, page: pageParam } = await searchParams;
   const searchTerm = q?.trim() ?? "";
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+  const offset = (page - 1) * PAGE_SIZE;
 
   const [postsResult, canCreate] = await Promise.all([
-    listPostMasters({ companyId, q: searchTerm || undefined }),
+    listPostMasters({
+      companyId,
+      q: searchTerm || undefined,
+      limit: PAGE_SIZE,
+      offset,
+      withCount: true,
+    }),
     canDo(companyId, "create_post"),
   ]);
 
@@ -66,6 +76,9 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       initialPosts={postsResult.data.posts}
       canCreate={canCreate}
       initialQ={searchTerm}
+      page={page}
+      pageSize={PAGE_SIZE}
+      totalCount={postsResult.data.totalCount}
     />
   );
 }
