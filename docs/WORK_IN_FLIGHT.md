@@ -6,42 +6,6 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
----
-## Session A
-- Started: 2026-05-03
-- Branch: feat/s1-16-bundlesocial-connect-portal
-- Slice: S1-16 — bundle.social hosted-portal connect flow. lib/platform/social/connections/{initiate-connect,sync}.ts wraps the SDK; POST /api/platform/social/connections/connect mints portal URL; GET /api/platform/social/connections/callback redirects back with attribution; POST /api/platform/social/connections/sync refreshes status/display_name; SocialConnectionsList wires real Connect/Reconnect/Refresh buttons; /company/social/connections surfaces ?connect= banner.
-- Files claimed:
-  - lib/bundlesocial.ts (touched — env var name BUNDLE_SOCIAL_TEAMID)
-  - lib/platform/social/connections/initiate-connect.ts (new)
-  - lib/platform/social/connections/sync.ts (new)
-  - lib/platform/social/connections/index.ts (touched)
-  - app/api/platform/social/connections/connect/route.ts (new)
-  - app/api/platform/social/connections/callback/route.ts (new)
-  - app/api/platform/social/connections/sync/route.ts (new)
-  - components/SocialConnectionsList.tsx (rewritten with real wiring)
-  - app/company/social/connections/page.tsx (added searchParams + companyId prop)
-  - .env.example, .env.local.example (TEAM_ID → TEAMID)
-  - lib/__tests__/social-connections-bundlesocial.test.ts (new)
-  - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: none.
-- Expected completion: same session.
----
-
-## ~~Session A (stale)~~ (stale claim from 2026-04-24, M12-6 shipped — left in place; previous owner removes when they next push)
-- Started: 2026-04-24
-- Branch: feat/m12-6-save-draft-persistence
-- Slice: M12-6 — Save-Draft persistence for briefs review; PATCH endpoint + button + re-enable fixme'd E2E test
-- Files claimed:
-  - app/api/briefs/[brief_id]/pages/route.ts (new PATCH handler)
-  - components/BriefReviewClient.tsx (add "Save draft" button + endpoint call)
-  - e2e/briefs-review.spec.ts (re-enable fixme'd upload→parse→commit test)
-  - lib/briefs.ts (if persistence logic needed)
-- Migration number reserved: none (data-only, no schema changes)
-- Expected completion: same session; auto-merge on green CI
-- Notes: M12-1 shipped with version_lock on brief_pages; M12-6 enables saving edits before commit to prevent 409 hash mismatch. The commit flow currently 409s because client computes hash from in-memory edits while server recomputes from unedited DB rows.
----
-
 ## Hot-shared files (always check before claiming)
 
 Even with no other session active, assume these files are "hot" and coordinate explicitly if touching them while another session is in flight:
