@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { Maximize2, Minimize2, TriangleAlert } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -121,8 +121,6 @@ export function BriefRunClient({
   const [controlState, setControlState] = useState<ControlState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [reviseOpen, setReviseOpen] = useState<string | null>(null); // page id
-  const [reviseNote, setReviseNote] = useState("");
 
   // RS-4 — poll the snapshot endpoint every 4s. The initial server-render
   // hydrates the surface; live updates flow in via `polled.data`. After
@@ -311,11 +309,7 @@ export function BriefRunClient({
     }
   }
 
-  async function handleRevise(page: BriefPageRow) {
-    if (!reviseNote.trim()) {
-      setErrorMessage("Add a note describing what to change.");
-      return;
-    }
+  async function handleRevise(page: BriefPageRow, note: string) {
     setControlState("acting");
     setErrorMessage(null);
     try {
@@ -326,7 +320,7 @@ export function BriefRunClient({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             expected_version_lock: page.version_lock,
-            note: reviseNote,
+            note,
           }),
         },
       );
@@ -336,8 +330,6 @@ export function BriefRunClient({
       };
       if (res.ok && payload.ok) {
         setControlState("idle");
-        setReviseOpen(null);
-        setReviseNote("");
         void polled.refresh();
         return;
       }
@@ -558,7 +550,7 @@ export function BriefRunClient({
                     isCurrentAwaitingReview={isAwaitingReview}
                     controlState={controlState}
                     onApprove={() => handleApprove(page)}
-                    onRevise={() => setReviseOpen(page.id)}
+                    onRevise={(note) => handleRevise(page, note)}
                     themeOriginUrl={
                       siteMode === "copy_existing" ? siteWpUrl : null
                     }
@@ -577,22 +569,6 @@ export function BriefRunClient({
           onCancel={() => setConfirmOpen(false)}
           onConfirm={() => handleStartRun(true)}
           submitting={controlState === "starting"}
-        />
-      )}
-
-      {reviseOpen && (
-        <ReviseModal
-          note={reviseNote}
-          onNoteChange={setReviseNote}
-          onCancel={() => {
-            setReviseOpen(null);
-            setReviseNote("");
-          }}
-          onConfirm={() => {
-            const page = sortedPages.find((p) => p.id === reviseOpen);
-            if (page) handleRevise(page);
-          }}
-          submitting={controlState === "acting"}
         />
       )}
 
@@ -648,19 +624,14 @@ function PagePreview({
   isCurrentAwaitingReview: boolean;
   controlState: ControlState;
   onApprove: () => void;
-  onRevise: () => void;
-  /** When set (copy_existing sites), inject Elementor / theme stylesheets
-      into the iframe so the preview renders with the source theme's CSS. */
+  onRevise: (note: string) => void;
   themeOriginUrl?: string | null;
 }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const [reviseExpanded, setReviseExpanded] = useState(false);
+  const [reviseNote, setReviseNote] = useState("");
+
   const html = page.generated_html ?? page.draft_html ?? "";
-  // Belt-and-suspenders: even after the runner's structural gate (PR
-  // #188), an operator-edited or legacy row could still hold a
-  // truncated doc. Surface a banner above the iframe so a black/blank
-  // preview is never silent. Trigger if the doc claims completeness
-  // (<!DOCTYPE / <html opener) AND is missing closing </body> or
-  // </html>. Bare fragments — which never claim to be complete docs —
-  // skip the check.
   const looksTruncated = useMemo(() => {
     if (!html) return false;
     const trimmed = html.trimEnd();
@@ -671,18 +642,45 @@ function PagePreview({
   }, [html]);
   const lastVisualCritique = useMemo(() => {
     const log = (page.critique_log ?? []) as BriefPageCritiqueEntry[];
-    return [...log]
-      .reverse()
-      .find((e) => e.pass_kind === "visual_critique");
+    return [...log].reverse().find((e) => e.pass_kind === "visual_critique");
   }, [page.critique_log]);
+
+  const wrappedSrc = useMemo(
+    () => wrapForPreview(html, { themeOriginUrl }),
+    [html, themeOriginUrl],
+  );
+
+  function handleReviseSubmit() {
+    onRevise(reviseNote);
+    setReviseExpanded(false);
+    setReviseNote("");
+  }
 
   return (
     <div className="mt-4 space-y-3">
       {html ? (
         <details className="group" open={isCurrentAwaitingReview}>
-          <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
-            {isCurrentAwaitingReview ? "Hide rendered preview" : "Show rendered preview"}
-          </summary>
+          <div className="flex items-center justify-between gap-2">
+            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+              {isCurrentAwaitingReview
+                ? "Hide rendered preview"
+                : "Show rendered preview"}
+            </summary>
+            <button
+              type="button"
+              onClick={() => setFullscreen((v) => !v)}
+              className="inline-flex items-center gap-1 rounded border bg-background px-2 py-0.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={fullscreen ? "Exit fullscreen" : "Fullscreen preview"}
+              aria-label={fullscreen ? "Exit fullscreen preview" : "Open fullscreen preview"}
+            >
+              {fullscreen ? (
+                <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 aria-hidden className="h-3.5 w-3.5" />
+              )}
+              {fullscreen ? "Exit" : "Fullscreen"}
+            </button>
+          </div>
           {looksTruncated && (
             <Alert
               variant="destructive"
@@ -697,31 +695,41 @@ function PagePreview({
               regenerate.
             </Alert>
           )}
-          <iframe
-            // Sandbox: allow-same-origin lifted so the iframe's own doc
-            // can pull cross-origin theme stylesheets from the WP source
-            // (copy_existing path). Scripts / forms / popups stay
-            // disallowed by leaving sandbox="" defaults intact.
-            //
-            // PB-3 (2026-04-29): wrapForPreview wraps path-B fragments in
-            // a synthetic doc with a shim stylesheet that approximates
-            // WP/Kadence defaults. UAT-2026-05-02 follow-up: when the
-            // site is in copy_existing mode, we additionally inject
-            // <link rel="stylesheet"> entries for the source site's
-            // Elementor / theme bundles so the preview renders with the
-            // actual theme styling, not just the bare shim.
-            sandbox=""
-            srcDoc={wrapForPreview(html, {
-              themeOriginUrl,
-            })}
-            className="mt-2 h-96 w-full rounded border"
-            title={`Preview of ${page.title}`}
-          />
+          {/* Normal (inline) iframe — hidden when fullscreen overlay is active */}
+          {!fullscreen && (
+            <iframe
+              sandbox=""
+              srcDoc={wrappedSrc}
+              className="mt-2 h-[65vh] min-h-[480px] w-full rounded border"
+              title={`Preview of ${page.title}`}
+            />
+          )}
         </details>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          No draft HTML yet.
-        </p>
+        <p className="text-sm text-muted-foreground">No draft HTML yet.</p>
+      )}
+
+      {/* Fullscreen overlay — portal-style fixed layer so nothing is squashed */}
+      {fullscreen && html && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+          <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
+            <span className="text-sm font-medium">{page.title} — preview</span>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="inline-flex items-center gap-1.5 rounded border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+            >
+              <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+              Exit fullscreen
+            </button>
+          </div>
+          <iframe
+            sandbox=""
+            srcDoc={wrappedSrc}
+            className="min-h-0 flex-1 w-full"
+            title={`Fullscreen preview of ${page.title}`}
+          />
+        </div>
       )}
 
       {lastVisualCritique && (
@@ -740,25 +748,102 @@ function PagePreview({
       )}
 
       {isCurrentAwaitingReview && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRevise}
-            disabled={controlState !== "idle"}
-          >
-            Revise with note
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={onApprove}
-            disabled={controlState !== "idle"}
-          >
-            {controlState === "acting" ? "Working…" : "Approve this page"}
-          </Button>
-        </div>
+        <>
+          {!reviseExpanded && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReviseExpanded(true)}
+                disabled={controlState !== "idle"}
+              >
+                Revise with note
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={onApprove}
+                disabled={controlState !== "idle"}
+              >
+                {controlState === "acting" ? "Working…" : "Approve this page"}
+              </Button>
+            </div>
+          )}
+
+          {/* Inline revise panel — below the preview so the operator can
+              scroll up to the page while writing their note. */}
+          {reviseExpanded && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold">Revise with a note</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  The runner re-enters this page with your note in the prompt
+                  for every pass. Scroll up to the preview while you write.
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor={`revise-note-${page.id}`}
+                  className="block text-sm font-medium"
+                >
+                  Note for the generator
+                </label>
+                <Textarea
+                  id={`revise-note-${page.id}`}
+                  className="mt-1"
+                  rows={6}
+                  value={reviseNote}
+                  onChange={(e) => setReviseNote(e.target.value)}
+                  placeholder="e.g. The hero section is too dense. Break into a headline + single CTA with generous whitespace underneath."
+                  maxLength={2000}
+                  disabled={controlState !== "idle"}
+                  autoFocus
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {reviseNote.length} / 2000 characters
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReviseExpanded(false);
+                    setReviseNote("");
+                  }}
+                  disabled={controlState !== "idle"}
+                >
+                  Cancel
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={onApprove}
+                    variant="outline"
+                    disabled={controlState !== "idle"}
+                  >
+                    Approve instead
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleReviseSubmit}
+                    disabled={
+                      controlState !== "idle" || reviseNote.trim() === ""
+                    }
+                  >
+                    {controlState === "acting"
+                      ? "Re-queueing…"
+                      : "Re-queue with note"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -868,75 +953,3 @@ function ConfirmationModal({
   );
 }
 
-function ReviseModal({
-  note,
-  onNoteChange,
-  onCancel,
-  onConfirm,
-  submitting,
-}: {
-  note: string;
-  onNoteChange: (s: string) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-  submitting: boolean;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="revise-note-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onCancel();
-      }}
-    >
-      <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg">
-        <h2 id="revise-note-title" className="text-lg font-semibold">
-          Revise this page with a note
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The runner re-enters this page from the top. Your note goes into
-          the prompt for every pass.
-        </p>
-        <div className="mt-4">
-          <label
-            htmlFor="revise-note-input"
-            className="block text-sm font-medium text-muted-foreground"
-          >
-            Note for the generator
-          </label>
-          <Textarea
-            id="revise-note-input"
-            className="mt-1"
-            rows={5}
-            value={note}
-            onChange={(e) => onNoteChange(e.target.value)}
-            placeholder="e.g. The hero section is too dense. Break into a headline + single CTA with generous whitespace underneath."
-            maxLength={2000}
-          />
-          <p className="mt-1 text-sm text-muted-foreground">
-            {note.length} / 2000 characters
-          </p>
-        </div>
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={onConfirm}
-            disabled={submitting || note.trim() === ""}
-          >
-            {submitting ? "Re-queueing…" : "Re-queue with note"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
