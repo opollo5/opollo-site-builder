@@ -14,3 +14,8 @@ export {
   type FirePublishInput,
   type FirePublishResult,
 } from "./fire";
+export {
+  retryPublishAttempt,
+  type RetryPublishInput,
+  type RetryPublishResult,
+} from "./retry";
