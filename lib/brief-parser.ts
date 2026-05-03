@@ -150,6 +150,36 @@ function detectUnclosedFence(source: string): ParserWarning | null {
 }
 
 // ---------------------------------------------------------------------------
+// Dedent — strip common leading whitespace shared by all non-empty lines.
+//
+// Operators frequently paste briefs from indented sources (chat code
+// blocks, formatted docs) where every line has the same 2-4 space prefix.
+// The structural parser anchors on `^##` / `^#`, so the leading indent
+// turns headings into body-text-with-prefix and the parser misses them.
+// This helper runs first so the rest of the pipeline sees a column-zero
+// document.
+//
+// Idempotent: a brief with no leading whitespace returns unchanged.
+// ---------------------------------------------------------------------------
+
+function dedentSource(source: string): string {
+  if (!source) return source;
+  const lines = source.split(/\r?\n/);
+  let minIndent = Number.POSITIVE_INFINITY;
+  for (const line of lines) {
+    if (line.trim().length === 0) continue;
+    const match = /^[ \t]*/.exec(line);
+    const indent = match ? match[0].length : 0;
+    if (indent < minIndent) minIndent = indent;
+    if (minIndent === 0) break;
+  }
+  if (!Number.isFinite(minIndent) || minIndent === 0) return source;
+  return lines
+    .map((line) => (line.length >= minIndent ? line.slice(minIndent) : line))
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Structural path #1 — markdown H2 delimiters (primary).
 // Every `## <title>` line starts a new page.
 // ---------------------------------------------------------------------------
@@ -481,7 +511,20 @@ export async function parseBriefDocument(opts: {
   const fenceWarning = detectUnclosedFence(source);
   if (fenceWarning) warnings.push(fenceWarning);
 
-  const { body, offset, warning: frontmatterWarning } = stripFrontmatter(source);
+  // UAT (2026-05-03 round-3): normalise whitespace BEFORE structural parse.
+  //   - Replace non-breaking spaces (U+00A0, common from chat copy-paste)
+  //     with regular spaces so [ \t] regexes can match them.
+  //   - Dedent: detect the minimum leading whitespace shared by every
+  //     non-empty line and strip it. Operators frequently paste briefs
+  //     from indented contexts (chat code blocks, formatted docs); the
+  //     uniform indent turns ## headings into body-text-with-leading-space
+  //     that the structural parser silently misses, dropping the operator
+  //     into the single-page fallback. The dedent step is idempotent: a
+  //     brief with no leading whitespace is unchanged.
+  const normalisedSource = dedentSource(source.replace(/ /g, " "));
+
+  const { body, offset, warning: frontmatterWarning } =
+    stripFrontmatter(normalisedSource);
   if (frontmatterWarning) warnings.push(frontmatterWarning);
 
   // Structural-first. Order matters: H2 → H1-fallback → hrule → numbered.
