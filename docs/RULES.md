@@ -70,6 +70,14 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ---
 
+## 9. Never echo env-var values or connection strings to tool output
+
+**Rule.** When a command consumes a value from `.env.local`, env, or any other secret source, it MUST run with stderr redirected to `$null` (PowerShell) / `/dev/null` (bash), and any successful-path output must be filtered to drop the secret before it appears in the conversation transcript. Concretely: pass the value via a variable (never inline it into the visible command), set `2>$null` on the invocation, and if the tool's own success output contains the secret (some CLIs echo what they parsed), additionally pipe through a redactor before printing. The same rule applies to anything that *constructs* a URL from an env value — `Write-Output $env:FOO`, `Write-Host $url`, `console.log(connectionString)` are all banned. If you need to confirm a value is set, print only its length or a SHA-256 prefix, never the value.
+
+**Incident (P1 bootstrap, 2026-05-03).** During the first attempt to apply migration 0074 to the remote project, a PowerShell parsing bug (`.Trim('"').Trim("'")` — only stripped quote characters, not whitespace) left trailing tabs on the value read from `.env.local`. The supabase CLI received `postgresql://user:password@host:6543/postgres\t\t --dry-run`, failed parsing, and echoed the full malformed input (including the live database password) to stderr — which Claude Code captured into the conversation transcript. The credential is now in a chat log Steven controls but couldn't be rotated until P1 finished. Rotation got logged in `docs/BACKLOG.md`. Going forward: every `.env`-consuming invocation gets `2>$null` (or stderr piped through a redactor), values pass via variables that are never `Write-Output`'d, and pre-flight parsing trims with bare `.Trim()` so malformed input fails before reaching the CLI.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.

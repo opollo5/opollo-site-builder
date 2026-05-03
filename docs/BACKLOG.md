@@ -46,6 +46,32 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## Rotate `SUPABASE_DB_URL` database password (opened 2026-05-03 during P1 bootstrap)
+
+**Tags:** `security`, `credentials`, `tech-debt`
+
+**What:** Reset the Supabase project's database password and update every place that holds a copy of the connection string. The current password was exposed in a Claude Code conversation transcript when `supabase db push --db-url $url` failed to parse a malformed value (trailing tabs from a careless `.Trim()` call) and the CLI echoed the full input — including the password — to stderr. The leak is contained to that one conversation log; rotation closes the window before the credential matters externally.
+
+**Why deferred:** Low urgency in the current state — the project is pre-public, no external contributors, no third-party audit access. A panic-rotation today would also block the in-flight P1 push that needs the live URL. Better to land P1, then rotate as a small dedicated chore. Steven explicitly accepted the risk and deferred until go-live.
+
+**Trigger:** Before any of the following — whichever lands first:
+- Go-live (the explicit deferral threshold Steven named).
+- An external contributor (consultant, freelancer, security review) gets repo or transcript access.
+- A Claude Code conversation transcript is exported / shared / archived to a system Steven doesn't fully control.
+- Any indicator the leaked credential has been used (Supabase Dashboard → Database → Connection logs flagging an unfamiliar IP).
+
+**Rough scope:** Small (~30 min):
+1. Supabase Dashboard → Project Settings → Database → "Reset database password". Note the new password.
+2. Update `.env.local` (`SUPABASE_DB_URL=...`).
+3. Update Vercel project env (Production + Preview + Development scopes if all three reference the DB URL).
+4. Redeploy or re-trigger the next deployment so the new value picks up.
+5. Smoke-test: `npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run` returns "Remote database is up to date" (no migrations pending). The cron workers (`/api/cron/*`) and the brief-runner exercise the same connection on their next tick — watch the request-id logs for connection errors.
+6. Delete the leaked transcript / mark it as containing rotated credentials. The string itself is now a deactivated artefact; no further action needed once rotation is complete.
+
+**Out of scope:** The Anon key and Service Role key are separate credentials — rotating them is a much bigger blast radius (every client + every server route reads them). Don't bundle that into this rotation. If those need rotating, treat as its own slice with a coordinated deploy.
+
+---
+
 ## Component test infra — jsdom + @testing-library/react (opened 2026-04-27 by RS-1 / RS-4)
 
 **What:** Add `jsdom` (or `happy-dom`), `@testing-library/react`, and a vitest project split (or `environmentMatchGlobs`) so we can run hook + component tests under `lib/__tests__/` (or a new `components/__tests__/`).
