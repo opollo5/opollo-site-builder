@@ -31,6 +31,8 @@ export type SocialPostsStats = {
   // 7 days (state_changed_at). Useful for the "approved this week"
   // tile.
   approvedThisWeek: number;
+  changesRequested: number;
+  failed: number;
 };
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -45,7 +47,7 @@ export async function getSocialPostsStats(args: {
   const svc = getServiceRoleClient();
   const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS).toISOString();
 
-  // Issue six HEAD counts in parallel. Each query is index-friendly
+  // Issue eight HEAD counts in parallel. Each query is index-friendly
   // (idx_post_master_company_state) and bounded by the company's
   // post volume.
   const counters = await Promise.all([
@@ -55,6 +57,8 @@ export async function getSocialPostsStats(args: {
     countByState(svc, args.companyId, "scheduled"),
     countByState(svc, args.companyId, "published"),
     countApprovedSince(svc, args.companyId, sevenDaysAgo),
+    countByState(svc, args.companyId, "changes_requested"),
+    countByState(svc, args.companyId, "failed"),
   ]);
 
   const errs = counters.filter((c) => c.error);
@@ -68,7 +72,7 @@ export async function getSocialPostsStats(args: {
     );
   }
 
-  const [drafts, awaiting, approved, scheduled, published, approvedRecent] =
+  const [drafts, awaiting, approved, scheduled, published, approvedRecent, changesReq, failed] =
     counters;
 
   return {
@@ -80,6 +84,8 @@ export async function getSocialPostsStats(args: {
       scheduled: scheduled.count,
       published: published.count,
       approvedThisWeek: approvedRecent.count,
+      changesRequested: changesReq.count,
+      failed: failed.count,
     },
     timestamp: new Date().toISOString(),
   };
