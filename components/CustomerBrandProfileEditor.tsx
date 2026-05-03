@@ -6,13 +6,23 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eyebrow, H1, Lead } from "@/components/ui/typography";
+// Value imports come directly from the sub-path. Importing them from
+// the `@/lib/platform/brand` barrel would pull `./get` and `./update`
+// (both `import "server-only"`) into the client bundle via the
+// barrel's re-exports — even mixed-syntax `import { type X, value }`
+// triggers module evaluation — and the build fails with
+// "You're importing a component that needs server-only".
+// Types are still routed through the barrel because `import type`
+// erases at build time and never triggers module evaluation.
 import {
-  type BrandFormality,
-  type BrandPov,
-  type BrandProfile,
   brandTierDescription,
   brandTierLabel,
   getBrandTier,
+} from "@/lib/platform/brand/completion";
+import type {
+  BrandFormality,
+  BrandPov,
+  BrandProfile,
 } from "@/lib/platform/brand";
 import type { PlatformCompany } from "@/lib/platform/companies";
 
@@ -34,7 +44,7 @@ type Props = {
   brand: BrandProfile | null;
 };
 
-type FormState = {
+export type FormState = {
   primary_colour: string;
   secondary_colour: string;
   accent_colour: string;
@@ -71,7 +81,8 @@ function initialState(brand: BrandProfile | null): FormState {
 // Build the patch payload — only include fields whose value differs
 // from the current brand. Empty string is sent as null (operator
 // clearing a value); unchanged fields are dropped from the patch.
-function buildPatch(
+// Exported for unit tests; the component is the only runtime caller.
+export function buildPatch(
   state: FormState,
   brand: BrandProfile | null,
 ): Record<string, unknown> {
