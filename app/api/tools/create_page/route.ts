@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
+import { readJsonBody, validationError } from "@/lib/http";
 import { executeCreatePage } from "@/lib/create-page";
 import {
   checkRateLimit,
@@ -18,12 +19,8 @@ export async function POST(req: Request) {
   const rl = await checkRateLimit("tools", rlId);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
 
   const result = await executeCreatePage(body);
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
