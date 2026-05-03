@@ -487,7 +487,7 @@ Reports live at:
 #### Security / auth tightening (next security review pass)
 
 - **[M15-4 #3] `tools/*` write routes have no session requirement.** `tools/publish_page`, `tools/update_page`, `tools/delete_page` are reachable with just a rate-limit token. M15-7 Phase 3b (#134) pinned current behaviour in tests; when auth gets tightened, tests will need to update. Scope: add `requireAdminForApi(['admin', 'operator'])` to the three write routes + refresh the tests.
-- **[M15-4 #8] 6 public GET routes have no route-level auth gate.** `sites/list`, `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`, `design-systems/[id]/preview` rely entirely on middleware. Defense-in-depth gap. Scope: add `requireAdminForApi()` to each; cost is one import + one check per route.
+- ~~**[M15-4 #8] 6 public GET routes have no route-level auth gate.**~~ Fixed 2026-05-03 — added `requireAdminForApi(["super_admin","admin"])` to GET handlers in `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`. `sites/list` and `design-systems/[id]/preview` already had gates per PLATFORM-AUDIT PR3 (#386).
 - **[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.** Direct POST outside the chat flow → executor uses empty AsyncLocalStorage context. Needs verification that direct calls fail safely. Scope: either (a) remove the tools routes if only used internally by chat, or (b) seed context from the request body's `site_id`.
 - **[M15-5 #12] `image_usage` RLS excludes `viewer` role.** Asymmetry vs `image_library` + `image_metadata`. Check if intentional; if so, comment the migration; if not, align the policy.
 
