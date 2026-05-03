@@ -132,7 +132,15 @@ export default async function SiteDetailPage({
   // site surface but only admins edit caps. The badge itself is
   // visible to operators for budget self-diagnosis.
   const tenantBudget = await getTenantBudget(site.id);
-  const isAdmin = access.user?.role === "admin" || access.user === null;
+  // Migration 0057 collapsed the legacy {admin, operator, viewer} tiers
+  // into {super_admin, admin, user}. The trusted-operator gate must
+  // include BOTH super_admin AND admin (UAT 2026-05-03 — super_admin
+  // hi@opollo.com was missing every isAdmin-gated UI control on this
+  // page, including the Budget edit button).
+  const isAdmin =
+    access.user?.role === "admin" ||
+    access.user?.role === "super_admin" ||
+    access.user === null;
 
   // M12-1 — briefs list. Empty for sites that haven't uploaded one yet.
   const briefsResult = await listSiteBriefs(site.id);
