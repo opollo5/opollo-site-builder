@@ -522,16 +522,33 @@ export async function parseBriefDocument(opts: {
   // first non-empty line trimmed to 60 chars, else "Untitled page".
   // Mode is short_brief vs full_text per the same word-count threshold
   // as the structural path.
+  //
+  // UAT round-3 polish (2026-05-03): when the single-page fallback fires,
+  // strip the noisy tier-2 (Claude inference) warnings. Those warnings
+  // describe partial failures of an earlier tier whose output we just
+  // discarded; surfacing them on the review page makes the review look
+  // alarmist when the final result is fine. Keep only structural-parser
+  // warnings (tier 1) and append the single-page fallback note.
   const trimmed = source.trim();
   if (trimmed.length > 0) {
     const inferredTitle = inferTitleFromBlob(trimmed);
     const wordCount = countWords(trimmed);
     const mode: BriefPageMode =
       wordCount >= FULL_TEXT_WORD_THRESHOLD ? "full_text" : "short_brief";
+    // Strip tier-2 inference warnings — the inference output didn't land,
+    // its warnings are noise on the operator-visible review page.
+    const inferenceWarningCodes: ReadonlyArray<ParserWarning["code"]> = [
+      "INFERENCE_ENTRY_DROPPED",
+    ];
+    for (let i = warnings.length - 1; i >= 0; i--) {
+      if (inferenceWarningCodes.includes(warnings[i].code)) {
+        warnings.splice(i, 1);
+      }
+    }
     warnings.push({
       code: "HEADING_HIERARCHY_SKIPPED",
       detail:
-        "Structural parser + Claude inference both failed to find page boundaries. Treated the whole document as a single page.",
+        "No page boundaries were detected, so the whole document was treated as a single page. You can rename this page on the review form before committing.",
     });
     logger.info("brief-parser.single_page_fallback", {
       brief_id: briefId,
