@@ -9,18 +9,16 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-10-cancel-approval
-- Slice: S1-10 — admin cancel-approval flow (write-safety hotspot). Migration 0073 adds a transactional cancel_post_approval Postgres function: revoke open request + bounce post pending_client_approval → draft + write a 'revoked' event row, all atomic. Route POST /api/platform/social/posts/[id]/cancel-approval gated by canDo(edit_post). Detail page button visible when post in pending_client_approval + permission.
+- Branch: feat/s1-11-dashboard-stats
+- Slice: S1-11 — social posts dashboard quick-stats. lib/platform/social/posts/dashboard.ts with getSocialPostsStats() (six HEAD counts via parallel index-friendly queries). SocialPostsDashboardCard.tsx renders six clickable tiles linking to the filtered list. /company landing converted from a redirect to a real dashboard.
 - Files claimed:
-  - supabase/migrations/0073_cancel_post_approval_fn.sql (new)
-  - supabase/rollbacks/0073_cancel_post_approval_fn.down.sql (new)
-  - lib/platform/social/posts/transitions.ts (extend with cancelApprovalRequest)
-  - lib/platform/social/posts/index.ts (re-export)
-  - app/api/platform/social/posts/[id]/cancel-approval/route.ts (new)
-  - components/SocialPostDetailClient.tsx (Cancel approval button + reason prompt)
-  - lib/__tests__/social-post-transitions.test.ts (extend with cancel coverage)
+  - lib/platform/social/posts/dashboard.ts (new)
+  - lib/platform/social/posts/index.ts (re-export getSocialPostsStats)
+  - components/SocialPostsDashboardCard.tsx (new)
+  - app/company/page.tsx (real dashboard; replaces redirect)
+  - lib/__tests__/social-posts-dashboard.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
-- Migration number reserved: 0073.
+- Migration number reserved: none.
 - Expected completion: same session.
 ---
 

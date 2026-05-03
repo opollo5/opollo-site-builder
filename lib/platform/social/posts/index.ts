@@ -1,4 +1,5 @@
 export { createPostMaster } from "./create";
+export { getSocialPostsStats, type SocialPostsStats } from "./dashboard";
 export { deletePostMaster } from "./delete";
 export { getPostMaster } from "./get";
 export { listPostMasters } from "./list";
