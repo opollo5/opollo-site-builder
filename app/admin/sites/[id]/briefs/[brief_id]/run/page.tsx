@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { BriefCommitWaiter } from "@/components/BriefCommitWaiter";
 import { BriefRunClient } from "@/components/BriefRunClient";
 import {
   estimateBriefRunCost,
@@ -84,9 +85,18 @@ export default async function BriefRunPage({
   }
 
   if (brief.status !== "committed") {
-    // The run surface is only meaningful once the brief is committed.
-    // Bounce the operator back to the review surface where they can
-    // commit.
+    // UAT (2026-05-03 round-3): replaced the static "isn't committed
+    // yet" panel with a client-side polling waiter. Even with the
+    // server-side visibility wait in /api/briefs/[brief_id]/commit,
+    // Vercel may route this server render to a different serverless
+    // instance whose connection pool hasn't yet seen the COMMIT —
+    // operators saw the panel for several seconds and were confused
+    // because they had JUST clicked Commit. The waiter polls the
+    // snapshot endpoint until status='committed' is visible (up to
+    // 30s) and then router.refresh()'es into the run UI. The
+    // exhaustion path falls through to a clearer "couldn't verify the
+    // commit" message + back-to-review link, replacing the prior
+    // panel's role.
     return (
       <main className="mx-auto max-w-5xl p-6">
         <Breadcrumbs
@@ -97,21 +107,10 @@ export default async function BriefRunPage({
             { label: brief.title },
           ]}
         />
-        <div
-          role="status"
-          className="mt-6 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200"
-        >
-          <p className="font-medium">This brief isn&apos;t committed yet.</p>
-          <p className="mt-1">
-            <a
-              className="underline hover:no-underline"
-              href={`/admin/sites/${site.id}/briefs/${brief.id}/review`}
-            >
-              Review and commit
-            </a>{" "}
-            before starting a generation run.
-          </p>
-        </div>
+        <BriefCommitWaiter
+          briefId={brief.id}
+          reviewUrl={`/admin/sites/${site.id}/briefs/${brief.id}/review`}
+        />
       </main>
     );
   }
