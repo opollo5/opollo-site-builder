@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { timingSafeEqual } from "node:crypto";
 
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -100,12 +101,8 @@ export async function POST(req: Request): Promise<NextResponse> {
     return jsonError("UNAUTHORIZED", "Invalid emergency key.", 401);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
