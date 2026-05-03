@@ -653,10 +653,13 @@ export function BriefReviewClient({
           <Button
             type="button"
             variant="default"
-            onClick={() => setCommitState("confirming")}
-            disabled={sortedPages.length === 0}
+            onClick={() => void handleCommit()}
+            disabled={
+              sortedPages.length === 0 || commitState === "committing"
+            }
+            data-testid="brief-review-commit-button"
           >
-            Commit page list
+            {commitState === "committing" ? "Committing…" : "Commit page list"}
           </Button>
         </div>
       )}
@@ -667,14 +670,16 @@ export function BriefReviewClient({
           === "committed". The committed state still exists in the DB —
           just no UI surface for it on this page. */}
 
-      {commitState === "confirming" && (
-        <CommitConfirmModal
-          pageCount={sortedPages.length}
-          firstPageTitle={sortedPages[0]?.title ?? ""}
-          onCancel={() => setCommitState("idle")}
-          onConfirm={handleCommit}
-        />
-      )}
+      {/* UAT (2026-05-03 round-3): the CommitConfirmModal was removed
+          because it was a low-value double-confirm — operators clicked
+          "Commit page list" twice (button → modal → inner button) for
+          every routine commit. The modal component is kept defined
+          below for future use behind a high-cost gate, but never
+          rendered today. The handleCommit POST → /api/.../commit fires
+          directly from the Commit button. M12-4 risk-15 confirmation
+          (CONFIRMATION_REQUIRED on cost > 50% remaining) is still
+          enforced server-side and surfaced on the run page when it
+          fires. */}
     </div>
   );
 }
