@@ -5,6 +5,7 @@ export {
   type RecordDecisionInput,
   type RecordDecisionResult,
 } from "./decisions";
+export { listApprovalEvents, type ApprovalEvent } from "./events";
 export {
   addRecipient,
   listRecipients,

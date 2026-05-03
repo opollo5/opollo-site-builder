@@ -1,13 +1,23 @@
 import { notFound, redirect } from "next/navigation";
 
 import { PostApprovalSection } from "@/components/PostApprovalSection";
+import { PostDecisionsAudit } from "@/components/PostDecisionsAudit";
 import { PostVariantsSection } from "@/components/PostVariantsSection";
 import { SocialPostDetailClient } from "@/components/SocialPostDetailClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
-import { listRecipients } from "@/lib/platform/social/approvals";
+import {
+  listApprovalEvents,
+  listRecipients,
+} from "@/lib/platform/social/approvals";
 import { getPostMaster } from "@/lib/platform/social/posts";
 import { listVariants } from "@/lib/platform/social/variants";
 import { getServiceRoleClient } from "@/lib/supabase";
+
+const POST_DECISION_STATES = new Set([
+  "approved",
+  "rejected",
+  "changes_requested",
+]);
 
 // ---------------------------------------------------------------------------
 // S1-3 — customer post detail at /company/social/posts/[id].
@@ -102,6 +112,30 @@ export default async function CompanySocialPostDetailPage({
     }
   }
 
+  // S1-8: when the post is in a post-decision state, surface the
+  // audit trail of reviewer responses. Resolve the most recent
+  // approval_request for the post (could be revoked, finalised, or
+  // expired — any of those are valid for showing the audit).
+  let auditEvents: Awaited<ReturnType<typeof listApprovalEvents>> | null = null;
+  const isPostDecision = POST_DECISION_STATES.has(postResult.data.state);
+  if (isPostDecision) {
+    const svc = getServiceRoleClient();
+    const lastRequest = await svc
+      .from("social_approval_requests")
+      .select("id")
+      .eq("post_master_id", postResult.data.id)
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!lastRequest.error && lastRequest.data) {
+      auditEvents = await listApprovalEvents({
+        approvalRequestId: lastRequest.data.id as string,
+        companyId,
+      });
+    }
+  }
+
   return (
     <>
       <SocialPostDetailClient
@@ -126,6 +160,9 @@ export default async function CompanySocialPostDetailPage({
           initialApprovalRequestId={approvalRequestId}
           canManage={canSubmit && isPendingApproval}
         />
+      ) : null}
+      {isPostDecision && auditEvents?.ok ? (
+        <PostDecisionsAudit events={auditEvents.data.events} />
       ) : null}
     </>
   );

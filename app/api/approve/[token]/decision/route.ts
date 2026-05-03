@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { logger } from "@/lib/logger";
+import { dispatch } from "@/lib/platform/notifications";
 import { recordApprovalDecision } from "@/lib/platform/social/approvals";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // S1-7 — POST /api/approve/[token]/decision
@@ -102,6 +105,44 @@ export async function POST(
       result.error.message,
       statusForCode(result.error.code),
     );
+  }
+
+  // Notify the submitter + company admins when the decision finalises
+  // the request. For all_must partial approvals (finalised=false) we
+  // hold notifications until the rule is satisfied — the in-progress
+  // state isn't actionable and we'd otherwise spam the submitter on
+  // every reviewer's individual approval.
+  //
+  // Best-effort: lookup + dispatch failures are logged but never
+  // propagate back into the response. The decision itself has
+  // already been committed and the recipient should see success.
+  if (result.data.finalised) {
+    try {
+      const svc = getServiceRoleClient();
+      const post = await svc
+        .from("social_post_master")
+        .select("company_id, created_by")
+        .eq("id", result.data.postId)
+        .maybeSingle();
+      if (post.error || !post.data) {
+        logger.warn("social.approvals.decisions.notify.post_lookup_failed", {
+          err: post.error?.message,
+          post_id: result.data.postId,
+        });
+      } else if (post.data.created_by) {
+        await dispatch({
+          event: "approval_decided",
+          companyId: post.data.company_id as string,
+          postMasterId: result.data.postId,
+          submitterUserId: post.data.created_by as string,
+          decision: parsed.data.decision,
+        });
+      }
+    } catch (err) {
+      logger.warn("social.approvals.decisions.notify.dispatch_failed", {
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   return NextResponse.json(
