@@ -62,8 +62,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (gate.kind === "deny") return gate.response;
 
   const rl = await checkRateLimit("cap_generate", `company:${companyId}`);
-  if (rateLimitExceeded(rl)) {
-    return errorJson("RATE_LIMITED", "CAP generation limit reached. Maximum 10 generations per 24 hours per company.", 429);
+  if (!rl.ok) {
+    return rateLimitExceeded(rl);
   }
 
   logger.info("cap.generate.route.start", { companyId, count, platforms, userId: gate.userId });
