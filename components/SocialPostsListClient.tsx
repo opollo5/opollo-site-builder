@@ -56,9 +56,12 @@ const FILTER_TABS: Array<{ key: "all" | SocialPostState; label: string }> = [
   { key: "all", label: "All" },
   { key: "draft", label: "Drafts" },
   { key: "pending_client_approval", label: "Awaiting approval" },
+  { key: "changes_requested", label: "Changes requested" },
   { key: "approved", label: "Approved" },
   { key: "scheduled", label: "Scheduled" },
   { key: "published", label: "Published" },
+  { key: "failed", label: "Failed" },
+  { key: "rejected", label: "Rejected" },
 ];
 
 export function SocialPostsListClient({
