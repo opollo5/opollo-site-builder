@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { PostApprovalSection } from "@/components/PostApprovalSection";
 import { PostDecisionsAudit } from "@/components/PostDecisionsAudit";
+import { PostScheduleSection } from "@/components/PostScheduleSection";
 import { PostVariantsSection } from "@/components/PostVariantsSection";
 import { SocialPostDetailClient } from "@/components/SocialPostDetailClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
@@ -10,6 +11,7 @@ import {
   listRecipients,
 } from "@/lib/platform/social/approvals";
 import { getPostMaster } from "@/lib/platform/social/posts";
+import { listScheduleEntries } from "@/lib/platform/social/scheduling";
 import { listVariants } from "@/lib/platform/social/variants";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -61,12 +63,14 @@ export default async function CompanySocialPostDetailPage({
 
   const companyId = session.company.companyId;
 
-  const [postResult, variantsResult, canEdit, canSubmit] = await Promise.all([
-    getPostMaster({ postId: id, companyId }),
-    listVariants({ postMasterId: id, companyId }),
-    canDo(companyId, "edit_post"),
-    canDo(companyId, "submit_for_approval"),
-  ]);
+  const [postResult, variantsResult, canEdit, canSubmit, canSchedule] =
+    await Promise.all([
+      getPostMaster({ postId: id, companyId }),
+      listVariants({ postMasterId: id, companyId }),
+      canDo(companyId, "edit_post"),
+      canDo(companyId, "submit_for_approval"),
+      canDo(companyId, "schedule_post"),
+    ]);
 
   if (!postResult.ok) {
     if (postResult.error.code === "NOT_FOUND") notFound();
@@ -164,6 +168,33 @@ export default async function CompanySocialPostDetailPage({
       {isPostDecision && auditEvents?.ok ? (
         <PostDecisionsAudit events={auditEvents.data.events} />
       ) : null}
+      {postResult.data.state === "approved"
+        ? await renderScheduleSection({
+            postId: postResult.data.id,
+            companyId,
+            canSchedule,
+          })
+        : null}
     </>
+  );
+}
+
+async function renderScheduleSection(args: {
+  postId: string;
+  companyId: string;
+  canSchedule: boolean;
+}) {
+  const entries = await listScheduleEntries({
+    postMasterId: args.postId,
+    companyId: args.companyId,
+  });
+  if (!entries.ok) return null;
+  return (
+    <PostScheduleSection
+      postId={args.postId}
+      companyId={args.companyId}
+      initialEntries={entries.data.entries}
+      canSchedule={args.canSchedule}
+    />
   );
 }

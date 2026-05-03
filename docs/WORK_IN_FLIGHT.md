@@ -9,14 +9,15 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-12-connections-list
-- Slice: S1-12 — social connections list page. lib/platform/social/connections {list, types}.ts reads social_connections rows. Route GET /api/platform/social/connections gated by view_calendar. Page /company/social/connections shows platform + display_name + status + connected_at. Admin-only Reconnect button is a stub (toast); bundle.social OAuth flow lands in S1-13.
+- Branch: feat/s1-14-schedule-entries
+- Slice: S1-14 — schedule entries (L3 layer). lib + route + UI for createScheduleEntry / listScheduleEntries / cancelScheduleEntry. State guard: only approved posts. Auto-creates social_post_variant row if missing. No bundle.social dependency — QStash enqueue + publish-handler land in S1-15+.
 - Files claimed:
-  - lib/platform/social/connections/{types,list,index}.ts (new)
-  - app/api/platform/social/connections/route.ts (new)
-  - app/company/social/connections/page.tsx (new)
-  - components/SocialConnectionsList.tsx (new)
-  - lib/__tests__/social-connections.test.ts (new)
+  - lib/platform/social/scheduling/{types,create,list,cancel,index}.ts (new)
+  - app/api/platform/social/posts/[id]/schedule/route.ts (new)
+  - app/api/platform/social/posts/[id]/schedule/[entry_id]/route.ts (new)
+  - components/PostScheduleSection.tsx (new)
+  - app/company/social/posts/[id]/page.tsx (wire schedule section)
+  - lib/__tests__/social-scheduling.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none.
 - Expected completion: same session.
