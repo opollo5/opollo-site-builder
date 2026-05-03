@@ -446,9 +446,9 @@ Captured during UAT prep in parallel with M15-7. Deferred to avoid collision in 
 
 Verified 2026-04-29: the post-commit panel in `BriefReviewClient.tsx` (~line 573) already renders user-friendly copy ("This brief is committed. You're ready to run the generator…") with two CTAs ("Back to briefs", "Open run surface →"). The dead-end + M12-5 jargon described in the original entry was fixed during M12-5 itself; the BACKLOG entry slipped through unmarked. Stale header comment updated in the same audit pass.
 
-## M12-6 — Save-Draft persistence for briefs review
+## ~~M12-6 — Save-Draft persistence for briefs review~~ (shipped 2026-05-03)
 
-Surfaced by the `fix(e2e)` slice (2026-04-24). The M12-1 slice plan §6.2 called for a "Save draft" button that persists `brief_pages` edits under `version_lock` before commit. That button was never implemented — the commit endpoint therefore 409s on any edit-then-commit flow because the client's hash is computed from in-memory edits while the server recomputes from unedited DB rows. The happy-path E2E in `e2e/briefs-review.spec.ts` is `test.fixme`'d until this lands. Pick up trigger: M12-6 starts. Scope: new `PATCH /api/briefs/[brief_id]/pages` endpoint + "Save draft" button wired into `BriefReviewClient.tsx` + re-enable the fixme'd test.
+PATCH endpoint at `app/api/briefs/[brief_id]/pages/route.ts` + "Save draft" button wired in `components/BriefReviewClient.tsx`. Fixed version_lock bug (`brief.version_lock` prop → `latestBrief.version_lock` state). E2E happy-path test re-enabled (commit confirm modal removed UAT 2026-05-03).
 
 ---
 
@@ -524,7 +524,7 @@ Reports live at:
   - `admin/sites/[id]/pages/[pageId]` PATCH
 - **[M15-6 #13] 6 of 7 tool JSON schemas untested.** `lib/tool-schemas.ts` — `searchImagesJsonSchema` tested; others aren't. Scope: parametric tests across all 7.
 - **[M15-6 #14] Tool lib implementations untested.** `lib/create-page.ts`, `lib/update-page.ts`, `lib/delete-page.ts`, `lib/get-page.ts`, `lib/list-pages.ts`, `lib/publish-page.ts`. M15-7 Phase 3b (#134) pins delegation at the route layer; the libs themselves wrap WP + Supabase calls with no dedicated tests. Scope: 2-3 hours per lib.
-- **[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.** Blocked on M12-6 save-draft. Re-enable when M12-6 lands.
+- ~~**[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.**~~ Shipped in M12-6 (2026-05-03).
 - **[M15-6 #17] `health-route.test.ts` only covers happy path.** Degraded branches untested. Scope: 1 hour.
 
 #### Tech-debt (bundled cleanup, no urgency)
