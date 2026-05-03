@@ -137,6 +137,7 @@ export const defaultAnthropicCall: AnthropicCallFn = async (req) => {
       },
       {
         headers: { "Idempotency-Key": req.idempotency_key },
+        signal: AbortSignal.timeout(60_000),
       },
     );
   } catch (err) {

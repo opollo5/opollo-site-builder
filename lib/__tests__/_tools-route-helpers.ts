@@ -21,8 +21,8 @@ export function makeJsonRequest(
 }
 
 /**
- * Build a POST Request whose body is NOT valid JSON.  The route's try/catch
- * around req.json() should fall back to `{}` and forward that to the executor.
+ * Build a POST Request whose body is NOT valid JSON.  Routes using readJsonBody
+ * will return 400 VALIDATION_FAILED before calling the executor.
  */
 export function makeMalformedRequest(
   url = "http://localhost:3000/api/tools/test",

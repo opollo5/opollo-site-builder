@@ -486,7 +486,7 @@ Reports live at:
 
 #### Security / auth tightening (next security review pass)
 
-- **[M15-4 #3] `tools/*` write routes have no session requirement.** `tools/publish_page`, `tools/update_page`, `tools/delete_page` are reachable with just a rate-limit token. M15-7 Phase 3b (#134) pinned current behaviour in tests; when auth gets tightened, tests will need to update. Scope: add `requireAdminForApi(['admin', 'operator'])` to the three write routes + refresh the tests.
+- ~~**[M15-4 #3] `tools/*` write routes have no session requirement.**~~ Fixed 2026-05-03 — `requireAdminForApi` added to `publish_page`, `update_page`, `delete_page`; tests updated; malformed-JSON now returns 400 instead of forwarding `{}` to executor.
 - **[M15-4 #8] 6 public GET routes have no route-level auth gate.** `sites/list`, `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`, `design-systems/[id]/preview` rely entirely on middleware. Defense-in-depth gap. Scope: add `requireAdminForApi()` to each; cost is one import + one check per route.
 - **[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.** Direct POST outside the chat flow → executor uses empty AsyncLocalStorage context. Needs verification that direct calls fail safely. Scope: either (a) remove the tools routes if only used internally by chat, or (b) seed context from the request body's `site_id`.
 - **[M15-5 #12] `image_usage` RLS excludes `viewer` role.** Asymmetry vs `image_library` + `image_metadata`. Check if intentional; if so, comment the migration; if not, align the policy.
@@ -494,7 +494,7 @@ Reports live at:
 #### Observability + write-safety hygiene (next defense-in-depth slice)
 
 - ~~**[M15-4 #5] `retryable: true` on VALIDATION_FAILED in 5 routes.**~~ Fixed 2026-04-29 — flipped to `retryable: false` in admin/images/[id], admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId], admin/users/invite, admin/users/[id]/role. Migration to `lib/http.validationError()` deferred to M15-4 #14 tech-debt cleanup.
-- **[M15-4 #6] No timeouts on external-call fetches** anywhere in the codebase (only `Sentry.flush(5000)` exists). Hanging Anthropic/WP/Supabase/Upstash drains function pool. Scope: `withTimeout(promise, ms)` helper in `lib/http.ts`; wrap external calls. Suggested initial values: Anthropic 60s, WordPress 30s, Cloudflare 30s, Supabase 15s.
+- ~~**[M15-4 #6] No timeouts on external-call fetches.**~~ Partially fixed 2026-05-03: `withTimeout<T>` helper added to `lib/http.ts`; `AbortSignal.timeout(60_000)` wired into `lib/anthropic-call.ts`; `AbortSignal.timeout(30_000)` wired into `lib/wordpress.ts` `wpFetch`. Cloudflare and Supabase deferred — Cloudflare calls are async upload returns, Supabase client manages its own pool.
 - **[M15-4 #7] ~15 routes still have no structured logging.** Partial coverage via #132 (9 routes + 2 libs). Remaining: admin/batch POST, admin/images/[id] restore, admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId] and its regenerate, auth/callback, design-systems/*, sites/register, sites/[id], sites/[id]/design-systems, sites/list, tools/* (all 7). Scope: add `logger.error()` on every error-return path; incremental, one route at a time.
 - **[M15-4 #12] Malformed JSON behavior inconsistent.** Old pattern (`try { body = req.json() } catch { body = {} }`) gives confusing "missing field" error; new pattern (`lib/http.readJsonBody`) gives clear "Request body must be valid JSON." Migration incomplete. Scope: migrate old-pattern routes to `readJsonBody` + `parseBodyWith`.
 
