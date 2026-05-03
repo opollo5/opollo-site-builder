@@ -225,3 +225,148 @@ function internal(message: string): ApiResponse<SubmitForApprovalResult> {
     timestamp: new Date().toISOString(),
   };
 }
+
+// ---------------------------------------------------------------------------
+// S1-9 — reopen a `changes_requested` post for editing.
+//
+// Flips state changes_requested → draft so the editor can revise and
+// re-submit. The originating approval_request stays in its finalised
+// state — its snapshot + events are preserved as the audit trail. The
+// editor's next submitForApproval will mint a fresh approval_request.
+//
+// Atomic single-row UPDATE with predicate (`state = 'changes_requested'`)
+// — concurrent reopens converge: one transitions, the others see 0
+// rows updated and return INVALID_STATE.
+//
+// Caller is responsible for canDo("edit_post", company_id).
+// ---------------------------------------------------------------------------
+
+export type ReopenForEditingResult = {
+  postId: string;
+  postState: "draft";
+};
+
+export async function reopenForEditing(args: {
+  postId: string;
+  companyId: string;
+}): Promise<ApiResponse<ReopenForEditingResult>> {
+  if (!args.postId) {
+    return reopenValidation("Post id is required.");
+  }
+  if (!args.companyId) {
+    return reopenValidation("Company id is required.");
+  }
+
+  const svc = getServiceRoleClient();
+
+  // Atomic predicate-guarded UPDATE. If the post moved out of
+  // changes_requested between client-side click and our UPDATE, we
+  // return 0 rows and surface INVALID_STATE rather than clobbering
+  // the now-current state.
+  const update = await svc
+    .from("social_post_master")
+    .update({ state: "draft" })
+    .eq("id", args.postId)
+    .eq("company_id", args.companyId)
+    .eq("state", "changes_requested")
+    .select("id, state")
+    .maybeSingle();
+
+  if (update.error) {
+    logger.error("social.posts.reopen.failed", {
+      err: update.error.message,
+      code: update.error.code,
+      post_id: args.postId,
+    });
+    return reopenInternal(`Failed to reopen post: ${update.error.message}`);
+  }
+
+  if (!update.data) {
+    // Either the post doesn't exist in this company OR it's not in
+    // changes_requested. Disambiguate via a follow-up read so the
+    // caller gets a useful envelope.
+    const lookup = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", args.postId)
+      .eq("company_id", args.companyId)
+      .maybeSingle();
+    if (lookup.error) {
+      return reopenInternal(`Lookup failed: ${lookup.error.message}`);
+    }
+    if (!lookup.data) {
+      return reopenNotFound();
+    }
+    return reopenInvalidState(
+      `Post is in '${lookup.data.state}', not 'changes_requested'. Only changes_requested posts can be reopened for editing.`,
+    );
+  }
+
+  return {
+    ok: true,
+    data: {
+      postId: update.data.id as string,
+      postState: "draft",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function reopenValidation(
+  message: string,
+): ApiResponse<ReopenForEditingResult> {
+  return {
+    ok: false,
+    error: {
+      code: "VALIDATION_FAILED",
+      message,
+      retryable: false,
+      suggested_action: "Fix the input and resubmit.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function reopenNotFound(): ApiResponse<ReopenForEditingResult> {
+  return {
+    ok: false,
+    error: {
+      code: "NOT_FOUND",
+      message: "No post with that id in this company.",
+      retryable: false,
+      suggested_action: "Check the post id.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function reopenInvalidState(
+  message: string,
+): ApiResponse<ReopenForEditingResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INVALID_STATE",
+      message,
+      retryable: false,
+      suggested_action:
+        "Reload the page; another user may have already moved this post.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
+function reopenInternal(
+  message: string,
+): ApiResponse<ReopenForEditingResult> {
+  return {
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message,
+      retryable: false,
+      suggested_action: "Retry. If the error persists, contact support.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}

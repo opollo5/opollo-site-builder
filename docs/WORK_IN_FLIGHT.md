@@ -9,15 +9,14 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-8-decision-notifications
-- Slice: S1-8 — close the loop on the approval flow. Dispatch approval_decided notification (email + in_app to submitter + admins) when a decision finalises the request. Sender-side audit trail of decisions on the post detail page when the post is in approved/rejected/changes_requested.
+- Branch: feat/s1-9-reopen-for-editing
+- Slice: S1-9 — reopen-for-editing flow. lib reopenForEditing flips changes_requested → draft via atomic predicate-guarded UPDATE. Route POST /api/platform/social/posts/[id]/reopen gated by canDo(edit_post). Detail page Reopen button visible only when state=changes_requested + permission.
 - Files claimed:
-  - lib/platform/social/approvals/events/{list,index}.ts (new)
-  - lib/platform/social/approvals/index.ts (re-export listApprovalEvents)
-  - app/api/approve/[token]/decision/route.ts (best-effort dispatch on finalised=true)
-  - components/PostDecisionsAudit.tsx (new)
-  - app/company/social/posts/[id]/page.tsx (wire audit section)
-  - lib/__tests__/social-approval-events.test.ts (new)
+  - lib/platform/social/posts/transitions.ts (extend with reopenForEditing)
+  - lib/platform/social/posts/index.ts (re-export reopenForEditing)
+  - app/api/platform/social/posts/[id]/reopen/route.ts (new)
+  - components/SocialPostDetailClient.tsx (Reopen button)
+  - lib/__tests__/social-post-transitions.test.ts (extend with reopen coverage)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none.
 - Expected completion: same session.
