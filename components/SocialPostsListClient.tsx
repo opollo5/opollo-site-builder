@@ -38,10 +38,13 @@ type FilterKey = "all" | SocialPostState;
 type SortCol = "state_changed_at" | "created_at";
 type SortDir = "asc" | "desc";
 
+type RowActionKind = "approving" | "rejecting" | "requesting";
+
 type Props = {
   companyId: string;
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
+  canApprove?: boolean;
   initialQ?: string;
   initialState?: FilterKey;
   page?: number;
@@ -129,6 +132,7 @@ export function SocialPostsListClient({
   companyId,
   initialPosts,
   canCreate,
+  canApprove = false,
   initialQ = "",
   initialState = "all",
   page = 1,
@@ -149,6 +153,7 @@ export function SocialPostsListClient({
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState(initialQ);
   const searchRef = useRef<HTMLInputElement>(null);
+  const [rowActions, setRowActions] = useState<Map<string, RowActionKind>>(new Map());
 
   const total = totalCount ?? posts.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -216,6 +221,55 @@ export function SocialPostsListClient({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleRowAction(
+    postId: string,
+    kind: RowActionKind,
+  ) {
+    if (rowActions.has(postId)) return;
+    const endpoint =
+      kind === "approving"
+        ? "approve"
+        : kind === "rejecting"
+          ? "reject"
+          : "request-changes";
+    setRowActions((prev) => new Map(prev).set(postId, kind));
+    try {
+      const res = await fetch(
+        `/api/platform/social/posts/${postId}/${endpoint}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ company_id: companyId }),
+        },
+      );
+      const json = (await res.json()) as
+        | { ok: true; data: { postState: SocialPostState } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) {
+        setError(!json.ok ? json.error.message : `Failed to ${kind.replace("ing", "")}.`);
+        setRowActions((prev) => {
+          const next = new Map(prev);
+          next.delete(postId);
+          return next;
+        });
+        return;
+      }
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId ? { ...p, state: json.data.postState } : p,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRowActions((prev) => {
+        const next = new Map(prev);
+        next.delete(postId);
+        return next;
+      });
     }
   }
 
@@ -405,6 +459,9 @@ export function SocialPostsListClient({
                     {sortBy === "created_at" ? (sortDir === "desc" ? " ↓" : " ↑") : " ↕"}
                   </button>
                 </th>
+                {canApprove ? (
+                  <th className="px-4 py-2 font-medium">Actions</th>
+                ) : null}
               </tr>
             </thead>
             <tbody>
@@ -461,6 +518,41 @@ export function SocialPostsListClient({
                       minute: "2-digit",
                     })}
                   </td>
+                  {canApprove ? (
+                    <td className="px-4 py-3">
+                      {p.state === "pending_client_approval" ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleRowAction(p.id, "approving")}
+                            disabled={rowActions.has(p.id)}
+                            className="rounded border border-emerald-600 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 transition"
+                            data-testid={`approve-row-${p.id}`}
+                          >
+                            {rowActions.get(p.id) === "approving" ? "…" : "Approve"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRowAction(p.id, "requesting")}
+                            disabled={rowActions.has(p.id)}
+                            className="rounded border border-amber-500 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition"
+                            data-testid={`request-changes-row-${p.id}`}
+                          >
+                            {rowActions.get(p.id) === "requesting" ? "…" : "Changes"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRowAction(p.id, "rejecting")}
+                            disabled={rowActions.has(p.id)}
+                            className="rounded border border-rose-500 px-2 py-0.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 transition"
+                            data-testid={`reject-row-${p.id}`}
+                          >
+                            {rowActions.get(p.id) === "rejecting" ? "…" : "Reject"}
+                          </button>
+                        </div>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

@@ -77,7 +77,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       ? (dirParam as "asc" | "desc")
       : "desc";
 
-  const [postsResult, canCreate] = await Promise.all([
+  const [postsResult, canCreate, canApprove] = await Promise.all([
     listPostMasters({
       companyId,
       q: searchTerm || undefined,
@@ -89,6 +89,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       sortDir,
     }),
     canDo(companyId, "create_post"),
+    canDo(companyId, "approve_post"),
   ]);
 
   if (!postsResult.ok) {
@@ -107,6 +108,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       companyId={companyId}
       initialPosts={postsResult.data.posts}
       canCreate={canCreate}
+      canApprove={canApprove}
       initialQ={searchTerm}
       initialState={stateFilter ?? "all"}
       page={page}
