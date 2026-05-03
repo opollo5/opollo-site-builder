@@ -38,7 +38,8 @@ export type LimiterName =
   | "register"
   | "password_reset"
   | "test_connection"
-  | "auth_2fa";
+  | "auth_2fa"
+  | "csv_upload";
 
 type LimiterConfig = {
   requests: number;
@@ -77,6 +78,10 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // every challenge regardless of which Redis bucket fired); this
   // limiter is the IP-side belt-and-braces.
   auth_2fa: { requests: 5, window: "1 h" },
+  // S7: bulk CSV post upload. 3 uploads/hour/company per the BUILD.md
+  // defaults. Keyed on "company:<uuid>" so different companies don't
+  // share the bucket.
+  csv_upload: { requests: 3, window: "1 h" },
 };
 
 export type RateLimitResult =

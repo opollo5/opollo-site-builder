@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
+import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
 import type {
@@ -127,12 +128,20 @@ export function SocialPostsListClient({
           </Lead>
         </div>
         {canCreate ? (
-          <Button
-            data-testid="new-post-button"
-            onClick={() => setShowCreate((v) => !v)}
-          >
-            {showCreate ? "Cancel" : "New post"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <BulkUploadButton
+              companyId={companyId}
+              onSuccess={(newPosts) =>
+                setPosts((prev) => [...newPosts, ...prev])
+              }
+            />
+            <Button
+              data-testid="new-post-button"
+              onClick={() => setShowCreate((v) => !v)}
+            >
+              {showCreate ? "Cancel" : "New post"}
+            </Button>
+          </div>
         ) : null}
       </div>
 

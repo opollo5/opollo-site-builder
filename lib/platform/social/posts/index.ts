@@ -1,3 +1,10 @@
+export {
+  bulkCreatePostMasters,
+  ROW_LIMIT,
+  type BulkCreateResult,
+  type BulkCsvRow,
+  type BulkRowError,
+} from "./bulk-create";
 export { createPostMaster } from "./create";
 export { duplicatePost } from "./duplicate";
 export { getSocialPostsStats, type SocialPostsStats } from "./dashboard";
