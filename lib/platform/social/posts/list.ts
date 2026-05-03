@@ -21,12 +21,12 @@ import type { ListPostMastersInput, PostMasterListItem } from "./types";
 // than created_at.
 // ---------------------------------------------------------------------------
 
-const DEFAULT_LIMIT = 50;
+const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 200;
 
 export async function listPostMasters(
   input: ListPostMastersInput,
-): Promise<ApiResponse<{ posts: PostMasterListItem[] }>> {
+): Promise<ApiResponse<{ posts: PostMasterListItem[]; totalCount: number }>> {
   if (!input.companyId) {
     return validation("Company id is required.");
   }
@@ -39,6 +39,7 @@ export async function listPostMasters(
     .from("social_post_master")
     .select(
       "id, state, source_type, master_text, link_url, created_by, created_at, updated_at, state_changed_at",
+      input.withCount ? { count: "exact" } : {},
     )
     .eq("company_id", input.companyId)
     .order("state_changed_at", { ascending: false })
@@ -65,7 +66,10 @@ export async function listPostMasters(
 
   return {
     ok: true,
-    data: { posts: (result.data ?? []) as PostMasterListItem[] },
+    data: {
+      posts: (result.data ?? []) as PostMasterListItem[],
+      totalCount: result.count ?? (result.data?.length ?? 0),
+    },
     timestamp: new Date().toISOString(),
   };
 }
@@ -77,7 +81,7 @@ function clamp(value: number, min: number, max: number): number {
 
 function validation(
   message: string,
-): ApiResponse<{ posts: PostMasterListItem[] }> {
+): ApiResponse<{ posts: PostMasterListItem[]; totalCount: number }> {
   return {
     ok: false,
     error: {
@@ -92,7 +96,7 @@ function validation(
 
 function internal(
   message: string,
-): ApiResponse<{ posts: PostMasterListItem[] }> {
+): ApiResponse<{ posts: PostMasterListItem[]; totalCount: number }> {
   return {
     ok: false,
     error: {
