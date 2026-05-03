@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
 import type {
   PostMasterListItem,
+  SocialPostSource,
   SocialPostState,
 } from "@/lib/platform/social/posts";
 
@@ -21,17 +22,26 @@ import type {
 // (master_text + link_url); a richer modal lands when variant /
 // scheduling slices arrive and the form needs more inputs.
 //
-// S1-37 — adds server-side text search via ?q= param. Submitting the
-// search form navigates to ?q=<term> which the page component passes
-// into listPostMasters (ILIKE on master_text). Client-side state
-// filters still apply on top of the server-filtered result set.
+// S1-37 — adds server-side text search via ?q= param.
+// S1-38 — adds ?page=N URL pagination (25 per page, prev/next links).
+// S1-40 — state-filter tabs are now URL-driven via ?state=. Dashboard
+//          tiles that link to ?state=approved etc. now pre-select the
+//          correct tab and the server applies the filter server-side.
+// S1-43 — source badge (CSV / CAP / API) shown under the copy text
+//          for non-manual posts; manual posts show no badge.
 // ---------------------------------------------------------------------------
+
+type FilterKey = "all" | SocialPostState;
 
 type Props = {
   companyId: string;
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
   initialQ?: string;
+  initialState?: FilterKey;
+  page?: number;
+  pageSize?: number;
+  totalCount?: number;
 };
 
 const STATE_PILL: Record<SocialPostState, string> = {
@@ -72,15 +82,48 @@ const FILTER_TABS: Array<{ key: "all" | SocialPostState; label: string }> = [
   { key: "rejected", label: "Rejected" },
 ];
 
+const SOURCE_LABEL: Partial<Record<SocialPostSource, string>> = {
+  csv: "CSV",
+  cap: "CAP",
+  api: "API",
+};
+
+const SOURCE_PILL: Partial<Record<SocialPostSource, string>> = {
+  csv: "bg-violet-100 text-violet-900",
+  cap: "bg-teal-100 text-teal-900",
+  api: "bg-slate-100 text-slate-700",
+};
+
+function buildUrl({
+  page,
+  q,
+  state,
+}: {
+  page: number;
+  q: string;
+  state: FilterKey;
+}): string {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (state !== "all") params.set("state", state);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return `/company/social/posts${qs ? `?${qs}` : ""}`;
+}
+
 export function SocialPostsListClient({
   companyId,
   initialPosts,
   canCreate,
   initialQ = "",
+  initialState = "all",
+  page = 1,
+  pageSize = 25,
+  totalCount,
 }: Props) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
-  const [filter, setFilter] = useState<(typeof FILTER_TABS)[number]["key"]>("all");
+  const [filter, setFilter] = useState<FilterKey>(initialState);
   const [showCreate, setShowCreate] = useState(false);
   const [masterText, setMasterText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
@@ -89,23 +132,32 @@ export function SocialPostsListClient({
   const [searchInput, setSearchInput] = useState(initialQ);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const visible = useMemo(
-    () => (filter === "all" ? posts : posts.filter((p) => p.state === filter)),
-    [posts, filter],
-  );
+  const total = totalCount ?? posts.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
+
+  // State filter is now server-side: posts already contains only the
+  // rows matching the active state tab. `visible` is identical to `posts`.
+  // The memo is kept so existing data-testid consumers still work.
+  const visible = useMemo(() => posts, [posts]);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const term = searchInput.trim();
-    const url = term
-      ? `/company/social/posts?q=${encodeURIComponent(term)}`
-      : "/company/social/posts";
-    router.push(url);
+    router.push(buildUrl({ page: 1, q: term, state: filter }));
   }
 
   function clearSearch() {
     setSearchInput("");
-    router.push("/company/social/posts");
+    router.push(buildUrl({ page: 1, q: "", state: filter }));
+  }
+
+  function handleTabClick(key: FilterKey) {
+    setFilter(key);
+    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: key }));
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -141,18 +193,20 @@ export function SocialPostsListClient({
     }
   }
 
+  const countLabel = initialQ
+    ? `${total} ${total === 1 ? "result" : "results"} for "${initialQ}"`
+    : total === 0
+      ? "No posts yet."
+      : totalPages > 1
+        ? `${from}–${to} of ${total} posts`
+        : `${total} ${total === 1 ? "post" : "posts"}`;
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <H1>Social posts</H1>
-          <Lead className="mt-0.5">
-            {initialQ
-              ? `${posts.length} ${posts.length === 1 ? "result" : "results"} for "${initialQ}".`
-              : posts.length === 0
-                ? "No posts yet."
-                : `${posts.length} ${posts.length === 1 ? "post" : "posts"}.`}
-          </Lead>
+          <Lead className="mt-0.5">{countLabel}</Lead>
         </div>
         {canCreate ? (
           <div className="flex items-center gap-2">
@@ -271,7 +325,7 @@ export function SocialPostsListClient({
           <button
             key={t.key}
             type="button"
-            onClick={() => setFilter(t.key)}
+            onClick={() => handleTabClick(t.key)}
             className={`rounded-full border px-3 py-1 text-sm transition ${
               filter === t.key
                 ? "border-primary bg-primary text-primary-foreground"
@@ -291,10 +345,10 @@ export function SocialPostsListClient({
         {visible.length === 0 ? (
           <div className="p-8 text-center text-sm text-muted-foreground">
             {initialQ
-              ? `No posts found matching "${initialQ}".`
-              : posts.length === 0
-                ? "No posts yet — click New post to draft your first one."
-                : "No posts match this filter."}
+              ? `No posts found matching "${initialQ}"${initialState !== "all" ? ` in this filter` : ""}.`
+              : initialState !== "all"
+                ? "No posts match this filter."
+                : "No posts yet — click New post to draft your first one."}
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -313,16 +367,26 @@ export function SocialPostsListClient({
                   className="border-b last:border-b-0 hover:bg-muted/20"
                   data-testid={`social-post-row-${p.id}`}
                 >
-                  <td className="max-w-md truncate px-4 py-3">
-                    <Link
-                      href={`/company/social/posts/${p.id}`}
-                      className="hover:underline"
-                      data-testid={`social-post-link-${p.id}`}
-                    >
-                      {p.master_text ?? (
-                        <span className="text-muted-foreground">— No copy —</span>
-                      )}
-                    </Link>
+                  <td className="max-w-md px-4 py-3">
+                    <div className="flex flex-col gap-1">
+                      <Link
+                        href={`/company/social/posts/${p.id}`}
+                        className="truncate hover:underline"
+                        data-testid={`social-post-link-${p.id}`}
+                      >
+                        {p.master_text ?? (
+                          <span className="text-muted-foreground">— No copy —</span>
+                        )}
+                      </Link>
+                      {SOURCE_LABEL[p.source_type] ? (
+                        <span
+                          className={`inline-block w-fit rounded px-1.5 py-0.5 text-xs font-medium ${SOURCE_PILL[p.source_type]}`}
+                          data-testid={`social-post-source-${p.id}`}
+                        >
+                          {SOURCE_LABEL[p.source_type]}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="max-w-xs truncate px-4 py-3 text-sm text-muted-foreground">
                     {p.link_url ?? "—"}
@@ -348,6 +412,38 @@ export function SocialPostsListClient({
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 ? (
+        <div
+          className="mt-4 flex items-center justify-between text-sm text-muted-foreground"
+          data-testid="posts-pagination"
+        >
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            {hasPrev ? (
+              <Link
+                href={buildUrl({ page: page - 1, q: initialQ, state: filter })}
+                className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
+                data-testid="posts-pagination-prev"
+              >
+                ← Previous
+              </Link>
+            ) : null}
+            {hasNext ? (
+              <Link
+                href={buildUrl({ page: page + 1, q: initialQ, state: filter })}
+                className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
+                data-testid="posts-pagination-next"
+              >
+                Next →
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
