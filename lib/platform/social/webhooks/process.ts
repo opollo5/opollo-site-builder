@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
+import { dispatch as notifyDispatch } from "@/lib/platform/notifications";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 import {
@@ -206,12 +207,22 @@ async function handlePostEvent(
   const now = new Date().toISOString();
   const variantLookup = await svc
     .from("social_post_variant")
-    .select("post_master_id")
+    .select("post_master_id, platform")
     .eq("id", attempt.data.post_variant_id)
     .maybeSingle();
   const masterId =
     (variantLookup.data?.post_master_id as string | undefined) ??
     "00000000-0000-0000-0000-000000000000";
+  const variantPlatform = (variantLookup.data?.platform as string | undefined) ?? "";
+
+  // Resolve master metadata for notification dispatch.
+  const masterMeta = await svc
+    .from("social_post_master")
+    .select("company_id, created_by")
+    .eq("id", masterId)
+    .maybeSingle();
+  const notifCompanyId = (masterMeta.data?.company_id as string | undefined) ?? "";
+  const notifSubmitter = (masterMeta.data?.created_by as string | undefined) ?? "";
 
   if (type === "post.published") {
     const update = await svc
@@ -244,6 +255,17 @@ async function handlePostEvent(
     if (masterUpdate.error) {
       logger.warn("bundlesocial.webhook.master_publish_failed", {
         err: masterUpdate.error.message,
+      });
+    }
+
+    if (notifCompanyId && notifSubmitter && variantPlatform) {
+      void notifyDispatch({
+        event: "post_published",
+        companyId: notifCompanyId,
+        postMasterId: masterId,
+        submitterUserId: notifSubmitter,
+        platform: variantPlatform,
+        postUrl: parsed.data.platformPostUrl ?? "",
       });
     }
 
@@ -282,6 +304,18 @@ async function handlePostEvent(
   if (masterUpdate.error) {
     logger.warn("bundlesocial.webhook.master_fail_failed", {
       err: masterUpdate.error.message,
+    });
+  }
+
+  if (notifCompanyId && notifSubmitter && variantPlatform) {
+    void notifyDispatch({
+      event: "post_failed",
+      companyId: notifCompanyId,
+      postMasterId: masterId,
+      submitterUserId: notifSubmitter,
+      platform: variantPlatform,
+      errorClass,
+      errorMessage: (parsed.data.error as { message?: string } | null)?.message ?? "Publish failed.",
     });
   }
 
