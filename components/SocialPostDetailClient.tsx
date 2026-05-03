@@ -321,14 +321,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   }
 
   async function handleRequestChanges() {
-    if (!confirm("Request changes? The post will be returned to the editor for revision.")) return;
+    const comment = prompt(
+      "Request changes? Enter a note for the editor (optional — leave blank to skip):",
+      "",
+    );
+    if (comment === null) return; // user dismissed
     setRequestingChanges(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/request-changes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: post.company_id }),
+        body: JSON.stringify({ company_id: post.company_id, comment: comment.trim() || null }),
       });
       const json = (await res.json()) as
         | { ok: true; data: { postState: "changes_requested" } }

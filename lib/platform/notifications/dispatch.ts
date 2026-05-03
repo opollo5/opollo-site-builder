@@ -257,7 +257,9 @@ function renderInApp(
           ? "Schedule it from the calendar when you're ready."
           : payload.decision === "rejected"
             ? "Open the post to see the feedback."
-            : "Changes requested — review the comments and resubmit.",
+            : payload.comment
+              ? payload.comment
+              : "Changes requested — review the post and resubmit.",
         actionUrl: `/company/social/posts/${payload.postMasterId}`,
       };
     case "connection_lost":
@@ -383,7 +385,9 @@ function renderEmailContent(
             ? "Your post was approved and is ready to schedule."
             : payload.decision === "rejected"
               ? "Your post was rejected. Open it on Opollo to see the feedback."
-              : "Changes were requested on your post. Open it on Opollo to review.",
+              : payload.comment
+                ? payload.comment
+                : "Changes were requested on your post. Open it on Opollo to review.",
         action: {
           label: "Open post",
           url: `${siteUrl()}/company/social/posts/${payload.postMasterId}`,

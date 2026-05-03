@@ -732,6 +732,7 @@ describe("lib/platform/social/posts/submitForApproval", () => {
       if (!result.ok) return;
       expect(result.data.postState).toBe("changes_requested");
       expect(result.data.createdBy).toBe(creator.id);
+      expect(result.data.comment).toBeNull();
 
       const svc = getServiceRoleClient();
       const after = await svc
@@ -740,6 +741,30 @@ describe("lib/platform/social/posts/submitForApproval", () => {
         .eq("id", post.id)
         .single();
       expect(after.data?.state).toBe("changes_requested");
+    });
+
+    it("passes comment through to result when provided", async () => {
+      const { post } = await createPendingApprovalPost2("request changes with comment");
+      const result = await requestChanges({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        comment: "  Please fix the headline and shorten the body.  ",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.comment).toBe("Please fix the headline and shorten the body.");
+    });
+
+    it("returns comment: null when comment is empty or whitespace", async () => {
+      const { post } = await createPendingApprovalPost2("request changes empty comment");
+      const result = await requestChanges({
+        postId: post.id,
+        companyId: COMPANY_A_ID,
+        comment: "   ",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.comment).toBeNull();
     });
 
     it("rejects requestChanges on a draft post with INVALID_STATE", async () => {

@@ -235,14 +235,28 @@ export function SocialPostsListClient({
         : kind === "rejecting"
           ? "reject"
           : "request-changes";
+
+    // Prompt for an optional comment when requesting changes.
+    let comment: string | null = null;
+    if (kind === "requesting") {
+      const input = prompt(
+        "Request changes? Enter a note for the editor (optional — leave blank to skip):",
+        "",
+      );
+      if (input === null) return; // user dismissed
+      comment = input.trim() || null;
+    }
+
     setRowActions((prev) => new Map(prev).set(postId, kind));
     try {
+      const body: Record<string, unknown> = { company_id: companyId };
+      if (comment !== null) body.comment = comment;
       const res = await fetch(
         `/api/platform/social/posts/${postId}/${endpoint}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ company_id: companyId }),
+          body: JSON.stringify(body),
         },
       );
       const json = (await res.json()) as
