@@ -53,6 +53,12 @@ export type UpsertVariantInput = {
   // Empty / whitespace-only collapses to null (resets to "use master").
   // is_custom is derived: non-null variant_text → true; null → false.
   variantText: string | null;
+  // S1-24: optional media attachments. When present (including empty
+  // []), the column is overwritten — pass undefined to leave the
+  // existing array untouched on upsert. Each id must reference a
+  // social_media_assets row in the same company; the lib enforces
+  // this guard.
+  mediaAssetIds?: string[];
 };
 
 export type ListVariantsInput = {
