@@ -63,4 +63,8 @@ export type ListPostMastersInput = {
   offset?: number;
   // Free-text search against master_text (ILIKE). Blank / undefined = no filter.
   q?: string;
+  // When true, runs count: "exact" alongside the data query so the caller
+  // can render "X–Y of N" pagination. Opt-in so callers that don't need it
+  // don't pay for the count round-trip.
+  withCount?: boolean;
 };

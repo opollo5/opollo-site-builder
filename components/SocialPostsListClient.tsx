@@ -21,10 +21,8 @@ import type {
 // (master_text + link_url); a richer modal lands when variant /
 // scheduling slices arrive and the form needs more inputs.
 //
-// S1-37 — adds server-side text search via ?q= param. Submitting the
-// search form navigates to ?q=<term> which the page component passes
-// into listPostMasters (ILIKE on master_text). Client-side state
-// filters still apply on top of the server-filtered result set.
+// S1-37 — adds server-side text search via ?q= param.
+// S1-38 — adds ?page=N URL pagination (25 per page, prev/next links).
 // ---------------------------------------------------------------------------
 
 type Props = {
@@ -32,6 +30,9 @@ type Props = {
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
   initialQ?: string;
+  page?: number;
+  pageSize?: number;
+  totalCount?: number;
 };
 
 const STATE_PILL: Record<SocialPostState, string> = {
@@ -72,11 +73,22 @@ const FILTER_TABS: Array<{ key: "all" | SocialPostState; label: string }> = [
   { key: "rejected", label: "Rejected" },
 ];
 
+function buildPageUrl(page: number, q: string): string {
+  const params = new URLSearchParams();
+  if (q) params.set("q", q);
+  if (page > 1) params.set("page", String(page));
+  const qs = params.toString();
+  return `/company/social/posts${qs ? `?${qs}` : ""}`;
+}
+
 export function SocialPostsListClient({
   companyId,
   initialPosts,
   canCreate,
   initialQ = "",
+  page = 1,
+  pageSize = 25,
+  totalCount,
 }: Props) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
@@ -89,6 +101,13 @@ export function SocialPostsListClient({
   const [searchInput, setSearchInput] = useState(initialQ);
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const total = totalCount ?? posts.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, total);
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
+
   const visible = useMemo(
     () => (filter === "all" ? posts : posts.filter((p) => p.state === filter)),
     [posts, filter],
@@ -97,10 +116,7 @@ export function SocialPostsListClient({
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const term = searchInput.trim();
-    const url = term
-      ? `/company/social/posts?q=${encodeURIComponent(term)}`
-      : "/company/social/posts";
-    router.push(url);
+    router.push(buildPageUrl(1, term));
   }
 
   function clearSearch() {
@@ -141,18 +157,20 @@ export function SocialPostsListClient({
     }
   }
 
+  const countLabel = initialQ
+    ? `${total} ${total === 1 ? "result" : "results"} for "${initialQ}"`
+    : total === 0
+      ? "No posts yet."
+      : totalPages > 1
+        ? `${from}–${to} of ${total} posts`
+        : `${total} ${total === 1 ? "post" : "posts"}`;
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <H1>Social posts</H1>
-          <Lead className="mt-0.5">
-            {initialQ
-              ? `${posts.length} ${posts.length === 1 ? "result" : "results"} for "${initialQ}".`
-              : posts.length === 0
-                ? "No posts yet."
-                : `${posts.length} ${posts.length === 1 ? "post" : "posts"}.`}
-          </Lead>
+          <Lead className="mt-0.5">{countLabel}</Lead>
         </div>
         {canCreate ? (
           <div className="flex items-center gap-2">
@@ -348,6 +366,38 @@ export function SocialPostsListClient({
           </table>
         )}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 ? (
+        <div
+          className="mt-4 flex items-center justify-between text-sm text-muted-foreground"
+          data-testid="posts-pagination"
+        >
+          <span>
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            {hasPrev ? (
+              <Link
+                href={buildPageUrl(page - 1, initialQ)}
+                className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
+                data-testid="posts-pagination-prev"
+              >
+                ← Previous
+              </Link>
+            ) : null}
+            {hasNext ? (
+              <Link
+                href={buildPageUrl(page + 1, initialQ)}
+                className="rounded-md border px-3 py-1 hover:bg-muted/40 transition"
+                data-testid="posts-pagination-next"
+              >
+                Next →
+              </Link>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
