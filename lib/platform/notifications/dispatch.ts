@@ -248,7 +248,7 @@ function renderInApp(
       return {
         title: "A post needs your approval",
         body: "Open the calendar to review.",
-        actionUrl: `/social/posts/${payload.postMasterId}`,
+        actionUrl: `/company/social/posts/${payload.postMasterId}`,
       };
     case "approval_decided":
       return {
@@ -258,19 +258,19 @@ function renderInApp(
           : payload.decision === "rejected"
             ? "Open the post to see the feedback."
             : "Changes requested — review the comments and resubmit.",
-        actionUrl: `/social/posts/${payload.postMasterId}`,
+        actionUrl: `/company/social/posts/${payload.postMasterId}`,
       };
     case "connection_lost":
       return {
         title: `${payload.platform} connection needs attention`,
         body: payload.reason,
-        actionUrl: "/company/connections",
+        actionUrl: "/company/social/connections",
       };
     case "connection_restored":
       return {
         title: `${payload.platform} connection is healthy again`,
         body: "Failed posts can be retried from the failures queue.",
-        actionUrl: "/company/connections",
+        actionUrl: "/company/social/connections",
       };
     case "post_published":
       return {
@@ -282,13 +282,13 @@ function renderInApp(
       return {
         title: `Publish to ${payload.platform} failed`,
         body: `${payload.errorClass}: ${payload.errorMessage}`,
-        actionUrl: `/social/posts/${payload.postMasterId}`,
+        actionUrl: `/company/social/posts/${payload.postMasterId}`,
       };
     case "changes_requested":
       return {
         title: "Changes requested on your post",
         body: payload.comment,
-        actionUrl: `/social/posts/${payload.postMasterId}`,
+        actionUrl: `/company/social/posts/${payload.postMasterId}`,
       };
     // Email-only events still get an inline renderer to keep the
     // exhaustive-switch contract; they just won't be invoked.
