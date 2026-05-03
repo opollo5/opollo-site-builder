@@ -154,7 +154,39 @@ export async function extractDesignFromUrl(
   options: { existingPages?: string[] } = {},
 ): Promise<ExtractionResult> {
   const notes: string[] = [];
-  const sourcePages = [url, ...(options.existingPages ?? [])];
+  // Same-origin filter on the operator-supplied extra-pages list.
+  // UAT (2026-05-02) — operators occasionally pasted URLs from other
+  // sites into the extra-pages textarea, and those would land in
+  // sites.extracted_design.source_pages even though the extractor only
+  // ever fetches the primary URL. The result was a misleading "Source
+  // pages" list on the appearance panel showing third-party hosts as
+  // if they were part of this customer's design surface.
+  let primaryOrigin: string | null = null;
+  try {
+    primaryOrigin = new URL(url).origin;
+  } catch {
+    // primary URL bad — extractCssFromUrl will surface the failure
+    // properly; just skip the filter so the rest of the pipeline runs.
+  }
+  const filteredExtras: string[] = [];
+  for (const extra of options.existingPages ?? []) {
+    try {
+      const u = new URL(extra);
+      if (primaryOrigin && u.origin === primaryOrigin) {
+        filteredExtras.push(extra);
+      } else if (primaryOrigin) {
+        notes.push(
+          `Ignored extra page ${extra} — different origin from ${primaryOrigin}.`,
+        );
+      } else {
+        // No primary origin to compare against — accept defensively.
+        filteredExtras.push(extra);
+      }
+    } catch {
+      notes.push(`Ignored extra page (not a valid URL): ${extra}`);
+    }
+  }
+  const sourcePages = [url, ...filteredExtras];
 
   let cssResult;
   try {
