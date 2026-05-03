@@ -114,6 +114,11 @@ function isPublicPath(pathname: string): boolean {
   // social_approval_recipients.token_hash). Same rationale as
   // /invite/<token> — the link must work pre-session.
   if (pathname.startsWith("/approve/")) return true;
+  // /api/approve/<token>/decision — paired API endpoint for the
+  // viewer page (S1-7). Token-as-auth: the route's lib validates
+  // SHA-256 hash against social_approval_recipients.token_hash
+  // before calling the migration-0072 atomic decision recorder.
+  if (pathname.startsWith("/api/approve/")) return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
