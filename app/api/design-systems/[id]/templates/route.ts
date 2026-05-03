@@ -10,6 +10,7 @@ import {
   respond,
   validateUuidParam,
 } from "@/lib/http";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { validateCompositionRefs } from "./_helpers";
 
 export const runtime = "nodejs";
@@ -36,6 +37,9 @@ const CreateBodySchema = CreateDesignTemplateSchema.omit({
 export async function POST(req: Request, ctx: RouteContext) {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;

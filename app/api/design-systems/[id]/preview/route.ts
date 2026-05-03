@@ -4,6 +4,7 @@ import { getDesignSystem } from "@/lib/design-systems";
 import { listComponents } from "@/lib/components";
 import { listTemplates } from "@/lib/templates";
 import { respond, validateUuidParam } from "@/lib/http";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -18,6 +19,9 @@ export async function GET(_req: Request, ctx: { params: { id: string } }) {
   // depth; consistent with sibling /api/design-systems/[id] routes).
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const param = validateUuidParam(ctx.params.id, "id");
   if (!param.ok) return param.response;
