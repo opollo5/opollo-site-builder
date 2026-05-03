@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { BulkUploadButton } from "@/components/BulkUploadButton";
+import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
 import type {
@@ -147,6 +148,7 @@ export function SocialPostsListClient({
   const [sortBy, setSortBy] = useState<SortCol>(initialSortBy);
   const [sortDir, setSortDir] = useState<SortDir>(initialSortDir);
   const [showCreate, setShowCreate] = useState(false);
+  const [showCAPGenerate, setShowCAPGenerate] = useState(false);
   const [masterText, setMasterText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -310,6 +312,13 @@ export function SocialPostsListClient({
                 setPosts((prev) => [...newPosts, ...prev])
               }
             />
+            <Button
+              variant="outline"
+              data-testid="cap-generate-button"
+              onClick={() => setShowCAPGenerate(true)}
+            >
+              Generate with AI
+            </Button>
             <Button
               data-testid="new-post-button"
               onClick={() => setShowCreate((v) => !v)}
@@ -605,6 +614,13 @@ export function SocialPostsListClient({
           </div>
         </div>
       ) : null}
+
+      <CAPGenerateModal
+        open={showCAPGenerate}
+        companyId={companyId}
+        onClose={() => setShowCAPGenerate(false)}
+        onSuccess={(newPosts) => setPosts((prev) => [...newPosts, ...prev])}
+      />
     </>
   );
 }
