@@ -61,4 +61,6 @@ export type ListPostMastersInput = {
   // any single tab gets >200 rows in practice.
   limit?: number;
   offset?: number;
+  // Free-text search against master_text (ILIKE). Blank / undefined = no filter.
+  q?: string;
 };
