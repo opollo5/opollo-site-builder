@@ -9,14 +9,14 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-11-dashboard-stats
-- Slice: S1-11 — social posts dashboard quick-stats. lib/platform/social/posts/dashboard.ts with getSocialPostsStats() (six HEAD counts via parallel index-friendly queries). SocialPostsDashboardCard.tsx renders six clickable tiles linking to the filtered list. /company landing converted from a redirect to a real dashboard.
+- Branch: feat/s1-12-connections-list
+- Slice: S1-12 — social connections list page. lib/platform/social/connections {list, types}.ts reads social_connections rows. Route GET /api/platform/social/connections gated by view_calendar. Page /company/social/connections shows platform + display_name + status + connected_at. Admin-only Reconnect button is a stub (toast); bundle.social OAuth flow lands in S1-13.
 - Files claimed:
-  - lib/platform/social/posts/dashboard.ts (new)
-  - lib/platform/social/posts/index.ts (re-export getSocialPostsStats)
-  - components/SocialPostsDashboardCard.tsx (new)
-  - app/company/page.tsx (real dashboard; replaces redirect)
-  - lib/__tests__/social-posts-dashboard.test.ts (new)
+  - lib/platform/social/connections/{types,list,index}.ts (new)
+  - app/api/platform/social/connections/route.ts (new)
+  - app/company/social/connections/page.tsx (new)
+  - components/SocialConnectionsList.tsx (new)
+  - lib/__tests__/social-connections.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none.
 - Expected completion: same session.
