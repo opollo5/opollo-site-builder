@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { SocialPostsListClient } from "@/components/SocialPostsListClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listPostMasters } from "@/lib/platform/social/posts";
+import type { SocialPostState } from "@/lib/platform/social/posts";
 
 // ---------------------------------------------------------------------------
 // S1-2 — customer-facing social posts list at /company/social/posts.
@@ -22,7 +23,20 @@ export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 25;
 
-type Props = { searchParams: Promise<{ q?: string; page?: string }> };
+const VALID_STATES: ReadonlySet<string> = new Set<SocialPostState>([
+  "draft",
+  "pending_client_approval",
+  "approved",
+  "rejected",
+  "changes_requested",
+  "pending_msp_release",
+  "scheduled",
+  "publishing",
+  "published",
+  "failed",
+]);
+
+type Props = { searchParams: Promise<{ q?: string; page?: string; state?: string }> };
 
 export default async function CompanySocialPostsPage({ searchParams }: Props) {
   const session = await getCurrentPlatformSession();
@@ -43,15 +57,20 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
   }
 
   const companyId = session.company.companyId;
-  const { q, page: pageParam } = await searchParams;
+  const { q, page: pageParam, state: stateParam } = await searchParams;
   const searchTerm = q?.trim() ?? "";
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
+  const stateFilter =
+    stateParam && VALID_STATES.has(stateParam)
+      ? (stateParam as SocialPostState)
+      : null;
 
   const [postsResult, canCreate] = await Promise.all([
     listPostMasters({
       companyId,
       q: searchTerm || undefined,
+      states: stateFilter ? [stateFilter] : undefined,
       limit: PAGE_SIZE,
       offset,
       withCount: true,
@@ -76,6 +95,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       initialPosts={postsResult.data.posts}
       canCreate={canCreate}
       initialQ={searchTerm}
+      initialState={stateFilter ?? "all"}
       page={page}
       pageSize={PAGE_SIZE}
       totalCount={postsResult.data.totalCount}

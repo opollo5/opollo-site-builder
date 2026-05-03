@@ -19,7 +19,11 @@ const ACTION_MIN_ROLE: Record<PermissionAction, CompanyRole> = {
   manage_users: "admin",
   edit_company_settings: "admin",
   manage_connections: "admin",
-  reconnect_connection: "admin",
+  // S8: editors+ can reconnect an existing disconnected/auth_required
+  // connection (re-OAuth on a credential that has expired). Creating new
+  // connections and deleting connections remain admin-only via
+  // manage_connections.
+  reconnect_connection: "editor",
   manage_invitations: "admin",
   create_post: "editor",
   edit_post: "editor",

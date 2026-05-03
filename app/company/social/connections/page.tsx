@@ -104,9 +104,10 @@ export default async function CompanySocialConnectionsPage({
 
   const companyId = session.company.companyId;
 
-  const [listResult, canManage] = await Promise.all([
+  const [listResult, canManage, canReconnect] = await Promise.all([
     listConnections({ companyId }),
     canDo(companyId, "manage_connections"),
+    canDo(companyId, "reconnect_connection"),
   ]);
 
   return (
@@ -126,6 +127,7 @@ export default async function CompanySocialConnectionsPage({
             companyId={companyId}
             connections={listResult.data.connections}
             canManage={canManage}
+            canReconnect={canReconnect}
           />
         ) : (
           <div
