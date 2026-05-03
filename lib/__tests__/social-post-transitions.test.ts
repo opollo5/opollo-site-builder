@@ -8,9 +8,12 @@ import {
 } from "vitest";
 
 import {
+  approvePost,
   cancelApprovalRequest,
   createPostMaster,
+  rejectPost,
   reopenForEditing,
+  requestChanges,
   submitForApproval,
 } from "@/lib/platform/social/posts";
 import { upsertVariant } from "@/lib/platform/social/variants";
@@ -578,6 +581,195 @@ describe("lib/platform/social/posts/submitForApproval", () => {
         .eq("approval_request_id", requestId)
         .eq("event_type", "revoked");
       expect(events.data?.length).toBe(1);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // S1-48 — approvePost / rejectPost / requestChanges (platform-user approver
+  // actions). All three share the same predicate-guarded UPDATE shape, so the
+  // test structure mirrors reopenForEditing above.
+  // ---------------------------------------------------------------------------
+
+  async function createPendingApprovalPost2(label: string) {
+    const post = await createDraft(label);
+    const submitted = await submitForApproval({
+      postId: post.id,
+      companyId: COMPANY_A_ID,
+    });
+    if (!submitted.ok) {
+      throw new Error(`createPendingApprovalPost2: ${submitted.error.code}`);
+    }
+    return { post, requestId: submitted.data.approvalRequestId };
+  }
+
+  describe("approvePost", () => {
+    it("happy path — flips pending_client_approval → approved", async () => {
+      const { post } = await createPendingApprovalPost2("approve me");
+      const result = await approvePost({ postId: post.id, companyId: COMPANY_A_ID });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.postState).toBe("approved");
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.state).toBe("approved");
+    });
+
+    it("rejects approve on a draft post with INVALID_STATE", async () => {
+      const post = await createDraft("draft not pending");
+      const result = await approvePost({ postId: post.id, companyId: COMPANY_A_ID });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("returns NOT_FOUND for cross-company access", async () => {
+      const { post } = await createPendingApprovalPost2("cross-company approve");
+      const result = await approvePost({ postId: post.id, companyId: COMPANY_B_ID });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("returns NOT_FOUND for missing post id", async () => {
+      const result = await approvePost({
+        postId: "00000000-0000-0000-0000-000000000fff",
+        companyId: COMPANY_A_ID,
+      });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("two parallel approves — only one transitions, the other sees INVALID_STATE", async () => {
+      const { post } = await createPendingApprovalPost2("race approve");
+
+      const [a, b] = await Promise.all([
+        approvePost({ postId: post.id, companyId: COMPANY_A_ID }),
+        approvePost({ postId: post.id, companyId: COMPANY_A_ID }),
+      ]);
+
+      const successes = [a, b].filter((r) => r.ok);
+      const failures = [a, b].filter((r) => !r.ok);
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+      if (failures[0]?.ok === false) {
+        expect(failures[0].error.code).toBe("INVALID_STATE");
+      }
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.state).toBe("approved");
+    });
+  });
+
+  describe("rejectPost", () => {
+    it("happy path — flips pending_client_approval → rejected", async () => {
+      const { post } = await createPendingApprovalPost2("reject me");
+      const result = await rejectPost({ postId: post.id, companyId: COMPANY_A_ID });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.postState).toBe("rejected");
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.state).toBe("rejected");
+    });
+
+    it("rejects reject on a draft post with INVALID_STATE", async () => {
+      const post = await createDraft("draft not pending");
+      const result = await rejectPost({ postId: post.id, companyId: COMPANY_A_ID });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("returns NOT_FOUND for cross-company access", async () => {
+      const { post } = await createPendingApprovalPost2("cross-company reject");
+      const result = await rejectPost({ postId: post.id, companyId: COMPANY_B_ID });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("two parallel rejects — only one transitions", async () => {
+      const { post } = await createPendingApprovalPost2("race reject");
+
+      const [a, b] = await Promise.all([
+        rejectPost({ postId: post.id, companyId: COMPANY_A_ID }),
+        rejectPost({ postId: post.id, companyId: COMPANY_A_ID }),
+      ]);
+
+      const successes = [a, b].filter((r) => r.ok);
+      const failures = [a, b].filter((r) => !r.ok);
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+      if (failures[0]?.ok === false) {
+        expect(failures[0].error.code).toBe("INVALID_STATE");
+      }
+    });
+  });
+
+  describe("requestChanges", () => {
+    it("happy path — flips pending_client_approval → changes_requested", async () => {
+      const { post } = await createPendingApprovalPost2("request changes");
+      const result = await requestChanges({ postId: post.id, companyId: COMPANY_A_ID });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.postState).toBe("changes_requested");
+
+      const svc = getServiceRoleClient();
+      const after = await svc
+        .from("social_post_master")
+        .select("state")
+        .eq("id", post.id)
+        .single();
+      expect(after.data?.state).toBe("changes_requested");
+    });
+
+    it("rejects requestChanges on a draft post with INVALID_STATE", async () => {
+      const post = await createDraft("draft not pending");
+      const result = await requestChanges({ postId: post.id, companyId: COMPANY_A_ID });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("INVALID_STATE");
+    });
+
+    it("returns NOT_FOUND for cross-company access", async () => {
+      const { post } = await createPendingApprovalPost2("cross-company changes");
+      const result = await requestChanges({ postId: post.id, companyId: COMPANY_B_ID });
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.error.code).toBe("NOT_FOUND");
+    });
+
+    it("two parallel requestChanges — only one transitions", async () => {
+      const { post } = await createPendingApprovalPost2("race request-changes");
+
+      const [a, b] = await Promise.all([
+        requestChanges({ postId: post.id, companyId: COMPANY_A_ID }),
+        requestChanges({ postId: post.id, companyId: COMPANY_A_ID }),
+      ]);
+
+      const successes = [a, b].filter((r) => r.ok);
+      const failures = [a, b].filter((r) => !r.ok);
+      expect(successes.length).toBe(1);
+      expect(failures.length).toBe(1);
+      if (failures[0]?.ok === false) {
+        expect(failures[0].error.code).toBe("INVALID_STATE");
+      }
     });
   });
 });
