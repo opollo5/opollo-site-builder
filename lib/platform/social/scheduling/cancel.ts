@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
+import { cancelScheduledPublish } from "@/lib/platform/social/publishing";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -96,6 +97,19 @@ export async function cancelScheduleEntry(
   if (!update.data) {
     // Race: another caller cancelled between our lookup and update.
     return invalidState("Entry was cancelled concurrently.");
+  }
+
+  // S1-18 — best-effort QStash message cancel. If this fails the
+  // callback may still fire, but claim_publish_job's CANCELLED gate
+  // (migration 0075) is the source of truth and will skip publishing.
+  const cancelResult = await cancelScheduledPublish(
+    (update.data as ScheduleEntry).qstash_message_id,
+  );
+  if (!cancelResult.ok) {
+    logger.warn("social.scheduling.cancel.qstash_cancel_failed", {
+      err: cancelResult.error.message,
+      entry_id: input.entryId,
+    });
   }
 
   return {
