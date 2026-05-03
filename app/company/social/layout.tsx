@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { NotificationBell } from "@/components/NotificationBell";
 import { SocialNavClient } from "@/components/SocialNavClient";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 
@@ -45,6 +46,7 @@ export default async function CompanySocialLayout({
             Opollo Social
           </Link>
           <SocialNavClient />
+          <NotificationBell companyId={session.company.companyId} />
         </nav>
       </header>
       <div id="social-main" tabIndex={-1} className="scroll-mt-14 focus:outline-none">
