@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { readJsonBody } from "@/lib/http";
 import {
   checkRateLimit,
   getClientIp,
@@ -49,11 +50,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const rl = await checkRateLimit("test_connection", rlId);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = null;
+  const body = await readJsonBody(req);
+  if (body === undefined) {
+    return NextResponse.json(
+      { ok: false, error: { code: "VALIDATION_FAILED", message: "Request body must be valid JSON." } },
+      { status: 400 },
+    );
   }
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {

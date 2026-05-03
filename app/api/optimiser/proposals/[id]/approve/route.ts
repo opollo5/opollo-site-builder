@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { readJsonBody } from "@/lib/http";
 import { approveProposal } from "@/lib/optimiser/proposals";
 
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ export async function POST(
   }
   let body;
   try {
-    body = Body.parse(await req.json().catch(() => ({})));
+    body = Body.parse(await readJsonBody(req) ?? {});
   } catch (err) {
     return NextResponse.json(
       {

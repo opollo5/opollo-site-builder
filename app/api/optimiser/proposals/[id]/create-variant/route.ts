@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { readJsonBody } from "@/lib/http";
 import { createVariantPair } from "@/lib/optimiser/variants/generator";
 
 // POST /api/optimiser/proposals/[id]/create-variant — Slice 18.
@@ -38,8 +39,7 @@ export async function POST(
   }
   let body: { traffic_split_percent?: number } = {};
   try {
-    const json = await req.json().catch(() => ({}));
-    body = Body.parse(json);
+    body = Body.parse(await readJsonBody(req) ?? {});
   } catch (err) {
     return NextResponse.json(
       {
