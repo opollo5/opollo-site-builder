@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { dispatch } from "@/lib/platform/notifications";
 import { submitForApproval } from "@/lib/platform/social/posts";
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,14 @@ export async function POST(
       statusForCode(result.error.code),
     );
   }
+
+  // Fire approval notification without blocking the response.
+  void dispatch({
+    event: "approval_requested",
+    companyId: parsed.data.company_id,
+    postMasterId: id,
+    submitterUserId: gate.userId,
+  });
 
   return NextResponse.json(
     {
