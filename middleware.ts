@@ -119,6 +119,11 @@ function isPublicPath(pathname: string): boolean {
   // SHA-256 hash against social_approval_recipients.token_hash
   // before calling the migration-0072 atomic decision recorder.
   if (pathname.startsWith("/api/approve/")) return true;
+  // /viewer/<token> — public read-only customer calendar (S1-15).
+  // Token IS the auth (SHA-256 hash → social_viewer_links.token_hash).
+  // External recipients aren't platform users; the link must work
+  // pre-session.
+  if (pathname.startsWith("/viewer/")) return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;

@@ -9,15 +9,17 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 ---
 ## Session A
 - Started: 2026-05-03
-- Branch: feat/s1-14-schedule-entries
-- Slice: S1-14 — schedule entries (L3 layer). lib + route + UI for createScheduleEntry / listScheduleEntries / cancelScheduleEntry. State guard: only approved posts. Auto-creates social_post_variant row if missing. No bundle.social dependency — QStash enqueue + publish-handler land in S1-15+.
+- Branch: feat/s1-15-viewer-links
+- Slice: S1-15 — customer viewer-link magic-link flow. lib/platform/social/viewer-links {create,list,resolve,revoke}.ts mints 90-day SHA-256 tokens. Admin POST/GET /api/platform/social/viewer-links + DELETE /[id] (canDo manage_invitations). Public /viewer/[token] renders read-only company calendar. Admin page /company/social/sharing.
 - Files claimed:
-  - lib/platform/social/scheduling/{types,create,list,cancel,index}.ts (new)
-  - app/api/platform/social/posts/[id]/schedule/route.ts (new)
-  - app/api/platform/social/posts/[id]/schedule/[entry_id]/route.ts (new)
-  - components/PostScheduleSection.tsx (new)
-  - app/company/social/posts/[id]/page.tsx (wire schedule section)
-  - lib/__tests__/social-scheduling.test.ts (new)
+  - lib/platform/social/viewer-links/{types,create,list,resolve,revoke,index}.ts (new)
+  - app/api/platform/social/viewer-links/route.ts (new)
+  - app/api/platform/social/viewer-links/[id]/route.ts (new)
+  - app/viewer/[token]/page.tsx (new — public read-only calendar)
+  - app/company/social/sharing/page.tsx (new — admin manager)
+  - components/ViewerLinksManager.tsx (new)
+  - middleware.ts (allow /viewer/* unauthenticated)
+  - lib/__tests__/social-viewer-links.test.ts (new)
   - docs/WORK_IN_FLIGHT.md
 - Migration number reserved: none.
 - Expected completion: same session.
