@@ -306,3 +306,37 @@ All three routes compile (typecheck passes). All three use `authorisedCronReques
 
 `npm run typecheck` — ✅ 0 errors  
 `npm run lint` — ✅ 0 errors / warnings
+
+---
+
+## Final verification sweep — 2026-05-05
+
+All items from the original work list confirmed implemented and passing typecheck + lint on main.
+
+### Part 1 — Blog upload fixes
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | EXIF metadata extraction | ✅ DONE | `lib/exif-extract.ts` with canonical mapping; imported in upload route + reextract lib |
+| 2 | Image caption backfill script | ✅ DONE | `scripts/backfill-image-captions.ts` — ready to run in prod (see backfill instructions above) |
+| 3 | Slug auto-generation | ✅ DONE | `lib/slug.ts` generateSlug() with 53-word stop-word set; wired to title onChange in BlogPostComposer |
+| 4 | Rich text editor | ✅ DONE | `components/RichTextEditor.tsx` — Tiptap with full toolbar (B/I/H1/H2/H3/lists/blockquote/link/undo/redo) |
+| 5 | Word count + read time | ✅ DONE | Lives in RichTextEditor toolbar; `Math.ceil(words/230)` minutes, updates live |
+| 6 | WordPress site indicator | ✅ DONE | "Publishing to: [hostname]" at form top; amber warning when no WP site connected |
+
+### Part 2 — Social platform
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 7 | Analytics page | ✅ DONE | `app/company/social/analytics/page.tsx` — recharts AreaChart/BarChart/PieChart, KPI cards, nav tab |
+| 8 | bundle.social OAuth flow | ✅ DONE | connect → hosted portal → callback → social_connections upsert; full round-trip verified |
+| 9 | Post approval magic link | ✅ DONE | submit → dispatch email → `/approve/[token]` page → ApprovalDecisionForm → state update |
+| 10 | Cron verification | ✅ DONE | All three crons in vercel.json with correct schedules; all route handlers compile |
+
+### Final checks
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✅ 0 errors |
+| `npm run lint` | ✅ 0 warnings |
+| `npm run audit:static` | ✅ 0 HIGH (pre-existing MEDIUM/LOW only) |
