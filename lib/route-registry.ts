@@ -36,6 +36,7 @@ export type RouteRegistryRow = {
   redirect_to:     string | null;
   wp_page_id:      number | null;
   wp_content_hash: string | null;
+  ordinal:         number | null;
   version_lock:    number;
   created_at:      string;
   updated_at:      string;
@@ -208,6 +209,7 @@ export async function upsertRoutesFromPlan(
       page_type: r.page_type,
       label:     r.label,
       status:    "planned" as const,
+      ordinal:   r.priority,
     }));
 
     const { data, error } = await supabase
