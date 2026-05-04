@@ -13,10 +13,6 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/process-transfer",
-      "schedule": "* * * * *"
-    },
-    {
       "path": "/api/cron/budget-reset",
       "schedule": "0 * * * *"
     },

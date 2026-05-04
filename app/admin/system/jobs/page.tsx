@@ -48,8 +48,6 @@ const CRON_DESCRIPTIONS: Record<string, string> = {
     "Drives regeneration_jobs — single-page re-renders triggered from the page detail surface.",
   "/api/cron/process-brief-runner":
     "Drives brief_runs — leases the next queued run and ticks one page worth of generation.",
-  "/api/cron/process-transfer":
-    "Drives transfer_jobs — image library Cloudflare ingest + WP media transfer.",
   "/api/cron/budget-reset":
     "Zero-out daily / monthly cents on tenant_cost_budgets when their reset timestamps pass.",
   "/api/cron/optimiser-sync-ads": "Pull ad spend + impression data from Google Ads.",
@@ -173,15 +171,6 @@ async function readQueueStats(): Promise<QueueStat[]> {
       cron: "/api/cron/process-regenerations",
       statusCol: "status",
       pendingValues: ["pending"],
-      runningValues: ["running"],
-      failedValues: ["failed"],
-    },
-    {
-      table: "transfer_jobs",
-      label: "Transfer jobs",
-      cron: "/api/cron/process-transfer",
-      statusCol: "status",
-      pendingValues: ["pending", "queued"],
       runningValues: ["running"],
       failedValues: ["failed"],
     },
