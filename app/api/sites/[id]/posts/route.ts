@@ -37,6 +37,15 @@ const BodySchema = z
     metadata: z.unknown().optional(),
     // BP-7 — image_library row id chosen via the BP-4 picker.
     featured_image_id: z.string().uuid().nullable().optional(),
+    // Operator-edited SEO title (may differ from parser-extracted meta_title).
+    meta_title: z.string().max(200).nullable().optional(),
+    // "draft" or "scheduled"; "published" goes through /publish route.
+    status: z.enum(["draft", "scheduled"]).optional(),
+    // ISO datetime string for scheduled posts; stored in metadata.
+    scheduled_at: z.string().nullable().optional(),
+    // WP term IDs for categories and tags.
+    wp_category_ids: z.array(z.number().int().nonnegative()).max(20).optional(),
+    wp_tag_ids: z.array(z.number().int().nonnegative()).max(20).optional(),
   })
   .strict();
 
@@ -96,13 +105,38 @@ export async function POST(
     .maybeSingle();
   const dsVersion = Number(ds?.version ?? 1);
 
+  // Merge parser snapshot with operator-edited extended fields so the
+  // post's metadata column carries everything needed for the publish path.
+  const baseMetadata =
+    parsed.data.metadata &&
+    typeof parsed.data.metadata === "object" &&
+    !Array.isArray(parsed.data.metadata)
+      ? (parsed.data.metadata as Record<string, unknown>)
+      : {};
+  const extendedMetadata: Record<string, unknown> = {
+    ...baseMetadata,
+    ...(parsed.data.meta_title !== undefined
+      ? { meta_title_override: parsed.data.meta_title }
+      : {}),
+    ...(parsed.data.scheduled_at !== undefined
+      ? { scheduled_at: parsed.data.scheduled_at }
+      : {}),
+    ...(parsed.data.wp_category_ids !== undefined
+      ? { wp_category_ids: parsed.data.wp_category_ids }
+      : {}),
+    ...(parsed.data.wp_tag_ids !== undefined
+      ? { wp_tag_ids: parsed.data.wp_tag_ids }
+      : {}),
+  };
+
   const result = await createPost({
     site_id: params.id,
     title: parsed.data.title,
     slug: parsed.data.slug,
     excerpt: parsed.data.excerpt ?? undefined,
     design_system_version: dsVersion,
-    metadata: parsed.data.metadata,
+    status: parsed.data.status,
+    metadata: extendedMetadata,
     featured_image_id: parsed.data.featured_image_id ?? undefined,
     created_by: gate.user?.id ?? null,
   });
