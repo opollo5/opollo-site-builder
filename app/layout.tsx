@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Manrope } from "next/font/google";
 import { cn } from "@/lib/utils";
+import "@/styles/tokens.css";
 import "./globals.css";
 
 const fredoka = Fredoka({
