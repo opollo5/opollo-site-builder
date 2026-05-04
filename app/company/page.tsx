@@ -139,6 +139,18 @@ export default async function CompanyLandingPage() {
             Images and videos attached to posts.
           </div>
         </Link>
+        {isAdmin ? (
+          <Link
+            href="/company/social/sharing"
+            className="block rounded-md border bg-card p-4 hover:border-primary/40"
+            data-testid="dashboard-link-sharing"
+          >
+            <div className="font-medium">Calendar sharing</div>
+            <div className="mt-1 text-base text-muted-foreground">
+              Mint read-only links to share the calendar with clients.
+            </div>
+          </Link>
+        ) : null}
         <Link
           href="/company/users"
           className="block rounded-md border bg-card p-4 hover:border-primary/40"
