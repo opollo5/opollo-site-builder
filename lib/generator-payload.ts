@@ -12,6 +12,7 @@
  */
 
 import type { PageType, SharedContentType } from './types/page-document';
+import { logger } from "@/lib/logger";
 
 // ─── HARD CAPS ─────────────────────────────────────────────────────────────
 // Change these only with a milestone. Never relax without a measured reason.
@@ -202,12 +203,12 @@ export function buildGeneratorPayload(opts: BuildPayloadOptions): GeneratorPaylo
 
 function capArray<T>(arr: T[], max: number, name: string): T[] {
   if (arr.length <= max) return arr;
-  console.warn(`[generator-payload] ${name} truncated from ${arr.length} to ${max}`);
+  logger.warn("generator-payload.truncated", { field: name, from: arr.length, to: max });
   return arr.slice(0, max);
 }
 
 function truncateChars(str: string, max: number, name: string): string {
   if (str.length <= max) return str;
-  console.warn(`[generator-payload] ${name} truncated from ${str.length} to ${max} chars`);
+  logger.warn("generator-payload.truncated_chars", { field: name, from: str.length, to: max });
   return str.slice(0, max);
 }
