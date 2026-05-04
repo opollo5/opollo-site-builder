@@ -48,6 +48,10 @@ import {
   type VisualCritique,
   type VisualRenderFn,
 } from "@/lib/visual-review";
+import { getSiteBlueprint } from "@/lib/site-blueprint";
+import { runPageDocumentGenerator } from "@/lib/page-document-generator";
+import { runRenderWorker } from "@/lib/render-worker";
+import { listActiveRoutes } from "@/lib/route-registry";
 
 // ---------------------------------------------------------------------------
 // M12-3 — Brief runner.
@@ -196,7 +200,9 @@ export type BriefRunTickOk = {
     | "page_failed" // gate fail or Anthropic terminal error
     | "run_completed" // no more pages
     | "lease_stolen"
-    | "nothing_to_do"; // status already terminal or awaiting_review
+    | "nothing_to_do" // status already terminal or awaiting_review
+    | "awaiting_blueprint_approval" // M16-7: blueprint exists but operator hasn't approved yet
+    | "site_plan_created"; // M16-7: site planner ran, blueprint created (draft)
   runStatus: BriefRunRow["status"];
   currentOrdinal: number | null;
   pageStatus: BriefPageStatus | null;
@@ -1365,6 +1371,123 @@ async function advanceOneStep(
     };
   }
 
+  // M16-7: Check for an approved site blueprint. If one exists, use the M16
+  // page-doc-generator path. If draft, release the lease and wait for approval.
+  // If no blueprint exists, fall through to the existing M12 HTML path.
+  const bpResult = await getSiteBlueprint(brief.site_id);
+  if (bpResult.ok && bpResult.data) {
+    const bp = bpResult.data;
+    if (bp.status === "draft") {
+      // Blueprint created but not yet approved — release lease, re-queue
+      await client.query(
+        `UPDATE brief_runs
+            SET status = 'queued',
+                lease_expires_at = NULL,
+                worker_id = NULL,
+                updated_at = now(),
+                version_lock = version_lock + 1
+          WHERE id = $1`,
+        [run.id],
+      );
+      logger.info("brief_runner.m16.awaiting_blueprint_approval", {
+        brief_run_id: run.id,
+        blueprint_id: bp.id,
+      });
+      return {
+        ok: true,
+        outcome: "awaiting_blueprint_approval",
+        runStatus: "queued",
+        currentOrdinal: run.current_ordinal ?? 0,
+        pageStatus: null,
+      };
+    }
+    if (bp.status === "approved") {
+      // M16 path — page doc generator instead of Anthropic HTML
+      const ordinal = run.current_ordinal ?? 0;
+      const pageRes = await client.query<BriefPageRow>(
+        `SELECT * FROM brief_pages
+          WHERE brief_id = $1 AND ordinal = $2 AND deleted_at IS NULL`,
+        [run.brief_id, ordinal],
+      );
+      const page = pageRes.rows[0];
+      if (!page) {
+        await client.query(
+          `UPDATE brief_runs
+              SET status = 'succeeded', finished_at = now(),
+                  lease_expires_at = NULL, worker_id = NULL,
+                  updated_at = now(), version_lock = version_lock + 1
+            WHERE id = $1`,
+          [run.id],
+        );
+        return {
+          ok: true,
+          outcome: "run_completed",
+          runStatus: "succeeded",
+          currentOrdinal: ordinal,
+          pageStatus: null,
+        };
+      }
+      if (page.page_status === "approved" || page.page_status === "skipped") {
+        // Advance ordinal and re-queue
+        await client.query(
+          `UPDATE brief_runs
+              SET current_ordinal = $2, status = 'queued',
+                  lease_expires_at = NULL, worker_id = NULL,
+                  updated_at = now(), version_lock = version_lock + 1
+            WHERE id = $1`,
+          [run.id, ordinal + 1],
+        );
+        return {
+          ok: true,
+          outcome: "lease_acquired_no_advance",
+          runStatus: "queued",
+          currentOrdinal: ordinal + 1,
+          pageStatus: page.page_status,
+        };
+      }
+      if (page.page_status === "awaiting_review") {
+        await client.query(
+          `UPDATE brief_runs
+              SET status = 'paused', current_ordinal = $2,
+                  lease_expires_at = NULL, worker_id = NULL,
+                  updated_at = now(), version_lock = version_lock + 1
+            WHERE id = $1`,
+          [run.id, ordinal],
+        );
+        return {
+          ok: true,
+          outcome: "page_advanced_to_review",
+          runStatus: "paused",
+          currentOrdinal: ordinal,
+          pageStatus: "awaiting_review",
+        };
+      }
+      if (page.page_status === "failed") {
+        await client.query(
+          `UPDATE brief_runs
+              SET status = 'failed',
+                  failure_code = COALESCE(failure_code, 'PAGE_FAILED'),
+                  failure_detail = COALESCE(failure_detail, $3),
+                  finished_at = now(),
+                  lease_expires_at = NULL,
+                  worker_id = NULL,
+                  updated_at = now(),
+                  version_lock = version_lock + 1
+            WHERE id = $1`,
+          [run.id, ordinal, `Page ${ordinal} is in status 'failed'.`],
+        );
+        return {
+          ok: true,
+          outcome: "page_failed",
+          runStatus: "failed",
+          currentOrdinal: ordinal,
+          pageStatus: "failed",
+        };
+      }
+      return await processPageM16(client, run, brief, page, bp.id);
+    }
+  }
+
   // Determine ordinal. First tick: start at ordinal 0.
   let ordinal = run.current_ordinal ?? 0;
 
@@ -1460,6 +1583,227 @@ async function advanceOneStep(
     // page_status is 'pending' or 'generating' — run the pass loop.
     return await processPagePassLoop(client, run, brief, page, call, visualRender);
   }
+}
+
+// ─── M16-7: Page document generator path ─────────────────────────────────────
+//
+// Called instead of processPagePassLoop when an approved site blueprint exists.
+// Uses M16-5 page-doc-generator (Haiku) + M16-6 render worker to produce HTML
+// from a structured PageDocument.
+
+async function processPageM16(
+  client: Client,
+  run: BriefRunRow,
+  brief: BriefRow,
+  page: BriefPageRow,
+  _blueprintId: string,
+): Promise<BriefRunTickResult> {
+  const svc = getServiceRoleClient();
+
+  // Mark page as generating
+  await client.query(
+    `UPDATE brief_pages
+        SET page_status = 'generating',
+            updated_at = now(),
+            version_lock = version_lock + 1
+      WHERE id = $1`,
+    [page.id],
+  );
+
+  // Find the matching route from route_registry by ordinal
+  const routesResult = await listActiveRoutes(brief.site_id);
+  const routes = routesResult.ok ? routesResult.data : [];
+  const route = routes.find(r => r.ordinal === page.ordinal);
+
+  if (!route) {
+    logger.warn("brief_runner.m16.route_not_found", {
+      brief_run_id: run.id,
+      site_id: brief.site_id,
+      page_ordinal: page.ordinal,
+    });
+    await client.query(
+      `UPDATE brief_pages
+          SET page_status = 'failed',
+              updated_at = now(),
+              version_lock = version_lock + 1
+        WHERE id = $1`,
+      [page.id],
+    );
+    await client.query(
+      `UPDATE brief_runs
+          SET status = 'failed',
+              failure_code = 'M16_ROUTE_NOT_FOUND',
+              failure_detail = $3,
+              finished_at = now(),
+              lease_expires_at = NULL,
+              worker_id = NULL,
+              updated_at = now(),
+              version_lock = version_lock + 1
+        WHERE id = $1`,
+      [run.id, page.ordinal, `No route_registry row with ordinal ${page.ordinal} for site ${brief.site_id}.`],
+    );
+    return {
+      ok: true,
+      outcome: "page_failed",
+      runStatus: "failed",
+      currentOrdinal: page.ordinal,
+      pageStatus: "failed",
+    };
+  }
+
+  // Get or create a pages row (wp_page_id is NULL for pre-publish M16 pages)
+  const { data: existingPage } = await svc
+    .from("pages")
+    .select("id")
+    .eq("site_id", brief.site_id)
+    .eq("slug", route.slug)
+    .maybeSingle();
+
+  let pagesId: string;
+  if (existingPage) {
+    pagesId = existingPage.id as string;
+  } else {
+    const { data: newPage, error: insertErr } = await svc
+      .from("pages")
+      .insert({
+        site_id:               brief.site_id,
+        slug:                  route.slug,
+        title:                 page.title,
+        page_type:             route.page_type,
+        design_system_version: 1,
+        status:                "draft",
+      })
+      .select("id")
+      .single();
+    if (insertErr || !newPage) {
+      logger.error("brief_runner.m16.pages_row_create_failed", {
+        brief_run_id: run.id,
+        error: insertErr?.message,
+      });
+      await client.query(
+        `UPDATE brief_pages
+            SET page_status = 'failed',
+                updated_at = now(),
+                version_lock = version_lock + 1
+          WHERE id = $1`,
+        [page.id],
+      );
+      await client.query(
+        `UPDATE brief_runs
+            SET status = 'failed',
+                failure_code = 'M16_PAGES_ROW_CREATE_FAILED',
+                finished_at = now(),
+                lease_expires_at = NULL,
+                worker_id = NULL,
+                updated_at = now(),
+                version_lock = version_lock + 1
+          WHERE id = $1`,
+        [run.id],
+      );
+      return {
+        ok: true,
+        outcome: "page_failed",
+        runStatus: "failed",
+        currentOrdinal: page.ordinal,
+        pageStatus: "failed",
+      };
+    }
+    pagesId = newPage.id as string;
+  }
+
+  // Call page doc generator (M16-5)
+  const genResult = await runPageDocumentGenerator({
+    siteId:      brief.site_id,
+    briefId:     brief.id,
+    pageId:      pagesId,
+    routeId:     route.id,
+    pageOrdinal: page.ordinal,
+  });
+
+  if (!genResult.ok) {
+    logger.error("brief_runner.m16.page_gen_failed", {
+      brief_run_id: run.id,
+      page_id:      pagesId,
+      code:         genResult.error.code,
+    });
+    await client.query(
+      `UPDATE brief_pages
+          SET page_status = 'failed',
+              updated_at = now(),
+              version_lock = version_lock + 1
+        WHERE id = $1`,
+      [page.id],
+    );
+    await client.query(
+      `UPDATE brief_runs
+          SET status = 'failed',
+              failure_code = $2,
+              finished_at = now(),
+              lease_expires_at = NULL,
+              worker_id = NULL,
+              updated_at = now(),
+              version_lock = version_lock + 1
+        WHERE id = $1`,
+      [run.id, genResult.error.code],
+    );
+    return {
+      ok: true,
+      outcome: "page_failed",
+      runStatus: "failed",
+      currentOrdinal: page.ordinal,
+      pageStatus: "failed",
+    };
+  }
+
+  // Run render worker to convert page_document → generated_html (M16-6)
+  await runRenderWorker({ siteId: brief.site_id });
+
+  // Read rendered HTML back (may be empty if render had warnings)
+  const { data: renderedPage } = await svc
+    .from("pages")
+    .select("generated_html")
+    .eq("id", pagesId)
+    .maybeSingle();
+  const draftHtml = (renderedPage?.generated_html as string | null) ?? "";
+
+  // Advance brief_page to awaiting_review (operator sees rendered HTML)
+  await client.query(
+    `UPDATE brief_pages
+        SET page_status = 'awaiting_review',
+            draft_html  = $2,
+            updated_at  = now(),
+            version_lock = version_lock + 1
+      WHERE id = $1`,
+    [page.id, draftHtml],
+  );
+
+  // Pause the run — operator must approve this page before the next runs
+  await client.query(
+    `UPDATE brief_runs
+        SET status = 'paused',
+            current_ordinal = $2,
+            lease_expires_at = NULL,
+            worker_id = NULL,
+            updated_at = now(),
+            version_lock = version_lock + 1
+      WHERE id = $1`,
+    [run.id, page.ordinal],
+  );
+
+  logger.info("brief_runner.m16.page_generated", {
+    brief_run_id: run.id,
+    page_id:      pagesId,
+    ordinal:      page.ordinal,
+    cached:       genResult.cached,
+  });
+
+  return {
+    ok: true,
+    outcome: "page_advanced_to_review",
+    runStatus: "paused",
+    currentOrdinal: page.ordinal,
+    pageStatus: "awaiting_review",
+  };
 }
 
 async function processPagePassLoop(
