@@ -87,6 +87,9 @@ CREATE TABLE route_registry (
   wp_page_id      INT,
   wp_content_hash TEXT,             -- SHA-256 of WP page content, for drift detection
 
+  -- Generation order (matches brief_pages.ordinal; set by site planner)
+  ordinal         INT,
+
   -- Optimistic locking
   version_lock  INT NOT NULL DEFAULT 1,
 
@@ -176,6 +179,18 @@ CREATE INDEX IF NOT EXISTS idx_pages_html_is_stale
 -- Index for WP status dashboard
 CREATE INDEX IF NOT EXISTS idx_pages_wp_status
   ON pages (site_id, wp_status);
+
+-- pages.wp_page_id — drop NOT NULL so M16 can create rows before WP publish
+ALTER TABLE pages ALTER COLUMN wp_page_id DROP NOT NULL;
+ALTER TABLE pages DROP CONSTRAINT IF EXISTS unique_wp_page_per_site;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pages_site_wp_unique
+  ON pages (site_id, wp_page_id)
+  WHERE wp_page_id IS NOT NULL;
+
+-- route_registry.ordinal index (column is declared above in CREATE TABLE)
+CREATE INDEX IF NOT EXISTS idx_route_registry_site_ordinal
+  ON route_registry (site_id, ordinal)
+  WHERE ordinal IS NOT NULL;
 
 -- ─── 5. design_components table — additive columns ────────────────────────
 -- Adds typed field schema (Puck Fields format) and render defaults.
