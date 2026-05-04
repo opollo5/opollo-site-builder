@@ -103,17 +103,15 @@ CREATE TABLE route_registry (
     -- Note: PostgreSQL partial unique via WHERE clause:
 );
 
--- Partial unique index: (site_id, slug) where status != 'removed'
--- This allows a slug to be re-used after a route is removed.
-CREATE UNIQUE INDEX idx_route_registry_active_slug
+-- Non-unique filtered index for active-slug lookups (status != 'removed').
+-- The table-level UNIQUE constraint (route_registry_site_slug_unique) handles
+-- ON CONFLICT detection for upserts; this index accelerates filtering queries.
+CREATE INDEX idx_route_registry_active_slug
   ON route_registry (site_id, slug)
   WHERE status != 'removed';
 
 CREATE INDEX idx_route_registry_site_id ON route_registry (site_id);
 CREATE INDEX idx_route_registry_status  ON route_registry (status);
-
--- Drop the naive UNIQUE from above (we used the partial index instead)
-ALTER TABLE route_registry DROP CONSTRAINT IF EXISTS route_registry_site_slug_unique;
 
 -- ─── 3. shared_content ─────────────────────────────────────────────────────
 -- Reusable content objects referenced by ID from any page section.

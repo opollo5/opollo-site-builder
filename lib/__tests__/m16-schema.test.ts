@@ -370,10 +370,11 @@ describe("pages — wp_status CHECK and defaults", () => {
     const { data, error } = await svc
       .from("pages")
       .insert({
-        site_id: site.id,
-        title:   "M16 test page",
-        slug:    "/m16-test",
-        status:  "draft",
+        site_id:   site.id,
+        title:     "M16 test page",
+        slug:      "/m16-test",
+        page_type: "service",
+        status:    "draft",
         design_system_version: 1,
       })
       .select("html_is_stale, wp_status, page_document, validation_result")
@@ -394,10 +395,11 @@ describe("pages — wp_status CHECK and defaults", () => {
       const { data, error } = await svc
         .from("pages")
         .insert({
-          site_id: site.id,
-          title:   `Page ${status}`,
-          slug:    `/page-${status.replace("_", "-")}`,
-          status:  "draft",
+          site_id:   site.id,
+          title:     `Page ${status}`,
+          slug:      `/page-${status.replace("_", "-")}`,
+          page_type: "service",
+          status:    "draft",
           wp_status: status,
           design_system_version: 1,
         })
@@ -414,10 +416,11 @@ describe("pages — wp_status CHECK and defaults", () => {
     const { error } = await svc
       .from("pages")
       .insert({
-        site_id:  site.id,
-        title:    "Bad status",
-        slug:     "/bad-wp-status",
-        status:   "draft",
+        site_id:   site.id,
+        title:     "Bad status",
+        slug:      "/bad-wp-status",
+        page_type: "service",
+        status:    "draft",
         wp_status: "uploaded",
         design_system_version: 1,
       })
