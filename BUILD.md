@@ -57,10 +57,12 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 
 ## Current state
 
-- **Slice in progress:** none — V1 roadmap complete (Phase A + Phase B + Phase C I1-I4)
-- **Most recently shipped:** S8 self-service connection reconnect (#472)
+- **Slice in progress:** none — V1 roadmap complete (Phase A + Phase B + Phase C I1-I5 + Phase D)
+- **Most recently shipped:** s1-57 cursor pagination for media library (#521)
 - **S0 (bundle.social verification):** complete
 - **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds), Bannerbear or Placid (compositing — evaluate at I2)
+
+> **Phase B post-V1 enhancements.** Since V1 shipped (S1–S8, s1-1 through s1-18), the social module has grown via additional `s1-N` slices (s1-19 through s1-57). These cover publish-route wiring, media library, approval actions, calendar nav, post list UX (search, filters, pagination, sorting), MSP release workflow, CAP-source badge, reviewer comments, notification dispatch, and connection management. Run `git log main --grep "feat(s1-"` for the full list.
 
 > **Slice numbering note.** Phase B shipped under the `S1-N` sub-slice convention (`feat(s1-1)` … `feat(s1-18)`), not the `S1` … `S8` parent labels in the build sequence below. The Phase B table maps each parent slice to the sub-slice PRs that delivered it; reference those PRs (and `git log main --grep "feat(s1-"`) for the actual implementation history.
 
@@ -103,11 +105,19 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 | I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ✅ Shipped (#457 Bannerbear primary, Placid stub, TEXT_ZONE_MAP pixel conversion) |
 | I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | ✅ Shipped (#459) |
 | I4 | Mood board UI: style selector, composition selector, 4–6 results, 1-click select. | ✅ Shipped (#463) |
-| I5 | CAP Phase 2: automated generation via source_type='cap' (Phase 2) | ❌ Pending (Phase 2 — see "What is NOT V1" further down) |
+| I5 | CAP Phase 2: automated generation via source_type='cap' | ✅ Shipped (#510 — image generation trigger E1) |
+
+### Phase D: CAP (Content Automation Pipeline)
+
+| Slice | Scope | Status |
+|-------|-------|--------|
+| D1/D2 | CAP copy generator + API route | ✅ Shipped (#506) |
+| D3 | CAP generate modal + toolbar button | ✅ Shipped (#507) |
+| D4 | Weekly CAP generation cron | ✅ Shipped (#508) |
 
 **Rule:** finish one slice, CI green, PR merged, before starting the next.
 
-> **Status reconciliation history.** This table was reconciled against actual `git log main` on 2026-05-03 (PR #X). Phase A/B status fields had drifted from reality during the P1 → S1-18 sprint. Going forward, BUILD.md status updates ride alongside slice merges (each slice's PR description includes the row update); a periodic full reconciliation runs when drift exceeds 2-3 slices.
+> **Status reconciliation history.** This table was reconciled against actual `git log main` on 2026-05-03 (PR #440) and updated on 2026-05-04 (this PR) to mark I5 shipped and add Phase D. Going forward, BUILD.md status updates ride alongside slice merges (each slice's PR description includes the row update); a periodic full reconciliation runs when drift exceeds 2-3 slices.
 
 ---
 
@@ -333,7 +343,7 @@ Read the image-generation skill before touching anything in `lib/image/`.
 
 ## What is NOT V1
 
-- AI writing assistants / CAP automated copy (Phase 2)
+- ~~AI writing assistants / CAP automated copy~~ (shipped — Phase D D1–D4 PRs #506–#508; I5 image trigger PR #510)
 - Analytics dashboards (Phase 2)
 - Multi-company users (one company per user in V1)
 - SSO (email + password only)
