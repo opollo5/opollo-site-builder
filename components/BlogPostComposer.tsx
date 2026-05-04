@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { Check, ChevronDown, ChevronRight } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -58,24 +58,21 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 //   - localStorage autosave (debounced 800ms). Keyed by siteId so two
 //     drafts on different sites don't collide. Saved state indicator
 //     reads "Saving…" / "Saved · just now" / "Saved 2m ago".
-//   - Progressive disclosure — meta title / meta description / parent
-//     page / featured image collapse behind a "More options" toggle
-//     that auto-opens when any of those fields has a value (parser
-//     pre-fill or operator edit). Save Draft works without expanding.
+//   - Progressive disclosure — parent page / featured image collapse
+//     behind a "More options" toggle. Save Draft works without expanding.
 // ---------------------------------------------------------------------------
 
 const PARSE_DEBOUNCE_MS = 200;
 const AUTOSAVE_DEBOUNCE_MS = 800;
 const AUTOSAVE_STATUS_FRESH_MS = 1500;
 
-// BL-3 — SEO recommendation envelopes. These are advisory only;
-// neither field is hard-capped at the recommendation line. Matches
-// what Google / Bing show in SERPs as of mid-2025.
+// BL-3 — SEO recommendation envelopes. Advisory only; neither field is
+// hard-capped. Matches Google / Bing SERPs as of mid-2025.
 const TITLE_SEO_CAP = 60;
 const META_TITLE_SEO_CAP = 60;
 const META_DESCRIPTION_SEO_MIN = 120;
 const META_DESCRIPTION_SEO_MAX = 160;
-// Adult reading speed for prose, words-per-minute. Substack uses ~250.
+// Adult reading speed for prose, words-per-minute.
 const READING_WPM = 230;
 
 const SOURCE_HINTS: Record<ParseSource, string> = {
@@ -128,9 +125,7 @@ function applyParse(
   return { value: parsed, source, touched: false };
 }
 
-// BL-3 — word + reading-time counter. Strips HTML tags, fenced code
-// blocks, and YAML front-matter so the figure tracks "what the reader
-// sees" rather than "raw markdown the operator pasted".
+// BL-3 — word + reading-time counter.
 function wordCount(text: string): number {
   if (!text) return 0;
   const stripped = text
@@ -148,9 +143,25 @@ function readingMinutes(words: number): number {
   return Math.max(1, Math.round(words / READING_WPM));
 }
 
-// BL-2 autosave shape — kept narrow on purpose so a future schema
-// change (e.g. a new field on FieldState) doesn't silently corrupt
-// stored drafts. Restoration tolerates partial / missing fields.
+// Taxonomy option (categories / tags). Defined locally to avoid importing
+// the server-only lib/wordpress module into a client component.
+interface WpTaxonomyOption {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+}
+
+type PublishMode = "draft" | "schedule";
+
+function defaultScheduledAt(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  d.setHours(12, 0, 0, 0);
+  return d.toISOString().slice(0, 16);
+}
+
+// BL-2 autosave shape.
 interface DraftSnapshot {
   v: 1;
   composerText: string;
@@ -161,6 +172,10 @@ interface DraftSnapshot {
   parentPage: WpPageOption | null;
   featuredImage: ImagePickerEntry | null;
   savedAt: number;
+  publishMode?: PublishMode;
+  scheduledAt?: string;
+  selectedCategories?: WpTaxonomyOption[];
+  selectedTags?: WpTaxonomyOption[];
 }
 
 function draftStorageKey(siteId: string): string {
@@ -182,31 +197,29 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [slug, setSlug] = useState<FieldState>(emptyField);
   const [metaTitle, setMetaTitle] = useState<FieldState>(emptyField);
   const [metaDescription, setMetaDescription] = useState<FieldState>(emptyField);
-  // BP-8 — parent page comes from a combobox backed by /api/sites/[id]/wp-pages.
   const [parentPage, setParentPage] = useState<WpPageOption | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastParse, setLastParse] = useState<BlogPostMetadata | null>(null);
-  // BP-4 — featured image is local-only state for now. BP-7 will
-  // persist via posts.featured_image_id and transfer to WP at publish.
-  const [featuredImage, setFeaturedImage] =
-    useState<ImagePickerEntry | null>(null);
+  const [featuredImage, setFeaturedImage] = useState<ImagePickerEntry | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // BL-2 — autosave state machine + disclosure toggle.
   const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
   const [fileReadError, setFileReadError] = useState<string | null>(null);
-  // Permalink structure from WP settings (cached in sites.wp_permalink_structure).
   const [permalinkStructure, setPermalinkStructure] = useState<string | null>(null);
   const [siteWpUrl, setSiteWpUrl] = useState<string | null>(null);
-  // Hydration guard — restore-from-localStorage runs once, AFTER mount,
-  // so SSR + first client render match. The ref blocks autosave from
-  // firing during the restore tick (otherwise the restored values would
-  // immediately get re-saved and trigger a Saved indicator on load).
+  const [siteName, setSiteName] = useState<string | null>(null);
+  // Fix 5 — publish scheduling.
+  const [publishMode, setPublishMode] = useState<PublishMode>("draft");
+  const [scheduledAt, setScheduledAt] = useState<string>(defaultScheduledAt);
+  // Fix 6 — WP categories + tags.
+  const [selectedCategories, setSelectedCategories] = useState<WpTaxonomyOption[]>([]);
+  const [selectedTags, setSelectedTags] = useState<WpTaxonomyOption[]>([]);
+  // Hydration guard — restore-from-localStorage runs once, AFTER mount.
   const restoredRef = useRef(false);
 
-  // BL-2 — restore from localStorage on mount. Runs once per siteId.
+  // BL-2 — restore from localStorage on mount.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -220,8 +233,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         restoredRef.current = true;
         return;
       }
-      // Apply each section guardedly so a partial snapshot doesn't
-      // throw. Operator can still type into anything that's missing.
       if (typeof parsed.composerText === "string") {
         setComposerValue({ text: parsed.composerText, file: null });
       }
@@ -230,35 +241,25 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (parsed.metaTitle) setMetaTitle(parsed.metaTitle);
       if (parsed.metaDescription) setMetaDescription(parsed.metaDescription);
       if (parsed.parentPage !== undefined) setParentPage(parsed.parentPage);
-      if (parsed.featuredImage !== undefined) {
-        setFeaturedImage(parsed.featuredImage);
-      }
-      // Surface the restore in the saved indicator + auto-open the
-      // disclosure if the restored draft used any advanced fields.
+      if (parsed.featuredImage !== undefined) setFeaturedImage(parsed.featuredImage);
+      if (parsed.publishMode) setPublishMode(parsed.publishMode);
+      if (parsed.scheduledAt) setScheduledAt(parsed.scheduledAt);
+      if (parsed.selectedCategories) setSelectedCategories(parsed.selectedCategories);
+      if (parsed.selectedTags) setSelectedTags(parsed.selectedTags);
       setDraftRestoredAt(parsed.savedAt);
-      if (
-        parsed.metaTitle?.value ||
-        parsed.metaDescription?.value ||
-        parsed.parentPage ||
-        parsed.featuredImage
-      ) {
+      if (parsed.parentPage || parsed.featuredImage) {
         setShowAdvanced(true);
       }
     } catch {
-      // Corrupt JSON — wipe the slot so subsequent loads don't loop.
       try {
         window.localStorage.removeItem(draftStorageKey(siteId));
       } catch {}
     } finally {
       restoredRef.current = true;
     }
-    // siteId is the storage key — re-run when the operator switches
-    // sites (PostsNewClient remounts BlogPostComposer on site change,
-    // but defending against in-place siteId swaps too).
   }, [siteId]);
 
   // Read attached file content into composerValue.text.
-  // Handles .docx (mammoth), and text-based files (.md, .html, .txt).
   useEffect(() => {
     const file = composerValue.file;
     if (!file) return;
@@ -288,7 +289,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               ],
             },
           );
-          // Extract title from first H1 if title field is empty.
           if (!cancelled && title.value.trim().length === 0) {
             const h1Match = /<h1[^>]*>(.*?)<\/h1>/i.exec(result.value);
             if (h1Match) {
@@ -318,41 +318,36 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return () => {
       cancelled = true;
     };
-  // Only react to the file reference changing, not to title — title
-  // is written inside this effect, creating a loop if included.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [composerValue.file]);
 
-  // Fetch permalink structure on mount (for URL preview below slug field).
+  // Fix 7 — fetch site name + permalink structure on mount.
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch(
-          `/api/sites/${siteId}/permalink-structure`,
-          { cache: "no-store" },
-        );
-        const payload = (await res.json().catch(() => null)) as
+        const [permRes, siteRes] = await Promise.all([
+          fetch(`/api/sites/${siteId}/permalink-structure`, { cache: "no-store" }),
+          fetch(`/api/sites/${siteId}`, { cache: "no-store" }),
+        ]);
+        const permPay = (await permRes.json().catch(() => null)) as
           | { ok: true; data: { permalink_structure: string | null } }
           | null;
-        if (payload?.ok) {
-          setPermalinkStructure(payload.data.permalink_structure);
-        }
-        // Also load wp_url for the preview from the site route.
-        const siteRes = await fetch(`/api/sites/${siteId}`, { cache: "no-store" });
+        if (permPay?.ok) setPermalinkStructure(permPay.data.permalink_structure);
+
         const sitePay = (await siteRes.json().catch(() => null)) as
-          | { ok: true; data: { site: { wp_url: string } } }
+          | { ok: true; data: { site: { wp_url: string; name: string } } }
           | null;
         if (sitePay?.ok) {
           setSiteWpUrl(sitePay.data.site.wp_url.replace(/\/$/, ""));
+          setSiteName(sitePay.data.site.name ?? null);
         }
       } catch {
-        // Non-fatal — URL preview simply won't render.
+        // Non-fatal — site indicator + URL preview simply won't render.
       }
     })();
   }, [siteId]);
 
-  // Debounced re-parse on every text change. Pure-logic call, but
-  // 200ms keeps every keystroke from reflowing four field updates.
+  // Debounced re-parse on every text change.
   useEffect(() => {
     if (composerValue.text.length === 0) {
       setLastParse(null);
@@ -377,15 +372,16 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return () => clearTimeout(id);
   }, [composerValue.text]);
 
-  // BL-2 — debounced autosave to localStorage. Skips while the form is
-  // submitting (the success path navigates away anyway) and waits for
-  // the initial restore to complete so we don't immediately re-save
-  // the snapshot we just loaded.
+  // Fix 3 — auto-open AdvancedDisclosure when featured image is selected.
+  useEffect(() => {
+    if (featuredImage !== null) setShowAdvanced(true);
+  }, [featuredImage]);
+
+  // BL-2 — debounced autosave to localStorage.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (!restoredRef.current) return;
     if (submitting) return;
-    // Empty form? Don't pollute storage with an empty snapshot.
     if (
       composerValue.text.length === 0 &&
       title.value.length === 0 &&
@@ -393,7 +389,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       metaTitle.value.length === 0 &&
       metaDescription.value.length === 0 &&
       parentPage === null &&
-      featuredImage === null
+      featuredImage === null &&
+      selectedCategories.length === 0 &&
+      selectedTags.length === 0
     ) {
       return;
     }
@@ -409,6 +407,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         parentPage,
         featuredImage,
         savedAt: Date.now(),
+        publishMode,
+        scheduledAt,
+        selectedCategories,
+        selectedTags,
       };
       try {
         window.localStorage.setItem(
@@ -417,7 +419,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         );
         setAutosave({ kind: "saved", at: snapshot.savedAt });
       } catch {
-        // Quota / disabled — fall back to idle so the indicator clears.
         setAutosave({ kind: "idle" });
       }
     }, AUTOSAVE_DEBOUNCE_MS);
@@ -430,6 +431,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     metaDescription,
     parentPage,
     featuredImage,
+    publishMode,
+    scheduledAt,
+    selectedCategories,
+    selectedTags,
     siteId,
     submitting,
   ]);
@@ -450,10 +455,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     setAutosave({ kind: "idle" });
     setDraftRestoredAt(null);
     setShowAdvanced(false);
+    setPublishMode("draft");
+    setScheduledAt(defaultScheduledAt());
+    setSelectedCategories([]);
+    setSelectedTags([]);
   }, [siteId]);
 
-  // If the operator clears a touched field, snap it back to the
-  // parsed value rather than leaving the form blank between edits.
   function setFieldValue(
     setter: typeof setTitle,
     value: string,
@@ -477,26 +484,23 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     metaDescription.value.trim().length > 0 &&
     metaDescription.value.length <= 160;
 
+  const scheduleIsValid =
+    publishMode !== "schedule" || scheduledAt.length > 0;
+
   const canSaveDraft =
     !submitting &&
     titleIsValid &&
     slugIsValid &&
-    composerValue.text.trim().length > 0;
+    composerValue.text.trim().length > 0 &&
+    scheduleIsValid;
 
-  // BP-8 — Start Run gate. All publish-time required fields must be
-  // valid. Today Start Run does the same thing as Save Draft (router
-  // push to detail); BP-7 will plumb the actual featured-image transfer
-  // + WP create at this point.
   const canStartRun =
     canSaveDraft &&
     metaTitleIsValid &&
     metaDescriptionIsValid &&
-    parentPage !== null &&
     featuredImage !== null;
 
-  // BL-8 — ⌘S / Ctrl+S triggers Save Draft from anywhere on the form.
-  // The browser's "save page" dialog interception is the standard
-  // shortcut operators expect from prose tools.
+  // BL-8 — ⌘S / Ctrl+S triggers Save Draft.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isCmdS =
@@ -504,8 +508,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (!isCmdS) return;
       if (!canSaveDraft) return;
       e.preventDefault();
-      // Submit via the form so React's onSubmit handler runs (we
-      // ride the same path Save Draft button takes).
       const formEl = document.getElementById(
         `blog-post-composer-form-${siteId}`,
       ) as HTMLFormElement | null;
@@ -518,6 +520,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   async function handleSaveDraft(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormError(null);
+
+    if (publishMode === "schedule" && !scheduledAt) {
+      setFormError("Please pick a date and time to schedule this post.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch(`/api/sites/${siteId}/posts`, {
@@ -530,9 +538,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             metaDescription.value.trim().length > 0
               ? metaDescription.value.trim()
               : null,
+          meta_title: metaTitle.value.trim() || null,
+          status: publishMode === "schedule" ? "scheduled" : "draft",
+          scheduled_at: publishMode === "schedule" ? scheduledAt : null,
+          wp_category_ids: selectedCategories.map((c) => c.id),
+          wp_tag_ids: selectedTags.map((t) => t.id),
           metadata: lastParse ?? null,
-          // BP-7 — persist the picker selection so publish-time can
-          // transfer it to WP without the operator re-picking.
           featured_image_id: featuredImage?.id ?? null,
         }),
       });
@@ -541,8 +552,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         | { ok: false; error: { code: string; message: string } }
         | null;
       if (payload?.ok) {
-        // BL-2 — wipe the autosave slot before navigating so a refresh
-        // on the detail page doesn't restore a now-saved snapshot.
         try {
           window.localStorage.removeItem(draftStorageKey(siteId));
         } catch {}
@@ -565,12 +574,36 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     }
   }
 
+  // Fix 8 — context-sensitive button labels.
+  const primaryLabel = publishMode === "schedule" ? "Schedule post" : "Save draft";
+  const secondaryLabel = publishMode === "schedule" ? "Schedule + run" : "Save + run";
+
   return (
     <form
       id={`blog-post-composer-form-${siteId}`}
       onSubmit={handleSaveDraft}
       className="space-y-6"
     >
+      {/* Fix 7 — site indicator. */}
+      {siteWpUrl && (
+        <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+          <span>Posting to</span>
+          {siteName && (
+            <span className="font-medium text-foreground">{siteName}</span>
+          )}
+          {siteName && <span>·</span>}
+          <span className="font-mono">
+            {(() => {
+              try {
+                return new URL(siteWpUrl).hostname;
+              } catch {
+                return siteWpUrl;
+              }
+            })()}
+          </span>
+        </div>
+      )}
+
       <div>
         <div className="flex items-baseline justify-between gap-2">
           <label
@@ -691,45 +724,148 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         </div>
       </fieldset>
 
+      {/* Fix 4 — SEO meta fields promoted out of AdvancedDisclosure. */}
+      <div className="space-y-4">
+        <div>
+          <label htmlFor="post-meta-title" className="block text-sm font-medium">
+            SEO title
+          </label>
+          <Input
+            id="post-meta-title"
+            className="mt-1"
+            value={metaTitle.value}
+            onChange={(e) =>
+              setFieldValue(
+                setMetaTitle,
+                e.target.value,
+                lastParse?.meta_title ?? null,
+                lastParse?.source_map.meta_title ?? "derived",
+              )
+            }
+            disabled={submitting}
+            maxLength={200}
+          />
+          <div className="mt-1 flex items-center justify-between gap-2">
+            <SourceHint source={metaTitle.source} />
+            <MetaTitleLengthHint length={metaTitle.value.length} />
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="post-meta-description"
+            className="block text-sm font-medium"
+          >
+            Meta description
+          </label>
+          <Textarea
+            id="post-meta-description"
+            className="mt-1"
+            rows={3}
+            value={metaDescription.value}
+            onChange={(e) =>
+              setFieldValue(
+                setMetaDescription,
+                e.target.value,
+                lastParse?.meta_description ?? null,
+                lastParse?.source_map.meta_description ?? "derived",
+              )
+            }
+            disabled={submitting}
+            maxLength={400}
+            aria-invalid={
+              metaDescription.value.length > 0 && !metaDescriptionIsValid
+            }
+          />
+          <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+            <SourceHint source={metaDescription.source} />
+            <MetaDescriptionLengthHint
+              length={metaDescription.value.length}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Fix 6 — WordPress categories + tags. */}
+      <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <div>
+          <label className="block text-sm font-medium">Categories</label>
+          <WpTaxonomyCombobox
+            siteId={siteId}
+            type="categories"
+            value={selectedCategories}
+            onChange={setSelectedCategories}
+            disabled={submitting}
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium">Tags</label>
+          <WpTaxonomyCombobox
+            siteId={siteId}
+            type="tags"
+            value={selectedTags}
+            onChange={setSelectedTags}
+            disabled={submitting}
+          />
+        </div>
+      </fieldset>
+
+      {/* Fix 5 — Publish scheduling. */}
+      <div>
+        <p className="text-sm font-medium">When to publish</p>
+        <div className="mt-2 flex flex-wrap gap-6">
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={`publish-mode-${siteId}`}
+              value="draft"
+              checked={publishMode === "draft"}
+              onChange={() => setPublishMode("draft")}
+              disabled={submitting}
+              className="accent-primary"
+            />
+            Save as draft
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={`publish-mode-${siteId}`}
+              value="schedule"
+              checked={publishMode === "schedule"}
+              onChange={() => setPublishMode("schedule")}
+              disabled={submitting}
+              className="accent-primary"
+            />
+            Schedule for later
+          </label>
+        </div>
+        {publishMode === "schedule" && (
+          <div className="mt-3">
+            <label
+              htmlFor="post-scheduled-at"
+              className="block text-sm font-medium"
+            >
+              Publish at
+            </label>
+            <Input
+              id="post-scheduled-at"
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(e) => setScheduledAt(e.target.value)}
+              className="mt-1 w-auto"
+              disabled={submitting}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* AdvancedDisclosure — Fix 4: now contains only parent page + featured image. */}
       <AdvancedDisclosure
         open={showAdvanced}
         onToggle={() => setShowAdvanced((v) => !v)}
-        summary={summarizeAdvanced({
-          metaTitle,
-          metaDescription,
-          parentPage,
-          featuredImage,
-        })}
+        summary={summarizeAdvanced({ parentPage, featuredImage })}
       >
-        <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label
-              htmlFor="post-meta-title"
-              className="block text-sm font-medium"
-            >
-              Meta title (SEO)
-            </label>
-            <Input
-              id="post-meta-title"
-              className="mt-1"
-              value={metaTitle.value}
-              onChange={(e) =>
-                setFieldValue(
-                  setMetaTitle,
-                  e.target.value,
-                  lastParse?.meta_title ?? null,
-                  lastParse?.source_map.meta_title ?? "derived",
-                )
-              }
-              disabled={submitting}
-              maxLength={200}
-            />
-            <div className="mt-1 flex items-center justify-between gap-2">
-              <SourceHint source={metaTitle.source} />
-              <MetaTitleLengthHint length={metaTitle.value.length} />
-            </div>
-          </div>
-
+        <div className="space-y-4">
           <div>
             <label
               htmlFor="post-parent-page"
@@ -750,97 +886,57 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             </p>
           </div>
 
-          <div className="md:col-span-2">
-            <label
-              htmlFor="post-meta-description"
-              className="block text-sm font-medium"
-            >
-              Meta description (SEO)
-            </label>
-            <Textarea
-              id="post-meta-description"
-              className="mt-1"
-              rows={3}
-              value={metaDescription.value}
-              onChange={(e) =>
-                setFieldValue(
-                  setMetaDescription,
-                  e.target.value,
-                  lastParse?.meta_description ?? null,
-                  lastParse?.source_map.meta_description ?? "derived",
-                )
-              }
-              disabled={submitting}
-              maxLength={400}
-              aria-invalid={
-                metaDescription.value.length > 0 && !metaDescriptionIsValid
-              }
-            />
-            <div className="mt-1 flex items-center justify-between gap-2 text-sm">
-              <SourceHint source={metaDescription.source} />
-              <MetaDescriptionLengthHint
-                length={metaDescription.value.length}
-              />
-            </div>
-          </div>
-        </fieldset>
-
-        <div className="mt-4 rounded-md border p-4 text-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-medium">Featured image</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Required at publish (enforced by BP-7&apos;s server-side
-                guard). Selecting here previews; persistence + WP attachment
-                ship in BP-7.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setPickerOpen(true)}
-              disabled={submitting}
-            >
-              {featuredImage ? "Change image" : "Pick image"}
-            </Button>
-          </div>
-          {featuredImage && featuredImage.delivery_url && (
-            <div className="mt-3 flex items-center gap-3">
-              {/* Cloudflare Images delivery URL — no Next/Image to avoid
-                  wiring imagedelivery.net into next.config remotePatterns
-                  for a thumbnail with explicit w=/h= params already. */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
-                alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
-                className="h-20 w-20 rounded-md border object-cover"
-              />
-              <div className="min-w-0">
-                <p
-                  className="truncate text-sm font-medium"
-                  title={featuredImage.caption ?? featuredImage.filename ?? ""}
-                >
-                  {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
+          <div className="rounded-md border p-4 text-sm">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">Featured image</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Required at publish (enforced by BP-7&apos;s server-side
+                  guard). Selecting here previews; persistence + WP attachment
+                  ship in BP-7.
                 </p>
-                <button
-                  type="button"
-                  onClick={() => setFeaturedImage(null)}
-                  className="text-sm text-muted-foreground underline hover:text-foreground"
-                >
-                  Remove
-                </button>
               </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setPickerOpen(true)}
+                disabled={submitting}
+              >
+                {featuredImage ? "Change image" : "Pick image"}
+              </Button>
             </div>
-          )}
+            {featuredImage && featuredImage.delivery_url && (
+              <div className="mt-3 flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
+                  alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
+                  className="h-20 w-20 rounded-md border object-cover"
+                />
+                <div className="min-w-0">
+                  <p
+                    className="truncate text-sm font-medium"
+                    title={featuredImage.caption ?? featuredImage.filename ?? ""}
+                  >
+                    {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setFeaturedImage(null)}
+                    className="text-sm text-muted-foreground underline hover:text-foreground"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </AdvancedDisclosure>
 
       {formError && <Alert variant="destructive">{formError}</Alert>}
 
-      {/* BL-2 — saved indicator + restored draft notice + discard button.
-          Sits flush above the action row so the operator catches the
-          state change in their primary scan path. */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <SaveStatus
           autosave={autosave}
@@ -849,6 +945,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         />
       </div>
 
+      {/* Fix 8 — context-sensitive button labels. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         <span
           aria-hidden
@@ -862,7 +959,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           </kbd>
         </span>
         <Button type="submit" disabled={!canSaveDraft}>
-          {submitting ? "Saving…" : "Save draft"}
+          {submitting ? "Saving…" : primaryLabel}
         </Button>
         <Button
           type="submit"
@@ -870,23 +967,28 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           title={
             canStartRun
               ? "Save the draft and continue to publish."
-              : "All required fields must be valid: title, slug, meta title, meta description, parent page, featured image."
+              : "Fill in SEO title, meta description, and featured image first."
           }
         >
-          {submitting ? "Saving…" : "Start run"}
+          {submitting ? "Saving…" : secondaryLabel}
         </Button>
       </div>
       {!canStartRun && canSaveDraft && (
         <p className="text-sm text-muted-foreground">
-          Start run needs the SEO meta fields, parent page, and featured
-          image — open <button
-            type="button"
-            onClick={() => setShowAdvanced(true)}
-            className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-          >
-            More options
-          </button>
-          {" "}to fill them in.
+          {secondaryLabel} needs SEO title, meta description, and featured image.
+          {featuredImage === null && (
+            <>
+              {" "}Open{" "}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(true)}
+                className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
+              >
+                More options
+              </button>{" "}
+              to pick a featured image.
+            </>
+          )}
         </p>
       )}
 
@@ -894,10 +996,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={(image) => setFeaturedImage(image)}
-        // R1-5 — pre-save suggestion context. Composer doesn't have a
-        // post id yet (save creates one); pass title + body snippet
-        // weighted toward title (3× repeat) so the picker's Suggested
-        // tab can FTS-rank library images.
         suggestionContext={
           title.value.trim().length > 0 || composerValue.text.trim().length > 0
             ? `${title.value} ${title.value} ${title.value} ${composerValue.text.slice(0, 400)}`.trim()
@@ -965,9 +1063,6 @@ function ReadingChip({ text }: { text: string }) {
   return (
     <span
       data-testid="post-reading-chip"
-      // BL-9 — fade-in the first time the chip surfaces. Re-runs on
-      // remount only (text changes don't re-trigger because React
-      // doesn't add the class on re-render of an already-mounted node).
       className="opollo-fade-in text-sm text-muted-foreground"
     >
       {words.toLocaleString()} {words === 1 ? "word" : "words"} ·{" "}
@@ -1022,9 +1117,6 @@ function MetaTitleLengthHint({ length }: { length: number }) {
 }
 
 function MetaDescriptionLengthHint({ length }: { length: number }) {
-  // Three states: empty / under-min / sweet-spot / over-max. The
-  // sweet spot reads as positive ("good length"); the over-max state
-  // gates the form via aria-invalid + this destructive label.
   if (length === 0) {
     return (
       <span className="text-muted-foreground">
@@ -1054,26 +1146,20 @@ function MetaDescriptionLengthHint({ length }: { length: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// BL-2 — Progressive disclosure wrapper for advanced fields.
+// Fix 4 — AdvancedDisclosure now wraps only parent page + featured image.
 // ---------------------------------------------------------------------------
 
 function summarizeAdvanced({
-  metaTitle,
-  metaDescription,
   parentPage,
   featuredImage,
 }: {
-  metaTitle: FieldState;
-  metaDescription: FieldState;
   parentPage: WpPageOption | null;
   featuredImage: ImagePickerEntry | null;
 }): string {
   const filled: string[] = [];
-  if (metaTitle.value.trim()) filled.push("meta title");
-  if (metaDescription.value.trim()) filled.push("meta description");
   if (parentPage) filled.push("parent page");
   if (featuredImage) filled.push("featured image");
-  if (filled.length === 0) return "SEO meta, parent page, featured image";
+  if (filled.length === 0) return "Parent page, featured image";
   return filled.join(", ");
 }
 
@@ -1118,9 +1204,7 @@ function AdvancedDisclosure({
 }
 
 // ---------------------------------------------------------------------------
-// BL-2 — Save status indicator. Reads the autosave state machine and
-// surfaces a single inline string the operator can scan without context
-// switching.
+// BL-2 — Save status indicator.
 // ---------------------------------------------------------------------------
 
 function SaveStatus({
@@ -1132,8 +1216,6 @@ function SaveStatus({
   restoredAt: number | null;
   onDiscard: () => void;
 }) {
-  // Restore notice takes priority on first paint; once the operator
-  // edits anything the autosave indicator owns the slot.
   const showingRestore = restoredAt !== null && autosave.kind === "idle";
 
   let label = "";
@@ -1174,21 +1256,156 @@ function SaveStatus({
 }
 
 // ---------------------------------------------------------------------------
+// Fix 6 — WpTaxonomyCombobox: multi-select for categories or tags.
+// ---------------------------------------------------------------------------
+
+function WpTaxonomyCombobox({
+  siteId,
+  type,
+  value,
+  onChange,
+  disabled,
+}: {
+  siteId: string;
+  type: "categories" | "tags";
+  value: WpTaxonomyOption[];
+  onChange: (next: WpTaxonomyOption[]) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<WpTaxonomyOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/sites/${siteId}/wp-taxonomies?type=${type}`,
+          { cache: "no-store" },
+        );
+        const payload = (await res.json().catch(() => null)) as
+          | { ok: true; data: { items: WpTaxonomyOption[] } }
+          | { ok: false; error: { message: string } }
+          | null;
+        if (!cancelled) {
+          if (payload?.ok) {
+            setOptions(payload.data.items);
+          } else {
+            setError(
+              payload?.ok === false
+                ? payload.error.message
+                : `Failed to load ${type}.`,
+            );
+          }
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [siteId, type]);
+
+  const selectedIds = useMemo(() => new Set(value.map((v) => v.id)), [value]);
+  const label = type === "categories" ? "category" : "tag";
+  const placeholder = loading
+    ? `Loading ${type}…`
+    : `Pick ${type}…`;
+
+  return (
+    <Popover open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="mt-1 flex min-h-10 w-full items-start justify-between gap-2 rounded-md border bg-background px-3 py-2 text-sm transition-smooth focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span
+            className={cn(
+              "flex min-h-6 flex-1 flex-wrap gap-1",
+              value.length === 0 && "text-muted-foreground",
+            )}
+          >
+            {value.length > 0
+              ? value.map((v) => (
+                  <span
+                    key={v.id}
+                    className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
+                  >
+                    {v.name}
+                  </span>
+                ))
+              : placeholder}
+          </span>
+          <ChevronDown
+            aria-hidden
+            className="mt-1 h-4 w-4 shrink-0 text-muted-foreground"
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-[var(--radix-popover-trigger-width)] max-h-60 overflow-y-auto p-0"
+      >
+        <Command shouldFilter={true}>
+          <CommandInput placeholder={`Search ${type}…`} />
+          <CommandList>
+            {error && (
+              <div role="alert" className="px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            <CommandEmpty>
+              {loading ? "Loading…" : `No ${label}s found.`}
+            </CommandEmpty>
+            {options.map((option) => (
+              <CommandItem
+                key={option.id}
+                value={`${option.name} ${option.slug}`}
+                onSelect={() => {
+                  if (selectedIds.has(option.id)) {
+                    onChange(value.filter((v) => v.id !== option.id));
+                  } else {
+                    onChange([...value, option]);
+                  }
+                }}
+              >
+                <Check
+                  aria-hidden
+                  className={cn(
+                    "mr-2 h-4 w-4 shrink-0",
+                    selectedIds.has(option.id) ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <span className="flex-1 truncate">{option.name}</span>
+                {option.count > 0 && (
+                  <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                    {option.count}
+                  </span>
+                )}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // BP-8 / BL-4 — WP parent-page combobox.
-//
-// Backed by /api/sites/[id]/wp-pages. Search is forwarded to WP's
-// `search` param (full-text against title + slug).
-//
-// BL-4 layered caching + prefetch on top of the BP-8 fetch loop:
-//   - Module-level Map keyed by `${siteId}:${query}` with 60s TTL. Two
-//     opens of the same combobox within a minute reuse the result so
-//     the dropdown opens instantly. Cache invalidates per-site (a real
-//     wp-pages mutation would need a manual `invalidateWpPagesCache`
-//     call — none today).
-//   - `onFocus` on the trigger button kicks off the empty-query fetch
-//     before the operator clicks, so the popover usually has data
-//     ready by the time it renders.
-//   - `onPointerEnter` on the trigger does the same, for mouse users.
 // ---------------------------------------------------------------------------
 
 export interface WpPageOption {
@@ -1245,9 +1462,6 @@ async function fetchWpPages(
   }));
 }
 
-// Cache-aware fetcher. Returns immediately on a fresh hit; otherwise
-// dedupes inflight requests so a focus + open + query-change trio
-// doesn't trigger three identical fetches in flight at once.
 async function loadWpPages(
   siteId: string,
   query: string,
@@ -1295,31 +1509,22 @@ function WpPageCombobox({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [pages, setPages] = useState<WpPageOption[]>(() => {
-    // Seed from cache so an immediately-opened popover isn't blank
-    // for one render tick.
     const cached = wpPagesCache.get(wpPagesCacheKey(siteId, ""));
     return cached?.pages ?? [];
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // BL-4 — prefetch on focus / hover. No-op if cache is fresh; the
-  // dedupe map blocks redundant concurrent fetches.
   const prefetchEmpty = useCallback(() => {
     if (disabled) return;
     const ctrl = new AbortController();
     void loadWpPages(siteId, "", ctrl.signal)
       .then((res) => {
-        // Only seed component state if no operator-typed query has
-        // landed in the meantime; otherwise we'd flash unsearched
-        // results into a search context.
         setPages((prev) =>
           prev.length === 0 || res.fromCache ? res.pages : prev,
         );
       })
-      .catch(() => {
-        // Silent — the open-time fetch will surface errors loud.
-      });
+      .catch(() => {});
   }, [siteId, disabled]);
 
   useEffect(() => {

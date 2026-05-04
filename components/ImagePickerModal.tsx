@@ -737,12 +737,12 @@ function ImageGrid({
                 </div>
               )}
             </div>
-            {img.caption && (
+            {(img.caption ?? img.alt_text ?? img.filename) && (
               <p
                 className="truncate px-2 py-1 text-sm text-muted-foreground"
-                title={img.caption}
+                title={img.caption ?? img.alt_text ?? img.filename ?? ""}
               >
-                {img.caption}
+                {img.caption ?? img.alt_text ?? img.filename}
               </p>
             )}
           </button>

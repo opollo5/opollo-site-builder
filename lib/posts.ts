@@ -79,6 +79,10 @@ export const CreatePostInputSchema = z
     // gate enforces requirement for entry-point posts (metadata IS NOT
     // NULL).
     featured_image_id: z.string().uuid().nullable().optional(),
+    // "draft" is the default; "scheduled" is set when the operator picks
+    // a future publish date. "published" is excluded — publishing goes
+    // through the dedicated /posts/[id]/publish route.
+    status: z.enum(["draft", "scheduled"]).optional(),
   })
   .strict();
 
@@ -249,7 +253,7 @@ async function createPostImpl(
     title: input.title,
     slug: input.slug,
     design_system_version: input.design_system_version,
-    status: "draft" as PostStatus,
+    status: (input.status ?? "draft") as PostStatus,
   };
   if (input.excerpt !== undefined) insertRow.excerpt = input.excerpt;
   if (input.author_id !== undefined) insertRow.author_id = input.author_id;

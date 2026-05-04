@@ -16,7 +16,7 @@ import {
   siteStatusKind,
 } from "@/components/ui/status-pill";
 import { H1, H3 } from "@/components/ui/typography";
-import { FileText, Layers, Sparkles, Workflow } from "lucide-react";
+import { FileText, LayoutTemplate, Layers, Sparkles, Workflow } from "lucide-react";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -535,6 +535,46 @@ export default async function SiteDetailPage({
                   className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                 >
                   Open Appearance panel →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* M16 — Site Plan Review (blueprint pages). */}
+          <div className="rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <LayoutTemplate aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <H3>Site Plan</H3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Review and approve the AI-generated page blueprint before
+                  running batch generation.
+                </p>
+                <Link
+                  href={`/admin/sites/${site.id}/blueprints/review`}
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                  Open Site Plan →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* M16 — Shared Content Manager. */}
+          <div className="rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <FileText aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <H3>Shared Content</H3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Reusable content objects — CTAs, testimonials, and FAQ items
+                  shared across generated pages.
+                </p>
+                <Link
+                  href={`/admin/sites/${site.id}/content`}
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                  Open Shared Content →
                 </Link>
               </div>
             </div>
