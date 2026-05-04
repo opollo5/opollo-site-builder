@@ -1,5 +1,21 @@
 import type { Metadata } from "next";
+import { Fredoka, Manrope } from "next/font/google";
+import { cn } from "@/lib/utils";
 import "./globals.css";
+
+const fredoka = Fredoka({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const manrope = Manrope({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-body",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Opollo Site Builder",
@@ -31,8 +47,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className="font-sans antialiased">{children}</body>
+    <html
+      lang="en"
+      className={cn(fredoka.variable, manrope.variable, "dark")}
+      suppressHydrationWarning
+    >
+      <body className="font-body antialiased">{children}</body>
     </html>
   );
 }

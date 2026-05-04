@@ -2,82 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+ * Opollo Design System — always-dark token layer.
+ *
+ * Raw hex vars (--pk, --gr, --bl, etc.) are for direct use in Opollo
+ * component classes. Tailwind/shadcn semantic vars (--background, etc.)
+ * are HSL approximations of the same palette so every shadcn primitive
+ * inherits the dark theme automatically.
+ *
+ * Light mode does not exist. The <html> element carries class="dark"
+ * unconditionally, which activates Tailwind's dark: variants everywhere.
+ * ------------------------------------------------------------------------- */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    /* R1-4 — bumped from 210 40% 96.1% so secondary buttons read
-       against the bg-canvas (220 14% 96%) wash. Now sits ~9 percentage
-       points darker than canvas — visible but still subordinate to
-       primary. */
-    --secondary: 220 13% 87%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    /* ---- Opollo raw hex tokens ----------------------------------------- */
+    --pk: #ff03a5;
+    --pk2: #cc0084;
+    --pk-soft: rgba(255, 3, 165, 0.12);
+    --gr: #00e5a0;
+    --gr2: #00c48a;
+    --gr-soft: rgba(0, 229, 160, 0.10);
+    --bl: #4da6ff;
+    --bl-soft: rgba(77, 166, 255, 0.10);
+    --am: #ffb300;
+    --rd: #ff4d6d;
+    --bg: #04040a;
+    --d1: #07070f;
+    --d2: #0b0b18;
+    --d3: #10101e;
+    --d4: #161624;
+    --white: #ffffff;
+    --m1: rgba(255, 255, 255, 0.92);
+    --m2: rgba(255, 255, 255, 0.58);
+    --m3: rgba(255, 255, 255, 0.32);
+    --m4: rgba(255, 255, 255, 0.18);
+    --b1: rgba(255, 255, 255, 0.06);
+    --b2: rgba(255, 255, 255, 0.12);
+    --b3: rgba(255, 255, 255, 0.20);
+
+    /* ---- Tailwind/shadcn semantic tokens (HSL, always-dark) -------------- */
+    --background: 240 37% 4%;           /* --d1  #07070f  card surface       */
+    --foreground: 0 0% 92%;             /* --m1  rgba(255,255,255,0.92)       */
+    --card: 240 37% 4%;                 /* --d1                               */
+    --card-foreground: 0 0% 92%;
+    --popover: 240 31% 9%;              /* --d3  #10101e  elevated panel      */
+    --popover-foreground: 0 0% 92%;
+    --primary: 322 100% 50%;            /* --pk  #ff03a5                      */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 24% 11%;           /* --d4  #161624  hover/elevated      */
+    --secondary-foreground: 0 0% 92%;
+    --muted: 240 31% 9%;                /* --d3                               */
+    --muted-foreground: 0 0% 58%;       /* --m2  rgba(255,255,255,0.58)       */
+    --accent: 240 24% 11%;              /* --d4                               */
+    --accent-foreground: 0 0% 92%;
+    --destructive: 350 100% 65%;        /* --rd  #ff4d6d                      */
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 14% 10%;              /* ≈ --b1  rgba(255,255,255,0.06)     */
+    --input: 240 9% 16%;                /* ≈ --b2  rgba(255,255,255,0.12)     */
+    --ring: 162 100% 45%;               /* --gr  #00e5a0  focus ring = green  */
     --radius: 0.5rem;
 
-    /* A-2 — Semantic status tokens. See documentation block below. */
-    --success: 142 71% 36%;          /* emerald-700 territory */
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 36%;           /* amber-700 territory */
-    --warning-foreground: 0 0% 100%;
-    --info: 199 89% 38%;             /* sky-700 territory */
-    --info-foreground: 0 0% 100%;
+    /* canvas = page base, one notch deeper than card surface */
+    --canvas: 240 43% 3%;               /* --bg  #04040a                      */
 
-    /* R1 — Canvas tint. Page background sits one notch off the card
-       background so card edges register. Linear / Vercel pattern:
-       cards stay white, canvas wash provides separation. */
-    --canvas: 220 14% 96%;           /* cool grey */
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    /* R1-4 — secondary in dark mode lifted slightly so it reads
-       against the dark --background. */
-    --secondary: 217.2 32.6% 25%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-
-    /* R1 — Canvas tint, dark variant. One notch deeper than the
-       --background card surface so cards still pop. */
-    --canvas: 222 47% 7%;
-
-    /* A-2 — Semantic status tokens, dark variants. Bumped luminance so
-       badges remain legible against the dark background. */
-    --success: 142 71% 50%;          /* emerald-500 area */
-    --success-foreground: 222 47% 11%;
-    --warning: 38 92% 60%;           /* amber-400 area */
-    --warning-foreground: 222 47% 11%;
-    --info: 199 89% 60%;             /* sky-400 area */
-    --info-foreground: 222 47% 11%;
+    /* status tokens — Opollo palette */
+    --success: 162 100% 45%;            /* --gr  green                        */
+    --success-foreground: 240 43% 3%;
+    --warning: 42 100% 50%;             /* --am  amber                        */
+    --warning-foreground: 240 43% 3%;
+    --info: 211 100% 65%;               /* --bl  blue                         */
+    --info-foreground: 240 43% 3%;
   }
 }
 
@@ -86,109 +80,163 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-canvas text-foreground;
+    font-family: var(--font-body, "Manrope", ui-sans-serif, system-ui, sans-serif);
+  }
+
+  /* Display font on headings — Fredoka per design system */
+  h1, h2, h3 {
+    font-family: var(--font-display, "Fredoka", ui-sans-serif, sans-serif);
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    font-weight: 600;
+  }
+
+  /* Green focus ring — replaces default */
+  *:focus-visible {
+    outline: 2px solid var(--gr);
+    outline-offset: 2px;
   }
 }
 
 /* ---------------------------------------------------------------------------
- * A-2 — Semantic color palette (documentation block).
- *
- * Five status intents — every pill, badge, and tinted-background block on
- * an admin surface picks one. Hand-rolled `bg-emerald-500/10 text-emerald-700`
- * patterns are forbidden going forward; consume the StatusPill primitive
- * from A-4 (which maps these intents → token classes below).
- *
- *   neutral     — default / unscoped state                  bg-muted text-muted-foreground
- *   active      — running, healthy, in-progress             bg-primary/10 text-primary
- *   success     — succeeded, complete, OK                   bg-success/10 text-success
- *   warning     — paused, awaiting review, soft caution     bg-warning/10 text-warning
- *   info        — informational, scheduled, queued          bg-info/10 text-info
- *   error       — failed, destructive, hard stop            bg-destructive/10 text-destructive
- *
- * Token semantics:
- *
- *   --success       hue rooted at emerald-700 (light) / emerald-500 (dark).
- *                   Light-mode value chosen so `text-success` against a
- *                   white background passes WCAG AA (4.5:1).
- *   --warning       amber-700 (light) / amber-400 (dark). Yellow shifted
- *                   to amber so it doesn't read as "neon caution sign".
- *   --info          sky-700 (light) / sky-400 (dark). Cooler than primary
- *                   so an info badge doesn't compete with an active state.
- *
- * Foreground variants (e.g. `text-success-foreground`) are reserved for
- * solid-fill badges (`bg-success text-success-foreground`). The default
- * pill pattern uses the muted-bg + bold-text convention because solid
- * fills crowd information-dense lists. Keep solid fills for one-off
- * marketing-style accent rows.
- *
- * Hand-rolled `text-emerald-700` / `bg-yellow-500/10` literals across the
- * codebase will be folded into these tokens during the A-4 sweep. Do not
- * add new ones in the meantime.
- * --------------------------------------------------------------------- */
+ * Opollo component classes
+ * Used directly in JSX alongside Tailwind utilities.
+ * ------------------------------------------------------------------------- */
+
+/* Eyebrow label — green dash prefix, uppercase tracking */
+.lbl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.20em;
+  color: var(--gr);
+}
+.lbl::before {
+  content: '—';
+  color: var(--gr);
+  font-weight: 700;
+}
+.lbl.lbl-live::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gr);
+  animation: lbl-pulse 2s ease-in-out infinite;
+}
+
+/* Single pink word-highlight per heading */
+.pk {
+  color: var(--pk);
+}
+
+/* Stat unit span — sits after the big number */
+.unit {
+  font-size: 55%;
+  font-weight: 500;
+  color: var(--m2);
+}
+
+/* Primary CTA button */
+.btn-pk {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--pk), var(--pk2));
+  color: #fff;
+  border: none;
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: filter 150ms ease-out, transform 150ms ease-out, box-shadow 150ms ease-out;
+}
+.btn-pk:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 24px rgba(255, 3, 165, 0.40);
+}
+.btn-pk:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Ghost button — hairline border, goes green on hover */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--m1);
+  border: 1px solid var(--b3);
+  border-radius: 100px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 10px 24px;
+  cursor: pointer;
+  transition: border-color 150ms ease-out, color 150ms ease-out;
+}
+.btn-ghost:hover {
+  border-color: var(--gr);
+  color: var(--gr);
+}
+
+/* Mesh gradient — atmospheric hero background */
+.mesh {
+  background:
+    radial-gradient(ellipse at 15% 50%, rgba(255, 3, 165, 0.15) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 20%, rgba(0, 229, 160, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 85%, rgba(77, 166, 255, 0.08) 0%, transparent 50%);
+  animation: mesh-drift 14s ease-in-out infinite;
+}
 
 /* ---------------------------------------------------------------------------
- * A-1 — Typography scale (documentation block).
+ * A-2 — Semantic status colors (documentation).
  *
- * Five tiers via the components/ui/typography.tsx primitives. Tailwind
- * sizes locked deliberately; do not introduce text-2xl/text-3xl on any
- * admin surface — those are marketing-page energy and pushed every list
- * below the operator's fold.
+ *   success  bg-success/10 text-success     green  #00e5a0
+ *   warning  bg-warning/10 text-warning     amber  #ffb300
+ *   info     bg-info/10 text-info           blue   #4da6ff
+ *   error    bg-destructive/10 text-destructive  red  #ff4d6d
+ *   neutral  bg-muted text-muted-foreground
+ * ------------------------------------------------------------------------- */
+
+/* ---------------------------------------------------------------------------
+ * A-1 — Typography scale.
  *
- *   <H1>      page heading             text-xl   font-semibold tracking-tight  ~20px
- *   <H2>      section heading          text-base font-semibold tracking-tight  ~16px
- *   <H3>      sub-section / card       text-sm   font-semibold                 ~14px
- *   <Eyebrow> small uppercase label    text-sm   font-medium uppercase tracking-wide  ~14px
- *                                                 text-muted-foreground
- *   <Lead>    intro / context line     text-base text-muted-foreground         ~16px
+ *   <H1>      page heading          text-xl  font-display  ~20px
+ *   <H2>      section heading       text-base font-display ~16px
+ *   <H3>      sub-section / card    text-sm  font-display  ~14px
+ *   <Eyebrow> .lbl                  10px     font-body 700 uppercase
+ *   Body      p / td / form values  font-body 400          ~16px floor
  *
- * Type-size minimums (UAT 2026-05-02):
- *   • Body text: text-base (1rem / 16px) is the floor. Paragraph copy,
- *     form input values, page descriptions, modal body all sit at this
- *     size or larger.
- *   • Small text: text-sm (0.875rem / 14px) is the floor for helper
- *     copy, captions, badges, eyebrows, breadcrumbs, status microcopy.
- *   • text-xs (0.75rem / 12px) is FORBIDDEN on every operator surface.
- *
- * Per-callsite uses of text-sm for primary reading copy (paragraphs,
- * descriptions) are a known follow-up sweep — see docs/BACKLOG.md
- * "Typography minimums Phase 2" — but no new text-xs is permitted in the
- * meantime.
- *
- * font-mono is reserved for literal data (cloudflare ids, cost values,
- * code tokens) — not for stylistic accent.
- *
- * Reference quality bar: matches Linear's issue view + Vercel's
- * deployment header. Do not introduce a 6th tier without revisiting.
- * --------------------------------------------------------------------- */
+ * text-xs (12px) is FORBIDDEN on operator surfaces.
+ * font-mono reserved for literal data (IDs, cost values, code tokens).
+ * ------------------------------------------------------------------------- */
 
 /* ---------------------------------------------------------------------------
  * RS-0 / A-3 — Motion primitives.
  *
- * Shared vocabulary for animated state changes. We name utilities after
- * intent (`opollo-fade-in`, `opollo-shimmer`) rather than mechanism so
- * future polish (e.g. swapping a fade for a slide) doesn't require
- * touching every consumer.
+ * Duration tiers:
+ *   150ms  hover / micro-state                .transition-smooth
+ *   200ms  standard state                     .opollo-slide-up
+ *   250ms  pop-in                             .opollo-pop-in
+ *   1100-1200ms  sweep/reveal
+ *   1500ms  shimmer (infinite)               .opollo-shimmer
  *
- * Four-tier duration system (do not introduce a 5th):
- *
- *   100ms   instant feedback                   .opollo-fade-out
- *   150ms   micro-state change                 .opollo-fade-in
- *   200ms   standard state change              .transition-smooth, .opollo-slide-up
- *   250ms   noticeable but not gratuitous      .opollo-pop-in
- *   600ms   data tick / count-up landing       .opollo-pulse-soft, RunCostTicker count-up
- *   1500ms  loading shimmer (infinite loop)    .opollo-shimmer
- *
- * Easing curves:
- *
- *   cubic-bezier(0.4, 0, 0.2, 1)        standard ease-out (most utilities)
- *   cubic-bezier(0.34, 1.56, 0.64, 1)   bounce-out for pop-in (slight overshoot)
- *
- * `prefers-reduced-motion: reduce` zeroes every motion utility below.
- * This honours the OS-level user preference and is the single place
- * accessibility-conscious users opt out — consumers don't need to gate
- * their own animations. New utilities MUST be added to the
- * reduced-motion block at the bottom.
- * ------------------------------------------------------------------------ */
+ * prefers-reduced-motion zeroes every utility at the bottom of this file.
+ * ------------------------------------------------------------------------- */
 
 @layer utilities {
   .transition-smooth {
@@ -196,7 +244,7 @@
       text-decoration-color, fill, stroke, opacity, box-shadow, transform,
       filter, backdrop-filter;
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-    transition-duration: 200ms;
+    transition-duration: 150ms;
   }
 
   .opollo-fade-in {
@@ -211,45 +259,25 @@
     animation: opollo-slide-up 200ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* A-3 — Skeleton shimmer. Drives the .skeleton primitive's
-   * "loading" pulse without using Tailwind's animate-pulse (which
-   * is a softer fade — too gentle to read as "this is loading").
-   * Linear-style left-to-right gradient sweep at ~1.5s. */
   .opollo-shimmer {
     background: linear-gradient(
       90deg,
       hsl(var(--muted)) 0%,
-      hsl(var(--muted) / 0.6) 50%,
+      hsl(var(--muted) / 0.5) 50%,
       hsl(var(--muted)) 100%
     );
     background-size: 200% 100%;
     animation: opollo-shimmer 1500ms ease-in-out infinite;
   }
 
-  /* A-3 — Soft pulse for "live data" tick. Status pills and the cost
-   * ticker reach for this when a value just changed; signals the
-   * change without yanking attention. 600ms one-shot, capped — not
-   * an infinite loop. Apply via a key prop change so React mounts
-   * a fresh element and the animation fires on every value-flip. */
   .opollo-pulse-soft {
     animation: opollo-pulse-soft 600ms cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* A-3 — Pop-in for count-up landing or new-item-appended state.
-   * Slightly more aggressive than slide-up: a 4% scale up + fade.
-   * 250ms, ease-out. Use sparingly; one element at a time. */
   .opollo-pop-in {
     animation: opollo-pop-in 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  /* A-3 — Stagger-in helpers. Each .opollo-stagger-in-N variant adds
-   * N * 50ms delay on top of opollo-fade-in so a list reveals one
-   * row at a time without manual JS choreography. Capped at -8 so
-   * we never animate more than 8 rows; long lists land instantly to
-   * avoid feeling sluggish.
-   *
-   * Usage: <li class="opollo-fade-in opollo-stagger-in-3"> in a loop
-   * where the loop index drives the suffix (0..7). */
   .opollo-stagger-in-1 { animation-delay: 50ms; }
   .opollo-stagger-in-2 { animation-delay: 100ms; }
   .opollo-stagger-in-3 { animation-delay: 150ms; }
@@ -261,71 +289,45 @@
 }
 
 @keyframes opollo-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes opollo-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
+  from { opacity: 1; }
+  to { opacity: 0; }
 }
 
 @keyframes opollo-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes opollo-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
 @keyframes opollo-pulse-soft {
-  0% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.04);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
+  0%   { transform: scale(1); opacity: 0.7; }
+  50%  { transform: scale(1.04); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes opollo-pop-in {
-  0% {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  60% {
-    opacity: 1;
-    transform: scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-  }
+  0%   { opacity: 0; transform: scale(0.96); }
+  60%  { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes lbl-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+@keyframes mesh-drift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -343,10 +345,14 @@
   .opollo-stagger-in-5,
   .opollo-stagger-in-6,
   .opollo-stagger-in-7,
-  .opollo-stagger-in-8 {
+  .opollo-stagger-in-8,
+  .mesh,
+  .lbl.lbl-live::before {
     animation: none !important;
     animation-delay: 0 !important;
     transition: none !important;
+  }
+  .opollo-shimmer {
     background: hsl(var(--muted)) !important;
   }
 }
@@ -354,36 +360,20 @@
 /* ---------------------------------------------------------------------------
  * UAT (2026-05-03) — operator-readability floor.
  *
- * Steven flagged the admin surfaces as too small to read comfortably:
- *   - "Body text 16px minimum, even where text-sm is used."
- *   - "Helper text 15px minimum (was 12-14px in places)."
- *   - "Lucide icons 25% larger so they're not a squint test."
- *
- * Implemented as a final-cascade override on Tailwind's text-* utilities
- * + a min-width/min-height clamp on Lucide icon SVGs. We bump the *small*
- * tiers up rather than touching `text-base` (already 16px). Surgical so
- * H1/H2/H3 + form input sizing stays untouched.
- *
- * Lucide bump: every icon rendered by lucide-react carries a `.lucide`
- * class. Targeting `svg.lucide` with min-width/min-height ensures any
- * icon authored as h-3/w-3 (12px) or h-4/w-4 (16px) renders at >=20px,
- * which is 25% larger than the prior most-common 16px default. Icons
- * authored explicitly larger (h-5/w-5 = 20px, h-6/w-6 = 24px) keep their
- * sizes via the height/width tailwind classes since min- only floors.
- * --------------------------------------------------------------------- */
+ * text-sm → 15px, text-xs → 15px. Lucide icons floored at 20px.
+ * Steven's explicit request: "Body text 16px minimum, icons 25% larger."
+ * ------------------------------------------------------------------------- */
 
 .text-xs {
-  /* 12px → 15px */
   font-size: 0.9375rem;
   line-height: 1.375rem;
 }
 .text-sm {
-  /* 14px → 15px */
   font-size: 0.9375rem;
   line-height: 1.4rem;
 }
 
 svg.lucide {
-  min-width: 1.25rem; /* 20px */
+  min-width: 1.25rem;
   min-height: 1.25rem;
 }

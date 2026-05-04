@@ -16,6 +16,12 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        sans: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
+        body: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "ui-sans-serif", "sans-serif"],
+        mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "monospace"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -34,9 +40,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
         },
-        // A-2 — semantic status tokens. Use as `bg-success/10 text-success`
-        // for tinted-bg pills (the canonical pattern for StatusPill in A-4)
-        // and `bg-success text-success-foreground` for solid-fill badges.
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
@@ -49,9 +52,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
-        // R1 — page-background tint. Cards stay on `bg-background` so
-        // their edges register against the canvas. Use as `bg-canvas`
-        // on the page wrapper only.
         canvas: "hsl(var(--canvas))",
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -69,6 +69,17 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        /* Opollo raw tokens — use as text-pk, bg-gr, border-bl, etc. */
+        pk: "var(--pk)",
+        gr: "var(--gr)",
+        bl: "var(--bl)",
+        am: "var(--am)",
+        rd: "var(--rd)",
+        d1: "var(--d1)",
+        d2: "var(--d2)",
+        d3: "var(--d3)",
+        d4: "var(--d4)",
+        "bg-base": "var(--bg)",
       },
       borderRadius: {
         lg: "var(--radius)",
