@@ -92,7 +92,7 @@ describe("runRenderWorker — no stale pages", () => {
     const site = await seedSite({ prefix: "rw01" });
     await createSiteBlueprint({ site_id: site.id, brand_name: "Test" });
     await upsertRoutesFromPlan(site.id, [
-      { slug: "/", pageType: "homepage", label: "Home", priority: 1 },
+      { slug: "/", page_type: "homepage" as const, label: "Home", priority: 1 },
     ]);
 
     const r = await runRenderWorker({ siteId: site.id });
@@ -110,7 +110,7 @@ describe("runRenderWorker — renders stale pages", () => {
     const site = await seedSite({ prefix: "rw02" });
     await createSiteBlueprint({ site_id: site.id, brand_name: "Test" });
     const routeResult = await upsertRoutesFromPlan(site.id, [
-      { slug: "/", pageType: "homepage", label: "Home", priority: 1 },
+      { slug: "/", page_type: "homepage" as const, label: "Home", priority: 1 },
     ]);
     expect(routeResult.ok).toBe(true);
     const routes = await listActiveRoutes(site.id);

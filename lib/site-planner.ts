@@ -203,8 +203,12 @@ export async function runSitePlanner(
   }
   blueprint = updated.data;
 
-  // 9. Upsert routes (idempotent — conflict on site_id+slug)
-  const routeResult = await upsertRoutesFromPlan(siteId, sitePlan.routePlan);
+  // 9. Upsert routes (idempotent — conflict on site_id+slug).
+  // RoutePlanItem uses camelCase pageType; upsertRoutesFromPlan expects snake_case.
+  const routeResult = await upsertRoutesFromPlan(
+    siteId,
+    sitePlan.routePlan.map(r => ({ ...r, page_type: r.pageType })),
+  );
   if (!routeResult.ok) {
     logger.error("site-planner.routes.upsert.failed", { siteId, error: routeResult.error });
     return { ok: false, error: { code: "STORE_FAILED", message: "Failed to upsert routes." } };
