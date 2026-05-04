@@ -464,8 +464,10 @@ describe("all render functions — XSS safety", () => {
   )("%s:%s does not render raw XSS payload", (_type, _variant, def) => {
     const p = { ...def.defaultProps, id: SECTION_ID, heading: xssPayload, headline: xssPayload };
     const html = def.render(p, "preview");
+    // Payload must be entity-encoded — raw < prevents browser from parsing
+    // the injected string as an HTML element (onerror= in text content is harmless).
     expect(html).not.toContain("<img src=x");
-    expect(html).not.toContain("onerror=");
+    expect(html).toContain("&lt;img src=x");
   });
 });
 
