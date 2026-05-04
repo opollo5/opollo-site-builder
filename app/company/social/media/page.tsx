@@ -55,6 +55,7 @@ export default async function CompanySocialMediaPage() {
           <MediaLibraryClient
             companyId={companyId}
             initialAssets={listResult.data.assets}
+            initialNextCursor={listResult.data.nextCursor}
             canEdit={canEdit}
           />
         ) : (
