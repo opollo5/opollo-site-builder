@@ -6,13 +6,13 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 function statusDotClass(status: DesignSystem["status"]): string {
   switch (status) {
     case "active":
-      return "bg-green-500";
+      return "bg-success";
     case "draft":
-      return "bg-slate-400";
+      return "bg-muted-foreground";
     case "archived":
-      return "bg-slate-300";
+      return "bg-muted-foreground/50";
     default:
-      return "bg-red-500";
+      return "bg-destructive";
   }
 }
 

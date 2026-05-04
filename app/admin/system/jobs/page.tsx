@@ -267,7 +267,7 @@ export default async function SystemJobsPage() {
       {stuckQueues.length > 0 && (
         <div
           role="alert"
-          className="mt-4 rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-900 dark:text-amber-200"
+          className="mt-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
         >
           <strong>Attention:</strong> {stuckQueues.length} queue
           {stuckQueues.length === 1 ? "" : "s"} {" "}
@@ -318,7 +318,7 @@ export default async function SystemJobsPage() {
                       ) : q.pending === 0 ? (
                         <span className="text-muted-foreground">0</span>
                       ) : stuck ? (
-                        <span className="font-semibold text-amber-700 dark:text-amber-400">
+                        <span className="font-semibold text-warning">
                           {q.pending}
                         </span>
                       ) : (

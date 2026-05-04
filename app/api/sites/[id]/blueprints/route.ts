@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { getSiteBlueprint } from "@/lib/site-blueprint";
@@ -47,22 +48,14 @@ export async function POST(req: Request, ctx: RouteContext) {
   });
 
   if (!result.ok) {
-    return Response.json(
-      {
-        ok: false,
-        error: result.error,
-        timestamp: new Date().toISOString(),
-      },
+    return NextResponse.json(
+      { ok: false, error: result.error, timestamp: new Date().toISOString() },
       { status: 422 },
     );
   }
 
-  return Response.json(
-    {
-      ok:        true,
-      data:      { blueprint: result.blueprint, cached: result.cached },
-      timestamp: new Date().toISOString(),
-    },
+  return NextResponse.json(
+    { ok: true, data: { blueprint: result.blueprint, cached: result.cached }, timestamp: new Date().toISOString() },
     { status: 200 },
   );
 }

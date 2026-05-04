@@ -8,7 +8,6 @@ import {
   getPostMaster,
   updatePostMaster,
 } from "@/lib/platform/social/posts";
-import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // S1-3 — single-post endpoints.
@@ -188,11 +187,6 @@ export async function DELETE(
 
   const gate = await requireCanDoForApi(companyId, "edit_post");
   if (gate.kind === "deny") return gate.response;
-
-  // Service role keeps the operation auditable even when the caller's
-  // RLS scope wouldn't let them DELETE under a direct query — gate
-  // already authorised the action.
-  void getServiceRoleClient;
 
   const result = await deletePostMaster({ postId: id, companyId });
   if (!result.ok) {
