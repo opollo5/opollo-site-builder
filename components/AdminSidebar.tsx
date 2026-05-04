@@ -213,9 +213,15 @@ export function AdminSidebar({
       <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-[rgba(4,4,10,0.85)] px-4 backdrop-blur-[18px] sm:hidden">
         <Link
           href="/admin/sites"
-          className="font-display text-sm font-semibold text-white tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
+          className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
         >
-          Opo<span className="text-[#FF03A5]">llo</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+            alt="Opollo"
+            width={120}
+            className="h-7 w-auto"
+          />
         </Link>
         <button
           type="button"
@@ -262,9 +268,15 @@ export function AdminSidebar({
             {!collapsed && (
               <Link
                 href="/admin/sites"
-                className="font-display text-sm font-semibold text-white tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
+                className="focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
               >
-                Opo<span className="text-[#FF03A5]">llo</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+                  alt="Opollo"
+                  width={120}
+                  className="h-7 w-auto"
+                />
               </Link>
             )}
             {/* Mobile close */}
