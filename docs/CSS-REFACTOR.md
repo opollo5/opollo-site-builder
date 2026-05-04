@@ -136,7 +136,24 @@ compile but are caught by Phase 6 lint rules.
 
 ---
 
-## Phase 4 — Replace arbitrary Tailwind spacing/size values (pending)
+## Phase 4 — Replace arbitrary rgba colour values with token aliases
+
+**PR:** (pending)
+**Date:** 2026-05-05
+**Branch:** feat/css-design-system-phase-4
+
+### Changes
+
+- `tailwind.config.ts` — added `m1`/`m2`/`m3`/`m4` (white opacity text tokens) and `b1`/`b2`/`b3` (rgba border tokens) to Tailwind color aliases
+- `components/AdminSidebar.tsx` — replaced `text-[rgba(255,255,255,0.58)]` → `text-m2`, `text-[rgba(255,255,255,0.32)]` → `text-m3`, `hover:bg-[rgba(255,255,255,0.06)]` → `hover:bg-b1`
+
+### Intentional exceptions (kept as arbitrary values)
+
+- `text-[rgba(255,255,255,0.40)]` — no exact token; between `--m3` (0.32) and `--m2` (0.58); used for inactive icon color
+- `bg-[rgba(255,3,165,0.10)]` — active nav item bg; `--pk-soft` is 0.12 (different); left as-is
+- `bg-[rgba(4,4,10,0.85)]` — mobile topbar at 85% opacity; no token
+- `hover:bg-[rgba(0,229,160,0.06)]` — nav hover bg; `--gr-soft` is 0.10 (different); left as-is
+- `hover:bg-[rgba(0,229,160,0.08)]` in button.tsx — ghost hover bg; no exact token
 
 ---
 
