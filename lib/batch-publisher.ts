@@ -11,6 +11,8 @@ import {
   transferImagesForPage,
   type WpMediaCallBundle,
 } from "@/lib/wp-media-transfer";
+import { isGutenbergCandidate, wrapInGutenbergBlock, computeContentHash } from "@/lib/gutenberg-format";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // M3-6 — WP publish with pre-commit slug claim.
@@ -97,6 +99,10 @@ export type PublishContext = {
   title: string;
   generated_html: string;
   design_system_version: string;
+  // M16-8: when set, signals this slot is from the M16 pipeline.
+  // publishSlot will update pages.wp_status='published' and store
+  // wp_content_hash in route_registry after a successful publish.
+  m16_route_id?: string;   // route_registry.id
 };
 
 async function withClient<T>(
@@ -339,6 +345,15 @@ export async function publishSlot(
         }
       }
 
+      // M16-8: Wrap M16-rendered HTML in Gutenberg Custom HTML block so WP
+      // stores and round-trips the data-opollo-id section attributes.
+      // Non-M16 HTML passes through unchanged (isGutenbergCandidate is false).
+      if (publishCtx.m16_route_id && isGutenbergCandidate(finalHtml)) {
+        // Use pagesId as the page identifier in the wrapper; it's populated
+        // by this point (either from slot pre-link or from the INSERT above).
+        finalHtml = wrapInGutenbergBlock(finalHtml, pagesId ?? publishCtx.slug);
+      }
+
       // Prepend the LeadSource font-load <link> markup for the WP-bound
       // HTML only. `finalHtml` stays as the post-image-rewrite body so
       // the downstream `pages.generated_html` UPDATE captures the model
@@ -394,16 +409,39 @@ export async function publishSlot(
       }
 
       // --- Final UPDATEs: pages + slot ---
+      //
+      // M16-8: When m16_route_id is set, also update wp_status = 'published'.
+      // The pages row here is the M16-created row (pre-linked via slot.pages_id).
       await c.query(
-        `
-        UPDATE pages
-           SET wp_page_id = $2,
-               generated_html = $3,
-               updated_at = now()
-         WHERE id = $1
-        `,
+        publishCtx.m16_route_id
+          ? `UPDATE pages
+                SET wp_page_id = $2,
+                    generated_html = $3,
+                    wp_status = 'published',
+                    updated_at = now()
+              WHERE id = $1`
+          : `UPDATE pages
+                SET wp_page_id = $2,
+                    generated_html = $3,
+                    updated_at = now()
+              WHERE id = $1`,
         [pagesId, wpPageId, finalHtml],
       );
+
+      // M16-8: Store the content hash in route_registry after COMMIT.
+      // Fire-and-forget — failure is non-fatal; drift detector reconciles hourly.
+      const m16PostPublishTasks: Promise<unknown>[] = [];
+
+      if (publishCtx.m16_route_id) {
+        const contentHash = await computeContentHash(wpBoundHtml);
+        const svc = getServiceRoleClient();
+        m16PostPublishTasks.push(
+          svc
+            .from("route_registry")
+            .update({ wp_content_hash: contentHash })
+            .eq("id", publishCtx.m16_route_id),
+        );
+      }
 
       const finalise = await c.query(
         `
@@ -463,6 +501,12 @@ export async function publishSlot(
       );
 
       await c.query("COMMIT");
+
+      // Fire M16 post-publish tasks after COMMIT (non-fatal if they fail)
+      if (m16PostPublishTasks.length > 0) {
+        await Promise.allSettled(m16PostPublishTasks);
+      }
+
       return {
         ok: true as const,
         pagesId: pagesId!,
