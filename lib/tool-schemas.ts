@@ -62,6 +62,10 @@ export const ERROR_CODES = [
   // admin/batch/[id]/cancel into the canonical vocabulary so any future
   // caller using respond() routes through errorCodeToStatus.
   "INVALID_STATE",
+  // M16-8 — WordPress site-publish route codes.
+  "WP_CREDENTIALS_MISSING",
+  "BLUEPRINT_NOT_FOUND",
+  "BLUEPRINT_MISMATCH",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
