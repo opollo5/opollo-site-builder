@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mockExecuteUpdatePage = vi.hoisted(() => vi.fn());
 const mockRequireAdminForApi = vi.hoisted(() => vi.fn());
 const mockCheckRateLimit = vi.hoisted(() => vi.fn());
+const mockResolveToolWpCreds = vi.hoisted(() => vi.fn());
+const mockRunWithWpCredentials = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/update-page", () => ({
   executeUpdatePage: mockExecuteUpdatePage,
@@ -27,6 +29,14 @@ vi.mock("@/lib/rate-limit", async () => {
     );
   return { ...actual, checkRateLimit: mockCheckRateLimit };
 });
+
+vi.mock("@/lib/tools-wp-creds", () => ({
+  resolveToolWpCreds: mockResolveToolWpCreds,
+}));
+
+vi.mock("@/lib/wordpress", () => ({
+  runWithWpCredentials: mockRunWithWpCredentials,
+}));
 
 vi.mock("next/headers", () => ({
   cookies: () => ({ getAll: () => [], set: () => {} }),
@@ -48,6 +58,8 @@ beforeEach(() => {
   mockExecuteUpdatePage.mockReset();
   mockRequireAdminForApi.mockReset().mockResolvedValue(GATE_ALLOW);
   mockCheckRateLimit.mockReset().mockResolvedValue({ ok: true, limit: 120, remaining: 119, reset: 0 });
+  mockResolveToolWpCreds.mockReset().mockResolvedValue({ ok: true, creds: undefined });
+  mockRunWithWpCredentials.mockReset().mockImplementation((_creds: unknown, fn: () => unknown) => fn());
 });
 
 const VALID_BODY = {
@@ -115,6 +127,31 @@ describe("POST /api/tools/update_page", () => {
     expect(res.status).toBe(429);
     const body = await res.json();
     expect(body.ok).toBe(false);
+    expect(mockExecuteUpdatePage).not.toHaveBeenCalled();
+  });
+
+  it("site_id provided — resolveToolWpCreds called and creds seeded into runWithWpCredentials", async () => {
+    const fakeCreds = { wp_url: "https://wp.example.com", wp_user: "admin", wp_app_password: "pass" };
+    mockResolveToolWpCreds.mockResolvedValue({ ok: true, creds: fakeCreds });
+    const envelope = makeSuccessEnvelope({ page_id: 11, status: "draft", modified_date: "2026-04-24T00:00:00Z" });
+    mockExecuteUpdatePage.mockResolvedValue(envelope);
+
+    const res = await POST(makeJsonRequest({ ...VALID_BODY, site_id: "site-uuid-1" }));
+
+    expect(res.status).toBe(200);
+    expect(mockResolveToolWpCreds).toHaveBeenCalledWith("site-uuid-1");
+    expect(mockRunWithWpCredentials).toHaveBeenCalledWith(fakeCreds, expect.any(Function));
+  });
+
+  it("site_id leads to NOT_FOUND — 404 returned; executor not called", async () => {
+    mockResolveToolWpCreds.mockResolvedValue({
+      ok: false,
+      response: new Response(JSON.stringify({ ok: false, error: { code: "NOT_FOUND" } }), { status: 404 }),
+    });
+
+    const res = await POST(makeJsonRequest({ ...VALID_BODY, site_id: "missing-site" }));
+
+    expect(res.status).toBe(404);
     expect(mockExecuteUpdatePage).not.toHaveBeenCalled();
   });
 });
