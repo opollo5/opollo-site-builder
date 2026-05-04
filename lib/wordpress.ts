@@ -1198,3 +1198,27 @@ export async function wpListTags(
   };
 }
 
+// ---------- wpCreateTag ----------
+
+export type WpCreateTagResult = WpResult<WpTaxonomyItem>;
+
+export async function wpCreateTag(
+  cfg: WpConfig,
+  name: string,
+): Promise<WpCreateTagResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/tags", {
+      method: "POST",
+      body: JSON.stringify({ name, slug: name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") }),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<unknown>(res);
+  if (!parsed.ok) return parsed;
+  return { ok: true, ...toTaxonomyItem(parsed.body) };
+}
+
