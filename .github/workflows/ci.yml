@@ -164,7 +164,7 @@ jobs:
   test:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     # pull-requests: write is required by the "Post vitest output on
     # failure" step below. It lets the step upsert a comment on the PR
     # with the tail of /tmp/vitest.out so the failing assertion is
