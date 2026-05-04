@@ -3,9 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { LayoutTemplate } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // /admin/sites/[id]/blueprints/review — M16-7.
@@ -151,9 +154,12 @@ export default function BlueprintReviewPage({
   if (!blueprint) {
     return (
       <main className="mx-auto max-w-4xl p-6">
-        <p className="text-muted-foreground text-sm">
-          No site plan found. Run the site planner from the brief run page first.
-        </p>
+        <EmptyState
+          icon={LayoutTemplate}
+          iconLabel="No site plan"
+          title="No site plan yet"
+          body="Run the site planner from the brief run page to generate a plan before approving page generation."
+        />
       </main>
     );
   }
