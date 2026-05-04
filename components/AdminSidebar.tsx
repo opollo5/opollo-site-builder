@@ -17,6 +17,7 @@ import {
   Menu,
   PenSquare,
   Settings,
+  Share2,
   ShieldCheck,
   Users,
   Workflow,
@@ -112,6 +113,12 @@ export function AdminSidebar({
       href: "/admin/images",
       icon: ImageIcon,
       testId: "nav-images",
+    },
+    {
+      label: "Social",
+      href: "/company/social/posts",
+      icon: Share2,
+      testId: "nav-social",
     },
     ...(isAdminTier
       ? [
