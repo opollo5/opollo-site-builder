@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { timingSafeEqual } from "node:crypto";
 
 import { revokeUserSessions } from "@/lib/auth-revoke";
+import { constantTimeEqual } from "@/lib/crypto-compare";
 import { readJsonBody } from "@/lib/http";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -69,20 +69,6 @@ const ActionSchema = z.discriminatedUnion("action", [
 // targets and the route is reachable without Supabase — any
 // misconfiguration that sets e.g. "changeme" would be catastrophic.
 const MIN_KEY_LENGTH = 32;
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    // timingSafeEqual throws on length mismatch; compare equal-length
-    // dummies so the length-mismatch path takes roughly the same time
-    // as a content mismatch.
-    const filler = Buffer.alloc(aBuf.length);
-    timingSafeEqual(aBuf, filler);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
-}
 
 function extractKey(req: Request): string | null {
   const custom = req.headers.get("x-opollo-emergency-key");
