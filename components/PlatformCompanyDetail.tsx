@@ -9,7 +9,17 @@ import type { CompanyDetail } from "@/lib/platform/companies";
 // of members with their role, and any pending invitations. Action
 // buttons (invite, revoke) land in P3-4.
 
-export function PlatformCompanyDetail({ detail }: { detail: CompanyDetail }) {
+export function PlatformCompanyDetail({
+  detail,
+  isOpolloStaff = false,
+  isCurrentUserMember = false,
+  joinAction = null,
+}: {
+  detail: CompanyDetail;
+  isOpolloStaff?: boolean;
+  isCurrentUserMember?: boolean;
+  joinAction?: ((formData: FormData) => Promise<void>) | null;
+}) {
   const { company, members, pending_invitations } = detail;
 
   return (
@@ -41,6 +51,44 @@ export function PlatformCompanyDetail({ detail }: { detail: CompanyDetail }) {
           )}
         </Lead>
       </header>
+
+      {isOpolloStaff && (
+        <section
+          className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3"
+          aria-label="Staff access"
+          data-testid="staff-join-section"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Opollo staff access</p>
+              <p className="text-sm text-muted-foreground">
+                {isCurrentUserMember
+                  ? "You are a member of this company. Go to the social platform to manage posts."
+                  : "Join this company as admin to manage their social media posts."}
+              </p>
+            </div>
+            {isCurrentUserMember ? (
+              <Link
+                href="/company"
+                className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                data-testid="staff-go-to-platform-link"
+              >
+                Go to platform →
+              </Link>
+            ) : joinAction ? (
+              <form action={joinAction}>
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                  data-testid="staff-join-button"
+                >
+                  Join as admin
+                </button>
+              </form>
+            ) : null}
+          </div>
+        </section>
+      )}
 
       <section
         className="rounded-lg border bg-card"

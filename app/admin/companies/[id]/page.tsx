@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { PlatformCompanyDetail } from "@/components/PlatformCompanyDetail";
+import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getPlatformCompany } from "@/lib/platform/companies";
+import { joinCompanyAsAdmin } from "../_actions";
 
 // P3-3 — Opollo admin company detail. Server-rendered. Loads company +
 // members + pending invitations via a single lib helper that fans out
@@ -15,7 +17,11 @@ export default async function CompanyDetailPage({
 }: {
   params: { id: string };
 }) {
-  const result = await getPlatformCompany(params.id);
+  const [result, session] = await Promise.all([
+    getPlatformCompany(params.id),
+    getCurrentPlatformSession(),
+  ]);
+
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
@@ -27,5 +33,21 @@ export default async function CompanyDetailPage({
       </div>
     );
   }
-  return <PlatformCompanyDetail detail={result.data} />;
+
+  const isCurrentUserMember =
+    !!session &&
+    result.data.members.some((m) => m.user_id === session.userId);
+
+  const boundJoinAction = session?.isOpolloStaff
+    ? joinCompanyAsAdmin.bind(null, params.id)
+    : null;
+
+  return (
+    <PlatformCompanyDetail
+      detail={result.data}
+      isOpolloStaff={session?.isOpolloStaff ?? false}
+      isCurrentUserMember={isCurrentUserMember}
+      joinAction={boundJoinAction}
+    />
+  );
 }
