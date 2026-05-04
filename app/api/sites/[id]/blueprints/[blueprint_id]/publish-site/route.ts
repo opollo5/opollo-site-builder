@@ -19,7 +19,7 @@ type RouteContext = { params: { id: string; blueprint_id: string } };
 // Idempotent. Safe to call repeatedly (all WP operations are upserts).
 // Does NOT publish individual pages — that is handled by the batch publisher.
 export async function POST(_req: Request, ctx: RouteContext) {
-  const gate = await requireAdminForApi({ roles: ["super_admin", "admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const siteParam = validateUuidParam(ctx.params.id, "id");
@@ -39,7 +39,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
     return respond({
       ok: false,
       error: {
-        code: "WP_CREDENTIALS_MISSING",
+        code: "VALIDATION_FAILED",
         message: "Site has no WordPress credentials configured.",
         retryable: false,
         suggested_action: "Add WP URL and app password in site settings.",
@@ -55,7 +55,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
     return respond({
       ok: false,
       error: {
-        code: "BLUEPRINT_NOT_FOUND",
+        code: "NOT_FOUND",
         message: `No blueprint found for site ${siteId}.`,
         retryable: false,
         suggested_action: "Run the site planner first to create a blueprint.",
@@ -68,7 +68,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
     return respond({
       ok: false,
       error: {
-        code: "BLUEPRINT_MISMATCH",
+        code: "VALIDATION_FAILED",
         message: "Blueprint ID does not match the site's active blueprint.",
         retryable: false,
         suggested_action: "Use the current blueprint ID from GET /blueprints.",
