@@ -5,6 +5,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatRelativeTime } from "@/lib/utils";
 
 // AUTH-FOUNDATION P4.4 — Trusted-devices listing on /account/devices.
@@ -34,9 +35,10 @@ export function TrustedDevicesList({
   const router = useRouter();
   const [revokingId, setRevokingId] = useState<string | null>(null);
   const [revokingOthers, setRevokingOthers] = useState(false);
+  const [pendingOne, setPendingOne] = useState<{ id: string; label: string } | null>(null);
+  const [pendingOthers, setPendingOthers] = useState(false);
 
   async function revokeOne(id: string, label: string) {
-    if (!window.confirm(`Sign out ${label}? It will need email approval again on its next sign-in.`)) return;
     setRevokingId(id);
     try {
       const res = await fetch(
@@ -58,7 +60,6 @@ export function TrustedDevicesList({
   }
 
   async function revokeOthers() {
-    if (!window.confirm("Sign out every device other than this one?")) return;
     setRevokingOthers(true);
     try {
       const res = await fetch("/api/account/devices/sign-out-others", {
@@ -88,12 +89,30 @@ export function TrustedDevicesList({
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={pendingOne !== null}
+        onOpenChange={(o) => !o && setPendingOne(null)}
+        title="Sign out this device?"
+        description={pendingOne ? `${pendingOne.label} will need email approval again on its next sign-in.` : undefined}
+        confirmLabel="Sign out"
+        confirmVariant="destructive"
+        onConfirm={() => pendingOne && void revokeOne(pendingOne.id, pendingOne.label)}
+      />
+      <ConfirmDialog
+        open={pendingOthers}
+        onOpenChange={(o) => !o && setPendingOthers(false)}
+        title="Sign out all other devices?"
+        description="Every device except this one will need email approval on its next sign-in."
+        confirmLabel="Sign out others"
+        confirmVariant="destructive"
+        onConfirm={() => void revokeOthers()}
+      />
       {showRevokeOthers && (
         <div className="flex justify-end">
           <Button
             type="button"
             variant="outline"
-            onClick={() => void revokeOthers()}
+            onClick={() => setPendingOthers(true)}
             disabled={revokingOthers}
             data-testid="revoke-other-devices"
           >
@@ -145,7 +164,7 @@ export function TrustedDevicesList({
                   <td className="px-2 py-2 text-right">
                     <button
                       type="button"
-                      onClick={() => void revokeOne(d.id, label)}
+                      onClick={() => setPendingOne({ id: d.id, label })}
                       disabled={revokingId === d.id}
                       className="rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
                       data-testid="revoke-device"

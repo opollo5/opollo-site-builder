@@ -66,7 +66,7 @@ export default defineConfig({
       : "npm run dev",
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 240_000,
     env: {
       // Opt-in: Playwright runs with FEATURE_SUPABASE_AUTH=true so the
       // admin-layout gate is on and the sign-in flow is exercised.
