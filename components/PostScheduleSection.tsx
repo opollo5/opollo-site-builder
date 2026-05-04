@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   PLATFORM_LABEL,
   SUPPORTED_PLATFORMS,
@@ -50,6 +51,7 @@ export function PostScheduleSection({
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [pendingCancelId, setPendingCancelId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
@@ -97,8 +99,7 @@ export function PostScheduleSection({
     }
   }
 
-  async function handleCancel(entryId: string) {
-    if (!confirm("Cancel this schedule entry?")) return;
+  async function doCancel(entryId: string) {
     setCancellingId(entryId);
     setError(null);
     try {
@@ -133,6 +134,16 @@ export function PostScheduleSection({
 
   return (
     <section className="mt-8" data-testid="post-schedule-section">
+      <ConfirmDialog
+        open={pendingCancelId !== null}
+        onOpenChange={(o) => !o && setPendingCancelId(null)}
+        title="Cancel this schedule entry?"
+        description="The post will be removed from the publish queue for this platform."
+        confirmLabel="Cancel entry"
+        confirmVariant="destructive"
+        onConfirm={() => pendingCancelId && doCancel(pendingCancelId)}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Schedule</h2>
@@ -269,7 +280,7 @@ export function PostScheduleSection({
                 <Button
                   size="sm"
                   variant="ghost"
-                  onClick={() => handleCancel(e.id)}
+                  onClick={() => setPendingCancelId(e.id)}
                   disabled={cancellingId === e.id}
                   data-testid={`schedule-cancel-${e.id}`}
                 >

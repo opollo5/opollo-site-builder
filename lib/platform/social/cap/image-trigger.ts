@@ -107,7 +107,7 @@ export async function triggerCAPImageGen(opts: {
       company_id: companyId,
       storage_path: image.storagePath,
       mime_type: `image/${image.format ?? "jpeg"}`,
-      bytes: 0,
+      bytes: image.buffer?.length ?? 0,
       source_url: signed.signedUrl,
       width: image.width ?? null,
       height: image.height ?? null,
