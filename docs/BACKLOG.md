@@ -488,8 +488,8 @@ Reports live at:
 
 - ~~**[M15-4 #3] `tools/*` write routes have no session requirement.**~~ Fixed 2026-05-03 — `requireAdminForApi` added to `publish_page`, `update_page`, `delete_page`; tests updated; malformed-JSON now returns 400 instead of forwarding `{}` to executor.
 - ~~**[M15-4 #8] 6 public GET routes have no route-level auth gate.**~~ Fixed 2026-05-03 — added `requireAdminForApi(["super_admin","admin"])` to GET handlers in `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`. `sites/list` and `design-systems/[id]/preview` already had gates per PLATFORM-AUDIT PR3 (#386).
-- **[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.** Direct POST outside the chat flow → executor uses empty AsyncLocalStorage context. Needs verification that direct calls fail safely. Scope: either (a) remove the tools routes if only used internally by chat, or (b) seed context from the request body's `site_id`.
-- **[M15-5 #12] `image_usage` RLS excludes `viewer` role.** Asymmetry vs `image_library` + `image_metadata`. Check if intentional; if so, comment the migration; if not, align the policy.
+- ~~**[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.**~~ Fixed 2026-05-04 — PR #528. `lib/tools-wp-creds.ts` helper added; all 6 WP tool routes now call `requireAdminForApi` + `resolveToolWpCreds(site_id)` + `runWithWpCredentials`. Tests updated across all 6 route test files.
+- ~~**[M15-5 #12] `image_usage` RLS excludes `viewer` role.**~~ Documented 2026-05-04 — PR #529 migration 0085 adds `COMMENT ON POLICY image_usage_read` explaining intentional viewer exclusion (WP transfer bookkeeping, not user-visible data).
 
 #### Observability + write-safety hygiene (next defense-in-depth slice)
 
@@ -506,26 +506,18 @@ Reports live at:
 
 - ~~**[M15-2 #4] Missing index on regen daily-budget query.**~~ Fixed 2026-05-03 — migration 0080 adds `idx_regen_jobs_created_at` index on `regeneration_jobs(created_at DESC)` supporting the `.gte("created_at", startOfDay)` range predicate in `lib/regeneration-publisher.ts#checkDailyBudget`.
 - **[M15-2 #5] No cancel endpoint for `transfer_jobs`.** Schema has `cancel_requested_at` column; no route uses it. Overlaps with [M15-5 #1] — if transfer cron is wired, add cancel; if cron is dead, drop the column.
-- **[M15-2 #8] Event-table PK type inconsistency.** `generation_events` + `regeneration_events` are `bigserial`; `transfer_events` is `uuid`. Cosmetic unless we build a unified event stream.
+- ~~**[M15-2 #8] Event-table PK type inconsistency.**~~ Documented 2026-05-04 — PR #533 migration 0086 adds `COMMENT ON TABLE` to all three event tables noting the bigserial/uuid mismatch and normalisation path.
 - **[M15-2 #10] Lease-coherent CHECK asymmetry.** `transfer_job_items_lease_coherent` requires `worker_id IS NOT NULL` in leased states; `generation_job_pages_lease_coherent` + `regeneration_jobs_lease_coherent` don't. Scope: tighten M3/M7 CHECKs after verifying no orphan-leased rows in production.
-- **[M15-2 #12] `image_usage` RLS excludes viewer.** See [M15-4 #8] grouping above — same theme.
-- **[M15-2 #13, #14] Service-role-only write tables + `opollo_config` read — undocumented at the migration level.** Intentional (workers use service-role; `first_admin_email` protected from enumeration) but the reasoning lives only in commit history. Scope: one-line comment blocks in each migration.
+- ~~**[M15-2 #12] `image_usage` RLS excludes viewer.**~~ See M15-5 #12 above — documented in PR #529.
+- ~~**[M15-2 #13, #14] Service-role-only write tables + `opollo_config` read — undocumented at the migration level.**~~ Documented 2026-05-04 — PR #529 migration 0085 adds `COMMENT ON TABLE` for all service-role-only write tables and `opollo_config` anon-read pattern.
 
 #### Test coverage (opportunistic — add when touching the surface)
 
-- **[M15-6 #5-12] Route handler tests not written.** Remaining after M15-7 Phase 3 (which covered chat, tools, wordpress):
-  - `cron/process-batch` route handler (lib-level well-covered)
-  - `cron/process-transfer` (overlaps [M15-5 #1]; test only after cron decision)
-  - `cron/budget-reset` route handler
-  - `cron/process-regenerations` — only WP_CREDS_MISSING branch covered
-  - `ops/self-probe` (no test at all)
-  - `sites/[id]` PATCH/DELETE
-  - `admin/images/[id]` + `/restore`
-  - `admin/sites/[id]/pages/[pageId]` PATCH
-- **[M15-6 #13] 6 of 7 tool JSON schemas untested.** `lib/tool-schemas.ts` — `searchImagesJsonSchema` tested; others aren't. Scope: parametric tests across all 7.
-- **[M15-6 #14] Tool lib implementations untested.** `lib/create-page.ts`, `lib/update-page.ts`, `lib/delete-page.ts`, `lib/get-page.ts`, `lib/list-pages.ts`, `lib/publish-page.ts`. M15-7 Phase 3b (#134) pins delegation at the route layer; the libs themselves wrap WP + Supabase calls with no dedicated tests. Scope: 2-3 hours per lib.
+- ~~**[M15-6 #5-12] Route handler tests not written.**~~ Shipped 2026-05-04 — PR #532 (cron/budget-reset, ops/self-probe, sites/[id] PATCH+DELETE, admin/images/[id] PATCH+DELETE+restore, admin/sites/[id]/pages/[pageId] PATCH) + PR #533 (cron/process-batch, cron/process-regenerations additional branches). Still open: `cron/process-transfer` — blocked on M15-5 #1 decision.
+- ~~**[M15-6 #13] 6 of 7 tool JSON schemas untested.**~~ Shipped 2026-05-04 — PR #530 adds parametric tests for all 7 schemas.
+- ~~**[M15-6 #14] Tool lib implementations untested.**~~ Shipped 2026-05-04 — PR #532 adds tests for all 6 executor libs (create-page, list-pages, get-page, update-page, delete-page, publish-page).
 - ~~**[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.**~~ Shipped in M12-6 (2026-05-03).
-- **[M15-6 #17] `health-route.test.ts` only covers happy path.** Degraded branches untested. Scope: 1 hour.
+- ~~**[M15-6 #17] `health-route.test.ts` only covers happy path.**~~ Shipped 2026-05-04 — PR #531 adds degraded branch + outer-catch tests.
 
 #### Tech-debt (bundled cleanup, no urgency)
 
@@ -545,7 +537,7 @@ Reports live at:
 - ~~**[M15-3 #10] `LEADSOURCE_WP_USER` / `LEADSOURCE_WP_APP_PASSWORD` undocumented format.**~~ 4-line comment added in `.env.local.example` (2026-04-29).
 - ~~**[M15-3 #11] `SENTRY_ORG` / `SENTRY_PROJECT` undocumented context.**~~ Inline comment added (2026-04-29).
 - ~~**[M15-3 #12] `DATABASE_URL` shell variable vs `SUPABASE_DB_URL` runtime env naming collision.**~~ Documented in `.env.local.example` (2026-04-29) — `SUPABASE_DB_URL` block now explains the shell-vs-runtime layering.
-- **[M15-3 #13] `ANALYZE` env var undocumented.** Only relevant to `npm run analyze`. Low priority. Still open.
+- ~~**[M15-3 #13] `ANALYZE` env var undocumented.**~~ Documented 2026-05-04 — PR #533 adds comment block in `.env.local.example`.
 - **[M15-5 Langfuse EU drift.** `lib/langfuse.ts:37` defaults to `https://us.cloud.langfuse.com`. EU projects without `LANGFUSE_HOST` silently go to the wrong datacenter. Not affected today (we're on US). Close when the `.env.local.example` comment ever needs updating anyway.
 
 #### Closed by M15-8 (future milestone — type generation + CI gates)
