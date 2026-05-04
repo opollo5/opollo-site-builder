@@ -125,8 +125,8 @@ components, and webhooks. Typecheck ✓ Lint ✓. Tests require Docker (not run)
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
 | S-4 | `app/company/social/connections/page.tsx` | `connect=sync-failed` banner shows generic "The connection couldn't be completed." — `sync.error.code` (e.g. "INTERNAL_ERROR") isn't in `REASON_LABEL` | ✅ Fixed — PR #546 |
-| S-5 | `lib/platform/social/cap/image-trigger.ts:108` | `bytes: 0` hardcoded in `social_media_assets` insert — file size not tracked for CAP images | Expose bytes from `generateWithFallback` or read from Supabase Storage stat after upload |
-| S-6 | `components/SocialPostDetailClient.tsx`, `components/PostScheduleSection.tsx` | `window.confirm()` / `window.prompt()` used for destructive actions (delete, submit, cancel-approval, reject, request-changes, schedule-cancel) — native browser dialogs, poor mobile UX | Replace with shadcn/ui `AlertDialog` + a `CommentDialog` (text-input variant); candidate for a dedicated polish slice |
+| S-5 | `lib/platform/social/cap/image-trigger.ts:108` | `bytes: 0` hardcoded in `social_media_assets` insert — file size not tracked for CAP images | ✅ Fixed PR #560 — uses `image.buffer?.length ?? 0` |
+| S-6 | `components/SocialPostDetailClient.tsx`, `components/PostScheduleSection.tsx` | `window.confirm()` / `window.prompt()` used for destructive actions (delete, submit, cancel-approval, reject, request-changes, schedule-cancel) — native browser dialogs, poor mobile UX | ✅ Fixed PR #560 — new `components/ui/confirm-dialog.tsx` (ConfirmDialog + CommentDialog over existing Radix Dialog) |
 
 ---
 
@@ -165,7 +165,7 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 |---|------|-------|---------------|
 | B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |
 | B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | Low risk (admin-only), but validate `site_name` doesn't contain `{{...}}` in `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
-| B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | Add `checkRateLimit("invite_accept", ...)` per-IP as used on the invitation accept endpoint |
+| B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | ✅ Fixed PR #560 — `approval_decision` limiter (20 req/h per-IP) added to `lib/rate-limit.ts` + route |
 
 ---
 

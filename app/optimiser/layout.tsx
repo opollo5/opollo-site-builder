@@ -36,10 +36,16 @@ export default async function OptimiserLayout({
       </a>
       <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3 text-sm">
-          <span className="font-semibold tracking-tight">
-            Opollo · Optimiser
+          <span className="flex items-center gap-2 font-semibold tracking-tight">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+              alt="Opollo"
+              width={80}
+              className="h-5 w-auto"
+            />
+            <span className="text-muted-foreground">· Optimiser</span>
           </span>
-          <span className="text-muted-foreground">·</span>
           <ul className="flex items-center gap-2">
             {NAV.map((item) => (
               <li key={item.href}>

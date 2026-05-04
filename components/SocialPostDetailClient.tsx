@@ -6,6 +6,10 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import {
+  ConfirmDialog,
+  CommentDialog,
+} from "@/components/ui/confirm-dialog";
 import { H1, Lead } from "@/components/ui/typography";
 import type {
   PostMaster,
@@ -44,6 +48,26 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   failed: "Failed",
 };
 
+type DialogState =
+  | { type: "none" }
+  | {
+      type: "confirm";
+      title: string;
+      description?: string;
+      confirmLabel?: string;
+      confirmVariant?: "default" | "destructive" | "outline" | "ghost";
+      onConfirm: () => void;
+    }
+  | {
+      type: "comment";
+      title: string;
+      description?: string;
+      commentLabel?: string;
+      confirmLabel?: string;
+      confirmVariant?: "default" | "destructive" | "outline" | "ghost";
+      onConfirm: (comment: string) => void;
+    };
+
 export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canRelease, canApprove }: Props) {
   const router = useRouter();
   const [masterText, setMasterText] = useState(post.master_text ?? "");
@@ -55,6 +79,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   const [reopening, setReopening] = useState(false);
   const [duplicating, setDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<DialogState>({ type: "none" });
 
   const isDraft = post.state === "draft";
   const isPendingApproval = post.state === "pending_client_approval";
@@ -69,6 +94,10 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [requestingChanges, setRequestingChanges] = useState(false);
+
+  function closeDialog() {
+    setDialog({ type: "none" });
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -101,8 +130,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleDelete() {
-    if (!confirm("Delete this draft post? This cannot be undone.")) return;
+  function handleDelete() {
+    setDialog({
+      type: "confirm",
+      title: "Delete this draft post?",
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      confirmVariant: "destructive",
+      onConfirm: executeDelete,
+    });
+  }
+
+  async function executeDelete() {
     setDeleting(true);
     setError(null);
     try {
@@ -125,14 +164,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleSubmitForApproval() {
-    if (
-      !confirm(
-        "Submit this post for approval? You won't be able to edit it again until the reviewer responds.",
-      )
-    ) {
-      return;
-    }
+  function handleSubmitForApproval() {
+    setDialog({
+      type: "confirm",
+      title: "Submit for approval?",
+      description:
+        "You won't be able to edit this post again until the reviewer responds.",
+      confirmLabel: "Submit",
+      onConfirm: executeSubmitForApproval,
+    });
+  }
+
+  async function executeSubmitForApproval() {
     setSubmitting(true);
     setError(null);
     try {
@@ -163,12 +206,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleCancelApproval() {
-    const reason = prompt(
-      "Cancel this approval request and bounce the post back to draft? Optional reason for the audit log:",
-      "",
-    );
-    if (reason === null) return; // user dismissed
+  function handleCancelApproval() {
+    setDialog({
+      type: "comment",
+      title: "Cancel approval request?",
+      description:
+        "The post will return to draft. An optional reason is recorded in the audit log.",
+      confirmLabel: "Cancel approval",
+      onConfirm: executeCancelApproval,
+    });
+  }
+
+  async function executeCancelApproval(reason: string) {
     setCancelling(true);
     setError(null);
     try {
@@ -179,7 +228,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             company_id: post.company_id,
-            reason: reason.trim() || null,
+            reason: reason || null,
           }),
         },
       );
@@ -202,14 +251,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleReopen() {
-    if (
-      !confirm(
-        "Reopen this post for editing? The reviewer's response will stay in the audit trail; you'll need to re-submit for approval after editing.",
-      )
-    ) {
-      return;
-    }
+  function handleReopen() {
+    setDialog({
+      type: "confirm",
+      title: "Reopen for editing?",
+      description:
+        "The reviewer's response will stay in the audit trail. You'll need to re-submit for approval after editing.",
+      confirmLabel: "Reopen",
+      onConfirm: executeReopen,
+    });
+  }
+
+  async function executeReopen() {
     setReopening(true);
     setError(null);
     try {
@@ -225,9 +278,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: true; data: { postState: "draft" } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        const msg = !json.ok
-          ? json.error.message
-          : "Failed to reopen post.";
+        const msg = !json.ok ? json.error.message : "Failed to reopen post.";
         setError(msg);
         setReopening(false);
         return;
@@ -240,14 +291,18 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleRelease() {
-    if (
-      !confirm(
-        "Release this post? It will move to Approved and can then be scheduled for publishing.",
-      )
-    ) {
-      return;
-    }
+  function handleRelease() {
+    setDialog({
+      type: "confirm",
+      title: "Release this post?",
+      description:
+        "It will move to Approved and can then be scheduled for publishing.",
+      confirmLabel: "Release",
+      onConfirm: executeRelease,
+    });
+  }
+
+  async function executeRelease() {
     setReleasing(true);
     setError(null);
     try {
@@ -275,8 +330,17 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleApprove() {
-    if (!confirm("Approve this post? It will move to Approved and can then be scheduled.")) return;
+  function handleApprove() {
+    setDialog({
+      type: "confirm",
+      title: "Approve this post?",
+      description: "It will move to Approved and can then be scheduled.",
+      confirmLabel: "Approve",
+      onConfirm: executeApprove,
+    });
+  }
+
+  async function executeApprove() {
     setApproving(true);
     setError(null);
     try {
@@ -301,19 +365,26 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleReject() {
-    const comment = prompt(
-      "Reject this post? Enter a note for the editor (optional — leave blank to skip):",
-      "",
-    );
-    if (comment === null) return; // user dismissed
+  function handleReject() {
+    setDialog({
+      type: "comment",
+      title: "Reject this post?",
+      description: "An optional note is sent to the editor.",
+      commentLabel: "Note for editor (optional)",
+      confirmLabel: "Reject",
+      confirmVariant: "destructive",
+      onConfirm: executeReject,
+    });
+  }
+
+  async function executeReject(comment: string) {
     setRejecting(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/reject`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: post.company_id, comment: comment.trim() || null }),
+        body: JSON.stringify({ company_id: post.company_id, comment: comment || null }),
       });
       const json = (await res.json()) as
         | { ok: true; data: { postState: "rejected" } }
@@ -331,19 +402,25 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function handleRequestChanges() {
-    const comment = prompt(
-      "Request changes? Enter a note for the editor (optional — leave blank to skip):",
-      "",
-    );
-    if (comment === null) return; // user dismissed
+  function handleRequestChanges() {
+    setDialog({
+      type: "comment",
+      title: "Request changes?",
+      description: "An optional note is sent to the editor.",
+      commentLabel: "Note for editor (optional)",
+      confirmLabel: "Request changes",
+      onConfirm: executeRequestChanges,
+    });
+  }
+
+  async function executeRequestChanges(comment: string) {
     setRequestingChanges(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/request-changes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: post.company_id, comment: comment.trim() || null }),
+        body: JSON.stringify({ company_id: post.company_id, comment: comment || null }),
       });
       const json = (await res.json()) as
         | { ok: true; data: { postState: "changes_requested" } }
@@ -591,6 +668,30 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
           <ReadOnlyView post={post} />
         )}
       </div>
+
+      {dialog.type === "confirm" && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => { if (!open) closeDialog(); }}
+          title={dialog.title}
+          description={dialog.description}
+          confirmLabel={dialog.confirmLabel}
+          confirmVariant={dialog.confirmVariant}
+          onConfirm={dialog.onConfirm}
+        />
+      )}
+      {dialog.type === "comment" && (
+        <CommentDialog
+          open
+          onOpenChange={(open) => { if (!open) closeDialog(); }}
+          title={dialog.title}
+          description={dialog.description}
+          commentLabel={dialog.commentLabel}
+          confirmLabel={dialog.confirmLabel}
+          confirmVariant={dialog.confirmVariant}
+          onConfirm={dialog.onConfirm}
+        />
+      )}
     </>
   );
 }
