@@ -131,11 +131,11 @@ function esc(s: unknown): string {
   if (s == null) return '';
   if (typeof s === 'object') return '';
   return String(s)
-    .replace(/on[a-z]+\s*=/gi, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
 }
 
 type CtaShape = { text?: string; url?: string; variant?: string };

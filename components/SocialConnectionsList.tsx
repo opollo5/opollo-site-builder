@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +45,7 @@ export function SocialConnectionsList({
   canManage,
   canReconnect,
 }: Props) {
+  const router = useRouter();
   const [busyRow, setBusyRow] = useState<string | null>(null);
   const [busyTop, setBusyTop] = useState<"connect" | "sync" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -124,9 +127,8 @@ export function SocialConnectionsList({
         setError(msg);
         return;
       }
-      // Re-render via full reload so the server-rendered list reflects
-      // the new statuses + display names.
-      window.location.reload();
+      toast.success("Connections refreshed.");
+      router.refresh();
     } finally {
       setBusyTop(null);
     }
