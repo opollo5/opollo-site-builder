@@ -19,7 +19,7 @@ type RouteContext = { params: { id: string; blueprint_id: string } };
 // Idempotent. Safe to call repeatedly (all WP operations are upserts).
 // Does NOT publish individual pages — that is handled by the batch publisher.
 export async function POST(_req: Request, ctx: RouteContext) {
-  const gate = await requireAdminForApi({ roles: ["super_admin", "admin", "operator"] });
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const siteParam = validateUuidParam(ctx.params.id, "id");

@@ -436,10 +436,12 @@ export async function publishSlot(
         const contentHash = await computeContentHash(wpBoundHtml);
         const svc = getServiceRoleClient();
         m16PostPublishTasks.push(
-          svc
-            .from("route_registry")
-            .update({ wp_content_hash: contentHash })
-            .eq("id", publishCtx.m16_route_id),
+          Promise.resolve(
+            svc
+              .from("route_registry")
+              .update({ wp_content_hash: contentHash })
+              .eq("id", publishCtx.m16_route_id),
+          ),
         );
       }
 
