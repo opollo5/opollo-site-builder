@@ -182,7 +182,7 @@ export default async function CompanySocialPostDetailPage({
       {isPostDecision && auditEvents?.ok ? (
         <PostDecisionsAudit events={auditEvents.data.events} />
       ) : null}
-      {postResult.data.state === "approved"
+      {(postResult.data.state === "approved" || postResult.data.state === "scheduled")
         ? await renderScheduleSection({
             postId: postResult.data.id,
             companyId,
