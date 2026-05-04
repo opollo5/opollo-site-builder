@@ -7,8 +7,8 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
-  CommentDialog,
   ConfirmDialog,
+  CommentDialog,
 } from "@/components/ui/confirm-dialog";
 import { H1, Lead } from "@/components/ui/typography";
 import type {
@@ -48,16 +48,25 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   failed: "Failed",
 };
 
-type DialogKind =
-  | "delete"
-  | "submit"
-  | "reopen"
-  | "release"
-  | "approve"
-  | "cancel_approval"
-  | "reject"
-  | "request_changes"
-  | null;
+type DialogState =
+  | { type: "none" }
+  | {
+      type: "confirm";
+      title: string;
+      description?: string;
+      confirmLabel?: string;
+      confirmVariant?: "default" | "destructive" | "outline" | "ghost";
+      onConfirm: () => void;
+    }
+  | {
+      type: "comment";
+      title: string;
+      description?: string;
+      commentLabel?: string;
+      confirmLabel?: string;
+      confirmVariant?: "default" | "destructive" | "outline" | "ghost";
+      onConfirm: (comment: string) => void;
+    };
 
 export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canRelease, canApprove }: Props) {
   const router = useRouter();
@@ -65,9 +74,12 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   const [linkUrl, setLinkUrl] = useState(post.link_url ?? "");
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [reopening, setReopening] = useState(false);
+  const [duplicating, setDuplicating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<DialogKind>(null);
+  const [dialog, setDialog] = useState<DialogState>({ type: "none" });
 
   const isDraft = post.state === "draft";
   const isPendingApproval = post.state === "pending_client_approval";
@@ -77,6 +89,15 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   const cancellable = canEdit && isPendingApproval;
   const releasable = canRelease && post.state === "pending_msp_release";
   const approvable = canApprove && isPendingApproval;
+  const [cancelling, setCancelling] = useState(false);
+  const [releasing, setReleasing] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [requestingChanges, setRequestingChanges] = useState(false);
+
+  function closeDialog() {
+    setDialog({ type: "none" });
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -96,7 +117,8 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: true; data: { post: PostMaster } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to save post.");
+        const msg = !json.ok ? json.error.message : "Failed to save post.";
+        setError(msg);
         return;
       }
       setEditing(false);
@@ -108,8 +130,19 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  async function doDelete() {
-    setBusy(true);
+  function handleDelete() {
+    setDialog({
+      type: "confirm",
+      title: "Delete this draft post?",
+      description: "This cannot be undone.",
+      confirmLabel: "Delete",
+      confirmVariant: "destructive",
+      onConfirm: executeDelete,
+    });
+  }
+
+  async function executeDelete() {
+    setDeleting(true);
     setError(null);
     try {
       const url = `/api/platform/social/posts/${post.id}?company_id=${encodeURIComponent(post.company_id)}`;
@@ -118,20 +151,32 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: true; data: { deleted: true } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to delete post.");
-        setBusy(false);
+        const msg = !json.ok ? json.error.message : "Failed to delete post.";
+        setError(msg);
+        setDeleting(false);
         return;
       }
       router.push("/company/social/posts");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setDeleting(false);
     }
   }
 
-  async function doSubmit() {
-    setBusy(true);
+  function handleSubmitForApproval() {
+    setDialog({
+      type: "confirm",
+      title: "Submit for approval?",
+      description:
+        "You won't be able to edit this post again until the reviewer responds.",
+      confirmLabel: "Submit",
+      onConfirm: executeSubmitForApproval,
+    });
+  }
+
+  async function executeSubmitForApproval() {
+    setSubmitting(true);
     setError(null);
     try {
       const res = await fetch(
@@ -146,20 +191,34 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: true; data: { approvalRequestId: string } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to submit for approval.");
-        setBusy(false);
+        const msg = !json.ok
+          ? json.error.message
+          : "Failed to submit for approval.";
+        setError(msg);
+        setSubmitting(false);
         return;
       }
       toast.success("Submitted for approval.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setSubmitting(false);
     }
   }
 
-  async function doCancelApproval(reason: string) {
-    setBusy(true);
+  function handleCancelApproval() {
+    setDialog({
+      type: "comment",
+      title: "Cancel approval request?",
+      description:
+        "The post will return to draft. An optional reason is recorded in the audit log.",
+      confirmLabel: "Cancel approval",
+      onConfirm: executeCancelApproval,
+    });
+  }
+
+  async function executeCancelApproval(reason: string) {
+    setCancelling(true);
     setError(null);
     try {
       const res = await fetch(
@@ -177,20 +236,34 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: true; data: { postState: "draft" } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to cancel approval.");
-        setBusy(false);
+        const msg = !json.ok
+          ? json.error.message
+          : "Failed to cancel approval.";
+        setError(msg);
+        setCancelling(false);
         return;
       }
       toast.success("Approval cancelled — post returned to draft.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setCancelling(false);
     }
   }
 
-  async function doReopen() {
-    setBusy(true);
+  function handleReopen() {
+    setDialog({
+      type: "confirm",
+      title: "Reopen for editing?",
+      description:
+        "The reviewer's response will stay in the audit trail. You'll need to re-submit for approval after editing.",
+      confirmLabel: "Reopen",
+      onConfirm: executeReopen,
+    });
+  }
+
+  async function executeReopen() {
+    setReopening(true);
     setError(null);
     try {
       const res = await fetch(
@@ -205,20 +278,32 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: true; data: { postState: "draft" } }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to reopen post.");
-        setBusy(false);
+        const msg = !json.ok ? json.error.message : "Failed to reopen post.";
+        setError(msg);
+        setReopening(false);
         return;
       }
       toast.success("Post reopened for editing.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setReopening(false);
     }
   }
 
-  async function doRelease() {
-    setBusy(true);
+  function handleRelease() {
+    setDialog({
+      type: "confirm",
+      title: "Release this post?",
+      description:
+        "It will move to Approved and can then be scheduled for publishing.",
+      confirmLabel: "Release",
+      onConfirm: executeRelease,
+    });
+  }
+
+  async function executeRelease() {
+    setReleasing(true);
     setError(null);
     try {
       const res = await fetch(
@@ -234,19 +319,29 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
         setError(!json.ok ? json.error.message : "Failed to release post.");
-        setBusy(false);
+        setReleasing(false);
         return;
       }
       toast.success("Post released — ready to schedule.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setReleasing(false);
     }
   }
 
-  async function doApprove() {
-    setBusy(true);
+  function handleApprove() {
+    setDialog({
+      type: "confirm",
+      title: "Approve this post?",
+      description: "It will move to Approved and can then be scheduled.",
+      confirmLabel: "Approve",
+      onConfirm: executeApprove,
+    });
+  }
+
+  async function executeApprove() {
+    setApproving(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/approve`, {
@@ -259,19 +354,31 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
         setError(!json.ok ? json.error.message : "Failed to approve post.");
-        setBusy(false);
+        setApproving(false);
         return;
       }
       toast.success("Post approved.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setApproving(false);
     }
   }
 
-  async function doReject(comment: string) {
-    setBusy(true);
+  function handleReject() {
+    setDialog({
+      type: "comment",
+      title: "Reject this post?",
+      description: "An optional note is sent to the editor.",
+      commentLabel: "Note for editor (optional)",
+      confirmLabel: "Reject",
+      confirmVariant: "destructive",
+      onConfirm: executeReject,
+    });
+  }
+
+  async function executeReject(comment: string) {
+    setRejecting(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/reject`, {
@@ -284,19 +391,30 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
         setError(!json.ok ? json.error.message : "Failed to reject post.");
-        setBusy(false);
+        setRejecting(false);
         return;
       }
       toast.success("Post rejected.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setRejecting(false);
     }
   }
 
-  async function doRequestChanges(comment: string) {
-    setBusy(true);
+  function handleRequestChanges() {
+    setDialog({
+      type: "comment",
+      title: "Request changes?",
+      description: "An optional note is sent to the editor.",
+      commentLabel: "Note for editor (optional)",
+      confirmLabel: "Request changes",
+      onConfirm: executeRequestChanges,
+    });
+  }
+
+  async function executeRequestChanges(comment: string) {
+    setRequestingChanges(true);
     setError(null);
     try {
       const res = await fetch(`/api/platform/social/posts/${post.id}/request-changes`, {
@@ -309,19 +427,19 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
         setError(!json.ok ? json.error.message : "Failed to request changes.");
-        setBusy(false);
+        setRequestingChanges(false);
         return;
       }
       toast.success("Changes requested.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setRequestingChanges(false);
     }
   }
 
   async function handleDuplicate() {
-    setBusy(true);
+    setDuplicating(true);
     setError(null);
     try {
       const res = await fetch(
@@ -337,7 +455,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
         setError(!json.ok ? json.error.message : "Failed to duplicate post.");
-        setBusy(false);
+        setDuplicating(false);
         return;
       }
       toast.success("Post duplicated.");
@@ -345,84 +463,12 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
-      setBusy(false);
+      setDuplicating(false);
     }
   }
 
   return (
     <>
-      {/* Confirm dialogs */}
-      <ConfirmDialog
-        open={dialog === "delete"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Delete post?"
-        description="This draft will be permanently deleted. This cannot be undone."
-        confirmLabel="Delete"
-        confirmVariant="destructive"
-        onConfirm={doDelete}
-      />
-      <ConfirmDialog
-        open={dialog === "submit"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Submit for approval?"
-        description="You won't be able to edit this post until the reviewer responds."
-        confirmLabel="Submit"
-        onConfirm={doSubmit}
-      />
-      <ConfirmDialog
-        open={dialog === "reopen"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Reopen for editing?"
-        description="The reviewer's response stays in the audit trail. You'll need to re-submit after editing."
-        confirmLabel="Reopen"
-        onConfirm={doReopen}
-      />
-      <ConfirmDialog
-        open={dialog === "release"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Release post?"
-        description="The post will move to Approved and can then be scheduled for publishing."
-        confirmLabel="Release"
-        onConfirm={doRelease}
-      />
-      <ConfirmDialog
-        open={dialog === "approve"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Approve post?"
-        description="The post will move to Approved and can then be scheduled."
-        confirmLabel="Approve"
-        onConfirm={doApprove}
-      />
-      {/* Comment dialogs */}
-      <CommentDialog
-        open={dialog === "cancel_approval"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Cancel approval request?"
-        description="The post will be returned to draft."
-        commentLabel="Reason (optional)"
-        commentPlaceholder="Why are you cancelling this request?"
-        confirmLabel="Cancel approval"
-        confirmVariant="destructive"
-        onConfirm={doCancelApproval}
-      />
-      <CommentDialog
-        open={dialog === "reject"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Reject post?"
-        commentLabel="Note for the editor (optional)"
-        confirmLabel="Reject"
-        confirmVariant="destructive"
-        onConfirm={doReject}
-      />
-      <CommentDialog
-        open={dialog === "request_changes"}
-        onOpenChange={(o) => !o && setDialog(null)}
-        title="Request changes?"
-        commentLabel="Note for the editor (optional)"
-        confirmLabel="Request changes"
-        onConfirm={doRequestChanges}
-      />
-
       <div className="flex items-start justify-between gap-3">
         <div>
           <Link
@@ -453,89 +499,89 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
             ) : null}
             {submittable ? (
               <Button
-                onClick={() => setDialog("submit")}
-                disabled={busy}
+                onClick={handleSubmitForApproval}
+                disabled={submitting}
                 data-testid="submit-post-button"
               >
-                Submit for approval
+                {submitting ? "Submitting…" : "Submit for approval"}
               </Button>
             ) : null}
             {reopenable ? (
               <Button
-                onClick={() => setDialog("reopen")}
-                disabled={busy}
+                onClick={handleReopen}
+                disabled={reopening}
                 data-testid="reopen-post-button"
               >
-                Reopen for editing
+                {reopening ? "Reopening…" : "Reopen for editing"}
               </Button>
             ) : null}
             {releasable ? (
               <Button
                 variant="outline"
-                onClick={() => setDialog("release")}
-                disabled={busy}
+                onClick={handleRelease}
+                disabled={releasing}
                 data-testid="release-post-button"
               >
-                Release
+                {releasing ? "Releasing…" : "Release"}
               </Button>
             ) : null}
             {approvable ? (
               <Button
-                onClick={() => setDialog("approve")}
-                disabled={busy}
+                onClick={handleApprove}
+                disabled={approving}
                 data-testid="approve-post-button"
               >
-                Approve
+                {approving ? "Approving…" : "Approve"}
               </Button>
             ) : null}
             {approvable ? (
               <Button
                 variant="outline"
-                onClick={() => setDialog("request_changes")}
-                disabled={busy}
+                onClick={handleRequestChanges}
+                disabled={requestingChanges}
                 data-testid="request-changes-button"
               >
-                Request changes
+                {requestingChanges ? "Requesting…" : "Request changes"}
               </Button>
             ) : null}
             {approvable ? (
               <Button
                 variant="destructive"
-                onClick={() => setDialog("reject")}
-                disabled={busy}
+                onClick={handleReject}
+                disabled={rejecting}
                 data-testid="reject-post-button"
               >
-                Reject
+                {rejecting ? "Rejecting…" : "Reject"}
               </Button>
             ) : null}
             {cancellable ? (
               <Button
                 variant="ghost"
-                onClick={() => setDialog("cancel_approval")}
-                disabled={busy}
+                onClick={handleCancelApproval}
+                disabled={cancelling}
                 data-testid="cancel-approval-button"
               >
-                Cancel approval
+                {cancelling ? "Cancelling…" : "Cancel approval"}
               </Button>
             ) : null}
             {canCreate ? (
               <Button
                 variant="outline"
                 onClick={handleDuplicate}
-                disabled={busy}
+                disabled={duplicating}
                 data-testid="duplicate-post-button"
               >
-                {busy ? "Duplicating…" : "Duplicate"}
+                {duplicating ? "Duplicating…" : "Duplicate"}
               </Button>
             ) : null}
             {editable ? (
               <Button
                 variant="destructive"
-                onClick={() => setDialog("delete")}
-                disabled={busy}
+                onClick={handleDelete}
+                disabled={deleting}
                 data-testid="delete-post-button"
               >
-                Delete
+                {deleting ? "Deleting…" : "Delete"}
               </Button>
             ) : null}
           </div>
@@ -622,6 +668,30 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
           <ReadOnlyView post={post} />
         )}
       </div>
+
+      {dialog.type === "confirm" && (
+        <ConfirmDialog
+          open
+          onOpenChange={(open) => { if (!open) closeDialog(); }}
+          title={dialog.title}
+          description={dialog.description}
+          confirmLabel={dialog.confirmLabel}
+          confirmVariant={dialog.confirmVariant}
+          onConfirm={dialog.onConfirm}
+        />
+      )}
+      {dialog.type === "comment" && (
+        <CommentDialog
+          open
+          onOpenChange={(open) => { if (!open) closeDialog(); }}
+          title={dialog.title}
+          description={dialog.description}
+          commentLabel={dialog.commentLabel}
+          confirmLabel={dialog.confirmLabel}
+          confirmVariant={dialog.confirmVariant}
+          onConfirm={dialog.onConfirm}
+        />
+      )}
     </>
   );
 }
