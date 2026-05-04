@@ -653,7 +653,7 @@ function ConceptResultsBlock({
             <div className="mt-2 h-2 w-full rounded bg-muted-foreground/20" />
             <div className="mt-1.5 h-2 w-5/6 rounded bg-muted-foreground/20" />
             <div className="mt-4 h-32 w-full rounded bg-muted-foreground/10" />
-            <p className="mt-2 text-[10px] text-muted-foreground">
+            <p className="mt-2 text-xs text-muted-foreground">
               Generating {label}…
             </p>
           </div>

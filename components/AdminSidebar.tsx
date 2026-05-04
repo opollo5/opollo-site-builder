@@ -320,7 +320,7 @@ export function AdminSidebar({
               <>
                 <div className="mt-4 mb-1 px-2.5">
                   {!collapsed && (
-                    <p className="lbl text-[10px]">Admin</p>
+                    <p className="lbl">Admin</p>
                   )}
                 </div>
                 <ul className="space-y-0.5">
@@ -406,7 +406,7 @@ export function AdminSidebar({
             )}
             {user && !collapsed && (
               <p
-                className="mt-2 truncate border-t border-white/[0.06] pt-2 px-2.5 text-[11px] text-[rgba(255,255,255,0.32)]"
+                className="mt-2 truncate border-t border-white/[0.06] pt-2 px-2.5 text-xs text-[rgba(255,255,255,0.32)]"
                 title={user.email}
               >
                 {user.email}

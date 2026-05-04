@@ -60,16 +60,54 @@ compile but are caught by Phase 6 lint rules.
 
 ---
 
-## Phase 2 — Fix font size violations (pending)
+## Phase 2 — Fix font size violations
 
-**Files to fix:** see pre-flight audit above
-**Violations to fix:** ~55 instances
+**PR:** (pending)
+**Date:** 2026-05-05
+**Branch:** feat/css-design-system-phase-2
+
+### Changes — bumped to text-xs (15px)
+
+| File | Lines | Element |
+|---|---|---|
+| `app/admin/sites/[id]/posts/page.tsx` | 281 | Post slug code |
+| `app/admin/users/audit/page.tsx` | 108 | Metadata JSON code block |
+| `components/AdminSidebar.tsx` | 409 | Current user email in footer |
+| `components/AppearanceEventLog.tsx` | 161 | Event details JSON in pre |
+| `components/BlogPostComposer.tsx` | 1169 | WP preview URL |
+| `components/BriefRunClient.tsx` | 869 | Issue severity badge |
+| `components/BulkImageUpload.tsx` | 397 | Upload status badge |
+| `components/BulkUploadPanel.tsx` | 684, 692, 706, 714 | Status badges (Rejected/Saving/Saved/Failed) |
+| `components/ConceptRefinementView.tsx` | 197, 214, 221, 438, 460 | Preview section labels |
+| `components/ConceptReviewCards.tsx` | 166, 191, 206, 221 | Font metadata + Desktop/Mobile toggle |
+| `components/DesignDirectionInputs.tsx` | 656 | "Generating…" message |
+| `components/MoodBoardStrip.tsx` | 87, 106 | Layout/visual-tone tag pills |
+| `components/RunCostTicker.tsx` | 168, 172 | Model identifiers |
+| `components/ScreenshotUploadZone.tsx` | 285 | Screenshot filename |
+| `components/ToneOfVoiceInputs.tsx` | 547, 583 | Style guide pre + sample labels |
+| `components/TrustedDevicesList.tsx` | 149 | "This device" badge |
+
+### Intentional exceptions — kept at small size
+
+| File | Lines | Element | Reason |
+|---|---|---|---|
+| `app/globals.css` | 112 | `.lbl { font-size: 10px }` | Eyebrow label spec (10–11px per design system) |
+| `app/globals.css` | 156, 185 | `.btn-pk`, `.btn-ghost` at 13px | Button spec (13px per design system) |
+| `components/AdminSidebar.tsx` | 323 | `.lbl` section label — removed redundant `text-[10px]` | `.lbl` class handles size |
+| `components/AdminSidebar.tsx` | 346, 349 | ⌘K keyboard symbol `<kbd>` | Decorative keyboard symbol |
+| `components/BlogPostComposer.tsx` | 1082, 1085 | ⌘S keyboard symbol `<kbd>` | Decorative keyboard symbol |
+| `components/BulkUploadPanel.tsx` | 398, 401 | ⌘↵ keyboard symbol `<kbd>` | Decorative keyboard symbol |
+| `components/CommandPalette.tsx` | 365, 369, 375 | ↑↓ ↵ esc keyboard hints | Compact keyboard hint footer |
+| `components/ConceptRefinementView.tsx` | 420 | Color swatch token badge | Decorative — has `title` tooltip |
+| `components/DesignUnderstandingPanel.tsx` | 102 | Color swatch badge | Decorative — has `title` tooltip |
+| `components/MoodBoardStrip.tsx` | 36 | Color swatch badge | Decorative — has `title` tooltip |
+| `components/NotificationBell.tsx` | 112 | Unread count in 16px circle | Layout-constrained |
+| `components/SetupWizard.tsx` | 624 | Color token key label on swatch | Decorative |
+| `components/ui/button.tsx` | 20 | Button text at 13px | Button spec (13px per design system) |
 
 ### Pending design decisions
 
-- `app/api/admin/email-test/route.ts:54` — `font-size:14px` inside a raw HTML string for a transactional email template. This is not a rendered component; the token system cannot enforce it directly. Needs a decision: accept as-is, or update the email template to use 16px minimum.
-- `app/globals.css:112` — `font-size: 10px` — need to inspect what this targets before replacing
-- `app/globals.css:156,185` — `font-size: 13px` — same, inspect target element
+- `app/api/admin/email-test/route.ts:54` — `font-size:14px` inside a raw HTML string for a transactional email template. This is not a rendered component; the token system cannot enforce it. Decision: accept as-is (14px in email context is fine for transactional email); not an operator-surface violation.
 
 ---
 

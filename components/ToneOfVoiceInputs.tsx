@@ -544,7 +544,7 @@ function ToneSummary({ tone }: { tone: ToneOfVoice }) {
         <summary className="cursor-pointer text-muted-foreground">
           Style guide ({tone.style_guide.length} chars)
         </summary>
-        <pre className="mt-2 whitespace-pre-wrap rounded bg-background p-2 text-[11px] text-foreground">
+        <pre className="mt-2 whitespace-pre-wrap rounded bg-background p-2 text-xs text-foreground">
           {tone.style_guide}
         </pre>
       </details>
@@ -580,7 +580,7 @@ function SamplesEditor({
             className="rounded-md border bg-card p-3"
             data-testid={`tov-sample-${s.kind}`}
           >
-            <p className="text-[10px] font-semibold uppercase text-muted-foreground">
+            <p className="text-xs font-semibold uppercase text-muted-foreground">
               {SAMPLE_LABELS[s.kind]}
             </p>
             <Textarea

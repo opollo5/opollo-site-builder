@@ -278,7 +278,7 @@ export default async function SitePostsList({
                       </Link>
                     </h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      <code className="text-[11px]">/{post.slug}</code>
+                      <code className="font-mono text-xs">/{post.slug}</code>
                       {post.wp_post_id
                         ? ` · WP id ${post.wp_post_id}`
                         : ""}

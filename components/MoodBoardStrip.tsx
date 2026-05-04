@@ -84,7 +84,7 @@ export function MoodBoardStrip({ view }: { view: View }) {
                   view.layout_tags.slice(0, 5).map((t) => (
                     <span
                       key={t}
-                      className="rounded-full border bg-background px-2 py-0.5 text-[10px]"
+                      className="rounded-full border bg-background px-2 py-0.5 text-xs"
                     >
                       {t}
                     </span>
@@ -103,7 +103,7 @@ export function MoodBoardStrip({ view }: { view: View }) {
                   view.visual_tone_tags.slice(0, 5).map((t) => (
                     <span
                       key={t}
-                      className="rounded-full border bg-foreground/10 px-2 py-0.5 text-[10px]"
+                      className="rounded-full border bg-foreground/10 px-2 py-0.5 text-xs"
                     >
                       {t}
                     </span>
