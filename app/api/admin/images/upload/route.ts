@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import Anthropic from "@anthropic-ai/sdk";
 import { parse as parseExif } from "exifr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -34,6 +35,70 @@ export const dynamic = "force-dynamic";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME_PREFIX = "image/";
+const AI_CAPTION_MAX_BYTES = 5 * 1024 * 1024;
+
+async function generateAiCaption(
+  imageId: string,
+  bytes: Uint8Array,
+  mimeType: string,
+): Promise<void> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return;
+
+  // Downscale large images: Anthropic vision accepts up to ~5 MB base64.
+  // Skip if the file is too large to avoid excessive token spend.
+  if (bytes.length > AI_CAPTION_MAX_BYTES) return;
+
+  const base64 = Buffer.from(bytes).toString("base64");
+  const mediaType = mimeType as "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+
+  try {
+    const client = new Anthropic({ apiKey });
+    const msg = await client.messages.create({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 256,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image",
+              source: { type: "base64", media_type: mediaType, data: base64 },
+            },
+            {
+              type: "text",
+              text: 'Describe this image concisely in one sentence for use as a photo caption (max 150 chars). Then on a new line write a short alt text for accessibility (max 100 chars). Format:\nCAPTION: <caption>\nALT: <alt text>',
+            },
+          ],
+        },
+      ],
+    });
+
+    const text = msg.content[0]?.type === "text" ? msg.content[0].text : "";
+    const captionMatch = /^CAPTION:\s*(.+)/m.exec(text);
+    const altMatch = /^ALT:\s*(.+)/m.exec(text);
+    const aiCaption = captionMatch?.[1]?.trim().slice(0, 150) ?? null;
+    const aiAlt = altMatch?.[1]?.trim().slice(0, 100) ?? null;
+
+    if (!aiCaption && !aiAlt) return;
+
+    const svc = getServiceRoleClient();
+    await svc
+      .from("image_library")
+      .update({
+        ...(aiCaption ? { caption: aiCaption } : {}),
+        ...(aiAlt ? { alt_text: aiAlt } : {}),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", imageId)
+      .is("caption", null);
+  } catch (err) {
+    logger.warn("image.upload.ai_caption_failed", {
+      image_id: imageId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 function errorJson(
   code: string,
@@ -262,6 +327,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
           });
         }
       });
+  }
+
+  // Fix 1 — AI captioning fallback: when EXIF yields no caption, generate
+  // one asynchronously via Anthropic vision (fire-and-forget).
+  if (!exifCaption && ins.data?.id && file.type.startsWith("image/")) {
+    void generateAiCaption(ins.data.id, bytes, file.type);
   }
 
   return NextResponse.json(
