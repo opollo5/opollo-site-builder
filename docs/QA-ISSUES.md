@@ -340,3 +340,24 @@ All items from the original work list confirmed implemented and passing typechec
 | `npm run typecheck` | ✅ 0 errors |
 | `npm run lint` | ✅ 0 warnings |
 | `npm run audit:static` | ✅ 0 HIGH (pre-existing MEDIUM/LOW only) |
+
+---
+
+## Phase 9 — Admin UI native dialog sweep + social E2E (2026-05-05, PR #561)
+
+### Fixed
+
+| # | Component | Issue | Fix |
+|---|-----------|-------|-----|
+| D-1 | `components/PendingInvitesTable.tsx` | `window.confirm()` on invite revoke | Replaced with `ConfirmDialog` (destructive, deferred state via `pendingRevoke`) |
+| D-2 | `components/RegenerateButton.tsx` | `window.confirm()` on page re-generate | Replaced with `ConfirmDialog` (destructive, `confirmOpen` state) |
+| D-3 | `components/TrustedDevicesList.tsx` | Two `window.confirm()` calls — revokeOne + revokeOthers | Replaced with two `ConfirmDialog` instances (`pendingOne` + `pendingOthers` state) |
+| D-4 | `components/RichTextEditor.tsx` | `window.prompt()` for link URL entry | Replaced with shadcn `Dialog` + `Input` (`linkDialogOpen` state, `linkInputRef`, Enter key support) |
+| E2E-1 | `e2e/social.spec.ts` | Zero E2E coverage for social platform routes | New spec: posts list, new-post button opens form, connections page, analytics page, media library — all with `auditA11y` |
+| CI-1 | `playwright.config.ts` | `webServer.timeout: 120_000` — CI build takes ~1m47s alone, expired before server start | Increased to `240_000` |
+| CI-2 | `.github/workflows/e2e.yml` | `timeout-minutes: 20` insufficient | Increased to `30` |
+
+### Typecheck + lint
+
+`npm run typecheck` — ✅ 0 errors
+`npm run lint` — ✅ 0 warnings / errors
