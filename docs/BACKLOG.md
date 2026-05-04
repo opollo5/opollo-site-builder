@@ -528,7 +528,7 @@ Reports live at:
 - ~~**[M15-4 #18] `/api/health` envelope outlier** — no `ok` field.~~ Deviation documented in route comment (2026-04-29).
 - ~~**[M15-4 #19] `/api/health` no outer try/catch.**~~ Wrapped in try/catch; thrown helper now produces a structured 503 with logger.error trail (2026-04-29).
 - **[M15-5 dead code] `lib/class-registry.ts`, `lib/content-schemas.ts`, `lib/supabase.ts#getAnonClient`.** Tested/scaffolded but not wired. Scope: per-module decision — ship the feature they were preparing, or delete. Triggers: class-registry unblocks a planned per-component CSS gate; content-schemas unblocks structured inline-HTML; getAnonClient unblocks a planned Stage-2 client-surface.
-- **[M15-2 #2 residue] `brief_runs` + `site_conventions`** — M12-1 forward-looking tables, not referenced in production code today. Close naturally when M12-2+ wires them. Comment at migration 0013 noting the forward intent would help.
+- ~~**[M15-2 #2 residue] `brief_runs` + `site_conventions`**~~ — Verified 2026-05-04: `brief_runs` IS referenced in `lib/brief-runner.ts` (leasing, status updates, content_summary cap). Migration 0013 already has the forward-intent comment. Item was premature — tables are wired.
 - **[M15-2 #11 residue] Dynamic update spreads** (`updateDesignSystem`, `updateComponent`, `updateTemplate`). Zod↔DB sync test in #129 guards against drift; the pattern itself is unchanged. Full resolution lands with M15-8 type generation.
 
 #### Env + doc polish (trivial, opportunistic)
@@ -538,7 +538,7 @@ Reports live at:
 - ~~**[M15-3 #11] `SENTRY_ORG` / `SENTRY_PROJECT` undocumented context.**~~ Inline comment added (2026-04-29).
 - ~~**[M15-3 #12] `DATABASE_URL` shell variable vs `SUPABASE_DB_URL` runtime env naming collision.**~~ Documented in `.env.local.example` (2026-04-29) — `SUPABASE_DB_URL` block now explains the shell-vs-runtime layering.
 - ~~**[M15-3 #13] `ANALYZE` env var undocumented.**~~ Documented 2026-05-04 — PR #533 adds comment block in `.env.local.example`.
-- **[M15-5 Langfuse EU drift.** `lib/langfuse.ts:37` defaults to `https://us.cloud.langfuse.com`. EU projects without `LANGFUSE_HOST` silently go to the wrong datacenter. Not affected today (we're on US). Close when the `.env.local.example` comment ever needs updating anyway.
+- ~~**[M15-5 Langfuse EU drift.**~~ Documented 2026-05-04 — `.env.local.example` `LANGFUSE_HOST` block updated to warn that EU-region projects must set `https://eu.cloud.langfuse.com`.
 
 #### Closed by M15-8 (future milestone — type generation + CI gates)
 
