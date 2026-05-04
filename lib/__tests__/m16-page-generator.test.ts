@@ -47,7 +47,7 @@ async function seedBlueprintAndRoutes(siteId: string) {
 
   // Upsert the route
   const routeResult = await upsertRoutesFromPlan(siteId, [
-    { slug: "/", pageType: "homepage", label: "Home", priority: 1 },
+    { slug: "/", page_type: "homepage" as const, label: "Home", priority: 1 },
   ]);
   if (!routeResult.ok) throw new Error("seedBlueprintAndRoutes: upsert routes failed");
   const routes = await listActiveRoutes(siteId);
