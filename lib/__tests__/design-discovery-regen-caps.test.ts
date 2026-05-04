@@ -15,7 +15,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // ---------------------------------------------------------------------------
 
 const TEST_SITE_NAME = "regen-caps-test-site";
-const TEST_SITE_PREFIX = "regen-caps-test";
+const TEST_SITE_PREFIX = "rege"; // varchar(4) constraint on sites.prefix
 
 let TEST_SITE_ID: string;
 
