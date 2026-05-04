@@ -4,6 +4,7 @@ import { listSharedContent } from "@/lib/shared-content";
 import { getSite } from "@/lib/sites";
 import { publishSiteToWordPress } from "@/lib/wp-site-publish";
 import { respond, validateUuidParam } from "@/lib/http";
+import type { ErrorCode } from "@/lib/tool-schemas";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -103,7 +104,7 @@ export async function POST(_req: Request, ctx: RouteContext) {
     return respond({
       ok: false,
       error: {
-        code: result.code,
+        code: (result.code as ErrorCode) ?? "INTERNAL_ERROR",
         message: result.message,
         retryable: false,
         suggested_action: "Check WP credentials and theme configuration.",

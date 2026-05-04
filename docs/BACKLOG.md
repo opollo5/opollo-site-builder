@@ -972,3 +972,29 @@ All P1/P2 items the audit re-encountered are already documented above with concr
 **`scripts/audit.ts` noise (PR #386, 2026-05-02):** the new heuristic static-audit job reports 39 HIGH issues. After classification this run: 33 are heuristic false positives (cron routes that use `CRON_SECRET` constant-time check, OAuth callbacks intentionally public, the `POST /api/platform/invitations/accept` route where the token IS the auth, four `migration-ordering` matches against English words like `it` / `the` / `these` / `resolve` in comment text). The remaining 2 (`/api/sites/list`, `/api/design-systems/[id]/preview`) are the existing M15-4 #8 defense-in-depth BACKLOG entry. CI's `static-audit` job is gating on these but main's branch protection doesn't require the check; merges proceed. Improving the script's heuristics is its own slice — out of scope for this run; flag if false-positive cleanup ever earns its keep.
 
 **Production health:** lint, typecheck, and build all green on main post-merge. Local `vitest run` requires Docker for `supabase start` — CI runs the full test suite (the same way prior runs verified the pre-existing m12-1-rls / m4-schema cells); `npm run test` was not exercised locally this run.
+
+---
+
+## M16 — Site graph architecture (all slices merged 2026-05-04)
+
+Site graph replaces HTML-as-canonical with a structured JSON page model. Full architecture in `docs/patterns/site-graph.md`.
+
+| Slice | PR | Status |
+|---|---|---|
+| M16-1 Schema migration (`site_blueprints`, `route_registry`, `shared_content`, `pages` columns) | #511 | ✅ merged |
+| M16-2 Types + data layer (`lib/types/page-document.ts`, `lib/models.ts`, `lib/generator-payload.ts`, `lib/site-blueprint.ts`, `lib/route-registry.ts`, `lib/shared-content.ts`) | #512 | ✅ merged |
+| M16-3 Component registry (20 variants, `lib/component-registry.ts`, `public/opollo-components.css`) | #513 | ✅ merged |
+| M16-4 Site planner — Pass 0+1 Sonnet, stores to 3 tables | #514 | ✅ merged |
+| M16-5 Page document generator — Pass 2 Haiku + retry + critique/revise | #515 | ✅ merged |
+| M16-6 Validator + ref-resolver + renderer + render-worker | #516 | ✅ merged |
+| M16-7 Batch-worker M16 wiring + blueprint review UI + shared content UI | #516 | ✅ merged (squashed with M16-6) |
+| M16-8 WP publisher — Gutenberg block, theme.json patch, synced patterns, drift detection | #522 | ✅ merged |
+| M16-9 E2E spec + pattern docs | — | ✅ this PR |
+
+**Deferred items from M16 (no blockers, trigger-gated):**
+
+- **Section regen UI** — operator can trigger regen of a single section from the review screen. Deferred; trigger is first operator request for section-level iteration.
+- **WP drift "Compare" action** — `drift_detected` flag is set; the operator UI shows the flag but the side-by-side diff viewer is deferred. Trigger is first operator needing to see the delta.
+- **Gutenberg block registry** (instead of Custom HTML) — v1 uses `<!-- wp:html -->` wrapper. Future: register an Opollo block plugin on WP and use `<!-- wp:opollo/section -->` with a block.json schema. Trigger is WP block editor compatibility requirement from a client.
+- **`generation_job_pages.pages_id` auto-link** — pre-linking the slot to the M16 pages row is currently done by the batch worker. A migration adding a trigger to auto-populate would eliminate one manual step. Deferred until a second pipeline stage needs the same pattern.
+- **Vision pass on WP drift** — fetch a screenshot of the live WP page and compare visually (not just HTML hash). Trigger is false-positive drift reports on themes that inject dynamic markup post-publish.

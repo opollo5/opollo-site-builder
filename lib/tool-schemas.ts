@@ -149,6 +149,11 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "INTERNAL_ERROR":
     case "UPDATE_FAILED":
       return 500;
+    case "WP_CREDENTIALS_MISSING":
+    case "BLUEPRINT_MISMATCH":
+      return 400;
+    case "BLUEPRINT_NOT_FOUND":
+      return 404;
   }
 }
 
