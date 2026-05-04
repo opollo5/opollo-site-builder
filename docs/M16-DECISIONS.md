@@ -29,6 +29,16 @@ Format:
 
 [M16-7] [2026-05-04] Decision: No "section prop editor" or "preview" page in M16-7 | Reason: These were listed in docs/plans/m16-parent.md as M16-7 targets but the CHECKPOINT note says Steven reviews rendered output before M16-8. The rendered HTML is visible via the existing pages UI (/admin/sites/[id]/pages). Adding a dedicated prop editor before confirming the pipeline produces correct output would be premature. Deferring to M16-8+. | Alternative: Building full section prop editor now (rejected — CHECKPOINT is already after M16-7; Steven's review of the pipeline output drives what the editor needs to expose)
 
+[M16-8] [2026-05-04] Decision: Single Custom HTML (wp:html) block per page rather than per-section blocks | Reason: Per-section blocks would require Gutenberg block registration and a React-based block editor. The Custom HTML block round-trips `data-opollo-id` attributes verbatim, which is all drift detection needs. | Alternative: Register custom Gutenberg block type per section (deferred — requires block.json + PHP registration; overkill for the current pipeline)
+
+[M16-8] [2026-05-04] Decision: Drift detection uses WP REST API `content.raw` field (not `content.rendered`) | Reason: `rendered` adds WordPress's `<p>` auto-formatting and shortcode expansion, making the hash unstable. `raw` is the exact string Opollo wrote. `context=edit` is required to expose `raw`. | Alternative: Hash `rendered` (rejected — non-deterministic; WP can reformat on save)
+
+[M16-8] [2026-05-04] Decision: Template parts (nav, footer) deferred | Reason: WP template parts require a block theme with a `parts/` directory and are FSE-only. Kadence 3.x supports FSE but the per-site configuration varies. Deferred until we have a confirmed Kadence version baseline and at least one site in production. | Alternative: Push static nav HTML as a Custom HTML block (rejected — doesn't bind to WP's native nav menus, breaking the operator's menu editor)
+
+[M16-8] [2026-05-04] Decision: wp_content_hash stored on route_registry (not pages) | Reason: route_registry is the stable slug-keyed identity; pages rows can be deleted and re-created across publish retries. Storing the hash on the route makes the drift detector robust to pages row churn. | Alternative: Store on pages (rejected — row churn would reset the hash on every republish attempt)
+
+[M16-8] [2026-05-04] Decision: Slug redirect from old pages deferred | Reason: Slug redirects require a WP plugin (Redirection or Yoast) or custom rewrite rules. No slug-change UI exists yet in M16 admin. Deferred to a follow-up slice when slug editing is exposed. | Alternative: Use WP REST API redirect endpoint (rejected — not available on stock Kadence installations)
+
 ---
 
 ## Blocked steps
