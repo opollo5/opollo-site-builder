@@ -46,6 +46,10 @@ const BodySchema = z
     // WP term IDs for categories and tags.
     wp_category_ids: z.array(z.number().int().nonnegative()).max(20).optional(),
     wp_tag_ids: z.array(z.number().int().nonnegative()).max(20).optional(),
+    // New tag names (not yet created in WP); created on publish.
+    wp_new_tag_names: z.array(z.string().min(1).max(200)).max(20).optional(),
+    // Pre-composed HTML for "Publish immediately" mode.
+    generated_html: z.string().max(500_000).nullable().optional(),
   })
   .strict();
 
@@ -127,6 +131,9 @@ export async function POST(
     ...(parsed.data.wp_tag_ids !== undefined
       ? { wp_tag_ids: parsed.data.wp_tag_ids }
       : {}),
+    ...(parsed.data.wp_new_tag_names !== undefined
+      ? { wp_new_tag_names: parsed.data.wp_new_tag_names }
+      : {}),
   };
 
   const result = await createPost({
@@ -139,6 +146,9 @@ export async function POST(
     metadata: extendedMetadata,
     featured_image_id: parsed.data.featured_image_id ?? undefined,
     created_by: gate.user?.id ?? null,
+    ...(parsed.data.generated_html !== undefined && parsed.data.generated_html !== null
+      ? { generated_html: parsed.data.generated_html }
+      : {}),
   });
 
   if (!result.ok) {
