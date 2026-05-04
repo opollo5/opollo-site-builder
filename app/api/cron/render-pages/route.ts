@@ -80,8 +80,8 @@ async function handle(req: NextRequest): Promise<NextResponse> {
       const res = await runRenderWorker({ siteId });
       results.push({
         siteId,
-        rendered: res.rendered,
-        errors:   res.errors,
+        rendered: res.ok ? res.rendered : 0,
+        errors:   res.ok ? res.errors   : 1,
       });
     }
 

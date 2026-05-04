@@ -166,7 +166,7 @@ export default function BlueprintReviewPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant={isApproved ? "default" : "secondary"}>
+          <Badge tone={isApproved ? "success" : "neutral"}>
             {isApproved ? "Approved" : "Draft"}
           </Badge>
           {isApproved ? (
@@ -216,7 +216,7 @@ export default function BlueprintReviewPage({
                   <td className="p-3 tabular-nums text-muted-foreground">{r.ordinal ?? i}</td>
                   <td className="p-3 font-mono">{r.slug}</td>
                   <td className="p-3">
-                    <Badge variant="outline" className="text-xs">{r.page_type}</Badge>
+                    <Badge tone="outline" className="text-xs">{r.page_type}</Badge>
                   </td>
                   <td className="p-3">{r.label}</td>
                 </tr>
@@ -243,7 +243,7 @@ export default function BlueprintReviewPage({
                 {content.map((c, i) => (
                   <tr key={c.id} className={i % 2 === 0 ? "" : "bg-muted/30"}>
                     <td className="p-3">
-                      <Badge variant="outline" className="text-xs">{c.content_type}</Badge>
+                      <Badge tone="outline" className="text-xs">{c.content_type}</Badge>
                     </td>
                     <td className="p-3">{c.label}</td>
                   </tr>

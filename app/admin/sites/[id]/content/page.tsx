@@ -13,7 +13,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
 // /admin/sites/[id]/content — M16-7.
@@ -162,7 +161,7 @@ export default function SharedContentPage({
           <Card key={type}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Badge variant="outline">{type}</Badge>
+                <Badge tone="outline">{type}</Badge>
                 <span className="text-muted-foreground font-normal text-sm">({typeRows.length})</span>
               </CardTitle>
             </CardHeader>
@@ -220,7 +219,7 @@ export default function SharedContentPage({
                 </div>
               )}
               <div className="space-y-1">
-                <Label htmlFor="sc-label">Label</Label>
+                <label htmlFor="sc-label" className="text-sm font-medium">Label</label>
                 <Input
                   id="sc-label"
                   value={edit.label}
@@ -228,7 +227,7 @@ export default function SharedContentPage({
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="sc-content">Content (JSON)</Label>
+                <label htmlFor="sc-content" className="text-sm font-medium">Content (JSON)</label>
                 <Textarea
                   id="sc-content"
                   className="min-h-48 font-mono text-xs"
