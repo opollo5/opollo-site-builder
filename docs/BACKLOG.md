@@ -479,7 +479,7 @@ Reports live at:
 
 ### Open — operational decisions needed
 
-- **[M15-5 #1] `/api/cron/process-transfer` not in `vercel.json`.** Route exists, worker is correct, nothing fires it. Trace in `docs/PRODUCTION_RISK_AUDIT_2026-04-24.md` showed publish-flow image transfer is inline-synchronous; only the iStock seed CLI creates `transfer_jobs` rows that need the cron to drain. **Decision needed:** run `SELECT count(*) FROM transfer_job_items WHERE state = 'pending';` — if `0`, delete route + `lib/transfer-worker.ts` (dead code); if `>0`, wire cron. Pick up trigger: Steven's DB check. Scope: either 1 line added to `vercel.json` + cron monitoring, or ~600 lines deleted (worker + route + tests).
+- ~~**[M15-5 #1] `/api/cron/process-transfer` not in `vercel.json`.**~~ Resolved 2026-05-04 — PR #527. DB check confirmed 0 pending rows; the entire M4 image-transfer pipeline (cron route, `lib/transfer-worker.ts`, `lib/anthropic-caption.ts`, 5 test files) deleted. Cron entry removed from `vercel.json`.
 - **[M15-5 #2] `bumpTenantUsage()` exported but never called.** Tenant budget counters track reservations only; actual-cost writeback helper is defined but unwired. Resolved during M15-7 as COSMETIC: `PROJECTED_COST_PER_BATCH_SLOT_CENTS = 30` and `PROJECTED_COST_PER_REGEN_CENTS = 30` are worst-case ceilings per the author's comment ("conservative — actual costs tend to be lower"). Tenants under-utilize caps but cannot overspend. Pick up trigger: tenant reports under-utilization complaint, OR we want actual-vs-projected reconciliation for billing accuracy. Scope: wire `bumpTenantUsage` into batch-worker slot-completion + regen finalization paths with the delta `actual - reserved`.
 
 ### Open — grouped by next-natural-slice trigger
@@ -505,7 +505,7 @@ Reports live at:
 #### Schema + constraint polish (next migration slice)
 
 - ~~**[M15-2 #4] Missing index on regen daily-budget query.**~~ Fixed 2026-05-03 — migration 0080 adds `idx_regen_jobs_created_at` index on `regeneration_jobs(created_at DESC)` supporting the `.gte("created_at", startOfDay)` range predicate in `lib/regeneration-publisher.ts#checkDailyBudget`.
-- **[M15-2 #5] No cancel endpoint for `transfer_jobs`.** Schema has `cancel_requested_at` column; no route uses it. Overlaps with [M15-5 #1] — if transfer cron is wired, add cancel; if cron is dead, drop the column.
+- ~~**[M15-2 #5] No cancel endpoint for `transfer_jobs`.**~~ Resolved 2026-05-04 — PR #527 migrated away the `cancel_requested_at` column (transfer cron deleted, M15-5 #1 took the "drop" path).
 - ~~**[M15-2 #8] Event-table PK type inconsistency.**~~ Documented 2026-05-04 — PR #533 migration 0086 adds `COMMENT ON TABLE` to all three event tables noting the bigserial/uuid mismatch and normalisation path.
 - **[M15-2 #10] Lease-coherent CHECK asymmetry.** `transfer_job_items_lease_coherent` requires `worker_id IS NOT NULL` in leased states; `generation_job_pages_lease_coherent` + `regeneration_jobs_lease_coherent` don't. Scope: tighten M3/M7 CHECKs after verifying no orphan-leased rows in production.
 - ~~**[M15-2 #12] `image_usage` RLS excludes viewer.**~~ See M15-5 #12 above — documented in PR #529.
@@ -513,7 +513,7 @@ Reports live at:
 
 #### Test coverage (opportunistic — add when touching the surface)
 
-- ~~**[M15-6 #5-12] Route handler tests not written.**~~ Shipped 2026-05-04 — PR #532 (cron/budget-reset, ops/self-probe, sites/[id] PATCH+DELETE, admin/images/[id] PATCH+DELETE+restore, admin/sites/[id]/pages/[pageId] PATCH) + PR #533 (cron/process-batch, cron/process-regenerations additional branches). Still open: `cron/process-transfer` — blocked on M15-5 #1 decision.
+- ~~**[M15-6 #5-12] Route handler tests not written.**~~ Shipped 2026-05-04 — PR #532 (cron/budget-reset, ops/self-probe, sites/[id] PATCH+DELETE, admin/images/[id] PATCH+DELETE+restore, admin/sites/[id]/pages/[pageId] PATCH) + PR #533 (cron/process-batch, cron/process-regenerations additional branches). `cron/process-transfer` route deleted by PR #527; no test needed.
 - ~~**[M15-6 #13] 6 of 7 tool JSON schemas untested.**~~ Shipped 2026-05-04 — PR #530 adds parametric tests for all 7 schemas.
 - ~~**[M15-6 #14] Tool lib implementations untested.**~~ Shipped 2026-05-04 — PR #532 adds tests for all 6 executor libs (create-page, list-pages, get-page, update-page, delete-page, publish-page).
 - ~~**[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.**~~ Shipped in M12-6 (2026-05-03).
@@ -522,7 +522,7 @@ Reports live at:
 #### Tech-debt (bundled cleanup, no urgency)
 
 - **[M15-4 #14] 12 local `errorJson()` helpers across route files.** Migration to `lib/http.respond()` / `lib/http.validationError()` incomplete. Large mechanical diff.
-- ~~**[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.**~~ Extracted to `lib/crypto-compare.ts` 2026-05-03 — PR #510. 9 files deduplicated: cron/budget-reset, cron/optimiser-monitor-rollouts, cron/process-batch, cron/process-brief-runner, cron/process-regenerations, cron/process-transfer, emergency, ops/reset-admin-password, ops/self-probe.
+- ~~**[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.**~~ Extracted to `lib/crypto-compare.ts` 2026-05-03 — PR #510. 9 files deduplicated: cron/budget-reset, cron/optimiser-monitor-rollouts, cron/process-batch, cron/process-brief-runner, cron/process-regenerations, emergency, ops/reset-admin-password, ops/self-probe, and cron/process-transfer (since deleted by PR #527).
 - ~~**[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum**.~~ Added to `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus 409 mapping (2026-04-29).
 - ~~**[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.**~~ Comment added in route handler explaining the financial-control rationale (2026-04-29).
 - ~~**[M15-4 #18] `/api/health` envelope outlier** — no `ok` field.~~ Deviation documented in route comment (2026-04-29).
