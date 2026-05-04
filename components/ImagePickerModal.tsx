@@ -35,6 +35,7 @@ import type { ImageListItem } from "@/lib/image-library";
 // ---------------------------------------------------------------------------
 
 const SEARCH_DEBOUNCE_MS = 300;
+const SUGGEST_DEBOUNCE_MS = 500;
 const PAGE_SIZE = 24;
 
 export interface ImagePickerEntry extends ImageListItem {
@@ -112,13 +113,15 @@ export function ImagePickerModal({
   }, [open, hasSuggestionSource]);
 
   // Suggested tab fetch — runs on open + when context changes.
+  // 500ms debounce so typing in the title doesn't fire a request
+  // on every keystroke.
   useEffect(() => {
     if (!open || tab !== "suggested" || !hasSuggestionSource) return;
     const ctrl = new AbortController();
     if (suggestInFlightRef.current) suggestInFlightRef.current.abort();
     suggestInFlightRef.current = ctrl;
 
-    void (async () => {
+    const timerId = setTimeout(async () => {
       setSuggestLoading(true);
       setSuggestError(null);
       try {
@@ -128,7 +131,7 @@ export function ImagePickerModal({
         } else if (suggestionContext) {
           params.set("suggest_from", suggestionContext);
         }
-        params.set("limit", "5");
+        params.set("limit", "6");
         const res = await fetch(`/api/admin/images/list?${params}`, {
           signal: ctrl.signal,
           cache: "no-store",
@@ -157,9 +160,10 @@ export function ImagePickerModal({
       } finally {
         if (!ctrl.signal.aborted) setSuggestLoading(false);
       }
-    })();
+    }, SUGGEST_DEBOUNCE_MS);
 
     return () => {
+      clearTimeout(timerId);
       ctrl.abort();
     };
   }, [open, tab, hasSuggestionSource, forPostId, suggestionContext]);
@@ -380,8 +384,8 @@ function SuggestedPanel({
         </div>
       )}
       {loading && items.length === 0 ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
-          {Array.from({ length: 5 }).map((_, i) => (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
+          {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
               className="aspect-square w-full rounded-md border bg-muted opollo-shimmer"

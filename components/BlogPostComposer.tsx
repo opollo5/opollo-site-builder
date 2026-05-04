@@ -34,10 +34,10 @@ import {
 } from "@/components/ImagePickerModal";
 import {
   parseBlogPostMetadata,
-  slugify,
   type BlogPostMetadata,
   type ParseSource,
 } from "@/lib/blog-post-parser";
+import { generateSlug } from "@/lib/slug";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -85,6 +85,7 @@ const SOURCE_HINTS: Record<ParseSource, string> = {
   h1: "Auto-filled from first heading",
   first_paragraph: "Auto-filled from first paragraph",
   derived: "Derived from title",
+  file: "Extracted from uploaded file",
   none: "",
 };
 
@@ -195,6 +196,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
+  const [fileReadError, setFileReadError] = useState<string | null>(null);
+  // Permalink structure from WP settings (cached in sites.wp_permalink_structure).
+  const [permalinkStructure, setPermalinkStructure] = useState<string | null>(null);
+  const [siteWpUrl, setSiteWpUrl] = useState<string | null>(null);
   // Hydration guard — restore-from-localStorage runs once, AFTER mount,
   // so SSR + first client render match. The ref blocks autosave from
   // firing during the restore tick (otherwise the restored values would
@@ -250,6 +255,100 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     // siteId is the storage key — re-run when the operator switches
     // sites (PostsNewClient remounts BlogPostComposer on site change,
     // but defending against in-place siteId swaps too).
+  }, [siteId]);
+
+  // Read attached file content into composerValue.text.
+  // Handles .docx (mammoth), and text-based files (.md, .html, .txt).
+  useEffect(() => {
+    const file = composerValue.file;
+    if (!file) return;
+    setFileReadError(null);
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        let text: string;
+        const lower = file.name.toLowerCase();
+        const isDocx =
+          lower.endsWith(".docx") ||
+          file.type ===
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+        if (isDocx) {
+          const mammoth = await import("mammoth");
+          const buf = await file.arrayBuffer();
+          const result = await mammoth.convertToHtml(
+            { arrayBuffer: buf },
+            {
+              styleMap: [
+                "p[style-name='Heading 1'] => h1:fresh",
+                "p[style-name='Heading 2'] => h2:fresh",
+                "p[style-name='Heading 3'] => h3:fresh",
+                "p[style-name='Normal'] => p:fresh",
+              ],
+            },
+          );
+          // Extract title from first H1 if title field is empty.
+          if (!cancelled && title.value.trim().length === 0) {
+            const h1Match = /<h1[^>]*>(.*?)<\/h1>/i.exec(result.value);
+            if (h1Match) {
+              const h1Text = h1Match[1].replace(/<[^>]+>/g, "").trim();
+              if (h1Text) {
+                setTitle({ value: h1Text, source: "file", touched: false });
+              }
+            }
+          }
+          text = result.value;
+        } else {
+          text = await file.text();
+        }
+
+        if (!cancelled) {
+          setComposerValue((prev) => ({ ...prev, text }));
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setFileReadError(
+            `Could not read file: ${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  // Only react to the file reference changing, not to title — title
+  // is written inside this effect, creating a loop if included.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerValue.file]);
+
+  // Fetch permalink structure on mount (for URL preview below slug field).
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/sites/${siteId}/permalink-structure`,
+          { cache: "no-store" },
+        );
+        const payload = (await res.json().catch(() => null)) as
+          | { ok: true; data: { permalink_structure: string | null } }
+          | null;
+        if (payload?.ok) {
+          setPermalinkStructure(payload.data.permalink_structure);
+        }
+        // Also load wp_url for the preview from the site route.
+        const siteRes = await fetch(`/api/sites/${siteId}`, { cache: "no-store" });
+        const sitePay = (await siteRes.json().catch(() => null)) as
+          | { ok: true; data: { site: { wp_url: string } } }
+          | null;
+        if (sitePay?.ok) {
+          setSiteWpUrl(sitePay.data.site.wp_url.replace(/\/$/, ""));
+        }
+      } catch {
+        // Non-fatal — URL preview simply won't render.
+      }
+    })();
   }, [siteId]);
 
   // Debounced re-parse on every text change. Pure-logic call, but
@@ -485,13 +584,21 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         <Composer
           textareaId="post-composer-input"
           value={composerValue}
-          onChange={setComposerValue}
-          accept=".md,.html,.txt,text/markdown,text/html,text/plain"
+          onChange={(v) => {
+            setComposerValue(v);
+            if (!v.file) setFileReadError(null);
+          }}
+          accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
           maxFileBytes={10 * 1024 * 1024}
           placeholder={`Type, paste, or drop your post.\n\nA YAML front-matter block, inline labels, or HTML meta tags will pre-fill the metadata fields below.`}
-          acceptHint="Markdown, HTML, or plain text. Drag-drop, paste, or use + to attach. Max 10 MB."
+          acceptHint="Markdown, HTML, plain text, or Word (.docx). Drag-drop, paste, or use + to attach. Max 10 MB."
           className="mt-1"
         />
+        {fileReadError && (
+          <p className="mt-1 text-sm text-destructive" role="alert">
+            {fileReadError}
+          </p>
+        )}
       </div>
 
       <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -520,9 +627,27 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         </div>
 
         <div>
-          <label htmlFor="post-slug" className="block text-sm font-medium">
-            URL slug
-          </label>
+          <div className="flex items-baseline justify-between gap-2">
+            <label htmlFor="post-slug" className="block text-sm font-medium">
+              URL slug
+            </label>
+            {title.value.trim().length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSlug({
+                    value: generateSlug(title.value),
+                    source: "derived",
+                    touched: true,
+                  });
+                }}
+                disabled={submitting}
+                className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+              >
+                Regenerate from title
+              </button>
+            )}
+          </div>
           <Input
             id="post-slug"
             className="mt-1"
@@ -536,11 +661,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               )
             }
             onBlur={() => {
-              // Auto-clean on blur so the operator never has to think
-              // about kebab-casing their own input.
               if (slug.value && !slugIsValid) {
                 setSlug({
-                  value: slugify(slug.value),
+                  value: generateSlug(slug.value),
                   source: "derived",
                   touched: true,
                 });
@@ -550,13 +673,20 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             maxLength={100}
             aria-invalid={!slugIsValid}
           />
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <SourceHint source={slug.source} />
-            {!slugIsValid && slug.value.length > 0 && (
-              <span className="text-sm text-destructive">
-                Lowercase letters, numbers, dashes only.
-              </span>
-            )}
+          <div className="mt-1 flex flex-col gap-0.5">
+            <div className="flex items-center justify-between gap-2">
+              <SourceHint source={slug.source} />
+              {!slugIsValid && slug.value.length > 0 && (
+                <span className="text-sm text-destructive">
+                  Lowercase letters, numbers, dashes only.
+                </span>
+              )}
+            </div>
+            <PermalinkPreview
+              structure={permalinkStructure}
+              wpUrl={siteWpUrl}
+              slug={slug.value}
+            />
           </div>
         </div>
       </fieldset>
@@ -775,6 +905,52 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         }
       />
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Permalink URL preview below the slug field.
+// ---------------------------------------------------------------------------
+
+const PERMALINK_TOKEN_DATE = new Date();
+
+function substitutePermalinkTokens(
+  structure: string,
+  slug: string,
+): string {
+  const y = PERMALINK_TOKEN_DATE.getFullYear().toString();
+  const m = String(PERMALINK_TOKEN_DATE.getMonth() + 1).padStart(2, "0");
+  const d = String(PERMALINK_TOKEN_DATE.getDate()).padStart(2, "0");
+  return structure
+    .replace(/%year%/g, y)
+    .replace(/%monthnum%/g, m)
+    .replace(/%month%/g, m)
+    .replace(/%day%/g, d)
+    .replace(/%postname%/g, slug || "your-slug")
+    .replace(/%post_id%/g, "1")
+    .replace(/%category%/g, "uncategorized")
+    .replace(/%author%/g, "author");
+}
+
+function PermalinkPreview({
+  structure,
+  wpUrl,
+  slug,
+}: {
+  structure: string | null;
+  wpUrl: string | null;
+  slug: string;
+}) {
+  if (!structure || !wpUrl || !slug) return null;
+  const path = substitutePermalinkTokens(structure, slug);
+  const preview = `${wpUrl}${path}`;
+  return (
+    <span
+      className="block truncate font-mono text-[11px] text-muted-foreground"
+      title={preview}
+    >
+      {preview}
+    </span>
   );
 }
 

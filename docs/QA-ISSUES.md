@@ -77,6 +77,18 @@ Severity: CRITICAL (blocks ship) | HIGH (fix before merge) | MEDIUM | LOW
 
 ---
 
+## Phase 7 — Blog Uploader + Image Fixes (2026-05-04)
+
+| Issue | Finding | Fix | Status |
+|---|---|---|---|
+| BU-1: .docx not supported | `accept` attr excluded `.docx`; no conversion path | Installed mammoth; added `useEffect` in BlogPostComposer that dynamically imports mammoth for `.docx` files, reads plain text for others; H1 title extraction; updated `accept` + hint copy | ✅ Fixed |
+| BU-2: Slug generation (simple kebab) | `slugify` in blog-post-parser was minimal — no stop-word removal, no Yoast-style algorithm | Created `lib/slug.ts` with `SLUG_STOP_WORDS` + `generateSlug()` (8-step Yoast algorithm); re-exported as `slugify` from blog-post-parser; "Regenerate from title" button added to composer | ✅ Fixed |
+| BU-2b: Permalink URL preview | No URL preview below slug field | Added `wp_permalink_structure` column (migration 0088); `GET /api/sites/[id]/permalink-structure` endpoint fetches + caches from WP settings API; `PermalinkPreview` component substitutes tokens + shows full URL | ✅ Fixed |
+| BU-3: Featured image suggestions empty | FTS returned 0–2 results with no fallback; Suggested tab fired immediately on every keystroke | Added SUGGEST_PAD_TO=3 padding with recent images in list route; default limit raised to 6 for empty-context; 500ms debounce added to Suggested tab effect; skeleton updated to 6 placeholders | ✅ Fixed |
+| BU-4: EXIF/IPTC not extracted | Upload route inserted null caption/alt_text/tags | Installed exifr; upload route now runs parseExif() after arrayBuffer; maps ImageDescription→caption, AltTextAccessibility→alt_text, Keywords→tags; stores exif_raw in image_metadata; reextract lib updated with same EXIF path | ✅ Fixed |
+
+---
+
 ## Phase 7 — Polish
 
 | Surface | Gap | Status |

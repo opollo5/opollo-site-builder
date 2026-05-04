@@ -38,7 +38,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // Soft-deleted images excluded by default.
 // ---------------------------------------------------------------------------
 
-const SUGGEST_DEFAULT_LIMIT = 5;
+const SUGGEST_DEFAULT_LIMIT = 6;
+const SUGGEST_PAD_TO = 3;
 const POST_BODY_SNIPPET_CHARS = 400;
 const TITLE_WEIGHT = 3;
 
@@ -167,7 +168,25 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const items: ImagePickerEntry[] = result.data.items.map((item) => ({
+  let rawItems = result.data.items;
+
+  // Suggestion mode: when FTS returned fewer than SUGGEST_PAD_TO results,
+  // pad with the most-recent active images the caller doesn't already have.
+  if (suggestionMode && !emptyContext && rawItems.length < SUGGEST_PAD_TO) {
+    const padNeeded = SUGGEST_PAD_TO - rawItems.length;
+    const padResult = await listImages({
+      limit: padNeeded + rawItems.length, // fetch a few extra in case of overlaps
+      offset: 0,
+      deleted: false,
+    });
+    if (padResult.ok) {
+      const existing = new Set(rawItems.map((i) => i.id));
+      const extras = padResult.data.items.filter((i) => !existing.has(i.id));
+      rawItems = [...rawItems, ...extras.slice(0, padNeeded)];
+    }
+  }
+
+  const items: ImagePickerEntry[] = rawItems.map((item) => ({
     ...item,
     delivery_url: item.cloudflare_id ? deliveryUrl(item.cloudflare_id) : null,
   }));
@@ -177,7 +196,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ok: true,
       data: {
         items,
-        total: result.data.total,
+        total: items.length,
         limit: result.data.limit,
         offset: result.data.offset,
         // R1-5 — suggestion context. UI uses this to render the

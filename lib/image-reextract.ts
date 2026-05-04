@@ -1,8 +1,11 @@
+import { parse as parseExif } from "exifr";
+
 import { deliveryUrl } from "@/lib/cloudflare-images";
 import {
   parseIstockIdFromFilename,
   readImageDimensions,
 } from "@/lib/image-dimensions";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -32,6 +35,7 @@ export type ReextractResult = {
   bytes: number | null;
   istock_id: string | null;
   istock_id_added: boolean;
+  exif_metadata_updated: boolean;
   notes: string[];
 };
 
@@ -142,6 +146,7 @@ export async function reextractImageMetadata(
   let nextHeight = row.height_px;
   let nextBytes = row.bytes;
   let dimensionsUpdated = false;
+  let exifMetadataUpdated = false;
 
   if (row.cloudflare_id) {
     if (!row.width_px || !row.height_px || !row.bytes) {
@@ -173,6 +178,85 @@ export async function reextractImageMetadata(
     }
   } else {
     notes.push("Image has no cloudflare_id; cannot probe.");
+  }
+
+  // EXIF/IPTC extraction for caption, alt_text, tags. Pull from the
+  // same header bytes already fetched. Falls back to Anthropic vision
+  // if no EXIF (deferred — vision pass is a future slice). Never fails
+  // the re-extract call.
+  if (row.cloudflare_id) {
+    try {
+      const deliveryUrlForExif = deliveryUrl(row.cloudflare_id, "public");
+      if (deliveryUrlForExif) {
+        const { bytes: headerBytes } = await fetchHeaderBytes(deliveryUrlForExif);
+        const exif = await parseExif(headerBytes.buffer as ArrayBuffer, {
+          tiff: true,
+          xmp: true,
+          iptc: true,
+          icc: false,
+          reviveValues: true,
+        }) as Record<string, unknown> | undefined;
+        if (exif) {
+          const cap =
+            (exif.ImageDescription as string | undefined) ??
+            (exif.Caption as string | undefined) ??
+            (exif.Headline as string | undefined) ??
+            null;
+          const exifCaption = cap?.trim() || null;
+          const alt =
+            (exif.AltTextAccessibility as string | undefined) ??
+            (exif.AltText as string | undefined) ??
+            null;
+          const exifAltText = alt?.trim() || null;
+          let exifTags: string[] = [];
+          const kw = exif.Keywords;
+          if (typeof kw === "string" && kw.trim()) {
+            exifTags = kw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+          } else if (Array.isArray(kw)) {
+            exifTags = (kw as string[]).map((s) => String(s).trim()).filter(Boolean);
+          }
+
+          // Upsert image_library fields if EXIF has data the row lacks.
+          const exifUpdate: Record<string, unknown> = {};
+          if (exifCaption && !row.source_ref) exifUpdate.caption = exifCaption;
+          if (exifAltText) exifUpdate.alt_text = exifAltText;
+          if (exifTags.length > 0) exifUpdate.tags = exifTags;
+
+          if (Object.keys(exifUpdate).length > 0) {
+            exifUpdate.updated_at = now();
+            await supabase.from("image_library").update(exifUpdate).eq("id", row.id);
+          }
+
+          // Always upsert exif_raw in image_metadata.
+          const existing = await supabase
+            .from("image_metadata")
+            .select("id")
+            .eq("image_id", row.id)
+            .eq("key", "exif_raw")
+            .maybeSingle();
+          if (existing.data) {
+            await supabase
+              .from("image_metadata")
+              .update({ value_jsonb: exif, updated_at: now() })
+              .eq("image_id", row.id)
+              .eq("key", "exif_raw");
+          } else {
+            await supabase
+              .from("image_metadata")
+              .insert({ image_id: row.id, key: "exif_raw", value_jsonb: exif });
+          }
+          exifMetadataUpdated = true;
+        } else {
+          notes.push("No EXIF/IPTC metadata found in image.");
+        }
+      }
+    } catch (err) {
+      logger.warn("image.reextract.exif_failed", {
+        image_id: row.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      notes.push(`EXIF extraction failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   const istockId = parseIstockIdFromFilename(row.filename);
@@ -244,6 +328,7 @@ export async function reextractImageMetadata(
       bytes: nextBytes,
       istock_id: istockId,
       istock_id_added: istockIdAdded,
+      exif_metadata_updated: exifMetadataUpdated,
       notes,
     },
     timestamp: now(),

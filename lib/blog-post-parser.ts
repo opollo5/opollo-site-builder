@@ -26,6 +26,7 @@ export type ParseSource =
   | "h1"
   | "first_paragraph"
   | "derived"
+  | "file"
   | "none";
 
 export interface BlogPostMetadata {
@@ -43,18 +44,10 @@ export interface BlogPostMetadata {
 
 const META_DESCRIPTION_CAP = 160;
 
-// Slugify a title to URL-safe kebab-case. ASCII only — non-ASCII chars
-// strip out (operator can override). Caps at 60 chars.
-export function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "") // strip combining diacritics
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 60)
-    .replace(/^-+|-+$/g, "");
-}
+// Re-exported for callers that import slugify from this module.
+// Delegates to the canonical Yoast-style generateSlug in lib/slug.ts.
+export { generateSlug as slugify } from "@/lib/slug";
+import { generateSlug as slugify } from "@/lib/slug";
 
 // Trim a string to a max length on the nearest word boundary, then
 // append "…" if truncation happened. The cap counts pre-ellipsis chars.
