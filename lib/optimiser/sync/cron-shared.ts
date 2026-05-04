@@ -1,24 +1,13 @@
 import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 
+import { constantTimeEqual } from "@/lib/crypto-compare";
 import { logger } from "@/lib/logger";
 
 // Shared cron-handler helpers for the optimiser sync routes. Mirrors
 // the existing /api/cron/process-batch authorisation pattern; lives
 // inside lib/optimiser so the route file at /api/cron/optimiser-sync-*
 // is a thin wrapper.
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    const filler = Buffer.alloc(aBuf.length);
-    timingSafeEqual(aBuf, filler);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
-}
 
 export function authorisedCronRequest(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

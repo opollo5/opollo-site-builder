@@ -112,7 +112,7 @@ components, and webhooks. Typecheck ✓ Lint ✓. Tests require Docker (not run)
 
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
-| S-4 | `app/company/social/connections/page.tsx` | `connect=sync-failed` banner shows generic "The connection couldn't be completed." — `sync.error.code` (e.g. "INTERNAL_ERROR") isn't in `REASON_LABEL` | ✅ Fixed — PR #TODO (site-builder-qa-sweep) |
+| S-4 | `app/company/social/connections/page.tsx` | `connect=sync-failed` banner shows generic "The connection couldn't be completed." — `sync.error.code` (e.g. "INTERNAL_ERROR") isn't in `REASON_LABEL` | ✅ Fixed — PR #546 |
 | S-5 | `lib/platform/social/cap/image-trigger.ts:108` | `bytes: 0` hardcoded in `social_media_assets` insert — file size not tracked for CAP images | Expose bytes from `generateWithFallback` or read from Supabase Storage stat after upload |
 | S-6 | `components/SocialPostDetailClient.tsx`, `components/PostScheduleSection.tsx` | `window.confirm()` / `window.prompt()` used for destructive actions (delete, submit, cancel-approval, reject, request-changes, schedule-cancel) — native browser dialogs, poor mobile UX | Replace with shadcn/ui `AlertDialog` + a `CommentDialog` (text-input variant); candidate for a dedicated polish slice |
 
@@ -124,7 +124,7 @@ Full audit of auth, admin API routes, cron routes, chat route, `lib/batch-publis
 `lib/brief-runner.ts`, `lib/rate-limit.ts`, `lib/encryption.ts`, migration history,
 and component-level code paths. Typecheck ✓ Lint ✓.
 
-### Fixed in PR #TODO (fix/site-builder-qa-sweep)
+### Fixed in PR #546 (fix/site-builder-qa-sweep)
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
