@@ -163,7 +163,7 @@ function ConceptCard({
         ))}
       </div>
 
-      <p className="mt-2 text-[10px] text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         Heading:{" "}
         <span
           className="text-foreground"
@@ -188,7 +188,7 @@ function ConceptCard({
             type="button"
             onClick={() => setView("desktop")}
             className={[
-              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px]",
+              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs",
               view === "desktop"
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground",
@@ -203,7 +203,7 @@ function ConceptCard({
             type="button"
             onClick={() => setView("mobile")}
             className={[
-              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px]",
+              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs",
               view === "mobile"
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground",
@@ -218,7 +218,7 @@ function ConceptCard({
         <button
           type="button"
           onClick={() => setPage(page === "homepage" ? "inner" : "homepage")}
-          className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
+          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
           data-testid={`concept-toggle-page-${concept.direction}`}
         >
           {page === "homepage" ? "View inner page →" : "← View homepage"}

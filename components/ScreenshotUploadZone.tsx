@@ -282,7 +282,7 @@ export function ScreenshotUploadZone({
                 <X aria-hidden className="h-3 w-3" />
               </Button>
               <p
-                className="truncate px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                className="truncate px-1.5 py-0.5 text-xs text-muted-foreground"
                 title={s.file_name}
               >
                 {s.file_name}

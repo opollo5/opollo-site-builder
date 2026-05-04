@@ -146,7 +146,7 @@ export function TrustedDevicesList({
                   <td className="px-3 py-2">
                     <div className="font-medium">{label}</div>
                     {d.is_current_device && (
-                      <span className="mt-1 inline-flex items-center rounded border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-success">
+                      <span className="mt-1 inline-flex items-center rounded border border-success/40 bg-success/10 px-2 py-0.5 text-xs uppercase tracking-wide text-success">
                         This device
                       </span>
                     )}
