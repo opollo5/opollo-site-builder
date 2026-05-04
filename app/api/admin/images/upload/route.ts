@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import Anthropic from "@anthropic-ai/sdk";
-import { parse as parseExif } from "exifr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
@@ -10,6 +9,7 @@ import {
   deliveryUrl,
   uploadImageFromBytes,
 } from "@/lib/cloudflare-images";
+import { extractExifFields } from "@/lib/exif-extract";
 import { readImageDimensions } from "@/lib/image-dimensions";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -156,32 +156,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   let exifTags: string[] = [];
   let exifRaw: Record<string, unknown> | null = null;
   try {
-    const exif = await parseExif(bytes.buffer as ArrayBuffer, {
-      tiff: true,
-      xmp: true,
-      iptc: true,
-      icc: false,
-      reviveValues: true,
-    }) as Record<string, unknown> | undefined;
-    if (exif) {
-      exifRaw = exif;
-      const cap =
-        (exif.ImageDescription as string | undefined) ??
-        (exif.Caption as string | undefined) ??
-        (exif.Headline as string | undefined) ??
-        null;
-      exifCaption = cap?.trim() || null;
-      const alt =
-        (exif.AltTextAccessibility as string | undefined) ??
-        (exif.AltText as string | undefined) ??
-        null;
-      exifAltText = alt?.trim() || null;
-      const kw = exif.Keywords;
-      if (typeof kw === "string" && kw.trim()) {
-        exifTags = kw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-      } else if (Array.isArray(kw)) {
-        exifTags = (kw as string[]).map((s) => String(s).trim()).filter(Boolean);
-      }
+    const exifFields = await extractExifFields(bytes.buffer as ArrayBuffer);
+    if (exifFields) {
+      exifCaption = exifFields.caption;
+      exifAltText = exifFields.alt_text;
+      exifTags = exifFields.tags;
+      exifRaw = exifFields.raw;
     }
   } catch (err) {
     logger.warn("image.upload.exif_parse_failed", {
