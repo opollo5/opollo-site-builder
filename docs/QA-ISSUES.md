@@ -166,3 +166,64 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 | B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |
 | B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | Low risk (admin-only), but validate `site_name` doesn't contain `{{...}}` in `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
 | B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | Add `checkRateLimit("invite_accept", ...)` per-IP as used on the invitation accept endpoint |
+
+---
+
+## Phase 8 — Blog Upload Complete Improvements (2026-05-04)
+
+### DB investigation (Fix 1)
+
+Queries run against production `image_library`:
+
+| Metric | Count |
+|---|---|
+| Rows with `caption IS NOT NULL AND caption != ''` | **0** |
+| Rows with `alt_text IS NOT NULL AND alt_text != ''` | **0** |
+| Rows with non-empty `tags` array | 1777 (empty array `[]` in all sample rows) |
+| Rows with `search_tsv IS NOT NULL` | 1777 (populated from filename) |
+
+All 1777 uploaded images have null caption + null alt_text. EXIF parsing was wired correctly but uploaded images had no EXIF metadata. AI captioning fallback added.
+
+### Fixes applied
+
+| Fix | File(s) | Change |
+|---|---|---|
+| FIX 1 | `app/api/admin/images/upload/route.ts` | Added `generateAiCaption()` using `claude-haiku-4-5-20251001` vision. Fire-and-forget after DB insert when `exifCaption` is null. Updates `caption` + `alt_text` with `.is("caption", null)` idempotency guard. |
+| FIX 2 | (already done) | `suggest_from` param on `/api/admin/images/list` already implemented. ImagePickerModal passes title + body snippet; FTS returns suggestions padded to min 3 with recents. |
+| FIX 3 | `components/BlogPostComposer.tsx` | Moved featured image section OUT of `AdvancedDisclosure` to a top-level card in the main form. Thumbnail shows inline with "Change image" / "Remove" controls. |
+| FIX 4 | `app/api/sites/[id]/posts/[post_id]/publish/route.ts` | Reads `meta_title_override` and `excerpt` from post row. Builds `_yoast_wpseo_title` + `_yoast_wpseo_metadesc` meta. Passes `meta` to `wpCreatePost` + `wpUpdatePost`. |
+| FIX 5 | `components/BlogPostComposer.tsx` | Added `"publish"` to `PublishMode`. Added "Publish immediately" radio as first option. Primary submit creates Opollo post with `generated_html = composerValue.text`, then calls the publish route. |
+| FIX 6 | `lib/wordpress.ts`, `app/api/sites/[id]/posts/[post_id]/publish/route.ts`, `components/BlogPostComposer.tsx`, `app/api/sites/[id]/posts/route.ts` | Added `wpCreateTag()`. Tags combobox supports "Add tag 'name'" (stored `isNew: true`, negative sentinel ID). Publish route reads `wp_category_ids`, `wp_tag_ids`, `wp_new_tag_names` from metadata; creates new tags; passes all IDs to WP. |
+| FIX 7 | (already done) | Site indicator banner at top of form. |
+| FIX 8 | `components/BlogPostComposer.tsx` | Primary: "Publish to WordPress" / "Save as Draft" / "Schedule Post". Secondary: "Save to Opollo" (always draft, no WP action). |
+| FIX 9 | (already done) | `ReadingChip` shows word count + read time. |
+| FIX 10 | (already done) | `UNIQUE_VIOLATION` translated to friendly message. |
+
+---
+
+## Social platform operational checks — 2026-05-05
+
+Verified as part of the analytics feature build (PR #555).
+
+### Cron jobs
+
+| Cron | Route | Schedule | Status |
+|---|---|---|---|
+| Social publish backfill | `/api/cron/social-publish-backfill` | `*/5 * * * *` (every 5 min) | ✅ In vercel.json, route exists, graceful no-op when `QSTASH_TOKEN` unset |
+| CAP weekly generation | `/api/cron/cap-weekly-generation` | `0 6 * * 1` (Mon 06:00 UTC) | ✅ In vercel.json, route exists, processes companies where `cap_weekly_enabled=true` |
+| Social connections health | `/api/cron/social-connections-health` | `0 3 * * *` (daily 03:00 UTC) | ✅ In vercel.json, route exists, graceful no-op when `BUNDLE_SOCIAL_API` or `BUNDLE_SOCIAL_TEAMID` unset |
+
+### OAuth and approval flows
+
+| Flow | Status | Notes |
+|---|---|---|
+| bundle.social connect portal | ✅ Complete | `POST /api/platform/social/connections/connect` mints portal URL → user authenticates → bundle.social redirects to `GET /api/platform/social/connections/callback` → `syncBundlesocialConnections({attributeNewToCompanyId})` → 302 to `/company/social/connections?connect=success|error|noop|sync-failed` |
+| Post approval magic-link email | ✅ Complete | `POST /api/platform/social/posts/[id]/submit` calls `dispatch({event: "approval_requested"})` (in-app + email to company admins/approvers). Adding a recipient via `POST /api/.../recipients` calls `renderSocialApprovalRequestEmail()` + `sendEmail()` with raw token → `/approve/[token]` page resolves token, renders snapshot, collects decision via `ApprovalDecisionForm` |
+
+### Analytics
+
+| Item | Status |
+|---|---|
+| `/company/social/analytics` page | ✅ Built — PR #555 |
+| `SocialNavClient` Analytics tab | ✅ Added |
+| `lib/platform/social/analytics.ts` | ✅ Server-only data lib, 7 parallel queries |

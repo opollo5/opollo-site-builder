@@ -17,6 +17,7 @@ const NAV = [
   { href: "/company/social/connections", label: "Connections" },
   { href: "/company/social/media", label: "Media" },
   { href: "/company/social/sharing", label: "Sharing" },
+  { href: "/company/social/analytics", label: "Analytics" },
 ] as const;
 
 export function SocialNavClient() {
