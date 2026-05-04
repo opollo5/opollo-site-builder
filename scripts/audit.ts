@@ -574,11 +574,19 @@ function check5_typography(): Issue[] {
   const issues: Issue[] = [];
   const roots = ["app", "components", "lib"];
 
-  // text-xs occurrences.
-  const textXsRe = /\btext-xs\b/;
-  // Inline fontSize below 14px.
+  // Arbitrary Tailwind font sizes below 15px — text-[10px] through text-[14px].
+  // text-xs and text-sm are VALID (both compile to 15px via tailwind.config.ts).
+  // Known intentional exceptions at <15px:
+  //   - .lbl eyebrow labels (10px per design spec) — uses CSS class, not Tailwind
+  //   - .btn-pk / .btn-ghost (13px per design spec) — uses CSS class, not Tailwind
+  //   - keyboard shortcut symbols (<kbd>) — decorative chrome
+  //   - color swatch labels in design-wizard — decorative
+  //   - notification count badge (layout-constrained 16px circle)
+  //   - components/ui/button.tsx text-[13px] — design spec button text
+  const arbitraryFontRe = /\btext-\[([0-9]|1[0-4])px\]/;
+  // Inline fontSize below 15px.
   const fsPxRe =
-    /fontSize\s*:\s*["']?(0\.[0-7]\d*rem|[1-9]px|1[0-3]px|0\.[0-7]\d*em)["']?/;
+    /fontSize\s*:\s*["']?(0\.[0-7]\d*rem|[1-9]px|1[0-4]px|0\.[0-7]\d*em)["']?/;
 
   for (const root of roots) {
     const dir = join(REPO_ROOT, root);
@@ -590,13 +598,14 @@ function check5_typography(): Issue[] {
       const state = { inBlock: false };
       lines.forEach((ln, i) => {
         const stripped = stripComments(ln, state, isCss);
-        if (textXsRe.test(stripped)) {
+        if (arbitraryFontRe.test(stripped)) {
           issues.push({
             category: "typography-minimums",
             severity: "LOW",
             file: rel,
             line: i + 1,
-            message: "text-xs (12px) is below the 0.875rem / 14px floor — uplift to text-sm (RULES.md #7)",
+            message:
+              "Arbitrary sub-15px font size — use text-xs (15px) instead, or document as intentional exception in CSS-REFACTOR.md",
           });
         }
         if (fsPxRe.test(stripped)) {
@@ -605,7 +614,7 @@ function check5_typography(): Issue[] {
             severity: "LOW",
             file: rel,
             line: i + 1,
-            message: "Inline fontSize is below the 14px floor (RULES.md #7)",
+            message: "Inline fontSize is below the 15px floor (RULES.md #7)",
           });
         }
       });
