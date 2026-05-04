@@ -1,7 +1,7 @@
 // Shared helper for the direct-Postgres workers (brief-runner,
-// batch-worker, regeneration-worker, transfer-worker, batch-jobs,
-// batch-publisher, regeneration-publisher, tenant-budgets, auth-revoke,
-// and the process-brief-runner cron). Returns an explicit pg.ClientConfig
+// batch-worker, regeneration-worker, batch-jobs, batch-publisher,
+// regeneration-publisher, tenant-budgets, auth-revoke, and the
+// process-brief-runner cron). Returns an explicit pg.ClientConfig
 // (host/port/user/password/database/ssl) parsed from SUPABASE_DB_URL.
 //
 // Why bypass pg.Client's `connectionString` field:
