@@ -87,6 +87,14 @@
     {
       "path": "/api/cron/cap-weekly-generation",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/social-connections-health",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/render-pages",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

@@ -203,8 +203,7 @@ export async function runSitePlanner(
   }
   blueprint = updated.data;
 
-  // 9. Upsert routes (idempotent — conflict on site_id+slug).
-  // RoutePlanItem uses camelCase pageType; upsertRoutesFromPlan expects snake_case.
+  // 9. Upsert routes (idempotent — conflict on site_id+slug)
   const routeResult = await upsertRoutesFromPlan(
     siteId,
     sitePlan.routePlan.map(r => ({ ...r, page_type: r.pageType })),

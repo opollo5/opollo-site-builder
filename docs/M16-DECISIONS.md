@@ -20,6 +20,15 @@ Format:
 
 [M16-SETUP] [2026-05-04] Decision: All six starter files (models.ts, page-document.ts, generator-payload.ts, page-validator.ts, prompts.ts, component-registry.ts) plus opollo-components.css were already present at their correct paths when build started. No copying needed. | Reason: Files were pre-staged before this build session. | Alternative: N/A
 
+
+[M16-7] [2026-05-04] Decision: processPageM16 marks brief_page as 'generating' before calling runPageDocumentGenerator | Reason: Prevents a second worker from picking up the same page if the brief runner is slow. The generating state is visible on restart. | Alternative: Marking after the Anthropic call (rejected — leaves a window where two workers could start on the same page)
+
+[M16-7] [2026-05-04] Decision: runRenderWorker called synchronously inside processPageM16 (not via cron) | Reason: Operator expects to see rendered HTML in the review surface immediately after page generation. Waiting for the 5-min cron cycle would feel broken. | Alternative: Fire-and-forget via cron only (rejected — bad UX); both paths run (sync in brief-runner, cron as flush safety net)
+
+[M16-7] [2026-05-04] Decision: Blueprint review page is a Client Component (not Server Component with fetches) | Reason: The approve/revert actions and loading state need client-side reactivity. The data load happens client-side via fetch since the route guards use the standard admin-api-gate cookie pattern. | Alternative: Server Component + Server Action (deferred — adds complexity for a low-traffic admin page)
+
+[M16-7] [2026-05-04] Decision: No "section prop editor" or "preview" page in M16-7 | Reason: These were listed in docs/plans/m16-parent.md as M16-7 targets but the CHECKPOINT note says Steven reviews rendered output before M16-8. The rendered HTML is visible via the existing pages UI (/admin/sites/[id]/pages). Adding a dedicated prop editor before confirming the pipeline produces correct output would be premature. Deferring to M16-8+. | Alternative: Building full section prop editor now (rejected — CHECKPOINT is already after M16-7; Steven's review of the pipeline output drives what the editor needs to expose)
+
 ---
 
 ## Blocked steps
