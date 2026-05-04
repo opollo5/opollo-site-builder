@@ -2,9 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { FileText } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -157,9 +160,12 @@ export default function SharedContentPage({
           <Skeleton className="h-32 w-full" />
         </div>
       ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No shared content yet. Run the site planner to generate it.
-        </p>
+        <EmptyState
+          icon={FileText}
+          iconLabel="No shared content"
+          title="No shared content yet"
+          body="Run the site planner to generate reusable content objects like CTAs, testimonials, and FAQ items."
+        />
       ) : (
         Object.entries(byType).map(([type, typeRows]) => (
           <Card key={type}>
