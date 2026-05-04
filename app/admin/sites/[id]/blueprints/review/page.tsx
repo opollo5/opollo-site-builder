@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // /admin/sites/[id]/blueprints/review — M16-7.
 //
@@ -138,8 +139,11 @@ export default function BlueprintReviewPage({
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-4xl p-6">
-        <p className="text-muted-foreground text-sm">Loading site plan…</p>
+      <main className="mx-auto max-w-4xl p-6 space-y-4">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-4 w-1/4" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
       </main>
     );
   }

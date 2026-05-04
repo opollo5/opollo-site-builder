@@ -131,6 +131,7 @@ function esc(s: unknown): string {
   if (s == null) return '';
   if (typeof s === 'object') return '';
   return String(s)
+    .replace(/on[a-z]+\s*=/gi, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
