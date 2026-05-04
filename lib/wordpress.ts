@@ -1128,3 +1128,4 @@ export async function wpPutSettings(
     settings: (parsed.body ?? {}) as Record<string, unknown>,
   };
 }
+
