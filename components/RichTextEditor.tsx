@@ -5,7 +5,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bold,
   Italic,
@@ -19,6 +19,15 @@ import {
   Undo,
   Redo,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -53,6 +62,9 @@ export function RichTextEditor({
   disabled = false,
   className,
 }: RichTextEditorProps) {
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const linkInputRef = useRef<HTMLInputElement>(null);
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -173,9 +185,7 @@ export function RichTextEditor({
             if (editor?.isActive("link")) {
               editor.chain().focus().unsetLink().run();
             } else {
-              // eslint-disable-next-line no-alert
-              const url = window.prompt("Link URL");
-              if (url) editor?.chain().focus().setLink({ href: url }).run();
+              setLinkDialogOpen(true);
             }
           }}
           active={editor?.isActive("link")}
@@ -212,6 +222,43 @@ export function RichTextEditor({
 
       {/* Editor area */}
       <EditorContent editor={editor} />
+
+      {/* Link insert dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Insert link</DialogTitle>
+          </DialogHeader>
+          <Input
+            ref={linkInputRef}
+            type="url"
+            placeholder="https://example.com"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                const url = linkInputRef.current?.value.trim() ?? "";
+                if (url) editor?.chain().focus().setLink({ href: url }).run();
+                setLinkDialogOpen(false);
+              }
+            }}
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setLinkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                const url = linkInputRef.current?.value.trim() ?? "";
+                if (url) editor?.chain().focus().setLink({ href: url }).run();
+                setLinkDialogOpen(false);
+              }}
+            >
+              Insert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
