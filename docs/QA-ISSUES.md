@@ -112,6 +112,42 @@ components, and webhooks. Typecheck ✓ Lint ✓. Tests require Docker (not run)
 
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
-| S-4 | `app/company/social/connections/page.tsx` | `connect=sync-failed` banner shows generic "The connection couldn't be completed." — `sync.error.code` (e.g. "INTERNAL_ERROR") isn't in `REASON_LABEL` | Add a `sync-failed` case with "Accounts may be connected but sync is still pending — try Refresh." |
+| S-4 | `app/company/social/connections/page.tsx` | `connect=sync-failed` banner shows generic "The connection couldn't be completed." — `sync.error.code` (e.g. "INTERNAL_ERROR") isn't in `REASON_LABEL` | ✅ Fixed — PR #TODO (site-builder-qa-sweep) |
 | S-5 | `lib/platform/social/cap/image-trigger.ts:108` | `bytes: 0` hardcoded in `social_media_assets` insert — file size not tracked for CAP images | Expose bytes from `generateWithFallback` or read from Supabase Storage stat after upload |
 | S-6 | `components/SocialPostDetailClient.tsx`, `components/PostScheduleSection.tsx` | `window.confirm()` / `window.prompt()` used for destructive actions (delete, submit, cancel-approval, reject, request-changes, schedule-cancel) — native browser dialogs, poor mobile UX | Replace with shadcn/ui `AlertDialog` + a `CommentDialog` (text-input variant); candidate for a dedicated polish slice |
+
+---
+
+## Site-builder broad sweep — 2026-05-04
+
+Full audit of auth, admin API routes, cron routes, chat route, `lib/batch-publisher.ts`,
+`lib/brief-runner.ts`, `lib/rate-limit.ts`, `lib/encryption.ts`, migration history,
+and component-level code paths. Typecheck ✓ Lint ✓.
+
+### Fixed in PR #TODO (fix/site-builder-qa-sweep)
+
+| # | File | Issue | Fix |
+|---|------|-------|-----|
+| B-1 | `lib/generator-payload.ts` | `console.warn` in production code path — bypasses structured logger, won't reach Axiom, no request ID attached | Replaced with `logger.warn(...)` |
+| B-2 | `app/api/cron/drift-detect/route.ts` | Local inline `constantTimeEqual` duplicating `@/lib/crypto-compare` — maintenance risk if shared impl ever gets a fix | Removed inline copy, import from shared module |
+| B-3 | `app/api/cron/render-pages/route.ts` | Same as B-2 | Removed inline copy, import from shared module |
+| B-4 | `app/company/social/connections/page.tsx` | `?connect=sync-failed` banner fell through to generic error message (S-4 from social sweep) | Added explicit amber warning: "Accounts may be connected but sync is still pending — try Refresh." |
+
+### No issues found (areas confirmed clean)
+
+| Area | Files reviewed | Result |
+|---|---|---|
+| Auth architecture | `lib/auth.ts`, `middleware.ts`, `lib/admin-gate.ts`, `lib/encryption.ts` | ✅ Clean |
+| Chat route | `app/api/chat/route.ts` | ✅ Clean — rate-limited, auth-gated, no tool injection, SSE error redaction correct |
+| Batch publisher | `lib/batch-publisher.ts` (527 lines) | ✅ Clean — advisory lock, SAVEPOINT adoption, idempotent WP GET-first |
+| Cron auth (all 24 routes) | Bearer CRON_SECRET via `@/lib/crypto-compare` (now consistent) | ✅ Clean |
+| Admin API routes | Sites, register, users, batch — all use `requireAdminForApi` gate, Zod validation, structured logger | ✅ Clean |
+| Rate limiting | `lib/rate-limit.ts` | ✅ Clean — fail-open semantics, all sensitive routes covered |
+| Migration history | 0001–0087 | ✅ Clean — sequential, soft-delete consistent |
+| `console.log` in production paths | All lib + app .ts/.tsx | ✅ Only `emergency/route.ts` (intentional, documented) and `logger.ts` sink (intentional) |
+
+### Logged as debt (not fixed)
+
+| # | File | Issue | Suggested fix |
+|---|------|-------|---------------|
+| B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |

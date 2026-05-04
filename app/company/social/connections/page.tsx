@@ -61,6 +61,17 @@ function ConnectBanner({ params }: { params: SearchParams }) {
       </div>
     );
   }
+  if (params.connect === "sync-failed") {
+    return (
+      <div
+        className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        role="alert"
+        data-testid="connect-banner-sync-failed"
+      >
+        Accounts may be connected but sync is still pending — try Refresh.
+      </div>
+    );
+  }
   const detail =
     params.reason && REASON_LABEL[params.reason]
       ? REASON_LABEL[params.reason]
