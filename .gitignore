@@ -28,6 +28,7 @@ scripts/output/
 .claude/settings.local.json
 .claude/settings.json.txt
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 
 # Supabase CLI temp dir (project ref cache, etc.). Ephemeral.
 supabase/.temp/
