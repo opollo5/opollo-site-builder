@@ -111,7 +111,28 @@ compile but are caught by Phase 6 lint rules.
 
 ---
 
-## Phase 3 — Replace hardcoded hex colours (pending)
+## Phase 3 — Replace hardcoded hex colours in UI components
+
+**PR:** (pending)
+**Date:** 2026-05-05
+**Branch:** feat/css-design-system-phase-3
+
+### Changes
+
+- `tailwind.config.ts` — added `pk2` and `gr2` to the color token aliases
+- `components/ui/button.tsx` — replaced `from-[#FF03A5] to-[#cc0084]` → `from-pk to-pk2`; hover colours → `border-gr`, `text-gr`, `text-pk`
+- `components/AdminSidebar.tsx` — replaced all `#FF03A5`, `#00e5a0`, `#07070f`, `#04040a` with `bg-pk`, `text-gr`, `hover:text-gr`, `ring-gr`, `ring-offset-d1`, gradient `var(--d1)…var(--bg)`
+- `components/optimiser/ScoreSparkline.tsx` — replaced Tailwind color values with `var(--gr)`, `var(--am)`, `var(--rd)` to align sparkline colours with the Opollo design system
+
+### Intentional exceptions (kept as hex)
+
+- `lib/design-discovery/industry-defaults.ts` — *client site* color presets (not admin UI tokens)
+- `lib/copy-existing-extract.ts` — fallback for extracted client site colors
+- `lib/design-discovery/extract-css.ts` — white/black filter comparisons
+- `app/api/platform/image/generate/route.ts` — fallback for brand color API
+- `e2e/*.spec.ts` — test fixture data
+- Form `placeholder` values showing example hex format
+- `app/api/admin/email-test/route.ts` — email HTML template color (resolved in Phase 5)
 
 ---
 

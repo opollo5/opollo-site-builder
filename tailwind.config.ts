@@ -87,7 +87,9 @@ const config: Config = {
         },
         /* Opollo raw tokens — use as text-pk, bg-gr, border-bl, etc. */
         pk: "var(--pk)",
+        pk2: "var(--pk2)",
         gr: "var(--gr)",
+        gr2: "var(--gr2)",
         bl: "var(--bl)",
         am: "var(--am)",
         rd: "var(--rd)",
