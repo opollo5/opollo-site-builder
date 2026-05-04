@@ -530,7 +530,7 @@ Reports live at:
 #### Tech-debt (bundled cleanup, no urgency)
 
 - **[M15-4 #14] 12 local `errorJson()` helpers across route files.** Migration to `lib/http.respond()` / `lib/http.validationError()` incomplete. Large mechanical diff.
-- **[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.** Move to `lib/http.ts` or `lib/crypto-compare.ts`.
+- ~~**[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.**~~ Extracted to `lib/crypto-compare.ts` 2026-05-03 — PR #510. 9 files deduplicated: cron/budget-reset, cron/optimiser-monitor-rollouts, cron/process-batch, cron/process-brief-runner, cron/process-regenerations, cron/process-transfer, emergency, ops/reset-admin-password, ops/self-probe.
 - ~~**[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum**.~~ Added to `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus 409 mapping (2026-04-29).
 - ~~**[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.**~~ Comment added in route handler explaining the financial-control rationale (2026-04-29).
 - ~~**[M15-4 #18] `/api/health` envelope outlier** — no `ok` field.~~ Deviation documented in route comment (2026-04-29).

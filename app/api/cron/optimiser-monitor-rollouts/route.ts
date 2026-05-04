@@ -1,8 +1,6 @@
-import { Buffer } from "node:buffer";
-import { timingSafeEqual } from "node:crypto";
-
 import { NextResponse, type NextRequest } from "next/server";
 
+import { constantTimeEqual } from "@/lib/crypto-compare";
 import { logger } from "@/lib/logger";
 import { fetchRolloutMetrics } from "@/lib/optimiser/staged-rollout/metrics";
 import {
@@ -33,17 +31,6 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    const filler = Buffer.alloc(aBuf.length);
-    timingSafeEqual(aBuf, filler);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
-}
 
 function authorised(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;

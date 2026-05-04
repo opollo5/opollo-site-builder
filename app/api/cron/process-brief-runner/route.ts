@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 
+import { constantTimeEqual } from "@/lib/crypto-compare";
 import {
   dummyAnthropicCall,
   dummyVisualRender,
@@ -48,17 +48,6 @@ export const dynamic = "force-dynamic";
 // tick typically completes in under 30s (one page's text + visual
 // passes); the ceiling is belt-and-suspenders for a stuck heartbeat.
 export const maxDuration = 299;
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    const filler = Buffer.alloc(aBuf.length);
-    timingSafeEqual(aBuf, filler);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
-}
 
 function authorised(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
