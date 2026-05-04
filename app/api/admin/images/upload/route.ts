@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { parse as parseExif } from "exifr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
@@ -84,6 +85,46 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const dims = readImageDimensions(bytes);
 
+  // Extract EXIF/IPTC/XMP metadata. NEVER block the upload on failure.
+  let exifCaption: string | null = null;
+  let exifAltText: string | null = null;
+  let exifTags: string[] = [];
+  let exifRaw: Record<string, unknown> | null = null;
+  try {
+    const exif = await parseExif(bytes.buffer as ArrayBuffer, {
+      tiff: true,
+      xmp: true,
+      iptc: true,
+      icc: false,
+      reviveValues: true,
+    }) as Record<string, unknown> | undefined;
+    if (exif) {
+      exifRaw = exif;
+      const cap =
+        (exif.ImageDescription as string | undefined) ??
+        (exif.Caption as string | undefined) ??
+        (exif.Headline as string | undefined) ??
+        null;
+      exifCaption = cap?.trim() || null;
+      const alt =
+        (exif.AltTextAccessibility as string | undefined) ??
+        (exif.AltText as string | undefined) ??
+        null;
+      exifAltText = alt?.trim() || null;
+      const kw = exif.Keywords;
+      if (typeof kw === "string" && kw.trim()) {
+        exifTags = kw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
+      } else if (Array.isArray(kw)) {
+        exifTags = (kw as string[]).map((s) => String(s).trim()).filter(Boolean);
+      }
+    }
+  } catch (err) {
+    logger.warn("image.upload.exif_parse_failed", {
+      filename,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   // Optional duplicate-handling: ?replace=1 archives any active row with
   // the same filename before the new upload lands so the new row can
   // own the (filename) namespace. Skip mode is enforced client-side via
@@ -158,6 +199,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     bytes: file.size,
     width_px: dims?.width ?? null,
     height_px: dims?.height ?? null,
+    caption: exifCaption,
+    alt_text: exifAltText,
+    tags: exifTags.length > 0 ? exifTags : [],
     created_by: gate.user?.id ?? null,
   };
   const ins = await supabase
@@ -202,6 +246,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       "Image uploaded to Cloudflare but failed to save in library.",
       500,
     );
+  }
+
+  // Persist raw EXIF object in image_metadata for later inspection /
+  // re-extraction without blocking the response.
+  if (exifRaw && ins.data?.id) {
+    supabase
+      .from("image_metadata")
+      .insert({ image_id: ins.data.id, key: "exif_raw", value_jsonb: exifRaw })
+      .then(({ error }) => {
+        if (error) {
+          logger.warn("image.upload.exif_metadata_insert_failed", {
+            image_id: ins.data!.id,
+            error: error.message,
+          });
+        }
+      });
   }
 
   return NextResponse.json(
