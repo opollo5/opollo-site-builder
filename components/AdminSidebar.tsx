@@ -8,7 +8,6 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Activity,
-  FileText,
   Globe,
   Image as ImageIcon,
   KeyRound,
@@ -29,25 +28,12 @@ import type { SessionUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// R1-1 — Sidebar navigation chrome.
+// Opollo sidebar — dark gradient rail, pink active indicator, green hover.
+// 240px expanded / 64px icon-only collapsed. Off-canvas drawer on mobile.
 //
-// Replaces the AdminNav top bar with a Claude.ai / ChatGPT-style left
-// rail. Pinned 240px wide on desktop; collapsible to 64px (icon-only)
-// via the bottom rail's chevron toggle. Mobile (< sm): off-canvas
-// drawer toggled by a top-right hamburger button on the
-// in-page mobile header.
-//
-// Persistence:
-//   - Cookie `opollo_sidebar_collapsed` (1 / 0). Server reads via
-//     next/headers cookies() in app/admin/layout.tsx and passes the
-//     state as `initialCollapsed` so SSR + first client paint match.
-//     This kills the hydration flash where the rail rendered expanded
-//     then snapped narrow on first useEffect tick. (R2 fix.)
-//   - localStorage mirror keeps the legacy key live so other tabs
-//     reading it don't see stale state. Cookie is the source of truth
-//     for SSR; localStorage is a convenience for any client-only code
-//     that wants to read without a roundtrip.
-//   - Mobile drawer opens fresh each time (no persistence).
+// Persistence: cookie `opollo_sidebar_collapsed` (1 / 0) set by server layout
+// so SSR + first client paint match (no hydration flash). localStorage mirrors
+// for legacy readers.
 // ---------------------------------------------------------------------------
 
 const SIDEBAR_COLLAPSED_LS_KEY = "opollo:sidebar:collapsed";
@@ -62,16 +48,8 @@ type NavLink = {
 
 interface AdminSidebarProps {
   user: SessionUser | null;
-  /** Operator-tier roles (admin or super_admin) — sees the operator-
-   *  management surfaces (Users, Companies). PLATFORM-AUDIT PR7
-   *  replaced the old `showUsersLink` boolean with the richer
-   *  isAdminTier / isSuperAdmin pair. */
   isAdminTier: boolean;
-  /** Top-tier role only — sees the super_admin-only surfaces
-   *  (Audit log, Email test). */
   isSuperAdmin: boolean;
-  /** R2 fix — cookie-driven initial state from the server layout so
-   *  SSR matches the first client render and there's no flash. */
   initialCollapsed?: boolean;
 }
 
@@ -82,7 +60,6 @@ export function AdminSidebar({
   initialCollapsed = false,
 }: AdminSidebarProps) {
   const pathname = usePathname();
-  // Cookie value drives SSR + first paint. No useEffect-based load.
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -90,32 +67,23 @@ export function AdminSidebar({
     setCollapsed((prev) => {
       const next = !prev;
       try {
-        window.localStorage.setItem(
-          SIDEBAR_COLLAPSED_LS_KEY,
-          next ? "1" : "0",
-        );
+        window.localStorage.setItem(SIDEBAR_COLLAPSED_LS_KEY, next ? "1" : "0");
       } catch {
-        // localStorage disabled — change still applies in-memory.
+        /* localStorage disabled — change applies in-memory */
       }
-      // Write cookie so the server layout picks up the new state on
-      // the next request. 1-year max-age; sidebar pref isn't sensitive.
-      // SameSite=Lax is the default for first-party admin requests.
       try {
         document.cookie = `${SIDEBAR_COLLAPSED_COOKIE}=${next ? "1" : "0"}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
       } catch {
-        // document.cookie write blocked (cookieless context) —
-        // change still applies in-memory.
+        /* cookieless context — change applies in-memory */
       }
       return next;
     });
   }
 
-  // Auto-close the mobile drawer on route change.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Escape closes the mobile drawer.
   useEffect(() => {
     if (!mobileOpen) return;
     function onKey(e: KeyboardEvent) {
@@ -163,10 +131,6 @@ export function AdminSidebar({
       : []),
   ];
 
-  // PLATFORM-AUDIT PR7 — super_admin-only "Admin" sub-section. These
-  // pages exist but had no nav entry, so they were unreachable except by
-  // typing the URL. Surface them as a separate tier in the rail rather
-  // than mixing them with the operator-management top-level links.
   const adminLinks: NavLink[] = isSuperAdmin
     ? [
         {
@@ -194,15 +158,57 @@ export function AdminSidebar({
     return pathname === href || pathname.startsWith(href + "/");
   }
 
+  function NavItem({
+    label,
+    href,
+    icon: Icon,
+    testId,
+  }: NavLink) {
+    const active = isActiveRoute(href);
+    return (
+      <li className="relative">
+        {active && (
+          <span
+            aria-hidden
+            className="absolute inset-y-1 left-0 w-0.5 rounded-full bg-[#FF03A5]"
+          />
+        )}
+        <Link
+          href={href}
+          data-testid={testId}
+          aria-current={active ? "page" : undefined}
+          title={collapsed ? label : undefined}
+          className={cn(
+            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0] focus-visible:ring-offset-2 focus-visible:ring-offset-[#07070f]",
+            active
+              ? "bg-[rgba(255,3,165,0.10)] text-white font-medium"
+              : "text-[rgba(255,255,255,0.58)] hover:bg-[rgba(0,229,160,0.06)] hover:text-[#00e5a0]",
+          )}
+        >
+          <Icon
+            aria-hidden
+            className={cn(
+              "h-4 w-4 shrink-0",
+              active
+                ? "text-white"
+                : "text-[rgba(255,255,255,0.40)] group-hover:text-[#00e5a0]",
+            )}
+          />
+          {!collapsed && <span className="truncate">{label}</span>}
+        </Link>
+      </li>
+    );
+  }
+
   return (
     <>
-      {/* Mobile-only top bar — hamburger + wordmark. Hidden above sm. */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b bg-background/95 px-4 backdrop-blur sm:hidden">
+      {/* Mobile top bar */}
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-[rgba(4,4,10,0.85)] px-4 backdrop-blur-[18px] sm:hidden">
         <Link
           href="/admin/sites"
-          className="text-sm font-semibold transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="font-display text-sm font-semibold text-white tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
         >
-          Opollo
+          Opo<span className="text-[#FF03A5]">llo</span>
         </Link>
         <button
           type="button"
@@ -210,68 +216,67 @@ export function AdminSidebar({
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
           aria-controls="admin-sidebar"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(255,255,255,0.06)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
           data-testid="admin-mobile-nav-button"
         >
           <Menu aria-hidden className="h-5 w-5" />
         </button>
       </div>
 
-      {/* Mobile-only backdrop. Click to close. */}
+      {/* Mobile backdrop */}
       {mobileOpen && (
         <button
           type="button"
           aria-label="Close navigation"
-          className="opollo-fade-in fixed inset-0 z-40 bg-black/40 sm:hidden"
+          className="opollo-fade-in fixed inset-0 z-40 bg-black/60 sm:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar — pinned left on desktop, off-canvas on mobile. */}
+      {/* Sidebar */}
       <aside
         id="admin-sidebar"
         aria-label="Primary"
         className={cn(
-          "border-r bg-background transition-all duration-200",
-          // Mobile: fixed off-canvas; slide in via translate.
+          // Opollo sidebar: dark gradient bg, rgba-white right border
+          "border-r border-white/[0.06] transition-all duration-200",
+          "bg-[linear-gradient(180deg,#07070f_0%,#04040a_100%)]",
+          // Mobile: fixed off-canvas
           "fixed inset-y-0 left-0 z-50 w-72 shrink-0 -translate-x-full",
           mobileOpen && "translate-x-0",
-          // Desktop: pinned, full-height.
+          // Desktop: pinned full-height
           "sm:sticky sm:top-0 sm:h-screen sm:translate-x-0",
           collapsed ? "sm:w-16" : "sm:w-60",
         )}
-        // aria-hidden left undefined: the sidebar is always part of
-        // the page tab order on desktop; on mobile it's translated
-        // off-canvas which already removes it from interaction.
       >
         <div className="flex h-full flex-col">
-          {/* Wordmark + collapse toggle (desktop) / close button (mobile) */}
-          <div className="flex h-14 items-center justify-between border-b px-3">
+          {/* Wordmark + collapse toggle */}
+          <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-3">
             {!collapsed && (
               <Link
                 href="/admin/sites"
-                className="text-sm font-semibold transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                className="font-display text-sm font-semibold text-white tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
               >
-                Opollo
+                Opo<span className="text-[#FF03A5]">llo</span>
               </Link>
             )}
+            {/* Mobile close */}
             <button
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(255,255,255,0.06)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0] sm:hidden"
             >
               <X aria-hidden className="h-5 w-5" />
             </button>
+            {/* Desktop collapse toggle */}
             <button
               type="button"
               onClick={toggleCollapsed}
-              aria-label={
-                collapsed ? "Expand sidebar" : "Collapse sidebar"
-              }
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               className={cn(
-                "hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:inline-flex",
+                "hidden h-8 w-8 items-center justify-center rounded-md text-[rgba(255,255,255,0.40)] transition-smooth hover:bg-[rgba(255,255,255,0.06)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0] sm:inline-flex",
                 collapsed && "mx-auto",
               )}
             >
@@ -286,102 +291,43 @@ export function AdminSidebar({
           {/* Primary nav */}
           <nav className="flex-1 overflow-y-auto p-2">
             <ul className="space-y-0.5">
-              {navLinks.map(({ label, href, icon: Icon, testId }) => {
-                const active = isActiveRoute(href);
-                return (
-                  <li key={href}>
-                    <Link
-                      href={href}
-                      data-testid={testId}
-                      aria-current={active ? "page" : undefined}
-                      title={collapsed ? label : undefined}
-                      className={cn(
-                        "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        active
-                          ? "bg-muted font-medium text-foreground"
-                          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                      )}
-                    >
-                      <Icon
-                        aria-hidden
-                        className={cn(
-                          "h-4 w-4 shrink-0",
-                          active
-                            ? "text-foreground"
-                            : "text-muted-foreground group-hover:text-foreground",
-                        )}
-                      />
-                      {!collapsed && <span className="truncate">{label}</span>}
-                    </Link>
-                  </li>
-                );
-              })}
+              {navLinks.map((link) => (
+                <NavItem key={link.href} {...link} />
+              ))}
             </ul>
 
-            {/* Super_admin-only Admin sub-section. Separator label
-                hidden when the rail is collapsed. */}
+            {/* Super_admin Admin sub-section */}
             {adminLinks.length > 0 && (
               <>
                 <div className="mt-4 mb-1 px-2.5">
                   {!collapsed && (
-                    <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-                      Admin
-                    </p>
+                    <p className="lbl text-[10px]">Admin</p>
                   )}
                 </div>
                 <ul className="space-y-0.5">
-                  {adminLinks.map(({ label, href, icon: Icon, testId }) => {
-                    const active = isActiveRoute(href);
-                    return (
-                      <li key={href}>
-                        <Link
-                          href={href}
-                          data-testid={testId}
-                          aria-current={active ? "page" : undefined}
-                          title={collapsed ? label : undefined}
-                          className={cn(
-                            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                            active
-                              ? "bg-muted font-medium text-foreground"
-                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                          )}
-                        >
-                          <Icon
-                            aria-hidden
-                            className={cn(
-                              "h-4 w-4 shrink-0",
-                              active
-                                ? "text-foreground"
-                                : "text-muted-foreground group-hover:text-foreground",
-                            )}
-                          />
-                          {!collapsed && (
-                            <span className="truncate">{label}</span>
-                          )}
-                        </Link>
-                      </li>
-                    );
-                  })}
+                  {adminLinks.map((link) => (
+                    <NavItem key={link.href} {...link} />
+                  ))}
                 </ul>
               </>
             )}
           </nav>
 
-          {/* Footer rail — ⌘K hint + user menu */}
-          <div className="border-t p-2">
+          {/* Footer rail */}
+          <div className="border-t border-white/[0.06] p-2">
             {!collapsed && (
-              <div className="mb-2 flex items-center justify-between rounded-md bg-muted/40 px-2 py-1.5">
-                <span className="text-sm text-muted-foreground">
+              <div className="mb-2 flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1.5">
+                <span className="text-sm text-[rgba(255,255,255,0.40)]">
                   Command palette
                 </span>
                 <span
-                  className="flex items-center gap-0.5 text-sm text-muted-foreground"
+                  className="flex items-center gap-0.5 text-sm text-[rgba(255,255,255,0.32)]"
                   aria-hidden
                 >
-                  <kbd className="rounded border bg-background px-1 font-mono text-[10px]">
+                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
                     ⌘
                   </kbd>
-                  <kbd className="rounded border bg-background px-1 font-mono text-[10px]">
+                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
                     K
                   </kbd>
                 </span>
@@ -392,16 +338,14 @@ export function AdminSidebar({
                 href="/account/security"
                 title={collapsed ? "Account security" : undefined}
                 className={cn(
-                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-muted-foreground transition-smooth hover:bg-muted/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-[#00e5a0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]",
                   isActiveRoute("/account/security") &&
-                    "bg-muted font-medium text-foreground",
+                    "bg-[rgba(255,3,165,0.10)] text-white font-medium",
                 )}
                 data-testid="nav-security"
               >
-                <KeyRound aria-hidden className="h-4 w-4 shrink-0" />
-                {!collapsed && (
-                  <span className="truncate">Account security</span>
-                )}
+                <KeyRound aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-[#00e5a0]" />
+                {!collapsed && <span className="truncate">Account security</span>}
               </Link>
             )}
             {user && (
@@ -409,25 +353,23 @@ export function AdminSidebar({
                 href="/account/devices"
                 title={collapsed ? "Trusted devices" : undefined}
                 className={cn(
-                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-muted-foreground transition-smooth hover:bg-muted/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-[#00e5a0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]",
                   isActiveRoute("/account/devices") &&
-                    "bg-muted font-medium text-foreground",
+                    "bg-[rgba(255,3,165,0.10)] text-white font-medium",
                 )}
                 data-testid="nav-devices"
               >
-                <Laptop aria-hidden className="h-4 w-4 shrink-0" />
-                {!collapsed && (
-                  <span className="truncate">Trusted devices</span>
-                )}
+                <Laptop aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-[#00e5a0]" />
+                {!collapsed && <span className="truncate">Trusted devices</span>}
               </Link>
             )}
             <Link
               href="/"
               title={collapsed ? "Back to builder" : undefined}
-              className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-muted-foreground transition-smooth hover:bg-muted/60 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-[#00e5a0] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
               data-testid="nav-back-to-builder"
             >
-              <Settings aria-hidden className="h-4 w-4 shrink-0" />
+              <Settings aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-[#00e5a0]" />
               {!collapsed && <span className="truncate">Back to builder</span>}
             </Link>
             {user && (
@@ -435,7 +377,7 @@ export function AdminSidebar({
                 <button
                   type="submit"
                   title={collapsed ? "Sign out" : undefined}
-                  className="group flex h-9 w-full items-center gap-3 rounded-md px-2.5 text-left text-sm text-destructive transition-smooth hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group flex h-9 w-full items-center gap-3 rounded-md px-2.5 text-left text-sm text-destructive transition-smooth hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#00e5a0]"
                   data-testid="nav-sign-out"
                 >
                   <LogOut aria-hidden className="h-4 w-4 shrink-0" />
@@ -445,7 +387,7 @@ export function AdminSidebar({
             )}
             {user && !collapsed && (
               <p
-                className="mt-2 truncate border-t pt-2 px-2.5 text-[11px] text-muted-foreground"
+                className="mt-2 truncate border-t border-white/[0.06] pt-2 px-2.5 text-[11px] text-[rgba(255,255,255,0.32)]"
                 title={user.email}
               >
                 {user.email}

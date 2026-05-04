@@ -76,7 +76,7 @@ export default async function AdminLayout({
         // children from forcing horizontal overflow.
         className="min-w-0 flex-1 px-4 py-6 scroll-mt-16 focus:outline-none sm:px-8 sm:py-8"
       >
-        <div className="mx-auto max-w-6xl">{children}</div>
+        <div className="mx-auto max-w-7xl">{children}</div>
       </main>
       <Toaster />
       <CommandPalette />
