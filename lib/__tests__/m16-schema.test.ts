@@ -19,8 +19,7 @@ import { seedSite } from "./_helpers";
 //   route_registry:
 //     - page_type CHECK: only the 7 allowed values
 //     - status CHECK: only 'planned'|'live'|'redirected'|'removed'
-//     - partial UNIQUE (site_id, slug) WHERE status != 'removed':
-//       two active routes cannot share a slug; removed routes can share
+//     - UNIQUE (site_id, slug): no two routes on the same site share a slug
 //     - redirect_to self-ref SET NULL on row delete
 //     - CASCADE from sites delete
 //
@@ -237,8 +236,8 @@ describe("route_registry — status CHECK", () => {
   });
 });
 
-describe("route_registry — partial UNIQUE (site_id, slug) WHERE status != 'removed'", () => {
-  it("rejects duplicate active slug on same site", async () => {
+describe("route_registry — UNIQUE (site_id, slug)", () => {
+  it("rejects duplicate slug on same site", async () => {
     const site = await seedSite({ prefix: "rr13" });
     const slug = "/duplicate-slug";
     await insertRoute({ site_id: site.id, slug, status: "live" });
@@ -252,21 +251,6 @@ describe("route_registry — partial UNIQUE (site_id, slug) WHERE status != 'rem
     const slug = "/shared-slug";
     await insertRoute({ site_id: a.id, slug, status: "live" });
     const r2 = await insertRoute({ site_id: b.id, slug, status: "live" });
-    expect(r2.id).not.toBeNull();
-  });
-
-  it("allows slug re-use after route is removed", async () => {
-    const svc = getServiceRoleClient();
-    const site = await seedSite({ prefix: "rr16" });
-    const slug = "/reusable-slug";
-    const first = await insertRoute({ site_id: site.id, slug, status: "live" });
-
-    await svc
-      .from("route_registry")
-      .update({ status: "removed" })
-      .eq("id", first.id!);
-
-    const r2 = await insertRoute({ site_id: site.id, slug, status: "planned" });
     expect(r2.id).not.toBeNull();
   });
 });
@@ -370,10 +354,11 @@ describe("pages — wp_status CHECK and defaults", () => {
     const { data, error } = await svc
       .from("pages")
       .insert({
-        site_id: site.id,
-        title:   "M16 test page",
-        slug:    "/m16-test",
-        status:  "draft",
+        site_id:   site.id,
+        title:     "M16 test page",
+        slug:      "/m16-test",
+        page_type: "service",
+        status:    "draft",
         design_system_version: 1,
       })
       .select("html_is_stale, wp_status, page_document, validation_result")
@@ -394,10 +379,11 @@ describe("pages — wp_status CHECK and defaults", () => {
       const { data, error } = await svc
         .from("pages")
         .insert({
-          site_id: site.id,
-          title:   `Page ${status}`,
-          slug:    `/page-${status.replace("_", "-")}`,
-          status:  "draft",
+          site_id:   site.id,
+          title:     `Page ${status}`,
+          slug:      `/page-${status.replace("_", "-")}`,
+          page_type: "service",
+          status:    "draft",
           wp_status: status,
           design_system_version: 1,
         })
@@ -414,10 +400,11 @@ describe("pages — wp_status CHECK and defaults", () => {
     const { error } = await svc
       .from("pages")
       .insert({
-        site_id:  site.id,
-        title:    "Bad status",
-        slug:     "/bad-wp-status",
-        status:   "draft",
+        site_id:   site.id,
+        title:     "Bad status",
+        slug:      "/bad-wp-status",
+        page_type: "service",
+        status:    "draft",
         wp_status: "uploaded",
         design_system_version: 1,
       })

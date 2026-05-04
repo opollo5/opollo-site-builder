@@ -32,7 +32,7 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 // sendEmail is mocked — no real SendGrid calls from CI.
 // ---------------------------------------------------------------------------
 
-const COMPANY_ID = "abcdef27-0000-0000-0000-not1fwir1ng0";
+const COMPANY_ID = "abcdef27-0000-0000-0000-000000000001";
 
 describe("S1-27 notification wiring", () => {
   let admin: SeededAuthUser;
