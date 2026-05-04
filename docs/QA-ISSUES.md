@@ -163,8 +163,8 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
-| B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |
-| B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | Low risk (admin-only), but validate `site_name` doesn't contain `{{...}}` in `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
+| B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | ✅ Fixed PR #560 — extracted to `VISUAL_PROJECTION_CRITIQUE_CENTS` / `VISUAL_PROJECTION_REVISE_CENTS` in `lib/visual-review.ts` |
+| B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | ✅ Fixed PR #560 — `siteNameSchema` rejects `{{...}}` at API boundary in `RegisterSiteInputSchema` + `UpdateSiteBasicsSchema` |
 | B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | ✅ Fixed PR #560 — `approval_decision` limiter (20 req/h per-IP) added to `lib/rate-limit.ts` + route |
 
 ---
@@ -227,3 +227,58 @@ Verified as part of the analytics feature build (PR #555).
 | `/company/social/analytics` page | ✅ Built — PR #555 |
 | `SocialNavClient` Analytics tab | ✅ Added |
 | `lib/platform/social/analytics.ts` | ✅ Server-only data lib, 7 parallel queries |
+
+---
+
+## Phase 9 — QA debt closure sweep (2026-05-05)
+
+### Fixed in PR #560 (fix/qa-debt-b8-s5-s6)
+
+| # | Fix | Details |
+|---|-----|---------|
+| B-8 | Rate-limit approve endpoint | `approval_decision` limiter (20 req/h per-IP) wired to `POST /api/approve/[token]/decision` |
+| S-5 | CAP image bytes | `bytes: 0` → `image.buffer?.length ?? 0` in `lib/platform/social/cap/image-trigger.ts` |
+| S-6 | AlertDialogs | New `components/ui/confirm-dialog.tsx` (ConfirmDialog + CommentDialog); replaces all `window.confirm()` / `window.prompt()` in `SocialPostDetailClient` + `PostScheduleSection` |
+| B-5 | Named cost constants | `VISUAL_PROJECTION_CRITIQUE_CENTS` / `VISUAL_PROJECTION_REVISE_CENTS` extracted to `lib/visual-review.ts` |
+| B-7 | Template-token injection | `siteNameSchema` rejects `{{...}}` at `RegisterSiteInputSchema` + `UpdateSiteBasicsSchema` boundary |
+
+### Fixed in PR #559 (fix/exif-field-mapping, merged 2026-05-05)
+
+| # | Fix | Details |
+|---|-----|---------|
+| BU-4 revised | Canonical EXIF mapping | `lib/exif-extract.ts` — unified `extractExifFields()` used by upload route + reextract lib. Field mapping: `caption ← Caption-Abstract ?? description ?? Headline`, `alt_text ← Headline ?? ObjectName ?? Title`, `tags ← Keywords or Subject (richer wins), max 12`. |
+| Social analytics skeleton | Loading state | `app/company/social/analytics/loading.tsx` added |
+
+### Image caption backfill — requires production env
+
+The backfill script `scripts/backfill-image-captions.ts` is complete and tested locally with `--dry-run`. It requires Cloudflare delivery URL access (`CLOUDFLARE_IMAGES_HASH` not set locally).
+
+To run in production:
+
+```sh
+CLOUDFLARE_IMAGES_HASH=<hash from Vercel env> \
+SUPABASE_URL=<url> \
+SUPABASE_SERVICE_ROLE_KEY=<key> \
+ANTHROPIC_API_KEY=<key> \
+npx tsx scripts/backfill-image-captions.ts
+```
+
+Add `--dry-run` first to verify row count. Estimated cost: ~$0.62 for ~1,777 images at Haiku pricing.
+
+After running, verify with:
+```sql
+SELECT count(*) FROM image_library WHERE caption IS NOT NULL AND caption != '';
+```
+
+### All QA debt items — final status
+
+| # | Status |
+|---|--------|
+| P1-1, P1-3 | ✅ Done earlier |
+| S-1, S-2, S-3 | ✅ Fixed PR #543 |
+| S-4 | ✅ Fixed PR #546 |
+| S-5, S-6 | ✅ Fixed PR #560 |
+| B-1 through B-4, B-6 | ✅ Fixed PR #546/548 |
+| B-5, B-7, B-8 | ✅ Fixed PR #560 |
+| BU-1 through BU-4 | ✅ Fixed PR #553/557/559 |
+| Image caption backfill | ⏳ Script ready — run manually in prod with CLOUDFLARE_IMAGES_HASH |
