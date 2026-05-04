@@ -6,12 +6,8 @@ import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
 // S1-23 — media library client component.
-//
-// V1 surface: the operator pastes an https URL + optional mime/bytes
-// → POSTs to /api/platform/social/media → row prepended to the list.
-// Each row shows a thumbnail (image/* via <img>, others a mime
-// badge) + the URL + bytes + a copy-id affordance for use by the
-// future variant-attach flow.
+// S1-57 — cursor pagination; "Load more" fetches the next page from the API
+//          using the created_at cursor returned by the server.
 // ---------------------------------------------------------------------------
 
 type Asset = {
@@ -29,6 +25,7 @@ type Asset = {
 type Props = {
   companyId: string;
   initialAssets: Asset[];
+  initialNextCursor: string | null;
   canEdit: boolean;
 };
 
@@ -50,12 +47,15 @@ function formatDate(iso: string): string {
 export function MediaLibraryClient({
   companyId,
   initialAssets,
+  initialNextCursor,
   canEdit,
 }: Props) {
   const [assets, setAssets] = useState(initialAssets);
+  const [nextCursor, setNextCursor] = useState<string | null>(initialNextCursor);
   const [showForm, setShowForm] = useState(false);
   const [url, setUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -86,6 +86,23 @@ export function MediaLibraryClient({
       setShowForm(false);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleLoadMore() {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const params = new URLSearchParams({ company_id: companyId, before: nextCursor });
+      const res = await fetch(`/api/platform/social/media?${params.toString()}`);
+      const json = (await res.json()) as
+        | { ok: true; data: { assets: Asset[]; next_cursor: string | null } }
+        | { ok: false; error: { message: string } };
+      if (!res.ok || !json.ok) return;
+      setAssets((prev) => [...prev, ...json.data.assets]);
+      setNextCursor(json.data.next_cursor);
+    } finally {
+      setLoadingMore(false);
     }
   }
 
@@ -164,56 +181,69 @@ export function MediaLibraryClient({
           {canEdit ? " Click Add asset to upload your first." : ""}
         </div>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {assets.map((a) => (
-            <li
-              key={a.id}
-              className="overflow-hidden rounded-lg border bg-card"
-              data-testid={`media-row-${a.id}`}
-            >
-              {a.source_url && a.mime_type.startsWith("image/") ? (
-                // Use <img> rather than next/image — these are external
-                // URLs we don't control + they don't go through the Next
-                // image optimiser.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={a.source_url}
-                  alt=""
-                  className="h-40 w-full object-cover"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="flex h-40 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
-                  {a.mime_type}
+        <>
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {assets.map((a) => (
+              <li
+                key={a.id}
+                className="overflow-hidden rounded-lg border bg-card"
+                data-testid={`media-row-${a.id}`}
+              >
+                {a.source_url && a.mime_type.startsWith("image/") ? (
+                  // Use <img> rather than next/image — these are external
+                  // URLs we don't control + they don't go through the Next
+                  // image optimiser.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={a.source_url}
+                    alt=""
+                    className="h-40 w-full object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="flex h-40 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+                    {a.mime_type}
+                  </div>
+                )}
+                <div className="p-3">
+                  <div className="break-all text-sm">
+                    {a.source_url ?? a.storage_path}
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                    <span>{formatBytes(a.bytes)}</span>
+                    <span>{formatDate(a.created_at)}</span>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <button
+                      type="button"
+                      className="text-primary underline"
+                      onClick={() => copyId(a.id)}
+                      data-testid={`media-copy-${a.id}`}
+                    >
+                      {copiedId === a.id ? "Copied" : "Copy id"}
+                    </button>
+                    {a.bundle_upload_id ? (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">
+                        uploaded
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-              )}
-              <div className="p-3">
-                <div className="break-all text-sm">
-                  {a.source_url ?? a.storage_path}
-                </div>
-                <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{formatBytes(a.bytes)}</span>
-                  <span>{formatDate(a.created_at)}</span>
-                </div>
-                <div className="mt-2 flex items-center gap-2 text-sm">
-                  <button
-                    type="button"
-                    className="text-primary underline"
-                    onClick={() => copyId(a.id)}
-                    data-testid={`media-copy-${a.id}`}
-                  >
-                    {copiedId === a.id ? "Copied" : "Copy id"}
-                  </button>
-                  {a.bundle_upload_id ? (
-                    <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-900">
-                      uploaded
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+          </ul>
+          {nextCursor ? (
+            <div className="mt-6 flex justify-center" data-testid="media-load-more">
+              <Button
+                variant="outline"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </Button>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );

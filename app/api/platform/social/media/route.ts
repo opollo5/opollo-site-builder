@@ -57,14 +57,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const gate = await requireCanDoForApi(companyId, "view_calendar");
   if (gate.kind === "deny") return gate.response;
 
-  const result = await listMediaAssets({ companyId });
+  const before = url.searchParams.get("before") ?? undefined;
+  const limitRaw = url.searchParams.get("limit");
+  const limit = limitRaw ? Number(limitRaw) : undefined;
+
+  const result = await listMediaAssets({ companyId, before, limit });
   if (!result.ok) {
     return errorJson(result.error.code, result.error.message, 500);
   }
   return NextResponse.json(
     {
       ok: true,
-      data: result.data,
+      data: { assets: result.data.assets, next_cursor: result.data.nextCursor },
       timestamp: new Date().toISOString(),
     },
     { status: 200 },
