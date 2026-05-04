@@ -124,7 +124,7 @@ Full audit of auth, admin API routes, cron routes, chat route, `lib/batch-publis
 `lib/brief-runner.ts`, `lib/rate-limit.ts`, `lib/encryption.ts`, migration history,
 and component-level code paths. Typecheck ✓ Lint ✓.
 
-### Fixed in PR #546 (fix/site-builder-qa-sweep)
+### Fixed in PR #546 + PR #548 (fix/site-builder-qa-sweep, fix/cron-auth-dedup-optimiser)
 
 | # | File | Issue | Fix |
 |---|------|-------|-----|
@@ -132,6 +132,7 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 | B-2 | `app/api/cron/drift-detect/route.ts` | Local inline `constantTimeEqual` duplicating `@/lib/crypto-compare` — maintenance risk if shared impl ever gets a fix | Removed inline copy, import from shared module |
 | B-3 | `app/api/cron/render-pages/route.ts` | Same as B-2 | Removed inline copy, import from shared module |
 | B-4 | `app/company/social/connections/page.tsx` | `?connect=sync-failed` banner fell through to generic error message (S-4 from social sweep) | Added explicit amber warning: "Accounts may be connected but sync is still pending — try Refresh." |
+| B-6 | `lib/optimiser/sync/cron-shared.ts` | Same inline `constantTimeEqual` copy — 13 optimiser cron routes share this file, so all were affected | Removed inline copy, import from `@/lib/crypto-compare` |
 
 ### No issues found (areas confirmed clean)
 
@@ -151,3 +152,5 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
 | B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |
+| B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | Low risk (admin-only), but validate `site_name` doesn't contain `{{...}}` in `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
+| B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | Add `checkRateLimit("invite_accept", ...)` per-IP as used on the invitation accept endpoint |
