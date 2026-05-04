@@ -9,11 +9,11 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { Check, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Composer, type ComposerValue } from "@/components/Composer";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import {
   Command,
   CommandEmpty,
@@ -72,8 +72,6 @@ const TITLE_SEO_CAP = 60;
 const META_TITLE_SEO_CAP = 60;
 const META_DESCRIPTION_SEO_MIN = 120;
 const META_DESCRIPTION_SEO_MAX = 160;
-// Adult reading speed for prose, words-per-minute.
-const READING_WPM = 230;
 
 const SOURCE_HINTS: Record<ParseSource, string> = {
   yaml: "Auto-filled from YAML front-matter",
@@ -125,24 +123,6 @@ function applyParse(
   return { value: parsed, source, touched: false };
 }
 
-// BL-3 — word + reading-time counter.
-function wordCount(text: string): number {
-  if (!text) return 0;
-  const stripped = text
-    .replace(/^---[\s\S]*?---/, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/`[^`]+`/g, " ")
-    .replace(/[#*_>~`-]+/g, " ");
-  const tokens = stripped.split(/\s+/).filter((t) => t.length > 0);
-  return tokens.length;
-}
-
-function readingMinutes(words: number): number {
-  if (words === 0) return 0;
-  return Math.max(1, Math.round(words / READING_WPM));
-}
-
 // Taxonomy option (categories / tags). Defined locally to avoid importing
 // the server-only lib/wordpress module into a client component.
 interface WpTaxonomyOption {
@@ -150,9 +130,22 @@ interface WpTaxonomyOption {
   name: string;
   slug: string;
   count: number;
+  /** True for tags typed by the operator that don't exist in WP yet. */
+  isNew?: boolean;
 }
 
-type PublishMode = "draft" | "schedule";
+// Local shape — mirrors what Composer exported; kept so state references compile.
+interface ComposerValue {
+  text: string;
+  file: File | null;
+}
+
+// Strip HTML tags for empty-content detection (Tiptap emits "<p></p>" for blank).
+function isEditorEmpty(html: string): boolean {
+  return html.replace(/<[^>]+>/g, "").trim().length === 0;
+}
+
+type PublishMode = "publish" | "draft" | "schedule";
 
 function defaultScheduledAt(): string {
   const d = new Date();
@@ -210,6 +203,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [permalinkStructure, setPermalinkStructure] = useState<string | null>(null);
   const [siteWpUrl, setSiteWpUrl] = useState<string | null>(null);
   const [siteName, setSiteName] = useState<string | null>(null);
+  const [siteLoading, setSiteLoading] = useState(true);
   // Fix 5 — publish scheduling.
   const [publishMode, setPublishMode] = useState<PublishMode>("draft");
   const [scheduledAt, setScheduledAt] = useState<string>(defaultScheduledAt);
@@ -247,7 +241,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (parsed.selectedCategories) setSelectedCategories(parsed.selectedCategories);
       if (parsed.selectedTags) setSelectedTags(parsed.selectedTags);
       setDraftRestoredAt(parsed.savedAt);
-      if (parsed.parentPage || parsed.featuredImage) {
+      if (parsed.parentPage) {
         setShowAdvanced(true);
       }
     } catch {
@@ -323,6 +317,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
 
   // Fix 7 — fetch site name + permalink structure on mount.
   useEffect(() => {
+    setSiteLoading(true);
     void (async () => {
       try {
         const [permRes, siteRes] = await Promise.all([
@@ -343,9 +338,20 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         }
       } catch {
         // Non-fatal — site indicator + URL preview simply won't render.
+      } finally {
+        setSiteLoading(false);
       }
     })();
   }, [siteId]);
+
+  // Fix 2 — auto-generate slug from title when slug is blank and untouched.
+  useEffect(() => {
+    if (!slug.touched && slug.value === "" && title.value.trim().length > 0) {
+      setSlug({ value: generateSlug(title.value), source: "derived", touched: false });
+    }
+  // Only re-run when title changes; slug setter is stable.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title.value]);
 
   // Debounced re-parse on every text change.
   useEffect(() => {
@@ -372,10 +378,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return () => clearTimeout(id);
   }, [composerValue.text]);
 
-  // Fix 3 — auto-open AdvancedDisclosure when featured image is selected.
-  useEffect(() => {
-    if (featuredImage !== null) setShowAdvanced(true);
-  }, [featuredImage]);
+  // Featured image is now outside the AdvancedDisclosure — no need to auto-open.
 
   // BL-2 — debounced autosave to localStorage.
   useEffect(() => {
@@ -383,7 +386,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     if (!restoredRef.current) return;
     if (submitting) return;
     if (
-      composerValue.text.length === 0 &&
+      isEditorEmpty(composerValue.text) &&
       title.value.length === 0 &&
       slug.value.length === 0 &&
       metaTitle.value.length === 0 &&
@@ -491,16 +494,19 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     !submitting &&
     titleIsValid &&
     slugIsValid &&
-    composerValue.text.trim().length > 0 &&
+    !isEditorEmpty(composerValue.text) &&
     scheduleIsValid;
 
-  const canStartRun =
+  const canPublish =
     canSaveDraft &&
     metaTitleIsValid &&
     metaDescriptionIsValid &&
     featuredImage !== null;
 
-  // BL-8 — ⌘S / Ctrl+S triggers Save Draft.
+  // Legacy alias used by the secondary "Save to Opollo" hint text.
+  const canStartRun = canPublish;
+
+  // BL-8 — ⌘S / Ctrl+S triggers Save to Opollo (draft, always safe).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isCmdS =
@@ -517,7 +523,96 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [canSaveDraft, siteId]);
 
-  async function handleSaveDraft(e: FormEvent<HTMLFormElement>) {
+  async function buildCreateBody(forceAsDraft = false) {
+    const newTagNames = selectedTags
+      .filter((t) => t.isNew)
+      .map((t) => t.name);
+    const existingTagIds = selectedTags
+      .filter((t) => !t.isNew)
+      .map((t) => t.id);
+    const mode = forceAsDraft ? "draft" : publishMode;
+    return {
+      title: title.value.trim(),
+      slug: slug.value.trim(),
+      excerpt:
+        metaDescription.value.trim().length > 0
+          ? metaDescription.value.trim()
+          : null,
+      meta_title: metaTitle.value.trim() || null,
+      status: mode === "schedule" ? "scheduled" : "draft",
+      scheduled_at: mode === "schedule" ? scheduledAt : null,
+      wp_category_ids: selectedCategories.map((c) => c.id),
+      wp_tag_ids: existingTagIds,
+      ...(newTagNames.length > 0 ? { wp_new_tag_names: newTagNames } : {}),
+      metadata: lastParse ?? null,
+      featured_image_id: featuredImage?.id ?? null,
+      // For "Publish immediately": send composed content as generated_html.
+      ...(mode === "publish" && composerValue.text.trim().length > 0
+        ? { generated_html: composerValue.text }
+        : {}),
+    };
+  }
+
+  async function submitToOpollo(forceAsDraft = false): Promise<{ id: string; edit_url: string } | null> {
+    const body = await buildCreateBody(forceAsDraft);
+    const baseSlug = body.slug as string;
+    const MAX_ATTEMPTS = 5;
+
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const attemptSlug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt + 1}`;
+      const res = await fetch(`/api/sites/${siteId}/posts`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...body, slug: attemptSlug }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok: true; data: { id: string; edit_url: string } }
+        | { ok: false; error: { code: string; message: string } }
+        | null;
+
+      if (payload?.ok) {
+        if (attemptSlug !== baseSlug) {
+          setSlug({ value: attemptSlug, source: "derived", touched: true });
+        }
+        return payload.data;
+      }
+
+      const code = payload?.ok === false ? payload.error.code : "INTERNAL_ERROR";
+      if (code === "UNIQUE_VIOLATION" && attempt < MAX_ATTEMPTS - 1) continue;
+
+      const fallback =
+        payload?.ok === false
+          ? payload.error.message
+          : `Save failed (HTTP ${res.status}).`;
+      setFormError(ERROR_TRANSLATIONS[code] ?? fallback);
+      return null;
+    }
+
+    setFormError("Could not find a unique slug. Edit the URL slug and try again.");
+    return null;
+  }
+
+  async function handlePublishToWp(postId: string) {
+    const res = await fetch(`/api/sites/${siteId}/posts/${postId}/publish`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ expected_version_lock: 0 }),
+    });
+    const payload = (await res.json().catch(() => null)) as
+      | { ok: true; data: unknown }
+      | { ok: false; error: { code: string; message: string } }
+      | null;
+    if (!payload?.ok) {
+      const code = payload?.ok === false ? payload.error.code : "WP_API_ERROR";
+      const fallback =
+        payload?.ok === false
+          ? payload.error.message
+          : `Publish failed (HTTP ${res.status}). Post saved to Opollo.`;
+      setFormError(ERROR_TRANSLATIONS[code] ?? fallback);
+    }
+  }
+
+  async function handlePrimarySubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setFormError(null);
 
@@ -528,71 +623,73 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/sites/${siteId}/posts`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          title: title.value.trim(),
-          slug: slug.value.trim(),
-          excerpt:
-            metaDescription.value.trim().length > 0
-              ? metaDescription.value.trim()
-              : null,
-          meta_title: metaTitle.value.trim() || null,
-          status: publishMode === "schedule" ? "scheduled" : "draft",
-          scheduled_at: publishMode === "schedule" ? scheduledAt : null,
-          wp_category_ids: selectedCategories.map((c) => c.id),
-          wp_tag_ids: selectedTags.map((t) => t.id),
-          metadata: lastParse ?? null,
-          featured_image_id: featuredImage?.id ?? null,
-        }),
-      });
-      const payload = (await res.json().catch(() => null)) as
-        | { ok: true; data: { id: string; edit_url: string } }
-        | { ok: false; error: { code: string; message: string } }
-        | null;
-      if (payload?.ok) {
-        try {
-          window.localStorage.removeItem(draftStorageKey(siteId));
-        } catch {}
-        router.push(payload.data.edit_url);
-        return;
+      const postData = await submitToOpollo();
+      if (!postData) return;
+
+      if (publishMode === "publish") {
+        await handlePublishToWp(postData.id);
       }
-      const code =
-        payload?.ok === false ? payload.error.code : "INTERNAL_ERROR";
-      const fallback =
-        payload?.ok === false
-          ? payload.error.message
-          : `Save failed (HTTP ${res.status}).`;
-      setFormError(ERROR_TRANSLATIONS[code] ?? fallback);
+
+      try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
+      router.push(postData.edit_url);
     } catch (err) {
-      setFormError(
-        `Network error: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      setFormError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setSubmitting(false);
     }
   }
 
-  // Fix 8 — context-sensitive button labels.
-  const primaryLabel = publishMode === "schedule" ? "Schedule post" : "Save draft";
-  const secondaryLabel = publishMode === "schedule" ? "Schedule + run" : "Save + run";
+  async function handleSaveToOpollo(e: React.MouseEvent<HTMLButtonElement>) {
+    e.preventDefault();
+    setFormError(null);
+    if (!canSaveDraft) return;
+    setSubmitting(true);
+    try {
+      const postData = await submitToOpollo(true);
+      if (!postData) return;
+      try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
+      router.push(postData.edit_url);
+    } catch (err) {
+      setFormError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Fix 8 — context-sensitive primary button labels.
+  const primaryLabel =
+    publishMode === "publish"
+      ? "Publish to WordPress"
+      : publishMode === "schedule"
+        ? "Schedule Post"
+        : "Save as Draft";
+  const primaryDisabled = publishMode === "publish" ? !canPublish : !canSaveDraft;
 
   return (
     <form
       id={`blog-post-composer-form-${siteId}`}
-      onSubmit={handleSaveDraft}
+      onSubmit={handlePrimarySubmit}
       className="space-y-6"
     >
-      {/* Fix 7 — site indicator. */}
+      {/* Fix 5 — site indicator: shows WP hostname + Change link, or a warning if not connected. */}
+      {!siteLoading && !siteWpUrl && (
+        <Alert variant="destructive" className="flex items-start gap-2">
+          <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            No WordPress site connected — this post will be saved as a draft in Opollo only.{" "}
+            <a
+              href={`/admin/sites/${siteId}/settings`}
+              className="underline underline-offset-2 hover:text-inherit"
+            >
+              Connect a site
+            </a>
+          </span>
+        </Alert>
+      )}
       {siteWpUrl && (
         <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          <span>Posting to</span>
-          {siteName && (
-            <span className="font-medium text-foreground">{siteName}</span>
-          )}
-          {siteName && <span>·</span>}
-          <span className="font-mono">
+          <span>Publishing to:</span>
+          <span className="font-mono text-foreground">
             {(() => {
               try {
                 return new URL(siteWpUrl).hostname;
@@ -601,30 +698,52 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               }
             })()}
           </span>
+          <a
+            href={`/admin/sites/${siteId}/settings`}
+            className="ml-1 inline-flex items-center gap-0.5 text-xs underline underline-offset-2 hover:text-foreground"
+            title={`Change WordPress site (currently ${siteName ?? siteWpUrl})`}
+          >
+            Change
+            <ExternalLink aria-hidden className="h-3 w-3" />
+          </a>
         </div>
       )}
 
       <div>
         <div className="flex items-baseline justify-between gap-2">
+          <label className="block text-sm font-medium">Post content</label>
+          {/* File attach button — mirrors old Composer's + button */}
           <label
-            htmlFor="post-composer-input"
-            className="block text-sm font-medium"
+            htmlFor="post-file-attach"
+            className={cn(
+              "cursor-pointer text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline",
+              submitting && "pointer-events-none opacity-50",
+            )}
+            title="Attach Markdown, HTML, plain text, or Word (.docx). Max 10 MB."
           >
-            Post content
+            Attach file
+            <input
+              id="post-file-attach"
+              type="file"
+              accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="sr-only"
+              disabled={submitting}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) {
+                  setFileReadError(null);
+                  setComposerValue((prev) => ({ ...prev, file: f }));
+                }
+                e.target.value = "";
+              }}
+            />
           </label>
-          <ReadingChip text={composerValue.text} />
         </div>
-        <Composer
-          textareaId="post-composer-input"
-          value={composerValue}
-          onChange={(v) => {
-            setComposerValue(v);
-            if (!v.file) setFileReadError(null);
-          }}
-          accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-          maxFileBytes={10 * 1024 * 1024}
+        <RichTextEditor
+          value={composerValue.text}
+          onChange={(html) => setComposerValue((prev) => ({ ...prev, text: html }))}
           placeholder={`Type, paste, or drop your post.\n\nA YAML front-matter block, inline labels, or HTML meta tags will pre-fill the metadata fields below.`}
-          acceptHint="Markdown, HTML, plain text, or Word (.docx). Drag-drop, paste, or use + to attach. Max 10 MB."
+          disabled={submitting}
           className="mt-1"
         />
         {fileReadError && (
@@ -818,6 +937,18 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             <input
               type="radio"
               name={`publish-mode-${siteId}`}
+              value="publish"
+              checked={publishMode === "publish"}
+              onChange={() => setPublishMode("publish")}
+              disabled={submitting}
+              className="accent-primary"
+            />
+            Publish immediately
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name={`publish-mode-${siteId}`}
               value="draft"
               checked={publishMode === "draft"}
               onChange={() => setPublishMode("draft")}
@@ -859,79 +990,76 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         )}
       </div>
 
-      {/* AdvancedDisclosure — Fix 4: now contains only parent page + featured image. */}
+      {/* Fix 3 — Featured image outside AdvancedDisclosure for prominence. */}
+      <div className="rounded-md border p-4 text-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="font-medium">Featured image</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Required when publishing. Pick from your image library or upload a new one.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setPickerOpen(true)}
+            disabled={submitting}
+          >
+            {featuredImage ? "Change image" : "Pick image"}
+          </Button>
+        </div>
+        {featuredImage && featuredImage.delivery_url && (
+          <div className="mt-3 flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
+              alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
+              className="h-20 w-20 rounded-md border object-cover"
+            />
+            <div className="min-w-0">
+              <p
+                className="truncate text-sm font-medium"
+                title={featuredImage.caption ?? featuredImage.filename ?? ""}
+              >
+                {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setFeaturedImage(null)}
+                className="text-sm text-muted-foreground underline hover:text-foreground"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* AdvancedDisclosure — now contains only parent page. */}
       <AdvancedDisclosure
         open={showAdvanced}
         onToggle={() => setShowAdvanced((v) => !v)}
-        summary={summarizeAdvanced({ parentPage, featuredImage })}
+        summary={summarizeAdvanced({ parentPage })}
       >
-        <div className="space-y-4">
-          <div>
-            <label
-              htmlFor="post-parent-page"
-              className="block text-sm font-medium"
-            >
-              Parent page
-            </label>
-            <WpPageCombobox
-              siteId={siteId}
-              value={parentPage}
-              onChange={setParentPage}
-              disabled={submitting}
-              triggerId="post-parent-page"
-            />
-            <p className="mt-1 text-sm text-muted-foreground">
-              Where this post will live in the WP site tree (queries
-              <code className="ml-1 font-mono">/wp/v2/pages</code>).
-            </p>
-          </div>
-
-          <div className="rounded-md border p-4 text-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">Featured image</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Required at publish (enforced by BP-7&apos;s server-side
-                  guard). Selecting here previews; persistence + WP attachment
-                  ship in BP-7.
-                </p>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setPickerOpen(true)}
-                disabled={submitting}
-              >
-                {featuredImage ? "Change image" : "Pick image"}
-              </Button>
-            </div>
-            {featuredImage && featuredImage.delivery_url && (
-              <div className="mt-3 flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
-                  alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
-                  className="h-20 w-20 rounded-md border object-cover"
-                />
-                <div className="min-w-0">
-                  <p
-                    className="truncate text-sm font-medium"
-                    title={featuredImage.caption ?? featuredImage.filename ?? ""}
-                  >
-                    {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setFeaturedImage(null)}
-                    className="text-sm text-muted-foreground underline hover:text-foreground"
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
+        <div>
+          <label
+            htmlFor="post-parent-page"
+            className="block text-sm font-medium"
+          >
+            Parent page
+          </label>
+          <WpPageCombobox
+            siteId={siteId}
+            value={parentPage}
+            onChange={setParentPage}
+            disabled={submitting}
+            triggerId="post-parent-page"
+          />
+          <p className="mt-1 text-sm text-muted-foreground">
+            Where this post will live in the WP site tree (queries
+            <code className="ml-1 font-mono">/wp/v2/pages</code>).
+          </p>
         </div>
       </AdvancedDisclosure>
 
@@ -958,37 +1086,31 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             S
           </kbd>
         </span>
-        <Button type="submit" disabled={!canSaveDraft}>
-          {submitting ? "Saving…" : primaryLabel}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={!canSaveDraft || submitting}
+          onClick={handleSaveToOpollo}
+          title="Save to Opollo as a draft without publishing to WordPress."
+        >
+          {submitting ? "Saving…" : "Save to Opollo"}
         </Button>
         <Button
           type="submit"
-          disabled={!canStartRun}
+          disabled={primaryDisabled || submitting}
           title={
-            canStartRun
-              ? "Save the draft and continue to publish."
-              : "Fill in SEO title, meta description, and featured image first."
+            publishMode === "publish" && !canPublish
+              ? "Fill in SEO title, meta description, and featured image to publish."
+              : undefined
           }
         >
-          {submitting ? "Saving…" : secondaryLabel}
+          {submitting ? "Saving…" : primaryLabel}
         </Button>
       </div>
-      {!canStartRun && canSaveDraft && (
+      {publishMode === "publish" && !canPublish && canSaveDraft && (
         <p className="text-sm text-muted-foreground">
-          {secondaryLabel} needs SEO title, meta description, and featured image.
-          {featuredImage === null && (
-            <>
-              {" "}Open{" "}
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(true)}
-                className="font-medium text-foreground underline underline-offset-2 hover:text-primary"
-              >
-                More options
-              </button>{" "}
-              to pick a featured image.
-            </>
-          )}
+          &ldquo;Publish to WordPress&rdquo; needs SEO title, meta description, and featured image.
+          Use &ldquo;Save to Opollo&rdquo; to save a draft first.
         </p>
       )}
 
@@ -997,8 +1119,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         onClose={() => setPickerOpen(false)}
         onSelect={(image) => setFeaturedImage(image)}
         suggestionContext={
-          title.value.trim().length > 0 || composerValue.text.trim().length > 0
-            ? `${title.value} ${title.value} ${title.value} ${composerValue.text.slice(0, 400)}`.trim()
+          title.value.trim().length > 0 || !isEditorEmpty(composerValue.text)
+            ? `${title.value} ${title.value} ${title.value} ${composerValue.text.replace(/<[^>]+>/g, " ").slice(0, 400)}`.trim()
             : null
         }
       />
@@ -1053,23 +1175,8 @@ function PermalinkPreview({
 }
 
 // ---------------------------------------------------------------------------
-// BL-3 — Inline length / reading-time hints. Pure presentational.
+// BL-3 — Inline length hints. Pure presentational.
 // ---------------------------------------------------------------------------
-
-function ReadingChip({ text }: { text: string }) {
-  const words = wordCount(text);
-  if (words === 0) return null;
-  const minutes = readingMinutes(words);
-  return (
-    <span
-      data-testid="post-reading-chip"
-      className="opollo-fade-in text-sm text-muted-foreground"
-    >
-      {words.toLocaleString()} {words === 1 ? "word" : "words"} ·{" "}
-      {minutes} min read
-    </span>
-  );
-}
 
 function TitleLengthHint({
   length,
@@ -1149,18 +1256,8 @@ function MetaDescriptionLengthHint({ length }: { length: number }) {
 // Fix 4 — AdvancedDisclosure now wraps only parent page + featured image.
 // ---------------------------------------------------------------------------
 
-function summarizeAdvanced({
-  parentPage,
-  featuredImage,
-}: {
-  parentPage: WpPageOption | null;
-  featuredImage: ImagePickerEntry | null;
-}): string {
-  const filled: string[] = [];
-  if (parentPage) filled.push("parent page");
-  if (featuredImage) filled.push("featured image");
-  if (filled.length === 0) return "Parent page, featured image";
-  return filled.join(", ");
+function summarizeAdvanced({ parentPage }: { parentPage: WpPageOption | null }): string {
+  return parentPage ? `Parent: ${parentPage.title}` : "Parent page";
 }
 
 function AdvancedDisclosure({
@@ -1273,6 +1370,7 @@ function WpTaxonomyCombobox({
   disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState("");
   const [options, setOptions] = useState<WpTaxonomyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1317,9 +1415,31 @@ function WpTaxonomyCombobox({
 
   const selectedIds = useMemo(() => new Set(value.map((v) => v.id)), [value]);
   const label = type === "categories" ? "category" : "tag";
-  const placeholder = loading
-    ? `Loading ${type}…`
-    : `Pick ${type}…`;
+  const placeholder = loading ? `Loading ${type}…` : `Pick ${type}…`;
+
+  const canCreateNew =
+    type === "tags" &&
+    inputValue.trim().length > 0 &&
+    !options.some(
+      (o) => o.name.toLowerCase() === inputValue.trim().toLowerCase(),
+    ) &&
+    !value.some(
+      (v) => v.name.toLowerCase() === inputValue.trim().toLowerCase(),
+    );
+
+  function addNewTag() {
+    const name = inputValue.trim();
+    if (!name) return;
+    const newTag: WpTaxonomyOption = {
+      id: -Date.now(),
+      name,
+      slug: name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
+      count: 0,
+      isNew: true,
+    };
+    onChange([...value, newTag]);
+    setInputValue("");
+  }
 
   return (
     <Popover open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
@@ -1341,8 +1461,12 @@ function WpTaxonomyCombobox({
               ? value.map((v) => (
                   <span
                     key={v.id}
-                    className="inline-flex items-center gap-0.5 rounded bg-muted px-1.5 py-0.5 text-xs font-medium"
+                    className={cn(
+                      "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium",
+                      v.isNew ? "bg-primary/10 text-primary" : "bg-muted",
+                    )}
                   >
+                    {v.isNew && <span aria-hidden>+</span>}
                     {v.name}
                   </span>
                 ))
@@ -1360,15 +1484,39 @@ function WpTaxonomyCombobox({
         className="w-[var(--radix-popover-trigger-width)] max-h-60 overflow-y-auto p-0"
       >
         <Command shouldFilter={true}>
-          <CommandInput placeholder={`Search ${type}…`} />
+          <CommandInput
+            placeholder={type === "tags" ? `Search or create ${label}…` : `Search ${type}…`}
+            value={inputValue}
+            onValueChange={setInputValue}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && canCreateNew) {
+                e.preventDefault();
+                addNewTag();
+              }
+            }}
+          />
           <CommandList>
             {error && (
               <div role="alert" className="px-3 py-2 text-sm text-destructive">
                 {error}
               </div>
             )}
+            {canCreateNew && (
+              <CommandItem
+                value={`__new__${inputValue}`}
+                onSelect={addNewTag}
+                className="text-primary"
+              >
+                <span className="mr-2 text-primary">+</span>
+                Add tag &ldquo;{inputValue.trim()}&rdquo;
+              </CommandItem>
+            )}
             <CommandEmpty>
-              {loading ? "Loading…" : `No ${label}s found.`}
+              {loading
+                ? "Loading…"
+                : type === "tags"
+                  ? "Type a name to search or create a tag."
+                  : `No ${label}s found.`}
             </CommandEmpty>
             {options.map((option) => (
               <CommandItem

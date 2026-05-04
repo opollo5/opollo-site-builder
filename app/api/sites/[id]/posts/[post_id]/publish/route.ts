@@ -15,6 +15,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { getSite } from "@/lib/sites";
 import {
   wpCreatePost,
+  wpCreateTag,
   wpUpdatePost,
   type WpConfig,
 } from "@/lib/wordpress";
@@ -245,7 +246,63 @@ export async function POST(
     }
   }
 
-  // 4. Publish / re-publish via WP REST.
+  // 4. Resolve taxonomy IDs + create any new WP tags.
+  const metaObj =
+    post.metadata !== null &&
+    typeof post.metadata === "object" &&
+    !Array.isArray(post.metadata)
+      ? (post.metadata as Record<string, unknown>)
+      : {};
+
+  const wpCategoryIds = Array.isArray(metaObj.wp_category_ids)
+    ? (metaObj.wp_category_ids as number[])
+    : undefined;
+
+  const existingTagIds = Array.isArray(metaObj.wp_tag_ids)
+    ? (metaObj.wp_tag_ids as number[])
+    : [];
+
+  const newTagNames = Array.isArray(metaObj.wp_new_tag_names)
+    ? (metaObj.wp_new_tag_names as string[])
+    : [];
+
+  const createdTagIds: number[] = [];
+  for (const tagName of newTagNames) {
+    const tagResult = await wpCreateTag(cfg, tagName);
+    if (tagResult.ok) {
+      createdTagIds.push(tagResult.id);
+    } else {
+      logger.warn("posts.publish.wp_tag_create_failed", {
+        post_id: postIdCheck.value,
+        tag_name: tagName,
+        wp_code: tagResult.code,
+      });
+    }
+  }
+
+  const allTagIds =
+    existingTagIds.length > 0 || createdTagIds.length > 0
+      ? [...existingTagIds, ...createdTagIds]
+      : undefined;
+
+  // Build Yoast SEO meta payload.
+  const metaTitleOverride =
+    typeof metaObj.meta_title_override === "string" && metaObj.meta_title_override.trim()
+      ? metaObj.meta_title_override.trim()
+      : null;
+  const metaDescriptionValue =
+    typeof post.excerpt === "string" && post.excerpt.trim()
+      ? post.excerpt.trim()
+      : null;
+  const yoastMeta: Record<string, unknown> | undefined =
+    metaTitleOverride !== null || metaDescriptionValue !== null
+      ? {
+          ...(metaTitleOverride !== null ? { _yoast_wpseo_title: metaTitleOverride } : {}),
+          ...(metaDescriptionValue !== null ? { _yoast_wpseo_metadesc: metaDescriptionValue } : {}),
+        }
+      : undefined;
+
+  // 5. Publish / re-publish via WP REST.
   const excerptValue = post.excerpt ?? undefined;
   const featuredMediaPatch =
     featuredMediaId !== null ? { featured_media: featuredMediaId } : {};
@@ -255,6 +312,9 @@ export async function POST(
         slug: post.slug,
         content: post.generated_html,
         ...(excerptValue !== undefined ? { excerpt: excerptValue } : {}),
+        ...(wpCategoryIds !== undefined ? { categories: wpCategoryIds } : {}),
+        ...(allTagIds !== undefined ? { tags: allTagIds } : {}),
+        ...(yoastMeta !== undefined ? { meta: yoastMeta } : {}),
         ...featuredMediaPatch,
         status: "publish",
       })
@@ -263,6 +323,9 @@ export async function POST(
         slug: post.slug,
         content: post.generated_html,
         ...(excerptValue !== undefined ? { excerpt: excerptValue } : {}),
+        ...(wpCategoryIds !== undefined ? { categories: wpCategoryIds } : {}),
+        ...(allTagIds !== undefined ? { tags: allTagIds } : {}),
+        ...(yoastMeta !== undefined ? { meta: yoastMeta } : {}),
         ...featuredMediaPatch,
         status: "publish",
       });
@@ -289,7 +352,7 @@ export async function POST(
     );
   }
 
-  // 5. Write Opollo state under version_lock CAS. First-publish path
+  // 6. Write Opollo state under version_lock CAS. First-publish path
   //    sets wp_post_id; re-publish leaves it intact. Both refresh
   //    published_at.
   const nowIso = new Date().toISOString();
@@ -342,7 +405,7 @@ export async function POST(
     );
   }
 
-  // 6. Revalidate the admin surfaces so the published state renders.
+  // 7. Revalidate the admin surfaces so the published state renders.
   revalidatePath(`/admin/sites/${siteIdCheck.value}/posts`);
   revalidatePath(`/admin/sites/${siteIdCheck.value}/posts/${post.id}`);
   revalidatePath(`/admin/sites/${siteIdCheck.value}`);

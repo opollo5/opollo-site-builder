@@ -41,7 +41,29 @@ export async function getCurrentPlatformSession(
     .eq("id", userId)
     .maybeSingle();
 
-  if (profileResult.error || !profileResult.data) return null;
+  if (profileResult.error) return null;
+
+  // Auto-provision: design intent (types.ts) is that Opollo operators have BOTH
+  // an opollo_users row AND a platform_users row with is_opollo_staff=true.
+  // When the platform_users row is missing (e.g. operator never manually seeded),
+  // check opollo_users and create the missing row rather than redirecting to /login.
+  if (!profileResult.data) {
+    const opolloResult = await svc
+      .from("opollo_users")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (opolloResult.error || !opolloResult.data) return null;
+
+    // UPSERT is safe against concurrent first-access requests.
+    await svc
+      .from("platform_users")
+      .upsert({ id: userId, email, is_opollo_staff: true }, { onConflict: "id" });
+
+    // No company membership by default — staff must join a company from /admin/companies.
+    return { userId, email, isOpolloStaff: true, company: null };
+  }
 
   const membershipResult = await svc
     .from("platform_company_users")
