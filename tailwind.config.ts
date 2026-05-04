@@ -98,6 +98,14 @@ const config: Config = {
         d3: "var(--d3)",
         d4: "var(--d4)",
         "bg-base": "var(--bg)",
+        /* Opollo muted/border tokens — use as text-m2, bg-b1, border-b3, etc. */
+        m1: "var(--m1)",
+        m2: "var(--m2)",
+        m3: "var(--m3)",
+        m4: "var(--m4)",
+        b1: "var(--b1)",
+        b2: "var(--b2)",
+        b3: "var(--b3)",
       },
       borderRadius: {
         lg: "var(--radius)",

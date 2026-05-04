@@ -189,7 +189,7 @@ export function AdminSidebar({
             "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-d1",
             active
               ? "bg-[rgba(255,3,165,0.10)] text-white font-medium"
-              : "text-[rgba(255,255,255,0.58)] hover:bg-[rgba(0,229,160,0.06)] hover:text-gr",
+              : "text-m2 hover:bg-[rgba(0,229,160,0.06)] hover:text-gr",
           )}
         >
           <Icon
@@ -229,7 +229,7 @@ export function AdminSidebar({
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
           aria-controls="admin-sidebar"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(255,255,255,0.06)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           data-testid="admin-mobile-nav-button"
         >
           <Menu aria-hidden className="h-5 w-5" />
@@ -284,7 +284,7 @@ export function AdminSidebar({
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(255,255,255,0.06)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:hidden"
             >
               <X aria-hidden className="h-5 w-5" />
             </button>
@@ -295,7 +295,7 @@ export function AdminSidebar({
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               className={cn(
-                "hidden h-8 w-8 items-center justify-center rounded-md text-[rgba(255,255,255,0.40)] transition-smooth hover:bg-[rgba(255,255,255,0.06)] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
+                "hidden h-8 w-8 items-center justify-center rounded-md text-[rgba(255,255,255,0.40)] transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
                 collapsed && "mx-auto",
               )}
             >
@@ -340,7 +340,7 @@ export function AdminSidebar({
                   Command palette
                 </span>
                 <span
-                  className="flex items-center gap-0.5 text-sm text-[rgba(255,255,255,0.32)]"
+                  className="flex items-center gap-0.5 text-sm text-m3"
                   aria-hidden
                 >
                   <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
@@ -357,7 +357,7 @@ export function AdminSidebar({
                 href="/account/security"
                 title={collapsed ? "Account security" : undefined}
                 className={cn(
-                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActiveRoute("/account/security") &&
                     "bg-[rgba(255,3,165,0.10)] text-white font-medium",
                 )}
@@ -372,7 +372,7 @@ export function AdminSidebar({
                 href="/account/devices"
                 title={collapsed ? "Trusted devices" : undefined}
                 className={cn(
-                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActiveRoute("/account/devices") &&
                     "bg-[rgba(255,3,165,0.10)] text-white font-medium",
                 )}
@@ -385,7 +385,7 @@ export function AdminSidebar({
             <Link
               href="/"
               title={collapsed ? "Back to builder" : undefined}
-              className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-[rgba(255,255,255,0.58)] transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+              className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
               data-testid="nav-back-to-builder"
             >
               <Settings aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
@@ -406,7 +406,7 @@ export function AdminSidebar({
             )}
             {user && !collapsed && (
               <p
-                className="mt-2 truncate border-t border-white/[0.06] pt-2 px-2.5 text-xs text-[rgba(255,255,255,0.32)]"
+                className="mt-2 truncate border-t border-white/[0.06] pt-2 px-2.5 text-xs text-m3"
                 title={user.email}
               >
                 {user.email}
