@@ -161,7 +161,7 @@ export async function POST(
     );
   }
 
-  await svc.from("generation_events").insert({
+  const { error: evtErr } = await svc.from("generation_events").insert({
     job_id: jobId,
     event: "batch_cancelled",
     details: {
@@ -169,6 +169,9 @@ export async function POST(
       prior_status: existing.status,
     },
   });
+  if (evtErr) {
+    logger.error("admin.batch.cancel.event_insert_failed", { job_id: jobId, error: evtErr });
+  }
 
   return NextResponse.json(
     {

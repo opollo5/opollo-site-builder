@@ -185,7 +185,7 @@ export default function DesignSystemComponentsPage() {
           extraContent={
             orphanTemplates.length > 0 ? (
               <div
-                className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-900 dark:text-yellow-200"
+                className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
                 role="status"
               >
                 <p className="font-medium">
