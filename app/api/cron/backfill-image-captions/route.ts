@@ -64,6 +64,12 @@ async function fetchOriginalBytes(
 // EXIF extraction
 // ---------------------------------------------------------------------------
 
+// Only accept plain strings — IPTC record objects stringify to "[object Object]".
+function str(v: unknown, max: number): string | null {
+  if (typeof v === "string" && v.trim()) return v.trim().slice(0, max) || null;
+  return null;
+}
+
 type ExifResult = {
   caption: string | null;
   altText: string | null;
@@ -75,27 +81,23 @@ async function extractExif(bytes: Uint8Array): Promise<ExifResult> {
     const meta = await exifr.parse(Buffer.from(bytes), { iptc: true, exif: true, xmp: true });
     if (!meta) return { caption: null, altText: null, tags: [] };
 
-    const rawCaption =
-      (meta["Caption-Abstract"] as string | undefined) ??
-      (meta.description as string | undefined) ??
-      (meta.Headline as string | undefined) ??
-      null;
+    const caption =
+      str(meta["Caption-Abstract"], 150) ??
+      str(meta.description, 150) ??
+      str(meta.Headline, 150);
 
-    const rawAlt =
-      (meta.Headline as string | undefined) ??
-      (meta.ObjectName as string | undefined) ??
-      (meta.Title as string | undefined) ??
-      null;
+    const altText =
+      str(meta.Headline, 100) ??
+      str(meta.ObjectName, 100) ??
+      str(meta.Title, 100);
 
     const rawTags: unknown = (meta.Keywords as unknown) ?? (meta.Subject as unknown) ?? [];
     const tagsArr = Array.isArray(rawTags) ? rawTags : rawTags ? [rawTags] : [];
     const tags = tagsArr
-      .map((t: unknown) => String(t).trim().toLowerCase())
+      .filter((t): t is string => typeof t === "string")
+      .map((t) => t.trim().toLowerCase())
       .filter(Boolean)
       .slice(0, 12);
-
-    const caption = rawCaption ? String(rawCaption).trim().slice(0, 150) || null : null;
-    const altText = rawAlt ? String(rawAlt).trim().slice(0, 100) || null : null;
 
     return { caption, altText, tags };
   } catch {
@@ -126,7 +128,7 @@ export async function GET(req: NextRequest) {
     .from("image_library")
     .select("id, cloudflare_id, filename, tags")
     .is("deleted_at", null)
-    .or("caption.is.null,caption.eq.")
+    .or("caption.is.null,caption.eq.,caption.eq.[object Object]")
     .order("created_at", { ascending: true })
     .limit(BATCH_SIZE);
 
@@ -192,7 +194,7 @@ export async function GET(req: NextRequest) {
     .from("image_library")
     .select("id", { count: "exact", head: true })
     .is("deleted_at", null)
-    .or("caption.is.null,caption.eq.");
+    .or("caption.is.null,caption.eq.,caption.eq.[object Object]");
 
   logger.info("backfill.tick_complete", {
     processed: total,
