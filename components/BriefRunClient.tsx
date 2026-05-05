@@ -866,7 +866,7 @@ function VisualCritiqueBlock({ entry }: { entry: BriefPageCritiqueEntry }) {
           {critique.issues.map((issue, i) => (
             <li key={i} className="flex gap-2">
               <span
-                className={`inline-flex shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${
+                className={`inline-flex shrink-0 rounded px-1.5 py-0.5 text-xs font-medium uppercase ${
                   issue.severity === "high"
                     ? "bg-destructive/10 text-destructive"
                     : "bg-muted text-muted-foreground"

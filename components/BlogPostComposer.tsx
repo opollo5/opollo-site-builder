@@ -1166,7 +1166,7 @@ function PermalinkPreview({
   const preview = `${wpUrl}${path}`;
   return (
     <span
-      className="block truncate font-mono text-[11px] text-muted-foreground"
+      className="block truncate font-mono text-xs text-muted-foreground"
       title={preview}
     >
       {preview}

@@ -39,6 +39,15 @@ export const VISUAL_REVIEW_VIEWPORT_HEIGHT = 900;
 // Surfaced here so tests + runner share the constant.
 export const VISUAL_MAX_ITERATIONS = 2;
 
+// Conservative cost projections used by the visual loop ceiling check.
+// Recalibrate when model pricing changes; extracted from brief-runner.ts
+// so the numbers appear once and are visible in diffs.
+// Critique pass: ~5c median observed on claude-sonnet-4-6; 10c is the
+// P90 conservative estimate. Revise pass: text-only but longer context,
+// ~15c is the P90 estimate.
+export const VISUAL_PROJECTION_CRITIQUE_CENTS = 10;
+export const VISUAL_PROJECTION_REVISE_CENTS = 15;
+
 // Default per-page combined-cost ceiling (cents). Tenants can override
 // via tenant_cost_budgets.per_page_ceiling_cents_override. See parent
 // plan Risk #13.

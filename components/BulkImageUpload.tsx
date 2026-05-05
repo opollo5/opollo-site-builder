@@ -394,7 +394,7 @@ function StateBadge({ state }: { state: FileState }) {
   };
   return (
     <span
-      className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${palette[state]}`}
+      className={`inline-flex items-center rounded px-1.5 py-0.5 text-xs uppercase tracking-wide ${palette[state]}`}
     >
       {state}
     </span>

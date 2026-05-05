@@ -681,7 +681,7 @@ function BulkCandidateCard({
 function CandidateStatusBadge({ candidate }: { candidate: BulkCandidate }) {
   if (candidate.rejected) {
     return (
-      <span className="rounded bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+      <span className="rounded bg-muted px-2 py-0.5 text-xs uppercase tracking-wide text-muted-foreground">
         Rejected
       </span>
     );
@@ -689,7 +689,7 @@ function CandidateStatusBadge({ candidate }: { candidate: BulkCandidate }) {
   switch (candidate.status) {
     case "saving":
       return (
-        <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+        <span className="inline-flex items-center gap-1 rounded bg-muted px-2 py-0.5 text-xs uppercase tracking-wide text-muted-foreground">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-foreground/50" />
           Saving
         </span>
@@ -703,7 +703,7 @@ function CandidateStatusBadge({ candidate }: { candidate: BulkCandidate }) {
           // BL-9 — pop-in lands the saved state with a small bounce
           // so the operator's eye registers the success without
           // needing to read the badge.
-          className="opollo-pop-in rounded border border-success/40 bg-success/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-success transition-smooth hover:bg-success/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="opollo-pop-in rounded border border-success/40 bg-success/10 px-2 py-0.5 text-xs uppercase tracking-wide text-success transition-smooth hover:bg-success/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           data-testid="bulk-candidate-saved-link"
         >
           Saved · open
@@ -711,7 +711,7 @@ function CandidateStatusBadge({ candidate }: { candidate: BulkCandidate }) {
       );
     case "failed":
       return (
-        <span className="rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-destructive">
+        <span className="rounded border border-destructive/40 bg-destructive/10 px-2 py-0.5 text-xs uppercase tracking-wide text-destructive">
           Failed
         </span>
       );

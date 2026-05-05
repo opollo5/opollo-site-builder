@@ -105,7 +105,7 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
                         {row.target_email as string}
                       </td>
                       <td className="px-3 py-2 text-sm text-muted-foreground">
-                        <code className="font-mono text-[11px]">
+                        <code className="font-mono text-xs">
                           {JSON.stringify(row.metadata ?? {}, null, 0)}
                         </code>
                       </td>

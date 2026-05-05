@@ -40,6 +40,8 @@ import {
 } from "@/lib/tenant-budgets";
 import {
   VISUAL_MAX_ITERATIONS,
+  VISUAL_PROJECTION_CRITIQUE_CENTS,
+  VISUAL_PROJECTION_REVISE_CENTS,
   defaultVisualRender,
   hasSeverityHighIssues,
   resolvePerPageCeilingCents,
@@ -2504,7 +2506,7 @@ async function runVisualReviewLoop(
     // Per-iteration cost projection. Conservative — assume the next
     // critique costs the median observed, ~5c on sonnet-4-6. If we're
     // about to exceed the ceiling, set quality_flag and bail.
-    const projectedIterationCostCents = 10;
+    const projectedIterationCostCents = VISUAL_PROJECTION_CRITIQUE_CENTS;
     if (
       wouldExceedPageCeiling({
         currentPageCostCents: page.page_cost_cents,
@@ -2625,7 +2627,7 @@ async function runVisualReviewLoop(
     }
     // Ceiling check on the revise too — the revise is a text pass,
     // conservatively assume ~15c on sonnet-4-6.
-    const projectedRevCostCents = 15;
+    const projectedRevCostCents = VISUAL_PROJECTION_REVISE_CENTS;
     if (
       wouldExceedPageCeiling({
         currentPageCostCents: page.page_cost_cents,

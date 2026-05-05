@@ -5,6 +5,7 @@ import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { dispatch } from "@/lib/platform/notifications";
 import { recordApprovalDecision } from "@/lib/platform/social/approvals";
+import { checkRateLimit, getClientIp, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,9 @@ export async function POST(
   if (!TOKEN_RE.test(token)) {
     return errorJson("NOT_FOUND", "This approval link is invalid.", 404);
   }
+
+  const rl = await checkRateLimit("approval_decision", `ip:${getClientIp(req)}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const body = await readJsonBody(req);
   if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);

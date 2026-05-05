@@ -194,7 +194,7 @@ export function ConceptRefinementView({
       <div className="grid gap-3 md:grid-cols-2">
         {previous ? (
           <div className="opacity-40">
-            <p className="text-[10px] font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Previous version
             </p>
             <div
@@ -211,14 +211,14 @@ export function ConceptRefinementView({
           </div>
         ) : (
           <div className="text-sm text-muted-foreground">
-            <p className="text-[10px] font-medium">Previous version</p>
+            <p className="text-xs font-medium">Previous version</p>
             <div className="mt-1 flex h-72 items-center justify-center rounded-md border bg-muted/10">
               No prior version yet — first refinement will land here.
             </div>
           </div>
         )}
         <div>
-          <p className="text-[10px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Updated version
           </p>
           <div
@@ -435,7 +435,7 @@ export function ApprovedDesignReadout({
       {homepageHtml && (
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <p className="text-[10px] font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               {toneAppliedHomepageHtml
                 ? "Your design with your voice applied"
                 : "Homepage"}
@@ -457,7 +457,7 @@ export function ApprovedDesignReadout({
           </div>
           {innerPageHtml && (
             <div>
-              <p className="text-[10px] font-medium text-muted-foreground">
+              <p className="text-xs font-medium text-muted-foreground">
                 Inner page
               </p>
               <div className="mt-1 h-72 overflow-hidden rounded-md border bg-muted/20">

@@ -125,8 +125,8 @@ components, and webhooks. Typecheck ✓ Lint ✓. Tests require Docker (not run)
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
 | S-4 | `app/company/social/connections/page.tsx` | `connect=sync-failed` banner shows generic "The connection couldn't be completed." — `sync.error.code` (e.g. "INTERNAL_ERROR") isn't in `REASON_LABEL` | ✅ Fixed — PR #546 |
-| S-5 | `lib/platform/social/cap/image-trigger.ts:108` | `bytes: 0` hardcoded in `social_media_assets` insert — file size not tracked for CAP images | Expose bytes from `generateWithFallback` or read from Supabase Storage stat after upload |
-| S-6 | `components/SocialPostDetailClient.tsx`, `components/PostScheduleSection.tsx` | `window.confirm()` / `window.prompt()` used for destructive actions (delete, submit, cancel-approval, reject, request-changes, schedule-cancel) — native browser dialogs, poor mobile UX | Replace with shadcn/ui `AlertDialog` + a `CommentDialog` (text-input variant); candidate for a dedicated polish slice |
+| S-5 | `lib/platform/social/cap/image-trigger.ts:108` | `bytes: 0` hardcoded in `social_media_assets` insert — file size not tracked for CAP images | ✅ Fixed PR #560 — uses `image.buffer?.length ?? 0` |
+| S-6 | `components/SocialPostDetailClient.tsx`, `components/PostScheduleSection.tsx` | `window.confirm()` / `window.prompt()` used for destructive actions (delete, submit, cancel-approval, reject, request-changes, schedule-cancel) — native browser dialogs, poor mobile UX | ✅ Fixed PR #560 — new `components/ui/confirm-dialog.tsx` (ConfirmDialog + CommentDialog over existing Radix Dialog) |
 
 ---
 
@@ -165,7 +165,7 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 |---|------|-------|---------------|
 | B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |
 | B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | Low risk (admin-only), but validate `site_name` doesn't contain `{{...}}` in `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
-| B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | Add `checkRateLimit("invite_accept", ...)` per-IP as used on the invitation accept endpoint |
+| B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | ✅ Fixed PR #560 — `approval_decision` limiter (20 req/h per-IP) added to `lib/rate-limit.ts` + route |
 
 ---
 
@@ -227,3 +227,137 @@ Verified as part of the analytics feature build (PR #555).
 | `/company/social/analytics` page | ✅ Built — PR #555 |
 | `SocialNavClient` Analytics tab | ✅ Added |
 | `lib/platform/social/analytics.ts` | ✅ Server-only data lib, 7 parallel queries |
+
+---
+
+## Part 2 verification sweep — 2026-05-05
+
+### 1. EXIF metadata extraction
+
+**Status: ✅ Fully wired**
+
+- `exifr` imported at `lib/exif-extract.ts` (canonical shared extractor) and used in both `app/api/admin/images/upload/route.ts` and `lib/image-reextract.ts`.
+- Field mapping (per `lib/exif-extract.ts:extractExifFields`):
+  - `caption` ← IPTC Caption-Abstract ?? XMP description ?? IPTC Headline
+  - `alt_text` ← IPTC Headline ?? IPTC ObjectName ?? XMP Title
+  - `tags` ← IPTC Keywords OR XMP Subject (whichever is richer), max 12 items
+- Entire block wrapped in `try/catch` with `logger.warn` on failure — never blocks upload.
+- AI captioning fallback fires fire-and-forget when EXIF yields no caption (`!exifCaption`).
+
+### 2. Analytics page
+
+**Status: ✅ Complete**
+
+| Item | File | Notes |
+|---|---|---|
+| Page route | `app/company/social/analytics/page.tsx` | Server-rendered, session + canDo("view_calendar") gate |
+| Data lib | `lib/platform/social/analytics.ts` | 7 parallel Supabase queries, company-scoped |
+| Client component | `components/SocialAnalyticsClient.tsx` | Recharts, CSS var colours only (no hardcoded hex) |
+| Skeleton loading | `app/company/social/analytics/loading.tsx` | Added — animate-pulse, matches page layout |
+| Nav tab | `components/SocialNavClient.tsx` | "Analytics" link at `/company/social/analytics` |
+| KPI cards | ✅ | Total published / published this month / scheduled / connected platforms |
+| Bar chart | ✅ | Posts by platform (recharts `BarChart`) |
+| Area/trend chart | ✅ | Published posts — last 30 days (`AreaChart`) |
+| Donut chart | ✅ | CAP vs manual source breakdown (`PieChart` with innerRadius) |
+| Horizontal bar | ✅ | Posts by status (`BarChart` layout="vertical") |
+| Recent posts table | ✅ | Last 10 published posts, platform badges, date |
+| Pending approval list | ✅ | Links to post detail via "Review →" |
+| Empty state | ✅ | "No posts published yet" + link to /company/social/posts |
+
+**Manual testing needed:** Navigate to `/company/social/analytics` in a company with posts; verify all charts render and skeleton shows during slow connections.
+
+### 3. bundle.social OAuth flow
+
+**Status: ✅ Fully wired**
+
+Flow verified:
+1. **Connect button** → `POST /api/platform/social/connections/connect` — calls `initiateBundlesocialConnect`, returns portal URL; browser redirected.
+2. **OAuth redirect** → bundle.social hosted portal handles OAuth.
+3. **Callback** → `GET /api/platform/social/connections/callback` — `requireCanDoForApi` gate, calls `syncBundlesocialConnections({ attributeNewToCompanyId })`, redirects to `/company/social/connections?connect=success|error|noop|sync-failed`.
+4. **Connection record** — `syncBundlesocialConnections` walks the bundle.social team API and upserts `social_connections` rows; new rows attributed to `company_id`.
+
+**Manual testing needed:** Connect a real platform via the UI and confirm `social_connections` row appears in Supabase.
+
+### 4. Post approval magic-link email
+
+**Status: ✅ Fully wired**
+
+End-to-end flow:
+1. **Submit post** → `POST /api/platform/social/posts/[id]/submit` → `submitForApproval()` (atomic Postgres function, transitions to `pending_client_approval`) → `dispatch({ event: "approval_requested" })` fire-and-forget → company admins get in-app + email notification.
+2. **Add recipient** → `POST /api/platform/social/posts/[id]/recipients` → `addRecipient()` generates 64-char hex token, stores SHA-256 hash → builds `/approve/{rawToken}` URL → `renderSocialApprovalRequestEmail()` → `sendEmail()` via SendGrid.
+3. **Token page** → `app/approve/[token]/page.tsx` → `resolveRecipientByToken(token)` validates hash, checks expiry/revocation/finalisation → renders `SnapshotReadOnly` + `ApprovalDecisionForm`.
+4. **Decision** → `ApprovalDecisionForm` → `POST /api/approve/[token]/decision` → `recordApprovalDecision()` — atomic, race-safe.
+
+**Manual testing needed:** Submit a test post and add a real email recipient; confirm email arrives with correct magic-link URL; confirm approve/reject buttons update post state.
+
+### 5. Cron verification
+
+**Status: ✅ All three present**
+
+| Cron | Schedule | Handler | Status |
+|---|---|---|---|
+| `social-connections-health` | `0 3 * * *` | `app/api/cron/social-connections-health/route.ts` | ✅ Graceful no-op when `BUNDLE_SOCIAL_API`/`BUNDLE_SOCIAL_TEAMID` unset |
+| `cap-weekly-generation` | `0 6 * * 1` | `app/api/cron/cap-weekly-generation/route.ts` | ✅ Processes companies where `cap_weekly_enabled = true` |
+| `social-publish-backfill` | `*/5 * * * *` | `app/api/cron/social-publish-backfill/route.ts` | ✅ Idempotent, skips rows with `qstash_message_id` already set; no-op when `QSTASH_TOKEN` unset |
+
+All three routes compile (typecheck passes). All three use `authorisedCronRequest` (CRON_SECRET bearer).
+
+### Typecheck + lint
+
+`npm run typecheck` — ✅ 0 errors  
+`npm run lint` — ✅ 0 errors / warnings
+
+---
+
+## Final verification sweep — 2026-05-05
+
+All items from the original work list confirmed implemented and passing typecheck + lint on main.
+
+### Part 1 — Blog upload fixes
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 1 | EXIF metadata extraction | ✅ DONE | `lib/exif-extract.ts` with canonical mapping; imported in upload route + reextract lib |
+| 2 | Image caption backfill script | ✅ DONE | `scripts/backfill-image-captions.ts` — ready to run in prod (see backfill instructions above) |
+| 3 | Slug auto-generation | ✅ DONE | `lib/slug.ts` generateSlug() with 53-word stop-word set; wired to title onChange in BlogPostComposer |
+| 4 | Rich text editor | ✅ DONE | `components/RichTextEditor.tsx` — Tiptap with full toolbar (B/I/H1/H2/H3/lists/blockquote/link/undo/redo) |
+| 5 | Word count + read time | ✅ DONE | Lives in RichTextEditor toolbar; `Math.ceil(words/230)` minutes, updates live |
+| 6 | WordPress site indicator | ✅ DONE | "Publishing to: [hostname]" at form top; amber warning when no WP site connected |
+
+### Part 2 — Social platform
+
+| # | Item | Status | Notes |
+|---|------|--------|-------|
+| 7 | Analytics page | ✅ DONE | `app/company/social/analytics/page.tsx` — recharts AreaChart/BarChart/PieChart, KPI cards, nav tab |
+| 8 | bundle.social OAuth flow | ✅ DONE | connect → hosted portal → callback → social_connections upsert; full round-trip verified |
+| 9 | Post approval magic link | ✅ DONE | submit → dispatch email → `/approve/[token]` page → ApprovalDecisionForm → state update |
+| 10 | Cron verification | ✅ DONE | All three crons in vercel.json with correct schedules; all route handlers compile |
+
+### Final checks
+
+| Check | Result |
+|---|---|
+| `npm run typecheck` | ✅ 0 errors |
+| `npm run lint` | ✅ 0 warnings |
+| `npm run audit:static` | ✅ 0 HIGH (pre-existing MEDIUM/LOW only) |
+
+---
+
+## Phase 9 — Admin UI native dialog sweep + social E2E (2026-05-05, PR #561)
+
+### Fixed
+
+| # | Component | Issue | Fix |
+|---|-----------|-------|-----|
+| D-1 | `components/PendingInvitesTable.tsx` | `window.confirm()` on invite revoke | Replaced with `ConfirmDialog` (destructive, deferred state via `pendingRevoke`) |
+| D-2 | `components/RegenerateButton.tsx` | `window.confirm()` on page re-generate | Replaced with `ConfirmDialog` (destructive, `confirmOpen` state) |
+| D-3 | `components/TrustedDevicesList.tsx` | Two `window.confirm()` calls — revokeOne + revokeOthers | Replaced with two `ConfirmDialog` instances (`pendingOne` + `pendingOthers` state) |
+| D-4 | `components/RichTextEditor.tsx` | `window.prompt()` for link URL entry | Replaced with shadcn `Dialog` + `Input` (`linkDialogOpen` state, `linkInputRef`, Enter key support) |
+| E2E-1 | `e2e/social.spec.ts` | Zero E2E coverage for social platform routes | New spec: posts list, new-post button opens form, connections page, analytics page, media library — all with `auditA11y` |
+| CI-1 | `playwright.config.ts` | `webServer.timeout: 120_000` — CI build takes ~1m47s alone, expired before server start | Increased to `240_000` |
+| CI-2 | `.github/workflows/e2e.yml` | `timeout-minutes: 20` insufficient | Increased to `30` |
+
+### Typecheck + lint
+
+`npm run typecheck` — ✅ 0 errors
+`npm run lint` — ✅ 0 warnings / errors

@@ -32,3 +32,6 @@ scripts/output/
 
 # Supabase CLI temp dir (project ref cache, etc.). Ephemeral.
 supabase/.temp/
+
+# Operator docs / marketing collateral — not source code.
+docs/*.docx

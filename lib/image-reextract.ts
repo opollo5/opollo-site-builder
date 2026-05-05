@@ -1,6 +1,5 @@
-import { parse as parseExif } from "exifr";
-
 import { deliveryUrl } from "@/lib/cloudflare-images";
+import { extractExifFields } from "@/lib/exif-extract";
 import {
   parseIstockIdFromFilename,
   readImageDimensions,
@@ -180,47 +179,18 @@ export async function reextractImageMetadata(
     notes.push("Image has no cloudflare_id; cannot probe.");
   }
 
-  // EXIF/IPTC extraction for caption, alt_text, tags. Pull from the
-  // same header bytes already fetched. Falls back to Anthropic vision
-  // if no EXIF (deferred — vision pass is a future slice). Never fails
-  // the re-extract call.
+  // EXIF/IPTC extraction for caption, alt_text, tags.
   if (row.cloudflare_id) {
     try {
       const deliveryUrlForExif = deliveryUrl(row.cloudflare_id, "public");
       if (deliveryUrlForExif) {
         const { bytes: headerBytes } = await fetchHeaderBytes(deliveryUrlForExif);
-        const exif = await parseExif(headerBytes.buffer as ArrayBuffer, {
-          tiff: true,
-          xmp: true,
-          iptc: true,
-          icc: false,
-          reviveValues: true,
-        }) as Record<string, unknown> | undefined;
-        if (exif) {
-          const cap =
-            (exif.ImageDescription as string | undefined) ??
-            (exif.Caption as string | undefined) ??
-            (exif.Headline as string | undefined) ??
-            null;
-          const exifCaption = cap?.trim() || null;
-          const alt =
-            (exif.AltTextAccessibility as string | undefined) ??
-            (exif.AltText as string | undefined) ??
-            null;
-          const exifAltText = alt?.trim() || null;
-          let exifTags: string[] = [];
-          const kw = exif.Keywords;
-          if (typeof kw === "string" && kw.trim()) {
-            exifTags = kw.split(/[,;]/).map((s) => s.trim()).filter(Boolean);
-          } else if (Array.isArray(kw)) {
-            exifTags = (kw as string[]).map((s) => String(s).trim()).filter(Boolean);
-          }
-
-          // Upsert image_library fields if EXIF has data the row lacks.
+        const exifFields = await extractExifFields(headerBytes.buffer as ArrayBuffer);
+        if (exifFields) {
           const exifUpdate: Record<string, unknown> = {};
-          if (exifCaption && !row.source_ref) exifUpdate.caption = exifCaption;
-          if (exifAltText) exifUpdate.alt_text = exifAltText;
-          if (exifTags.length > 0) exifUpdate.tags = exifTags;
+          if (exifFields.caption && !row.source_ref) exifUpdate.caption = exifFields.caption;
+          if (exifFields.alt_text) exifUpdate.alt_text = exifFields.alt_text;
+          if (exifFields.tags.length > 0) exifUpdate.tags = exifFields.tags;
 
           if (Object.keys(exifUpdate).length > 0) {
             exifUpdate.updated_at = now();
@@ -237,13 +207,13 @@ export async function reextractImageMetadata(
           if (existing.data) {
             await supabase
               .from("image_metadata")
-              .update({ value_jsonb: exif, updated_at: now() })
+              .update({ value_jsonb: exifFields.raw, updated_at: now() })
               .eq("image_id", row.id)
               .eq("key", "exif_raw");
           } else {
             await supabase
               .from("image_metadata")
-              .insert({ image_id: row.id, key: "exif_raw", value_jsonb: exif });
+              .insert({ image_id: row.id, key: "exif_raw", value_jsonb: exifFields.raw });
           }
           exifMetadataUpdated = true;
         } else {

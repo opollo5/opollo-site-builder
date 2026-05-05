@@ -163,7 +163,7 @@ function ConceptCard({
         ))}
       </div>
 
-      <p className="mt-2 text-[10px] text-muted-foreground">
+      <p className="mt-2 text-xs text-muted-foreground">
         Heading:{" "}
         <span
           className="text-foreground"
@@ -188,7 +188,7 @@ function ConceptCard({
             type="button"
             onClick={() => setView("desktop")}
             className={[
-              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px]",
+              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs",
               view === "desktop"
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground",
@@ -203,7 +203,7 @@ function ConceptCard({
             type="button"
             onClick={() => setView("mobile")}
             className={[
-              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px]",
+              "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-xs",
               view === "mobile"
                 ? "bg-foreground text-background"
                 : "text-muted-foreground hover:text-foreground",
@@ -218,7 +218,7 @@ function ConceptCard({
         <button
           type="button"
           onClick={() => setPage(page === "homepage" ? "inner" : "homepage")}
-          className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
+          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
           data-testid={`concept-toggle-page-${concept.direction}`}
         >
           {page === "homepage" ? "View inner page →" : "← View homepage"}
@@ -257,11 +257,11 @@ function ConceptCard({
 function MicroUiPreview({ micro }: { micro: ConceptResult["micro_ui"] }) {
   return (
     <div className="mt-3 rounded-md border bg-muted/10 p-2">
-      <p className="mb-1 text-[10px] font-medium text-muted-foreground">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">
         Micro UI
       </p>
       <div
-        className="grid gap-1.5 text-[10px] text-foreground [&_*]:!max-w-full [&_*]:!box-border"
+        className="grid gap-1.5 text-xs text-foreground [&_*]:!max-w-full [&_*]:!box-border"
         data-testid="concept-micro-ui"
       >
         <div
@@ -299,7 +299,7 @@ function BeforeAfterPanel({
       </p>
       <div className="mt-3 grid gap-4 md:grid-cols-2">
         <div>
-          <p className="text-[10px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Your reference
           </p>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -312,7 +312,7 @@ function BeforeAfterPanel({
           />
         </div>
         <div>
-          <p className="text-[10px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Our interpretation
           </p>
           <div

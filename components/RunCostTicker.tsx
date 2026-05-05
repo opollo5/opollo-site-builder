@@ -165,11 +165,11 @@ export function RunCostTicker({
               <dt className="text-muted-foreground">Pages</dt>
               <dd className="text-right">{pages.length}</dd>
               <dt className="text-muted-foreground">Text model</dt>
-              <dd className="text-right break-all font-mono text-[10px]">
+              <dd className="text-right break-all font-mono text-xs">
                 {textModel ?? "—"}
               </dd>
               <dt className="text-muted-foreground">Visual model</dt>
-              <dd className="text-right break-all font-mono text-[10px]">
+              <dd className="text-right break-all font-mono text-xs">
                 {visualModel ?? "—"}
               </dd>
             </dl>
