@@ -621,7 +621,7 @@ function DesignDirectionDetails({
                 style={{ background: s.v }}
                 aria-hidden
               />
-              <span className="font-mono text-[10px] uppercase">{s.k}</span>
+              <span className="font-mono text-xs uppercase">{s.k}</span>
             </span>
           ))}
         </div>

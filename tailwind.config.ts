@@ -17,10 +17,10 @@ const config: Config = {
     },
     extend: {
       fontSize: {
-        // text-xs and text-sm both produce 15px — intentional minimum
-        'xs':   ['0.9375rem', { lineHeight: '1.5' }],   // 15px
-        'sm':   ['0.9375rem', { lineHeight: '1.5' }],   // 15px
-        'base': ['1rem',      { lineHeight: '1.5' }],   // 16px
+        // 16px is the absolute minimum for all operator-facing text
+        'xs':   ['1rem', { lineHeight: '1.5' }],   // 16px — minimum
+        'sm':   ['1rem', { lineHeight: '1.5' }],   // 16px — minimum
+        'base': ['1rem', { lineHeight: '1.5' }],   // 16px — standard body
         'lg':   ['1.125rem',  { lineHeight: '1.75rem' }],
         'xl':   ['1.25rem',   { lineHeight: '1.75rem' }],
         '2xl':  ['1.5rem',    { lineHeight: '2rem' }],
@@ -106,6 +106,7 @@ const config: Config = {
         b1: "var(--b1)",
         b2: "var(--b2)",
         b3: "var(--b3)",
+        "icon-dim": "var(--icon-dim)",
       },
       borderRadius: {
         lg: "var(--radius)",
