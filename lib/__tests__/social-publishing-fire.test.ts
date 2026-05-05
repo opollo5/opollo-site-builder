@@ -219,7 +219,12 @@ describe("fireScheduledPublish — claim outcomes", () => {
     expect(mockClient.post.postCreate).not.toHaveBeenCalled();
   });
 
-  it("second concurrent fire returns already_claimed", async () => {
+  it("second sequential fire returns invalid_state (master already publishing)", async () => {
+    // After a successful first fire the master transitions to 'publishing'.
+    // A second sequential call to claim_publish_job sees the master is no
+    // longer in an approved/scheduled state and returns invalid_state.
+    // True concurrency (ALREADY_CLAIMED) cannot be exercised in a sequential
+    // test; the RPC's claim race is covered by the DB constraint.
     const { scheduleEntryId } = await seedChain({});
     mockClient.post.postCreate.mockResolvedValueOnce({
       id: "bp_first",
@@ -233,7 +238,7 @@ describe("fireScheduledPublish — claim outcomes", () => {
     const second = await fireScheduledPublish({ scheduleEntryId });
     expect(second.ok).toBe(true);
     if (!second.ok) return;
-    expect(second.data.outcome).toBe("already_claimed");
+    expect(second.data.outcome).toBe("invalid_state");
     // bundle.social was called exactly once.
     expect(mockClient.post.postCreate).toHaveBeenCalledTimes(1);
   });

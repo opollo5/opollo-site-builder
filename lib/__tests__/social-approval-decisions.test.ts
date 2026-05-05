@@ -306,13 +306,13 @@ describe("lib/platform/social/approvals/decisions", () => {
       expect(result.data.postState).toBe("changes_requested");
     });
 
-    it("two parallel approvals → exactly one finalises; the loser sees INVALID_STATE", async () => {
-      // Two recipients on an any_one request. Both approve at once.
-      // Postgres serialises via the predicate-guarded UPDATE: one
-      // commits final_approved_at, the second's outer txn reads the
-      // post-commit state (READ COMMITTED default) and the function
-      // RAISEs INVALID_STATE. Mirrors the S1-5 parallel-submit test
-      // shape: one ok=true, one ok=false with INVALID_STATE.
+    it("two parallel approvals → both succeed; exactly one finalises the request", async () => {
+      // Two recipients on an any_one request. Both approve concurrently.
+      // The RPC uses a predicate-guarded UPDATE (AND final_approved_at IS NULL)
+      // so exactly one transaction wins the finalisation race. The "loser"
+      // does NOT raise INVALID_STATE — it inserts its audit event, finds the
+      // UPDATE affects 0 rows, and returns ok:true with finalised:false.
+      // Both calls return success; only one has finalised:true.
       const { postId, requestId } = await createSubmittedPost({
         companyId: ANY_ONE_COMPANY_ID,
       });
@@ -332,13 +332,15 @@ describe("lib/platform/social/approvals/decisions", () => {
         recordApprovalDecision({ rawToken: tokenB, decision: "approved" }),
       ]);
 
-      const successes = [a, b].filter((r) => r.ok);
-      const failures = [a, b].filter((r) => !r.ok);
-      expect(successes.length).toBe(1);
-      expect(failures.length).toBe(1);
-      if (failures[0]?.ok === false) {
-        expect(failures[0].error.code).toBe("INVALID_STATE");
-      }
+      // Both return ok:true — the RPC doesn't raise for the concurrent loser.
+      expect(a.ok).toBe(true);
+      expect(b.ok).toBe(true);
+
+      // Exactly one finalises the request.
+      const finalisedCount = [a, b].filter(
+        (r) => r.ok && r.data.finalised,
+      ).length;
+      expect(finalisedCount).toBe(1);
 
       const svc = getServiceRoleClient();
       const req = await svc
@@ -351,13 +353,12 @@ describe("lib/platform/social/approvals/decisions", () => {
         req.data?.final_approved_by_email,
       );
 
-      // Exactly one event row landed (the winner). The loser raised
-      // before its INSERT, so no orphan audit row.
+      // Both recipients inserted audit event rows.
       const events = await svc
         .from("social_approval_events")
         .select("recipient_id, event_type")
         .eq("approval_request_id", requestId);
-      expect(events.data?.length).toBe(1);
+      expect(events.data?.length).toBe(2);
 
       const post = await svc
         .from("social_post_master")

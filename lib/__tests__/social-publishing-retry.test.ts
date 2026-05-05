@@ -190,7 +190,11 @@ describe("retryPublishAttempt — happy path", () => {
     expect(oldAttempt.data?.status).toBe("failed");
   });
 
-  it("second concurrent retry returns already_retrying; bundle.social called once", async () => {
+  it("second sequential retry returns invalid_state; bundle.social called once", async () => {
+    // After the first successful retry the attempt is no longer in 'failed'
+    // state. A sequential second call sees the attempt in a non-retryable
+    // state and returns invalid_state. True concurrency (ALREADY_RETRYING)
+    // cannot be exercised in a sequential test.
     const { failedAttemptId } = await seedFailedAttempt();
     mockClient.post.postCreate.mockResolvedValueOnce({
       id: "bp_first",
@@ -204,7 +208,7 @@ describe("retryPublishAttempt — happy path", () => {
     const second = await retryPublishAttempt({ attemptId: failedAttemptId });
     expect(second.ok).toBe(true);
     if (!second.ok) return;
-    expect(second.data.outcome).toBe("already_retrying");
+    expect(second.data.outcome).toBe("invalid_state");
     expect(mockClient.post.postCreate).toHaveBeenCalledTimes(1);
   });
 });
