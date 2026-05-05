@@ -21,7 +21,7 @@ import { seedSite } from "./_helpers";
 
 async function seedSiteWithoutCredentials(): Promise<{ id: string }> {
   const svc = getServiceRoleClient();
-  const prefix = `cr${Math.random().toString(36).slice(2, 6)}`;
+  const prefix = Math.random().toString(36).slice(2, 6);
   const { data, error } = await svc
     .from("sites")
     .insert({
