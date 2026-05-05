@@ -17,7 +17,6 @@ test.describe("optimiser — change log + rollback", () => {
 
   test("change log renders proposal_approved + manual_rollback events", async ({
     page,
-    request,
   }, testInfo) => {
     const client = await seedOptClient({
       slug: `log-${Date.now()}`,
@@ -36,7 +35,8 @@ test.describe("optimiser — change log + rollback", () => {
     });
 
     // Approve via the API so the change log gets a proposal_approved row.
-    const approveRes = await request.post(
+    // Use page.request so the signed-in session cookies are included.
+    const approveRes = await page.request.post(
       `/api/optimiser/proposals/${proposal.id}/approve`,
       {
         headers: { "content-type": "application/json" },
@@ -46,7 +46,7 @@ test.describe("optimiser — change log + rollback", () => {
     expect([200, 201]).toContain(approveRes.status());
 
     // Manual rollback via the API.
-    const rollbackRes = await request.post(
+    const rollbackRes = await page.request.post(
       `/api/optimiser/proposals/${proposal.id}/rollback`,
       {
         headers: { "content-type": "application/json" },
@@ -72,7 +72,7 @@ test.describe("optimiser — change log + rollback", () => {
   });
 
   test("rollback on a pending proposal returns ROLLBACK_FAILED", async ({
-    request,
+    page,
   }) => {
     const client = await seedOptClient({
       slug: `rb-pending-${Date.now()}`,
@@ -89,7 +89,7 @@ test.describe("optimiser — change log + rollback", () => {
       status: "pending",
     });
 
-    const res = await callApi(request, {
+    const res = await callApi(page.request, {
       method: "POST",
       url: `/api/optimiser/proposals/${proposal.id}/rollback`,
       body: { reason: "Should fail on pending." },

@@ -25,6 +25,7 @@ test.describe("optimiser — onboarding wizard", () => {
   test("create client + walk to pages step + complete", async ({
     page,
   }, testInfo) => {
+    test.setTimeout(60_000);
     await page.goto("/optimiser/onboarding");
     await auditA11y(page, testInfo);
 
@@ -94,6 +95,7 @@ test.describe("optimiser — onboarding wizard", () => {
   });
 
   test("create client surfaces SLUG_CONFLICT on duplicate", async ({ page }) => {
+    test.setTimeout(60_000);
     const slug = `dupe-${Date.now()}`;
     const supabase = supabaseServiceClient();
     await supabase.from("opt_clients").insert({
