@@ -11,7 +11,7 @@ The platform layer owns customer companies, users, roles, invitations, and notif
 
 ## Auth gate layering
 
-Customer-facing routes (`/customer/*`) and operator routes that view customer data (`/admin/platform/*`) use different gates:
+Customer-facing routes (`/company/*`) and operator routes that view customer data (`/admin/platform/*`) use different gates:
 
 ```typescript
 // /admin/platform/companies/[companyId]/route.ts
@@ -24,10 +24,9 @@ export async function GET(req: Request, { params }: { params: { companyId: strin
   const { companyId } = await requireCompanyContext(params.companyId);
 }
 
-// /customer/settings/users/route.ts
-// Customer user accessing own company — customer gate only
-import { requireCustomerAuth } from '@/lib/platform/auth/customer-gate';
-import { requireCompanyContext } from '@/lib/platform/auth/company-context';
+// /company/users/route.ts (example — actual auth uses getCurrentPlatformSession)
+// Customer user accessing own company — platform session gate
+import { getCurrentPlatformSession } from '@/lib/platform/auth';
 
 export async function GET(req: Request) {
   await requireCustomerAuth(req);                                  // customer auth (separate from admin gate)
@@ -235,20 +234,19 @@ Critical notifications (`is_critical: true` on `platform_email_log`) alert Opoll
   companies/                  ← list all companies
   companies/[id]/             ← company detail, brand, subscriptions
 
-/customer/                    ← customer-facing: different layout shell, different auth gate
-  dashboard/
-  settings/brand/
-  settings/users/
-  social/posts/
-  social/calendar/
-  image/
+/company/                     ← customer-facing: different layout shell, different auth gate
+  users/                      ← invite + manage team
+  settings/brand/             ← brand profile editor
+  social/posts/               ← compose, approve, schedule
+  social/analytics/           ← social analytics dashboard
+  social/connections/         ← connect / reconnect / health
 
 /invite/[token]/              ← invitation acceptance (no auth required)
 /review/[token]/              ← magic-link approval (no auth session)
-/calendar/[token]/            ← magic-link calendar (no auth session)
+/viewer/[token]/              ← magic-link calendar (no auth session)
 ```
 
-`/customer/*` must have a different layout (`app/customer/layout.tsx`) from `/admin/` — no admin sidebar, customer chrome only.
+`/company/*` uses a different layout (`app/company/layout.tsx`) from `/admin/` — no admin sidebar, customer chrome only (CompanyTopNav, NotificationBell).
 
 ## What lives where
 
@@ -256,7 +254,7 @@ Critical notifications (`is_critical: true` on `platform_email_log`) alert Opoll
 lib/platform/
   auth/
     company-context.ts    — requireCompanyContext()
-    customer-gate.ts      — requireCustomerAuth() for /customer/* routes
+    index.ts              — getCurrentPlatformSession(), canDo() — used in /company/* routes
     permissions.ts        — canDo(), role checks
     session.ts            — getAuthUser(), getPlatformUser()
   companies/              — getCompany, listCompanies, createCompany, updateCompany
