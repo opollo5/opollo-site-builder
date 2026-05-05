@@ -107,28 +107,37 @@ async function extractExifMetadata(bytes: Uint8Array): Promise<ExifResult> {
 
     if (!meta) return { caption: null, altText: null, tags: [] };
 
+    // Guard: exifr can return IPTC fields as objects (IptcRecord) rather than
+    // plain strings in some firmware-written JPEGs. Using String() on those
+    // produces "[object Object]". Only accept actual string values.
+    const str = (v: unknown): string | null => {
+      if (typeof v === "string" && v.trim()) return v.trim();
+      return null;
+    };
+
     const rawCaption =
-      (meta["Caption-Abstract"] as string | undefined) ??
-      (meta.description as string | undefined) ??
-      (meta.Headline as string | undefined) ??
+      str(meta["Caption-Abstract"]) ??
+      str(meta.description) ??
+      str(meta.Headline) ??
       null;
 
     const rawAlt =
-      (meta.Headline as string | undefined) ??
-      (meta.ObjectName as string | undefined) ??
-      (meta.Title as string | undefined) ??
+      str(meta.Headline) ??
+      str(meta.ObjectName) ??
+      str(meta.Title) ??
       null;
 
     const rawTags: unknown =
       (meta.Keywords as unknown) ?? (meta.Subject as unknown) ?? [];
     const tagsArr = Array.isArray(rawTags) ? rawTags : rawTags ? [rawTags] : [];
     const tags = tagsArr
-      .map((t: unknown) => String(t).trim().toLowerCase())
+      .filter((t: unknown) => typeof t === "string")
+      .map((t: unknown) => (t as string).trim().toLowerCase())
       .filter(Boolean)
       .slice(0, 12);
 
-    const caption = rawCaption ? String(rawCaption).trim().slice(0, 150) || null : null;
-    const altText = rawAlt ? String(rawAlt).trim().slice(0, 100) || null : null;
+    const caption = rawCaption ? rawCaption.slice(0, 150) || null : null;
+    const altText = rawAlt ? rawAlt.slice(0, 100) || null : null;
 
     return { caption, altText, tags };
   } catch {
@@ -147,7 +156,7 @@ async function main() {
     .from("image_library")
     .select("id", { count: "exact", head: true })
     .is("deleted_at", null)
-    .or("caption.is.null,caption.eq.");
+    .or("caption.is.null,caption.eq.,caption.eq.[object Object]");
 
   const total = count ?? 0;
   console.log(`Images needing captions: ${total}\n`);
@@ -163,7 +172,7 @@ async function main() {
       .from("image_library")
       .select("id, cloudflare_id, filename, caption, tags")
       .is("deleted_at", null)
-      .or("caption.is.null,caption.eq.")
+      .or("caption.is.null,caption.eq.,caption.eq.[object Object]")
       .order("created_at", { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);
 
@@ -176,8 +185,10 @@ async function main() {
     for (const row of rows) {
       processed++;
 
-      // Resume-safe: skip if caption already set (handles race with offset drift).
-      if (row.caption && (row.caption as string).trim().length > 0) {
+      // Resume-safe: skip if caption already set with a real value.
+      // "[object Object]" is treated as absent — it's a bug artefact, not real data.
+      const existingCaption = (row.caption as string | null)?.trim() ?? "";
+      if (existingCaption.length > 0 && existingCaption !== "[object Object]") {
         noData++;
         continue;
       }
@@ -218,7 +229,9 @@ async function main() {
         .from("image_library")
         .update(patch)
         .eq("id", row.id)
-        .is("caption", null); // idempotency guard
+        // Idempotency: only write when caption is still absent or was corrupted
+        // by the [object Object] bug from a previous run.
+        .or("caption.is.null,caption.eq.,caption.eq.[object Object]");
 
       if (updateError) {
         console.error(`[${processed}/${total}] ${row.id} — DB error: ${updateError.message}`);
