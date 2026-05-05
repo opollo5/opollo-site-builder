@@ -14,6 +14,11 @@ describe("generateSlug", () => {
     expect(generateSlug("the a an")).toBe("a");
   });
 
+  it("returns empty string for empty input without throwing", () => {
+    expect(generateSlug("")).toBe("");
+    expect(generateSlug("   ")).toBe("");
+  });
+
   it("strips diacritics", () => {
     expect(generateSlug("Café du Monde")).toBe("cafe-monde");
   });

@@ -46,7 +46,7 @@ export function generateSlug(raw: string): string {
   const meaningful = words.filter((w) => !SLUG_STOP_WORDS.has(w));
   if (meaningful.length > 0) {
     s = meaningful.join(" ");
-  } else {
+  } else if (words.length > 0) {
     s = words.reduce((shortest, w) => (w.length < shortest.length ? w : shortest));
   }
 
