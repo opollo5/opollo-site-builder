@@ -158,6 +158,12 @@ export function AdminSidebar({
           icon: Mail,
           testId: "nav-email-test",
         },
+        {
+          label: "Design system",
+          href: "/admin/settings/design-system",
+          icon: Settings,
+          testId: "nav-design-system-settings",
+        },
       ]
     : [];
 
