@@ -110,9 +110,10 @@ test.describe("M13-4 posts — admin surface", () => {
   test("detail page renders generated HTML in a sandboxed iframe + preflight surface", async ({
     page,
   }, testInfo) => {
-    // 60s: the WP preflight makes a real fetch to https://e2e.test which can
-    // take up to ~30s to fail via TCP timeout on some CI environments.
-    test.setTimeout(60_000);
+    // 120s: the WP preflight makes a real server-side fetch to https://e2e.test
+    // which can take up to ~30s to fail via TCP timeout on some CI environments,
+    // and auditA11y adds another ~30s. 120s gives a 60s buffer.
+    test.setTimeout(120_000);
     const site = await findTestSite();
     const { postId } = await seedDraftPost({
       siteId: site.id,
