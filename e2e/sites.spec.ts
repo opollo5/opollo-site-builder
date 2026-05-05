@@ -196,4 +196,48 @@ test.describe("sites CRUD", () => {
 
     await expect(row).toHaveCount(0);
   });
+
+  // Issue 5 — image-library toggle must be an explicit switch, not a
+  // status label that looks like a button.
+  test("image-library toggle on settings page is a role=switch pill control", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await stubTestConnection(page);
+
+    await page.goto("/admin/sites/new");
+    await page.getByTestId("site-name").fill(`Toggle Test ${Date.now()}`);
+    await page.getByTestId("site-wp-url").fill("https://toggle-test.test");
+    await page.getByTestId("site-wp-user").fill("wp");
+    await page.getByTestId("site-wp-password").fill("password-1234");
+    await page.getByTestId("site-test-connection").click();
+    await expect(page.getByTestId("site-test-result")).toContainText(
+      /Connected as/i,
+    );
+    await page.getByTestId("site-create-save").click();
+    await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/onboarding/);
+    const siteId = page
+      .url()
+      .match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
+    if (!siteId) throw new Error("Could not extract site ID from URL");
+
+    await page.goto(`/admin/sites/${siteId}/settings`);
+
+    const toggle = page.getByTestId("use-image-library-toggle");
+    await expect(toggle).toBeVisible();
+    // Must be a proper switch semantic, not aria-pressed on a Button.
+    await expect(toggle).toHaveRole("switch");
+    // Default is off.
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    // Turn on.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    // Turn off.
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await auditA11y(page, testInfo);
+  });
 });
