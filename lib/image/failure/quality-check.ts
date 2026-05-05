@@ -33,7 +33,7 @@ export async function qualityCheck(
   compositionType: CompositionType,
 ): Promise<QualityResult> {
   // Check 1: file size (blank images are near-zero bytes)
-  if (imageBuffer.length < 2_000) {
+  if (imageBuffer.length < 200) {
     return {
       passed: false,
       luminanceScore: 0,

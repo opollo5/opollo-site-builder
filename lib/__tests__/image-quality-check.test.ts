@@ -57,7 +57,7 @@ describe("selectOverlayColour", () => {
 
 describe("qualityCheck", () => {
   it("fails tiny buffers (< 50 KB)", async () => {
-    const tiny = Buffer.alloc(1000, 0);
+    const tiny = Buffer.alloc(100, 0);
     const result = await qualityCheck(tiny, "split_layout");
     expect(result.passed).toBe(false);
     expect(result.reason).toMatch(/too small/i);
