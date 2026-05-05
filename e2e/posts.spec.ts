@@ -132,22 +132,16 @@ test.describe("M13-4 posts — admin surface", () => {
     const iframe = page.locator('iframe[sandbox=""]');
     await expect(iframe).toBeVisible();
 
-    // The E2E test site almost certainly doesn't have a real WP backend
-    // behind its wp_url (it's a fixture site from global-setup).
-    // preflight should surface some kind of blocker — either
-    // REST_UNREACHABLE or AUTH_CAPABILITY_MISSING. Assert a blocker
-    // banner is present rather than pinning the exact code.
-    const blockerBanner = page.locator('[role="alert"]').filter({
-      hasText: /can't publish|WordPress REST|WP Admin|app password/i,
-    });
-    // Either the blocker OR the Publish button is visible, depending on
-    // the test site's WP state. We don't pin which, because that's
-    // environment-dependent; either is acceptable.
-    const publishOrBlocker = (await blockerBanner.count()) > 0
-      ? "blocker"
-      : (await page.getByRole("button", { name: /^publish to WP$/i }).count()) > 0
-        ? "publish"
-        : "neither";
+    // The E2E test site has no real WP backend (wp_url = https://e2e.test),
+    // so preflight returns a network-error blocker. The Alert renders with
+    // data-testid="preflight-blocker" regardless of which blocker code fires.
+    // Either the blocker OR the Publish button is visible depending on WP state.
+    const publishOrBlocker =
+      (await page.getByTestId("preflight-blocker").count()) > 0
+        ? "blocker"
+        : (await page.getByRole("button", { name: /publish to WP/i }).count()) > 0
+          ? "publish"
+          : "neither";
     expect(publishOrBlocker).not.toBe("neither");
 
     await auditA11y(page, testInfo);
