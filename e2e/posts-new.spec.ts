@@ -52,8 +52,8 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await expect(firstOption).toBeVisible();
     await firstOption.click();
 
-    // Composer textarea appears once a site is bound.
-    await expect(page.locator("#post-composer-input")).toBeVisible();
+    // Composer (TipTap ProseMirror) appears once a site is bound.
+    await expect(page.locator(".ProseMirror")).toBeVisible();
 
     await auditA11y(page, testInfo);
   });
@@ -115,9 +115,9 @@ test.describe("/admin/posts/new — top-level entry", () => {
     const panel = page.getByTestId("post-advanced-panel");
     await expect(panel).toHaveCount(0);
 
-    // Type into the textarea + title; autosave fires after the 800ms
-    // debounce.
-    const composer = page.locator("#post-composer-input");
+    // Type into the composer (TipTap ProseMirror); autosave fires after
+    // the 800ms debounce.
+    const composer = page.locator(".ProseMirror");
     await composer.fill("Hello world body for autosave probe.");
     await page.locator("#post-title").fill("Autosave probe");
 
@@ -146,7 +146,7 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await expect(page.locator("#post-title")).toHaveValue(
       /autosave probe/i,
     );
-    await expect(page.locator("#post-composer-input")).toHaveValue(
+    await expect(page.locator(".ProseMirror")).toContainText(
       /hello world body for autosave probe/i,
     );
 
