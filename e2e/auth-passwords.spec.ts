@@ -316,7 +316,7 @@ test.describe.serial("M14-5 recovery email-link callback hop (audit PR 4)", () =
 
     const svc = serviceClient();
 
-    const origin = new URL(page.url() || "http://localhost:3000").origin;
+    const origin = "http://localhost:3000";
 
     // generateLink returns the hashed_token we can present directly to
     // the app's /api/auth/callback route. We call the callback with
