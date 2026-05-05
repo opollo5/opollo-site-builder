@@ -61,12 +61,12 @@ describe("buildPrompt", () => {
       primaryColour: "#FF03A5",
       compositionType: "texture",
       industry: "Technology / SaaS",
-      mood: "energetic",
+      mood: "nostalgic",
       simplify: true,
     });
     // Simplified prompt omits industry and mood
     expect(p).not.toContain("digital");
-    expect(p).not.toContain("energetic");
+    expect(p).not.toContain("nostalgic");
     expect(p).toContain("no text");
   });
 
