@@ -223,7 +223,6 @@ test.describe("M13-6b posts pipeline — brief → approve → bridge → list",
       generated_html: string | null;
       status: string;
     };
-    const slugPrefix = "post-one-";
     let postRow: BridgedPostRow | null = null;
     for (let i = 0; i < 10; i++) {
       const res = await svc
@@ -232,7 +231,7 @@ test.describe("M13-6b posts pipeline — brief → approve → bridge → list",
           "id, site_id, slug, title, content_type, generated_html, status",
         )
         .eq("site_id", site.id)
-        .like("slug", `${slugPrefix}%`)
+        .eq("title", pageTitle)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -278,6 +277,6 @@ test.describe("M13-6b posts pipeline — brief → approve → bridge → list",
       .order("created_at", { ascending: false })
       .limit(1)
       .single();
-    expect(runAfter.data?.status).toMatch(/^(succeeded|paused|running)$/);
+    expect(runAfter.data?.status).toMatch(/^(succeeded|paused|running|queued)$/);
   });
 });

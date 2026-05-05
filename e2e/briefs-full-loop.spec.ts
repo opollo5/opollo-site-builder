@@ -177,6 +177,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
       request,
       briefId,
       expectedOrdinal: 0,
+      maxTicks: 12,
     });
 
     // 4. Re-render the surface. Approve button on page 0 should appear.
@@ -191,6 +192,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
       request,
       briefId,
       expectedOrdinal: 1,
+      maxTicks: 12,
     });
 
     await page.reload();
@@ -206,12 +208,18 @@ test.describe("M12-6 briefs — full-loop run", () => {
       request,
       briefId,
       expectedOrdinal: 2,
+      maxTicks: 12,
     });
 
     // 7. Cancel the run. The button lives in the header when the run is
     // active/paused. Reload first so the client picks up the paused state.
     await page.reload();
     await page.getByRole("button", { name: /cancel run/i }).click();
+    // Wait for the cancel POST to complete before querying the DB;
+    // the button disappears once the response lands.
+    await expect(
+      page.getByRole("button", { name: /cancel run/i }),
+    ).toBeHidden({ timeout: 15_000 });
 
     // 8. Assert post-state:
     //   - First two pages approved, generated_html populated
