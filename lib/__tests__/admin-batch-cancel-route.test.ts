@@ -92,7 +92,7 @@ function buildReadMock(existing: unknown, readErr: unknown = null) {
 function buildFullSuccessMock(existing: { id: string; status: string; cancel_requested_at: null; created_by: string }) {
   const maybeSingle = vi.fn().mockResolvedValue({ data: existing, error: null });
   const selectEq = vi.fn().mockReturnValue({ maybeSingle });
-  const select = vi.fn().mockReturnValue({ selectEq });
+  const select = vi.fn().mockReturnValue({ eq: selectEq });
 
   // generation_jobs update chain
   const jobUpdateEq = vi.fn().mockResolvedValue({ error: null });
