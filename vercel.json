@@ -95,6 +95,10 @@
     {
       "path": "/api/cron/drift-detect",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/backfill-image-captions",
+      "schedule": "*/5 * * * *"
     }
   ]
 }
