@@ -56,7 +56,9 @@ test.describe("optimiser — page browser", () => {
     await page.goto(`/optimiser?client=${client.id}`);
     await auditA11y(page, testInfo);
 
-    await expect(page.getByText("Active")).toBeVisible();
+    // Use span-scoped locator to avoid strict-mode collision with the
+    // state <select> option and URL text that also contain "Active".
+    await expect(page.locator("span").getByText("Active", { exact: true })).toBeVisible();
     await expect(page.getByText("Healthy — no action needed")).toBeVisible();
     await expect(page.getByText("Gathering data")).toBeVisible();
     await expect(page.getByText("Read-only (external)")).toBeVisible();
@@ -98,7 +100,8 @@ test.describe("optimiser — page browser", () => {
     });
 
     await page.goto(`/optimiser?client=${client.id}`);
-    await page.getByRole("button", { name: /Healthy \(/ }).click();
+    // State filter is a <select> (second combobox after reliability filter).
+    await page.getByRole("combobox").nth(1).selectOption("healthy");
     await expect(page.getByText("https://example.test/h")).toBeVisible();
     await expect(page.getByText("https://example.test/a")).toHaveCount(0);
   });

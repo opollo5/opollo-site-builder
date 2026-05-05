@@ -174,10 +174,8 @@ test.describe("M12-1 briefs — upload + review", () => {
     await pageB.goto(reviewUrl);
     await expect(pageB.getByRole("heading", { name: unique })).toBeVisible();
 
-    // A commits first.
+    // A commits first. No confirm modal — removed UAT 2026-05-03 round-3.
     await pageA.getByRole("button", { name: /Commit page list/i }).click();
-    const dialogA = pageA.getByRole("dialog", { name: /Commit this page list\?/i });
-    await dialogA.getByRole("button", { name: /^Commit page list$/i }).click();
     // RS-3: successful commit lands on the run surface.
     await pageA.waitForURL(
       /\/admin\/sites\/[0-9a-f-]{36}\/briefs\/[0-9a-f-]{36}\/run$/,
@@ -187,8 +185,6 @@ test.describe("M12-1 briefs — upload + review", () => {
     // ALREADY_EXISTS since A already committed with the matching hash.
     // B's commit button should still be present (render is client-state).
     await pageB.getByRole("button", { name: /Commit page list/i }).click();
-    const dialogB = pageB.getByRole("dialog", { name: /Commit this page list\?/i });
-    await dialogB.getByRole("button", { name: /^Commit page list$/i }).click();
 
     // Because B's hash matches A's (neither edited), the server treats
     // this as a successful replay — UI flips to the run surface too.

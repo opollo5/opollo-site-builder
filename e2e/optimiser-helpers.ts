@@ -142,52 +142,47 @@ export async function seedAdGroupAndAd(args: {
   descriptions: string[];
 }): Promise<{ adGroupId: string; campaignId: string; adId: string }> {
   const supabase = supabaseServiceClient();
+  // opt_campaigns/ad_groups/ads all have partial unique indexes (WHERE
+  // deleted_at IS NULL) which PostgreSQL can't use for ON CONFLICT
+  // inference. Since external_id is always Date.now()-unique we can
+  // just insert directly — there is never an existing row to update.
   const { data: campaign, error: cErr } = await supabase
     .from("opt_campaigns")
-    .upsert(
-      {
-        client_id: args.clientId,
-        external_id: `e2e-cmp-${Date.now()}`,
-        name: args.campaignName ?? "E2E Campaign",
-        status: "enabled",
-        channel_type: "SEARCH",
-      },
-      { onConflict: "client_id,external_id" },
-    )
+    .insert({
+      client_id: args.clientId,
+      external_id: `e2e-cmp-${Date.now()}`,
+      name: args.campaignName ?? "E2E Campaign",
+      status: "enabled",
+      channel_type: "SEARCH",
+    })
     .select("id")
     .single();
   if (cErr || !campaign) throw new Error(`seedAdGroup campaign: ${cErr?.message}`);
   const { data: adGroup, error: agErr } = await supabase
     .from("opt_ad_groups")
-    .upsert(
-      {
-        client_id: args.clientId,
-        campaign_id: campaign.id as string,
-        external_id: `e2e-ag-${Date.now()}`,
-        name: args.adGroupName ?? "E2E Ad Group",
-        status: "enabled",
-        raw: { top_search_terms: [{ term: "managed it support", impressions: 100 }] },
-      },
-      { onConflict: "client_id,external_id" },
-    )
+    .insert({
+      client_id: args.clientId,
+      campaign_id: campaign.id as string,
+      external_id: `e2e-ag-${Date.now()}`,
+      name: args.adGroupName ?? "E2E Ad Group",
+      status: "enabled",
+      raw: { top_search_terms: [{ term: "managed it support", impressions: 100 }] },
+    })
     .select("id")
     .single();
   if (agErr || !adGroup) throw new Error(`seedAdGroup ag: ${agErr?.message}`);
   const { data: ad, error: aErr } = await supabase
     .from("opt_ads")
-    .upsert(
-      {
-        client_id: args.clientId,
-        ad_group_id: adGroup.id as string,
-        external_id: `e2e-ad-${Date.now()}`,
-        ad_type: "responsive_search_ad",
-        status: "enabled",
-        headlines: args.headlines,
-        descriptions: args.descriptions,
-        final_url: args.finalUrl,
-      },
-      { onConflict: "ad_group_id,external_id" },
-    )
+    .insert({
+      client_id: args.clientId,
+      ad_group_id: adGroup.id as string,
+      external_id: `e2e-ad-${Date.now()}`,
+      ad_type: "responsive_search_ad",
+      status: "enabled",
+      headlines: args.headlines,
+      descriptions: args.descriptions,
+      final_url: args.finalUrl,
+    })
     .select("id")
     .single();
   if (aErr || !ad) throw new Error(`seedAd: ${aErr?.message}`);
