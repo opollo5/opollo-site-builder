@@ -138,7 +138,7 @@ describe("GET /api/admin/users/list: payload", () => {
   });
 
   it("returns every opollo_users row for an admin, newest first", async () => {
-    const admin = await seedAuthUser({ role: "admin" });
+    const admin = await seedAuthUser({ role: "super_admin" });
     // Seed a second user; the two timestamps are usually close enough
     // that ordering by created_at desc is still deterministic because
     // the second insert's now() > the first's.
@@ -162,8 +162,8 @@ describe("GET /api/admin/users/list: payload", () => {
   });
 
   it("includes revoked_at on a revoked row", async () => {
-    const admin = await seedAuthUser({ role: "admin" });
-    const target = await seedAuthUser({ role: "admin" });
+    const admin = await seedAuthUser({ role: "super_admin" });
+    const target = await seedAuthUser({ role: "super_admin" });
 
     const svc = getServiceRoleClient();
     const { error: updateErr } = await svc
