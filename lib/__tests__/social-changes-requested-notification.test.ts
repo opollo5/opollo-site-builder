@@ -31,7 +31,7 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 // covered by a typecheck-enforced exhaustive switch.
 // ---------------------------------------------------------------------------
 
-const COMPANY_ID = "abcdef31-0000-0000-0000-chng0000req0";
+const COMPANY_ID = "abcdef31-0000-0000-0000-000000c40e00";
 
 describe("S1-31 changes_requested notification", () => {
   let submitter: SeededAuthUser;

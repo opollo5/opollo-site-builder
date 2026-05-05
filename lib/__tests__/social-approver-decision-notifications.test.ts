@@ -34,7 +34,7 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 
 const mockSendEmail = sendEmail as unknown as ReturnType<typeof vi.fn>;
 
-const COMPANY_ID = "abcdef55-0000-0000-0000-apprv0decis0";
+const COMPANY_ID = "abcdef55-0000-0000-0000-000000de6150";
 const POST_ID = "00000000-0000-0000-0000-000000000055";
 
 describe("S1-55 approval_decided notification — comment routing", () => {

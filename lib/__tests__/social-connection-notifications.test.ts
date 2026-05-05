@@ -28,7 +28,7 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 // company admins when a connection is lost or restored.
 // ---------------------------------------------------------------------------
 
-const COMPANY_ID = "abcdef30-0000-0000-0000-c0nnlost0000";
+const COMPANY_ID = "abcdef30-0000-0000-0000-00000c010000";
 
 describe("S1-30 connection notification wiring", () => {
   let admin: SeededAuthUser;
