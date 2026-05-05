@@ -89,6 +89,46 @@ export async function fireScheduledPublish(
 
   const svc = getServiceRoleClient();
 
+  // Step 0: timing-drift check. QStash typically delivers within seconds
+  // of the scheduled time; check the schedule_entry's scheduled_at so we
+  // can warn operators when a publish fires significantly late (e.g. after
+  // a QStash outage). We always proceed — a late post is better than a
+  // missed one — but an error-level log fires when drift exceeds
+  // MAX_LATE_MINUTES so on-call can investigate.
+  const TOLERANCE_MINUTES = 2;
+  const MAX_LATE_MINUTES = 30;
+  {
+    const entryR = await svc
+      .from("social_schedule_entries")
+      .select("scheduled_at")
+      .eq("id", input.scheduleEntryId)
+      .maybeSingle();
+
+    if (entryR.data?.scheduled_at) {
+      const scheduledMs = Date.parse(entryR.data.scheduled_at as string);
+      const driftSeconds = Math.round((Date.now() - scheduledMs) / 1000);
+      const absDriftMin = Math.abs(driftSeconds) / 60;
+
+      if (driftSeconds < -TOLERANCE_MINUTES * 60) {
+        logger.warn("social.publish.fire.early", {
+          schedule_entry_id: input.scheduleEntryId,
+          drift_seconds: driftSeconds,
+        });
+      } else if (driftSeconds > MAX_LATE_MINUTES * 60) {
+        logger.error("social.publish.fire.very_late", {
+          schedule_entry_id: input.scheduleEntryId,
+          drift_seconds: driftSeconds,
+          drift_minutes: Math.round(absDriftMin),
+        });
+      } else if (driftSeconds > TOLERANCE_MINUTES * 60) {
+        logger.warn("social.publish.fire.late", {
+          schedule_entry_id: input.scheduleEntryId,
+          drift_seconds: driftSeconds,
+        });
+      }
+    }
+  }
+
   // Step 1: atomic claim.
   const claimResult = await svc.rpc("claim_publish_job", {
     p_schedule_entry_id: input.scheduleEntryId,
