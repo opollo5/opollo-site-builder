@@ -269,7 +269,7 @@ async function seedM16SlotAndPages(prefix: string) {
 describe("publishSlot — M16 wp_status extension", () => {
   it("sets pages.wp_status=published and stores wp_content_hash after a successful publish", async () => {
     const { publishSlot } = await import("@/lib/batch-publisher");
-    const { svc, site, pageRow, routeRow, job, slot } = await seedM16SlotAndPages("wpp01");
+    const { svc, site, pageRow, routeRow, job, slot } = await seedM16SlotAndPages("wp01");
 
     const html = '<div class="opollo-Hero" data-opollo-id="sec-1">Hello</div>';
     const wp = {
@@ -280,11 +280,11 @@ describe("publishSlot — M16 wp_status extension", () => {
 
     const result = await publishSlot(
       slot.id,
-      `worker-wpp01`,
+      `worker-wp01`,
       {
         job_id:                job.id,
         site_id:               site.id,
-        slug:                  "/wpp01-home",
+        slug:                  "/wp01-home",
         title:                 "Home",
         generated_html:        html,
         design_system_version: "1",
@@ -315,7 +315,7 @@ describe("publishSlot — M16 wp_status extension", () => {
 
   it("wraps M16 HTML in Gutenberg block before sending to WP", async () => {
     const { publishSlot } = await import("@/lib/batch-publisher");
-    const { site, job, slot } = await seedM16SlotAndPages("wpp02");
+    const { site, job, slot } = await seedM16SlotAndPages("wp02");
 
     const m16Html = '<div class="opollo-Hero" data-opollo-id="sec-uuid">Content</div>';
     let capturedContent = "";
@@ -324,18 +324,18 @@ describe("publishSlot — M16 wp_status extension", () => {
       getBySlug: async () => ({ ok: true as const, found: null }),
       create: async (input: { slug: string; title: string; content: string }) => {
         capturedContent = input.content;
-        return { ok: true as const, wp_page_id: 99, slug: "/wpp02-home" };
+        return { ok: true as const, wp_page_id: 99, slug: "/wp02-home" };
       },
       update: async () => ({ ok: true as const, wp_page_id: 99 }),
     };
 
     await publishSlot(
       slot.id,
-      `worker-wpp02`,
+      `worker-wp02`,
       {
         job_id:                job.id,
         site_id:               site.id,
-        slug:                  "/wpp02-home",
+        slug:                  "/wp02-home",
         title:                 "Home",
         generated_html:        m16Html,
         design_system_version: "1",

@@ -25,6 +25,8 @@ async function seedBrief(siteId: string, opts: { title?: string; brand_voice?: s
       site_id:              siteId,
       title:                opts.title ?? "Test brief",
       status:               "committed",
+      committed_at:         new Date().toISOString(),
+      committed_page_hash:  "a".repeat(64),
       source_storage_path:  "test/path.txt",
       source_mime_type:     "text/plain",
       source_size_bytes:    100,

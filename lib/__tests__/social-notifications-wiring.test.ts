@@ -98,7 +98,7 @@ describe("S1-27 notification wiring", () => {
     const r = await svc
       .from("platform_notifications")
       .select("id", { count: "exact", head: true })
-      .eq("recipient_user_id", recipientId)
+      .eq("user_id", recipientId)
       .eq("company_id", COMPANY_ID);
     return r.count ?? 0;
   }

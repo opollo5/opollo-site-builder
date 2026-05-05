@@ -425,10 +425,10 @@ async function handleAccountEvent(
     };
   }
 
-  // Severity mapping: disconnected = error (publishing blocked);
+  // Severity mapping: disconnected = critical (publishing blocked);
   // auth_required = warning (until token refreshed).
   const severity =
-    type === "social.account.disconnected" ? "error" : "warning";
+    type === "social.account.disconnected" ? "critical" : "warning";
   const alert = await svc.from("social_connection_alerts").insert({
     connection_id: conn.data.id,
     company_id: conn.data.company_id,
