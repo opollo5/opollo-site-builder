@@ -5,9 +5,8 @@
 
 CREATE TABLE IF NOT EXISTS design_system_settings (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  company_id  uuid        REFERENCES companies(id) ON DELETE CASCADE,
+  company_id  uuid,
 
-  -- Color tokens (hex strings, validated by CHECK)
   color_pk    text CHECK (color_pk  IS NULL OR color_pk  ~ '^#[0-9a-fA-F]{3,8}$'),
   color_pk2   text CHECK (color_pk2 IS NULL OR color_pk2 ~ '^#[0-9a-fA-F]{3,8}$'),
   color_gr    text CHECK (color_gr  IS NULL OR color_gr  ~ '^#[0-9a-fA-F]{3,8}$'),
@@ -21,24 +20,18 @@ CREATE TABLE IF NOT EXISTS design_system_settings (
   color_d4    text CHECK (color_d4  IS NULL OR color_d4  ~ '^#[0-9a-fA-F]{3,8}$'),
   color_bg    text CHECK (color_bg  IS NULL OR color_bg  ~ '^#[0-9a-fA-F]{3,8}$'),
 
-  -- Typography tokens
   font_display  text,
   font_body     text,
+  radius        text,
 
-  -- Geometry tokens
-  radius  text,
-
-  -- Audit columns
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now(),
   created_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   updated_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL,
 
-  -- One row per company (NULL = global)
   UNIQUE NULLS NOT DISTINCT (company_id)
 );
 
--- updated_at trigger
 CREATE OR REPLACE FUNCTION update_design_system_settings_updated_at()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
@@ -49,7 +42,6 @@ CREATE TRIGGER trg_design_system_settings_updated_at
 
 ALTER TABLE design_system_settings ENABLE ROW LEVEL SECURITY;
 
--- Service role has full access; admin UI reads/writes via service role client.
 CREATE POLICY service_role_all ON design_system_settings
   FOR ALL TO service_role USING (true) WITH CHECK (true);
 

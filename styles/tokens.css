@@ -15,7 +15,7 @@
 
 :root {
   /* ── Typography scale ────────────────────────────────────────────
-   * 16px is the absolute minimum — applies to text-xs, text-sm, and text-base.
+   * 16px is the absolute minimum — text-xs = text-sm = text-base = 1rem.
    * NEVER use font sizes below 16px on operator surfaces (eyebrow .lbl is 0.75rem, design exception).
    * ─────────────────────────────────────────────────────────────── */
   --font-size-xs:   1rem; /* 16px — absolute minimum */

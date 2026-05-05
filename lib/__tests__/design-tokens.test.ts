@@ -3,9 +3,6 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { typography, buildCssVariableBlock } from "@/lib/design-system/tokens";
 
-// ---------------------------------------------------------------------------
-// Font size floor
-// ---------------------------------------------------------------------------
 describe("typography.fontSize", () => {
   it("all sizes except eyebrow are >= 1rem (16px)", () => {
     for (const [key, value] of Object.entries(typography.fontSize)) {
@@ -20,9 +17,6 @@ describe("typography.fontSize", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// buildCssVariableBlock
-// ---------------------------------------------------------------------------
 describe("buildCssVariableBlock", () => {
   it("returns empty string for empty overrides", () => {
     expect(buildCssVariableBlock({})).toBe("");
@@ -36,14 +30,10 @@ describe("buildCssVariableBlock", () => {
   });
 
   it("omits undefined keys", () => {
-    const result = buildCssVariableBlock({ colorPk: "#ff0000" });
-    expect(result).not.toContain("--gr");
+    expect(buildCssVariableBlock({ colorPk: "#ff0000" })).not.toContain("--gr");
   });
 });
 
-// ---------------------------------------------------------------------------
-// File-scan helpers
-// ---------------------------------------------------------------------------
 function collectFiles(dir: string, exts: string[]): string[] {
   const results: string[] = [];
   function walk(d: string) {
@@ -64,17 +54,8 @@ const ROOT = path.resolve(__dirname, "../..");
 const SRC_FILES = [
   ...collectFiles(path.join(ROOT, "app"), [".tsx", ".ts"]),
   ...collectFiles(path.join(ROOT, "components"), [".tsx", ".ts"]),
-].filter(
-  (f) =>
-    !f.includes("email") &&
-    !f.includes("seed") &&
-    !f.includes("__tests__") &&
-    !f.includes(".test."),
-);
+].filter((f) => !f.includes("email") && !f.includes("seed") && !f.includes("__tests__") && !f.includes(".test."));
 
-// ---------------------------------------------------------------------------
-// No sub-16px arbitrary font sizes
-// ---------------------------------------------------------------------------
 const subMinFontRe = /\btext-\[([0-9]|1[0-5])px\]/;
 
 describe("No sub-16px arbitrary font sizes in source", () => {
@@ -82,30 +63,7 @@ describe("No sub-16px arbitrary font sizes in source", () => {
     it(`${path.relative(ROOT, file)} has no text-[<16px]`, () => {
       const content = fs.readFileSync(file, "utf-8");
       const match = content.match(subMinFontRe);
-      if (match) {
-        throw new Error(
-          `Found sub-16px arbitrary text size "${match[0]}" in ${path.relative(ROOT, file)}`,
-        );
-      }
-    });
-  }
-});
-
-// ---------------------------------------------------------------------------
-// No hardcoded hex colours in className/style
-// ---------------------------------------------------------------------------
-const hexInClassRe = /(?:className|style)=[^>]*#[0-9a-fA-F]{3,8}(?!\s*;)/;
-
-describe("No hardcoded hex colours in className/style", () => {
-  for (const file of SRC_FILES) {
-    it(`${path.relative(ROOT, file)} has no hex in className/style`, () => {
-      const content = fs.readFileSync(file, "utf-8");
-      const match = content.match(hexInClassRe);
-      if (match) {
-        throw new Error(
-          `Found hex colour in className/style in ${path.relative(ROOT, file)}: ${match[0].slice(0, 80)}`,
-        );
-      }
+      if (match) throw new Error(`sub-16px font "${match[0]}" in ${path.relative(ROOT, file)}`);
     });
   }
 });

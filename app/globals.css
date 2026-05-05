@@ -107,8 +107,7 @@
  * ------------------------------------------------------------------------- */
 
 /* Eyebrow label — green dash prefix, uppercase tracking.
-   0.75rem (12px) design exception: eyebrow sits ABOVE headings; raising
-   to 16px would invert the hierarchy. Smallest size permitted anywhere. */
+   0.75rem (12px) design exception: sits ABOVE headings; 16px would invert the hierarchy. */
 .lbl {
   display: inline-flex;
   align-items: center;

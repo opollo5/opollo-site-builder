@@ -15,6 +15,7 @@ import {
   LogOut,
   Mail,
   Menu,
+  Palette,
   PenSquare,
   Settings,
   Share2,
@@ -157,6 +158,12 @@ export function AdminSidebar({
           href: "/admin/email-test",
           icon: Mail,
           testId: "nav-email-test",
+        },
+        {
+          label: "Settings",
+          href: "/admin/settings",
+          icon: Palette,
+          testId: "nav-settings",
         },
       ]
     : [];

@@ -1,17 +1,8 @@
 /**
  * lib/design-system/tokens.ts
- *
  * Single TypeScript source of truth for all Opollo design tokens.
- * These values mirror the CSS custom properties in app/globals.css and
- * styles/tokens.css. When changing a value, update both places.
- *
- * Exported types are used by the admin design-system settings page to
- * construct per-company override blocks injected into app/layout.tsx.
  */
 
-// ---------------------------------------------------------------------------
-// Colors
-// ---------------------------------------------------------------------------
 export const colors = {
   pk:  "#ff03a5",
   pk2: "#cc0084",
@@ -38,9 +29,6 @@ export const colors = {
   blSoft: "rgba(77, 166, 255, 0.10)",
 } as const;
 
-// ---------------------------------------------------------------------------
-// Typography
-// ---------------------------------------------------------------------------
 export const typography = {
   fontDisplay: "Fredoka",
   fontBody:    "Manrope",
@@ -59,9 +47,6 @@ export const typography = {
   },
 } as const;
 
-// ---------------------------------------------------------------------------
-// Geometry
-// ---------------------------------------------------------------------------
 export const radii = {
   sm:    "0.25rem",
   md:    "0.375rem",
@@ -71,31 +56,14 @@ export const radii = {
   full:  "9999px",
 } as const;
 
-// ---------------------------------------------------------------------------
-// Overridable token keys (admin settings page)
-// ---------------------------------------------------------------------------
 export type OverridableTokenKey =
-  | "colorPk"
-  | "colorPk2"
-  | "colorGr"
-  | "colorGr2"
-  | "colorBl"
-  | "colorAm"
-  | "colorRd"
-  | "colorD1"
-  | "colorD2"
-  | "colorD3"
-  | "colorD4"
-  | "colorBg"
-  | "fontDisplay"
-  | "fontBody"
-  | "radius";
+  | "colorPk" | "colorPk2" | "colorGr" | "colorGr2"
+  | "colorBl" | "colorAm" | "colorRd"
+  | "colorD1" | "colorD2" | "colorD3" | "colorD4" | "colorBg"
+  | "fontDisplay" | "fontBody" | "radius";
 
 export type TokenOverrides = Partial<Record<OverridableTokenKey, string>>;
 
-// ---------------------------------------------------------------------------
-// buildCssVariableBlock — server-side per-company override injection
-// ---------------------------------------------------------------------------
 export function buildCssVariableBlock(overrides: TokenOverrides): string {
   const vars: string[] = [];
   if (overrides.colorPk)     vars.push(`--pk: ${overrides.colorPk};`);

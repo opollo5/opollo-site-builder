@@ -34,7 +34,7 @@ export default async function OptimiserLayout({
       >
         Skip to main content
       </a>
-      <header className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border bg-canvas/95 backdrop-blur">
         <nav className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3 text-sm">
           <span className="flex items-center gap-2 font-semibold tracking-tight">
             {/* eslint-disable-next-line @next/next/no-img-element */}
