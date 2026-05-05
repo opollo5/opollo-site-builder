@@ -181,7 +181,7 @@ test.describe("M13-5d appearance panel", () => {
 
     // The blocked-preflight summary surfaces the blocker code so an
     // on-call operator can match it against the runbook.
-    await expect(page.getByText(/REST_UNREACHABLE/)).toBeVisible();
+    await expect(page.getByText(/REST_UNREACHABLE/).first()).toBeVisible();
 
     await auditA11y(page, testInfo);
   });
