@@ -77,7 +77,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 | P1 | Schema, RLS, auth helpers | ✅ Shipped (#376 migration 0070; #435 migration 0074 audit cols + brand governance + image-gen log + version_lock + soft-delete + `_active` views) |
 | P2 | Invitation flow (send, accept, set password) | ✅ Shipped (P2-1 #378 auth helpers; P2-2 #380 send/revoke; P2-3 #385 accept; #388 accept-page follow-up; P2-4 #403 reminder + expiry callbacks) |
 | P3 | Opollo staff view: `/admin/platform/companies` (list, create, brand overview) | ✅ Shipped (P3-1 #387 list; P3-2 #391 create; P3-3 #393 detail; P3-4 #395 invite-from-detail) |
-| P4 | Customer admin: `/company/users` (invite, manage roles) | ✅ Shipped (#397). **Route note:** customer surface lives under `/company/*`, not `/customer/*` as originally drafted — the rest of this doc still says `/customer/...` in places; treat those as `/company/...` until a future cleanup unifies the prose. |
+| P4 | Customer admin: `/company/users` (invite, manage roles) | ✅ Shipped (#397). Customer surface lives under `/company/*`. The route structure section and this doc have been updated to reflect the final naming. |
 | P5 | Notification system (email + in-app foundation) | ✅ Shipped (#399 dispatcher) |
 | P-Brand-1 | Brand profile editor: `/company/settings/brand` (visual identity + tone + content rules + version history) | ✅ Shipped (P-Brand-1a/1b/1c #448 editor + API + landing integration; P-Brand-1d #453 E2E helper + spec) |
 | P-Brand-2 | Brand helper functions: `get_active_brand_profile()`, `can_access_product()`, completion tier logic | ✅ Shipped: DB helpers in #435; `getBrandTier()` + tier label/description in `lib/platform/brand/completion.ts` (P-Brand-1c). |
@@ -126,31 +126,35 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 ```
 app/
 ├── admin/                          ← EXISTING operator routes (do not move)
-│   ├── platform/                   ← NEW: Opollo staff managing customer companies
+│   ├── platform/                   ← Opollo staff managing customer companies
 │   │   ├── companies/              ← list, create, brand overview, product subscriptions
 │   │   └── companies/[id]/         ← company detail, brand, social settings
 │   └── [existing routes unchanged]
-├── customer/                       ← NEW: customer-facing (different layout shell, different gate)
-│   ├── layout.tsx                  ← customer chrome (no admin sidebar)
-│   ├── dashboard/                  ← company overview, brand completion prompt
-│   ├── settings/
-│   │   ├── brand/                  ← brand profile editor
-│   │   └── users/                  ← invite + manage team
+├── company/                        ← customer-facing (different layout shell, different gate)
+│   ├── layout.tsx                  ← customer chrome (CompanyTopNav, NotificationBell, Toaster)
 │   ├── social/
-│   │   ├── calendar/               ← read-only calendar (magic link or logged-in)
-│   │   └── posts/                  ← compose, approve, schedule
-│   └── image/                      ← mood board generation UI
+│   │   ├── layout.tsx              ← social sub-nav strip (sticky below company header)
+│   │   ├── posts/                  ← compose, approve, schedule
+│   │   ├── posts/[id]/             ← post detail, variants, approval, schedule, publish history
+│   │   ├── analytics/              ← social analytics dashboard (KPIs, charts, recent/pending)
+│   │   └── connections/            ← connect / reconnect / health
+│   ├── users/                      ← invite + manage team
+│   └── settings/
+│       └── brand/                  ← brand profile editor
 ├── review/[token]/                 ← magic-link approval (no auth session, scoped token)
-├── calendar/[token]/               ← magic-link read-only calendar
+├── viewer/[token]/                 ← magic-link read-only calendar
 ├── invite/[token]/                 ← invitation acceptance
 └── api/
     ├── platform/                   ← platform API routes
-    ├── social/                     ← social API routes
-    ├── image/                      ← image generation API routes
-    └── webhooks/bundle-social/     ← bundle.social webhook receiver
+    │   └── social/posts/           ← post CRUD + transitions (submit, approve, reject, schedule, publish)
+    ├── cron/                       ← Vercel cron jobs (watchdog, CAP, connection sweep)
+    ├── webhooks/
+    │   ├── bundlesocial/           ← bundle.social inbound (post.published / post.failed)
+    │   └── qstash/social-publish/  ← QStash → fireScheduledPublish
+    └── [existing routes unchanged]
 ```
 
-**Critical:** `/customer/*` uses a different layout shell and auth gate from `/admin/*`. Middleware must apply different policy to each prefix. Do NOT bolt customer auth onto existing `/admin/*` routes.
+**Critical:** `/company/*` uses a different layout shell and auth gate from `/admin/*`. Middleware applies `getCurrentPlatformSession()` to `/company/*` and the existing operator gate to `/admin/*`. Do NOT bolt customer auth onto existing `/admin/*` routes.
 
 ---
 
@@ -344,7 +348,7 @@ Read the image-generation skill before touching anything in `lib/image/`.
 ## What is NOT V1
 
 - ~~AI writing assistants / CAP automated copy~~ (shipped — Phase D D1–D4 PRs #506–#508; I5 image trigger PR #510)
-- Analytics dashboards (Phase 2)
+- ~~Analytics dashboards~~ (shipped — `/company/social/analytics`, `lib/platform/social/analytics.ts`)
 - Multi-company users (one company per user in V1)
 - SSO (email + password only)
 - Two-factor auth for customer users (Phase 2)
