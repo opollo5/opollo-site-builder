@@ -29,24 +29,7 @@ export default async function CompanyLandingPage() {
 
   if (!session.company) {
     if (session.isOpolloStaff) {
-      return (
-        <main className="mx-auto max-w-3xl p-6 text-sm">
-          <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
-            <p className="font-medium">No company selected.</p>
-            <p className="mt-1 text-muted-foreground">
-              You&apos;re logged in as Opollo staff. To view a company&apos;s
-              social media, open the company in the admin panel and click
-              &ldquo;Join as admin&rdquo;.
-            </p>
-            <Link
-              href="/admin/companies"
-              className="mt-3 inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Go to Companies →
-            </Link>
-          </div>
-        </main>
-      );
+      redirect("/admin/companies");
     }
     return (
       <main className="mx-auto max-w-3xl p-6 text-sm">

@@ -14,16 +14,27 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
-// P3-4 — invite-user button + modal. Self-contained client component.
-// Drops into the company detail header. Posts to POST /api/platform/invitations
-// (which gates on requireCanDoForApi(companyId, "manage_invitations") via
-// session cookie — operator opollo_users staff and customer admins both
-// satisfy this on /admin/companies/[id]).
-//
-// On success: close the modal + router.refresh() so the new pending row
-// appears in the detail page's pending-invitations table.
-
 type Role = "admin" | "approver" | "editor" | "viewer";
+
+const ERROR_MESSAGES: Record<string, string> = {
+  PENDING_INVITE_EXISTS:
+    "An active invitation already exists for this email. Revoke it first, then re-invite.",
+  ACTIVE_MEMBERSHIP_EXISTS:
+    "This email is already a member of a company on the platform.",
+  EMAIL_DELIVERY_FAILED:
+    "Invitation created but the email failed to send. The user will receive a reminder in 3 days, or you can revoke and resend.",
+  VALIDATION_FAILED: "Please check the email address and try again.",
+  COMPANY_NOT_FOUND: "Company not found. Refresh the page and try again.",
+  FORBIDDEN: "You don't have permission to invite users to this company.",
+};
+
+function friendlyError(code: string | undefined, fallback: string): string {
+  return (code && ERROR_MESSAGES[code]) ?? fallback;
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 const ROLE_OPTIONS: Array<{ value: Role; label: string; help: string }> = [
   {
@@ -102,7 +113,10 @@ export function PlatformInviteUserModal({
 
     if (!response.ok || !json?.ok) {
       setError(
-        json?.error?.message ?? `Request failed (${response.status}).`,
+        friendlyError(
+          json?.error?.code,
+          json?.error?.message ?? `Request failed (${response.status}).`,
+        ),
       );
       setSubmitting(false);
       return;
@@ -209,7 +223,7 @@ export function PlatformInviteUserModal({
               <Button
                 type="submit"
                 data-testid="invite-submit"
-                disabled={submitting || !email.trim()}
+                disabled={submitting || !isValidEmail(email)}
               >
                 {submitting ? "Sending…" : "Send invitation"}
               </Button>

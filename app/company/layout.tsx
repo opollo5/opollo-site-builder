@@ -1,19 +1,13 @@
-import type { ReactNode } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 
-import { CompanyTopNav } from "@/components/CompanyTopNav";
-import { NotificationBell } from "@/components/NotificationBell";
+import {
+  CompanySidebar,
+  COMPANY_SIDEBAR_COLLAPSED_COOKIE,
+} from "@/components/CompanySidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
-
-// ---------------------------------------------------------------------------
-// /company — outer shell layout.
-//
-// Provides the full-page chrome (skip link, sticky brand header, Toaster)
-// for all /company/* routes. The /company/social/* sub-layout adds its own
-// secondary tab strip beneath this header; it must NOT duplicate the outer
-// min-h-screen wrapper, skip link, or NotificationBell.
-// ---------------------------------------------------------------------------
 
 export default async function CompanyLayout({
   children,
@@ -25,36 +19,34 @@ export default async function CompanyLayout({
     redirect(`/login?next=${encodeURIComponent("/company")}`);
   }
 
-  const companyId = session.company?.companyId ?? null;
+  const isAdmin =
+    session.isOpolloStaff || session.company?.role === "admin";
+
+  const initialCollapsed =
+    cookies().get(COMPANY_SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-canvas text-foreground sm:flex">
       <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none"
+        href="#company-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
       >
         Skip to main content
       </a>
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center gap-2 px-6 py-2">
-          <span className="mr-3 shrink-0 text-sm font-semibold tracking-tight">
-            Opollo
-          </span>
-          <CompanyTopNav />
-          <div className="ml-auto">
-            {companyId ? (
-              <NotificationBell companyId={companyId} />
-            ) : null}
-          </div>
-        </div>
-      </header>
-      <div
-        id="main-content"
+      <CompanySidebar
+        email={session.email}
+        isOpolloStaff={session.isOpolloStaff}
+        isAdmin={isAdmin}
+        companyId={session.company?.companyId ?? null}
+        initialCollapsed={initialCollapsed}
+      />
+      <main
+        id="company-main"
         tabIndex={-1}
-        className="scroll-mt-14 focus:outline-none"
+        className="min-w-0 flex-1 px-4 py-6 scroll-mt-16 focus:outline-none sm:px-8 sm:py-8"
       >
-        {children}
-      </div>
+        <div className="mx-auto max-w-5xl">{children}</div>
+      </main>
       <Toaster />
     </div>
   );

@@ -54,7 +54,7 @@ export function PlatformCompanyDetail({
 
       {isOpolloStaff && (
         <section
-          className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3"
+          className="rounded-lg border border-border bg-muted/30 px-4 py-3"
           aria-label="Staff access"
           data-testid="staff-join-section"
         >
