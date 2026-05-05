@@ -305,7 +305,10 @@ function parseMigrations(): MigrationSchema {
     .sort();
 
   for (const f of files) {
-    const src = readSafe(join(migDir, f));
+    const rawSrc = readSafe(join(migDir, f));
+    // Strip SQL single-line comments so that sequences like -- ...(foo); inside
+    // a comment don't trick the non-greedy CREATE TABLE body regex into stopping early.
+    const src = rawSrc.replace(/--[^\r\n]*/g, "");
     const version = f.split("_")[0];
 
     // CREATE TABLE [IF NOT EXISTS] [public.]name (...);
@@ -319,8 +322,13 @@ function parseMigrations(): MigrationSchema {
       const cols = columns.get(tbl) ?? new Set<string>();
       // Each line that starts with an identifier → column name.
       for (const rawLine of body.split(/,\s*\n|,(?=\s*[a-zA-Z_])/)) {
-        const stripped = rawLine.trim();
-        const colMatch = stripped.match(/^["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?\s+/);
+        // Skip past SQL -- comment lines to find the actual column definition.
+        const colLine = rawLine.split("\n").find((l) => {
+          const t = l.trim();
+          return t.length > 0 && !t.startsWith("--");
+        });
+        if (!colLine) continue;
+        const colMatch = colLine.trim().match(/^["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?\s+/);
         if (colMatch) {
           const colName = colMatch[1].toLowerCase();
           // Filter out keywords that aren't columns.
@@ -340,20 +348,49 @@ function parseMigrations(): MigrationSchema {
       columns.set(tbl, cols);
     }
 
-    // ALTER TABLE name ADD COLUMN [IF NOT EXISTS] col ...
-    const alterRe =
-      /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
-    let am;
-    while ((am = alterRe.exec(src)) !== null) {
-      const tbl = am[1];
-      const col = am[2].toLowerCase();
-      const cols = columns.get(tbl) ?? new Set<string>();
-      cols.add(col);
-      columns.set(tbl, cols);
+    // ALTER TABLE name ADD COLUMN [IF NOT EXISTS] col ... (multi-column aware)
+    // Find each ALTER TABLE statement boundary then collect all ADD COLUMN
+    // clauses within it, so multi-column ALTER TABLE statements are fully parsed.
+    const alterTableRe =
+      /ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
+    let at2;
+    while ((at2 = alterTableRe.exec(src)) !== null) {
+      const tbl = at2[1];
+      const stmtEnd = src.indexOf(";", at2.index + at2[0].length);
+      if (stmtEnd === -1) continue;
+      const stmtBody = src.slice(at2.index + at2[0].length, stmtEnd);
+      const addColRe =
+        /ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
+      let ac;
+      while ((ac = addColRe.exec(stmtBody)) !== null) {
+        const col = ac[1].toLowerCase();
+        const cols = columns.get(tbl) ?? new Set<string>();
+        cols.add(col);
+        columns.set(tbl, cols);
+      }
     }
   }
 
   return { columns, createdIn };
+}
+
+// Keep only depth-1 content so nested JSONB object keys don't appear as column names.
+function stripNestedBraces(text: string): string {
+  let result = "";
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === "{" || ch === "[") {
+      if (depth === 0) result += ch;
+      depth++;
+    } else if (ch === "}" || ch === "]") {
+      depth--;
+      if (depth === 0) result += ch;
+    } else if (depth === 1) {
+      result += ch;
+    }
+  }
+  return result;
 }
 
 function check3_dbColumnReferences(): Issue[] {
@@ -365,7 +402,7 @@ function check3_dbColumnReferences(): Issue[] {
   // columns. Writes of updated_by/created_by to these tables fail at
   // runtime with "column does not exist". Built-in list rather than
   // re-parsing the doc — these are the known offenders.
-  const AUDIT_NOT_YET_FOLDED = new Set(["sites"]);
+  const AUDIT_NOT_YET_FOLDED = new Set<string>([]);
 
   // Pattern: .from("name").update({ ... }) | .insert({ ... }) | .upsert({ ... })
   const callRe =
@@ -381,11 +418,14 @@ function check3_dbColumnReferences(): Issue[] {
       const objText = m[3];
       const knownCols = columns.get(table);
 
-      // Extract simple top-level keys: `key:` at start of identifier.
+      // Extract simple top-level keys only — strip nested {}/[] first so that
+      // JSONB sub-object keys (e.g. `details: { cancelled_by: ... }`) are not
+      // mistakenly treated as column names for the parent table.
+      const topLevelText = stripNestedBraces(objText);
       const keyRe = /(?:^|[\s,{])([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g;
       let km;
       const keysSeen = new Set<string>();
-      while ((km = keyRe.exec(objText)) !== null) {
+      while ((km = keyRe.exec(topLevelText)) !== null) {
         keysSeen.add(km[1].toLowerCase());
       }
 
