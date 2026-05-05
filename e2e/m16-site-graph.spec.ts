@@ -208,7 +208,7 @@ test.describe("M16 — Shared content manager", () => {
   test("shared content page shows content type badges", async ({ page }) => {
     await page.goto(`/admin/sites/${SITE_ID}/content`);
     await expect(page.getByText("Main CTA")).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/cta/i)).toBeVisible();
+    await expect(page.getByText(/cta/i).first()).toBeVisible();
     await expect(page.getByText(/testimonial/i)).toBeVisible();
   });
 

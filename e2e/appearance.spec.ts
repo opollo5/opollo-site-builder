@@ -47,7 +47,11 @@ async function findTestSite(): Promise<{ id: string }> {
       `E2E test site not found (prefix ${E2E_TEST_SITE_PREFIX}): ${error?.message ?? "no row"}`,
     );
   }
-  return { id: data.id as string };
+  const id = data.id as string;
+  // Appearance panel requires site_mode='new_design' to render AppearancePanelClient.
+  // Without it the page shows the onboarding prompt instead.
+  await svc.from("sites").update({ site_mode: "new_design" }).eq("id", id);
+  return { id };
 }
 
 test.describe("M13-5d appearance panel", () => {
