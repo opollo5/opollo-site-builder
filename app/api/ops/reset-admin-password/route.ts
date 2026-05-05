@@ -159,7 +159,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       );
     }
 
-    if (opolloUser.role !== "admin") {
+    if (opolloUser.role !== "super_admin") {
       logger.warn("ops_reset_admin_password_wrong_role", {
         email: normalizedEmail,
         role: opolloUser.role,
@@ -167,7 +167,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       });
       return jsonError(
         "FORBIDDEN",
-        "This endpoint can only reset passwords for users with role='admin'.",
+        "This endpoint can only reset passwords for users with role='super_admin'.",
         403,
       );
     }

@@ -139,7 +139,7 @@ let otherOperator: SeededAuthUser;
 
 beforeEach(async () => {
   process.env.FEATURE_SUPABASE_AUTH = "true";
-  admin = await seedAuthUser({ role: "admin" });
+  admin = await seedAuthUser({ role: "super_admin" });
   operator = await seedAuthUser({ role: "admin" });
   otherOperator = await seedAuthUser({ role: "admin" });
 });

@@ -342,7 +342,7 @@ describe("generateCAPPosts", () => {
     const callFn = makeStubCallFn(makeCannedResponse([]));
 
     const result = await generateCAPPosts(
-      { companyId: COMPANY_ID, platforms: [] as never, count: 1, triggeredBy: null },
+      { companyId: COMPANY_ID, platforms: ["invalid_platform"] as never, count: 1, triggeredBy: null },
       callFn,
     );
 

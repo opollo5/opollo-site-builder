@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { getActiveBrandProfile } from "@/lib/platform/brand";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -18,7 +18,9 @@ const COMPANY_NO_BRAND_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1";
 const COMPANY_HAS_BRAND_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2";
 
 describe("lib/platform/brand/get — getActiveBrandProfile", () => {
-  beforeAll(async () => {
+  beforeEach(async () => {
+    // _setup.ts TRUNCATE wipes platform_companies (and brand_profiles via
+    // CASCADE) before each test, so seed here rather than in beforeAll.
     const svc = getServiceRoleClient();
     const seed = await svc
       .from("platform_companies")
@@ -42,25 +44,6 @@ describe("lib/platform/brand/get — getActiveBrandProfile", () => {
     if (seed.error) {
       throw new Error(`seed companies: ${seed.error.message}`);
     }
-  });
-
-  afterAll(async () => {
-    const svc = getServiceRoleClient();
-    await svc
-      .from("platform_companies")
-      .delete()
-      .in("id", [COMPANY_NO_BRAND_ID, COMPANY_HAS_BRAND_ID]);
-  });
-
-  beforeEach(async () => {
-    const svc = getServiceRoleClient();
-    // Wipe brand rows for the test companies between tests so seeds are
-    // deterministic. Internal-company brand profile (from migration 0074
-    // seed) is untouched.
-    await svc
-      .from("platform_brand_profiles")
-      .delete()
-      .in("company_id", [COMPANY_NO_BRAND_ID, COMPANY_HAS_BRAND_ID]);
   });
 
   it("returns null when the company has no brand profile yet", async () => {

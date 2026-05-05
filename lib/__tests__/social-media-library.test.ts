@@ -18,8 +18,18 @@ const COMPANY_B = "abcdef00-0000-0000-0000-bbbbbbbb2323";
 beforeEach(async () => {
   vi.restoreAllMocks();
   // Default: HEAD returns 404 so the lib falls through to defaults.
-  vi.spyOn(globalThis, "fetch").mockResolvedValue(
-    new Response(null, { status: 404 }),
+  // Use mockImplementation so only HEAD requests are intercepted; Supabase
+  // inserts (POST) go to the real fetch — a null-body 404 fed to postgrest-js
+  // triggers the 404→204 catch branch, setting error=null/data=null and
+  // crashing callers that dereference insert.data.id.
+  const realFetch = globalThis.fetch;
+  vi.spyOn(globalThis, "fetch").mockImplementation(
+    (input: RequestInfo | URL, init?: RequestInit) => {
+      if ((init?.method ?? "GET").toUpperCase() === "HEAD") {
+        return Promise.resolve(new Response(null, { status: 404 }));
+      }
+      return realFetch(input as RequestInfo | URL, init);
+    },
   );
 
   const svc = getServiceRoleClient();

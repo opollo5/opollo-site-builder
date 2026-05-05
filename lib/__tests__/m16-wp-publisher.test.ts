@@ -266,20 +266,22 @@ async function seedM16SlotAndPages(prefix: string) {
     .single();
   if (jErr || !job) throw new Error(`job insert: ${jErr?.message ?? "no row"}`);
 
-  // Slot pre-linked to the M16 pages row (this is the M16 flow difference)
+  // Slot pre-linked to the M16 pages row (this is the M16 flow difference).
+  // generation_job_pages requires slot_index, inputs, and idempotency keys;
+  // site_id/page_type/slug/title are carried in the PublishContext arg, not
+  // stored as table columns.
   const { data: slot, error: sErr } = await svc
     .from("generation_job_pages")
     .insert({
-      job_id:    job.id,
-      site_id:   site.id,
-      page_type: "homepage",
-      slug:      `/${prefix}-home`,
-      title:     "Home",
-      design_system_version: 1,
-      state:     "validating",
-      worker_id: `worker-${prefix}`,
-      lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
-      pages_id:  pageRow.id,  // pre-link so publishSlot adopts the M16 row
+      job_id:                    job.id,
+      slot_index:                0,
+      inputs:                    {},
+      anthropic_idempotency_key: `ak-${prefix}-home`,
+      wp_idempotency_key:        `wk-${prefix}-home`,
+      state:                     "validating",
+      worker_id:                 `worker-${prefix}`,
+      lease_expires_at:          new Date(Date.now() + 60_000).toISOString(),
+      pages_id:                  pageRow.id,  // pre-link so publishSlot adopts the M16 row
     })
     .select("id")
     .single();

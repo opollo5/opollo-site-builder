@@ -12,7 +12,7 @@ test.describe("users admin surface", () => {
     page,
   }, testInfo) => {
     await page.goto("/admin/users");
-    await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
     await auditA11y(page, testInfo);
 
     // The seeded admin row is present. getByText would be a strict-mode

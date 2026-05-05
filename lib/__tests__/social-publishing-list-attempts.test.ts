@@ -104,6 +104,7 @@ async function seedAttempt(opts: {
       publish_job_id: job.data.id,
       post_variant_id: variant.data.id,
       connection_id: conn.data.id,
+      company_id: opts.companyId,
       status: opts.status ?? "succeeded",
       started_at: opts.startedAt,
       completed_at: opts.startedAt,

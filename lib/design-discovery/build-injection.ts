@@ -207,7 +207,7 @@ export function renderInjection(row: SiteContextRow | null): string {
 
   // new_design pathway — preserve the original DESIGN-DISCOVERY
   // behaviour, including the flag gate.
-  if (row.site_mode !== "new_design" && !isDesignContextEnabled()) {
+  if (row.site_mode === "new_design" && !isDesignContextEnabled()) {
     return "";
   }
 

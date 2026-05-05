@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   type FormState,
   buildPatch,
-} from "@/components/CustomerBrandProfileEditor";
+} from "@/lib/platform/brand/build-patch";
 import type { BrandProfile } from "@/lib/platform/brand";
 
 // P-Brand-1c — diff-only patch builder. Load-bearing because the PATCH

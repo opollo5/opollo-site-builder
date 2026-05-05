@@ -143,7 +143,7 @@ describe("POST /api/admin/users/invite: auth", () => {
 
   it("returns 403 when caller is operator", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "admin" });
+    const op = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 
     const res = await invitePOST(

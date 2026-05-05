@@ -416,7 +416,7 @@ describe("M3-1 — RLS policies", () => {
     });
     admin = await seedAuthUser({
       email: "m3-admin@opollo.test",
-      role: "admin",
+      role: "super_admin",
       persistent: true,
     });
     viewer = await seedAuthUser({

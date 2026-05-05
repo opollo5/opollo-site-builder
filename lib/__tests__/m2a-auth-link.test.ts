@@ -40,13 +40,13 @@ describe("M2a: handle_new_auth_user trigger", () => {
     expect(row?.role).toBe("user");
   });
 
-  it("promotes to 'admin' when email matches opollo_config.first_admin_email", async () => {
+  it("promotes to 'super_admin' when email matches opollo_config.first_admin_email", async () => {
     await setFirstAdminEmail("boss@opollo.test");
     // seedAuthUser with no role= override lets the trigger's decision stand.
     // Tracked for cleanup via the helper's internal Set.
     const user = await seedAuthUser({ email: "boss@opollo.test" });
     const row = await readOpolloUser(user.id);
-    expect(row?.role).toBe("admin");
+    expect(row?.role).toBe("super_admin");
   });
 
   it("leaves non-matching emails as 'viewer' even when first_admin_email is set", async () => {

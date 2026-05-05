@@ -6,8 +6,6 @@ import * as wp from "@/lib/wordpress";
 // AUTH-FOUNDATION P2.1 — capability + error mapping unit matrix.
 
 describe("testWpConnection", () => {
-  const originalGetMe = wp.wpGetMe;
-
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -179,7 +177,7 @@ describe("testWpConnection", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.code).toBe("INVALID_URL");
-    expect(originalGetMe).not.toHaveBeenCalled();
+    expect(vi.mocked(wp.wpGetMe)).not.toHaveBeenCalled();
   });
 
   it("rejects a non-http(s) URL", async () => {

@@ -146,7 +146,7 @@ describe("requireAdminForApi: FEATURE_SUPABASE_AUTH on, kill switch off", () => 
   });
 
   it("returns 403 FORBIDDEN for an operator when admin is required", async () => {
-    const operator = await seedAuthUser({ role: "admin" });
+    const operator = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(operator.email);
 
     const gate = await requireAdminForApi();

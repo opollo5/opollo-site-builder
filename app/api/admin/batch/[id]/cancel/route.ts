@@ -76,10 +76,10 @@ export async function POST(
     return errorJson("NOT_FOUND", "No job with that id.", 404);
   }
 
-  // Operators can only cancel their own jobs; admins can cancel any.
+  // super_admin can cancel any job; admin can only cancel their own.
   if (
     gate.user &&
-    gate.user.role !== "admin" &&
+    gate.user.role !== "super_admin" &&
     existing.created_by !== gate.user.id
   ) {
     return errorJson(

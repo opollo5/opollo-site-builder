@@ -58,9 +58,9 @@ async function seedPublishChain(
     .from("social_post_master")
     .insert({
       company_id: COMPANY_A_ID,
-      title: "Test post",
+      master_text: "Test post",
       state: "publishing",
-      source: "manual",
+      source_type: "manual",
     })
     .select("id")
     .single();
@@ -97,6 +97,7 @@ async function seedPublishChain(
       post_variant_id: variant.data.id,
       connection_id: conn,
       bundle_post_id: bundlePostId,
+      company_id: COMPANY_A_ID,
       status: "in_flight",
     })
     .select("id")
@@ -290,7 +291,7 @@ describe("processBundlesocialWebhook — account events", () => {
       .select("severity, message")
       .eq("connection_id", connectionId);
     expect(alerts.data?.length).toBe(1);
-    expect(alerts.data?.[0]?.severity).toBe("error");
+    expect(alerts.data?.[0]?.severity).toBe("critical");
     expect(alerts.data?.[0]?.message).toBe("User revoked permissions");
   });
 

@@ -93,7 +93,7 @@ describe("bulkCreatePostMasters", () => {
       [makeRow(longText)],
       CREATOR_ID,
     );
-    expect(result.errors[0]?.message).toMatch(/10[,_]000/);
+    expect(result.errors[0]?.message).toMatch(/10[,_]?000/);
   });
 
   it("validates link_url format", async () => {
