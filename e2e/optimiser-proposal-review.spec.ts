@@ -79,6 +79,9 @@ test.describe("optimiser — proposal review", () => {
     });
 
     await page.goto(`/optimiser/proposals/${proposal.id}`);
+    // RepromptForm defaults to "controlled" mode; switch to "free" to
+    // expose the "Augment the brief" freeform textarea.
+    await page.getByRole("button", { name: /free reprompt/i }).click();
     await page
       .getByPlaceholder(/Augment the brief/)
       .fill("Keep the existing testimonial component.");

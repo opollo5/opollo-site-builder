@@ -154,8 +154,7 @@ async function approvePageViaUI(opts: {
   const escaped = opts.pageTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const card = opts.page
     .getByRole("heading", { name: new RegExp(`1\\. ${escaped}`) })
-    .locator("..")
-    .locator("..");
+    .locator("../../..");
   await expect(card.getByText(/Awaiting review/i).first()).toBeVisible();
   await card.getByRole("button", { name: /approve this page/i }).click();
 }

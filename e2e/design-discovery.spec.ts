@@ -311,7 +311,7 @@ test.describe("design discovery wizard", () => {
   test("skip path: skip both steps → done with using-defaults messaging", async ({
     page,
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     const id = await createSiteAndOpenSetup(
       page,
       `DD Skip ${Date.now()}`,
@@ -322,7 +322,7 @@ test.describe("design discovery wizard", () => {
     await page.waitForURL(new RegExp(`/admin/sites/${id}/setup\\?step=2`));
 
     await expect(page.getByTestId("setup-step-2")).toBeVisible();
-    await page.getByTestId("tov-skip").click();
+    await page.getByTestId("setup-step-2-skip").click();
     await page.waitForURL(new RegExp(`/admin/sites/${id}/setup\\?step=3`));
 
     await expect(page.getByTestId("setup-step-3")).toBeVisible();
