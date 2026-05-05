@@ -34,7 +34,7 @@ function Thumbnail({ item }: { item: ImageListItem }) {
     return (
       <div
         aria-hidden="true"
-        className="flex h-12 w-12 items-center justify-center rounded bg-muted text-xs text-muted-foreground"
+        className="flex h-12 w-12 items-center justify-center rounded bg-muted text-sm text-muted-foreground"
       >
         —
       </div>
@@ -83,7 +83,7 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
   return (
     <div className="overflow-hidden rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="w-16 px-4 py-2 font-medium">Preview</th>
             <th className="px-4 py-2 font-medium">Caption</th>
@@ -117,7 +117,7 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
                   )}
                 </Link>
                 {item.filename && (
-                  <div className="mt-1 text-xs text-muted-foreground">
+                  <div className="mt-1 text-sm text-muted-foreground">
                     {item.filename}
                   </div>
                 )}
@@ -125,19 +125,19 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
               <td className="px-4 py-3 align-top">
                 <div className="flex flex-wrap gap-1">
                   {item.tags.length === 0 ? (
-                    <span className="text-xs text-muted-foreground">—</span>
+                    <span className="text-sm text-muted-foreground">—</span>
                   ) : (
                     item.tags.slice(0, 6).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded bg-muted px-2 py-0.5 text-xs"
+                        className="rounded bg-muted px-2 py-0.5 text-sm"
                       >
                         {tag}
                       </span>
                     ))
                   )}
                   {item.tags.length > 6 && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       +{item.tags.length - 6}
                     </span>
                   )}
@@ -146,10 +146,10 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
               <td className="px-4 py-3 align-top">
                 <StatusPill kind={imageSourceKind(item.source)} />
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {formatDimensions(item.width_px, item.height_px)}
               </td>
-              <td className="px-4 py-3 align-top text-xs text-muted-foreground">
+              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
                 {formatRelativeTime(item.created_at)}
               </td>
             </tr>

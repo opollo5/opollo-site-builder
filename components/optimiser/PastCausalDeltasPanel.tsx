@@ -48,7 +48,7 @@ export function PastCausalDeltasPanel({
         {[crSummary, scoreSummary].filter(Boolean).join(" / ")}
         {confidenceLabel ? ` with ${confidenceLabel}` : ""}.
       </p>
-      <ul className="mt-2 space-y-1 text-xs text-emerald-800/80">
+      <ul className="mt-2 space-y-1 text-sm text-emerald-800/80">
         {deltas.slice(0, 3).map((d) => (
           <li key={d.id}>
             ·{" "}

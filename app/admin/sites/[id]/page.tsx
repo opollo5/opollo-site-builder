@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
+import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { SetupReminderBanner } from "@/components/SetupReminderBanner";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
@@ -15,7 +16,7 @@ import {
   siteStatusKind,
 } from "@/components/ui/status-pill";
 import { H1, H3 } from "@/components/ui/typography";
-import { FileText, Layers, Sparkles, Workflow } from "lucide-react";
+import { FileText, LayoutTemplate, Layers, Sparkles, Workflow } from "lucide-react";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -131,7 +132,15 @@ export default async function SiteDetailPage({
   // site surface but only admins edit caps. The badge itself is
   // visible to operators for budget self-diagnosis.
   const tenantBudget = await getTenantBudget(site.id);
-  const isAdmin = access.user?.role === "admin" || access.user === null;
+  // Migration 0057 collapsed the legacy {admin, operator, viewer} tiers
+  // into {super_admin, admin, user}. The trusted-operator gate must
+  // include BOTH super_admin AND admin (UAT 2026-05-03 — super_admin
+  // hi@opollo.com was missing every isAdmin-gated UI control on this
+  // page, including the Budget edit button).
+  const isAdmin =
+    access.user?.role === "admin" ||
+    access.user?.role === "super_admin" ||
+    access.user === null;
 
   // M12-1 — briefs list. Empty for sites that haven't uploaded one yet.
   const briefsResult = await listSiteBriefs(site.id);
@@ -141,13 +150,44 @@ export default async function SiteDetailPage({
   // the setup wizard. Renders only when BOTH discovery statuses are
   // 'pending'; the banner itself manages dismissal via localStorage.
   const setupStatusResult = await getSetupStatus(site.id);
+
+  // DESIGN-SYSTEM-OVERHAUL PR 6 — site_mode gate. NULL = operator
+  // hasn't picked between copy_existing / new_design yet. Render the
+  // onboarding banner and suppress the design-discovery one (which
+  // only applies to the new_design path).
+  // PR 12 — also pull the extracted profile and concept tokens so the
+  // "Design system" sidebar card can render a mode-aware preview
+  // (palette swatches for copy_existing, concept thumbnail for
+  // new_design) without a second round-trip.
+  const { data: siteModeRow } = await svc
+    .from("sites")
+    .select(
+      "site_mode, extracted_design, design_tokens, homepage_concept_html, design_direction_status",
+    )
+    .eq("id", site.id)
+    .maybeSingle();
+  const siteMode = (siteModeRow?.site_mode as string | null) ?? null;
+  const extractedDesign = (siteModeRow?.extracted_design ?? null) as
+    | { colors?: Record<string, string | null> }
+    | null;
+  const designTokens = (siteModeRow?.design_tokens ?? null) as
+    | Record<string, string>
+    | null;
+  const conceptHtml =
+    (siteModeRow?.homepage_concept_html as string | null) ?? null;
+  const designApproved =
+    (siteModeRow?.design_direction_status as string | null) === "approved";
+  const needsOnboarding = siteMode === null;
   const needsSetupReminder =
+    !needsOnboarding &&
+    siteMode === "new_design" &&
     setupStatusResult.ok &&
     setupStatusResult.data.design_direction_status === "pending" &&
     setupStatusResult.data.tone_of_voice_status === "pending";
 
   return (
     <>
+      {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
       {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -159,7 +199,7 @@ export default async function SiteDetailPage({
             ]}
           />
           <H1 className="mt-2">{site.name}</H1>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
             <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
             <a
               href={site.wp_url}
@@ -192,7 +232,7 @@ export default async function SiteDetailPage({
             <H3>Recent batches</H3>
             <Link
               href={`/admin/batches?site_id=${encodeURIComponent(site.id)}`}
-              className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+              className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               View all →
             </Link>
@@ -214,7 +254,7 @@ export default async function SiteDetailPage({
                 />
               </div>
             ) : (
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Template</th>
@@ -289,7 +329,7 @@ export default async function SiteDetailPage({
                 />
               </div>
             ) : (
-              <table className="w-full text-xs">
+              <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-left text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Title</th>
@@ -350,8 +390,91 @@ export default async function SiteDetailPage({
 
           <div className="rounded-lg border p-3">
             <H3>Design system</H3>
-            <div className="mt-2 text-xs">
-              {ds ? (
+            <div className="mt-2 text-sm" data-testid="site-design-system-card">
+              {needsOnboarding ? (
+                <>
+                  <p className="text-muted-foreground">
+                    Not set up. Pick how you want to use this site to get going.
+                  </p>
+                  <Link
+                    href={`/admin/sites/${site.id}/onboarding`}
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
+                    data-testid="site-design-system-onboarding-link"
+                  >
+                    Set up now →
+                  </Link>
+                </>
+              ) : siteMode === "copy_existing" ? (
+                <>
+                  <p className="font-medium">Copy existing site</p>
+                  {extractedDesign?.colors ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(["primary", "secondary", "accent", "background", "text"] as const).map(
+                        (key) => {
+                          const color = extractedDesign.colors?.[key];
+                          if (!color) return null;
+                          return (
+                            <span
+                              key={key}
+                              className="h-5 w-5 rounded border"
+                              style={{ backgroundColor: color }}
+                              title={`${key}: ${color}`}
+                              aria-label={`${key} colour ${color}`}
+                            />
+                          );
+                        },
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      No design profile extracted yet.
+                    </p>
+                  )}
+                  <Link
+                    href={`/admin/sites/${site.id}/setup/extract`}
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
+                  >
+                    {extractedDesign ? "Edit profile →" : "Run extraction →"}
+                  </Link>
+                </>
+              ) : siteMode === "new_design" ? (
+                <>
+                  <p className="font-medium">New design</p>
+                  {designApproved && designTokens ? (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {(["primary", "secondary", "accent", "background", "text"] as const).map(
+                        (key) => {
+                          const color = designTokens[key];
+                          if (!color) return null;
+                          return (
+                            <span
+                              key={key}
+                              className="h-5 w-5 rounded border"
+                              style={{ backgroundColor: color }}
+                              title={`${key}: ${color}`}
+                              aria-label={`${key} colour ${color}`}
+                            />
+                          );
+                        },
+                      )}
+                    </div>
+                  ) : conceptHtml ? (
+                    <p className="mt-1 text-muted-foreground">
+                      Concept drafted; setup not yet approved.
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground">
+                      Setup wizard not started.
+                    </p>
+                  )}
+                  <Link
+                    href={`/admin/sites/${site.id}/setup`}
+                    className="mt-2 inline-block text-muted-foreground transition-smooth hover:text-foreground"
+                  >
+                    {designApproved ? "Edit setup →" : "Continue setup →"}
+                  </Link>
+                </>
+              ) : ds ? (
                 <>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Version {String(ds.version)}</span>
@@ -403,15 +526,55 @@ export default async function SiteDetailPage({
               <Layers aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Appearance</H3>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Sync the active DS palette to Kadence on this site&apos;s
                   WordPress install.
                 </p>
                 <Link
                   href={`/admin/sites/${site.id}/appearance`}
-                  className="mt-2 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                 >
                   Open Appearance panel →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* M16 — Site Plan Review (blueprint pages). */}
+          <div className="rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <LayoutTemplate aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <H3>Site Plan</H3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Review and approve the AI-generated page blueprint before
+                  running batch generation.
+                </p>
+                <Link
+                  href={`/admin/sites/${site.id}/blueprints/review`}
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                  Open Site Plan →
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* M16 — Shared Content Manager. */}
+          <div className="rounded-lg border p-3">
+            <div className="flex items-start gap-2">
+              <FileText aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <H3>Shared Content</H3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Reusable content objects — CTAs, testimonials, and FAQ items
+                  shared across generated pages.
+                </p>
+                <Link
+                  href={`/admin/sites/${site.id}/content`}
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                >
+                  Open Shared Content →
                 </Link>
               </div>
             </div>
@@ -430,13 +593,13 @@ export default async function SiteDetailPage({
                     <StatusPill kind="brief_parsing" label="Not set" />
                   )}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Brand voice &amp; design direction defaults that every new
                   brief inherits.
                 </p>
                 <Link
                   href={`/admin/sites/${site.id}/settings`}
-                  className="mt-2 inline-block text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+                  className="mt-2 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                 >
                   Open Settings →
                 </Link>

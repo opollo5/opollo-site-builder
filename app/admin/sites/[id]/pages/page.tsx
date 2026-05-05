@@ -150,7 +150,7 @@ export default async function SitePagesList({
         </div>
         <Link
           href={`/admin/sites/${params.id}`}
-          className="text-xs text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         >
           ← Site detail
         </Link>
@@ -164,7 +164,7 @@ export default async function SitePagesList({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="pages-q"
-            className="text-xs font-medium text-muted-foreground"
+            className="text-sm font-medium text-muted-foreground"
           >
             Search
           </label>
@@ -180,7 +180,7 @@ export default async function SitePagesList({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="pages-status"
-            className="text-xs font-medium text-muted-foreground"
+            className="text-sm font-medium text-muted-foreground"
           >
             Status
           </label>
@@ -198,7 +198,7 @@ export default async function SitePagesList({
         <div className="flex flex-col gap-1">
           <label
             htmlFor="pages-type"
-            className="text-xs font-medium text-muted-foreground"
+            className="text-sm font-medium text-muted-foreground"
           >
             Type
           </label>
@@ -230,14 +230,14 @@ export default async function SitePagesList({
               page_type: null,
               page: 1,
             })}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground"
           >
             Clear
           </Link>
         )}
       </form>
 
-      <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <div data-testid="pages-range">
           {total === 0 ? "0 pages" : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
         </div>

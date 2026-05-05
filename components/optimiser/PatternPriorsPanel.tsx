@@ -50,7 +50,7 @@ export function PatternPriorsPanel({
       <header className="space-y-1">
         <p className="font-medium">
           Cross-client priors
-          <span className="ml-2 text-xs uppercase tracking-wide opacity-80">
+          <span className="ml-2 text-sm uppercase tracking-wide opacity-80">
             anonymised, {label}
           </span>
         </p>
@@ -64,12 +64,12 @@ export function PatternPriorsPanel({
           </strong>{" "}
           (95% CI: {ciLow.toFixed(1)} to {ciHigh.toFixed(1)}).
         </p>
-        <p className="text-xs opacity-80">
+        <p className="text-sm opacity-80">
           Pattern: <em>{top.observation}</em>
         </p>
       </header>
       {patterns.length > 1 && (
-        <ul className="mt-3 space-y-1 text-xs opacity-90">
+        <ul className="mt-3 space-y-1 text-sm opacity-90">
           {patterns.slice(1, 4).map((p) => {
             const m = Number(p.effect_pp_mean);
             const s = m >= 0 ? "+" : "";
@@ -83,7 +83,7 @@ export function PatternPriorsPanel({
           })}
         </ul>
       )}
-      <p className="mt-3 text-xs opacity-70">
+      <p className="mt-3 text-sm opacity-70">
         Cross-client patterns are anonymised structural observations
         only — no client names, URLs, copy, testimonials, or pricing
         leave the contributing accounts. Per spec §11.2.

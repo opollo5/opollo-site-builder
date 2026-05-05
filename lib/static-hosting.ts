@@ -2,9 +2,40 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 
-import Client from "ssh2-sftp-client";
+import type ClientType from "ssh2-sftp-client";
 
 import { logger } from "@/lib/logger";
+
+// ssh2-sftp-client depends on ssh2's native C++ addon (sshcrypto.node).
+// Vercel's serverless build will not bundle the native binary, and at
+// runtime the addon may also fail to load on platforms that don't ship
+// the OpenSSL headers it needs. The module is loaded lazily inside
+// writeStaticPage and any failure (build-time externalisation gap or
+// runtime loader error) is converted into a dry-run result. Production
+// SiteGround writes will only succeed in environments that resolve the
+// require — the dry-run fallback is the existing safe path.
+type SftpClientCtor = new () => ClientType;
+
+async function loadSftpClient(): Promise<
+  | { ok: true; ctor: SftpClientCtor }
+  | { ok: false; error: string }
+> {
+  try {
+    const mod = (await import("ssh2-sftp-client")) as
+      | { default: SftpClientCtor }
+      | SftpClientCtor;
+    const ctor =
+      typeof mod === "function"
+        ? (mod as SftpClientCtor)
+        : (mod.default as SftpClientCtor);
+    return { ok: true, ctor };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // OPTIMISER PHASE 1.5 SLICE 14 — Static-file write to SiteGround.
@@ -70,7 +101,10 @@ export type StaticWriteResult =
     };
 
 export interface DryRunPayload {
-  reason: "credentials_not_configured" | "credentials_invalid";
+  reason:
+    | "credentials_not_configured"
+    | "credentials_invalid"
+    | "module_unavailable";
   missing_env_vars: string[];
   target_path: string;
   body_size: number;
@@ -149,7 +183,22 @@ export async function writeStaticPage(
 
   const target = targetPath(input);
   const archive = historyPath(input);
-  const sftp = new Client();
+
+  const loaded = await loadSftpClient();
+  if (!loaded.ok) {
+    logger.warn("static-hosting: ssh2-sftp-client unavailable, dry-running", {
+      err: loaded.error,
+      target,
+    });
+    return {
+      ok: true,
+      dry_run: true,
+      payload: buildDryRunPayload(input, "module_unavailable", [
+        "ssh2-sftp-client (native module unavailable)",
+      ]),
+    };
+  }
+  const sftp = new loaded.ctor();
 
   try {
     await sftp.connect({
@@ -231,7 +280,7 @@ function dirname(path: string): string {
   return idx > 0 ? path.slice(0, idx) : "/";
 }
 
-async function ensureDir(sftp: Client, dir: string): Promise<void> {
+async function ensureDir(sftp: ClientType, dir: string): Promise<void> {
   try {
     await sftp.mkdir(dir, true);
   } catch (err) {
@@ -244,7 +293,7 @@ async function ensureDir(sftp: Client, dir: string): Promise<void> {
   }
 }
 
-async function fileExists(sftp: Client, path: string): Promise<boolean> {
+async function fileExists(sftp: ClientType, path: string): Promise<boolean> {
   try {
     const stat = await sftp.stat(path);
     return Boolean(stat);

@@ -72,7 +72,7 @@ function denyResponse(
 export async function requireAdminForApi(
   opts: { roles?: readonly Role[] } = {},
 ): Promise<ApiGateResult> {
-  const roles = opts.roles ?? (["admin"] as const);
+  const roles = opts.roles ?? (["super_admin", "admin"] as const);
 
   if (!isSupabaseAuthOn()) return { kind: "allow", user: null };
 

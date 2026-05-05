@@ -41,12 +41,12 @@ function Label({
 
 function FieldError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return <p className="mt-1 text-sm text-destructive">{message}</p>;
 }
 
 function FieldWarning({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-yellow-700 dark:text-yellow-400">{message}</p>;
+  return <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">{message}</p>;
 }
 
 function initialFromTemplate(t: DesignTemplate): FormState {
@@ -360,7 +360,7 @@ export function TemplateFormModal({
               />
               <FieldError message={fieldErrors.page_type} />
               {mode.kind === "edit" && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Page type is immutable after create.
                 </p>
               )}
@@ -395,7 +395,7 @@ export function TemplateFormModal({
             <Label htmlFor="tf-composition">Template composition</Label>
             <textarea
               id="tf-composition"
-              className="mt-1 h-48 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-48 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.composition}
               onChange={(e) => setField("composition", e.target.value)}
               spellCheck={false}
@@ -403,7 +403,7 @@ export function TemplateFormModal({
             />
             <FieldError message={fieldErrors.composition} />
             <FieldWarning message={fieldWarnings.composition} />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Ordered array of {"{"} component, content_source {"}"} entries.
               Every <code>component</code> must resolve to a component in this
               design system — a warning shows above if one doesn&apos;t.
@@ -414,7 +414,7 @@ export function TemplateFormModal({
             <Label htmlFor="tf-required">Required fields per component</Label>
             <textarea
               id="tf-required"
-              className="mt-1 h-24 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-24 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.required_fields}
               onChange={(e) => setField("required_fields", e.target.value)}
               spellCheck={false}
@@ -427,7 +427,7 @@ export function TemplateFormModal({
             <Label htmlFor="tf-seo">SEO defaults (optional)</Label>
             <textarea
               id="tf-seo"
-              className="mt-1 h-20 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-20 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.seo_defaults}
               onChange={(e) => setField("seo_defaults", e.target.value)}
               spellCheck={false}

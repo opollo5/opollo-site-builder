@@ -150,12 +150,49 @@ function detectUnclosedFence(source: string): ParserWarning | null {
 }
 
 // ---------------------------------------------------------------------------
+// Dedent — strip common leading whitespace shared by all non-empty lines.
+//
+// Operators frequently paste briefs from indented sources (chat code
+// blocks, formatted docs) where every line has the same 2-4 space prefix.
+// The structural parser anchors on `^##` / `^#`, so the leading indent
+// turns headings into body-text-with-prefix and the parser misses them.
+// This helper runs first so the rest of the pipeline sees a column-zero
+// document.
+//
+// Idempotent: a brief with no leading whitespace returns unchanged.
+// ---------------------------------------------------------------------------
+
+function dedentSource(source: string): string {
+  if (!source) return source;
+  const lines = source.split(/\r?\n/);
+  let minIndent = Number.POSITIVE_INFINITY;
+  for (const line of lines) {
+    if (line.trim().length === 0) continue;
+    const match = /^[ \t]*/.exec(line);
+    const indent = match ? match[0].length : 0;
+    if (indent < minIndent) minIndent = indent;
+    if (minIndent === 0) break;
+  }
+  if (!Number.isFinite(minIndent) || minIndent === 0) return source;
+  return lines
+    .map((line) => (line.length >= minIndent ? line.slice(minIndent) : line))
+    .join("\n");
+}
+
+// ---------------------------------------------------------------------------
 // Structural path #1 — markdown H2 delimiters (primary).
 // Every `## <title>` line starts a new page.
 // ---------------------------------------------------------------------------
 
 function parseByH2(body: string, offset: number): BriefPageDraft[] {
-  const lineRegex = /^##\s+(.+?)\s*$/gm;
+  // UAT (2026-05-03 round-3): tolerate up to 3 spaces of leading
+  // whitespace on heading lines per CommonMark §4.2 (ATX headings).
+  // Operators frequently paste briefs from indented code blocks — the
+  // prior `^##` anchor required column 0, which silently turned every
+  // ## heading into body text and the parser dropped to single-page
+  // fallback. Tabs are normalised to spaces in pre-processing already
+  // so [ \t] is belt-and-suspenders.
+  const lineRegex = /^[ \t]{0,3}##\s+(.+?)\s*$/gm;
   const matches: Array<{ index: number; title: string; lineEnd: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = lineRegex.exec(body))) {
@@ -175,7 +212,9 @@ function parseByH2(body: string, offset: number): BriefPageDraft[] {
 // ---------------------------------------------------------------------------
 
 function parseByH1(body: string, offset: number): BriefPageDraft[] {
-  const lineRegex = /^#\s+(.+?)\s*$/gm;
+  // UAT (2026-05-03 round-3): same leading-whitespace tolerance as
+  // parseByH2. CommonMark §4.2 allows 0-3 spaces before an ATX heading.
+  const lineRegex = /^[ \t]{0,3}#\s+(.+?)\s*$/gm;
   const matches: Array<{ index: number; title: string; lineEnd: number }> = [];
   let m: RegExpExecArray | null;
   while ((m = lineRegex.exec(body))) {
@@ -472,7 +511,20 @@ export async function parseBriefDocument(opts: {
   const fenceWarning = detectUnclosedFence(source);
   if (fenceWarning) warnings.push(fenceWarning);
 
-  const { body, offset, warning: frontmatterWarning } = stripFrontmatter(source);
+  // UAT (2026-05-03 round-3): normalise whitespace BEFORE structural parse.
+  //   - Replace non-breaking spaces (U+00A0, common from chat copy-paste)
+  //     with regular spaces so [ \t] regexes can match them.
+  //   - Dedent: detect the minimum leading whitespace shared by every
+  //     non-empty line and strip it. Operators frequently paste briefs
+  //     from indented contexts (chat code blocks, formatted docs); the
+  //     uniform indent turns ## headings into body-text-with-leading-space
+  //     that the structural parser silently misses, dropping the operator
+  //     into the single-page fallback. The dedent step is idempotent: a
+  //     brief with no leading whitespace is unchanged.
+  const normalisedSource = dedentSource(source.replace(/ /g, " "));
+
+  const { body, offset, warning: frontmatterWarning } =
+    stripFrontmatter(normalisedSource);
   if (frontmatterWarning) warnings.push(frontmatterWarning);
 
   // Structural-first. Order matters: H2 → H1-fallback → hrule → numbered.
@@ -504,19 +556,97 @@ export async function parseBriefDocument(opts: {
   });
   warnings.push(...inference.warnings);
 
-  if (inference.pages.length === 0) {
+  if (inference.pages.length > 0) {
     return {
-      ok: false,
-      code: "INFERENCE_FALLBACK_FAILED",
-      detail: "Claude returned no valid page entries for this document.",
+      ok: true,
+      parser_mode: "claude_inference",
+      pages: inference.pages,
+      warnings,
+    };
+  }
+
+  // UAT (2026-05-03) — single-page fallback. Operators don't always type
+  // briefs with formal page boundaries; sometimes a brief is just three
+  // paragraphs of "build me a homepage about X for SMBs". When the
+  // structural parser AND the Claude-inference fallback both fail to
+  // find page boundaries, treat the entire document as a single page.
+  // The page title comes from a leading heading if one exists, else the
+  // first non-empty line trimmed to 60 chars, else "Untitled page".
+  // Mode is short_brief vs full_text per the same word-count threshold
+  // as the structural path.
+  //
+  // UAT round-3 polish (2026-05-03): when the single-page fallback fires,
+  // strip the noisy tier-2 (Claude inference) warnings. Those warnings
+  // describe partial failures of an earlier tier whose output we just
+  // discarded; surfacing them on the review page makes the review look
+  // alarmist when the final result is fine. Keep only structural-parser
+  // warnings (tier 1) and append the single-page fallback note.
+  const trimmed = source.trim();
+  if (trimmed.length > 0) {
+    const inferredTitle = inferTitleFromBlob(trimmed);
+    const wordCount = countWords(trimmed);
+    const mode: BriefPageMode =
+      wordCount >= FULL_TEXT_WORD_THRESHOLD ? "full_text" : "short_brief";
+    // Strip tier-2 inference warnings — the inference output didn't land,
+    // its warnings are noise on the operator-visible review page.
+    const inferenceWarningCodes: ReadonlyArray<ParserWarning["code"]> = [
+      "INFERENCE_ENTRY_DROPPED",
+    ];
+    for (let i = warnings.length - 1; i >= 0; i--) {
+      if (inferenceWarningCodes.includes(warnings[i].code)) {
+        warnings.splice(i, 1);
+      }
+    }
+    warnings.push({
+      code: "HEADING_HIERARCHY_SKIPPED",
+      detail:
+        "No page boundaries were detected, so the whole document was treated as a single page. You can rename this page on the review form before committing.",
+    });
+    logger.info("brief-parser.single_page_fallback", {
+      brief_id: briefId,
+      word_count: wordCount,
+      title: inferredTitle,
+    });
+    return {
+      ok: true,
+      parser_mode: "claude_inference",
+      pages: [
+        {
+          ordinal: 0,
+          title: inferredTitle,
+          mode,
+          source_text: trimmed,
+          word_count: wordCount,
+          source_span_start: 0,
+          source_span_end: trimmed.length,
+        },
+      ],
       warnings,
     };
   }
 
   return {
-    ok: true,
-    parser_mode: "claude_inference",
-    pages: inference.pages,
+    ok: false,
+    code: "INFERENCE_FALLBACK_FAILED",
+    detail: "Claude returned no valid page entries for this document.",
     warnings,
   };
+}
+
+function inferTitleFromBlob(text: string): string {
+  // Prefer markdown headings: # / ## / ### lines anywhere in the doc.
+  const headingMatch = text.match(/^\s{0,3}#{1,3}\s+(.+)$/m);
+  if (headingMatch) {
+    const title = headingMatch[1].trim().slice(0, 60);
+    if (title.length > 0) return title;
+  }
+  // Fall back to the first non-empty line, trimmed.
+  const firstLine = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  if (firstLine && firstLine.length > 0) {
+    return firstLine.slice(0, 60);
+  }
+  return "Untitled page";
 }

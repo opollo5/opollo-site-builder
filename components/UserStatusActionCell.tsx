@@ -65,12 +65,12 @@ export function UserStatusActionCell({
   if (optimisticRevoked) {
     return (
       <div className="flex items-center gap-2">
-        <span className="text-xs text-destructive">revoked</span>
+        <span className="text-sm text-destructive">revoked</span>
         <button
           type="button"
           onClick={() => void reinstate()}
           disabled={submitting}
-          className="rounded border px-2 py-0.5 text-xs transition-smooth hover:bg-muted disabled:opacity-60"
+          className="rounded border px-2 py-0.5 text-sm transition-smooth hover:bg-muted disabled:opacity-60"
         >
           {submitting ? "…" : "Reinstate"}
         </button>
@@ -80,13 +80,13 @@ export function UserStatusActionCell({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="text-xs text-muted-foreground">active</span>
+      <span className="text-sm text-muted-foreground">active</span>
       <button
         type="button"
         onClick={() => setRevokeOpen(true)}
         disabled={isSelf || submitting}
         title={isSelf ? "You cannot revoke your own access." : undefined}
-        className="rounded border px-2 py-0.5 text-xs text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
+        className="rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
       >
         {submitting ? "…" : "Revoke"}
       </button>

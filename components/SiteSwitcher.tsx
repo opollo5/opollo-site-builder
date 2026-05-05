@@ -239,7 +239,7 @@ export function SiteSwitcher() {
                   />
                   <span className="flex-1 truncate">{s.name}</span>
                   {selected && (
-                    <span className="text-xs text-muted-foreground">✓</span>
+                    <span className="text-sm text-muted-foreground">✓</span>
                   )}
                 </button>
               );

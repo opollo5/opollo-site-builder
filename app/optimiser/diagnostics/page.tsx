@@ -82,7 +82,7 @@ export default async function OptimiserDiagnosticsPage() {
             <span className="font-mono">
               {report.pattern_library.consenting_client_count}
             </span>
-            <span className="ml-2 text-xs text-muted-foreground">
+            <span className="ml-2 text-sm text-muted-foreground">
               (gates BOTH contribution and application — §11.2.2)
             </span>
           </li>
@@ -92,7 +92,7 @@ export default async function OptimiserDiagnosticsPage() {
               {report.pattern_library.pattern_count}
             </span>
             {report.pattern_library.pattern_count > 0 && (
-              <span className="ml-2 text-xs text-muted-foreground">
+              <span className="ml-2 text-sm text-muted-foreground">
                 ({report.pattern_library.pattern_by_confidence.high} high
                 · {report.pattern_library.pattern_by_confidence.moderate}{" "}
                 moderate ·{" "}
@@ -113,11 +113,52 @@ export default async function OptimiserDiagnosticsPage() {
             </span>
           </li>
         </ul>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Pattern rows are anonymised by schema — no foreign keys to
           client/page/proposal. The extractor cron runs daily at 10:00
           UTC; per-client consent toggles on the client settings page.
         </p>
+      </section>
+
+      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-medium">
+          Server-error feed (Phase 1.5 slice D)
+        </h2>
+        <ModuleRow
+          label="Vercel logs env configured"
+          ok={report.server_error_feed.env_configured}
+          detail={
+            report.server_error_feed.env_configured
+              ? "Daily sync at 11:00 UTC writes opt_metrics_daily rows with source='server_errors'."
+              : `Missing: ${report.server_error_feed.missing.join(", ")}. Without this, staged-rollout error_rate threshold can't fire (errors_new stays 0).`
+          }
+        />
+        <ul className="space-y-1 text-sm">
+          <li>
+            <span className="text-muted-foreground">Last sync: </span>
+            <span className="font-mono">
+              {report.server_error_feed.last_synced_at
+                ? new Date(report.server_error_feed.last_synced_at).toLocaleString()
+                : "(never)"}
+            </span>
+          </li>
+          <li>
+            <span className="text-muted-foreground">Pages with 5xx (24h): </span>
+            <span
+              className={`font-mono ${report.server_error_feed.pages_with_errors_24h > 0 ? "text-amber-700" : ""}`}
+            >
+              {report.server_error_feed.pages_with_errors_24h}
+            </span>
+          </li>
+          <li>
+            <span className="text-muted-foreground">Total 5xx (24h): </span>
+            <span
+              className={`font-mono ${report.server_error_feed.total_5xx_24h > 0 ? "text-amber-700" : ""}`}
+            >
+              {report.server_error_feed.total_5xx_24h}
+            </span>
+          </li>
+        </ul>
       </section>
 
       <section className="space-y-4">
@@ -132,7 +173,7 @@ export default async function OptimiserDiagnosticsPage() {
                 {s.source.replace("_", " ")}
               </h3>
               <span
-                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${
+                className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${
                   s.env.configured
                     ? "border-emerald-200 bg-emerald-50 text-emerald-900"
                     : "border-red-200 bg-red-50 text-red-900"

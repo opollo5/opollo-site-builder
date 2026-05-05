@@ -209,10 +209,9 @@ export async function verifyClarity(clientId: string): Promise<VerifyResult> {
 }
 
 export async function verifyGa4(clientId: string): Promise<VerifyResult> {
-  const oauthClient =
-    process.env.GA4_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const oauthSecret =
-    process.env.GA4_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  // GA4 reuses the shared Google Ads OAuth client.
+  const oauthClient = process.env.GOOGLE_ADS_CLIENT_ID;
+  const oauthSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
   if (!oauthClient || !oauthSecret) {
     return {
       ok: false,

@@ -45,7 +45,7 @@ export function ComponentsGrid({
     <div className="space-y-8">
       {categories.map((cat) => (
         <section key={cat}>
-          <h2 className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <h2 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
             {cat}
           </h2>
           <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -60,15 +60,15 @@ export function ComponentsGrid({
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <div className="text-sm font-medium">{c.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-sm text-muted-foreground">
                         {variantLabel(c)}
                       </div>
                     </div>
-                    <div className="shrink-0 text-xs text-muted-foreground">
+                    <div className="shrink-0 text-sm text-muted-foreground">
                       v<span className="font-mono">{c.version_lock}</span>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     {countRequiredFields(c.content_schema)} required field
                     {countRequiredFields(c.content_schema) === 1 ? "" : "s"}
                   </p>

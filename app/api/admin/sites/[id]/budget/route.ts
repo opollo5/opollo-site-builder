@@ -3,6 +3,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody } from "@/lib/http";
+import { logger } from "@/lib/logger";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { updateTenantBudget } from "@/lib/tenant-budgets";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
@@ -75,19 +78,18 @@ export async function PATCH(
   // current usage on the site detail page but cannot raise / lower
   // caps. Tightening this rule needs an explicit role-policy decision,
   // not a drive-by widening.
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   if (!UUID_RE.test(params.id)) {
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -113,6 +115,7 @@ export async function PATCH(
   );
 
   if (!result.ok) {
+    logger.error("updateTenantBudget failed", { code: result.code });
     const status = errorCodeToStatus(
       result.code === "VERSION_CONFLICT"
         ? "VERSION_CONFLICT"

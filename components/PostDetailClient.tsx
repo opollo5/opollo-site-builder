@@ -143,13 +143,13 @@ export function PostDetailClient({
         <div>
           <H1>{post.title}</H1>
           <p className="mt-1 text-sm text-muted-foreground">
-            <code className="text-xs">/{post.slug}</code>
+            <code className="text-sm">/{post.slug}</code>
             {" · "}
             <StatusPill kind={postStatusKind(post.status)} className="capitalize" />
             {post.wp_post_id && (
               <>
                 {" · "}
-                <span className="text-xs">WP id {post.wp_post_id}</span>
+                <span className="text-sm">WP id {post.wp_post_id}</span>
               </>
             )}
           </p>
@@ -189,7 +189,7 @@ export function PostDetailClient({
           {"blocker" in preflight && (
             <>
               <p>{preflight.blocker.detail}</p>
-              <p className="mt-2 text-xs">
+              <p className="mt-2 text-sm">
                 <strong>What to do:</strong> {preflight.blocker.nextAction}
               </p>
             </>
@@ -231,7 +231,7 @@ export function PostDetailClient({
       )}
 
       {wpFrontendUrl && post.status === "published" && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Live on WordPress:{" "}
           <a
             href={wpFrontendUrl}

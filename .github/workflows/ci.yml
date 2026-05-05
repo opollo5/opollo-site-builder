@@ -33,10 +33,11 @@ jobs:
           # the file would make supabase db push try to re-apply it).
           # Each entry here needs a tracked follow-up to renumber + run
           # supabase migration repair across staging + prod.
-          #   - 0031: 0031_email_log.sql (#286) collides with
-          #           0031_optimiser_clients.sql (#293). One of the two
-          #           is silently missing from prod. Follow-up TBD.
-          allowlist="0031"
+          # Empty: the historical 0031 collision was resolved by
+          # renumbering 0031_optimiser_clients.sql → 0069. Production
+          # recovery for environments mid-collision is handled by
+          # deploy-migrations.yml's `repair_versions_applied` input.
+          allowlist=""
           fail=0
           for dir in supabase/migrations supabase/rollbacks; do
             [ -d "$dir" ] || continue
@@ -78,7 +79,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -97,7 +98,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -111,13 +112,43 @@ jobs:
       - run: npm run lint
       - run: npm run lint:css
 
+  static-audit:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint, typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      # PLATFORM-AUDIT — runs scripts/audit.ts (eight static checks).
+      # Exit code 1 on any HIGH severity issue → fails the job.
+      # See scripts/audit.ts header for the full check list. Output is
+      # captured to /tmp/audit.out so the failing-run summary step can
+      # paste it back as a PR comment.
+      - name: Run audit:static
+        env:
+          NO_COLOR: "1"
+        run: |
+          set -o pipefail
+          npm run audit:static 2>&1 | tee /tmp/audit.out
+
   build:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -133,7 +164,7 @@ jobs:
   test:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     # pull-requests: write is required by the "Post vitest output on
     # failure" step below. It lets the step upsert a comment on the PR
     # with the tail of /tmp/vitest.out so the failing assertion is
@@ -144,7 +175,7 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm

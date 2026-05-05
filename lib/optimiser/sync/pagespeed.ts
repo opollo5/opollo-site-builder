@@ -33,7 +33,7 @@ type PsiResult = {
 export async function syncPagespeedForClient(
   clientId: string,
 ): Promise<{ rows_written: number; skipped?: boolean }> {
-  const apiKey = process.env.PAGESPEED_API_KEY;
+  const apiKey = process.env.PSI_API_KEY;
   if (!apiKey) {
     return { rows_written: 0, skipped: true };
   }

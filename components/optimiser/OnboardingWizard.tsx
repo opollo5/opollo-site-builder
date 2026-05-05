@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TryAutoImportPanel } from "@/components/optimiser/TryAutoImportPanel";
 import type { ConnectorStatus } from "@/lib/optimiser/connector-status";
 import type { OptClient } from "@/lib/optimiser/clients";
 
@@ -76,7 +77,7 @@ export function OnboardingWizard({
                     </span>
                     <StatusDot state={state} />
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className="mt-1 text-sm text-muted-foreground">
                     {step.description}
                   </p>
                 </button>
@@ -241,7 +242,7 @@ function ClientDetailsStep({
           value={budget}
           onChange={(e) => setBudget(Number(e.target.value))}
         />
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Soft warning at 75%, hard cutoff at 100%. Default: $50.
         </p>
       </div>
@@ -452,7 +453,7 @@ function ClarityStep({
       </div>
       <div>
         <p className="text-sm font-medium">JS snippet</p>
-        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
+        <pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted p-3 text-sm">
 {snippet}
         </pre>
       </div>
@@ -716,7 +717,7 @@ function PagesStep({ client, stepStatus, setStatus, onComplete }: PagesStepProps
                     }
                   />
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">{p.url}</td>
+                <td className="px-3 py-2 font-mono text-sm">{p.url}</td>
                 <td className="px-3 py-2 text-right">
                   ${(p.spend_30d_usd_cents / 100).toFixed(0)}
                 </td>
@@ -739,6 +740,7 @@ function PagesStep({ client, stepStatus, setStatus, onComplete }: PagesStepProps
       <Button onClick={saveSelections} disabled={saving} variant="outline">
         {saving ? "Saving…" : "Save selections"}
       </Button>
+      <TryAutoImportPanel clientId={client.id} />
     </div>
   );
 }
@@ -751,7 +753,7 @@ function oauthErrorCopy(error: string): string {
     case "ads_oauth_not_configured":
       return "Ads OAuth env not provisioned. Contact ops to set GOOGLE_ADS_CLIENT_ID / _SECRET / _DEVELOPER_TOKEN.";
     case "ga4_oauth_not_configured":
-      return "GA4 OAuth env not provisioned. Contact ops to set GA4_CLIENT_ID / _SECRET.";
+      return "GA4 OAuth env not provisioned. Contact ops to set GOOGLE_ADS_CLIENT_ID / _SECRET (GA4 reuses the shared Google OAuth client).";
     case "ads_oauth_exchange_failed":
     case "ga4_oauth_exchange_failed":
       return "Token exchange failed. Try again; if it persists check the OAuth client config.";

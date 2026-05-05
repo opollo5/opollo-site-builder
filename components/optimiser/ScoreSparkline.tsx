@@ -11,9 +11,9 @@ export type SparklinePoint = {
 };
 
 const STROKE_BY_CLASS: Record<ScoreClassification, string> = {
-  high_performer: "#10b981",
-  optimisable: "#f59e0b",
-  needs_attention: "#ef4444",
+  high_performer: "var(--gr)",
+  optimisable: "var(--am)",
+  needs_attention: "var(--rd)",
 };
 
 export function ScoreSparkline({
@@ -29,7 +29,7 @@ export function ScoreSparkline({
     return (
       <div
         style={{ width, height }}
-        className="flex items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground"
+        className="flex items-center justify-center rounded-md border border-dashed border-border text-sm text-muted-foreground"
       >
         no history
       </div>

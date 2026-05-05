@@ -273,7 +273,7 @@ export function CommandPalette() {
                     <Icon aria-hidden className="h-4 w-4 text-muted-foreground" />
                     <span className="flex-1 truncate">{item.label}</span>
                     {item.description && (
-                      <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                      <span className="ml-2 shrink-0 text-sm text-muted-foreground">
                         {item.description}
                       </span>
                     )}
@@ -294,7 +294,7 @@ export function CommandPalette() {
                     >
                       <Globe aria-hidden className="h-4 w-4 text-muted-foreground" />
                       <span className="flex-1 truncate">{site.name}</span>
-                      <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                      <span className="ml-2 shrink-0 text-sm text-muted-foreground">
                         /{site.prefix}
                       </span>
                     </CommandItem>
@@ -354,13 +354,13 @@ export function CommandPalette() {
                   className="h-4 w-4 text-muted-foreground"
                 />
                 <span className="flex-1">Open docs (GitHub)</span>
-                <span className="ml-2 shrink-0 text-xs text-muted-foreground">
+                <span className="ml-2 shrink-0 text-sm text-muted-foreground">
                   ↗
                 </span>
               </CommandItem>
             </CommandGroup>
           </CommandList>
-          <div className="flex items-center justify-between border-t px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center justify-between border-t px-3 py-2 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
                 ↑↓

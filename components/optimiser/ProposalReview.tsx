@@ -139,7 +139,7 @@ export function ProposalReview({
             <div>
               <h1 className="text-2xl font-semibold">{proposal.headline}</h1>
               {pageUrl && (
-                <p className="font-mono text-xs text-muted-foreground">{pageUrl}</p>
+                <p className="font-mono text-sm text-muted-foreground">{pageUrl}</p>
               )}
             </div>
             <RiskPill risk={proposal.risk_level} />
@@ -163,7 +163,7 @@ export function ProposalReview({
                 <div className="font-medium">
                   {e.label ?? e.evidence_type}
                 </div>
-                <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-2 text-xs">
+                <pre className="mt-1 max-h-40 overflow-auto rounded bg-muted p-2 text-sm">
 {JSON.stringify(e.payload, null, 2)}
                 </pre>
               </li>
@@ -175,14 +175,14 @@ export function ProposalReview({
         </Section>
 
         <Section title="Current performance">
-          <pre className="max-h-60 overflow-auto rounded-md border border-border bg-card p-4 text-xs">
+          <pre className="max-h-60 overflow-auto rounded-md border border-border bg-card p-4 text-sm">
 {JSON.stringify(proposal.current_performance, null, 2)}
           </pre>
         </Section>
 
         <Section title="Pre-build reprompt (optional)">
           <RepromptForm value={reprompt} onChange={setReprompt} />
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-sm text-muted-foreground">
             Appended to the change set on approve. Phase 1.5 forwards this into the Site Builder brief.
           </p>
         </Section>
@@ -245,7 +245,7 @@ export function ProposalReview({
           >
             {submitting ? "Submitting…" : "Approve all"}
           </Button>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Phase 1: approval marks the proposal as <code>approved</code>. Brief submission to the Site Builder generation engine lands in Phase 1.5.
           </p>
         </div>
@@ -282,7 +282,7 @@ export function ProposalReview({
           >
             {submitting ? "Submitting…" : "Reject"}
           </Button>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             Per §11.1: 3× the same reason (excluding &quot;Bad timing&quot;) suppresses the playbook for this client.
           </p>
         </div>
@@ -311,7 +311,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function SubRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between pl-4 text-xs">
+    <div className="flex items-center justify-between pl-4 text-sm">
       <span className="text-muted-foreground">· {label}</span>
       <span className="font-mono">{value}</span>
     </div>
@@ -327,7 +327,7 @@ function RiskPill({ risk }: { risk: string }) {
         : "bg-emerald-100 text-emerald-900 border-emerald-200";
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ${cls}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${cls}`}
     >
       {risk} risk
     </span>

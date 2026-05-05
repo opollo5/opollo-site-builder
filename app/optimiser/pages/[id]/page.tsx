@@ -129,7 +129,7 @@ export default async function OptimiserPageDetail({
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             <Link href="/optimiser" className="text-primary underline-offset-4 hover:underline">
               ← Page browser
             </Link>{" "}
@@ -138,7 +138,7 @@ export default async function OptimiserPageDetail({
           <h1 className="text-2xl font-semibold tracking-tight">
             {page.display_name ?? page.url}
           </h1>
-          <p className="font-mono text-xs text-muted-foreground">{page.url}</p>
+          <p className="font-mono text-sm text-muted-foreground">{page.url}</p>
         </div>
         <Button asChild variant="outline">
           <Link

@@ -29,7 +29,7 @@ export default function ForgotPasswordPage() {
         <div className="rounded-lg border bg-background p-6 shadow-sm">
           <ForgotPasswordForm />
         </div>
-        <p className="text-center text-xs text-muted-foreground">
+        <p className="text-center text-sm text-muted-foreground">
           <a
             href="/login"
             className="underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"

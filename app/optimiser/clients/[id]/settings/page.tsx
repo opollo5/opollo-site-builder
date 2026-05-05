@@ -65,7 +65,7 @@ export default async function ClientSettingsPage({
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             <Link href="/optimiser" className="text-primary underline-offset-4 hover:underline">
               ← Page browser
             </Link>
@@ -89,11 +89,11 @@ export default async function ClientSettingsPage({
         <h2 className="text-lg font-medium">Composite score weights</h2>
         <p className="text-sm text-muted-foreground">
           The composite is{" "}
-          <code className="font-mono text-xs">
+          <code className="font-mono text-sm">
             (alignment × {weights.alignment.toFixed(2)}) + (behaviour × {weights.behaviour.toFixed(2)}) + (conversion × {weights.conversion.toFixed(2)}) + (technical × {weights.technical.toFixed(2)})
           </code>
           . Defaults are{" "}
-          <code className="font-mono text-xs">0.25 / 0.30 / 0.30 / 0.15</code>.
+          <code className="font-mono text-sm">0.25 / 0.30 / 0.30 / 0.15</code>.
         </p>
         <ul className="space-y-3">
           {(Object.keys(weights) as Array<keyof ScoreWeights>).map((key) => (

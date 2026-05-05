@@ -174,6 +174,17 @@ CREATE TRIGGER guard_super_admin_trigger
 -- ----------------------------------------------------------------------------
 -- 5. invites table
 -- ----------------------------------------------------------------------------
+--
+-- Recovery preamble: the 0031 version-prefix collision (resolved in
+-- #371/#372/#373) blocked this migration from being recorded. On
+-- environments where an earlier `supabase db push` got far enough to
+-- create these tables before failing on a later statement, the
+-- tables now exist with no schema_migrations row. Drop them up front
+-- so the CREATE statements below can run cleanly. Invite/audit flows
+-- weren't functional pre-recovery, so these tables are empty in
+-- every affected environment — nothing to preserve.
+DROP TABLE IF EXISTS user_audit_log CASCADE;
+DROP TABLE IF EXISTS invites CASCADE;
 
 CREATE TABLE invites (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),

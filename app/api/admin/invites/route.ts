@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
 import { sendEmail } from "@/lib/email/sendgrid";
+import { readJsonBody } from "@/lib/http";
 import { renderInviteEmail } from "@/lib/email/templates/invite";
 import { createInvite } from "@/lib/invites";
 import { logger } from "@/lib/logger";
@@ -42,7 +43,7 @@ function errJson(code: string, message: string, status: number): NextResponse {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   // Rate limit: per-actor when authenticated, per-IP otherwise. Reuses
@@ -51,12 +52,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const rl = await checkRateLimit("invite", rlId);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = null;
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = Body.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

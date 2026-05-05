@@ -73,11 +73,11 @@ export default async function OptimiserChangeLogPage({
             )}
             {rows.map((r) => (
               <tr key={r.id} className="border-t border-border align-top">
-                <td className="px-3 py-2 text-xs text-muted-foreground whitespace-nowrap">
+                <td className="px-3 py-2 text-sm text-muted-foreground whitespace-nowrap">
                   {new Date(r.created_at).toLocaleString()}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">{r.event}</td>
-                <td className="px-3 py-2 font-mono text-xs">
+                <td className="px-3 py-2 font-mono text-sm">{r.event}</td>
+                <td className="px-3 py-2 font-mono text-sm">
                   {r.proposal_id ? (
                     <Link
                       href={`/optimiser/proposals/${r.proposal_id}`}
@@ -89,11 +89,11 @@ export default async function OptimiserChangeLogPage({
                     "—"
                   )}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">
+                <td className="px-3 py-2 font-mono text-sm">
                   {r.landing_page_id ? `${r.landing_page_id.slice(0, 8)}…` : "—"}
                 </td>
                 <td className="px-3 py-2">
-                  <pre className="max-h-32 max-w-md overflow-auto rounded bg-muted p-2 text-xs">
+                  <pre className="max-h-32 max-w-md overflow-auto rounded bg-muted p-2 text-sm">
 {JSON.stringify(r.details, null, 2)}
                   </pre>
                 </td>

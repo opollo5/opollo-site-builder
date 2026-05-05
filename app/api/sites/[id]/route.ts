@@ -3,6 +3,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   archiveSite,
   getSite,
@@ -53,9 +55,15 @@ export async function GET(
   _req: Request,
   { params }: { params: { id: string } },
 ) {
+  // PLATFORM-AUDIT M15-4 #8: site data was previously readable by any caller
+  // relying only on middleware. Defence-in-depth gate matches PATCH/DELETE.
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
+  if (gate.kind === "deny") return gate.response;
+
   // Never include credentials in a response served over HTTP. Internal
   // consumers (chat route) must call getSite directly with includeCredentials.
   const result = await getSite(params.id, { includeCredentials: false });
+  if (!result.ok) logger.error("getSite failed", { code: result.error.code });
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
   return NextResponse.json(result, { status });
 }
@@ -81,12 +89,8 @@ export async function PATCH(
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = PatchBodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -115,6 +119,7 @@ export async function PATCH(
   if (basicsPatch.success) {
     const basicsResult = await updateSiteBasics(params.id, basicsPatch.data);
     if (!basicsResult.ok) {
+      logger.error("updateSiteBasics failed", { code: basicsResult.error.code });
       return NextResponse.json(basicsResult, {
         status: errorCodeToStatus(basicsResult.error.code),
       });
@@ -137,6 +142,7 @@ export async function PATCH(
           : undefined,
     });
     if (!credsResult.ok) {
+      logger.error("updateSiteCredentials failed", { code: credsResult.error.code });
       return NextResponse.json(credsResult, {
         status: errorCodeToStatus(credsResult.error.code),
       });
@@ -150,6 +156,7 @@ export async function PATCH(
     revalidatePath("/admin/sites");
     revalidatePath(`/admin/sites/${params.id}`);
   }
+  if (!refreshed.ok) logger.error("getSite refresh failed", { code: refreshed.error.code });
   const status = refreshed.ok ? 200 : errorCodeToStatus(refreshed.error.code);
   return NextResponse.json(
     refreshed.ok
@@ -175,6 +182,7 @@ export async function DELETE(
     revalidatePath("/admin/sites");
     revalidatePath(`/admin/sites/${params.id}`);
   }
+  if (!result.ok) logger.error("archiveSite failed", { code: result.error.code });
   const status = result.ok ? 200 : errorCodeToStatus(result.error.code);
   return NextResponse.json(result, { status });
 }

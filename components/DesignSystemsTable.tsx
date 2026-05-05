@@ -6,13 +6,13 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 function statusDotClass(status: DesignSystem["status"]): string {
   switch (status) {
     case "active":
-      return "bg-green-500";
+      return "bg-success";
     case "draft":
-      return "bg-slate-400";
+      return "bg-muted-foreground";
     case "archived":
-      return "bg-slate-300";
+      return "bg-muted-foreground/50";
     default:
-      return "bg-red-500";
+      return "bg-destructive";
   }
 }
 
@@ -56,7 +56,7 @@ export function DesignSystemsTable({
   return (
     <div className="overflow-hidden rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-2 font-medium">Version</th>
             <th className="px-4 py-2 font-medium">Status</th>
@@ -89,19 +89,19 @@ export function DesignSystemsTable({
                 <div className="flex flex-wrap items-center justify-end gap-2">
                   <Link
                     href={`/admin/sites/${siteId}/design-system/components?ds=${ds.id}`}
-                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
                   >
                     Components →
                   </Link>
                   <Link
                     href={`/admin/sites/${siteId}/design-system/templates?ds=${ds.id}`}
-                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
                   >
                     Templates →
                   </Link>
                   <Link
                     href={`/admin/sites/${siteId}/design-system/preview?ds=${ds.id}`}
-                    className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+                    className="text-sm text-muted-foreground hover:text-foreground hover:underline"
                   >
                     Preview →
                   </Link>

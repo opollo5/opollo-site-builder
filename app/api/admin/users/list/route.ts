@@ -35,7 +35,7 @@ export type AdminUserRow = {
 };
 
 export async function GET(): Promise<NextResponse> {
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const svc = getServiceRoleClient();

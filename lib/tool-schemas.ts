@@ -62,6 +62,10 @@ export const ERROR_CODES = [
   // admin/batch/[id]/cancel into the canonical vocabulary so any future
   // caller using respond() routes through errorCodeToStatus.
   "INVALID_STATE",
+  // M16-8 — WordPress site-publish route codes.
+  "WP_CREDENTIALS_MISSING",
+  "BLUEPRINT_NOT_FOUND",
+  "BLUEPRINT_MISMATCH",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -145,6 +149,11 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "INTERNAL_ERROR":
     case "UPDATE_FAILED":
       return 500;
+    case "WP_CREDENTIALS_MISSING":
+    case "BLUEPRINT_MISMATCH":
+      return 400;
+    case "BLUEPRINT_NOT_FOUND":
+      return 404;
   }
 }
 
@@ -152,8 +161,20 @@ export function errorCodeToStatus(code: ErrorCode): number {
 
 export const SitePrefixPattern = /^[a-z0-9]{2,4}$/;
 
+// Site name must not contain template tokens ({{...}}) — the system-prompt
+// builder uses replaceAll substitution and a name containing a token would
+// double-expand, injecting arbitrary content (B-7).
+const TEMPLATE_TOKEN_RE = /\{\{[^}]+\}\}/;
+const siteNameSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .refine((v) => !TEMPLATE_TOKEN_RE.test(v), {
+    message: "Site name must not contain template tokens ({{ ... }}).",
+  });
+
 export const RegisterSiteInputSchema = z.object({
-  name: z.string().min(1).max(100),
+  name: siteNameSchema,
   wp_url: z.string().url(),
   // Optional at the API boundary. lib/sites.createSite generates one
   // server-side from the site name when absent (M2d UX cleanup:
@@ -165,7 +186,7 @@ export const RegisterSiteInputSchema = z.object({
 export type RegisterSiteInput = z.infer<typeof RegisterSiteInputSchema>;
 
 export const UpdateSiteBasicsSchema = z.object({
-  name: z.string().min(1).max(100).optional(),
+  name: siteNameSchema.optional(),
   wp_url: z.string().url().optional(),
 }).refine((p) => Object.keys(p).length > 0, {
   message: "At least one field must be provided.",
@@ -188,6 +209,8 @@ export type SiteRecord = {
   brand_voice: string | null;
   design_direction: string | null;
   version_lock: number;
+  // DESIGN-SYSTEM-OVERHAUL — null when onboarding hasn't picked a mode yet.
+  site_mode: "copy_existing" | "new_design" | null;
 };
 
 export type SiteListItem = {

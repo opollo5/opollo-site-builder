@@ -6,6 +6,7 @@ import {
   DesignBriefSchema,
   saveDesignBrief,
 } from "@/lib/design-discovery/design-brief";
+import { readJsonBody } from "@/lib/http";
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/sites/[id]/setup/save-brief
@@ -49,12 +50,8 @@ export async function POST(
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const wrapper = body as { brief?: unknown; advance_status?: unknown };
   const parsed = DesignBriefSchema.safeParse(wrapper?.brief ?? null);
   if (!parsed.success) {

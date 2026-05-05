@@ -8,6 +8,7 @@ import {
   SIDEBAR_COLLAPSED_COOKIE,
 } from "@/components/AdminSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
+import { DebugFooter } from "@/components/DebugFooter";
 import { Toaster } from "@/components/ui/toaster";
 
 // Shared shell for every page under /admin.
@@ -33,11 +34,19 @@ export default async function AdminLayout({
 
   const user = access.user;
 
-  // The Users link is admin-only when the flag is on. Under flag-off /
-  // kill-switch, `user` is null and the Basic Auth operator has root-
-  // level trust already — show the link rather than break the admin
-  // surface during a break-glass outage.
-  const showUsersLink = !user || user.role === "admin";
+  // PLATFORM-AUDIT PR7 — role-aware nav.
+  //
+  // Under flag-off / kill-switch, `user` is null and the Basic Auth
+  // operator has root-level trust already — surface every nav link.
+  //
+  // Under flag-on, gate by role. The previous code path used
+  // `user.role === "admin"` only, which silently excluded super_admin
+  // from the Users link (UAT-found bug). Now both super_admin AND admin
+  // see operator-management surfaces; super_admin alone sees the
+  // sub-tier admin tools (audit log, email test).
+  const isAdminTier =
+    !user || user.role === "admin" || user.role === "super_admin";
+  const isSuperAdmin = !user || user.role === "super_admin";
 
   // Cookie value drives initial collapse state. Default false (expanded)
   // when the cookie is absent — first-time operators get the full rail.
@@ -55,7 +64,8 @@ export default async function AdminLayout({
       </a>
       <AdminSidebar
         user={user}
-        showUsersLink={showUsersLink}
+        isAdminTier={isAdminTier}
+        isSuperAdmin={isSuperAdmin}
         initialCollapsed={initialCollapsed}
       />
       <main
@@ -66,10 +76,18 @@ export default async function AdminLayout({
         // children from forcing horizontal overflow.
         className="min-w-0 flex-1 px-4 py-6 scroll-mt-16 focus:outline-none sm:px-8 sm:py-8"
       >
-        <div className="mx-auto max-w-6xl">{children}</div>
+        <div className="mx-auto max-w-7xl">{children}</div>
       </main>
       <Toaster />
       <CommandPalette />
+      {isSuperAdmin && (
+        <DebugFooter
+          buildSha={process.env.VERCEL_GIT_COMMIT_SHA ?? null}
+          vercelEnv={process.env.VERCEL_ENV ?? null}
+          userEmail={user?.email ?? null}
+          userRole={user?.role ?? null}
+        />
+      )}
     </div>
   );
 }

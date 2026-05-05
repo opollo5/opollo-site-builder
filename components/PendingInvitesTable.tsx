@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatRelativeTime } from "@/lib/utils";
 
 // AUTH-FOUNDATION P3.3 — pending-invites table on /admin/users.
@@ -24,9 +25,9 @@ export function PendingInvitesTable({
 }) {
   const router = useRouter();
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<{ id: string; email: string } | null>(null);
 
   async function revoke(id: string, email: string) {
-    if (!window.confirm(`Revoke pending invite for ${email}?`)) return;
     setRevoking(id);
     try {
       const res = await fetch(
@@ -53,9 +54,19 @@ export function PendingInvitesTable({
   }
 
   return (
+    <>
+      <ConfirmDialog
+        open={pendingRevoke !== null}
+        onOpenChange={(o) => !o && setPendingRevoke(null)}
+        title="Revoke this invite?"
+        description={pendingRevoke ? `Remove the pending invite for ${pendingRevoke.email}. They will not be able to use the invite link.` : undefined}
+        confirmLabel="Revoke invite"
+        confirmVariant="destructive"
+        onConfirm={() => pendingRevoke && void revoke(pendingRevoke.id, pendingRevoke.email)}
+      />
     <div className="rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Email</th>
             <th className="px-3 py-2 font-medium">Role</th>
@@ -77,19 +88,19 @@ export function PendingInvitesTable({
               >
                 <td className="px-3 py-2 font-medium">{inv.email}</td>
                 <td className="px-3 py-2">
-                  <span className="inline-flex items-center rounded border border-input px-2 py-0.5 text-xs">
+                  <span className="inline-flex items-center rounded border border-input px-2 py-0.5 text-sm">
                     {inv.role}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
+                <td className="px-3 py-2 text-sm text-muted-foreground">
                   {inv.invited_by_email ?? "(deleted user)"}
                 </td>
-                <td className="px-3 py-2 text-xs text-muted-foreground">
+                <td className="px-3 py-2 text-sm text-muted-foreground">
                   <span data-screenshot-mask>
                     {formatRelativeTime(inv.created_at)}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-xs">
+                <td className="px-3 py-2 text-sm">
                   <span
                     className={
                       expiringSoon
@@ -104,9 +115,9 @@ export function PendingInvitesTable({
                 <td className="px-2 py-2 text-right">
                   <button
                     type="button"
-                    onClick={() => void revoke(inv.id, inv.email)}
+                    onClick={() => setPendingRevoke({ id: inv.id, email: inv.email })}
                     disabled={revoking === inv.id}
-                    className="rounded border px-2 py-0.5 text-xs text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
+                    className="rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
                     data-testid="invite-revoke-button"
                   >
                     {revoking === inv.id ? "…" : "Revoke"}
@@ -118,5 +129,6 @@ export function PendingInvitesTable({
         </tbody>
       </table>
     </div>
+    </>
   );
 }

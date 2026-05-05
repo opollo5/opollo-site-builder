@@ -7,6 +7,7 @@ import {
   rewriteImageUrls,
 } from "@/lib/html-image-rewrite";
 import { LEADSOURCE_FONT_LOAD_HTML } from "@/lib/leadsource-fonts";
+import { logger } from "@/lib/logger";
 import { runFragmentStructuralCheck } from "@/lib/brief-runner";
 import { runGates, type RunGatesResult } from "@/lib/quality-gates";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -272,7 +273,7 @@ async function publishRegenJobImpl(
         design_system_version: String(page.design_system_version ?? 1),
       });
   if (gates.kind === "failed") {
-    await supabase.from("regeneration_events").insert({
+    const { error: evtErr } = await supabase.from("regeneration_events").insert({
       regeneration_job_id: jobId,
       type: "gates_failed",
       payload: {
@@ -282,6 +283,7 @@ async function publishRegenJobImpl(
         gates_run: gates.gates_run,
       },
     });
+    if (evtErr) logger.error("regeneration.event.insert_failed", { job_id: jobId, type: "gates_failed", error: evtErr.message });
     await supabase
       .from("regeneration_jobs")
       .update({
@@ -615,16 +617,6 @@ export function readRegenDailyBudgetCents(): number {
  * Caller (the POST route) is responsible for the admin gate and UUID
  * validation. This helper assumes well-formed ids.
  */
-function requireDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by enqueueRegenJob for the budget reservation transaction.",
-    );
-  }
-  return url;
-}
-
 export async function enqueueRegenJob(
   input: EnqueueRegenJobInput,
 ): Promise<EnqueueRegenJobResult> {
@@ -692,7 +684,8 @@ export async function enqueueRegenJob(
   // concurrent enqueues against the same tenant serialise. Rollback
   // on any failure releases the lock without charging the budget.
   const jobId = crypto.randomUUID();
-  const client = new Client({ connectionString: requireDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const client = new Client(requireDbConfig());
   await client.connect();
   try {
     await client.query("BEGIN");

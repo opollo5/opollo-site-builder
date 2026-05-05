@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -67,12 +68,8 @@ function successEnvelope(email: string): NextResponse {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -98,8 +95,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return rateLimitExceeded(rl);
   }
 
+  // Land emails on the client-side /auth/callback page — it dispatches
+  // to /api/auth/callback for PKCE / OTP query shapes and handles
+  // implicit-flow URL fragments directly. Pre-fix, the email pointed
+  // at the API route, which couldn't read fragments → recovery clicks
+  // landed on /auth-error?reason=missing_code.
   const redirectTo = buildAuthRedirectUrl(
-    "/api/auth/callback?next=%2Fauth%2Freset-password",
+    "/auth/callback?next=%2Fauth%2Freset-password",
     req,
   );
 

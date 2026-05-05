@@ -118,7 +118,7 @@ export function EmailTestForm() {
       {result.kind === "ok" && (
         <Alert data-testid="email-test-success">
           Sent. SendGrid message id:{" "}
-          <code className="font-mono text-xs">{result.messageId}</code>
+          <code className="font-mono text-sm">{result.messageId}</code>
         </Alert>
       )}
       {result.kind === "err" && (

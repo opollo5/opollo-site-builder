@@ -37,7 +37,24 @@ async function signOutAndRedirect(req: NextRequest): Promise<NextResponse> {
   url.search = "";
   // 303 See Other is the right status for POST→GET redirect. Browsers
   // respect it consistently; 302 is technically spec-ambiguous.
-  return NextResponse.redirect(url, { status: 303 });
+  const response = NextResponse.redirect(url, { status: 303 });
+
+  // Clear the 2FA in-flight cookies. signOut() above clears the Supabase
+  // session cookies via the SSR adapter; the 2FA cookies live outside
+  // that adapter and have to be cleared here. Without this, a logout
+  // mid-flow leaves opollo_2fa_pending set and the next /login →
+  // signInWithPassword → /admin/sites navigation gets bounced back to
+  // /login/check-email by middleware, looking like a stuck-login bug.
+  for (const name of ["opollo_2fa_pending", "opollo_pending_device_id"]) {
+    response.cookies.set(name, "", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 0,
+    });
+  }
+  return response;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

@@ -64,7 +64,7 @@ export function DesignUnderstandingPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-semibold">Here&apos;s what we understood</h3>
         <span
-          className="inline-flex items-center gap-1.5 text-xs"
+          className="inline-flex items-center gap-1.5 text-sm"
           data-testid="dd-confidence"
           data-confidence={confidence}
         >
@@ -76,7 +76,7 @@ export function DesignUnderstandingPanel({
         </span>
       </div>
 
-      <dl className="mt-3 grid gap-2 text-xs md:grid-cols-2">
+      <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2">
         <div>
           <dt className="font-medium text-muted-foreground">Tone</dt>
           <dd>{tone}</dd>
@@ -118,7 +118,7 @@ export function DesignUnderstandingPanel({
       <button
         type="button"
         onClick={() => setShowEditor((v) => !v)}
-        className="mt-3 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        className="mt-3 text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
         aria-expanded={showEditor}
         data-testid="dd-edit-understanding-toggle"
       >

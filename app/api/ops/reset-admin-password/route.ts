@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { timingSafeEqual } from "node:crypto";
 
+import { constantTimeEqual } from "@/lib/crypto-compare";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -41,17 +42,6 @@ const BodySchema = z.object({
   email: z.string().email().max(320),
   new_password: z.string().min(MIN_PASSWORD_LENGTH).max(256),
 });
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    const filler = Buffer.alloc(aBuf.length);
-    timingSafeEqual(aBuf, filler);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
-}
 
 function extractKey(req: Request): string | null {
   const custom = req.headers.get("x-opollo-emergency-key");
@@ -100,12 +90,8 @@ export async function POST(req: Request): Promise<NextResponse> {
     return jsonError("UNAUTHORIZED", "Invalid emergency key.", 401);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(

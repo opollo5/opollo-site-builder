@@ -152,12 +152,12 @@ export function EditPageMetadataModal({
               maxLength={100}
               disabled={submitting}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Lowercase letters, digits, and hyphens only.
             </p>
             {slugChanged && (
               <p
-                className="mt-1 text-xs text-yellow-700"
+                className="mt-1 text-sm text-yellow-700"
                 data-testid="slug-change-warning"
               >
                 Changing the slug updates our record only — WordPress keeps

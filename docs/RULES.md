@@ -54,6 +54,30 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ---
 
+## 7. Typography minimums — body ≥ 1rem, small ≥ 0.875rem, no text-xs
+
+**Rule.** Operator-facing UI text has two floors. Body text (paragraph copy, form input values, page descriptions, modal body, table cells used as primary reading content) sits at `text-base` (1rem / 16px) minimum. Small text (helper copy, captions, badges, eyebrows, breadcrumbs, status microcopy) sits at `text-sm` (0.875rem / 14px) minimum. `text-xs` (0.75rem / 12px) is forbidden on every operator surface; do not introduce it in new code, and uplift any encountered to `text-sm`. The two floors map directly to Tailwind's existing utilities — no custom font-size values, no inline `style={{ fontSize: ... }}` below 14px. Reference: A-1 typography-scale doc block in `app/globals.css`.
+
+**Incident (UAT 2026-05-02).** Steven flagged during UAT that the admin UI had "a lot of text that is too small to read" — 530+ `text-xs` (12px) usages across 122 files lived in the operator surfaces, plus the A-1 typography primitives' `Lead` ("intro / context line") sat at `text-sm` despite being the body-copy companion to `H1`. Phase 1 sweep eliminated `text-xs` site-wide and bumped `Lead` to `text-base`. Phase 2 — auditing each `text-sm` callsite where the role is body copy rather than helper / caption — is captured in `docs/BACKLOG.md`.
+
+---
+
+## 8. Pre-merge checklist — `npm run audit:static` HIGH must be zero
+
+**Rule.** Every PR MUST pass the `static-audit` CI job — i.e. `npm run audit:static` exits with code 0 (no HIGH severity issues). The script lives at `scripts/audit.ts` and runs nine checks (HIGH severity: middleware-public-paths, migration-ordering, unauthenticated-api; MEDIUM: admin-api-gate, db-column-references, error-handling; LOW: typography-minimums, env-vars, dead-routes). HIGH severity gates the build; MEDIUM/LOW are advisory. If a HIGH hit is a genuine false positive, the fix is to refine the heuristic in the audit script itself — never bypass with `// audit:ignore` or similar (no such mechanism exists by design). If the audit reports a new MEDIUM or LOW class on a PR, address it in the same PR or open a follow-up; don't let the warning count drift up.
+
+**Incident (PLATFORM-AUDIT 2026-05-02).** UAT surfaced three logic-error classes that cost a half-day each to debug at runtime — middleware-public-path miss (invite acceptance link bounced to /login), admin API gate excluding super_admin (invite submit returned `Role 'super_admin' is not permitted`), and missing-column writes to `sites.updated_by` (mode save returned masked 500). All three would have been caught by static analysis. The PLATFORM-AUDIT workstream (PRs #386, #389, #392, #394, #396, #398, #400) shipped the audit script + CI integration + fixes for every HIGH finding the first run produced (38 → 0). Going forward, CI catches these classes at PR time, not at UAT time.
+
+---
+
+## 9. Never echo env-var values or connection strings to tool output
+
+**Rule.** When a command consumes a value from `.env.local`, env, or any other secret source, it MUST run with stderr redirected to `$null` (PowerShell) / `/dev/null` (bash), and any successful-path output must be filtered to drop the secret before it appears in the conversation transcript. Concretely: pass the value via a variable (never inline it into the visible command), set `2>$null` on the invocation, and if the tool's own success output contains the secret (some CLIs echo what they parsed), additionally pipe through a redactor before printing. The same rule applies to anything that *constructs* a URL from an env value — `Write-Output $env:FOO`, `Write-Host $url`, `console.log(connectionString)` are all banned. If you need to confirm a value is set, print only its length or a SHA-256 prefix, never the value.
+
+**Incident (P1 bootstrap, 2026-05-03).** During the first attempt to apply migration 0074 to the remote project, a PowerShell parsing bug (`.Trim('"').Trim("'")` — only stripped quote characters, not whitespace) left trailing tabs on the value read from `.env.local`. The supabase CLI received `postgresql://user:password@host:6543/postgres\t\t --dry-run`, failed parsing, and echoed the full malformed input (including the live database password) to stderr — which Claude Code captured into the conversation transcript. The credential is now in a chat log Steven controls but couldn't be rotated until P1 finished. Rotation got logged in `docs/BACKLOG.md`. Going forward: every `.env`-consuming invocation gets `2>$null` (or stderr piped through a redactor), values pass via variables that are never `Write-Output`'d, and pre-flight parsing trims with bare `.Trim()` so malformed input fails before reaching the CLI.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.

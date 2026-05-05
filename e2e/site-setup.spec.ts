@@ -46,12 +46,17 @@ async function createSiteAndOpenSetup(
     /Connected as/i,
   );
   await page.getByTestId("site-create-save").click();
-  // PR 11 — fresh sites land on /setup?step=1 directly. Extract id
-  // from there; no need for a separate goto.
-  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
+  // DESIGN-SYSTEM-OVERHAUL (PR 6) — fresh sites land on the
+  // /onboarding mode-selection screen first. Pick "Build a new
+  // website" to continue into the existing design-discovery wizard
+  // at step 1.
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/onboarding/);
   const url = page.url();
   const id = url.match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
   if (!id) throw new Error(`Failed to extract site id from ${url}`);
+  await page.getByTestId("site-onboarding-option-new_design").click();
+  await page.getByTestId("site-onboarding-submit").click();
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/setup\?step=1/);
   return id;
 }
 

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { restoreImage } from "@/lib/image-library";
+import { logger } from "@/lib/logger";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,7 @@ export async function POST(
   });
 
   if (!result.ok) {
+    logger.error("restoreImage failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },

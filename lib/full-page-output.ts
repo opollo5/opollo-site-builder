@@ -1,5 +1,10 @@
 import "server-only";
 
+import {
+  renderTrafficSplitSnippet,
+  type TrafficSplitConfig,
+} from "@/lib/optimiser/ab-testing/traffic-split-snippet";
+
 // ---------------------------------------------------------------------------
 // OPTIMISER PHASE 1.5 SLICE 14 — Full-page HTML composition.
 //
@@ -68,11 +73,22 @@ export interface ComposeFullPageInput {
   tracking: TrackingConfig;
   /** Document metadata. */
   meta: FullPageMeta;
+  /** When this page is part of a running A/B test, the JS hash split
+   *  config that routes a percentage of visitors to variant B. Emitted
+   *  as the first <script> in <head> so it runs before content render
+   *  (avoids a flash of the wrong variant). Omit when no test is
+   *  active — the page renders without any split logic. */
+  abSplit?: TrafficSplitConfig;
 }
 
 export function composeFullPage(input: ComposeFullPageInput): string {
   const lang = input.meta.lang ?? "en";
-  const head = renderHead(input.meta, input.cssBundle, input.tracking);
+  const head = renderHead(
+    input.meta,
+    input.cssBundle,
+    input.tracking,
+    input.abSplit,
+  );
   const body = renderBody(
     input.fragmentHtml,
     input.chrome,
@@ -93,12 +109,21 @@ function renderHead(
   meta: FullPageMeta,
   cssBundle: string,
   tracking: TrackingConfig,
+  abSplit: TrafficSplitConfig | undefined,
 ): string {
   const lines: string[] = [
+    // charset MUST be in the first 1024 bytes of <head> per HTML5.
     '<meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
-    `<title>${escapeHtml(meta.title)}</title>`,
   ];
+  // Traffic-split snippet runs before any pixel / content (after the
+  // mandatory meta charset). If the visitor needs to be redirected
+  // to the other variant, that happens before paint and before GA4
+  // fires a session for the wrong variant.
+  if (abSplit) {
+    lines.push(renderTrafficSplitSnippet(abSplit));
+  }
+  lines.push(`<title>${escapeHtml(meta.title)}</title>`);
   if (meta.description) {
     lines.push(
       `<meta name="description" content="${escapeAttr(meta.description)}">`,

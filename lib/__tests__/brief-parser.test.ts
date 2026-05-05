@@ -270,9 +270,14 @@ describe("brief-parser", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 10. Inference returns only bogus quotes → INFERENCE_FALLBACK_FAILED.
+  // 10. Inference returns only bogus quotes → single-page fallback.
+  //
+  // When all entries fail validation the parser falls back to treating the
+  // whole source as a single page rather than failing outright.
+  // INFERENCE_ENTRY_DROPPED warnings are stripped (noise on the review page)
+  // and HEADING_HIERARCHY_SKIPPED is added to signal the fallback.
   // -----------------------------------------------------------------------
-  it("inference-no-match: every entry fails validation → INFERENCE_FALLBACK_FAILED", async () => {
+  it("inference-no-match: every entry fails validation → single-page fallback", async () => {
     const src = loadFixture("no-structure.md");
     const entries = [
       { title: "Ghost Page A", source_quote: "This string absolutely does not appear anywhere in the source document text you uploaded." },
@@ -285,9 +290,11 @@ describe("brief-parser", () => {
       sourceSha256: sha256Hex(src),
       anthropicCall,
     });
-    const err = expectErr(result);
-    expect(err.code).toBe("INFERENCE_FALLBACK_FAILED");
-    expect(err.warnings.filter((w) => w.code === "INFERENCE_ENTRY_DROPPED").length).toBeGreaterThanOrEqual(2);
+    const ok = expectOk(result);
+    expect(ok.pages).toHaveLength(1);
+    expect(ok.warnings.some((w) => w.code === "HEADING_HIERARCHY_SKIPPED")).toBe(true);
+    // INFERENCE_ENTRY_DROPPED warnings are stripped in the fallback path
+    expect(ok.warnings.filter((w) => w.code === "INFERENCE_ENTRY_DROPPED").length).toBe(0);
   });
 
   // -----------------------------------------------------------------------

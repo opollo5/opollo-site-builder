@@ -81,7 +81,18 @@ const ENFORCED_HEADERS: Readonly<Record<string, string>> = Object.freeze({
 function buildReportOnlyCsp(): string {
   const wpOrigin = process.env.NEXT_PUBLIC_LEADSOURCE_WP_URL ?? "";
   const supabaseOrigin = process.env.SUPABASE_URL ?? "";
-  const connectSources = ["'self'", supabaseOrigin, wpOrigin]
+  // External API hosts called from server routes (image generation +
+  // compositing). All three are HTTPS-only; the CSP source list is
+  // explicit-host so a typoed env var or rogue dependency can't reach a
+  // different origin.
+  const connectSources = [
+    "'self'",
+    supabaseOrigin,
+    wpOrigin,
+    "https://api.ideogram.ai",
+    "https://api.bannerbear.com",
+    "https://api.placid.app",
+  ]
     .filter(Boolean)
     .join(" ");
   // 'unsafe-inline' for style-src: shadcn/Radix components inject inline

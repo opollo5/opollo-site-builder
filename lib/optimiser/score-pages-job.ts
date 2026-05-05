@@ -255,7 +255,7 @@ async function scoreAndProposeForPage(args: {
         },
       ];
 
-      await supabase.from("opt_alignment_scores").upsert(
+      const { error: scoreErr } = await supabase.from("opt_alignment_scores").upsert(
         {
           client_id: args.clientId,
           ad_group_id: adGroupId,
@@ -272,6 +272,7 @@ async function scoreAndProposeForPage(args: {
         },
         { onConflict: "ad_group_id,landing_page_id" },
       );
+      if (scoreErr) logger.error("optimiser.score_pages.upsert_failed", { client_id: args.clientId, ad_group_id: adGroupId, error: scoreErr.message });
     }
   }
 

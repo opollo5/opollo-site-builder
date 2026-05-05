@@ -231,16 +231,6 @@ export type BudgetResetResult = {
   monthlyReset: number;
 };
 
-function requireBudgetResetDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by resetExpiredBudgets for the cron UPDATEs.",
-    );
-  }
-  return url;
-}
-
 /**
  * Zero daily/monthly usage for any row whose reset timestamp is past.
  * Advances the reset timestamp by one day / one month so the next
@@ -283,7 +273,8 @@ export async function resetExpiredBudgets(opts: {
   };
 
   if (opts.client) return run(opts.client);
-  const c = new Client({ connectionString: requireBudgetResetDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const c = new Client(requireDbConfig());
   await c.connect();
   try {
     return await run(c);

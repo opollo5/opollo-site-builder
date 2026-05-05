@@ -22,6 +22,7 @@ import {
 // state. Default is the real builder; production callers omit the
 // option.
 export type BuildSystemPromptFn = (site: SiteIdentity) => Promise<string>;
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -68,22 +69,13 @@ export type LeasedRegenJob = {
 
 export type ReaperResult = { reapedCount: number };
 
-function requireDbUrl(): string {
-  const url = process.env.SUPABASE_DB_URL;
-  if (!url) {
-    throw new Error(
-      "SUPABASE_DB_URL is not set. Required by the regeneration worker.",
-    );
-  }
-  return url;
-}
-
 async function withClient<T>(
   provided: Client | null,
   fn: (c: Client) => Promise<T>,
 ): Promise<T> {
   if (provided) return fn(provided);
-  const c = new Client({ connectionString: requireDbUrl() });
+  const { requireDbConfig } = await import("@/lib/db-direct");
+  const c = new Client(requireDbConfig());
   await c.connect();
   try {
     return await fn(c);
@@ -659,7 +651,7 @@ async function handleRetryOrTerminal(
       updated_at: new Date().toISOString(),
     })
     .eq("id", jobId);
-  await supabase.from("regeneration_events").insert({
+  const { error: evtErr } = await supabase.from("regeneration_events").insert({
     regeneration_job_id: jobId,
     type: "terminal_failure",
     payload: {
@@ -668,6 +660,7 @@ async function handleRetryOrTerminal(
       message: failure.message,
     },
   });
+  if (evtErr) logger.error("regeneration.event.insert_failed", { job_id: jobId, type: "terminal_failure", error: evtErr.message });
 }
 
 // ---------------------------------------------------------------------------
@@ -723,7 +716,7 @@ async function recordTerminalFailure(
     failure_detail: string;
   },
 ): Promise<void> {
-  await supabase.from("regeneration_events").insert({
+  const { error: evtErr } = await supabase.from("regeneration_events").insert({
     regeneration_job_id: jobId,
     type: "terminal_failure",
     payload: {
@@ -731,6 +724,7 @@ async function recordTerminalFailure(
       failure_detail: opts.failure_detail,
     },
   });
+  if (evtErr) logger.error("regeneration.event.insert_failed", { job_id: jobId, type: "terminal_failure", error: evtErr.message });
   await supabase
     .from("regeneration_jobs")
     .update({

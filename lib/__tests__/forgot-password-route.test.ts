@@ -187,7 +187,13 @@ describe("POST /api/auth/forgot-password: happy path", () => {
     );
     expect(mockState.resetCalls).toHaveLength(1);
     expect(mockState.resetCalls[0].email).toBe("hi@opollo.com");
+    // Lands on the client-side /auth/callback page — it dispatches
+    // PKCE / OTP query shapes to /api/auth/callback and handles
+    // implicit-flow URL fragments directly via setSession.
     expect(mockState.resetCalls[0].options.redirectTo).toContain(
+      "/auth/callback",
+    );
+    expect(mockState.resetCalls[0].options.redirectTo).not.toContain(
       "/api/auth/callback",
     );
     expect(mockState.resetCalls[0].options.redirectTo).toContain(

@@ -34,9 +34,12 @@ type Ga4CredentialPayload = {
 };
 
 function getOAuthEnv(): { client_id: string; client_secret: string } | null {
-  const clientId = process.env.GA4_CLIENT_ID ?? process.env.GOOGLE_OAUTH_CLIENT_ID;
-  const clientSecret =
-    process.env.GA4_CLIENT_SECRET ?? process.env.GOOGLE_OAUTH_CLIENT_SECRET;
+  // GA4 reuses the Google Ads OAuth client (single shared OAuth client across
+  // both flows). The Cloud OAuth client must have both `adwords` and
+  // `analytics.readonly` scopes authorised, with the GA4 callback URL added
+  // under "Authorised redirect URIs".
+  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
   if (!clientId || !clientSecret) return null;
   return { client_id: clientId, client_secret: clientSecret };
 }

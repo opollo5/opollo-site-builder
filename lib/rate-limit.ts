@@ -34,10 +34,17 @@ export type LimiterName =
   | "login"
   | "auth_callback"
   | "invite"
+  | "invite_accept"
   | "register"
   | "password_reset"
   | "test_connection"
-  | "auth_2fa";
+  | "auth_2fa"
+  | "csv_upload"
+  | "user_mgmt"
+  | "admin_write"
+  | "briefs_upload"
+  | "cap_generate"
+  | "approval_decision";
 
 type LimiterConfig = {
   requests: number;
@@ -52,6 +59,10 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   login:          { requests: 10,  window: "60 s" },
   auth_callback:  { requests: 10,  window: "60 s" },
   invite:         { requests: 20,  window: "1 h" },
+  // P2-3: public POST /api/platform/invitations/accept. Per-IP cap on
+  // brute-force attempts against random tokens. 32-byte SHA-256 keyspace
+  // is computationally safe; this is defence in depth.
+  invite_accept:  { requests: 20,  window: "1 h" },
   register:       { requests: 20,  window: "1 h" },
   // M14-3: forgot-password per-email bucket. 5 requests per email per
   // hour caps both accidental user mashing and a compromised sender
@@ -72,6 +83,30 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // every challenge regardless of which Redis bucket fired); this
   // limiter is the IP-side belt-and-braces.
   auth_2fa: { requests: 5, window: "1 h" },
+  // S7: bulk CSV post upload. 3 uploads/hour/company per the BUILD.md
+  // defaults. Keyed on "company:<uuid>" so different companies don't
+  // share the bucket.
+  csv_upload: { requests: 3, window: "1 h" },
+  // M15-4 #9: user-management mutations (revoke, reinstate, role change).
+  // Admin-only; 20/hour is generous for legitimate use (a team of 5
+  // churning through a user list) while blocking automated scanning.
+  user_mgmt: { requests: 20, window: "1 h" },
+  // M15-4 #9: miscellaneous admin writes (budget PATCH, design-system
+  // writes, sites/list). 60/hour per authenticated admin covers normal
+  // dashboard use without opening bulk-mutation paths.
+  admin_write: { requests: 60, window: "1 h" },
+  // M15-4 #9: brief file upload endpoint. Each call parses up to 10 MB
+  // of markdown; 10/hour prevents runaway re-uploads during a single
+  // session while leaving headroom for retries.
+  briefs_upload: { requests: 10, window: "1 h" },
+  // D2: CAP copy generation. Each trigger calls Claude + creates up to
+  // 5 posts; 10/company/24 h caps runaway spend while leaving headroom
+  // for daily editorial use. Keyed on "company:<uuid>".
+  cap_generate: { requests: 10, window: "24 h" },
+  // B-8: public approval decision endpoint. 256-bit token keyspace makes
+  // brute-force infeasible; this per-IP cap is defence-in-depth against
+  // credential-stuffing / automated replay. 20/hour matches invite_accept.
+  approval_decision: { requests: 20, window: "1 h" },
 };
 
 export type RateLimitResult =

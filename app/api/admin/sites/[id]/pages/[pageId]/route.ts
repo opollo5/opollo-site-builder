@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   PAGE_SLUG_MAX,
   PAGE_SLUG_RE,
@@ -94,12 +96,8 @@ export async function PATCH(
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -124,6 +122,7 @@ export async function PATCH(
   });
 
   if (!result.ok) {
+    logger.error("updatePageMetadata failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },

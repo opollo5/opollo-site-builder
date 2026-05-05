@@ -13,6 +13,7 @@ import {
   validationError,
   validateUuidParam,
 } from "@/lib/http";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { validateScopedCss } from "@/lib/scope-prefix";
 
 export const runtime = "nodejs";
@@ -33,6 +34,9 @@ const PatchBodySchema = UpdateDesignComponentSchema.and(
 export async function PATCH(req: Request, ctx: RouteContext) {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const dsParam = validateUuidParam(ctx.params.id, "id");
   if (!dsParam.ok) return dsParam.response;
@@ -68,6 +72,9 @@ export async function PATCH(req: Request, ctx: RouteContext) {
 export async function DELETE(req: Request, ctx: RouteContext) {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("admin_write", `user:${gate.user?.id ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const dsParam = validateUuidParam(ctx.params.id, "id");
   if (!dsParam.ok) return dsParam.response;

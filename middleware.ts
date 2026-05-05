@@ -73,10 +73,57 @@ const PUBLIC_PATHS = new Set<string>([
   // covered by the prefix check below.
   "/auth/forgot-password",
   "/auth/reset-password",
+  // /auth/callback — client-side companion to /api/auth/callback that
+  // handles Supabase implicit-flow links (#access_token=... in the URL
+  // fragment). Reachable without a session because the whole point is
+  // to MINT the session from the fragment.
+  "/auth/callback",
+  // /auth/approve — 2FA email-approval landing page. The token IS the
+  // auth (server-component validates the random 32-byte token via a
+  // SHA-256 lookup against login_challenges.token_hash). The page must
+  // be reachable from any device, including ones with no Supabase
+  // session — the whole point of email approval is that the operator
+  // can click from a phone, hardware key, etc. Without this entry the
+  // middleware bounced unauthenticated callers to /login, breaking
+  // cross-device approval.
+  "/auth/approve",
+  // /auth/accept-invite — invite redemption landing page (P3.2). Same
+  // rationale as /auth/approve: the token IS the auth (server-component
+  // validates a SHA-256 hash against invites.token_hash). The whole
+  // point is that an invitee — who has no Supabase session yet because
+  // they don't have an account — clicks the link from their email and
+  // sets a password. Without this entry the middleware bounced them to
+  // /login, where they had no credentials, so invites were unredeemable
+  // (UAT §1.1.4 surfaced this 2026-05-02). The /api/auth/accept-invite
+  // POST counterpart that the form submits to is already covered by
+  // the /api/auth/* prefix check below.
+  "/auth/accept-invite",
 ]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // /invite/<token> — platform-layer invitation accept page. Token IS
+  // the auth (server-component validates SHA-256 against
+  // platform_invitations.token_hash). Recipients have no Supabase
+  // session yet — the whole point is to MINT one by setting their
+  // password. Without this, the email link bounces to /login.
+  if (pathname.startsWith("/invite/")) return true;
+  // /approve/<token> — social-approval magic link (S1-6). External
+  // reviewers may not be platform users at all; the token is the
+  // auth (server-component validates SHA-256 against
+  // social_approval_recipients.token_hash). Same rationale as
+  // /invite/<token> — the link must work pre-session.
+  if (pathname.startsWith("/approve/")) return true;
+  // /api/approve/<token>/decision — paired API endpoint for the
+  // viewer page (S1-7). Token-as-auth: the route's lib validates
+  // SHA-256 hash against social_approval_recipients.token_hash
+  // before calling the migration-0072 atomic decision recorder.
+  if (pathname.startsWith("/api/approve/")) return true;
+  // /viewer/<token> — public read-only customer calendar (S1-15).
+  // Token IS the auth (SHA-256 hash → social_viewer_links.token_hash).
+  // External recipients aren't platform users; the link must work
+  // pre-session.
+  if (pathname.startsWith("/viewer/")) return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
@@ -84,6 +131,10 @@ function isPublicPath(pathname: string): boolean {
   // involved. Required so the Vercel cron tick can reach the worker
   // endpoint without a session.
   if (pathname.startsWith("/api/cron/")) return true;
+  // /api/webhooks/* carries its own HMAC signature verification (S1-17
+  // bundle.social). External services aren't platform users — the
+  // signature IS the auth. Without this, every webhook bounces to /login.
+  if (pathname.startsWith("/api/webhooks/")) return true;
   // /api/ops/* runs its own admin-OR-emergency-key auth. The
   // emergency-key path exists so verification works even if Supabase
   // Auth is the thing being debugged — we can't route the probe
@@ -247,10 +298,11 @@ async function supabaseAuthGate(req: NextRequest): Promise<NextResponse> {
     const path = req.nextUrl.pathname;
     const allowedDuringPending =
       path === "/login/check-email" ||
-      path === "/auth/approve" ||
       path === "/logout" ||
       path.startsWith("/api/auth/") ||
       path.startsWith("/_next/");
+    // /auth/approve is now in PUBLIC_PATHS and short-circuits before
+    // here; listing it again would be dead code.
     if (!allowedDuringPending) {
       const url = req.nextUrl.clone();
       url.pathname = "/login/check-email";

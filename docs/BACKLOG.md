@@ -6,6 +6,72 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
+## ~~Typography minimums Phase 2 — `text-sm`-as-body callsite sweep~~ (shipped 2026-05-03, PR #492)
+
+**Tags:** `ux`, `typography`, `tech-debt`
+
+**What:** Phase 1 (this PR) eliminated `text-xs` site-wide (530 occurrences across 122 files → uplifted to `text-sm`) and bumped the `Lead` typography primitive from `text-sm` to `text-base`. Phase 2 walks every remaining `text-sm` usage and re-classifies: if the role is body copy (paragraph, description, form input value, modal body), bump to `text-base`; if it's small text (helper, caption, badge, eyebrow, breadcrumb, status microcopy), keep at `text-sm`. Per `docs/RULES.md` rule #7, body text floor is 1rem and small text floor is 0.875rem.
+
+**Why deferred:** Phase 1 was a mechanical bulk replace — safe, scoped, reviewable. Phase 2 needs per-callsite judgment ("is this paragraph or a caption?") which scales worse and risks visual hierarchy drift if done in one shot. Doing it as its own slice lets the review focus on the role-classification calls instead of mixing them with the bulk uplift.
+
+**Also deferred from Phase 2:**
+- The `H3` primitive sits at `text-sm` (14px) as a sub-section heading. Bumping it to `text-base` collides with `H2` (also 16px) and collapses the H1/H2/H3 visual hierarchy. A redesign that introduces `text-lg` for `H2` (or similar tier shift) is a separate design call. Steven's intent for "body ≥ 1rem" is about reading copy, not heading hierarchy — leaving `H3` at `text-sm` is consistent with that interpretation.
+- ESLint rule blocking `text-xs` in JSX className attributes. Would catch regressions automatically. Needs `eslint-plugin-tailwindcss` or a custom rule and a config plumbing step.
+
+**Trigger:** the next per-screen polish PR (e.g. when a slice naturally touches the affected component), OR proactively when Phase 1 stabilises and operators report any remaining "text too small" feedback.
+
+**Rough scope:** Medium (~half a day). Visual diff review across the admin surfaces, per-component classname audit, layout adjustments where the bump causes overflow / truncation. Manual visual pass on `/admin/sites/[id]`, brief review surface, post detail surface, image library, audit log, settings.
+
+---
+
+## ~~DATA_CONVENTIONS rollout — add audit columns to `sites`~~ (shipped 2026-05-03, PR #491)
+
+**Tags:** `schema`, `data-conventions`, `tech-debt`
+
+**What:** Migration adds `created_by uuid` and `updated_by uuid` columns to the `sites` table (both nullable, FK to `opollo_users(id)` with `ON DELETE SET NULL`). After the migration lands, restore the `updated_by: gate.user?.id ?? null` writes in three routes that drop them today:
+- `app/api/admin/sites/[id]/onboarding/route.ts`
+- `app/api/admin/sites/[id]/use-image-library/route.ts`
+- `app/api/admin/sites/[id]/setup/extract/save/route.ts`
+
+**Why deferred:** UAT was blocked when those three routes returned 500 (`column "updated_by" of relation "sites" does not exist`). The surgical fix dropped the column writes to unblock. Per `docs/DATA_CONVENTIONS.md`, audit columns are forward-facing — existing tables fold in on the next natural migration. The fold-in for `sites` deserves its own slice with a backfill plan, not a UAT-blocker drive-by.
+
+**Trigger:** any future slice that wants per-row authorship on `sites` (e.g. an admin audit-log surface that filters site changes by actor). Or proactive cleanup once the schema migration backlog is light.
+
+**Rough scope:**
+- Migration: `ALTER TABLE sites ADD COLUMN created_by uuid REFERENCES opollo_users(id) ON DELETE SET NULL, ADD COLUMN updated_by uuid REFERENCES opollo_users(id) ON DELETE SET NULL;`. Existing rows: NULL (no historical attribution available — that's fine).
+- Restore the three writes (revert the surgical drop). Cite this PR's commit when restoring.
+- Optional: backfill `created_by` for newly-onboarded sites going forward via the `OnboardingReminderBanner` flow's saving step (out of scope unless authorship is a hard product requirement).
+
+**Size:** Small (~30 min for the migration + 10 min to restore the three writes + tests).
+
+---
+
+## Rotate `SUPABASE_DB_URL` database password (opened 2026-05-03 during P1 bootstrap)
+
+**Tags:** `security`, `credentials`, `tech-debt`
+
+**What:** Reset the Supabase project's database password and update every place that holds a copy of the connection string. The current password was exposed in a Claude Code conversation transcript when `supabase db push --db-url $url` failed to parse a malformed value (trailing tabs from a careless `.Trim()` call) and the CLI echoed the full input — including the password — to stderr. The leak is contained to that one conversation log; rotation closes the window before the credential matters externally.
+
+**Why deferred:** Low urgency in the current state — the project is pre-public, no external contributors, no third-party audit access. A panic-rotation today would also block the in-flight P1 push that needs the live URL. Better to land P1, then rotate as a small dedicated chore. Steven explicitly accepted the risk and deferred until go-live.
+
+**Trigger:** Before any of the following — whichever lands first:
+- Go-live (the explicit deferral threshold Steven named).
+- An external contributor (consultant, freelancer, security review) gets repo or transcript access.
+- A Claude Code conversation transcript is exported / shared / archived to a system Steven doesn't fully control.
+- Any indicator the leaked credential has been used (Supabase Dashboard → Database → Connection logs flagging an unfamiliar IP).
+
+**Rough scope:** Small (~30 min):
+1. Supabase Dashboard → Project Settings → Database → "Reset database password". Note the new password.
+2. Update `.env.local` (`SUPABASE_DB_URL=...`).
+3. Update Vercel project env (Production + Preview + Development scopes if all three reference the DB URL).
+4. Redeploy or re-trigger the next deployment so the new value picks up.
+5. Smoke-test: `npx supabase db push --db-url "$SUPABASE_DB_URL" --dry-run` returns "Remote database is up to date" (no migrations pending). The cron workers (`/api/cron/*`) and the brief-runner exercise the same connection on their next tick — watch the request-id logs for connection errors.
+6. Delete the leaked transcript / mark it as containing rotated credentials. The string itself is now a deactivated artefact; no further action needed once rotation is complete.
+
+**Out of scope:** The Anon key and Service Role key are separate credentials — rotating them is a much bigger blast radius (every client + every server route reads them). Don't bundle that into this rotation. If those need rotating, treat as its own slice with a coordinated deploy.
+
+---
+
 ## Component test infra — jsdom + @testing-library/react (opened 2026-04-27 by RS-1 / RS-4)
 
 **What:** Add `jsdom` (or `happy-dom`), `@testing-library/react`, and a vitest project split (or `environmentMatchGlobs`) so we can run hook + component tests under `lib/__tests__/` (or a new `components/__tests__/`).
@@ -364,22 +430,9 @@ Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 st
 
 Captured during UAT prep in parallel with M15-7. Deferred to avoid collision in concurrent development; highest-priority UX fixes picked up once M15-7 ships.
 
-### Admin top navigation redesign
+### ~~Admin top navigation redesign~~ (shipped — AdminSidebar already live)
 
-**What:** Current top nav at `/admin` is functional but unpolished: links stretch wide across the full screen width, spacing between items is inconsistent, user email + Security + "Back to builder" + Sign out are all crammed into the right edge with no visual hierarchy. Feels like a prototype, not a product.
-
-**Why deferred:** Captured during UAT prep after being observed live. M15-7 is mid-flight.
-
-**Trigger:** After M15-7 Phase 4 completes, paired with the site actions menu fix (similar file surface, same review).
-
-**Desired end state (professional SaaS admin pattern):**
-- Left side: logo + primary nav (Sites, Batches, Images, Users) — compact, grouped, clear visual separation from right side
-- Right side: user menu as a single button (avatar or email with chevron) that opens a dropdown containing: Security, Back to builder, Sign out, any future account actions
-- Collapse the cluttered right-edge links into that dropdown
-- Add subtle visual treatment: border-bottom, slight background contrast, or shadow to separate nav from page content
-- Responsive: collapse nav items to hamburger on mobile widths
-- Active route indicator on the current page link (underline, bold, or background accent)
-- Consistent horizontal padding, max-width container so nav doesn't stretch edge-to-edge on wide screens
+`app/admin/layout.tsx` was switched from a horizontal `AdminNav` to a left-sidebar `AdminSidebar` (see R1-1 comment in that file). The desired end state — compact grouped nav, user menu, active route indicator, no edge-to-edge stretch — is delivered by the sidebar. No further work needed.
 
 **Inspiration patterns:** Vercel dashboard, Linear, Stripe Dashboard, Supabase dashboard top nav
 
@@ -393,9 +446,9 @@ Captured during UAT prep in parallel with M15-7. Deferred to avoid collision in 
 
 Verified 2026-04-29: the post-commit panel in `BriefReviewClient.tsx` (~line 573) already renders user-friendly copy ("This brief is committed. You're ready to run the generator…") with two CTAs ("Back to briefs", "Open run surface →"). The dead-end + M12-5 jargon described in the original entry was fixed during M12-5 itself; the BACKLOG entry slipped through unmarked. Stale header comment updated in the same audit pass.
 
-## M12-6 — Save-Draft persistence for briefs review
+## ~~M12-6 — Save-Draft persistence for briefs review~~ (shipped 2026-05-03)
 
-Surfaced by the `fix(e2e)` slice (2026-04-24). The M12-1 slice plan §6.2 called for a "Save draft" button that persists `brief_pages` edits under `version_lock` before commit. That button was never implemented — the commit endpoint therefore 409s on any edit-then-commit flow because the client's hash is computed from in-memory edits while the server recomputes from unedited DB rows. The happy-path E2E in `e2e/briefs-review.spec.ts` is `test.fixme`'d until this lands. Pick up trigger: M12-6 starts. Scope: new `PATCH /api/briefs/[brief_id]/pages` endpoint + "Save draft" button wired into `BriefReviewClient.tsx` + re-enable the fixme'd test.
+PATCH endpoint at `app/api/briefs/[brief_id]/pages/route.ts` + "Save draft" button wired in `components/BriefReviewClient.tsx`. Fixed version_lock bug (`brief.version_lock` prop → `latestBrief.version_lock` state). E2E happy-path test re-enabled (commit confirm modal removed UAT 2026-05-03).
 
 ---
 
@@ -426,64 +479,56 @@ Reports live at:
 
 ### Open — operational decisions needed
 
-- **[M15-5 #1] `/api/cron/process-transfer` not in `vercel.json`.** Route exists, worker is correct, nothing fires it. Trace in `docs/PRODUCTION_RISK_AUDIT_2026-04-24.md` showed publish-flow image transfer is inline-synchronous; only the iStock seed CLI creates `transfer_jobs` rows that need the cron to drain. **Decision needed:** run `SELECT count(*) FROM transfer_job_items WHERE state = 'pending';` — if `0`, delete route + `lib/transfer-worker.ts` (dead code); if `>0`, wire cron. Pick up trigger: Steven's DB check. Scope: either 1 line added to `vercel.json` + cron monitoring, or ~600 lines deleted (worker + route + tests).
+- ~~**[M15-5 #1] `/api/cron/process-transfer` not in `vercel.json`.**~~ Resolved 2026-05-04 — PR #527. DB check confirmed 0 pending rows; the entire M4 image-transfer pipeline (cron route, `lib/transfer-worker.ts`, `lib/anthropic-caption.ts`, 5 test files) deleted. Cron entry removed from `vercel.json`.
 - **[M15-5 #2] `bumpTenantUsage()` exported but never called.** Tenant budget counters track reservations only; actual-cost writeback helper is defined but unwired. Resolved during M15-7 as COSMETIC: `PROJECTED_COST_PER_BATCH_SLOT_CENTS = 30` and `PROJECTED_COST_PER_REGEN_CENTS = 30` are worst-case ceilings per the author's comment ("conservative — actual costs tend to be lower"). Tenants under-utilize caps but cannot overspend. Pick up trigger: tenant reports under-utilization complaint, OR we want actual-vs-projected reconciliation for billing accuracy. Scope: wire `bumpTenantUsage` into batch-worker slot-completion + regen finalization paths with the delta `actual - reserved`.
 
 ### Open — grouped by next-natural-slice trigger
 
 #### Security / auth tightening (next security review pass)
 
-- **[M15-4 #3] `tools/*` write routes have no session requirement.** `tools/publish_page`, `tools/update_page`, `tools/delete_page` are reachable with just a rate-limit token. M15-7 Phase 3b (#134) pinned current behaviour in tests; when auth gets tightened, tests will need to update. Scope: add `requireAdminForApi(['admin', 'operator'])` to the three write routes + refresh the tests.
-- **[M15-4 #8] 6 public GET routes have no route-level auth gate.** `sites/list`, `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`, `design-systems/[id]/preview` rely entirely on middleware. Defense-in-depth gap. Scope: add `requireAdminForApi()` to each; cost is one import + one check per route.
-- **[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.** Direct POST outside the chat flow → executor uses empty AsyncLocalStorage context. Needs verification that direct calls fail safely. Scope: either (a) remove the tools routes if only used internally by chat, or (b) seed context from the request body's `site_id`.
-- **[M15-5 #12] `image_usage` RLS excludes `viewer` role.** Asymmetry vs `image_library` + `image_metadata`. Check if intentional; if so, comment the migration; if not, align the policy.
+- ~~**[M15-4 #3] `tools/*` write routes have no session requirement.**~~ Fixed 2026-05-03 — `requireAdminForApi` added to `publish_page`, `update_page`, `delete_page`; tests updated; malformed-JSON now returns 400 instead of forwarding `{}` to executor.
+- ~~**[M15-4 #8] 6 public GET routes have no route-level auth gate.**~~ Fixed 2026-05-03 — added `requireAdminForApi(["super_admin","admin"])` to GET handlers in `sites/[id]`, `sites/[id]/design-systems`, `design-systems/[id]/components`, `design-systems/[id]/templates`. `sites/list` and `design-systems/[id]/preview` already had gates per PLATFORM-AUDIT PR3 (#386).
+- ~~**[M15-4 #11] `tools/*` routes don't seed `runWithWpCredentials()` context.**~~ Fixed 2026-05-04 — PR #528. `lib/tools-wp-creds.ts` helper added; all 6 WP tool routes now call `requireAdminForApi` + `resolveToolWpCreds(site_id)` + `runWithWpCredentials`. Tests updated across all 6 route test files.
+- ~~**[M15-5 #12] `image_usage` RLS excludes `viewer` role.**~~ Documented 2026-05-04 — PR #529 migration 0085 adds `COMMENT ON POLICY image_usage_read` explaining intentional viewer exclusion (WP transfer bookkeeping, not user-visible data).
 
 #### Observability + write-safety hygiene (next defense-in-depth slice)
 
 - ~~**[M15-4 #5] `retryable: true` on VALIDATION_FAILED in 5 routes.**~~ Fixed 2026-04-29 — flipped to `retryable: false` in admin/images/[id], admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId], admin/users/invite, admin/users/[id]/role. Migration to `lib/http.validationError()` deferred to M15-4 #14 tech-debt cleanup.
-- **[M15-4 #6] No timeouts on external-call fetches** anywhere in the codebase (only `Sentry.flush(5000)` exists). Hanging Anthropic/WP/Supabase/Upstash drains function pool. Scope: `withTimeout(promise, ms)` helper in `lib/http.ts`; wrap external calls. Suggested initial values: Anthropic 60s, WordPress 30s, Cloudflare 30s, Supabase 15s.
-- **[M15-4 #7] ~15 routes still have no structured logging.** Partial coverage via #132 (9 routes + 2 libs). Remaining: admin/batch POST, admin/images/[id] restore, admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId] and its regenerate, auth/callback, design-systems/*, sites/register, sites/[id], sites/[id]/design-systems, sites/list, tools/* (all 7). Scope: add `logger.error()` on every error-return path; incremental, one route at a time.
-- **[M15-4 #12] Malformed JSON behavior inconsistent.** Old pattern (`try { body = req.json() } catch { body = {} }`) gives confusing "missing field" error; new pattern (`lib/http.readJsonBody`) gives clear "Request body must be valid JSON." Migration incomplete. Scope: migrate old-pattern routes to `readJsonBody` + `parseBodyWith`.
+- ~~**[M15-4 #6] No timeouts on external-call fetches.**~~ Partially fixed 2026-05-03: `withTimeout<T>` helper added to `lib/http.ts`; `AbortSignal.timeout(60_000)` wired into `lib/anthropic-call.ts`; `AbortSignal.timeout(30_000)` wired into `lib/wordpress.ts` `wpFetch`. Cloudflare and Supabase deferred — Cloudflare calls are async upload returns, Supabase client manages its own pool.
+- ~~**[M15-4 #7] ~15 routes still have no structured logging.**~~ Fixed 2026-05-03 — PR #505. Added `logger.error()` to every error-return path across: tools/* (7 routes), admin/batch POST, admin/images/[id] (PATCH+DELETE+restore), admin/sites/[id]/budget, admin/sites/[id]/pages/[pageId] + regenerate, auth/callback, sites/register, sites/[id] (GET+PATCH+DELETE), sites/list; `respond()` in lib/http.ts now logs all non-ok responses covering design-systems/* + sites/[id]/design-systems.
+- ~~**[M15-4 #12] Malformed JSON behavior inconsistent.**~~ Fixed 2026-05-03 across all batches — PR #500 (admin/*), PR #501 (auth/account/ops/emergency/approve/sites/*), PR #502 (tools/*), PR #503 (platform/social/*), PR #504 (optimiser/* 3 silent-swallow routes). Zod.parse-in-try/catch routes already correct; only `.catch(()=>({}))` and `catch { body = null }` variants needed fixing.
 
 #### Rate-limiting coverage (next rate-limit slice)
 
-- **[M15-4 #9] 9 sensitive routes without a rate limit.** User-mgmt (revoke, reinstate, role), budget PATCH, briefs upload (10MB), design-system writes, `sites/list`, `design-systems/[id]/preview`. Scope: add named buckets in `lib/rate-limit.ts` (`user_mgmt`, `admin_write`, `briefs`); wire each route.
+- ~~**[M15-4 #9] 9 sensitive routes without a rate limit.**~~ Fixed 2026-05-03 — added `user_mgmt` (20/1h), `admin_write` (60/1h), `briefs_upload` (10/1h) buckets in `lib/rate-limit.ts`; wired into revoke, reinstate, role, budget PATCH, briefs upload, design-system activate/archive/components/templates, `sites/list`, and `design-systems/[id]/preview`.
 
 #### Schema + constraint polish (next migration slice)
 
-- **[M15-2 #4] Missing index on regen daily-budget query.** `lib/regeneration-worker.ts#checkDailyBudget` does `.select("cost_usd_cents").gte("created_at", startOfDay)` with no supporting index. Per-enqueue cost. Scope: either add `idx_regen_jobs_created_at` partial index or scope the query to `site_id` (existing composite index then covers it).
-- **[M15-2 #5] No cancel endpoint for `transfer_jobs`.** Schema has `cancel_requested_at` column; no route uses it. Overlaps with [M15-5 #1] — if transfer cron is wired, add cancel; if cron is dead, drop the column.
-- **[M15-2 #8] Event-table PK type inconsistency.** `generation_events` + `regeneration_events` are `bigserial`; `transfer_events` is `uuid`. Cosmetic unless we build a unified event stream.
+- ~~**[M15-2 #4] Missing index on regen daily-budget query.**~~ Fixed 2026-05-03 — migration 0080 adds `idx_regen_jobs_created_at` index on `regeneration_jobs(created_at DESC)` supporting the `.gte("created_at", startOfDay)` range predicate in `lib/regeneration-publisher.ts#checkDailyBudget`.
+- ~~**[M15-2 #5] No cancel endpoint for `transfer_jobs`.**~~ Resolved 2026-05-04 — PR #527 migrated away the `cancel_requested_at` column (transfer cron deleted, M15-5 #1 took the "drop" path).
+- ~~**[M15-2 #8] Event-table PK type inconsistency.**~~ Documented 2026-05-04 — PR #533 migration 0086 adds `COMMENT ON TABLE` to all three event tables noting the bigserial/uuid mismatch and normalisation path.
 - **[M15-2 #10] Lease-coherent CHECK asymmetry.** `transfer_job_items_lease_coherent` requires `worker_id IS NOT NULL` in leased states; `generation_job_pages_lease_coherent` + `regeneration_jobs_lease_coherent` don't. Scope: tighten M3/M7 CHECKs after verifying no orphan-leased rows in production.
-- **[M15-2 #12] `image_usage` RLS excludes viewer.** See [M15-4 #8] grouping above — same theme.
-- **[M15-2 #13, #14] Service-role-only write tables + `opollo_config` read — undocumented at the migration level.** Intentional (workers use service-role; `first_admin_email` protected from enumeration) but the reasoning lives only in commit history. Scope: one-line comment blocks in each migration.
+- ~~**[M15-2 #12] `image_usage` RLS excludes viewer.**~~ See M15-5 #12 above — documented in PR #529.
+- ~~**[M15-2 #13, #14] Service-role-only write tables + `opollo_config` read — undocumented at the migration level.**~~ Documented 2026-05-04 — PR #529 migration 0085 adds `COMMENT ON TABLE` for all service-role-only write tables and `opollo_config` anon-read pattern.
 
 #### Test coverage (opportunistic — add when touching the surface)
 
-- **[M15-6 #5-12] Route handler tests not written.** Remaining after M15-7 Phase 3 (which covered chat, tools, wordpress):
-  - `cron/process-batch` route handler (lib-level well-covered)
-  - `cron/process-transfer` (overlaps [M15-5 #1]; test only after cron decision)
-  - `cron/budget-reset` route handler
-  - `cron/process-regenerations` — only WP_CREDS_MISSING branch covered
-  - `ops/self-probe` (no test at all)
-  - `sites/[id]` PATCH/DELETE
-  - `admin/images/[id]` + `/restore`
-  - `admin/sites/[id]/pages/[pageId]` PATCH
-- **[M15-6 #13] 6 of 7 tool JSON schemas untested.** `lib/tool-schemas.ts` — `searchImagesJsonSchema` tested; others aren't. Scope: parametric tests across all 7.
-- **[M15-6 #14] Tool lib implementations untested.** `lib/create-page.ts`, `lib/update-page.ts`, `lib/delete-page.ts`, `lib/get-page.ts`, `lib/list-pages.ts`, `lib/publish-page.ts`. M15-7 Phase 3b (#134) pins delegation at the route layer; the libs themselves wrap WP + Supabase calls with no dedicated tests. Scope: 2-3 hours per lib.
-- **[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.** Blocked on M12-6 save-draft. Re-enable when M12-6 lands.
-- **[M15-6 #17] `health-route.test.ts` only covers happy path.** Degraded branches untested. Scope: 1 hour.
+- ~~**[M15-6 #5-12] Route handler tests not written.**~~ Shipped 2026-05-04 — PR #532 (cron/budget-reset, ops/self-probe, sites/[id] PATCH+DELETE, admin/images/[id] PATCH+DELETE+restore, admin/sites/[id]/pages/[pageId] PATCH) + PR #533 (cron/process-batch, cron/process-regenerations additional branches). `cron/process-transfer` route deleted by PR #527; no test needed.
+- ~~**[M15-6 #13] 6 of 7 tool JSON schemas untested.**~~ Shipped 2026-05-04 — PR #530 adds parametric tests for all 7 schemas.
+- ~~**[M15-6 #14] Tool lib implementations untested.**~~ Shipped 2026-05-04 — PR #532 adds tests for all 6 executor libs (create-page, list-pages, get-page, update-page, delete-page, publish-page).
+- ~~**[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.**~~ Shipped in M12-6 (2026-05-03).
+- ~~**[M15-6 #17] `health-route.test.ts` only covers happy path.**~~ Shipped 2026-05-04 — PR #531 adds degraded branch + outer-catch tests.
 
 #### Tech-debt (bundled cleanup, no urgency)
 
 - **[M15-4 #14] 12 local `errorJson()` helpers across route files.** Migration to `lib/http.respond()` / `lib/http.validationError()` incomplete. Large mechanical diff.
-- **[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.** Move to `lib/http.ts` or `lib/crypto-compare.ts`.
+- ~~**[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.**~~ Extracted to `lib/crypto-compare.ts` 2026-05-03 — PR #510. 9 files deduplicated: cron/budget-reset, cron/optimiser-monitor-rollouts, cron/process-batch, cron/process-brief-runner, cron/process-regenerations, emergency, ops/reset-admin-password, ops/self-probe, and cron/process-transfer (since deleted by PR #527).
 - ~~**[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum**.~~ Added to `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus 409 mapping (2026-04-29).
 - ~~**[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.**~~ Comment added in route handler explaining the financial-control rationale (2026-04-29).
 - ~~**[M15-4 #18] `/api/health` envelope outlier** — no `ok` field.~~ Deviation documented in route comment (2026-04-29).
 - ~~**[M15-4 #19] `/api/health` no outer try/catch.**~~ Wrapped in try/catch; thrown helper now produces a structured 503 with logger.error trail (2026-04-29).
-- **[M15-5 dead code] `lib/class-registry.ts`, `lib/content-schemas.ts`, `lib/supabase.ts#getAnonClient`.** Tested/scaffolded but not wired. Scope: per-module decision — ship the feature they were preparing, or delete. Triggers: class-registry unblocks a planned per-component CSS gate; content-schemas unblocks structured inline-HTML; getAnonClient unblocks a planned Stage-2 client-surface.
-- **[M15-2 #2 residue] `brief_runs` + `site_conventions`** — M12-1 forward-looking tables, not referenced in production code today. Close naturally when M12-2+ wires them. Comment at migration 0013 noting the forward intent would help.
+- ~~**[M15-5 dead code] `lib/class-registry.ts`, `lib/content-schemas.ts`, `lib/supabase.ts#getAnonClient`.**~~ Deleted 2026-05-04: `class-registry.ts` + its test deleted (M3 shipped without wiring the CSS gate; no planned follow-up); `getAnonClient` removed from `lib/supabase.ts` (Stage 2 auth shipped via `@supabase/ssr`, not the anon client); `content-schemas.ts` was already absent.
+- ~~**[M15-2 #2 residue] `brief_runs` + `site_conventions`**~~ — Verified 2026-05-04: `brief_runs` IS referenced in `lib/brief-runner.ts` (leasing, status updates, content_summary cap). Migration 0013 already has the forward-intent comment. Item was premature — tables are wired.
 - **[M15-2 #11 residue] Dynamic update spreads** (`updateDesignSystem`, `updateComponent`, `updateTemplate`). Zod↔DB sync test in #129 guards against drift; the pattern itself is unchanged. Full resolution lands with M15-8 type generation.
 
 #### Env + doc polish (trivial, opportunistic)
@@ -492,8 +537,8 @@ Reports live at:
 - ~~**[M15-3 #10] `LEADSOURCE_WP_USER` / `LEADSOURCE_WP_APP_PASSWORD` undocumented format.**~~ 4-line comment added in `.env.local.example` (2026-04-29).
 - ~~**[M15-3 #11] `SENTRY_ORG` / `SENTRY_PROJECT` undocumented context.**~~ Inline comment added (2026-04-29).
 - ~~**[M15-3 #12] `DATABASE_URL` shell variable vs `SUPABASE_DB_URL` runtime env naming collision.**~~ Documented in `.env.local.example` (2026-04-29) — `SUPABASE_DB_URL` block now explains the shell-vs-runtime layering.
-- **[M15-3 #13] `ANALYZE` env var undocumented.** Only relevant to `npm run analyze`. Low priority. Still open.
-- **[M15-5 Langfuse EU drift.** `lib/langfuse.ts:37` defaults to `https://us.cloud.langfuse.com`. EU projects without `LANGFUSE_HOST` silently go to the wrong datacenter. Not affected today (we're on US). Close when the `.env.local.example` comment ever needs updating anyway.
+- ~~**[M15-3 #13] `ANALYZE` env var undocumented.**~~ Documented 2026-05-04 — PR #533 adds comment block in `.env.local.example`.
+- ~~**[M15-5 Langfuse EU drift.**~~ Documented 2026-05-04 — `.env.local.example` `LANGFUSE_HOST` block updated to warn that EU-region projects must set `https://eu.cloud.langfuse.com`.
 
 #### Closed by M15-8 (future milestone — type generation + CI gates)
 
@@ -556,14 +601,7 @@ Trigger to pick up: next UI polish pass, OR before any admin UI brand-scope chan
 
 All Critical + High findings from the prompt-1 security audit closed by PRs #93 (role gates on design-systems + sites/register), #100 (rate limiting on cost-bearing + auth-adjacent routes), and #102 (server-only guards on node-only lib modules). Finding 6 (.env.local.example drift) closed alongside this entry in the same PR. One Medium deferral:
 
-- **RLS null-safety hardening (Medium, defense-in-depth).** Seven RLS policies across five migration files assume `auth.uid()` is non-NULL for authenticated sessions. PG semantics treat a NULL `USING` clause as not-visible — **no cross-tenant leak today** — but silent denial is the real failure mode during any auth-mechanism cutover. Files:
-  - `supabase/migrations/0004_m2a_auth_link.sql:148` — `public.auth_role()` body
-  - `supabase/migrations/0005_m2b_rls_policies.sql:112-114` — `opollo_users_self_read`
-  - `supabase/migrations/0007_m3_1_batch_schema.sql:125,249,291`
-  - `supabase/migrations/0010_m4_1_image_library_schema.sql:490,500,510`
-  - `supabase/migrations/0011_m7_1_regeneration_schema.sql:177,229`
-
-  Belt-and-braces prefix: `(auth.uid() IS NOT NULL AND ...) OR public.auth_role() = 'admin'`. **Trigger to pick up:** bundle into the next Supabase Auth migration slice — the one the audit calls "M3 auth migration", i.e. the next-after-M2 auth cutover, naming-ambiguous vs. the already-shipped batch-generator M3. Do NOT ship as a hotfix — the policies do not leak today; landing a belt-and-braces prefix outside a wider migration slice is churn for no live risk.
+- ~~**RLS null-safety hardening (Medium, defense-in-depth).**~~ Shipped in migration `0023_audit_rls_null_safety.sql` (PR #129) — adds `created_by IS NOT NULL AND` guard to all eight affected creator-scoped policies across `generation_jobs`, `generation_job_pages`, `generation_events`, `regeneration_jobs`, `regeneration_events`, `transfer_jobs`, `transfer_job_items`, and `image_library`. Verified 2026-05-04.
 
 ---
 
@@ -897,3 +935,51 @@ M15-2 schema polish (#4, #5, #8, #10, #12, #13, #14); M15-4 security/auth (#3, #
 Generic infra / product surface (all pre-existed this run, all explicitly trigger-gated): Stripe billing, Storybook, Feature flags, k6 load testing, chaos engineering, synthetic monitoring, property-based testing, size-limit budgets, admin de-jargoning, CHANGELOG, API ref, Next.js 14 → 16 framework upgrade, CSP enforce-mode, soft-delete schema hygiene, deferred dependency upgrades.
 
 **Production health throughout the sweep:** green. `scripts/diagnose-prod.ts health-deep` reported `overall: ok` at 3, 6, and 9 PRs. No new failed brief_runs, no stuck running runs, no budget-reset backlog.
+
+### BUILD-AUDIT autonomous run (2026-05-02, PR #388)
+
+Full logical-completeness sweep across the codebase ahead of UAT, scoped to anything broken / missing / incomplete that prior audits hadn't already triaged. One P0 closed; everything else already in BACKLOG with concrete triggers.
+
+| PR | What | Closes |
+|---|---|---|
+| #388 | `app/invite/[token]/page.tsx` + `PlatformAcceptInviteForm` + middleware allowlist for `/invite/` | "P2-3 deferred `/invite/[token]` UI page" — the platform-invitation send flow (P2-2 / #380) was emailing recipients a link to a 404. P2-3's PR description called this out as deferred; this run picked it up. |
+
+**What the audit confirmed already-fixed:**
+- AUDIT.md (2026-04-26) BLOCKER error codes (`PASSWORD_WEAK`, `SAME_PASSWORD`, etc.) — present in `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus.
+- AUDIT.md HIGH RLS NULL-safety on creator-scoped policies — `0023_audit_rls_null_safety.sql`.
+- AUDIT.md MEDIUM soft-delete leakage on 5 user-facing tables — `0024_audit_soft_delete_rls.sql`.
+- AUDIT.md HIGH `NEXT_PUBLIC_VERCEL_ENV` documentation — landed in #209 env-doc polish.
+- M15-3 `LANGFUSE_HOST` / runbook typo — landed in #127.
+
+**What stayed in BACKLOG (no auto-fix; trigger-gated):**
+All P1/P2 items the audit re-encountered are already documented above with concrete triggers — `CLOUDFLARE_IMAGES_HASH` hard-required promotion, M15-4 #8 defense-in-depth gates, M15-4 #6/#7/#9 observability hygiene + rate-limit coverage, M15-5 #1 `process-transfer` cron decision, M15-8 generated Supabase types, the seven migrations missing rollback files, and the standard Phase-2 product-surface set (Stripe / Next.js 16 / mu-plugin / Kadence typography).
+
+**`scripts/audit.ts` noise (PR #386, 2026-05-02):** the new heuristic static-audit job reports 39 HIGH issues. After classification this run: 33 are heuristic false positives (cron routes that use `CRON_SECRET` constant-time check, OAuth callbacks intentionally public, the `POST /api/platform/invitations/accept` route where the token IS the auth, four `migration-ordering` matches against English words like `it` / `the` / `these` / `resolve` in comment text). The remaining 2 (`/api/sites/list`, `/api/design-systems/[id]/preview`) are the existing M15-4 #8 defense-in-depth BACKLOG entry. CI's `static-audit` job is gating on these but main's branch protection doesn't require the check; merges proceed. Improving the script's heuristics is its own slice — out of scope for this run; flag if false-positive cleanup ever earns its keep.
+
+**Production health:** lint, typecheck, and build all green on main post-merge. Local `vitest run` requires Docker for `supabase start` — CI runs the full test suite (the same way prior runs verified the pre-existing m12-1-rls / m4-schema cells); `npm run test` was not exercised locally this run.
+
+---
+
+## M16 — Site graph architecture (all slices merged 2026-05-04)
+
+Site graph replaces HTML-as-canonical with a structured JSON page model. Full architecture in `docs/patterns/site-graph.md`.
+
+| Slice | PR | Status |
+|---|---|---|
+| M16-1 Schema migration (`site_blueprints`, `route_registry`, `shared_content`, `pages` columns) | #511 | ✅ merged |
+| M16-2 Types + data layer (`lib/types/page-document.ts`, `lib/models.ts`, `lib/generator-payload.ts`, `lib/site-blueprint.ts`, `lib/route-registry.ts`, `lib/shared-content.ts`) | #512 | ✅ merged |
+| M16-3 Component registry (20 variants, `lib/component-registry.ts`, `public/opollo-components.css`) | #513 | ✅ merged |
+| M16-4 Site planner — Pass 0+1 Sonnet, stores to 3 tables | #514 | ✅ merged |
+| M16-5 Page document generator — Pass 2 Haiku + retry + critique/revise | #515 | ✅ merged |
+| M16-6 Validator + ref-resolver + renderer + render-worker | #516 | ✅ merged |
+| M16-7 Batch-worker M16 wiring + blueprint review UI + shared content UI | #516 | ✅ merged (squashed with M16-6) |
+| M16-8 WP publisher — Gutenberg block, theme.json patch, synced patterns, drift detection | #522 | ✅ merged |
+| M16-9 E2E spec + pattern docs | — | ✅ this PR |
+
+**Deferred items from M16 (no blockers, trigger-gated):**
+
+- **Section regen UI** — operator can trigger regen of a single section from the review screen. Deferred; trigger is first operator request for section-level iteration.
+- **WP drift "Compare" action** — `drift_detected` flag is set; the operator UI shows the flag but the side-by-side diff viewer is deferred. Trigger is first operator needing to see the delta.
+- **Gutenberg block registry** (instead of Custom HTML) — v1 uses `<!-- wp:html -->` wrapper. Future: register an Opollo block plugin on WP and use `<!-- wp:opollo/section -->` with a block.json schema. Trigger is WP block editor compatibility requirement from a client.
+- **`generation_job_pages.pages_id` auto-link** — pre-linking the slot to the M16 pages row is currently done by the batch worker. A migration adding a trigger to auto-populate would eliminate one manual step. Deferred until a second pipeline stage needs the same pattern.
+- **Vision pass on WP drift** — fetch a screenshot of the live WP page and compare visually (not just HTML hash). Trigger is false-positive drift reports on themes that inject dynamic markup post-publish.

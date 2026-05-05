@@ -16,10 +16,12 @@ import type { RolloutMetrics } from "./evaluator";
 //   - bounces (sessions * (1 - engagement_rate) where engagement_rate
 //             is the GA4 default; falls back to 0 if missing).
 //
-// "errors_new" — 5xx on the new variant — is not yet ingested into
-// opt_metrics_daily. Returned as 0 until a server-error feed lands;
-// document this gap in the cron's per-tick log so operators don't
-// over-trust the error_rate threshold.
+// "errors_new" — 5xx on the new variant — comes from
+// opt_metrics_daily rows with source='server_errors' written by the
+// Vercel logs sync (Phase 1.5 slice D). When the Vercel feed isn't
+// configured (env vars unset), no rows are written and errors_new
+// stays at 0 for affected windows; the diagnostic surface flags the
+// dormant feed so operators don't over-trust the error_rate threshold.
 //
 // Until the actual traffic-split mechanism (Ads URL swap or JS hash
 // split) lands, "new" and "baseline" both read the same page-level
@@ -69,6 +71,14 @@ export async function fetchRolloutMetrics(
     .eq("dimension_key", "")
     .gte("metric_date", baselineStart.toISOString().slice(0, 10))
     .lte("metric_date", baselineEnd.toISOString().slice(0, 10));
+  const errorsRes = await supabase
+    .from("opt_metrics_daily")
+    .select("metric_date, metrics")
+    .eq("landing_page_id", input.landing_page_id)
+    .eq("source", "server_errors")
+    .eq("dimension_key", "")
+    .gte("metric_date", startedAt.toISOString().slice(0, 10))
+    .lte("metric_date", input.now.toISOString().slice(0, 10));
 
   if (newRes.error) {
     logger.error("staged-rollout: metrics new window fetch failed", {
@@ -80,19 +90,36 @@ export async function fetchRolloutMetrics(
       err: baselineRes.error.message,
     });
   }
+  if (errorsRes.error) {
+    logger.error("staged-rollout: server_errors fetch failed", {
+      err: errorsRes.error.message,
+    });
+  }
 
   const newAgg = aggregate(newRes.data ?? []);
   const baselineAgg = aggregate(baselineRes.data ?? []);
+  const errorsAgg = aggregateErrors(errorsRes.data ?? []);
 
   return {
     sessions_new: newAgg.sessions,
     conversions_new: newAgg.conversions,
     bounces_new: newAgg.bounces,
-    errors_new: 0, // 5xx feed not ingested yet — see header comment.
+    errors_new: errorsAgg.errors_5xx,
     sessions_baseline: baselineAgg.sessions,
     conversions_baseline: baselineAgg.conversions,
     bounces_baseline: baselineAgg.bounces,
   };
+}
+
+function aggregateErrors(
+  rows: Array<{ metrics: unknown }>,
+): { errors_5xx: number } {
+  let errors = 0;
+  for (const row of rows) {
+    const m = (row.metrics ?? {}) as Record<string, unknown>;
+    if (typeof m.errors_5xx === "number") errors += m.errors_5xx;
+  }
+  return { errors_5xx: errors };
 }
 
 interface MetricsAgg {

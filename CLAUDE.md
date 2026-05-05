@@ -8,7 +8,7 @@ A chat interface that generates WordPress pages for Opollo's clients.
 - Work autonomously. Don't ask for permission for normal coding tasks.
 - **Before starting a task that matches a pattern, read `docs/patterns/<pattern-name>.md` first.** The patterns folder is the playbook for recurring shapes — files, tests, PR structure, known pitfalls. If no pattern matches, proceed from first principles and note whether the task is a candidate for a new pattern.
 - **For operations tasks** (deploy rollback, key rotation, stuck incident, missing migration, env-var provisioning) — consult `docs/RUNBOOK.md` before acting. Do not freelance on destructive or irreversible operations.
-- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline) — see `docs/RULES.md`. Each rule has the incident that taught it.
+- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline, secret-handling discipline) — see `docs/RULES.md`. Each rule has the incident that taught it.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
@@ -120,6 +120,7 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - `npm run test` — Vitest
 - `npm run test:coverage` — Vitest with V8 coverage (60% line / 55% branch baseline)
 - `npm run test:e2e` — Playwright (requires `supabase start`)
+- `npm run audit:static` — static-analysis script (`scripts/audit.ts`) catching middleware/auth/db/migration/typography/env-var/error-handling/dead-route class errors before runtime. **HIGH severity gates CI.** Per `docs/RULES.md` rule #8 — see also the PLATFORM-AUDIT workstream PRs (#386, #389, #392, #394, #396, #398, #400, #402).
 - `npm run analyze` — production build with @next/bundle-analyzer reports
 
 ## DX hygiene
@@ -160,6 +161,7 @@ Supply-chain scanning runs server-side:
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
 - **RUNBOOK is load-bearing for incident response. Code that changes a blocker code, audit event name, or error envelope MUST update the matching `docs/RUNBOOK.md` entry in the same PR.**
+- **Never print env-var values or connection strings to tool output.** Any command that reads from `.env.local`, env, or another secret source runs with `2>$null` (PowerShell) / `2>/dev/null` (bash). Pass values via variables — never inline them into the visible command, never `Write-Output`/`Write-Host`/`echo` them, never paste a connection string into a chat update. If you need to confirm a value is set, print only its length or a hash prefix. Tool output that surfaces a secret (CLI parse errors, `--debug` flags, verbose logs) gets piped through a redactor before it reaches the conversation. Full rule + incident: `docs/RULES.md` #9.
 
 ## Performance standards
 - **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`
@@ -249,6 +251,290 @@ Every PR that adds or substantially changes an admin-facing route, form, or acti
 - Every spec navigates to every page it touches and runs `auditA11y(page, testInfo)` — axe findings are non-blocking today but the history is building for the Level-3 upgrade.
 
 If a change is tested only at the unit layer and not in E2E, state why in the PR description ("purely a lib/ change", "admin-facing but flagged off for this slice", etc.). Silent omissions are a review-blocker.
+
+## Design System Architecture — Audit 2026-05-02
+
+Foundational audit done before the DESIGN-SYSTEM-OVERHAUL workstream (PRs 0–15).
+Findings drive the architecture decisions that follow. File:line citations
+in parentheses are the source of truth — re-verify before relying on a claim
+older than ~one milestone.
+
+### Q1 — Are the Versions / Components / Templates / Preview tabs load-bearing?
+
+**No** for `design_system_versions.tokens_css` / `base_styles_css`.
+
+The four tabs at `app/admin/sites/[id]/design-system/{page,components,preview,templates}/page.tsx`
+are UI-only — they let an operator edit and store CSS strings against
+`design_system_versions`, but those strings are never read by the brief
+runner, batch worker, blog pipeline, or any Anthropic call. The only
+consumer of `design_system_versions` rows is the admin UI via
+`app/api/sites/[id]/design-systems/route.ts`.
+
+Caveat: the **separate** `design_systems` (singular) registry — gated by
+`FEATURE_DESIGN_SYSTEM_V2` — does feed `tokens_css` into the prompt's
+"Available components" registry block via `lib/design-system-prompt.ts:82`
+and `lib/system-prompt.ts:218–248`. Different table, different flag,
+different code path. The four UI tabs do NOT participate in that.
+
+Architectural consequence: PR 9 takes the "NOT load-bearing" branch — hide
+the tabs behind an Advanced disclosure and replace the raw-CSS-editor entry
+point with a guided flow.
+
+### Q2 — What does `context_build_failed` mean?
+
+Server-side audit-log outcome only, emitted by
+`app/api/sites/[id]/appearance/preflight/route.ts:94` when
+`buildPaletteSyncContext()` returns `!ok`. The user never sees the literal
+string — the route maps the inner code to an HTTP envelope (409 / 401 / 404 /
+502) returned at lines 100–122. Inner codes: `KADENCE_NOT_ACTIVE`,
+`SITE_NOT_FOUND`, `SITE_CONFIG_MISSING`, `DS_NOT_FOUND`, `WP_AUTH_FAILED`,
+`WP_REST_UNREACHABLE`.
+
+What the user actually sees today is whatever the Appearance panel renders
+when the preflight POST fails — which is where the leak happens. PR 8 + PR 14
+fix the UX side; the server-side outcome string stays for the audit log.
+
+### Q3 — Brief runner inputs: design-discovery (new) vs tokens.css (old) — both?
+
+Both, gated independently.
+
+- `lib/brief-runner.ts:1606` calls `buildDesignContextPrefix(brief.site_id)`
+  every page-tick. Reads `sites.{design_tokens, homepage_concept_html,
+  tone_applied_homepage_html, tone_of_voice}`. Gated by
+  `DESIGN_CONTEXT_ENABLED`.
+- `lib/system-prompt.ts:218–248` (`resolveDesignSystemSlot`) — when
+  `FEATURE_DESIGN_SYSTEM_V2` is on AND a `design_systems` row is active,
+  embeds `tokens_css` + component/template registry into the prompt template.
+- Both can be on simultaneously; they target different prompt regions.
+  Neither reads from the four-tab `design_system_versions` table.
+
+### Q4 — DESIGN_CONTEXT_ENABLED on staging / prod
+
+Default unset → flag treats it as off
+(`lib/design-discovery/build-injection.ts:42`). Not committed in repo
+(no `.env.staging`, no workflow file sets it). Operator-configured at deploy
+time in Vercel. **Treat as currently OFF in prod** until Steven confirms
+otherwise. PR 10 will run mode-aware generation as a separate code path so
+the workstream isn't blocked on flipping that flag.
+
+### Q5 — Content generation output format (Path B confirmation)
+
+Confirmed Path B — fragments only, inline CSS budget capped.
+
+`lib/brief-runner.ts:574–609` system prompt enforces:
+- Raw HTML, no markdown fences.
+- A contiguous fragment of one or more top-level `<section>` elements.
+- No `<!DOCTYPE>`, `<html>`, `<head>`, `<body>`, `<nav>`, `<header>`,
+  `<footer>`, `<meta>`, `<link>`, `<title>`, `<script>`.
+- Every `<section>` carries `data-opollo`.
+- Every CSS class begins with the site prefix.
+- `<style>` blocks allowed only for keyframes / scoped utilities; total
+  inline-style budget under 200 characters.
+
+Reference: `docs/plans/path-b-migration-parent.md`.
+
+### Q6 — Setup wizard at /admin/sites/[id]/setup
+
+Exists, three-step DESIGN-DISCOVERY wizard
+(`app/admin/sites/[id]/setup/page.tsx:15–29`):
+
+1. **Design direction** — operator-supplied references / description /
+   industry → 3 generated concepts → approve one.
+2. **Tone of voice** — sample copy + guided questions → tone JSON +
+   approved samples.
+3. **Done** — summary + "Start generating content" CTA.
+
+`?step=1|2|3` query param drives step. No-param entry redirects to
+the resume step computed from `design_direction_status` and
+`tone_of_voice_status`. Writes to: `design_brief`,
+`{design_direction,tone_of_voice}_status`, `homepage_concept_html`,
+`inner_page_concept_html`, `tone_applied_homepage_html`, `design_tokens`,
+`tone_of_voice`, `regeneration_counts`.
+
+### Q7 — "Set up design system" button on site detail
+
+`app/admin/sites/[id]/page.tsx:389–394` — links to
+`/admin/sites/${site.id}/design-system` (the four-tab UI). PR 12 redirects
+this to `/admin/sites/${site.id}/onboarding` (the new mode-selection
+screen introduced in PR 6).
+
+### Q8 — sites table columns related to design
+
+Migration **0060** (`supabase/migrations/0060_design_discovery_columns.sql`):
+
+| Column | Type | Default | Null | Purpose |
+|---|---|---|---|---|
+| `design_brief` | jsonb | — | yes | Step 1 operator inputs (refs, screenshots, description, industry, refinement notes). |
+| `homepage_concept_html` | text | — | yes | Approved homepage concept HTML; inline CSS only; reference context for generation. |
+| `inner_page_concept_html` | text | — | yes | Companion to homepage concept for inner pages. |
+| `tone_applied_homepage_html` | text | — | yes | Homepage concept with approved tone rewritten into hero / CTA / first service card. |
+| `design_tokens` | jsonb | — | yes | Extracted tokens: `{primary, secondary, accent, background, text, font_heading, font_body, border_radius, spacing_unit}`. |
+| `design_direction_status` | text | `'pending'` | no | `pending` / `in_progress` / `approved` / `skipped`. |
+| `tone_of_voice` | jsonb | — | yes | `{formality_level, sentence_length, jargon_usage, personality_markers[], avoid_markers[], target_audience, style_guide, approved_samples}`. |
+| `tone_of_voice_status` | text | `'pending'` | no | Same enum as design_direction_status. |
+
+Migration **0066** (`supabase/migrations/0066_design_discovery_regen_counts.sql`):
+
+| Column | Type | Default | Null | Purpose |
+|---|---|---|---|---|
+| `regeneration_counts` | jsonb | `{"concept_refinements":0,"tone_samples":0}` | no | Server-enforced caps (≤10 per loop) tracked across the wizard. |
+
+### Architecture decisions for PRs 5–15 (locked by this audit)
+
+1. **Site mode** — add `sites.site_mode` enum (`copy_existing` | `new_design`)
+   default null. New onboarding screen at `/admin/sites/[id]/onboarding`
+   (PR 6) sets it before the user hits the existing wizard or the new
+   extraction flow.
+2. **Copy-existing extraction columns** — add `sites.extracted_design`
+   (jsonb) + `sites.extracted_css_classes` (jsonb) for PR 7's output. Keep
+   the existing DESIGN-DISCOVERY columns (`design_tokens` etc.) as the
+   `new_design` path.
+3. **Design system tabs** — take the NOT-load-bearing branch in PR 9.
+   Hide tabs behind Advanced; entry point becomes the mode-aware design
+   summary, not the raw CSS editor.
+4. **Mode-aware generation** — PR 10 routes both `copy_existing` and
+   `new_design` paths through `buildDesignContextPrefix`, with the
+   copy-existing branch substituting `extracted_design` /
+   `extracted_css_classes` for `design_tokens` / concept HTML. Behaviour
+   when `site_mode IS NULL` falls back to current logic; no regression
+   on flag-off sites.
+5. **Appearance panel** — PR 8 reads `site_mode` first and renders one of
+   three states (no mode set / copy_existing / new_design). The
+   `context_build_failed` audit code stays server-side; the UI never
+   surfaces it.
+
+## Design System Architecture — Final state (post DESIGN-SYSTEM-OVERHAUL, 2026-05-02)
+
+DESIGN-SYSTEM-OVERHAUL workstream landed PRs 0–15 (#355–#370). Sites are
+now routed through one of two modes set during onboarding; generation
+behaviour, the appearance panel, and the design-system landing all
+branch off that. Below is the post-workstream contract — refer here
+when reasoning about generation prompts or onboarding flows.
+
+### Two site modes
+
+`sites.site_mode` is a text + CHECK column (`copy_existing` | `new_design`,
+nullable) added in migration 0067.
+
+- **NULL** — site hasn't been onboarded yet. Site detail renders the
+  `OnboardingReminderBanner` (non-dismissible, links to
+  `/admin/sites/[id]/onboarding`). Appearance panel renders an empty
+  state. Design-system landing renders an empty state. Generation
+  fallback: pre-PR-10 behaviour exactly (empty design context unless
+  `DESIGN_CONTEXT_ENABLED` is on).
+- **`copy_existing`** — site has a live WordPress theme. PR 7's
+  extraction wizard at `/admin/sites/[id]/setup/extract` populates
+  `sites.extracted_design` (colours / fonts / layout density / visual
+  tone / screenshot URL / source pages) and
+  `sites.extracted_css_classes` (container / heading levels / button /
+  card). Appearance panel renders the read-only profile + Re-extract
+  link; **no Kadence sync** (the host theme owns styling).
+  Design-system landing renders the "Copy existing site" card.
+- **`new_design`** — site is being built fresh on Kadence. The existing
+  DESIGN-DISCOVERY wizard at `/admin/sites/[id]/setup` runs through
+  design direction → concepts → tone of voice. Appearance panel renders
+  the existing `AppearancePanelClient` with Kadence preflight + sync
+  + rollback flow. Design-system landing renders the "New design" card.
+
+### Content generation contract per mode
+
+`lib/design-discovery/build-injection.ts` orchestrates context
+injection; called once per page-tick from `lib/brief-runner.ts:1606`
+and from `lib/system-prompt.ts:200`. Dispatch on `site_mode`:
+
+- **`copy_existing`** — always runs (mode is the gate;
+  `DESIGN_CONTEXT_ENABLED` is irrelevant). Emits an
+  `<existing_theme_context>` block built from `extracted_design` +
+  `extracted_css_classes`. Tells the model to use the extracted CSS
+  class names on container / h1 / h2 / h3 / button / card, and NOT
+  to introduce new CSS or inline styles unless absolutely necessary.
+  Falls back to plain semantic tags for any null bucket.
+- **`new_design`** — gated by `DESIGN_CONTEXT_ENABLED`. Emits the
+  existing `<design_context>` + `<voice_context>` blocks from
+  `design_tokens` / `homepage_concept_html` / `tone_of_voice`.
+- **NULL** — pre-PR-10 fallback exactly: empty unless the flag is on.
+
+Path B (PB-1) still applies in both modes: fragments only, no chrome,
+inline-style budget capped at 200 chars total. The mode-aware
+`<existing_theme_context>` is additive guidance — it doesn't change
+the page envelope contract.
+
+### Blog post simplification (PR 13)
+
+`PageContext` carries `siteMode` so `systemPromptFor` appends a
+`<blog_post_guidance>` block when `brief.content_type === 'post'`:
+
+- Both modes: prefer plain semantic markup (h1, h2, h3, p, ul, ol,
+  li, blockquote, img with alt) over decorative wrappers.
+- `copy_existing` posts: avoid inline CSS entirely.
+- `new_design` posts: inline `<style>` permitted but capped at ~3
+  simple rules.
+
+The page envelope contract (data-opollo wrapper, site-prefix on classes)
+still applies.
+
+### Image library context (PR 11, opt-in)
+
+`sites.use_image_library` (boolean, default false; migration 0068).
+Toggleable from `/admin/sites/[id]/settings`. When on, the brief
+runner calls `buildImageLibraryContextPrefix({siteId, topic: page.title})`,
+which queries `image_library` for active rows with caption + alt_text
+matching the topic via `websearch_to_tsquery` on `search_tsv`. Up to
+5 results are inlined as `<image_library_context>` so the model can
+reference URLs directly. Off by default until operators verify
+metadata quality.
+
+### Screen / route map
+
+| Route | Purpose |
+|---|---|
+| `/admin/sites/[id]` | Mode-aware site detail. Banner + design-system card branch on `site_mode`. |
+| `/admin/sites/[id]/onboarding` | Mode-selection screen (PR 6). Always lands fresh sites here from `SiteCreateForm`. |
+| `/admin/sites/[id]/setup` | DESIGN-DISCOVERY wizard (`new_design` only). |
+| `/admin/sites/[id]/setup/extract` | Copy-existing extraction wizard (PR 7; `copy_existing` only). |
+| `/admin/sites/[id]/appearance` | Mode-aware appearance panel (PR 8). |
+| `/admin/sites/[id]/design-system` | Mode-aware summary + Advanced disclosure. `?advanced=1` reveals the four legacy tabs. |
+| `/admin/sites/[id]/design-system/{components,templates,preview}` | Power-user surfaces. Reachable via direct URL or Advanced toggle. Not load-bearing on generation (audit). |
+| `/admin/sites/[id]/settings` | Per-site settings. Includes the image-library toggle. |
+
+### Env vars (post-workstream)
+
+- `DESIGN_CONTEXT_ENABLED` — gates the `new_design` injection path
+  only. Unset by default. The `copy_existing` path runs regardless.
+- `FEATURE_DESIGN_SYSTEM_V2` — gates the separate `design_systems`
+  registry block (different from `design_system_versions`). Unchanged
+  by this workstream.
+- `OPOLLO_MASTER_KEY` / `CLOUDFLARE_*` / `SUPABASE_*` — unchanged.
+
+### Known gaps / deferred items
+
+- **Pre-existing CI Supabase-stack failure.** Migrations
+  `0031_email_log.sql` and `0031_optimiser_clients.sql` collide on
+  the version primary key. Hotfix branch
+  `hotfix/migration-0031-collision` (#348) renumbers
+  `optimiser_clients` to 0066 but is stale relative to current main.
+  E2E + Vitest workflows fail at "Start Supabase local stack" until
+  this lands. The DESIGN-SYSTEM-OVERHAUL workstream PRs all merged
+  with passing lint + typecheck + build but cannot be E2E-validated
+  until the collision is resolved.
+- **Vision pass on copy-existing extraction.** PR 7's extractor is
+  HTML/CSS-first. Adding a Sonnet vision pass on the Microlink
+  screenshot is feasible (we already have the pipeline shape from
+  the design-discovery wizard) but deferred — v1 signals look
+  strong on static-HTML sites.
+- **Cloudflare optimised variant.** Per-account dashboard
+  configuration; PR 4 documented the operator-side setup
+  (`width=1200, fit=scale-down`) but didn't automate variant
+  provisioning. Future slice can add a setup script if more sites
+  need it.
+- **Audit-log filtering.** PR 14 introduced the `ErrorFallback`
+  primitive but the appearance event log still surfaces every
+  outcome including raw audit codes. Filtering noise events from
+  the operator-visible feed is a follow-up.
+- **Onboarding mid-stream re-flips.** `POST /onboarding` overwrites
+  `site_mode` unconditionally. Operator who flips mid-wizard leaves
+  orphan rows in the previous mode's columns. Cheap to surface as
+  a confirmation step in a follow-up; not a corruption risk.
 
 ## Optimiser module
 

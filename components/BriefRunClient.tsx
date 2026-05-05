@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, TriangleAlert } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,8 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
 export function BriefRunClient({
   siteId,
   siteName,
+  siteMode = null,
+  siteWpUrl = null,
   brief: initialBrief,
   pages: initialPages,
   activeRun: initialActiveRun,
@@ -108,6 +110,8 @@ export function BriefRunClient({
 }: {
   siteId: string;
   siteName: string;
+  siteMode?: "copy_existing" | "new_design" | null;
+  siteWpUrl?: string | null;
   brief: BriefRow;
   pages: BriefPageRow[];
   activeRun: BriefRunSnapshot | null;
@@ -117,8 +121,6 @@ export function BriefRunClient({
   const [controlState, setControlState] = useState<ControlState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [reviseOpen, setReviseOpen] = useState<string | null>(null); // page id
-  const [reviseNote, setReviseNote] = useState("");
 
   // RS-4 — poll the snapshot endpoint every 4s. The initial server-render
   // hydrates the surface; live updates flow in via `polled.data`. After
@@ -157,7 +159,32 @@ export function BriefRunClient({
     // After the smooth scroll begins, focus the card so screen-readers
     // jump along with the visual focus.
     el.focus({ preventScroll: true });
+    // Open the rendered-preview <details> so the operator sees the
+    // generated page immediately, not a collapsed panel.
+    const detailsEl = el.querySelector<HTMLDetailsElement>("details");
+    if (detailsEl) detailsEl.open = true;
   }
+
+  // Auto-scroll to the first awaiting-review page when the surface
+  // first lands on one. Tracks the page id so re-renders during the
+  // same review session don't yank scroll position around. Cleared
+  // when the operator approves / revises (page id changes or no page
+  // is awaiting). Honours prefers-reduced-motion via behavior:auto.
+  const lastScrolledToRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!firstAwaitingReview) {
+      lastScrolledToRef.current = null;
+      return;
+    }
+    if (lastScrolledToRef.current === firstAwaitingReview.id) return;
+    lastScrolledToRef.current = firstAwaitingReview.id;
+    // Defer one tick so the page card has rendered before we scroll.
+    const id = window.requestAnimationFrame(() => {
+      scrollToPageCard(firstAwaitingReview.id);
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [firstAwaitingReview]);
 
   const isRunTerminal =
     activeRun?.status === "succeeded" ||
@@ -282,11 +309,7 @@ export function BriefRunClient({
     }
   }
 
-  async function handleRevise(page: BriefPageRow) {
-    if (!reviseNote.trim()) {
-      setErrorMessage("Add a note describing what to change.");
-      return;
-    }
+  async function handleRevise(page: BriefPageRow, note: string) {
     setControlState("acting");
     setErrorMessage(null);
     try {
@@ -297,7 +320,7 @@ export function BriefRunClient({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             expected_version_lock: page.version_lock,
-            note: reviseNote,
+            note,
           }),
         },
       );
@@ -307,8 +330,6 @@ export function BriefRunClient({
       };
       if (res.ok && payload.ok) {
         setControlState("idle");
-        setReviseOpen(null);
-        setReviseNote("");
         void polled.refresh();
         return;
       }
@@ -332,17 +353,33 @@ export function BriefRunClient({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{brief.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Run surface for <span className="font-medium">{siteName}</span>
+          {/* UAT (2026-05-03 round-3): converted the run-status line from
+              a <p> with inline pills to a flex row so the status pill +
+              Live badge baseline-align cleanly with the prose. The pills
+              have padding-y of their own; baseline alignment inside a
+              text-sm <p> dropped them ~1px below the text and read as
+              broken to operators. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+            <span>
+              Run surface for <span className="font-medium">{siteName}</span>
+            </span>
             {activeRun && (
               <>
-                {" — "}
+                <span aria-hidden className="text-muted-foreground/60">—</span>
                 {/* RS-5 — when a specific page is awaiting review, the
                     run-level pill becomes a clickable shortcut showing
                     the ordinal so the operator knows exactly which page
                     is blocking. Falls back to the static pill when no
                     page is awaiting (defensive). */}
-                {activeRun.status === "paused" && firstAwaitingReview ? (
+                {activeRun.status === "paused" &&
+                firstAwaitingReview &&
+                sortedPages.length > 1 ? (
+                  // UAT (2026-05-03 round-3): only show the "Page N
+                  // awaiting your review →" clickable shortcut on
+                  // multi-page briefs. With a single page the operator
+                  // is already looking at the only card; the shortcut
+                  // is a no-op that adds visual noise. Single-page
+                  // briefs fall through to the static run pill.
                   <StatusPill
                     kind="run_paused"
                     role="button"
@@ -368,20 +405,33 @@ export function BriefRunClient({
                 )}
               </>
             )}
-            {/* RS-4 — discreet stale indicator. Only renders when the
-                last successful poll is more than 8s old (intervalMs * 2),
-                so a single late tick doesn't flicker the badge. */}
-            {polled.isStale && (
+            {/* RS-4 — live-update indicator. Stale (>8s without a fresh
+                fetch) shows amber; healthy shows a faint pulsing green
+                so the operator sees the surface is wired up and doesn't
+                feel the urge to refresh. */}
+            {polled.isStale ? (
               <span
                 role="status"
-                className="ml-2 inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-muted px-2 py-0.5 font-medium text-sm text-muted-foreground"
                 title="Live updates paused — retrying"
               >
                 <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                 Reconnecting…
               </span>
+            ) : (
+              <span
+                role="status"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                title="This page auto-updates as the runner makes progress"
+              >
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
+                />
+                Live
+              </span>
             )}
-          </p>
+          </div>
         </div>
         {isRunActive && (
           <Button
@@ -420,7 +470,7 @@ export function BriefRunClient({
           title={
             <>
               Run failed:{" "}
-              <code className="text-xs">{activeRun.failure_code}</code>
+              <code className="text-sm">{activeRun.failure_code}</code>
             </>
           }
         >
@@ -460,7 +510,7 @@ export function BriefRunClient({
                     >
                       {page.ordinal + 1}. {page.title}
                     </h3>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                    <div className="mt-1 flex flex-wrap items-center gap-2 text-sm">
                       <PageStatusPill status={page.page_status} />
                       {page.quality_flag && (
                         <QualityFlagBadge flag={page.quality_flag} />
@@ -473,7 +523,13 @@ export function BriefRunClient({
                       </span>
                     </div>
                   </div>
-                  {isAwaitingReview && (
+                  {isAwaitingReview && sortedPages.length > 1 && (
+                    // UAT (2026-05-03 round-3): only render the per-page
+                    // "Review now →" CTA on multi-page briefs. With a
+                    // single page the operator is already looking at it;
+                    // the button is a no-op that scrolls to the card the
+                    // operator is already on. The Show/Hide rendered
+                    // preview <details> on the card itself is enough.
                     <Button
                       type="button"
                       size="sm"
@@ -494,7 +550,10 @@ export function BriefRunClient({
                     isCurrentAwaitingReview={isAwaitingReview}
                     controlState={controlState}
                     onApprove={() => handleApprove(page)}
-                    onRevise={() => setReviseOpen(page.id)}
+                    onRevise={(note) => handleRevise(page, note)}
+                    themeOriginUrl={
+                      siteMode === "copy_existing" ? siteWpUrl : null
+                    }
                   />
                 )}
               </li>
@@ -510,22 +569,6 @@ export function BriefRunClient({
           onCancel={() => setConfirmOpen(false)}
           onConfirm={() => handleStartRun(true)}
           submitting={controlState === "starting"}
-        />
-      )}
-
-      {reviseOpen && (
-        <ReviseModal
-          note={reviseNote}
-          onNoteChange={setReviseNote}
-          onCancel={() => {
-            setReviseOpen(null);
-            setReviseNote("");
-          }}
-          onConfirm={() => {
-            const page = sortedPages.find((p) => p.id === reviseOpen);
-            if (page) handleRevise(page);
-          }}
-          submitting={controlState === "acting"}
         />
       )}
 
@@ -574,22 +617,21 @@ function PagePreview({
   controlState,
   onApprove,
   onRevise,
+  themeOriginUrl = null,
 }: {
   page: BriefPageRow;
   briefId: string;
   isCurrentAwaitingReview: boolean;
   controlState: ControlState;
   onApprove: () => void;
-  onRevise: () => void;
+  onRevise: (note: string) => void;
+  themeOriginUrl?: string | null;
 }) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const [reviseExpanded, setReviseExpanded] = useState(false);
+  const [reviseNote, setReviseNote] = useState("");
+
   const html = page.generated_html ?? page.draft_html ?? "";
-  // Belt-and-suspenders: even after the runner's structural gate (PR
-  // #188), an operator-edited or legacy row could still hold a
-  // truncated doc. Surface a banner above the iframe so a black/blank
-  // preview is never silent. Trigger if the doc claims completeness
-  // (<!DOCTYPE / <html opener) AND is missing closing </body> or
-  // </html>. Bare fragments — which never claim to be complete docs —
-  // skip the check.
   const looksTruncated = useMemo(() => {
     if (!html) return false;
     const trimmed = html.trimEnd();
@@ -600,18 +642,45 @@ function PagePreview({
   }, [html]);
   const lastVisualCritique = useMemo(() => {
     const log = (page.critique_log ?? []) as BriefPageCritiqueEntry[];
-    return [...log]
-      .reverse()
-      .find((e) => e.pass_kind === "visual_critique");
+    return [...log].reverse().find((e) => e.pass_kind === "visual_critique");
   }, [page.critique_log]);
+
+  const wrappedSrc = useMemo(
+    () => wrapForPreview(html, { themeOriginUrl }),
+    [html, themeOriginUrl],
+  );
+
+  function handleReviseSubmit() {
+    onRevise(reviseNote);
+    setReviseExpanded(false);
+    setReviseNote("");
+  }
 
   return (
     <div className="mt-4 space-y-3">
       {html ? (
-        <details className="group">
-          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
-            Show rendered preview
-          </summary>
+        <details className="group" open={isCurrentAwaitingReview}>
+          <div className="flex items-center justify-between gap-2">
+            <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
+              {isCurrentAwaitingReview
+                ? "Hide rendered preview"
+                : "Show rendered preview"}
+            </summary>
+            <button
+              type="button"
+              onClick={() => setFullscreen((v) => !v)}
+              className="inline-flex items-center gap-1 rounded border bg-background px-2 py-0.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+              title={fullscreen ? "Exit fullscreen" : "Fullscreen preview"}
+              aria-label={fullscreen ? "Exit fullscreen preview" : "Open fullscreen preview"}
+            >
+              {fullscreen ? (
+                <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 aria-hidden className="h-3.5 w-3.5" />
+              )}
+              {fullscreen ? "Exit" : "Fullscreen"}
+            </button>
+          </div>
           {looksTruncated && (
             <Alert
               variant="destructive"
@@ -626,28 +695,41 @@ function PagePreview({
               regenerate.
             </Alert>
           )}
-          <iframe
-            // Sandbox prevents scripts, plugins, forms, popups from the
-            // preview. draft_html is Claude-generated and already passes
-            // the runner's quality gates, but belt-and-suspenders: render
-            // it in a constrained frame.
-            //
-            // PB-3 (2026-04-29): wrapForPreview wraps path-B fragments in
-            // a synthetic doc with a shim stylesheet that approximates
-            // WP/Kadence defaults so the operator sees STYLED content
-            // for visual review rather than unstyled raw HTML. Path-A
-            // documents (claim completeness via DOCTYPE / <html opener)
-            // are passed through unchanged. See lib/preview-iframe-wrapper.ts.
-            sandbox=""
-            srcDoc={wrapForPreview(html)}
-            className="mt-2 h-96 w-full rounded border"
-            title={`Preview of ${page.title}`}
-          />
+          {/* Normal (inline) iframe — hidden when fullscreen overlay is active */}
+          {!fullscreen && (
+            <iframe
+              sandbox=""
+              srcDoc={wrappedSrc}
+              className="mt-2 h-[65vh] min-h-[480px] w-full rounded border"
+              title={`Preview of ${page.title}`}
+            />
+          )}
         </details>
       ) : (
-        <p className="text-xs text-muted-foreground">
-          No draft HTML yet.
-        </p>
+        <p className="text-sm text-muted-foreground">No draft HTML yet.</p>
+      )}
+
+      {/* Fullscreen overlay — portal-style fixed layer so nothing is squashed */}
+      {fullscreen && html && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-background">
+          <div className="flex shrink-0 items-center justify-between border-b px-4 py-2">
+            <span className="text-sm font-medium">{page.title} — preview</span>
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="inline-flex items-center gap-1.5 rounded border bg-background px-3 py-1.5 text-sm hover:bg-muted"
+            >
+              <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+              Exit fullscreen
+            </button>
+          </div>
+          <iframe
+            sandbox=""
+            srcDoc={wrappedSrc}
+            className="min-h-0 flex-1 w-full"
+            title={`Fullscreen preview of ${page.title}`}
+          />
+        </div>
       )}
 
       {lastVisualCritique && (
@@ -656,35 +738,112 @@ function PagePreview({
 
       {page.operator_notes && page.operator_notes.trim() !== "" && (
         <details className="group">
-          <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+          <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
             Your past notes
           </summary>
-          <pre className="mt-2 whitespace-pre-wrap rounded border bg-muted p-2 text-xs">
+          <pre className="mt-2 whitespace-pre-wrap rounded border bg-muted p-2 text-sm">
             {page.operator_notes}
           </pre>
         </details>
       )}
 
       {isCurrentAwaitingReview && (
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onRevise}
-            disabled={controlState !== "idle"}
-          >
-            Revise with note
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={onApprove}
-            disabled={controlState !== "idle"}
-          >
-            {controlState === "acting" ? "Working…" : "Approve this page"}
-          </Button>
-        </div>
+        <>
+          {!reviseExpanded && (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setReviseExpanded(true)}
+                disabled={controlState !== "idle"}
+              >
+                Revise with note
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={onApprove}
+                disabled={controlState !== "idle"}
+              >
+                {controlState === "acting" ? "Working…" : "Approve this page"}
+              </Button>
+            </div>
+          )}
+
+          {/* Inline revise panel — below the preview so the operator can
+              scroll up to the page while writing their note. */}
+          {reviseExpanded && (
+            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+              <div>
+                <p className="text-sm font-semibold">Revise with a note</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  The runner re-enters this page with your note in the prompt
+                  for every pass. Scroll up to the preview while you write.
+                </p>
+              </div>
+              <div>
+                <label
+                  htmlFor={`revise-note-${page.id}`}
+                  className="block text-sm font-medium"
+                >
+                  Note for the generator
+                </label>
+                <Textarea
+                  id={`revise-note-${page.id}`}
+                  className="mt-1"
+                  rows={6}
+                  value={reviseNote}
+                  onChange={(e) => setReviseNote(e.target.value)}
+                  placeholder="e.g. The hero section is too dense. Break into a headline + single CTA with generous whitespace underneath."
+                  maxLength={2000}
+                  disabled={controlState !== "idle"}
+                  autoFocus
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {reviseNote.length} / 2000 characters
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReviseExpanded(false);
+                    setReviseNote("");
+                  }}
+                  disabled={controlState !== "idle"}
+                >
+                  Cancel
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={onApprove}
+                    variant="outline"
+                    disabled={controlState !== "idle"}
+                  >
+                    Approve instead
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleReviseSubmit}
+                    disabled={
+                      controlState !== "idle" || reviseNote.trim() === ""
+                    }
+                  >
+                    {controlState === "acting"
+                      ? "Re-queueing…"
+                      : "Re-queue with note"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -701,13 +860,13 @@ function VisualCritiqueBlock({ entry }: { entry: BriefPageCritiqueEntry }) {
     <div className="rounded border bg-muted/50 p-3 text-sm">
       <p className="font-medium">Visual critique</p>
       {critique.issues.length === 0 ? (
-        <p className="mt-1 text-xs text-muted-foreground">No issues flagged.</p>
+        <p className="mt-1 text-sm text-muted-foreground">No issues flagged.</p>
       ) : (
-        <ul className="mt-2 space-y-1 text-xs">
+        <ul className="mt-2 space-y-1 text-sm">
           {critique.issues.map((issue, i) => (
             <li key={i} className="flex gap-2">
               <span
-                className={`inline-flex shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase ${
+                className={`inline-flex shrink-0 rounded px-1.5 py-0.5 text-xs font-medium uppercase ${
                   issue.severity === "high"
                     ? "bg-destructive/10 text-destructive"
                     : "bg-muted text-muted-foreground"
@@ -724,7 +883,7 @@ function VisualCritiqueBlock({ entry }: { entry: BriefPageCritiqueEntry }) {
         </ul>
       )}
       {critique.overall_notes && (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-sm text-muted-foreground">
           {critique.overall_notes}
         </p>
       )}
@@ -794,75 +953,3 @@ function ConfirmationModal({
   );
 }
 
-function ReviseModal({
-  note,
-  onNoteChange,
-  onCancel,
-  onConfirm,
-  submitting,
-}: {
-  note: string;
-  onNoteChange: (s: string) => void;
-  onCancel: () => void;
-  onConfirm: () => void;
-  submitting: boolean;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="revise-note-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onCancel();
-      }}
-    >
-      <div className="w-full max-w-lg rounded-lg border bg-background p-6 shadow-lg">
-        <h2 id="revise-note-title" className="text-lg font-semibold">
-          Revise this page with a note
-        </h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          The runner re-enters this page from the top. Your note goes into
-          the prompt for every pass.
-        </p>
-        <div className="mt-4">
-          <label
-            htmlFor="revise-note-input"
-            className="block text-xs font-medium text-muted-foreground"
-          >
-            Note for the generator
-          </label>
-          <Textarea
-            id="revise-note-input"
-            className="mt-1"
-            rows={5}
-            value={note}
-            onChange={(e) => onNoteChange(e.target.value)}
-            placeholder="e.g. The hero section is too dense. Break into a headline + single CTA with generous whitespace underneath."
-            maxLength={2000}
-          />
-          <p className="mt-1 text-xs text-muted-foreground">
-            {note.length} / 2000 characters
-          </p>
-        </div>
-        <div className="mt-5 flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onCancel}
-            disabled={submitting}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={onConfirm}
-            disabled={submitting || note.trim() === ""}
-          >
-            {submitting ? "Re-queueing…" : "Re-queue with note"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}

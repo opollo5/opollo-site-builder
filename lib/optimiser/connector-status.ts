@@ -177,8 +177,8 @@ export function bannerForConnector(
       return null;
     case "pagespeed":
       // PSI uses an Opollo-wide API key; per-client banner only fires
-      // if PAGESPEED_API_KEY is genuinely missing — that's a system
-      // banner, not a client banner.
+      // if PSI_API_KEY is genuinely missing — that's a system banner,
+      // not a client banner.
       return null;
   }
 }

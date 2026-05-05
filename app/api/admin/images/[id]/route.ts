@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody } from "@/lib/http";
 import {
   IMAGE_ALT_TEXT_MAX,
   IMAGE_CAPTION_MAX,
@@ -11,6 +12,7 @@ import {
   softDeleteImage,
   updateImageMetadata,
 } from "@/lib/image-library";
+import { logger } from "@/lib/logger";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
@@ -106,12 +108,8 @@ export async function PATCH(
     );
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -142,6 +140,7 @@ export async function PATCH(
   });
 
   if (!result.ok) {
+    logger.error("updateImageMetadata failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },
@@ -193,6 +192,7 @@ export async function DELETE(
   });
 
   if (!result.ok) {
+    logger.error("softDeleteImage failed", { code: result.error.code });
     const status = errorCodeToStatus(result.error.code);
     return NextResponse.json(
       { ...result, timestamp: result.timestamp },

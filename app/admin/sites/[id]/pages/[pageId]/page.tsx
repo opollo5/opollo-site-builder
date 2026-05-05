@@ -125,7 +125,7 @@ export default async function PageDetail({
       <div className="mt-4 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <H1 className="truncate">{page.title}</H1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             {statusBadge(page.status)}
             <span className="rounded bg-muted px-2 py-0.5">
               {page.page_type.replace(/_/g, " ")}
@@ -159,7 +159,7 @@ export default async function PageDetail({
                 href={wpAdminEditUrl(page.site_wp_url, page.wp_page_id)}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs underline hover:text-foreground"
+                className="text-sm underline hover:text-foreground"
                 data-testid="wp-admin-link"
               >
                 Open in WP admin ↗
@@ -169,7 +169,7 @@ export default async function PageDetail({
                   href={wpPublicUrl(page.site_wp_url, page.slug)}
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs underline hover:text-foreground"
+                  className="text-sm underline hover:text-foreground"
                   data-testid="wp-public-link"
                 >
                   View live ↗
@@ -179,7 +179,7 @@ export default async function PageDetail({
           )}
           <Link
             href={backHref}
-            className="text-xs text-muted-foreground hover:text-foreground"
+            className="text-sm text-muted-foreground hover:text-foreground"
             data-testid="page-back-to-list"
           >
             ← Back to pages
@@ -197,7 +197,7 @@ export default async function PageDetail({
           <dt className="text-muted-foreground">Title</dt>
           <dd>{page.title}</dd>
           <dt className="text-muted-foreground">Slug</dt>
-          <dd className="font-mono text-xs">{page.slug}</dd>
+          <dd className="font-mono text-sm">{page.slug}</dd>
           <dt className="text-muted-foreground">Type</dt>
           <dd className="capitalize">
             {page.page_type.replace(/_/g, " ")}
@@ -213,22 +213,22 @@ export default async function PageDetail({
           <dt className="text-muted-foreground">DS version</dt>
           <dd>v{page.design_system_version}</dd>
           <dt className="text-muted-foreground">WP page id</dt>
-          <dd className="font-mono text-xs">#{page.wp_page_id}</dd>
+          <dd className="font-mono text-sm">#{page.wp_page_id}</dd>
           <dt className="text-muted-foreground">Created</dt>
-          <dd className="text-xs">{formatRelativeTime(page.created_at)}</dd>
+          <dd className="text-sm">{formatRelativeTime(page.created_at)}</dd>
           <dt className="text-muted-foreground">Updated</dt>
-          <dd className="text-xs">{formatRelativeTime(page.updated_at)}</dd>
+          <dd className="text-sm">{formatRelativeTime(page.updated_at)}</dd>
         </dl>
       </section>
 
       <section className="mt-8">
         <H3>
           Re-generation history{" "}
-          <span className="text-xs font-normal text-muted-foreground">
+          <span className="text-sm font-normal text-muted-foreground">
             ({regenJobs.length})
           </span>
         </H3>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           Each row is one operator-triggered re-run against the current design
           system. Cost + tokens come from Anthropic; failures carry their
           terminal code. In-flight jobs auto-refresh while the Re-generate

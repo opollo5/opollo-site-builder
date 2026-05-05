@@ -112,7 +112,7 @@ export function AcceptInviteForm({
         />
         <StrengthMeter score={strength} length={password.length} />
         {tooShort && (
-          <p className="mt-1 text-xs text-destructive">
+          <p className="mt-1 text-sm text-destructive">
             At least {MIN_LENGTH} characters.
           </p>
         )}
@@ -137,7 +137,7 @@ export function AcceptInviteForm({
           data-testid="accept-invite-confirm"
         />
         {mismatch && (
-          <p className="mt-1 text-xs text-destructive">
+          <p className="mt-1 text-sm text-destructive">
             Passwords don&apos;t match.
           </p>
         )}
@@ -212,7 +212,7 @@ function StrengthMeter({ score, length }: { score: number; length: number }) {
           />
         ))}
       </div>
-      <span className={cn("text-xs", tone)}>
+      <span className={cn("text-sm", tone)}>
         {score === 0 ? `${length}/${MIN_LENGTH}` : labels[score]}
       </span>
     </div>

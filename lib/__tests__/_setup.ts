@@ -69,6 +69,46 @@ export async function truncateAll(): Promise<void> {
   // Order matters when referential actions other than CASCADE apply. We
   // use CASCADE to sidestep FK ordering between sites / design_systems.
   // Scoped to public-schema tables only.
+  // Platform / social tables (P1, migration 0070) are TRUNCATEd here too so
+  // any test that touches them resets cleanly. They use IF EXISTS-shaped
+  // logic via DO block — `TRUNCATE` itself raises if the table is absent
+  // (e.g. on a workspace running an older migration set).
+  await pg.query(`
+    DO $$
+    DECLARE
+      tbl text;
+      tbls text[] := ARRAY[
+        'social_webhook_events',
+        'social_publish_attempts',
+        'social_publish_jobs',
+        'social_schedule_entries',
+        'social_viewer_links',
+        'social_approval_events',
+        'social_approval_recipients',
+        'social_approval_requests',
+        'social_media_assets',
+        'social_post_variant',
+        'social_post_master',
+        'social_connection_alerts',
+        'social_connections',
+        'platform_notifications',
+        'platform_invitations',
+        'platform_company_users',
+        'platform_users',
+        'platform_companies'
+      ];
+    BEGIN
+      FOREACH tbl IN ARRAY tbls LOOP
+        IF EXISTS (
+          SELECT 1 FROM pg_tables
+          WHERE schemaname = 'public' AND tablename = tbl
+        ) THEN
+          EXECUTE format('TRUNCATE TABLE %I RESTART IDENTITY CASCADE', tbl);
+        END IF;
+      END LOOP;
+    END $$;
+  `);
+
   await pg.query(`
     TRUNCATE TABLE
       tenant_cost_budgets,

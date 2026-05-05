@@ -140,7 +140,7 @@ async function wpFetch(
   let lastErr: unknown;
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(url, { ...init, headers });
+      const res = await fetch(url, { ...init, headers, signal: AbortSignal.timeout(30_000) });
       if (res.status >= 500 && attempt < MAX_RETRIES) {
         await sleep(BASE_DELAY_MS * Math.pow(2, attempt));
         continue;
@@ -1128,3 +1128,97 @@ export async function wpPutSettings(
     settings: (parsed.body ?? {}) as Record<string, unknown>,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Blog taxonomy helpers — categories + tags (for BlogPostComposer).
+// ---------------------------------------------------------------------------
+
+export type WpTaxonomyItem = {
+  id: number;
+  name: string;
+  slug: string;
+  count: number;
+};
+
+export type WpListTaxonomyResult = WpResult<{ items: WpTaxonomyItem[] }>;
+
+function toTaxonomyItem(raw: unknown): WpTaxonomyItem {
+  const r = raw as Record<string, unknown>;
+  return {
+    id: Number(r.id ?? 0),
+    name: renderedString(r.name) || String(r.slug ?? ""),
+    slug: String(r.slug ?? ""),
+    count: typeof r.count === "number" ? r.count : Number(r.count ?? 0),
+  };
+}
+
+export async function wpListCategories(
+  cfg: WpConfig,
+): Promise<WpListTaxonomyResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(
+      cfg,
+      "/wp-json/wp/v2/categories?per_page=100&_fields=id,name,slug,count",
+      { method: "GET" },
+    );
+  } catch (err) {
+    return networkError(err);
+  }
+  const mappedCat = await mapHttpErrorToWpError(res);
+  if (mappedCat) return mappedCat;
+  const parsedCat = await parseJsonOrError<unknown[]>(res);
+  if (!parsedCat.ok) return parsedCat;
+  return {
+    ok: true,
+    items: (Array.isArray(parsedCat.body) ? parsedCat.body : []).map(toTaxonomyItem),
+  };
+}
+
+export async function wpListTags(
+  cfg: WpConfig,
+): Promise<WpListTaxonomyResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(
+      cfg,
+      "/wp-json/wp/v2/tags?per_page=100&_fields=id,name,slug,count",
+      { method: "GET" },
+    );
+  } catch (err) {
+    return networkError(err);
+  }
+  const mappedTag = await mapHttpErrorToWpError(res);
+  if (mappedTag) return mappedTag;
+  const parsedTag = await parseJsonOrError<unknown[]>(res);
+  if (!parsedTag.ok) return parsedTag;
+  return {
+    ok: true,
+    items: (Array.isArray(parsedTag.body) ? parsedTag.body : []).map(toTaxonomyItem),
+  };
+}
+
+// ---------- wpCreateTag ----------
+
+export type WpCreateTagResult = WpResult<WpTaxonomyItem>;
+
+export async function wpCreateTag(
+  cfg: WpConfig,
+  name: string,
+): Promise<WpCreateTagResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/tags", {
+      method: "POST",
+      body: JSON.stringify({ name, slug: name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") }),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<unknown>(res);
+  if (!parsed.ok) return parsed;
+  return { ok: true, ...toTaxonomyItem(parsed.body) };
+}
+

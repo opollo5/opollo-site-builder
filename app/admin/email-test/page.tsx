@@ -33,7 +33,7 @@ export default async function EmailTestPage() {
 
       <Alert className="mt-6">
         Restricted to <strong>super_admin</strong>. Every send is
-        captured in <code className="font-mono text-xs">email_log</code>{" "}
+        captured in <code className="font-mono text-sm">email_log</code>{" "}
         for audit.
       </Alert>
 

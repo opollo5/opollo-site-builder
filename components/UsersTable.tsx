@@ -42,7 +42,7 @@ export function UsersTable({
         title="No users yet"
         body={
           <>
-            The <code className="font-mono text-xs">first_admin_email</code>{" "}
+            The <code className="font-mono text-sm">first_admin_email</code>{" "}
             bootstrap promotes the first Supabase signup to admin; everyone
             else starts as viewer.
           </>
@@ -55,7 +55,7 @@ export function UsersTable({
     <div className="overflow-x-auto rounded-md border">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
+          <tr className="border-b bg-muted/40 text-left text-sm text-muted-foreground">
             <th className="px-3 py-2 font-medium">Email</th>
             <th className="px-3 py-2 font-medium">Role</th>
             <th className="px-3 py-2 font-medium">Created</th>
@@ -69,7 +69,7 @@ export function UsersTable({
                 <div className="flex flex-col">
                   <span>{u.email}</span>
                   {u.display_name && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-sm text-muted-foreground">
                       {u.display_name}
                     </span>
                   )}

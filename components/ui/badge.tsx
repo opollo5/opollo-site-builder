@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 // 95% of the time and Badge directly only for one-off labels (image
 // source category, design-system version, etc.).
 //
-// Density target: text-xs / py-0.5 / px-2 = ~22px tall. Linear-density.
+// Density target: text-sm / py-0.5 / px-2 = ~22px tall. Linear-density.
 // `density="default"` (22px) for inline rows; `density="loose"` (24px)
 // for badges that sit alongside an H1 and need slightly more weight.
 // ---------------------------------------------------------------------------
@@ -41,9 +41,9 @@ const badgeVariants = cva(
       },
       density: {
         // ~22px tall — the default for inline badge usage in tables / lists.
-        default: "px-2 py-0.5 text-xs",
+        default: "px-2 py-0.5 text-sm",
         // ~24px tall — for badges adjacent to H1 / H2 headings.
-        loose: "px-2.5 py-1 text-xs",
+        loose: "px-2.5 py-1 text-sm",
       },
     },
     defaultVariants: {

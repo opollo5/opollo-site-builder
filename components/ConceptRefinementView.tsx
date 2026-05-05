@@ -94,12 +94,26 @@ export function ConceptRefinementView({
       );
       const payload = (await res.json().catch(() => null)) as
         | { ok: true; data: ConceptResult }
-        | { ok: false; error: { message: string } }
+        | { ok: false; error: { code?: string; message: string } }
         | null;
       if (!payload?.ok) {
         setError(
           payload?.ok === false ? payload.error.message : "Refinement failed.",
         );
+        // Server-side cap (DESIGN-DISCOVERY-FOLLOWUP PR 3): a 429
+        // means the operator has burned their 10-call budget on the
+        // server, even if local state thinks they have remaining.
+        // Snap the local counter forward so the Refine button locks.
+        if (
+          res.status === 429 ||
+          (payload?.ok === false && payload.error.code === "LIMIT_REACHED")
+        ) {
+          setRefinementNotes(
+            new Array(REFINE_CAP).fill("").map((_, i) =>
+              refinementNotes[i] ?? "(server-side cap)",
+            ),
+          );
+        }
         setRefining(false);
         return;
       }
@@ -163,14 +177,14 @@ export function ConceptRefinementView({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">{current.label} direction</h3>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             {current.rationale}
           </p>
         </div>
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
+          className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded-sm"
           data-testid="concept-refinement-back"
         >
           ← Back to all directions
@@ -180,7 +194,7 @@ export function ConceptRefinementView({
       <div className="grid gap-3 md:grid-cols-2">
         {previous ? (
           <div className="opacity-40">
-            <p className="text-[10px] font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               Previous version
             </p>
             <div
@@ -196,15 +210,15 @@ export function ConceptRefinementView({
             </div>
           </div>
         ) : (
-          <div className="text-xs text-muted-foreground">
-            <p className="text-[10px] font-medium">Previous version</p>
+          <div className="text-sm text-muted-foreground">
+            <p className="text-xs font-medium">Previous version</p>
             <div className="mt-1 flex h-72 items-center justify-center rounded-md border bg-muted/10">
               No prior version yet — first refinement will land here.
             </div>
           </div>
         )}
         <div>
-          <p className="text-[10px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Updated version
           </p>
           <div
@@ -224,7 +238,7 @@ export function ConceptRefinementView({
       <div className="rounded-md border bg-muted/20 p-3">
         <label
           htmlFor="concept-refinement-feedback"
-          className="block text-xs font-medium"
+          className="block text-sm font-medium"
         >
           Refine this direction
         </label>
@@ -239,7 +253,7 @@ export function ConceptRefinementView({
           className="mt-1"
           data-testid="concept-refinement-feedback"
         />
-        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
           <span data-testid="concept-refinement-counter">
             {refinementsUsed}/{REFINE_CAP} refinements used.
             {showWarning && (
@@ -275,7 +289,7 @@ export function ConceptRefinementView({
 
       {error && (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           role="alert"
           data-testid="concept-refinement-error"
         >
@@ -369,7 +383,7 @@ export function ApprovedDesignReadout({
           <p className="text-sm font-semibold text-success">
             Design direction approved
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-sm text-muted-foreground">
             This is what every page we generate will be styled around.
           </p>
         </div>
@@ -421,7 +435,7 @@ export function ApprovedDesignReadout({
       {homepageHtml && (
         <div className="grid gap-3 md:grid-cols-2">
           <div>
-            <p className="text-[10px] font-medium text-muted-foreground">
+            <p className="text-xs font-medium text-muted-foreground">
               {toneAppliedHomepageHtml
                 ? "Your design with your voice applied"
                 : "Homepage"}
@@ -443,7 +457,7 @@ export function ApprovedDesignReadout({
           </div>
           {innerPageHtml && (
             <div>
-              <p className="text-[10px] font-medium text-muted-foreground">
+              <p className="text-xs font-medium text-muted-foreground">
                 Inner page
               </p>
               <div className="mt-1 h-72 overflow-hidden rounded-md border bg-muted/20">
@@ -461,7 +475,7 @@ export function ApprovedDesignReadout({
 
       {error && (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           role="alert"
         >
           {error}

@@ -49,7 +49,7 @@ function Label({
 
 function FieldError({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="mt-1 text-xs text-destructive">{message}</p>;
+  return <p className="mt-1 text-sm text-destructive">{message}</p>;
 }
 
 function initialFromComponent(c: DesignComponent): FormState {
@@ -307,7 +307,7 @@ export function ComponentFormModal({
               />
               <FieldError message={fieldErrors.name} />
               {mode.kind === "edit" && (
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-sm text-muted-foreground">
                   Name is immutable after create — it&apos;s part of the uniqueness
                   key with variant.
                 </p>
@@ -342,7 +342,7 @@ export function ComponentFormModal({
             <Label htmlFor="cf-html">HTML template</Label>
             <textarea
               id="cf-html"
-              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.html_template}
               onChange={(e) => setField("html_template", e.target.value)}
               spellCheck={false}
@@ -355,14 +355,14 @@ export function ComponentFormModal({
             <Label htmlFor="cf-css">CSS</Label>
             <textarea
               id="cf-css"
-              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.css}
               onChange={(e) => setField("css", e.target.value)}
               spellCheck={false}
               disabled={submitting}
             />
             <FieldError message={fieldErrors.css} />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Every class selector must use the site&apos;s scope prefix (e.g.
               .ls-*). The server rejects unscoped CSS at submit time.
             </p>
@@ -372,7 +372,7 @@ export function ComponentFormModal({
             <Label htmlFor="cf-schema">Content shape (JSON Schema)</Label>
             <textarea
               id="cf-schema"
-              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-40 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.content_schema}
               onChange={(e) => setField("content_schema", e.target.value)}
               spellCheck={false}
@@ -385,7 +385,7 @@ export function ComponentFormModal({
             <Label htmlFor="cf-image-slots">Image slots (optional)</Label>
             <textarea
               id="cf-image-slots"
-              className="mt-1 h-20 w-full rounded-md border bg-background px-3 py-2 font-mono text-xs"
+              className="mt-1 h-20 w-full rounded-md border bg-background px-3 py-2 font-mono text-sm"
               value={form.image_slots}
               onChange={(e) => setField("image_slots", e.target.value)}
               spellCheck={false}

@@ -100,7 +100,7 @@ const STATUS_MAP: Record<StatusKind, StatusEntry> = {
   brief_failed_parse: { label: "Parse failed", tone: "error" },
 
   // Run
-  run_queued: { label: "Queued", tone: "primary" },
+  run_queued: { label: "Queued — waiting for runner", tone: "primary", pulse: true },
   run_running: { label: "Running", tone: "primary", pulse: true },
   run_paused: { label: "Awaiting your review", tone: "warning" },
   run_succeeded: { label: "Complete", tone: "success" },
@@ -116,10 +116,15 @@ const STATUS_MAP: Record<StatusKind, StatusEntry> = {
   page_skipped: { label: "Skipped", tone: "neutral" },
 
   // Site
-  site_active: { label: "active", tone: "success" },
-  site_pending_pairing: { label: "pending pairing", tone: "neutral" },
-  site_paused: { label: "paused", tone: "warning" },
-  site_removed: { label: "removed", tone: "error" },
+  site_active: { label: "Connected", tone: "success" },
+  // UAT (2026-05-03) — "pending pairing" is internal jargon. Operators
+  // see this on every freshly-added site that hasn't yet had its WP
+  // credentials saved + verified, so rename to "Setup incomplete".
+  // Tone left neutral because it isn't a problem — it's a "next action
+  // lives here" state.
+  site_pending_pairing: { label: "Setup incomplete", tone: "neutral" },
+  site_paused: { label: "Paused", tone: "warning" },
+  site_removed: { label: "Removed", tone: "error" },
 
   // Job
   job_queued: { label: "queued", tone: "neutral" },

@@ -89,7 +89,7 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
   return (
     <div className="rounded-md border">
       <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Name</th>
             <th className="px-3 py-2 font-medium">WP URL</th>
@@ -127,7 +127,7 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
               <td className="px-3 py-2">
                 <StatusCell status={s.status} />
               </td>
-              <td className="px-3 py-2 text-xs text-muted-foreground">
+              <td className="px-3 py-2 text-sm text-muted-foreground">
                 <span data-screenshot-mask>
                   {formatRelativeTime(s.updated_at)}
                 </span>

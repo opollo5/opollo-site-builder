@@ -4,6 +4,8 @@ import { z } from "zod";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { DesignBriefSchema } from "@/lib/design-discovery/design-brief";
 import { regenerateConcept } from "@/lib/design-discovery/generate-concepts";
+import { incrementRegenCount } from "@/lib/design-discovery/regen-caps";
+import { readJsonBody } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getSite } from "@/lib/sites";
 
@@ -59,12 +61,8 @@ export async function POST(
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const wrapper = body as { brief?: unknown; direction?: unknown };
   const briefParsed = DesignBriefSchema.safeParse(wrapper?.brief ?? null);
   const directionParsed = DirectionSchema.safeParse(wrapper?.direction);
@@ -89,6 +87,37 @@ export async function POST(
       siteResult.error.code,
       siteResult.error.message,
       siteResult.error.code === "NOT_FOUND" ? 404 : 500,
+    );
+  }
+
+  // Server-side cap enforcement. Increment FIRST so the count is
+  // burned the moment the call lands; if Anthropic later fails the
+  // operator still owes that attempt against the cap (matches the
+  // intended product behaviour: 10 paid calls per site, not 10
+  // successful refinements).
+  const cap = await incrementRegenCount(
+    siteResult.data.site.id,
+    "concept_refinements",
+  );
+  if (!cap.ok) {
+    if (cap.error.code === "LIMIT_REACHED") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "LIMIT_REACHED",
+            message: cap.error.message,
+            retryable: false,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 429 },
+      );
+    }
+    return errorJson(
+      cap.error.code,
+      cap.error.message,
+      cap.error.code === "NOT_FOUND" ? 404 : 500,
     );
   }
 

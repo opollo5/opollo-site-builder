@@ -4,6 +4,8 @@ import type { Page, TestInfo } from "@playwright/test";
 import {
   E2E_ADMIN_EMAIL,
   E2E_ADMIN_PASSWORD,
+  E2E_CUSTOMER_EMAIL,
+  E2E_CUSTOMER_PASSWORD,
 } from "./fixtures";
 
 // Shared helpers for the Playwright suite.
@@ -22,6 +24,18 @@ export async function signInAsAdmin(page: Page): Promise<void> {
   await page.getByRole("button", { name: /sign in/i }).click();
   // Default post-login redirect is /admin/sites.
   await page.waitForURL(/\/admin\/sites/);
+}
+
+/**
+ * Sign in as the seeded company admin via /login?next=/company.
+ * Returns after the /company landing page has loaded.
+ */
+export async function signInAsCompanyAdmin(page: Page): Promise<void> {
+  await page.goto("/login?next=%2Fcompany");
+  await page.getByLabel("Email").fill(E2E_CUSTOMER_EMAIL);
+  await page.getByLabel("Password").fill(E2E_CUSTOMER_PASSWORD);
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.waitForURL(/\/company/);
 }
 
 /**

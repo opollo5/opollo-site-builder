@@ -34,7 +34,7 @@ export function KadencePaletteDiffTable({
   return (
     <div className="overflow-x-auto rounded-lg border">
       <table className="w-full text-sm">
-        <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+        <thead className="bg-muted/40 text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 text-left">Slot</th>
             <th className="px-3 py-2 text-left">Current</th>
@@ -55,7 +55,7 @@ export function KadencePaletteDiffTable({
 function DiffRow({ entry }: { entry: PaletteDiffEntry }) {
   return (
     <tr className={entry.changed ? "bg-yellow-500/5" : ""}>
-      <td className="px-3 py-2 font-mono text-xs">{entry.slot}</td>
+      <td className="px-3 py-2 font-mono text-sm">{entry.slot}</td>
       <td className="px-3 py-2">
         <ColorCell name={entry.current.name} color={entry.current.color} />
       </td>
@@ -64,11 +64,11 @@ function DiffRow({ entry }: { entry: PaletteDiffEntry }) {
       </td>
       <td className="px-3 py-2 text-right">
         {entry.changed ? (
-          <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-xs font-medium text-yellow-900 dark:text-yellow-200">
+          <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-sm font-medium text-yellow-900 dark:text-yellow-200">
             Changed
           </span>
         ) : (
-          <span className="text-xs text-muted-foreground">No change</span>
+          <span className="text-sm text-muted-foreground">No change</span>
         )}
       </td>
     </tr>
@@ -83,7 +83,7 @@ function ColorCell({
   color: string | null;
 }) {
   if (!color) {
-    return <span className="text-xs text-muted-foreground">—</span>;
+    return <span className="text-sm text-muted-foreground">—</span>;
   }
   return (
     <div className="flex items-center gap-2">
@@ -93,9 +93,9 @@ function ColorCell({
         style={{ backgroundColor: color }}
       />
       <div className="min-w-0">
-        <div className="font-mono text-xs">{color}</div>
+        <div className="font-mono text-sm">{color}</div>
         {name && (
-          <div className="truncate text-xs text-muted-foreground">{name}</div>
+          <div className="truncate text-sm text-muted-foreground">{name}</div>
         )}
       </div>
     </div>

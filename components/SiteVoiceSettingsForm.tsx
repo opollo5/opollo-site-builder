@@ -104,7 +104,7 @@ export function SiteVoiceSettingsForm({
           maxLength={FIELD_MAX_BYTES}
           placeholder="e.g. Warm, confident, plain language. Avoid jargon. Second-person (you / your) by default."
         />
-        <p className="mt-1.5 text-xs text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           How every page on this site should sound. New briefs inherit
           this as a default.{" "}
           <span className="font-mono">
@@ -131,7 +131,7 @@ export function SiteVoiceSettingsForm({
           maxLength={FIELD_MAX_BYTES}
           placeholder="e.g. Generous white space. Hero with photo background. Single CTA per section, accent color for emphasis."
         />
-        <p className="mt-1.5 text-xs text-muted-foreground">
+        <p className="mt-1.5 text-sm text-muted-foreground">
           Visual constraints for the anchor cycle on every brief.{" "}
           <span className="font-mono">
             {designDirection.length.toLocaleString()}/

@@ -81,7 +81,6 @@ test.describe("M12-1 briefs — upload + review", () => {
     await signInAsAdmin(page);
   });
 
-  // TODO(M12-6): re-enable once the Save-Draft persistence gap lands.
   // M12-6 — exercises the full upload → edit → save draft → commit flow.
   test("upload → parse → commit happy path", async ({ page }, testInfo) => {
     test.setTimeout(60_000);
@@ -115,19 +114,20 @@ test.describe("M12-1 briefs — upload + review", () => {
 
     await auditA11y(page, testInfo);
 
-    // Save draft to persist edits to DB.
-    await page.getByRole("button", { name: /Save draft/i }).click();
+    // Save draft — wait for it to complete (button returns to "Save draft"
+    // once isSavingDraft resets to false). This persists in-memory edits to
+    // DB so the commit hash matches the server-side recomputation.
+    const saveDraftBtn = page.getByRole("button", { name: /Save draft/i });
+    await saveDraftBtn.click();
+    await expect(saveDraftBtn).toBeEnabled({ timeout: 10_000 });
 
-    // Commit.
+    // Commit. No confirm modal — it was removed (UAT 2026-05-03 round-3)
+    // because the double-confirm added friction on every routine commit.
+    // RS-3: successful commit redirects straight to the run surface.
     await page.getByRole("button", { name: /Commit page list/i }).click();
-    const confirmDialog = page.getByRole("dialog", { name: /Commit this page list\?/i });
-    await expect(confirmDialog).toBeVisible();
-    await confirmDialog.getByRole("button", { name: /^Commit page list$/i }).click();
-
-    // RS-3: successful commit redirects straight to the run surface;
-    // the operator never sees the intermediate "committed" panel.
     await page.waitForURL(
       /\/admin\/sites\/[0-9a-f-]{36}\/briefs\/[0-9a-f-]{36}\/run$/,
+      { timeout: 15_000 },
     );
     await expect(page.getByRole("button", { name: /Commit page list/i })).toHaveCount(0);
   });

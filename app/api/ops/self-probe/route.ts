@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { timingSafeEqual } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
+
+import { constantTimeEqual } from "@/lib/crypto-compare";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import {
@@ -42,17 +43,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 const MIN_KEY_LENGTH = 32;
-
-function constantTimeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a, "utf8");
-  const bBuf = Buffer.from(b, "utf8");
-  if (aBuf.length !== bBuf.length) {
-    const filler = Buffer.alloc(aBuf.length);
-    timingSafeEqual(aBuf, filler);
-    return false;
-  }
-  return timingSafeEqual(aBuf, bBuf);
-}
 
 function hasEmergencyKey(req: NextRequest): boolean {
   const expected = process.env.OPOLLO_EMERGENCY_KEY;

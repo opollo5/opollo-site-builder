@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -15,6 +20,12 @@ import { Input } from "@/components/ui/input";
 //
 // Input is in DOLLARS (cleaner for operators) but sent in CENTS over
 // the wire — the modal multiplies on submit and the API stores cents.
+//
+// UAT (2026-05-03 round-3): operators wanted "this is changing"
+// feedback while the budget revalidation propagates. Wrap router.refresh
+// in a transition so the modal stays open in a "Refreshing…" state until
+// the RSC re-render lands; close on the same tick the new values become
+// visible underneath. No more snap-to-new-value jolt.
 // ---------------------------------------------------------------------------
 
 type BudgetProps = {
@@ -74,11 +85,22 @@ function EditTenantBudgetModal({
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [refreshLatched, setRefreshLatched] = useState(false);
 
   useEffect(() => {
     setDaily(centsToDollars(budget.daily_cap_cents));
     setMonthly(centsToDollars(budget.monthly_cap_cents));
   }, [budget.daily_cap_cents, budget.monthly_cap_cents]);
+
+  // Close the modal once the in-flight router.refresh transition has
+  // resolved AND we previously latched a refresh as expected. Prevents
+  // the "modal closes then values jolt" gap operators flagged.
+  useEffect(() => {
+    if (refreshLatched && !isPending) {
+      onClose();
+    }
+  }, [refreshLatched, isPending, onClose]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -122,8 +144,13 @@ function EditTenantBudgetModal({
         setSubmitting(false);
         return;
       }
-      router.refresh();
-      onClose();
+      // Stay in the saving state until router.refresh()'s server fetch
+      // resolves. The latch + the useEffect above close the modal on
+      // the same tick the new values become visible underneath.
+      setRefreshLatched(true);
+      startTransition(() => {
+        router.refresh();
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setSubmitting(false);
@@ -137,7 +164,7 @@ function EditTenantBudgetModal({
       aria-modal="true"
       aria-labelledby="edit-budget-title"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose();
+        if (e.target === e.currentTarget && !submitting && !isPending) onClose();
       }}
     >
       <div className="w-full max-w-md rounded-lg border bg-background p-6 shadow-lg">
@@ -160,7 +187,7 @@ function EditTenantBudgetModal({
               min="0"
               value={daily}
               onChange={(e) => setDaily(e.target.value)}
-              disabled={submitting}
+              disabled={submitting || isPending}
               autoFocus
             />
           </div>
@@ -175,7 +202,7 @@ function EditTenantBudgetModal({
               min="0"
               value={monthly}
               onChange={(e) => setMonthly(e.target.value)}
-              disabled={submitting}
+              disabled={submitting || isPending}
             />
           </div>
           {error && (
@@ -192,12 +219,16 @@ function EditTenantBudgetModal({
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={submitting}
+              disabled={submitting || isPending}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting ? "Saving…" : "Save caps"}
+            <Button type="submit" disabled={submitting || isPending}>
+              {isPending
+                ? "Refreshing…"
+                : submitting
+                  ? "Saving…"
+                  : "Save caps"}
             </Button>
           </div>
         </form>

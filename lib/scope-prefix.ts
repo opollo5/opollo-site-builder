@@ -89,17 +89,12 @@ function stripIgnorable(css: string): string {
 // extractCssClasses — Layer-3 helper (M1f).
 //
 // Returns the full set of class names DEFINED by the CSS, regardless of
-// prefix. Used by lib/class-registry.ts to build the registry against which
-// generated HTML is validated at page-render time. Compound selectors
-// (`.a.b`), descendant chains (`.a > .b`), and negations (`:not(.x)`) all
-// contribute every class they mention.
+// prefix. Compound selectors (`.a.b`), descendant chains (`.a > .b`), and
+// negations (`:not(.x)`) all contribute every class they mention.
 //
 // The parsing strategy is intentionally regex-based to stay dep-free: same
 // strip-ignorable pass as validateScopedCss() runs, then CLASS_SELECTOR_RE
-// picks up every `.ident` occurrence in selector context. This will false-
-// positive only if operator CSS embeds a `.classlike` token inside an
-// attribute selector's string literal (e.g. `[data-x=".foo"]`), which the
-// current seed doesn't do and the M3 generator won't emit.
+// picks up every `.ident` occurrence in selector context.
 // ---------------------------------------------------------------------------
 
 export function extractCssClasses(css: string): Set<string> {

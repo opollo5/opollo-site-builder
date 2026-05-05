@@ -101,12 +101,15 @@ In **Authentication → URL Configuration**:
 **Redirect URLs allowlist entries:**
 
 ```
+https://opollo.vercel.app/auth/callback
 https://opollo.vercel.app/api/auth/callback
 https://opollo.vercel.app/auth/reset-password
 https://opollo.vercel.app/auth/forgot-password
+https://*-opollo.vercel.app/auth/callback
 https://*-opollo.vercel.app/api/auth/callback
 https://*-opollo.vercel.app/auth/reset-password
 https://*-opollo.vercel.app/auth/forgot-password
+http://localhost:3000/auth/callback
 http://localhost:3000/api/auth/callback
 http://localhost:3000/auth/reset-password
 http://localhost:3000/auth/forgot-password
@@ -116,7 +119,9 @@ http://localhost:3000/auth/forgot-password
 - Second block: Vercel preview deploys. The `*-opollo.vercel.app` wildcard covers every branch-preview URL.
 - Third block: local dev. Only needed if a developer tests email flows against the production Supabase project (not typical — local dev should use local Supabase).
 
-The `/auth/reset-password` and `/auth/forgot-password` entries are forward-looking — those routes land with M14-3. Registering them now means M14-3 doesn't need another dashboard trip.
+`/auth/callback` (the page route) is the canonical landing URL — the app passes it as `redirectTo` on every `resetPasswordForEmail` / `generateLink({ type: 'invite' })` call. The client-side page parses Supabase's three link shapes (PKCE `?code=`, OTP `?token_hash=&type=`, implicit `#access_token=...`) and either forwards to `/api/auth/callback` (server-handled query shapes) or calls `setSession` directly (implicit-flow fragments). Both URLs must be in the allowlist because Supabase rejects redirects that don't match an entry exactly. The `/auth/reset-password` and `/auth/forgot-password` entries are reachable directly during the recovery flow.
+
+If the production URL is `opollo-site-builder.vercel.app` rather than `opollo.vercel.app`, substitute that host throughout — the entries above are templates against whichever host `NEXT_PUBLIC_SITE_URL` is pinned to.
 
 **Corresponding env var (set in Vercel):**
 

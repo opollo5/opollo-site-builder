@@ -3,6 +3,8 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { extractTone } from "@/lib/design-discovery/extract-tone";
+import { readJsonBody } from "@/lib/http";
+import { resetRegenCount } from "@/lib/design-discovery/regen-caps";
 import {
   AVOID_OPTIONS,
   PERSONALITY_OPTIONS,
@@ -50,12 +52,8 @@ export async function POST(
     return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
   }
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -98,6 +96,12 @@ export async function POST(
       { status: 200 },
     );
   }
+
+  // Re-extracting tone replaces the existing profile + samples on
+  // the client (ToneOfVoiceInputs.onExtract sets regenAttempts to 0
+  // locally). Mirror that on the server so the cap budget refreshes
+  // for the new tone run too.
+  await resetRegenCount(params.id, "tone_samples");
 
   return NextResponse.json(
     { ok: true, data: result.data, timestamp: new Date().toISOString() },

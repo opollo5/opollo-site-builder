@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { readJsonBody, validationError } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
   getClientIp,
@@ -25,12 +27,8 @@ export async function POST(req: Request) {
   const rl = await checkRateLimit("register", rlId);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+  const body = await readJsonBody(req);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
 
   const parsed = RegisterSiteInputSchema.safeParse(body);
   if (!parsed.success) {
@@ -50,6 +48,7 @@ export async function POST(req: Request) {
   }
 
   const result = await createSite(parsed.data);
+  if (!result.ok) logger.error("createSite failed", { code: result.error.code });
   if (result.ok) {
     // Bust the cached server-component render of /admin/sites so the
     // list reflects the new row on the next navigation — without this

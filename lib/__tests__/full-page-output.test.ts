@@ -161,4 +161,45 @@ describe("composeFullPage", () => {
     });
     expect(html).not.toContain("<style>");
   });
+
+  it("emits the JS hash traffic-split snippet before the title when abSplit is set", () => {
+    const html = composeFullPage({
+      fragmentHtml: "<section></section>",
+      cssBundle: "",
+      chrome: baseChrome,
+      tracking: {},
+      meta: { title: "Variant A" },
+      abSplit: {
+        test_id: "test-abc-123",
+        traffic_split_percent: 50,
+        variant_a_url: "https://example.com/page",
+        variant_b_url: "https://example.com/page-b",
+        this_variant: "A",
+      },
+    });
+    expect(html).toContain("Opollo A/B traffic split");
+    expect(html).toContain("test-abc-123");
+    expect(html).toContain("opt_v");
+    expect(html).toContain("opollo_vid");
+    // charset must precede the snippet (HTML5 spec — first 1024 bytes)
+    expect(html.indexOf('<meta charset="utf-8">')).toBeLessThan(
+      html.indexOf("Opollo A/B traffic split"),
+    );
+    // and the snippet must precede the title
+    expect(html.indexOf("Opollo A/B traffic split")).toBeLessThan(
+      html.indexOf("<title>Variant A</title>"),
+    );
+  });
+
+  it("omits the traffic-split snippet entirely when abSplit is undefined", () => {
+    const html = composeFullPage({
+      fragmentHtml: "<section></section>",
+      cssBundle: "",
+      chrome: baseChrome,
+      tracking: {},
+      meta: { title: "No test" },
+    });
+    expect(html).not.toContain("Opollo A/B traffic split");
+    expect(html).not.toContain("opollo_vid");
+  });
 });

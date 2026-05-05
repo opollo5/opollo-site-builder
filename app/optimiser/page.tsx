@@ -69,7 +69,7 @@ export default async function OptimiserHomePage({
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Page browser</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-base text-muted-foreground">
             All managed landing pages, with state, data reliability, and key metrics.
           </p>
         </div>
@@ -101,13 +101,13 @@ function EmptyState({ clientsExist }: { clientsExist: boolean }) {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Optimiser</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Autonomous Landing Page Optimisation Engine — Phase 1.
         </p>
       </header>
       <section className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
         <h2 className="text-lg font-medium">No onboarded clients yet</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <p className="mt-2 text-base text-muted-foreground">
           {clientsExist
             ? "Continue an in-progress onboarding to see the page browser."
             : "Start by adding a client through the onboarding wizard."}

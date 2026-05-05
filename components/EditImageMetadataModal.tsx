@@ -196,7 +196,7 @@ export function EditImageMetadataModal({
               placeholder="comma, separated, tags"
               disabled={submitting}
             />
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Up to 12 tags, max 40 characters each.
             </p>
           </div>

@@ -137,15 +137,22 @@ export function BriefReviewClient({
   const [voiceOverrideOpen, setVoiceOverrideOpen] = useState<boolean>(
     !hasSiteDefault || hasPerBriefOverride,
   );
-  // M12-5 — operator picks model tiers at commit time. Default to the
-  // value the server committed the brief with; fall back to the cheap
-  // default (Haiku) when a row has no value, so dev/UAT runs don't
-  // accidentally spend Sonnet/Opus money. Operator opts up explicitly.
+  // M12-5 — operator picks model tiers at commit time. Once committed,
+  // the brief carries the operator's choice and we display that. Pre-
+  // commit, default to DEFAULT_MODEL_ID (Sonnet 4.6) regardless of the
+  // DB column default — UAT (2026-05-02) showed Haiku's first-pass
+  // output reads thin on real briefs, and operators were slipping past
+  // the picker on the assumption that "default" meant "right". Cheap
+  // dev/test runs opt DOWN to Haiku explicitly.
   const [textModel, setTextModel] = useState<string>(
-    brief.text_model ?? DEFAULT_MODEL_ID,
+    brief.status === "committed" && brief.text_model
+      ? brief.text_model
+      : DEFAULT_MODEL_ID,
   );
   const [visualModel, setVisualModel] = useState<string>(
-    brief.visual_model ?? DEFAULT_MODEL_ID,
+    brief.status === "committed" && brief.visual_model
+      ? brief.visual_model
+      : DEFAULT_MODEL_ID,
   );
 
   const isReadOnly = brief.status === "committed";
@@ -210,7 +217,7 @@ export function BriefReviewClient({
         method: "PATCH",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          expected_version_lock: brief.version_lock,
+          expected_version_lock: latestBrief.version_lock,
           pages: pageUpdates,
         }),
       });
@@ -330,7 +337,7 @@ export function BriefReviewClient({
           <ul className="mt-1 list-disc space-y-1 pl-5">
             {warnings.map((w: { code: string; detail?: string }, i: number) => (
               <li key={i}>
-                <code className="text-xs">{w.code}</code>
+                <code className="text-sm">{w.code}</code>
                 {w.detail ? <>: {w.detail}</> : null}
               </li>
             ))}
@@ -347,13 +354,27 @@ export function BriefReviewClient({
               <h2 id="voice-direction-heading" className="text-base font-semibold">
                 Brand voice &amp; design direction
               </h2>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {hasSiteDefault && !voiceOverrideOpen
                   ? "Inheriting from site defaults. Expand to customize for this brief."
                   : hasSiteDefault
                     ? "Override values for this brief only. The site defaults below stay unchanged."
-                    : "These guide every page the generator produces. Set once on Site Settings to inherit on every brief."}
+                    : "These guide every page the generator produces."}
               </p>
+              {!hasSiteDefault && !isReadOnly && (
+                <div className="mt-2 rounded-md border border-blue-500/40 bg-blue-500/5 p-2 text-xs text-blue-900 dark:text-blue-200">
+                  <strong>Tip:</strong> brand voice is a property of the
+                  whole site — set it once on{" "}
+                  <a
+                    href={`/admin/sites/${siteId}/settings`}
+                    className="underline hover:no-underline"
+                  >
+                    Site Settings
+                  </a>{" "}
+                  and every brief inherits it. Saves retyping it on each
+                  upload.
+                </div>
+              )}
             </div>
             {hasSiteDefault && !isReadOnly && (
               <Button
@@ -372,7 +393,7 @@ export function BriefReviewClient({
             <div className="space-y-2 rounded-md bg-muted/40 p-3 text-sm">
               {siteBrandVoiceDefault && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-sm font-medium text-muted-foreground">
                     Brand voice (site default)
                   </p>
                   <p className="mt-1 whitespace-pre-wrap">
@@ -382,7 +403,7 @@ export function BriefReviewClient({
               )}
               {siteDesignDirectionDefault && (
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="text-sm font-medium text-muted-foreground">
                     Design direction (site default)
                   </p>
                   <p className="mt-1 whitespace-pre-wrap">
@@ -400,7 +421,7 @@ export function BriefReviewClient({
             <div>
               <label
                 htmlFor="brand-voice-input"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Brand voice
               </label>
@@ -416,7 +437,7 @@ export function BriefReviewClient({
               />
               <p
                 id="brand-voice-hint"
-                className="mt-1 text-xs text-muted-foreground"
+                className="mt-1 text-sm text-muted-foreground"
               >
                 How every page should sound. 4 KB max.
               </p>
@@ -424,7 +445,7 @@ export function BriefReviewClient({
             <div>
               <label
                 htmlFor="design-direction-input"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Design direction
               </label>
@@ -440,7 +461,7 @@ export function BriefReviewClient({
               />
               <p
                 id="design-direction-hint"
-                className="mt-1 text-xs text-muted-foreground"
+                className="mt-1 text-sm text-muted-foreground"
               >
                 Constrains the anchor cycle on page 1, then re-used verbatim
                 for pages 2..N. 4 KB max.
@@ -456,7 +477,7 @@ export function BriefReviewClient({
             <h2 id="model-tier-heading" className="text-base font-semibold">
               Model tier
             </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">
               Pick the Claude model for text generation and for the visual
               review critique. Sonnet is the default for both — Opus is
               reserved for complex-judgment briefs. See the cost estimate on
@@ -467,7 +488,7 @@ export function BriefReviewClient({
             <div>
               <label
                 htmlFor="text-model-select"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Text model (draft / critique / revise passes)
               </label>
@@ -484,14 +505,14 @@ export function BriefReviewClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {MODEL_OPTIONS.find((o) => o.value === textModel)?.hint ?? ""}
               </p>
             </div>
             <div>
               <label
                 htmlFor="visual-model-select"
-                className="block text-xs font-medium text-muted-foreground"
+                className="block text-sm font-medium text-muted-foreground"
               >
                 Visual critique model
               </label>
@@ -508,7 +529,7 @@ export function BriefReviewClient({
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-sm text-muted-foreground">
                 {MODEL_OPTIONS.find((o) => o.value === visualModel)?.hint ?? ""}
               </p>
             </div>
@@ -520,7 +541,7 @@ export function BriefReviewClient({
         <section aria-label="Page list">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold">Page list</h2>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {sortedPages.length} page{sortedPages.length === 1 ? "" : "s"}
             </p>
           </div>
@@ -529,13 +550,13 @@ export function BriefReviewClient({
             {sortedPages.map((p) => (
               <li key={p.localKey} className="rounded-lg border p-4">
                 <div className="flex items-start gap-4">
-                  <div className="w-8 shrink-0 text-center text-xs text-muted-foreground pt-2">
+                  <div className="w-8 shrink-0 text-center text-sm text-muted-foreground pt-2">
                     {p.ordinal + 1}
                   </div>
 
                   <div className="flex-1 space-y-3">
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground">
+                      <label className="block text-sm font-medium text-muted-foreground">
                         Page title
                       </label>
                       <Input
@@ -548,26 +569,32 @@ export function BriefReviewClient({
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <ModePill
-                        mode={p.mode}
-                        disabled={isReadOnly}
-                        onToggle={() =>
-                          setPage(p.localKey, {
-                            mode: p.mode === "full_text" ? "short_brief" : "full_text",
-                          })
-                        }
-                      />
-                      <span className="text-xs text-muted-foreground">
+                      {p.mode === "import" ? (
+                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-900">
+                          Import (mode locked)
+                        </span>
+                      ) : (
+                        <ModePill
+                          mode={p.mode}
+                          disabled={isReadOnly}
+                          onToggle={() =>
+                            setPage(p.localKey, {
+                              mode: p.mode === "full_text" ? "short_brief" : "full_text",
+                            })
+                          }
+                        />
+                      )}
+                      <span className="text-sm text-muted-foreground">
                         {p.word_count} word{p.word_count === 1 ? "" : "s"}
                       </span>
                     </div>
 
                     <details className="group">
-                      <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                      <summary className="cursor-pointer text-sm text-muted-foreground hover:text-foreground">
                         Show source excerpt
                       </summary>
                       <Textarea
-                        className="mt-2 text-xs"
+                        className="mt-2 text-sm"
                         value={p.source_text}
                         readOnly
                         rows={Math.min(12, Math.max(3, p.source_text.split("\n").length))}
@@ -626,10 +653,13 @@ export function BriefReviewClient({
           <Button
             type="button"
             variant="default"
-            onClick={() => setCommitState("confirming")}
-            disabled={sortedPages.length === 0}
+            onClick={() => void handleCommit()}
+            disabled={
+              sortedPages.length === 0 || commitState === "committing"
+            }
+            data-testid="brief-review-commit-button"
           >
-            Commit page list
+            {commitState === "committing" ? "Committing…" : "Commit page list"}
           </Button>
         </div>
       )}
@@ -640,14 +670,16 @@ export function BriefReviewClient({
           === "committed". The committed state still exists in the DB —
           just no UI surface for it on this page. */}
 
-      {commitState === "confirming" && (
-        <CommitConfirmModal
-          pageCount={sortedPages.length}
-          firstPageTitle={sortedPages[0]?.title ?? ""}
-          onCancel={() => setCommitState("idle")}
-          onConfirm={handleCommit}
-        />
-      )}
+      {/* UAT (2026-05-03 round-3): the CommitConfirmModal was removed
+          because it was a low-value double-confirm — operators clicked
+          "Commit page list" twice (button → modal → inner button) for
+          every routine commit. The modal component is kept defined
+          below for future use behind a high-cost gate, but never
+          rendered today. The handleCommit POST → /api/.../commit fires
+          directly from the Commit button. M12-4 risk-15 confirmation
+          (CONFIRMATION_REQUIRED on cost > 50% remaining) is still
+          enforced server-side and surfaced on the run page when it
+          fires. */}
     </div>
   );
 }
@@ -677,7 +709,7 @@ function ModePill({
   return (
     <button
       type="button"
-      className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+      className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
       onClick={onToggle}
       disabled={disabled}
       title={description}
