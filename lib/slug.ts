@@ -28,6 +28,7 @@ export const SLUG_STOP_WORDS = new Set([
   "they", "them", "their",
   "what", "which", "who", "whom", "whose",
   "not", "no",
+  "how", "du",
 ]);
 
 const TRUNCATE_AT = 60;
@@ -46,7 +47,7 @@ export function generateSlug(raw: string): string {
   if (meaningful.length > 0) {
     s = meaningful.join(" ");
   } else {
-    s = words.join(" ");
+    s = words.reduce((shortest, w) => (w.length < shortest.length ? w : shortest));
   }
 
   // 4. Replace non-alphanumeric runs with hyphens

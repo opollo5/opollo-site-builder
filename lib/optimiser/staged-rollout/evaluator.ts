@@ -100,7 +100,7 @@ export function evaluateRollout(input: EvaluationInput): EvaluationResult {
       : null;
   const bounce_new = ratio(metrics.bounces_new, metrics.sessions_new);
   const bounce_baseline = ratio(metrics.bounces_baseline, metrics.sessions_baseline);
-  const bounce_spike_pct = relDiffPct(bounce_new, bounce_baseline) * -1; // higher bounce = positive spike
+  const bounce_spike_pct = relDiffPct(bounce_new, bounce_baseline); // higher bounce = positive spike
   const error_rate = ratio(metrics.errors_new, metrics.sessions_new);
 
   const floors = {

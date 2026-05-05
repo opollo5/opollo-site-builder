@@ -76,7 +76,7 @@ test.describe("social platform", () => {
     const analyticsError = page.getByTestId("analytics-error");
     const mainContent = page.locator("main");
     await expect(
-      analyticsEmpty.or(analyticsError).or(mainContent),
+      analyticsEmpty.or(analyticsError).or(mainContent).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     await auditA11y(page, testInfo);
