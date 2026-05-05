@@ -305,14 +305,24 @@ export async function installExternalApiMocks(page: Page): Promise<void> {
       body: JSON.stringify({ rows: [] }),
     }),
   );
-  // Clarity — return empty insights.
-  await page.route(/www\.clarity\.ms/, (route: Route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([]),
-    }),
-  );
+  // Clarity verify endpoint (server-side fetch; stub the Next.js route
+  // instead of www.clarity.ms which page.route() can't intercept).
+  // GET → no_data so onboarding test sees "Waiting for first Clarity session".
+  // PUT (save token) continues through to the real handler.
+  await page.route("**/api/optimiser/clients/*/clarity", async (route: Route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          data: { ok: false, kind: "no_data", message: "Waiting for first Clarity session." },
+        }),
+      });
+    } else {
+      await route.continue();
+    }
+  });
   // PageSpeed Insights.
   await page.route(/pagespeedonline\.googleapis\.com/, (route: Route) =>
     route.fulfill({
