@@ -100,8 +100,8 @@ test.describe("optimiser — page browser", () => {
     });
 
     await page.goto(`/optimiser?client=${client.id}`);
-    // State filter is a <select> (second combobox after reliability filter).
-    await page.getByRole("combobox").nth(1).selectOption("healthy");
+    // State filter is the third combobox: nth(0)=client switcher, nth(1)=reliability, nth(2)=state.
+    await page.getByRole("combobox").nth(2).selectOption("healthy");
     await expect(page.getByText("https://example.test/h")).toBeVisible();
     await expect(page.getByText("https://example.test/a")).toHaveCount(0);
   });
