@@ -109,7 +109,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 10px;
+  font-size: var(--font-size-xs, 1rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.20em;
@@ -153,7 +153,7 @@
   border: none;
   border-radius: 100px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-base, 1rem);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -182,7 +182,7 @@
   border: 1px solid var(--b3);
   border-radius: 100px;
   font-family: inherit;
-  font-size: 13px;
+  font-size: var(--font-size-base, 1rem);
   font-weight: 600;
   padding: 10px 24px;
   cursor: pointer;
@@ -218,10 +218,10 @@
  *   <H1>      page heading          text-xl  font-display  ~20px
  *   <H2>      section heading       text-base font-display ~16px
  *   <H3>      sub-section / card    text-sm  font-display  ~14px
- *   <Eyebrow> .lbl                  10px     font-body 700 uppercase
- *   Body      p / td / form values  font-body 400          ~16px floor
+ *   <Eyebrow> .lbl                  16px     font-body 700 uppercase
+ *   Body      p / td / form values  font-body 400          16px floor
  *
- * text-xs (12px) is FORBIDDEN on operator surfaces.
+ * 16px is the absolute minimum on all operator surfaces.
  * font-mono reserved for literal data (IDs, cost values, code tokens).
  * ------------------------------------------------------------------------- */
 
@@ -358,19 +358,19 @@
 }
 
 /* ---------------------------------------------------------------------------
- * UAT (2026-05-03) — operator-readability floor.
+ * Readability floor (updated 2026-05-06).
  *
- * text-sm → 15px, text-xs → 15px. Lucide icons floored at 20px.
- * Steven's explicit request: "Body text 16px minimum, icons 25% larger."
+ * text-sm → 16px, text-xs → 16px. Lucide icons floored at 20px.
+ * Minimum enforced in tailwind.config.ts + lib/design-system/tokens.ts.
  * ------------------------------------------------------------------------- */
 
 .text-xs {
-  font-size: 0.9375rem;
-  line-height: 1.375rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
 }
 .text-sm {
-  font-size: 0.9375rem;
-  line-height: 1.4rem;
+  font-size: 1rem;
+  line-height: 1.5rem;
 }
 
 svg.lucide {

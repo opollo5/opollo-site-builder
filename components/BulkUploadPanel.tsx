@@ -395,10 +395,10 @@ Body of second post.`}
           aria-hidden
           className="hidden items-center gap-0.5 text-sm text-muted-foreground sm:inline-flex"
         >
-          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
+          <kbd className="rounded border bg-muted px-1 font-mono text-xs">
             ⌘
           </kbd>
-          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
+          <kbd className="rounded border bg-muted px-1 font-mono text-xs">
             ↵
           </kbd>
         </span>

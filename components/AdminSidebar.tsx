@@ -343,10 +343,10 @@ export function AdminSidebar({
                   className="flex items-center gap-0.5 text-sm text-m3"
                   aria-hidden
                 >
-                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
+                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-xs">
                     ⌘
                   </kbd>
-                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
+                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-xs">
                     K
                   </kbd>
                 </span>

@@ -2,15 +2,17 @@
 /**
  * scripts/audit.ts — Static analysis: catch logic errors before UAT.
  *
- * Eight checks (HIGH | MEDIUM | LOW severity):
+ * Ten checks (HIGH | MEDIUM | LOW severity):
  *   1. Middleware public paths              HIGH
  *   2. Admin API gate coverage              MEDIUM
  *   3. DB column references                 MEDIUM
  *   4. Migration ordering                   HIGH
- *   5. Typography minimums                  LOW
+ *   5. Typography minimums (16px floor)     LOW
  *   6. Env var coverage                     LOW
  *   7. Unauthenticated API routes           HIGH
  *   8. Missing error handling on writes     MEDIUM
+ *   9. Dead routes                          LOW
+ *  10. Hardcoded design values              LOW
  *
  * Output:
  *   - Per-issue lines: FILE:LINE — CATEGORY — message
@@ -614,19 +616,13 @@ function check5_typography(): Issue[] {
   const issues: Issue[] = [];
   const roots = ["app", "components", "lib"];
 
-  // Arbitrary Tailwind font sizes below 15px — text-[10px] through text-[14px].
-  // text-xs and text-sm are VALID (both compile to 15px via tailwind.config.ts).
-  // Known intentional exceptions at <15px:
-  //   - .lbl eyebrow labels (10px per design spec) — uses CSS class, not Tailwind
-  //   - .btn-pk / .btn-ghost (13px per design spec) — uses CSS class, not Tailwind
-  //   - keyboard shortcut symbols (<kbd>) — decorative chrome
-  //   - color swatch labels in design-wizard — decorative
-  //   - notification count badge (layout-constrained 16px circle)
-  //   - components/ui/button.tsx text-[13px] — design spec button text
-  const arbitraryFontRe = /\btext-\[([0-9]|1[0-4])px\]/;
-  // Inline fontSize below 15px.
+  // Arbitrary Tailwind font sizes below 16px — text-[10px] through text-[15px].
+  // text-xs, text-sm, and text-base are VALID (all compile to 16px via tailwind.config.ts).
+  // 16px is the absolute minimum for all operator-facing text (updated 2026-05-06).
+  const arbitraryFontRe = /\btext-\[([0-9]|1[0-5])px\]/;
+  // Inline fontSize below 16px.
   const fsPxRe =
-    /fontSize\s*:\s*["']?(0\.[0-7]\d*rem|[1-9]px|1[0-4]px|0\.[0-7]\d*em)["']?/;
+    /fontSize\s*:\s*["']?(0\.[0-7]\d*rem|[1-9]px|1[0-5]px|0\.[0-7]\d*em)["']?/;
 
   for (const root of roots) {
     const dir = join(REPO_ROOT, root);
@@ -645,7 +641,7 @@ function check5_typography(): Issue[] {
             file: rel,
             line: i + 1,
             message:
-              "Arbitrary sub-15px font size — use text-xs (15px) instead, or document as intentional exception in CSS-REFACTOR.md",
+              "Arbitrary sub-16px font size — use text-xs (16px minimum per lib/design-system/tokens.ts) instead",
           });
         }
         if (fsPxRe.test(stripped)) {
@@ -654,7 +650,7 @@ function check5_typography(): Issue[] {
             severity: "LOW",
             file: rel,
             line: i + 1,
-            message: "Inline fontSize is below the 15px floor (RULES.md #7)",
+            message: "Inline fontSize is below the 16px floor (lib/design-system/tokens.ts)",
           });
         }
       });
@@ -1030,6 +1026,81 @@ function check9_deadRoutes(): Issue[] {
 }
 
 // ============================================================================
+// Check 10 — Hardcoded design values in component files (LOW)
+// ============================================================================
+
+/**
+ * Flags hardcoded hex colours and arbitrary px font sizes in className or
+ * style props within app/ and components/. Values in:
+ *   - email templates (lib/email/templates/) — exempt (inline HTML)
+ *   - CSS files (globals.css, tokens.css) — exempt (intentional token layer)
+ *   - test/fixture files — exempt (already excluded by SKIP_DIRS)
+ *   - seed/ directory — exempt (WordPress template CSS)
+ *
+ * Correct approach: add the value to lib/design-system/tokens.ts + use the
+ * corresponding Tailwind class (e.g. text-pk, bg-gr, border-b3).
+ */
+function check10_hardcodedDesignValues(): Issue[] {
+  const issues: Issue[] = [];
+
+  // Hex pattern that looks like it's inside a className or style string.
+  // Matches #xxx and #xxxxxx but not css-variable definitions (--foo: #...).
+  // Allow-list: globals.css and tokens.css are the intentional token layer.
+  const hexRe = /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/;
+
+  // Arbitrary Tailwind px font-size pattern text-[Npx].
+  const arbitraryTextRe = /\btext-\[\d+px\]/;
+
+  const EXEMPT_PATHS = [
+    "lib/email/templates/",
+    "lib/email/",
+    "app/globals.css",
+    "styles/tokens.css",
+    "seed/",
+    "public/",
+  ];
+
+  for (const root of ["app", "components"]) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".ts", ".tsx"])) {
+      const rel = relPath(file);
+      if (EXEMPT_PATHS.some((p) => rel.includes(p))) continue;
+      const lines = readSafe(file).split(/\r?\n/);
+      const state = { inBlock: false };
+      lines.forEach((ln, i) => {
+        const stripped = stripComments(ln, state, false);
+        // Only flag hex values that appear inside className strings or style objects.
+        if (
+          hexRe.test(stripped) &&
+          /className|style\s*=|style\s*:/.test(stripped)
+        ) {
+          issues.push({
+            category: "hardcoded-design-values",
+            severity: "LOW",
+            file: rel,
+            line: i + 1,
+            message:
+              "Hardcoded hex colour in className/style — use a Tailwind token class (text-pk, bg-gr, etc.) or a CSS var from lib/design-system/tokens.ts",
+          });
+        }
+        if (arbitraryTextRe.test(stripped)) {
+          issues.push({
+            category: "hardcoded-design-values",
+            severity: "LOW",
+            file: rel,
+            line: i + 1,
+            message:
+              "Arbitrary Tailwind text-[Xpx] — use text-xs / text-sm / text-base (all 16px min) from lib/design-system/tokens.ts",
+          });
+        }
+      });
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
 // Output
 // ============================================================================
 
@@ -1098,7 +1169,7 @@ function printResults(issues: Issue[]): boolean {
 // ============================================================================
 
 function main(): void {
-  console.log("scripts/audit.ts — running 8 static checks...\n");
+  console.log("scripts/audit.ts — running 10 static checks...\n");
 
   const all: Issue[] = [
     ...check1_middlewarePublicPaths(),
@@ -1110,6 +1181,7 @@ function main(): void {
     ...check7_unauthenticatedApi(),
     ...check8_errorHandling(),
     ...check9_deadRoutes(),
+    ...check10_hardcodedDesignValues(),
   ];
 
   const failed = printResults(all);

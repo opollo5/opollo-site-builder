@@ -417,7 +417,7 @@ export function ApprovedDesignReadout({
             return (
               <span
                 key={k}
-                className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[10px]"
+                className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-xs"
                 title={`${k}: ${v}`}
               >
                 <span

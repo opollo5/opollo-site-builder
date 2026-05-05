@@ -99,7 +99,7 @@ export function DesignUnderstandingPanel({
             {view.swatches.slice(0, 5).map((c, i) => (
               <span
                 key={`${c}-${i}`}
-                className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-[10px]"
+                className="inline-flex items-center gap-1 rounded-md border bg-background px-1.5 py-0.5 text-xs"
                 title={c}
               >
                 <span

@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 // Opollo button hierarchy — all variants are full-pill (rounded-full).
-// default  → pink gradient CTA (uppercase 13px 700)
+// default  → pink gradient CTA (uppercase 16px 700)
 // outline  → hairline border, goes green on hover
 // ghost    → transparent, green on hover (nav / table actions)
 // secondary → subtle elevated surface
@@ -17,7 +17,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-gradient-to-r from-pk to-pk2 text-white text-[13px] font-bold uppercase tracking-[0.05em] hover:brightness-110 hover:-translate-y-px hover:shadow-[0_4px_24px_rgba(255,3,165,0.40)] active:translate-y-0 active:shadow-none",
+          "bg-gradient-to-r from-pk to-pk2 text-white text-base font-bold uppercase tracking-[0.05em] hover:brightness-110 hover:-translate-y-px hover:shadow-[0_4px_24px_rgba(255,3,165,0.40)] active:translate-y-0 active:shadow-none",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:translate-y-px",
         outline:

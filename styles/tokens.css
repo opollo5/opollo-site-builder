@@ -1,26 +1,27 @@
 /*
  * styles/tokens.css
  *
- * SINGLE SOURCE OF TRUTH for all design tokens.
+ * CSS custom-property layer for design tokens.
+ * TypeScript source of truth: lib/design-system/tokens.ts
  *
  * Rules enforced by lint + CI (see audit:static and .eslintrc):
- * - Minimum font size: 15px (text-xs, text-sm)
- * - Minimum body font size: 16px (text-base)
+ * - Minimum font size: 16px (all operator-facing text)
  * - No hardcoded hex colours — use semantic tokens below
- * - No arbitrary Tailwind values
+ * - No arbitrary Tailwind text-[Xpx] values
  *
- * To add a new token: add it here first, then use it.
- * Never add a value directly to a component.
+ * To add a token: add it to lib/design-system/tokens.ts first,
+ * then mirror the CSS variable here.
+ * Never add raw values directly to a component.
  */
 
 :root {
   /* ── Typography scale ────────────────────────────────────────────
-   * text-xs and text-sm are BOTH 15px by design.
+   * 16px is the absolute minimum for all operator-facing text.
+   * text-xs and text-sm both resolve to 1rem (16px).
    * This is enforced in tailwind.config.ts.
-   * NEVER use font sizes below these values.
    * ─────────────────────────────────────────────────────────────── */
-  --font-size-xs:   0.9375rem; /* 15px — minimum allowed */
-  --font-size-sm:   0.9375rem; /* 15px — minimum allowed */
+  --font-size-xs:   1rem;      /* 16px — minimum */
+  --font-size-sm:   1rem;      /* 16px — minimum */
   --font-size-base: 1rem;      /* 16px — standard body */
   --font-size-lg:   1.125rem;  /* 18px */
   --font-size-xl:   1.25rem;   /* 20px */
