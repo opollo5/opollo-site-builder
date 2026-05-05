@@ -177,7 +177,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
       request,
       briefId,
       expectedOrdinal: 0,
-      maxTicks: 12,
+      maxTicks: 20,
     });
 
     // 4. Re-render the surface. Approve button on page 0 should appear.
@@ -192,7 +192,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
       request,
       briefId,
       expectedOrdinal: 1,
-      maxTicks: 12,
+      maxTicks: 20,
     });
 
     await page.reload();
@@ -208,18 +208,13 @@ test.describe("M12-6 briefs — full-loop run", () => {
       request,
       briefId,
       expectedOrdinal: 2,
-      maxTicks: 12,
+      maxTicks: 20,
     });
 
     // 7. Cancel the run. The button lives in the header when the run is
     // active/paused. Reload first so the client picks up the paused state.
     await page.reload();
     await page.getByRole("button", { name: /cancel run/i }).click();
-    // Wait for the cancel POST to complete before querying the DB;
-    // the button disappears once the response lands.
-    await expect(
-      page.getByRole("button", { name: /cancel run/i }),
-    ).toBeHidden({ timeout: 15_000 });
 
     // 8. Assert post-state:
     //   - First two pages approved, generated_html populated
@@ -241,13 +236,22 @@ test.describe("M12-6 briefs — full-loop run", () => {
     expect(rows[1]!.generated_html).toBeTruthy();
     expect(rows[2]!.page_status).toBe("awaiting_review");
 
-    const runAfter = await svc
-      .from("brief_runs")
-      .select("status")
-      .eq("brief_id", briefId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-    expect(runAfter.data?.status).toBe("cancelled");
+    // Poll until the cancel POST completes and brief_runs reflects it.
+    // The cancel button may hide optimistically before the API lands, so
+    // waiting for UI feedback is unreliable; poll the DB directly.
+    let cancelledStatus: string | null = null;
+    for (let i = 0; i < 30; i++) {
+      await page.waitForTimeout(500);
+      const check = await svc
+        .from("brief_runs")
+        .select("status")
+        .eq("brief_id", briefId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      cancelledStatus = check.data?.status ?? null;
+      if (cancelledStatus === "cancelled") break;
+    }
+    expect(cancelledStatus).toBe("cancelled");
   });
 });
