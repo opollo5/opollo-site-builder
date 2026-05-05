@@ -109,7 +109,7 @@ export function NotificationBell({ companyId }: Props) {
         </svg>
         {unread > 0 && (
           <span
-            className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground"
+            className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground"
             aria-hidden="true"
           >
             {unread > 9 ? "9+" : unread}

@@ -240,7 +240,7 @@ export function SocialCalendarClient({ entries, monthIso }: Props) {
                         href={`/company/social/posts/${e.post_master_id}`}
                         data-testid={`calendar-entry-${e.id}`}
                         className={[
-                          "flex items-center gap-1 rounded px-1 py-0.5 text-[11px] leading-tight truncate hover:opacity-80 transition-opacity",
+                          "flex items-center gap-1 rounded px-1 py-0.5 text-xs leading-tight truncate hover:opacity-80 transition-opacity",
                           CHIP_CLASS[e.platform],
                         ].join(" ")}
                         title={e.preview ?? "(no copy)"}
