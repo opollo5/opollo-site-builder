@@ -1,33 +1,39 @@
 import { redirect } from "next/navigation";
 
 import { SocialCalendarClient } from "@/components/SocialCalendarClient";
-import { H1, Lead } from "@/components/ui/typography";
+import { H1 } from "@/components/ui/typography";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
 
 // ---------------------------------------------------------------------------
-// S1-25/S1-32 — customer calendar view at /company/social/calendar.
+// /company/social/calendar — monthly grid view.
 //
-// Server-rendered. Accepts ?from=YYYY-MM-DD to set the window start
-// (defaults to today). Always shows a 30-day forward window.
+// Accepts ?month=YYYY-MM (defaults to current month). Fetches schedule
+// entries for the full 6-row grid (Mon before the 1st through Sun after
+// the last day) so the client can render a standard month grid without
+// a second request. The client component handles month navigation and
+// platform filtering.
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 
-const WINDOW_DAYS = 30;
-
 type Props = {
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ month?: string }>;
 };
 
-function parseFromParam(raw: string | undefined): Date {
-  if (!raw) return new Date();
-  const d = new Date(raw);
-  return isNaN(d.getTime()) ? new Date() : d;
+function parseMonthParam(raw: string | undefined): { year: number; month: number } {
+  const today = new Date();
+  if (!raw) return { year: today.getFullYear(), month: today.getMonth() + 1 };
+  const match = /^(\d{4})-(\d{2})$/.exec(raw);
+  if (!match) return { year: today.getFullYear(), month: today.getMonth() + 1 };
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  if (month < 1 || month > 12) return { year: today.getFullYear(), month: today.getMonth() + 1 };
+  return { year, month };
 }
 
 export default async function CompanySocialCalendarPage({ searchParams }: Props) {
-  const { from: fromParam } = await searchParams;
+  const { month: monthParam } = await searchParams;
 
   const session = await getCurrentPlatformSession();
   if (!session) {
@@ -35,55 +41,53 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
   }
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-base">
-        <p className="font-medium">Account not provisioned to a company.</p>
-        <p className="mt-1 text-muted-foreground">
-          Your account isn&apos;t a member of any company on the platform
-          yet. Ask an admin to invite you, or contact Opollo support.
-        </p>
+      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+        <p className="font-medium">No company context.</p>
       </div>
     );
   }
 
-  const windowStart = parseFromParam(fromParam);
-  const windowEnd = new Date(windowStart.getTime() + WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const { year, month } = parseMonthParam(monthParam);
+  const monthIso = `${year}-${String(month).padStart(2, "0")}`;
+
+  // Grid bounds: Monday on/before the 1st → 42 days later (6 rows × 7 cols).
+  const firstOfMonth = new Date(year, month - 1, 1);
+  const startDow = (firstOfMonth.getDay() + 6) % 7; // Mon=0 … Sun=6
+  const gridStart = new Date(firstOfMonth);
+  gridStart.setDate(firstOfMonth.getDate() - startDow);
+  const gridEnd = new Date(gridStart);
+  gridEnd.setDate(gridStart.getDate() + 42);
 
   const result = await listCompanyScheduleEntries({
     companyId: session.company.companyId,
-    fromIso: windowStart.toISOString(),
-    toIso: windowEnd.toISOString(),
+    fromIso: gridStart.toISOString(),
+    toIso: gridEnd.toISOString(),
   });
 
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <header>
+    <main className="mx-auto max-w-5xl p-6">
+      <header className="mb-6">
         <H1>Calendar</H1>
-        <Lead className="mt-0.5">
-          {WINDOW_DAYS}-day window. Use Prev / Next to navigate.
-        </Lead>
       </header>
-      <div className="mt-6">
-        {result.ok ? (
-          <SocialCalendarClient
-            entries={result.data.entries.map((e) => ({
-              id: e.id,
-              post_master_id: e.post_master_id,
-              platform: e.platform,
-              scheduled_at: e.scheduled_at,
-              preview: e.preview,
-            }))}
-            fromIso={windowStart.toISOString()}
-            toIso={windowEnd.toISOString()}
-          />
-        ) : (
-          <div
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
-            role="alert"
-          >
-            Failed to load calendar: {result.error.message}
-          </div>
-        )}
-      </div>
+      {result.ok ? (
+        <SocialCalendarClient
+          entries={result.data.entries.map((e) => ({
+            id: e.id,
+            post_master_id: e.post_master_id,
+            platform: e.platform,
+            scheduled_at: e.scheduled_at,
+            preview: e.preview,
+          }))}
+          monthIso={monthIso}
+        />
+      ) : (
+        <div
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+          role="alert"
+        >
+          Failed to load calendar: {result.error.message}
+        </div>
+      )}
     </main>
   );
 }
