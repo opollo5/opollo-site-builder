@@ -236,10 +236,32 @@ async function seedM16SlotAndPages(prefix: string) {
     .single();
   if (pErr || !pageRow) throw new Error(`page insert: ${pErr?.message ?? "no row"}`);
 
+  // Design system + template (generation_jobs.template_id is NOT NULL)
+  const { data: dsRow, error: dsErr } = await svc
+    .from("design_systems")
+    .insert({ site_id: site.id, version: 1, tokens_css: "", base_styles: "" })
+    .select("id")
+    .single();
+  if (dsErr || !dsRow) throw new Error(`ds insert: ${dsErr?.message ?? "no row"}`);
+
+  const { data: tmplRow, error: tmplErr } = await svc
+    .from("design_templates")
+    .insert({
+      design_system_id: dsRow.id,
+      page_type: "homepage",
+      name: "homepage-default",
+      composition: [],
+      required_fields: {},
+      is_default: true,
+    })
+    .select("id")
+    .single();
+  if (tmplErr || !tmplRow) throw new Error(`template insert: ${tmplErr?.message ?? "no row"}`);
+
   // Batch job
   const { data: job, error: jErr } = await svc
     .from("generation_jobs")
-    .insert({ site_id: site.id, status: "running", requested_count: 1, succeeded_count: 0, failed_count: 0 })
+    .insert({ site_id: site.id, template_id: tmplRow.id, status: "running", requested_count: 1, succeeded_count: 0, failed_count: 0 })
     .select("id")
     .single();
   if (jErr || !job) throw new Error(`job insert: ${jErr?.message ?? "no row"}`);
