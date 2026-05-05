@@ -6,6 +6,7 @@ import {
 } from "@/lib/bundlesocial";
 import { logger } from "@/lib/logger";
 import { resolveBundleUploadIds } from "@/lib/platform/social/media";
+import { getQstashClient } from "@/lib/qstash";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -43,6 +44,7 @@ export type FirePublishResult = {
     | "ok"
     | "already_claimed"
     | "cancelled"
+    | "capped"
     | "not_found"
     | "invalid_state"
     | "no_connection"
@@ -121,6 +123,35 @@ export async function fireScheduledPublish(
   }
   if (claim.outcome === "ALREADY_CLAIMED") {
     return ok({ outcome: "already_claimed" });
+  }
+  if (claim.outcome === "CAPPED") {
+    // Re-enqueue with a 30s delay so the claim is retried once the
+    // in-flight pipeline drains. Deduplication bucket of 35s prevents
+    // multiple rapid re-enqueues for the same entry.
+    const qstash = getQstashClient();
+    if (qstash) {
+      const origin =
+        process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ?? "";
+      const callbackUrl = `${origin}/api/webhooks/qstash/social-publish`;
+      const dedupBucket = Math.floor(Date.now() / 35000);
+      try {
+        await qstash.publishJSON({
+          url: callbackUrl,
+          body: { scheduleEntryId: input.scheduleEntryId },
+          delay: 30,
+          deduplicationId: `social-publish-cap-${input.scheduleEntryId}-${dedupBucket}`,
+        });
+      } catch (err) {
+        logger.warn("social.publish.fire.cap_reenqueue_failed", {
+          err: err instanceof Error ? err.message : String(err),
+          schedule_entry_id: input.scheduleEntryId,
+        });
+      }
+    }
+    logger.info("social.publish.fire.capped", {
+      schedule_entry_id: input.scheduleEntryId,
+    });
+    return ok({ outcome: "capped" });
   }
   if (claim.outcome !== "OK") {
     return internal(`Unexpected claim outcome: ${claim.outcome}`);
