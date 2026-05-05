@@ -293,7 +293,7 @@ export async function publishApprovedPageAsFullPage(
   }
 
   if (writeRes.dry_run) {
-    await supabase.from("opt_change_log").insert({
+    const { error: logErr } = await supabase.from("opt_change_log").insert({
       client_id: client.id,
       proposal_id: proposal.id,
       landing_page_id: proposal.landing_page_id,
@@ -309,6 +309,7 @@ export async function publishApprovedPageAsFullPage(
       actor_user_id: null,
       created_at: nowIso,
     });
+    if (logErr) logger.error("optimiser.publish.change_log_insert_failed", { proposal_id: proposal.id, event: "page_regenerated", error: logErr.message });
     return {
       published: true,
       dry_run: true,
@@ -317,7 +318,7 @@ export async function publishApprovedPageAsFullPage(
     };
   }
 
-  await supabase.from("opt_change_log").insert({
+  const { error: logErr } = await supabase.from("opt_change_log").insert({
     client_id: client.id,
     proposal_id: proposal.id,
     landing_page_id: proposal.landing_page_id,
@@ -332,6 +333,7 @@ export async function publishApprovedPageAsFullPage(
     actor_user_id: null,
     created_at: nowIso,
   });
+  if (logErr) logger.error("optimiser.publish.change_log_insert_failed", { proposal_id: proposal.id, event: "page_regenerated", error: logErr.message });
 
   return {
     published: true,

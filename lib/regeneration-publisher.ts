@@ -7,6 +7,7 @@ import {
   rewriteImageUrls,
 } from "@/lib/html-image-rewrite";
 import { LEADSOURCE_FONT_LOAD_HTML } from "@/lib/leadsource-fonts";
+import { logger } from "@/lib/logger";
 import { runFragmentStructuralCheck } from "@/lib/brief-runner";
 import { runGates, type RunGatesResult } from "@/lib/quality-gates";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -272,7 +273,7 @@ async function publishRegenJobImpl(
         design_system_version: String(page.design_system_version ?? 1),
       });
   if (gates.kind === "failed") {
-    await supabase.from("regeneration_events").insert({
+    const { error: evtErr } = await supabase.from("regeneration_events").insert({
       regeneration_job_id: jobId,
       type: "gates_failed",
       payload: {
@@ -282,6 +283,7 @@ async function publishRegenJobImpl(
         gates_run: gates.gates_run,
       },
     });
+    if (evtErr) logger.error("regeneration.event.insert_failed", { job_id: jobId, type: "gates_failed", error: evtErr.message });
     await supabase
       .from("regeneration_jobs")
       .update({

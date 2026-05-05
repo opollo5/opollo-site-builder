@@ -47,7 +47,7 @@ function errorJson(
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const gate = await requireAdminForApi();
+  const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const body = await readJsonBody(req);

@@ -194,7 +194,8 @@ export async function reextractImageMetadata(
 
           if (Object.keys(exifUpdate).length > 0) {
             exifUpdate.updated_at = now();
-            await supabase.from("image_library").update(exifUpdate).eq("id", row.id);
+            const { error: imgErr } = await supabase.from("image_library").update(exifUpdate).eq("id", row.id);
+            if (imgErr) logger.error("image.reextract.update_failed", { image_id: row.id, error: imgErr.message });
           }
 
           // Always upsert exif_raw in image_metadata.
