@@ -187,12 +187,12 @@ describe("checkAdminAccess: custom options (M2d-1)", () => {
     await setKillSwitchRow(null);
   });
 
-  it("redirects an operator to the insufficientRoleRedirectTo target when admin is required", async () => {
+  it("redirects an operator to the insufficientRoleRedirectTo target when super_admin is required", async () => {
     const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
     const result = await checkAdminAccess({
-      requiredRoles: ["admin"],
+      requiredRoles: ["super_admin"],
       insufficientRoleRedirectTo: "/admin/sites",
     });
     expect(result).toEqual({ kind: "redirect", to: "/admin/sites" });
@@ -213,7 +213,7 @@ describe("checkAdminAccess: custom options (M2d-1)", () => {
     const operator = await seedAuthUser({ role: "admin" });
     mockState.client = await signedInClient(operator.email);
 
-    const result = await checkAdminAccess({ requiredRoles: ["admin"] });
+    const result = await checkAdminAccess({ requiredRoles: ["super_admin"] });
     expect(result).toEqual({ kind: "redirect", to: "/" });
   });
 });
