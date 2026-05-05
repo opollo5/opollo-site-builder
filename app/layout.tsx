@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fredoka, Manrope } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { getDesignSystemCssOverride } from "@/lib/design-system/get-override";
 import "@/styles/tokens.css";
 import "./globals.css";
 
@@ -42,17 +43,24 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cssOverride = await getDesignSystemCssOverride();
   return (
     <html
       lang="en"
       className={cn(fredoka.variable, manrope.variable, "dark")}
       suppressHydrationWarning
     >
+      {cssOverride && (
+        <head>
+          {/* eslint-disable-next-line react/no-danger */}
+          <style dangerouslySetInnerHTML={{ __html: cssOverride }} />
+        </head>
+      )}
       <body className="font-body antialiased">{children}</body>
     </html>
   );

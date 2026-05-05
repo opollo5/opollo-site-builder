@@ -4,7 +4,7 @@
  * SINGLE SOURCE OF TRUTH for all design tokens.
  *
  * Rules enforced by lint + CI (see audit:static and .eslintrc):
- * - Minimum font size: 15px (text-xs, text-sm)
+ * - Minimum font size: 16px (text-xs = text-sm = text-base = 1rem)
  * - Minimum body font size: 16px (text-base)
  * - No hardcoded hex colours — use semantic tokens below
  * - No arbitrary Tailwind values
@@ -15,12 +15,11 @@
 
 :root {
   /* ── Typography scale ────────────────────────────────────────────
-   * text-xs and text-sm are BOTH 15px by design.
-   * This is enforced in tailwind.config.ts.
-   * NEVER use font sizes below these values.
+   * 16px is the absolute minimum — text-xs = text-sm = text-base = 1rem.
+   * NEVER use font sizes below 16px on operator surfaces (eyebrow .lbl is 0.75rem, design exception).
    * ─────────────────────────────────────────────────────────────── */
-  --font-size-xs:   0.9375rem; /* 15px — minimum allowed */
-  --font-size-sm:   0.9375rem; /* 15px — minimum allowed */
+  --font-size-xs:   1rem; /* 16px — absolute minimum */
+  --font-size-sm:   1rem; /* 16px — absolute minimum */
   --font-size-base: 1rem;      /* 16px — standard body */
   --font-size-lg:   1.125rem;  /* 18px */
   --font-size-xl:   1.25rem;   /* 20px */

@@ -150,7 +150,7 @@ function ConceptCard({
         {SWATCH_KEYS.map((k) => (
           <span
             key={k}
-            className="inline-flex items-center gap-1 rounded-md border bg-background px-1 py-0.5 text-[9px]"
+            className="inline-flex items-center gap-1 rounded-md border bg-background px-1 py-0.5 text-xs"
             title={`${k}: ${concept.design_tokens[k]}`}
           >
             <span
