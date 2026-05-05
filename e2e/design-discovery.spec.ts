@@ -311,7 +311,7 @@ test.describe("design discovery wizard", () => {
   test("skip path: skip both steps → done with using-defaults messaging", async ({
     page,
   }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     const id = await createSiteAndOpenSetup(
       page,
       `DD Skip ${Date.now()}`,

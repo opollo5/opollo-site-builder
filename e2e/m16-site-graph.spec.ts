@@ -160,7 +160,7 @@ test.describe("M16 — Blueprint review", () => {
     // Wait for the page to load the blueprint data
     await expect(page.getByText("E2E Test Brand")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/homepage/i)).toBeVisible();
-    await expect(page.getByText(/service/i)).toBeVisible();
+    await expect(page.getByText(/service/i).first()).toBeVisible();
   });
 
   test("blueprint review page shows 'Draft' status badge", async ({ page }) => {

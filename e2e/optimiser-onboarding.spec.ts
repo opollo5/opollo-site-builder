@@ -43,6 +43,10 @@ test.describe("optimiser — onboarding wizard", () => {
     await page.getByRole("button", { name: /create client/i }).click();
     await page.waitForURL(/\/optimiser\/onboarding\/[0-9a-f-]{36}/);
 
+    // Navigate to the Client details step via the sidebar (deriveStep may
+    // default to "ads" when Google Ads is not yet connected).
+    await page.getByRole("button", { name: /client details/i }).first().click();
+
     // Step 1 (client details) is the default landing step. Re-save to
     // exercise the PATCH path.
     await expect(
