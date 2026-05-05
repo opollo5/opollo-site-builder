@@ -75,7 +75,7 @@ export async function recordRejection(args: {
       })
       .eq("id", existing.id as string);
   } else {
-    await supabase.from("opt_client_memory").insert({
+    const { error: memErr } = await supabase.from("opt_client_memory").insert({
       client_id: args.clientId,
       memory_type: "rejected_pattern",
       key,
@@ -88,6 +88,7 @@ export async function recordRejection(args: {
       },
       updated_by: args.userId,
     });
+    if (memErr) logger.error("optimiser.client_memory.insert_failed", { client_id: args.clientId, key, error: memErr.message });
   }
 
   if (SUPPRESSION_EXEMPT_REASONS.has(args.reasonCode)) {

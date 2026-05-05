@@ -479,7 +479,7 @@ async function persistWinningVariantToMemory(args: {
       })
       .eq("id", existing.id as string);
   } else {
-    await supabase.from("opt_client_memory").insert({
+    const { error: memErr } = await supabase.from("opt_client_memory").insert({
       client_id: args.clientId,
       memory_type: "winning_variant",
       key,
@@ -495,6 +495,7 @@ async function persistWinningVariantToMemory(args: {
         last_lift_pp: lift_pp,
       },
     });
+    if (memErr) logger.error("optimiser.monitor.memory_insert_failed", { client_id: args.clientId, key, error: memErr.message });
   }
 }
 
@@ -547,7 +548,7 @@ async function recalibratePlaybook(args: {
     Math.round((newMid + halfWidth) * 1000) / 1000,
   );
 
-  await supabase.from("opt_playbook_calibration").insert({
+  const { error: calErr } = await supabase.from("opt_playbook_calibration").insert({
     playbook_id: playbookId,
     source_test_id: null, // Phase 2 placeholder; could carry test.id in future
     observed_uplift_pp: Math.round(observedLiftSigned * 1000) / 1000,
@@ -562,6 +563,7 @@ async function recalibratePlaybook(args: {
     reason: "observed",
     notes: `A/B winner=${args.winnerLabel}, observed lift ${observedLiftSigned.toFixed(2)}pp; weighted average against seed midpoint ${seedMid.toFixed(2)}pp.`,
   });
+  if (calErr) logger.error("optimiser.monitor.calibration_insert_failed", { playbook_id: playbookId, error: calErr.message });
 
   await supabase
     .from("opt_playbooks")
