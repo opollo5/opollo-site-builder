@@ -104,7 +104,7 @@ describe("M4-1: image-library schema", () => {
     // public.auth_role() resolves for the authenticated clients.
     const svc = getServiceRoleClient();
     await svc.from("opollo_users").insert([
-      { id: admin.id, email: admin.email, role: "admin" },
+      { id: admin.id, email: admin.email, role: "super_admin" },
       { id: operator.id, email: operator.email, role: "admin" },
       { id: viewer.id, email: viewer.email, role: "user" },
     ]);

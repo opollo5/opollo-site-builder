@@ -21,7 +21,7 @@ test.describe("auth happy path", () => {
     await page.getByRole("button", { name: /sign in/i }).click();
 
     await page.waitForURL(/\/admin\/sites/);
-    await expect(page.getByRole("heading", { name: "Manage sites" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sites", level: 1 })).toBeVisible();
 
     // Header shows the email + sign-out control.
     await expect(page.getByText(E2E_ADMIN_EMAIL)).toBeVisible();
@@ -44,7 +44,7 @@ test.describe("auth happy path", () => {
   test("signed-in admin reaches /admin/users", async ({ page }, testInfo) => {
     await signInAsAdmin(page);
     await page.goto("/admin/users");
-    await expect(page.getByRole("heading", { name: "Users" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Users", level: 1 })).toBeVisible();
     await auditA11y(page, testInfo);
   });
 });

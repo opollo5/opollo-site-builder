@@ -233,9 +233,15 @@ describe("POST /api/briefs/[brief_id]/cancel", () => {
     const site = await seedSite();
     const svc = getServiceRoleClient();
     const { briefId, pageIds } = await seedCommittedBriefWithPages(site.id, 2);
-    await svc
+    const runInsert = await svc
       .from("brief_runs")
-      .insert({ brief_id: briefId, status: "running" });
+      .insert({
+        brief_id: briefId,
+        status: "running",
+        worker_id: "test-worker-cancel",
+        lease_expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+    if (runInsert.error) throw new Error(`seed run: ${runInsert.error.message}`);
 
     // Also mark one page as approved (simulating mid-run progress).
     await svc

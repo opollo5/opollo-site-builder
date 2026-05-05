@@ -24,11 +24,21 @@ describe("lib/platform/brand/update — updateBrandProfile", () => {
   let actor: SeededAuthUser;
 
   beforeAll(async () => {
+    // Auth user is persistent — survives _setup.ts TRUNCATE. Seed once.
     actor = await seedAuthUser({
       email: "p-brand-1b-actor@opollo.test",
       persistent: true,
     });
+  });
 
+  afterAll(async () => {
+    const svc = getServiceRoleClient();
+    if (actor) await svc.auth.admin.deleteUser(actor.id);
+  });
+
+  beforeEach(async () => {
+    // _setup.ts TRUNCATE wipes platform_companies, platform_users, and
+    // platform_brand_profiles (via CASCADE) before each test. Re-seed here.
     const svc = getServiceRoleClient();
     const seedCompany = await svc
       .from("platform_companies")
@@ -45,7 +55,7 @@ describe("lib/platform/brand/update — updateBrandProfile", () => {
     }
 
     // updateBrandProfile inserts created_by/updated_by referencing
-    // platform_users; we must seed the actor's profile row.
+    // platform_users; re-seed the actor's profile row after each truncate.
     const seedUser = await svc
       .from("platform_users")
       .insert({
@@ -58,24 +68,6 @@ describe("lib/platform/brand/update — updateBrandProfile", () => {
     if (seedUser.error) {
       throw new Error(`seed user: ${seedUser.error.message}`);
     }
-  });
-
-  afterAll(async () => {
-    const svc = getServiceRoleClient();
-    await svc
-      .from("platform_brand_profiles")
-      .delete()
-      .eq("company_id", COMPANY_ID);
-    await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
-    if (actor) await svc.auth.admin.deleteUser(actor.id);
-  });
-
-  beforeEach(async () => {
-    const svc = getServiceRoleClient();
-    await svc
-      .from("platform_brand_profiles")
-      .delete()
-      .eq("company_id", COMPANY_ID);
   });
 
   it("bootstraps v1 with created=true when no profile exists", async () => {

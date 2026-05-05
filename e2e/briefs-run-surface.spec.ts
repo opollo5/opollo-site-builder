@@ -114,10 +114,10 @@ test.describe("M12-5 briefs — run surface", () => {
       page.getByRole("heading", { level: 1, name: /E2E run surface/ }),
     ).toBeVisible();
 
-    // Cost panel: estimate + remaining + spent.
-    await expect(page.getByRole("heading", { name: /^cost$/i })).toBeVisible();
-    await expect(page.getByText(/Estimate/i)).toBeVisible();
-    await expect(page.getByText(/Remaining this month/i)).toBeVisible();
+    // Cost ticker: floating region (RS-6 replaced the inline cost panel).
+    await expect(
+      page.getByRole("region", { name: /run cost/i }),
+    ).toBeVisible();
 
     // Start CTA visible (no active run).
     await expect(
@@ -162,13 +162,10 @@ test.describe("M12-5 briefs — run surface", () => {
 
     await page.goto(`/admin/sites/${site.id}/briefs/${briefId}/run`);
 
-    // The server component renders a "commit first" banner with a link
-    // back to the review surface.
+    // The server component renders BriefCommitWaiter for non-committed briefs.
+    // The waiter shows a loading state immediately while polling for the commit.
     await expect(
-      page.getByText(/this brief isn't committed yet/i),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /review and commit/i }),
+      page.getByText(/Finishing your commit/i),
     ).toBeVisible();
   });
 });

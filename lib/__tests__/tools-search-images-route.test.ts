@@ -87,16 +87,14 @@ describe("POST /api/tools/search_images", () => {
     expect(body).toEqual(envelope);
   });
 
-  it("malformed JSON body → executor receives {} fallback", async () => {
-    const envelope = makeSuccessEnvelope({ images: [] });
-    mockExecuteSearchImages.mockResolvedValue(envelope);
-
+  it("malformed JSON body → 400 before executor is called", async () => {
     const res = await POST(makeMalformedRequest());
 
-    expect(mockExecuteSearchImages).toHaveBeenCalledWith({});
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body).toEqual(envelope);
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("VALIDATION_FAILED");
+    expect(mockExecuteSearchImages).not.toHaveBeenCalled();
   });
 
   it("429 — rate-limit denial short-circuits; executor is never called", async () => {

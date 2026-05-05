@@ -83,7 +83,7 @@ describe("M2b: user-scoped RLS policies", () => {
     // them during this test's policy evaluations.
     const svc = getServiceRoleClient();
     await svc.from("opollo_users").insert([
-      { id: admin.id, email: admin.email, role: "admin" },
+      { id: admin.id, email: admin.email, role: "super_admin" },
       { id: operator.id, email: operator.email, role: "admin" },
       { id: viewer.id, email: viewer.email, role: "user" },
     ]);

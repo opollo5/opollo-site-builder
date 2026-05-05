@@ -19,11 +19,11 @@ import {
   brandTierLabel,
   getBrandTier,
 } from "@/lib/platform/brand/completion";
-import type {
-  BrandFormality,
-  BrandPov,
-  BrandProfile,
-} from "@/lib/platform/brand";
+import type { BrandFormality, BrandPov, BrandProfile } from "@/lib/platform/brand";
+import {
+  buildPatch,
+  type FormState,
+} from "@/lib/platform/brand/build-patch";
 import type { PlatformCompany } from "@/lib/platform/companies";
 
 // P-Brand-1c — client-side edit form for the active brand profile.
@@ -44,22 +44,6 @@ type Props = {
   brand: BrandProfile | null;
 };
 
-export type FormState = {
-  primary_colour: string;
-  secondary_colour: string;
-  accent_colour: string;
-  heading_font: string;
-  body_font: string;
-  formality: BrandFormality | "";
-  point_of_view: BrandPov | "";
-  industry: string;
-  safe_mode: boolean;
-  change_summary: string;
-  submitting: boolean;
-  error: string | null;
-  success: string | null;
-};
-
 function initialState(brand: BrandProfile | null): FormState {
   return {
     primary_colour: brand?.primary_colour ?? "",
@@ -76,45 +60,6 @@ function initialState(brand: BrandProfile | null): FormState {
     error: null,
     success: null,
   };
-}
-
-// Build the patch payload — only include fields whose value differs
-// from the current brand. Empty string is sent as null (operator
-// clearing a value); unchanged fields are dropped from the patch.
-// Exported for unit tests; the component is the only runtime caller.
-export function buildPatch(
-  state: FormState,
-  brand: BrandProfile | null,
-): Record<string, unknown> {
-  const patch: Record<string, unknown> = {};
-
-  function diff<K extends keyof BrandProfile>(
-    key: K,
-    formValue: string | boolean,
-  ): void {
-    const formNormalised =
-      typeof formValue === "string" ? formValue.trim() : formValue;
-    const formForCompare =
-      formNormalised === "" ? null : formNormalised;
-    const currentValue = brand?.[key] ?? null;
-    if (formForCompare !== currentValue) {
-      patch[key] = formForCompare;
-    }
-  }
-
-  diff("primary_colour", state.primary_colour);
-  diff("secondary_colour", state.secondary_colour);
-  diff("accent_colour", state.accent_colour);
-  diff("heading_font", state.heading_font);
-  diff("body_font", state.body_font);
-  diff("industry", state.industry);
-  diff("formality", state.formality);
-  diff("point_of_view", state.point_of_view);
-  if ((brand?.safe_mode ?? false) !== state.safe_mode) {
-    patch.safe_mode = state.safe_mode;
-  }
-
-  return patch;
 }
 
 export function CustomerBrandProfileEditor({ company, brand }: Props) {

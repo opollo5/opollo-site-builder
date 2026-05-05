@@ -7,12 +7,12 @@ import {
 } from "@/lib/image/failure/quality-check";
 
 // Create a synthetic JPEG with a uniform greyscale fill.
-// luminance = 0–255; size is 200×200px so it exceeds the 50 KB floor only
-// if we use a large enough image. We use 400×400 + high quality to be safe.
+// luminance = 0–255; 1200×1200 at quality 90 reliably produces > 2 KB even
+// for solid-colour inputs (JPEG DCT artefacts prevent near-zero output).
 async function syntheticImage(
   luminance: number,
-  width = 400,
-  height = 400,
+  width = 1200,
+  height = 1200,
 ): Promise<Buffer> {
   return sharp({
     create: {
@@ -57,7 +57,7 @@ describe("selectOverlayColour", () => {
 
 describe("qualityCheck", () => {
   it("fails tiny buffers (< 50 KB)", async () => {
-    const tiny = Buffer.alloc(1000, 0);
+    const tiny = Buffer.alloc(100, 0);
     const result = await qualityCheck(tiny, "split_layout");
     expect(result.passed).toBe(false);
     expect(result.reason).toMatch(/too small/i);

@@ -12,11 +12,14 @@ const COMPANY_B = "abcdef00-0000-0000-0000-bbbbbbbb2424";
 
 async function seedCompanyAndPost(companyId: string): Promise<string> {
   const svc = getServiceRoleClient();
+  // Use the first 4 chars of the last UUID segment as a unique discriminator.
+  // Both company UUIDs end in '2424', so companyId.slice(-4) would collide.
+  const uniq = (companyId.split("-")[4] ?? companyId).slice(0, 4);
   const co = await svc.from("platform_companies").insert({
     id: companyId,
-    name: `S1-24 ${companyId.slice(-4)}`,
-    slug: `s1-24-${companyId.slice(-4)}`,
-    domain: `s1-24-${companyId.slice(-4)}.test`,
+    name: `S1-24 ${uniq}`,
+    slug: `s1-24-${uniq}`,
+    domain: `s1-24-${uniq}.test`,
     is_opollo_internal: false,
     timezone: "Australia/Melbourne",
     approval_default_rule: "any_one",
