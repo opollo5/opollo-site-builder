@@ -435,8 +435,9 @@ function ClarityStep({
         is recorded.
       </p>
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Clarity API token</label>
+        <label htmlFor="clarity-api-token" className="block text-sm font-medium">Clarity API token</label>
         <Input
+          id="clarity-api-token"
           type="password"
           value={token}
           onChange={(e) => setToken(e.target.value)}

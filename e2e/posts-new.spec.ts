@@ -115,16 +115,20 @@ test.describe("/admin/posts/new — top-level entry", () => {
     const panel = page.getByTestId("post-advanced-panel");
     await expect(panel).toHaveCount(0);
 
-    // Type into the composer (TipTap ProseMirror); autosave fires after
-    // the 800ms debounce.
+    // Type into the composer (TipTap ProseMirror). Use pressSequentially so
+    // TipTap's key-event handlers fire and update the React state that the
+    // autosave debounce watches.
     const composer = page.locator(".ProseMirror");
-    await composer.fill("Hello world body for autosave probe.");
+    await composer.click();
+    await composer.pressSequentially("Hello world body for autosave probe.");
     await page.locator("#post-title").fill("Autosave probe");
 
-    // Save indicator surfaces.
+    // Wait for the autosave to COMPLETE (localStorage written), not just
+    // started. "Saving…" fires immediately; "Saved ·" fires after the 800ms
+    // debounce callback runs.
     await expect(page.getByTestId("post-save-status")).toContainText(
-      /saving|saved/i,
-      { timeout: 5000 },
+      /saved ·/i,
+      { timeout: 8000 },
     );
 
     // Open the disclosure manually.
