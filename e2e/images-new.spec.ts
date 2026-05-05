@@ -140,9 +140,9 @@ test.describe("image library — new features", () => {
     await page.goto("/admin/images");
     await expect(page.getByRole("heading", { name: /image library/i })).toBeVisible();
 
-    // All seeded titles appear in the table.
+    // All seeded titles appear in the table as row links.
     for (const seed of NEW_SEEDS) {
-      await expect(page.getByText(seed.title)).toBeVisible();
+      await expect(page.getByRole("link", { name: seed.title, exact: true })).toBeVisible();
     }
 
     await auditA11y(page, testInfo);
@@ -276,15 +276,15 @@ test.describe("image library — new features", () => {
       return rows.length <= 1;
     });
 
-    // Verify one of the deleted IDs is gone from DB.
+    // Verify 2 of the 3 seeded rows are gone from DB.
+    // (List is sorted created_at DESC, so nth(0)/nth(1) are gamma+beta.)
     const supabase = serviceRoleClient();
     const { data } = await supabase
       .from("image_library")
       .select("id, source_ref")
-      .in("source_ref", ["e2e-new-alpha", "e2e-new-beta"]);
+      .in("source_ref", ["e2e-new-alpha", "e2e-new-beta", "e2e-new-gamma"]);
 
-    // At least 2 should be deleted.
-    expect((data ?? []).length).toBeLessThanOrEqual(0);
+    expect((data ?? []).length).toBeLessThanOrEqual(1);
   });
 
   // -------------------------------------------------------------------------
@@ -295,7 +295,10 @@ test.describe("image library — new features", () => {
     page,
   }) => {
     // Intercept the reextract API to return a controlled payload.
+    // The 150 ms delay lets React commit the busy=true state before the
+    // response resolves so the loading-text assertion is observable.
     await page.route(/\/api\/admin\/images\/[^/]+\/reextract/, async (route) => {
+      await new Promise<void>((r) => setTimeout(r, 150));
       await route.fulfill({
         status: 200,
         contentType: "application/json",
@@ -355,6 +358,7 @@ test.describe("image library — new features", () => {
     const btn = page.getByTestId("image-reextract-button");
     await btn.click();
 
-    await expect(page.getByRole("alert")).toContainText("Cloudflare credentials not configured.");
+    // Use p[role="alert"] to exclude the Next.js route-announcer div.
+    await expect(page.locator("p[role='alert']")).toContainText("Cloudflare credentials not configured.");
   });
 });
