@@ -111,6 +111,13 @@ test.describe("pages admin surface", () => {
   test.beforeEach(async ({ page }) => {
     siteId = await lookupTestSiteId();
     pageIds = await seedPages(siteId);
+    // Reset budget usage so regen tests aren't blocked by BUDGET_EXCEEDED
+    // from prior tests in the same run (e.g. briefs-full-loop consuming
+    // daily_usage_cents before pages:212 / pages:247 run).
+    await serviceRoleClient()
+      .from("tenant_cost_budgets")
+      .update({ daily_usage_cents: 0, monthly_usage_cents: 0 })
+      .eq("site_id", siteId);
     await signInAsAdmin(page);
   });
 
