@@ -71,7 +71,7 @@ export default async function CompanySocialPostDetailPage({
 
   const companyId = session.company.companyId;
 
-  const [postResult, variantsResult, canEdit, canSubmit, canSchedule, canCreate, canRelease, canApprove] =
+  const [postResult, variantsResult, canEdit, canSubmit, canSchedule, canCreate, canApprove] =
     await Promise.all([
       getPostMaster({ postId: id, companyId }),
       listVariants({ postMasterId: id, companyId }),
@@ -79,7 +79,6 @@ export default async function CompanySocialPostDetailPage({
       canDo(companyId, "submit_for_approval"),
       canDo(companyId, "schedule_post"),
       canDo(companyId, "create_post"),
-      canDo(companyId, "release_post"),
       canDo(companyId, "approve_post"),
     ]);
 
@@ -158,7 +157,6 @@ export default async function CompanySocialPostDetailPage({
         canEdit={canEdit}
         canSubmit={canSubmit}
         canCreate={canCreate}
-        canRelease={canRelease}
         canApprove={canApprove}
       />
       {variantsResult.ok ? (

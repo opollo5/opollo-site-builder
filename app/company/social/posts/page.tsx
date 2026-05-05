@@ -29,7 +29,6 @@ const VALID_STATES: ReadonlySet<string> = new Set<SocialPostState>([
   "approved",
   "rejected",
   "changes_requested",
-  "pending_msp_release",
   "scheduled",
   "publishing",
   "published",

@@ -31,7 +31,6 @@ type Props = {
   canEdit: boolean;
   canSubmit: boolean;
   canCreate: boolean;
-  canRelease: boolean;
   canApprove: boolean;
 };
 
@@ -41,7 +40,6 @@ const STATE_LABEL: Record<SocialPostState, string> = {
   approved: "Approved",
   rejected: "Rejected",
   changes_requested: "Changes requested",
-  pending_msp_release: "Awaiting MSP release",
   scheduled: "Scheduled",
   publishing: "Publishing",
   published: "Published",
@@ -68,7 +66,7 @@ type DialogState =
       onConfirm: (comment: string) => void;
     };
 
-export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canRelease, canApprove }: Props) {
+export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, canApprove }: Props) {
   const router = useRouter();
   const [masterText, setMasterText] = useState(post.master_text ?? "");
   const [linkUrl, setLinkUrl] = useState(post.link_url ?? "");
@@ -87,10 +85,8 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
   const submittable = canSubmit && isDraft;
   const reopenable = canEdit && post.state === "changes_requested";
   const cancellable = canEdit && isPendingApproval;
-  const releasable = canRelease && post.state === "pending_msp_release";
   const approvable = canApprove && isPendingApproval;
   const [cancelling, setCancelling] = useState(false);
-  const [releasing, setReleasing] = useState(false);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
   const [requestingChanges, setRequestingChanges] = useState(false);
@@ -291,45 +287,6 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     }
   }
 
-  function handleRelease() {
-    setDialog({
-      type: "confirm",
-      title: "Release this post?",
-      description:
-        "It will move to Approved and can then be scheduled for publishing.",
-      confirmLabel: "Release",
-      onConfirm: executeRelease,
-    });
-  }
-
-  async function executeRelease() {
-    setReleasing(true);
-    setError(null);
-    try {
-      const res = await fetch(
-        `/api/platform/social/posts/${post.id}/release`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ company_id: post.company_id }),
-        },
-      );
-      const json = (await res.json()) as
-        | { ok: true; data: { postState: "approved" } }
-        | { ok: false; error: { message: string } };
-      if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to release post.");
-        setReleasing(false);
-        return;
-      }
-      toast.success("Post released — ready to schedule.");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setReleasing(false);
-    }
-  }
-
   function handleApprove() {
     setDialog({
       type: "confirm",
@@ -513,16 +470,6 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
                 data-testid="reopen-post-button"
               >
                 {reopening ? "Reopening…" : "Reopen for editing"}
-              </Button>
-            ) : null}
-            {releasable ? (
-              <Button
-                variant="outline"
-                onClick={handleRelease}
-                disabled={releasing}
-                data-testid="release-post-button"
-              >
-                {releasing ? "Releasing…" : "Release"}
               </Button>
             ) : null}
             {approvable ? (
