@@ -181,7 +181,7 @@ beforeEach(() => {
   mockState.lookupResult = {
     data: {
       id: ADMIN_UUID,
-      role: "admin",
+      role: "super_admin",
       revoked_at: null,
     },
     error: null,

@@ -30,11 +30,11 @@ import { POST } from "@/app/api/admin/batch/[id]/cancel/route";
 
 const GATE_ALLOW_ADMIN = {
   kind: "allow" as const,
-  user: { id: "admin-1", email: "admin@test.com", role: "admin" as const },
+  user: { id: "admin-1", email: "admin@test.com", role: "super_admin" as const },
 };
 const GATE_ALLOW_OPERATOR = {
   kind: "allow" as const,
-  user: { id: "op-1", email: "op@test.com", role: "operator" as const },
+  user: { id: "op-1", email: "op@test.com", role: "admin" as const },
 };
 const GATE_DENY = {
   kind: "deny" as const,

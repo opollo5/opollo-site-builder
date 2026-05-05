@@ -142,7 +142,7 @@ describe("POST /api/admin/users/[id]/revoke: auth + validation", () => {
 
   it("returns 403 when caller is operator", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "admin" });
+    const op = await seedAuthUser({ role: "user" });
     const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 
@@ -301,7 +301,7 @@ describe("POST /api/admin/users/[id]/reinstate", () => {
   });
 
   it("requires admin (403 operator)", async () => {
-    const op = await seedAuthUser({ role: "admin" });
+    const op = await seedAuthUser({ role: "user" });
     const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 

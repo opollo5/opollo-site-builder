@@ -35,3 +35,4 @@ supabase/.temp/
 
 # Operator docs / marketing collateral — not source code.
 docs/*.docx
+.env*.local

@@ -135,7 +135,7 @@ describe("PATCH /api/admin/users/[id]/role: auth", () => {
 
   it("returns 403 when caller is operator", async () => {
     process.env.FEATURE_SUPABASE_AUTH = "true";
-    const op = await seedAuthUser({ role: "admin" });
+    const op = await seedAuthUser({ role: "user" });
     const target = await seedAuthUser({ role: "user" });
     mockState.client = await signedInClient(op.email);
 
@@ -258,7 +258,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
     // still two admins at the moment of the check.
     mockState.client = await signedInClient(admin.email);
     const demote = await roleRoutePATCH(
-      makeRequest(secondAdmin.id, { role: "admin" }),
+      makeRequest(secondAdmin.id, { role: "user" }),
       { params: { id: secondAdmin.id } },
     );
     expect(demote.status).toBe(200);
@@ -304,7 +304,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
     // State: `admin` is admin; `secondAdmin` is operator. `admin` is
     // the only admin row. Try to demote.
     const res = await roleRoutePATCH(
-      makeRequest(admin.id, { role: "admin" }),
+      makeRequest(admin.id, { role: "user" }),
       { params: { id: admin.id } },
     );
     expect(res.status).toBe(409);
@@ -341,7 +341,7 @@ describe("PATCH /api/admin/users/[id]/role: guardrails", () => {
       mockState.client = anonClient();
 
       const res = await roleRoutePATCH(
-        makeRequest(activeAdmin.id, { role: "admin" }),
+        makeRequest(activeAdmin.id, { role: "user" }),
         { params: { id: activeAdmin.id } },
       );
       expect(res.status).toBe(409);

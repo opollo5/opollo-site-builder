@@ -120,6 +120,7 @@ async function seedFailedAttempt(opts?: {
       publish_job_id: job.data.id,
       post_variant_id: variant.data.id,
       connection_id: connectionId ?? job.data.id, // connection FK is required; use any uuid when no real connection (test won't read it)
+      company_id: COMPANY_ID,
       status: opts?.attemptStatus ?? "failed",
       error_class: "rate_limit",
       error_payload: { message: "Too many" },

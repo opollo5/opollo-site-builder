@@ -22,7 +22,7 @@ Keep this file terse. If a section grows past a screen, split it out.
 | `opollo_config.auth_kill_switch = 'off'` (or row absent) | Restores normal Supabase Auth flow. | Same endpoint, `{"action":"kill_switch_off"}`. |
 | Revoke all sessions for one user | Invalidates refresh tokens + bans the user in `auth.users`. | `POST /api/admin/users/[id]/revoke` (admin required). Break-glass alt: `POST /api/emergency {"action":"revoke_user","user_id":"<uuid>"}`. |
 | Reset a locked-out admin's password | Sets a new password on `auth.users` directly via service-role. Does NOT revoke existing sessions. | `POST /api/ops/reset-admin-password` with `OPOLLO_EMERGENCY_KEY` + body `{"email":"<admin email>","new_password":"<new>"}`. |
-| Cancel in-flight batch | Stops pending slots from leasing; in-flight slots finish but don't flip status back. | `POST /api/admin/batch/[id]/cancel` (creator or admin). |
+| Cancel in-flight batch | Stops pending slots from leasing; in-flight slots finish but don't flip status back. | `POST /api/admin/batch/[id]/cancel` (creator or super_admin). |
 | Rollback deploy | Re-tag the last known-good commit. | `vercel rollback <deployment-url>` or promote a prior deployment in the Vercel dashboard. |
 
 ---
@@ -164,7 +164,7 @@ Expected: `{"ok":true,"data":{"email":"...","user_id":"..."}}`. Sign in with the
 - Key missing or <32 chars → 503 `EMERGENCY_NOT_CONFIGURED`.
 - Wrong key → 401 `UNAUTHORIZED` (constant-time compare).
 - Target not in `opollo_users` → 404 `NOT_FOUND`.
-- Target has `role != 'admin'` → 403 `FORBIDDEN`. This endpoint is admin-only — emergency-key compromise must not become a full tenant takeover. Use `POST /api/emergency {"action":"revoke_user"}` for non-admin intervention instead.
+- Target has `role != 'super_admin'` → 403 `FORBIDDEN`. This endpoint is super_admin-only — emergency-key compromise must not become a full tenant takeover. Use `POST /api/emergency {"action":"revoke_user"}` for non-super_admin intervention instead.
 - Password shorter than 12 chars → 400 `VALIDATION_FAILED`.
 
 **Resolve:**
