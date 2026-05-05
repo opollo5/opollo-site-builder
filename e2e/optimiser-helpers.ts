@@ -91,22 +91,40 @@ export async function seedLandingPage(args: {
   technicalAlerts?: string[];
 }): Promise<{ id: string }> {
   const supabase = supabaseServiceClient();
+  // The unique index on (client_id, url) is a partial index (WHERE deleted_at IS NULL),
+  // so ON CONFLICT can't infer it. Use select-then-insert/update instead of upsert.
+  const { data: existing } = await supabase
+    .from("opt_landing_pages")
+    .select("id")
+    .eq("client_id", args.clientId)
+    .eq("url", args.url)
+    .is("deleted_at", null)
+    .maybeSingle();
+  const payload = {
+    client_id: args.clientId,
+    url: args.url,
+    managed: args.managed ?? true,
+    management_mode: "read_only",
+    state: args.state ?? "active",
+    spend_30d_usd_cents: args.spendUsdCents ?? 0,
+    active_technical_alerts: args.technicalAlerts ?? [],
+    data_reliability: args.state === "insufficient_data" ? "red" : "green",
+  };
+  if (existing) {
+    const { data, error } = await supabase
+      .from("opt_landing_pages")
+      .update(payload)
+      .eq("id", existing.id as string)
+      .select("id")
+      .single();
+    if (error || !data) {
+      throw new Error(`seedLandingPage: ${error?.message ?? "no row"}`);
+    }
+    return { id: data.id as string };
+  }
   const { data, error } = await supabase
     .from("opt_landing_pages")
-    .upsert(
-      {
-        client_id: args.clientId,
-        url: args.url,
-        managed: args.managed ?? true,
-        management_mode: "read_only",
-        state: args.state ?? "active",
-        spend_30d_usd_cents: args.spendUsdCents ?? 0,
-        active_technical_alerts: args.technicalAlerts ?? [],
-        data_reliability:
-          args.state === "insufficient_data" ? "red" : "green",
-      },
-      { onConflict: "client_id,url" },
-    )
+    .insert(payload)
     .select("id")
     .single();
   if (error || !data) {

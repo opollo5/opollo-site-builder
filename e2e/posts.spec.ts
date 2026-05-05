@@ -137,7 +137,8 @@ test.describe("M13-4 posts — admin surface", () => {
     // preflight should surface some kind of blocker — either
     // REST_UNREACHABLE or AUTH_CAPABILITY_MISSING. Assert a blocker
     // banner is present rather than pinning the exact code.
-    const blockerBanner = page.locator('[role="alert"]').filter({
+    // Warning alerts use role="status" (not "alert") per alert.tsx VARIANT_ROLE.
+    const blockerBanner = page.locator('[role="status"]').filter({
       hasText: /can't publish|WordPress REST|WP Admin|app password/i,
     });
     // Either the blocker OR the Publish button is visible, depending on

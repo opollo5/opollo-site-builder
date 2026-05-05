@@ -93,7 +93,7 @@ test.describe("M12-1 briefs — upload + review", () => {
     await uploadBrief(page, siteUrl, makeBrief(unique), unique);
 
     await expect(page.getByRole("heading", { name: unique })).toBeVisible();
-    await expect(page.getByText(/Awaiting review/i)).toBeVisible();
+    await expect(page.getByText(/^Parsed$/i)).toBeVisible();
 
     // 3 pages (Home / About / Pricing) rendered. The titles live in
     // editable <Input> textboxes, not in text nodes — Playwright's

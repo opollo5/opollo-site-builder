@@ -119,7 +119,7 @@ test.describe("pages admin surface", () => {
   }, testInfo) => {
     await page.goto(`/admin/sites/${siteId}/pages`);
     await expect(
-      page.getByRole("heading", { name: /pages for/i }),
+      page.getByRole("heading", { name: /^pages$/i }),
     ).toBeVisible();
     await auditA11y(page, testInfo);
 
@@ -144,7 +144,7 @@ test.describe("pages admin surface", () => {
     await page.getByTestId("site-pages-link").click();
     await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/pages/);
     await expect(
-      page.getByRole("heading", { name: /pages for/i }),
+      page.getByRole("heading", { name: /^pages$/i }),
     ).toBeVisible();
   });
 
@@ -225,11 +225,9 @@ test.describe("pages admin surface", () => {
     // History panel starts empty.
     await expect(page.getByTestId("regen-history-empty")).toBeVisible();
 
-    // Auto-accept the confirm() dialog fired by the Re-generate button.
-    page.once("dialog", (dialog) => {
-      void dialog.accept();
-    });
+    // Click the regenerate button, then confirm in the ConfirmDialog.
     await page.getByTestId("regenerate-button").click();
+    await page.getByRole("button", { name: /re-generate/i }).last().click();
 
     // After router.refresh the history panel shows the new row as
     // pending. M7-5 wires the cron; E2E runs don't include a cron
