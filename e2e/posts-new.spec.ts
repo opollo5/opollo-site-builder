@@ -96,68 +96,155 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await auditA11y(page, testInfo);
   });
 
-  // BL-2 — autosave + progressive disclosure round-trip.
-  test("autosave persists across reload and disclosure toggles", async ({
+  // BL-2 — new post route always starts blank; saved draft is offered
+  // via an explicit restore banner, never silently applied.
+  test("navigating to new post always starts with empty editor", async ({
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
     await page.goto("/admin/posts/new");
 
-    // Pick the seeded site so the composer mounts with a stable
-    // localStorage key.
     await page.getByTestId("posts-new-site-picker").click();
     const firstOption = page
       .locator('[data-testid^="posts-new-site-option-"]')
       .first();
     await firstOption.click();
 
-    // Advanced fields are collapsed by default for a fresh draft.
-    const panel = page.getByTestId("post-advanced-panel");
-    await expect(panel).toHaveCount(0);
+    // Seed a draft in localStorage so the next navigation would previously
+    // have silently restored it.
+    await page.evaluate(() => {
+      const key = Object.keys(localStorage).find((k) =>
+        k.startsWith("opollo:post-draft:"),
+      );
+      if (!key) {
+        // Write a synthetic stale draft so the test is deterministic even
+        // when no prior autosave exists.
+        const siteId = window.location.search; // fallback — not ideal but robust
+        void siteId;
+        // Write to any matching key; the composerValue is what we care about.
+        const entries = Object.entries(localStorage);
+        const draftKey =
+          entries.find(([k]) => k.startsWith("opollo:post-draft:"))?.[0] ??
+          "opollo:post-draft:synthetic";
+        localStorage.setItem(
+          draftKey,
+          JSON.stringify({
+            v: 1,
+            composerText: "<p>Stale content from previous session</p>",
+            title: { value: "Stale title", source: "h1", touched: true },
+            slug: { value: "url1", source: "derived", touched: true },
+            savedAt: Date.now() - 1000 * 60 * 60, // 1 hour ago
+          }),
+        );
+      }
+    });
 
-    // Type into the composer (TipTap ProseMirror). Use pressSequentially so
-    // TipTap's key-event handlers fire and update the React state that the
-    // autosave debounce watches.
-    const composer = page.locator(".ProseMirror");
-    await composer.click();
-    await composer.pressSequentially("Hello world body for autosave probe.");
-    await page.locator("#post-title").fill("Autosave probe");
-
-    // Wait for the autosave to COMPLETE (localStorage written), not just
-    // started. "Saving…" fires immediately; "Saved ·" fires after the 800ms
-    // debounce callback runs.
-    await expect(page.getByTestId("post-save-status")).toContainText(
-      /saved ·/i,
-      { timeout: 8000 },
-    );
-
-    // Open the disclosure manually.
-    await page.getByTestId("post-advanced-toggle").click();
-    await expect(page.getByTestId("post-advanced-panel")).toBeVisible();
-
-    // Reload — the snapshot should rehydrate the title + body.
     await page.reload();
-
-    // The site picker resets to "Pick a site…" because the page
-    // tracks selection client-side, but the composer's localStorage
-    // is keyed by siteId. Re-pick the site to remount the composer.
     await page.getByTestId("posts-new-site-picker").click();
     await page
       .locator('[data-testid^="posts-new-site-option-"]')
       .first()
       .click();
 
-    await expect(page.locator("#post-title")).toHaveValue(
-      /autosave probe/i,
+    // The editor must be blank — no stale content.
+    await expect(page.locator(".ProseMirror")).toBeEmpty();
+    // Title field must be blank.
+    await expect(page.locator("#post-title")).toHaveValue("");
+
+    // A restore banner must be visible, offering to bring the draft back.
+    await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
+    await expect(page.getByTestId("draft-restore-btn")).toBeVisible();
+    await expect(page.getByTestId("draft-discard-btn")).toBeVisible();
+
+    await auditA11y(page, testInfo);
+  });
+
+  // BL-2 — autosave + explicit restore round-trip.
+  test("clicking Restore draft applies saved content", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/posts/new");
+
+    await page.getByTestId("posts-new-site-picker").click();
+    const firstOption = page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first();
+    await firstOption.click();
+
+    const composer = page.locator(".ProseMirror");
+    await composer.click();
+    await composer.pressSequentially("Hello world body for autosave probe.");
+    await page.locator("#post-title").fill("Autosave probe");
+
+    await expect(page.getByTestId("post-save-status")).toContainText(
+      /saved ·/i,
+      { timeout: 8000 },
     );
+
+    await page.reload();
+
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    // Restore banner visible; editor still blank.
+    await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
+    await expect(page.locator("#post-title")).toHaveValue("");
+
+    // Click Restore — draft content loads.
+    await page.getByTestId("draft-restore-btn").click();
+    await expect(page.locator("#post-title")).toHaveValue(/autosave probe/i);
     await expect(page.locator(".ProseMirror")).toContainText(
       /hello world body for autosave probe/i,
     );
 
-    // "Draft restored" status surfaces with a Discard control.
+    // Banner disappears after restoring.
+    await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
+
+    await auditA11y(page, testInfo);
+  });
+
+  // BL-2 — dismissing the banner clears the saved draft.
+  test("clicking Start fresh clears the saved draft and hides banner", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/posts/new");
+
+    await page.getByTestId("posts-new-site-picker").click();
+    const firstOption = page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first();
+    await firstOption.click();
+
+    const composer = page.locator(".ProseMirror");
+    await composer.click();
+    await composer.pressSequentially("Some content to be discarded.");
+    await page.locator("#post-title").fill("Draft to discard");
+
     await expect(page.getByTestId("post-save-status")).toContainText(
-      /draft restored|saved/i,
+      /saved ·/i,
+      { timeout: 8000 },
     );
+
+    await page.reload();
+
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
+
+    // Click Start fresh — banner disappears, editor stays blank.
+    await page.getByTestId("draft-discard-btn").click();
+    await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
+    await expect(page.locator("#post-title")).toHaveValue("");
+    await expect(page.locator(".ProseMirror")).toBeEmpty();
 
     await auditA11y(page, testInfo);
   });

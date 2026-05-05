@@ -210,47 +210,59 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   // Fix 6 — WP categories + tags.
   const [selectedCategories, setSelectedCategories] = useState<WpTaxonomyOption[]>([]);
   const [selectedTags, setSelectedTags] = useState<WpTaxonomyOption[]>([]);
-  // Hydration guard — restore-from-localStorage runs once, AFTER mount.
+  // BL-2 — pending draft found in localStorage; shown as a restore prompt,
+  // NOT applied silently. Operator must explicitly click "Restore" to load it.
+  const [pendingDraft, setPendingDraft] = useState<DraftSnapshot | null>(null);
+  // Hydration guard — draft-check runs once, AFTER mount.
   const restoredRef = useRef(false);
 
-  // BL-2 — restore from localStorage on mount.
+  // BL-2 — check localStorage on mount. Do NOT silently restore. Instead,
+  // surface a banner so the operator can choose to restore or start fresh.
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      restoredRef.current = true;
+      return;
+    }
     try {
       const raw = window.localStorage.getItem(draftStorageKey(siteId));
-      if (!raw) {
-        restoredRef.current = true;
-        return;
-      }
-      const parsed = JSON.parse(raw) as DraftSnapshot;
-      if (parsed?.v !== 1) {
-        restoredRef.current = true;
-        return;
-      }
-      if (typeof parsed.composerText === "string") {
-        setComposerValue({ text: parsed.composerText, file: null });
-      }
-      if (parsed.title) setTitle(parsed.title);
-      if (parsed.slug) setSlug(parsed.slug);
-      if (parsed.metaTitle) setMetaTitle(parsed.metaTitle);
-      if (parsed.metaDescription) setMetaDescription(parsed.metaDescription);
-      if (parsed.parentPage !== undefined) setParentPage(parsed.parentPage);
-      if (parsed.featuredImage !== undefined) setFeaturedImage(parsed.featuredImage);
-      if (parsed.publishMode) setPublishMode(parsed.publishMode);
-      if (parsed.scheduledAt) setScheduledAt(parsed.scheduledAt);
-      if (parsed.selectedCategories) setSelectedCategories(parsed.selectedCategories);
-      if (parsed.selectedTags) setSelectedTags(parsed.selectedTags);
-      setDraftRestoredAt(parsed.savedAt);
-      if (parsed.parentPage) {
-        setShowAdvanced(true);
+      if (raw) {
+        const parsed = JSON.parse(raw) as DraftSnapshot;
+        if (parsed?.v === 1) {
+          setPendingDraft(parsed);
+        }
       }
     } catch {
-      try {
-        window.localStorage.removeItem(draftStorageKey(siteId));
-      } catch {}
+      try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
     } finally {
       restoredRef.current = true;
     }
+  }, [siteId]);
+
+  const applyPendingDraft = useCallback(() => {
+    if (!pendingDraft) return;
+    if (typeof pendingDraft.composerText === "string") {
+      setComposerValue({ text: pendingDraft.composerText, file: null });
+    }
+    if (pendingDraft.title) setTitle(pendingDraft.title);
+    if (pendingDraft.slug) setSlug(pendingDraft.slug);
+    if (pendingDraft.metaTitle) setMetaTitle(pendingDraft.metaTitle);
+    if (pendingDraft.metaDescription) setMetaDescription(pendingDraft.metaDescription);
+    if (pendingDraft.parentPage !== undefined) setParentPage(pendingDraft.parentPage);
+    if (pendingDraft.featuredImage !== undefined) setFeaturedImage(pendingDraft.featuredImage);
+    if (pendingDraft.publishMode) setPublishMode(pendingDraft.publishMode);
+    if (pendingDraft.scheduledAt) setScheduledAt(pendingDraft.scheduledAt);
+    if (pendingDraft.selectedCategories) setSelectedCategories(pendingDraft.selectedCategories);
+    if (pendingDraft.selectedTags) setSelectedTags(pendingDraft.selectedTags);
+    setDraftRestoredAt(pendingDraft.savedAt);
+    if (pendingDraft.parentPage) setShowAdvanced(true);
+    setPendingDraft(null);
+  }, [pendingDraft]);
+
+  const dismissPendingDraft = useCallback(() => {
+    if (typeof window !== "undefined") {
+      try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
+    }
+    setPendingDraft(null);
   }, [siteId]);
 
   // Read attached file content into composerValue.text.
@@ -671,6 +683,15 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       onSubmit={handlePrimarySubmit}
       className="space-y-6"
     >
+      {/* BL-2 — explicit draft restore prompt. Never silently restore. */}
+      {pendingDraft && (
+        <DraftRestoreBanner
+          savedAt={pendingDraft.savedAt}
+          onRestore={applyPendingDraft}
+          onDiscard={dismissPendingDraft}
+        />
+      )}
+
       {/* Fix 5 — site indicator: shows WP hostname + Change link, or a warning if not connected. */}
       {!siteLoading && !siteWpUrl && (
         <Alert variant="destructive" className="flex items-start gap-2">
@@ -1763,5 +1784,58 @@ function WpPageCombobox({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BL-2 — Explicit draft restore prompt.
+//
+// Shown when a localStorage draft is found on mount. The editor always
+// starts blank; the operator must consciously click Restore to load the
+// draft. This prevents stale content from previous sessions appearing
+// unexpectedly when navigating to /admin/posts/new.
+// ---------------------------------------------------------------------------
+
+function DraftRestoreBanner({
+  savedAt,
+  onRestore,
+  onDiscard,
+}: {
+  savedAt: number;
+  onRestore: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <div
+      data-testid="draft-restore-banner"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm"
+      role="alert"
+    >
+      <span className="text-foreground">
+        You have an unsaved draft from{" "}
+        <span className="font-medium">
+          {formatRelativeTime(new Date(savedAt).toISOString())}
+        </span>
+        .
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onDiscard}
+          data-testid="draft-discard-btn"
+          className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        >
+          Start fresh
+        </button>
+        <button
+          type="button"
+          onClick={onRestore}
+          data-testid="draft-restore-btn"
+          className="rounded-md border bg-background px-3 py-1 text-sm font-medium transition-smooth hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          Restore draft
+        </button>
+      </div>
+    </div>
   );
 }
