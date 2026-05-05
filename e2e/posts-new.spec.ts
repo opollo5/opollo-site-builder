@@ -161,4 +161,49 @@ test.describe("/admin/posts/new — top-level entry", () => {
 
     await auditA11y(page, testInfo);
   });
+
+  // Fix 4 — "Publishing to" Change link must navigate to /admin/posts/new
+  // (the site picker), not to the site settings brand-voice page.
+  test("'Publishing to' Change link returns to /admin/posts/new", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/posts/new");
+
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    // Wait for the composer to mount.
+    await expect(page.locator(".ProseMirror")).toBeVisible();
+
+    // The "Publishing to" section is only rendered when the site has WP
+    // credentials set (siteWpUrl is non-null). Check both cases.
+    const changeLink = page.getByRole("link", { name: /^change$/i });
+
+    if (await changeLink.isVisible()) {
+      // The link must point to the site picker route, NOT to settings.
+      const href = await changeLink.getAttribute("href");
+      expect(href).toBe("/admin/posts/new");
+      expect(href).not.toMatch(/\/settings/);
+    }
+
+    // Regardless of WP credentials, no link on this page should route to
+    // site-level settings from the "Publishing to" indicator.
+    const settingsLinks = page.locator(
+      `[href*="/admin/sites/"][href$="/settings"]`,
+    );
+    // The only acceptable settings link is the "Connect a site" fallback,
+    // which is only shown when the site has NO WP credentials.
+    const wpConnected = await page
+      .getByText("Publishing to:", { exact: false })
+      .isVisible();
+    if (wpConnected) {
+      await expect(settingsLinks).toHaveCount(0);
+    }
+
+    await auditA11y(page, testInfo);
+  });
 });

@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown, ChevronRight } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -699,12 +699,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             })()}
           </span>
           <a
-            href={`/admin/sites/${siteId}/settings`}
+            href="/admin/posts/new"
             className="ml-1 inline-flex items-center gap-0.5 text-xs underline underline-offset-2 hover:text-foreground"
-            title={`Change WordPress site (currently ${siteName ?? siteWpUrl})`}
+            title="Change publish destination — returns to site picker"
           >
             Change
-            <ExternalLink aria-hidden className="h-3 w-3" />
           </a>
         </div>
       )}
