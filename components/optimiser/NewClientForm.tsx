@@ -49,12 +49,13 @@ export function NewClientForm() {
   return (
     <form onSubmit={submit} className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Display name</label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} required />
+        <label htmlFor="ncf-name" className="block text-sm font-medium">Display name</label>
+        <Input id="ncf-name" value={name} onChange={(e) => setName(e.target.value)} required />
       </div>
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Slug</label>
+        <label htmlFor="ncf-slug" className="block text-sm font-medium">Slug</label>
         <Input
+          id="ncf-slug"
           value={slug}
           onChange={(e) =>
             setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
@@ -66,18 +67,20 @@ export function NewClientForm() {
         />
       </div>
       <div className="space-y-2">
-        <label className="block text-sm font-medium">
+        <label htmlFor="ncf-email" className="block text-sm font-medium">
           Primary contact email (optional)
         </label>
         <Input
+          id="ncf-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
       </div>
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Monthly LLM budget (USD)</label>
+        <label htmlFor="ncf-budget" className="block text-sm font-medium">Monthly LLM budget (USD)</label>
         <Input
+          id="ncf-budget"
           type="number"
           min={0}
           value={budget}

@@ -66,6 +66,10 @@ async function createTestUser(suffix: string): Promise<TestUser> {
   if (error || !data.user) {
     throw new Error(`createTestUser failed: ${error?.message ?? "no user"}`);
   }
+  // Promote to admin so signInViaForm (which waits for /admin/sites) works
+  // when FEATURE_SUPABASE_AUTH=true. The trigger inserts opollo_users with
+  // role='user' by default; admin is required to reach /admin/*.
+  await svc.from("opollo_users").update({ role: "admin" }).eq("id", data.user.id);
   return { id: data.user.id, email, password };
 }
 

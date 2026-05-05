@@ -115,7 +115,6 @@ describe("lib/platform/social/posts/dashboard", () => {
       approvedThisWeek: 0,
       changesRequested: 0,
       failed: 0,
-      pendingMspRelease: 0,
     });
   });
 

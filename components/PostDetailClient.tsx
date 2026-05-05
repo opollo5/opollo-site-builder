@@ -180,6 +180,7 @@ export function PostDetailClient({
       {preflightBlocked && (
         <Alert
           variant="warning"
+          data-testid="preflight-blocker"
           title={
             "blocker" in preflight
               ? preflight.blocker.title

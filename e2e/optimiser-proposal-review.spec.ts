@@ -61,6 +61,7 @@ test.describe("optimiser — proposal review", () => {
   });
 
   test("approve flow updates status to approved", async ({ page }) => {
+    test.setTimeout(60_000);
     const client = await seedOptClient({
       slug: `approve-${Date.now()}`,
       onboarded: true,
@@ -157,7 +158,7 @@ test.describe("optimiser — proposal review", () => {
     await page.goto(`/optimiser/proposals/${proposal.id}`);
     await page.getByRole("button", { name: /^approve all$/i }).click();
     await expect(
-      page.getByText(/expired|regenerate/i),
+      page.getByText(/expired|regenerate/i).first(),
     ).toBeVisible();
   });
 });

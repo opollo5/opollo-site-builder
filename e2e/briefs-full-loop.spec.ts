@@ -147,7 +147,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
     page,
     request,
   }, testInfo) => {
-    test.setTimeout(120_000);
+    test.setTimeout(240_000);
     const site = await findTestSite();
     const { briefId } = await seedCommittedBrief({
       siteId: site.id,

@@ -92,7 +92,7 @@ async function stubBlueprintRevert(page: Page, siteId: string) {
 }
 
 async function stubRouteRegistry(page: Page, siteId: string) {
-  await page.route(`**/api/sites/${siteId}/route-registry*`, async (route: Route) => {
+  await page.route(`**/api/sites/${siteId}/routes*`, async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -179,8 +179,11 @@ test.describe("M16 — Blueprint review", () => {
     await expect(approveBtn).toBeVisible();
     await approveBtn.click();
 
-    // After approve the page should reflect approved status
-    await expect(page.getByText(/approved/i)).toBeVisible({ timeout: 8_000 });
+    // handleApprove() navigates to the site detail page on success —
+    // just verify we left the review URL.
+    await page.waitForURL((url) => !url.href.includes("/blueprints/review"), {
+      timeout: 8_000,
+    });
   });
 
   test("blueprint review page passes accessibility audit", async ({ page, }, testInfo) => {
