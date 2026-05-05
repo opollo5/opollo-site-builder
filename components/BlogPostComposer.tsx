@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Check, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { AlertTriangle, Check, ChevronDown } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -197,7 +197,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [featuredImage, setFeaturedImage] = useState<ImagePickerEntry | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
-  const [showAdvanced, setShowAdvanced] = useState(false);
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
   const [fileReadError, setFileReadError] = useState<string | null>(null);
   const [permalinkStructure, setPermalinkStructure] = useState<string | null>(null);
@@ -241,9 +240,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (parsed.selectedCategories) setSelectedCategories(parsed.selectedCategories);
       if (parsed.selectedTags) setSelectedTags(parsed.selectedTags);
       setDraftRestoredAt(parsed.savedAt);
-      if (parsed.parentPage) {
-        setShowAdvanced(true);
-      }
     } catch {
       try {
         window.localStorage.removeItem(draftStorageKey(siteId));
@@ -457,7 +453,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     setLastParse(null);
     setAutosave({ kind: "idle" });
     setDraftRestoredAt(null);
-    setShowAdvanced(false);
     setPublishMode("draft");
     setScheduledAt(defaultScheduledAt());
     setSelectedCategories([]);
@@ -502,9 +497,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     metaTitleIsValid &&
     metaDescriptionIsValid &&
     featuredImage !== null;
-
-  // Legacy alias used by the secondary "Save to Opollo" hint text.
-  const canStartRun = canPublish;
 
   // BL-8 — ⌘S / Ctrl+S triggers Save to Opollo (draft, always safe).
   useEffect(() => {
@@ -669,98 +661,34 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     <form
       id={`blog-post-composer-form-${siteId}`}
       onSubmit={handlePrimarySubmit}
-      className="space-y-6"
+      className="lg:grid lg:grid-cols-[1fr_300px] lg:items-start lg:gap-8"
     >
-      {/* Fix 5 — site indicator: shows WP hostname + Change link, or a warning if not connected. */}
-      {!siteLoading && !siteWpUrl && (
-        <Alert variant="destructive" className="flex items-start gap-2">
-          <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>
-            No WordPress site connected — this post will be saved as a draft in Opollo only.{" "}
-            <a
-              href={`/admin/sites/${siteId}/settings`}
-              className="underline underline-offset-2 hover:text-inherit"
-            >
-              Connect a site
-            </a>
-          </span>
-        </Alert>
-      )}
-      {siteWpUrl && (
-        <div className="flex items-center gap-1.5 rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-          <span>Publishing to:</span>
-          <span className="font-mono text-foreground">
-            {(() => {
-              try {
-                return new URL(siteWpUrl).hostname;
-              } catch {
-                return siteWpUrl;
-              }
-            })()}
-          </span>
-          <a
-            href={`/admin/sites/${siteId}/settings`}
-            className="ml-1 inline-flex items-center gap-0.5 text-xs underline underline-offset-2 hover:text-foreground"
-            title={`Change WordPress site (currently ${siteName ?? siteWpUrl})`}
-          >
-            Change
-            <ExternalLink aria-hidden className="h-3 w-3" />
-          </a>
-        </div>
-      )}
-
-      <div>
-        <div className="flex items-baseline justify-between gap-2">
-          <label className="block text-sm font-medium">Post content</label>
-          {/* File attach button — mirrors old Composer's + button */}
-          <label
-            htmlFor="post-file-attach"
-            className={cn(
-              "cursor-pointer text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline",
-              submitting && "pointer-events-none opacity-50",
-            )}
-            title="Attach Markdown, HTML, plain text, or Word (.docx). Max 10 MB."
-          >
-            Attach file
-            <input
-              id="post-file-attach"
-              type="file"
-              accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-              className="sr-only"
-              disabled={submitting}
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) {
-                  setFileReadError(null);
-                  setComposerValue((prev) => ({ ...prev, file: f }));
-                }
-                e.target.value = "";
-              }}
-            />
-          </label>
-        </div>
-        <RichTextEditor
-          value={composerValue.text}
-          onChange={(html) => setComposerValue((prev) => ({ ...prev, text: html }))}
-          placeholder={`Type, paste, or drop your post.\n\nA YAML front-matter block, inline labels, or HTML meta tags will pre-fill the metadata fields below.`}
-          disabled={submitting}
-          className="mt-1"
-        />
-        {fileReadError && (
-          <p className="mt-1 text-sm text-destructive" role="alert">
-            {fileReadError}
-          </p>
+      {/* ── LEFT: title + editor ── */}
+      <div className="space-y-4">
+        {!siteLoading && !siteWpUrl && (
+          <Alert variant="destructive" className="flex items-start gap-2">
+            <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              No WordPress site connected — this post will be saved as a draft in Opollo only.{" "}
+              <a
+                href={`/admin/sites/${siteId}/settings`}
+                className="underline underline-offset-2 hover:text-inherit"
+              >
+                Connect a site
+              </a>
+            </span>
+          </Alert>
         )}
-      </div>
 
-      <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {/* Prominent title field — mirrors WordPress block editor */}
         <div>
-          <label htmlFor="post-title" className="block text-sm font-medium">
+          <label htmlFor="post-title" className="sr-only">
             Title
           </label>
           <Input
             id="post-title"
-            className="mt-1"
+            className="rounded-none border-0 border-b px-0 text-2xl font-bold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+            placeholder="Post title"
             value={title.value}
             onChange={(e) =>
               setFieldValue(setTitle, e.target.value, lastParse?.title ?? null, "derived")
@@ -771,14 +699,183 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           />
           <div className="mt-1 flex items-center justify-between gap-2">
             <SourceHint source={title.source} />
-            <TitleLengthHint
-              length={title.value.length}
-              valid={titleIsValid}
-            />
+            <TitleLengthHint length={title.value.length} valid={titleIsValid} />
           </div>
         </div>
 
+        {/* Body editor + file attach */}
         <div>
+          <div className="flex items-baseline justify-between gap-2">
+            <label className="block text-sm font-medium">Post content</label>
+            <label
+              htmlFor="post-file-attach"
+              className={cn(
+                "cursor-pointer text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline",
+                submitting && "pointer-events-none opacity-50",
+              )}
+              title="Attach Markdown, HTML, plain text, or Word (.docx). Max 10 MB."
+            >
+              Attach file
+              <input
+                id="post-file-attach"
+                type="file"
+                accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                className="sr-only"
+                disabled={submitting}
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) {
+                    setFileReadError(null);
+                    setComposerValue((prev) => ({ ...prev, file: f }));
+                  }
+                  e.target.value = "";
+                }}
+              />
+            </label>
+          </div>
+          <RichTextEditor
+            value={composerValue.text}
+            onChange={(html) => setComposerValue((prev) => ({ ...prev, text: html }))}
+            placeholder={`Type, paste, or drop your post.\n\nA YAML front-matter block, inline labels, or HTML meta tags will pre-fill the metadata fields below.`}
+            disabled={submitting}
+            className="mt-1"
+          />
+          {fileReadError && (
+            <p className="mt-1 text-sm text-destructive" role="alert">
+              {fileReadError}
+            </p>
+          )}
+        </div>
+
+        {formError && <Alert variant="destructive">{formError}</Alert>}
+
+        <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          <SaveStatus
+            autosave={autosave}
+            restoredAt={draftRestoredAt}
+            onDiscard={discardDraft}
+          />
+        </div>
+      </div>
+
+      {/* ── RIGHT: document sidebar ── */}
+      <aside
+        className="mt-6 space-y-3 lg:mt-0"
+        aria-label="Post settings"
+        data-testid="post-sidebar"
+      >
+        {/* Publish panel */}
+        <SidebarPanel title="Publish" defaultOpen testId="sidebar-publish">
+          {siteWpUrl && (
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+              <span className="shrink-0">Publishing to:</span>
+              <span className="min-w-0 flex-1 truncate font-mono text-xs text-foreground">
+                {(() => {
+                  try {
+                    return new URL(siteWpUrl).hostname;
+                  } catch {
+                    return siteWpUrl;
+                  }
+                })()}
+              </span>
+              <a
+                href="/admin/posts/new"
+                className="shrink-0 text-xs underline underline-offset-2 hover:text-foreground"
+                title={`Change WordPress site (currently ${siteName ?? siteWpUrl})`}
+              >
+                Change
+              </a>
+            </div>
+          )}
+
+          <div>
+            <p className="mb-2 text-sm font-medium">Status</p>
+            <div className="space-y-1.5">
+              {(["draft", "publish", "schedule"] as const).map((mode) => (
+                <label
+                  key={mode}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <input
+                    type="radio"
+                    name={`publish-mode-${siteId}`}
+                    value={mode}
+                    checked={publishMode === mode}
+                    onChange={() => setPublishMode(mode)}
+                    disabled={submitting}
+                    className="accent-primary"
+                  />
+                  {mode === "draft"
+                    ? "Save as draft"
+                    : mode === "publish"
+                      ? "Publish immediately"
+                      : "Schedule for later"}
+                </label>
+              ))}
+            </div>
+            {publishMode === "schedule" && (
+              <div className="mt-3">
+                <label
+                  htmlFor="post-scheduled-at"
+                  className="block text-sm font-medium"
+                >
+                  Publish at
+                </label>
+                <Input
+                  id="post-scheduled-at"
+                  type="datetime-local"
+                  value={scheduledAt}
+                  onChange={(e) => setScheduledAt(e.target.value)}
+                  className="mt-1 w-full"
+                  disabled={submitting}
+                />
+              </div>
+            )}
+          </div>
+
+          {publishMode === "publish" && !canPublish && canSaveDraft && (
+            <p className="text-sm text-muted-foreground">
+              Add SEO title, meta description, and featured image to publish.
+            </p>
+          )}
+
+          <div className="flex flex-col gap-2">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={primaryDisabled || submitting}
+              title={
+                publishMode === "publish" && !canPublish
+                  ? "Fill in SEO title, meta description, and featured image to publish."
+                  : undefined
+              }
+            >
+              {submitting ? "Saving…" : primaryLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={!canSaveDraft || submitting}
+              onClick={handleSaveToOpollo}
+              title="Save to Opollo as a draft without publishing to WordPress."
+            >
+              {submitting ? "Saving…" : "Save to Opollo"}
+            </Button>
+          </div>
+
+          <p
+            aria-hidden
+            className="flex items-center justify-center gap-0.5 text-sm text-muted-foreground"
+          >
+            <kbd className="rounded border bg-muted px-1 font-mono text-xs">⌘</kbd>
+            <kbd className="rounded border bg-muted px-1 font-mono text-xs">S</kbd>
+            <span className="ml-1">to save draft</span>
+          </p>
+        </SidebarPanel>
+
+        {/* Permalink panel */}
+        <SidebarPanel title="Permalink" defaultOpen testId="sidebar-permalink">
           <div className="flex items-baseline justify-between gap-2">
             <label htmlFor="post-slug" className="block text-sm font-medium">
               URL slug
@@ -786,23 +883,22 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             {title.value.trim().length > 0 && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={() =>
                   setSlug({
                     value: generateSlug(title.value),
                     source: "derived",
                     touched: true,
-                  });
-                }}
+                  })
+                }
                 disabled={submitting}
-                className="text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                className="rounded-sm text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                Regenerate from title
+                Regenerate
               </button>
             )}
           </div>
           <Input
             id="post-slug"
-            className="mt-1"
             value={slug.value}
             onChange={(e) =>
               setFieldValue(
@@ -814,23 +910,19 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             }
             onBlur={() => {
               if (slug.value && !slugIsValid) {
-                setSlug({
-                  value: generateSlug(slug.value),
-                  source: "derived",
-                  touched: true,
-                });
+                setSlug({ value: generateSlug(slug.value), source: "derived", touched: true });
               }
             }}
             disabled={submitting}
             maxLength={100}
             aria-invalid={!slugIsValid}
           />
-          <div className="mt-1 flex flex-col gap-0.5">
+          <div className="space-y-0.5">
             <div className="flex items-center justify-between gap-2">
               <SourceHint source={slug.source} />
               {!slugIsValid && slug.value.length > 0 && (
                 <span className="text-sm text-destructive">
-                  Lowercase letters, numbers, dashes only.
+                  Lowercase, numbers, dashes only.
                 </span>
               )}
             </div>
@@ -840,75 +932,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               slug={slug.value}
             />
           </div>
-        </div>
-      </fieldset>
+        </SidebarPanel>
 
-      {/* Fix 4 — SEO meta fields promoted out of AdvancedDisclosure. */}
-      <div className="space-y-4">
-        <div>
-          <label htmlFor="post-meta-title" className="block text-sm font-medium">
-            SEO title
-          </label>
-          <Input
-            id="post-meta-title"
-            className="mt-1"
-            value={metaTitle.value}
-            onChange={(e) =>
-              setFieldValue(
-                setMetaTitle,
-                e.target.value,
-                lastParse?.meta_title ?? null,
-                lastParse?.source_map.meta_title ?? "derived",
-              )
-            }
-            disabled={submitting}
-            maxLength={200}
-          />
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <SourceHint source={metaTitle.source} />
-            <MetaTitleLengthHint length={metaTitle.value.length} />
-          </div>
-        </div>
-
-        <div>
-          <label
-            htmlFor="post-meta-description"
-            className="block text-sm font-medium"
-          >
-            Meta description
-          </label>
-          <Textarea
-            id="post-meta-description"
-            className="mt-1"
-            rows={3}
-            value={metaDescription.value}
-            onChange={(e) =>
-              setFieldValue(
-                setMetaDescription,
-                e.target.value,
-                lastParse?.meta_description ?? null,
-                lastParse?.source_map.meta_description ?? "derived",
-              )
-            }
-            disabled={submitting}
-            maxLength={400}
-            aria-invalid={
-              metaDescription.value.length > 0 && !metaDescriptionIsValid
-            }
-          />
-          <div className="mt-1 flex items-center justify-between gap-2 text-sm">
-            <SourceHint source={metaDescription.source} />
-            <MetaDescriptionLengthHint
-              length={metaDescription.value.length}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Fix 6 — WordPress categories + tags. */}
-      <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div>
-          <label className="block text-sm font-medium">Categories</label>
+        {/* Categories panel */}
+        <SidebarPanel title="Categories" defaultOpen testId="sidebar-categories">
           <WpTaxonomyCombobox
             siteId={siteId}
             type="categories"
@@ -916,9 +943,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             onChange={setSelectedCategories}
             disabled={submitting}
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium">Tags</label>
+        </SidebarPanel>
+
+        {/* Tags panel */}
+        <SidebarPanel title="Tags" defaultOpen testId="sidebar-tags">
           <WpTaxonomyCombobox
             siteId={siteId}
             type="tags"
@@ -926,129 +954,125 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             onChange={setSelectedTags}
             disabled={submitting}
           />
-        </div>
-      </fieldset>
+        </SidebarPanel>
 
-      {/* Fix 5 — Publish scheduling. */}
-      <div>
-        <p className="text-sm font-medium">When to publish</p>
-        <div className="mt-2 flex flex-wrap gap-6">
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name={`publish-mode-${siteId}`}
-              value="publish"
-              checked={publishMode === "publish"}
-              onChange={() => setPublishMode("publish")}
-              disabled={submitting}
-              className="accent-primary"
-            />
-            Publish immediately
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name={`publish-mode-${siteId}`}
-              value="draft"
-              checked={publishMode === "draft"}
-              onChange={() => setPublishMode("draft")}
-              disabled={submitting}
-              className="accent-primary"
-            />
-            Save as draft
-          </label>
-          <label className="flex cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name={`publish-mode-${siteId}`}
-              value="schedule"
-              checked={publishMode === "schedule"}
-              onChange={() => setPublishMode("schedule")}
-              disabled={submitting}
-              className="accent-primary"
-            />
-            Schedule for later
-          </label>
-        </div>
-        {publishMode === "schedule" && (
-          <div className="mt-3">
-            <label
-              htmlFor="post-scheduled-at"
-              className="block text-sm font-medium"
-            >
-              Publish at
-            </label>
-            <Input
-              id="post-scheduled-at"
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(e) => setScheduledAt(e.target.value)}
-              className="mt-1 w-auto"
-              disabled={submitting}
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Fix 3 — Featured image outside AdvancedDisclosure for prominence. */}
-      <div className="rounded-md border p-4 text-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="font-medium">Featured image</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Required when publishing. Pick from your image library or upload a new one.
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => setPickerOpen(true)}
-            disabled={submitting}
-          >
-            {featuredImage ? "Change image" : "Pick image"}
-          </Button>
-        </div>
-        {featuredImage && featuredImage.delivery_url && (
-          <div className="mt-3 flex items-center gap-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`${featuredImage.delivery_url}/w=120,h=120,fit=cover`}
-              alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
-              className="h-20 w-20 rounded-md border object-cover"
-            />
-            <div className="min-w-0">
+        {/* Featured image panel */}
+        <SidebarPanel title="Featured image" defaultOpen testId="sidebar-featured-image">
+          {featuredImage?.delivery_url ? (
+            <div className="space-y-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`${featuredImage.delivery_url}/w=300,h=200,fit=cover`}
+                alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
+                className="aspect-video w-full rounded-md border object-cover"
+              />
               <p
                 className="truncate text-sm font-medium"
                 title={featuredImage.caption ?? featuredImage.filename ?? ""}
               >
                 {featuredImage.caption ?? featuredImage.filename ?? "Untitled"}
               </p>
-              <button
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={submitting}
+                >
+                  Replace
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFeaturedImage(null)}
+                  disabled={submitting}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="mb-2 text-sm text-muted-foreground">
+                Required when publishing.
+              </p>
+              <Button
                 type="button"
-                onClick={() => setFeaturedImage(null)}
-                className="text-sm text-muted-foreground underline hover:text-foreground"
+                variant="outline"
+                size="sm"
+                className="w-full"
+                onClick={() => setPickerOpen(true)}
+                disabled={submitting}
               >
-                Remove
-              </button>
+                Set featured image
+              </Button>
+            </div>
+          )}
+        </SidebarPanel>
+
+        {/* SEO panel — collapsed by default (secondary metadata) */}
+        <SidebarPanel title="SEO" defaultOpen={false} testId="sidebar-seo">
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="post-meta-title" className="block text-sm font-medium">
+                SEO title
+              </label>
+              <Input
+                id="post-meta-title"
+                className="mt-1"
+                value={metaTitle.value}
+                onChange={(e) =>
+                  setFieldValue(
+                    setMetaTitle,
+                    e.target.value,
+                    lastParse?.meta_title ?? null,
+                    lastParse?.source_map.meta_title ?? "derived",
+                  )
+                }
+                disabled={submitting}
+                maxLength={200}
+              />
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <SourceHint source={metaTitle.source} />
+                <MetaTitleLengthHint length={metaTitle.value.length} />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="post-meta-description"
+                className="block text-sm font-medium"
+              >
+                Meta description
+              </label>
+              <Textarea
+                id="post-meta-description"
+                className="mt-1"
+                rows={3}
+                value={metaDescription.value}
+                onChange={(e) =>
+                  setFieldValue(
+                    setMetaDescription,
+                    e.target.value,
+                    lastParse?.meta_description ?? null,
+                    lastParse?.source_map.meta_description ?? "derived",
+                  )
+                }
+                disabled={submitting}
+                maxLength={400}
+                aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
+              />
+              <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+                <SourceHint source={metaDescription.source} />
+                <MetaDescriptionLengthHint length={metaDescription.value.length} />
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </SidebarPanel>
 
-      {/* AdvancedDisclosure — now contains only parent page. */}
-      <AdvancedDisclosure
-        open={showAdvanced}
-        onToggle={() => setShowAdvanced((v) => !v)}
-        summary={summarizeAdvanced({ parentPage })}
-      >
-        <div>
-          <label
-            htmlFor="post-parent-page"
-            className="block text-sm font-medium"
-          >
-            Parent page
-          </label>
+        {/* Parent page panel — collapsed by default (optional, rare) */}
+        <SidebarPanel title="Parent page" defaultOpen={false} testId="sidebar-parent-page">
           <WpPageCombobox
             siteId={siteId}
             value={parentPage}
@@ -1057,62 +1081,10 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             triggerId="post-parent-page"
           />
           <p className="mt-1 text-sm text-muted-foreground">
-            Where this post will live in the WP site tree (queries
-            <code className="ml-1 font-mono">/wp/v2/pages</code>).
+            Where this post will live in the WP site tree.
           </p>
-        </div>
-      </AdvancedDisclosure>
-
-      {formError && <Alert variant="destructive">{formError}</Alert>}
-
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
-        <SaveStatus
-          autosave={autosave}
-          restoredAt={draftRestoredAt}
-          onDiscard={discardDraft}
-        />
-      </div>
-
-      {/* Fix 8 — context-sensitive button labels. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <span
-          aria-hidden
-          className="hidden items-center gap-0.5 text-sm text-muted-foreground sm:inline-flex"
-        >
-          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
-            ⌘
-          </kbd>
-          <kbd className="rounded border bg-muted px-1 font-mono text-[10px]">
-            S
-          </kbd>
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!canSaveDraft || submitting}
-          onClick={handleSaveToOpollo}
-          title="Save to Opollo as a draft without publishing to WordPress."
-        >
-          {submitting ? "Saving…" : "Save to Opollo"}
-        </Button>
-        <Button
-          type="submit"
-          disabled={primaryDisabled || submitting}
-          title={
-            publishMode === "publish" && !canPublish
-              ? "Fill in SEO title, meta description, and featured image to publish."
-              : undefined
-          }
-        >
-          {submitting ? "Saving…" : primaryLabel}
-        </Button>
-      </div>
-      {publishMode === "publish" && !canPublish && canSaveDraft && (
-        <p className="text-sm text-muted-foreground">
-          &ldquo;Publish to WordPress&rdquo; needs SEO title, meta description, and featured image.
-          Use &ldquo;Save to Opollo&rdquo; to save a draft first.
-        </p>
-      )}
+        </SidebarPanel>
+      </aside>
 
       <ImagePickerModal
         open={pickerOpen}
@@ -1253,48 +1225,43 @@ function MetaDescriptionLengthHint({ length }: { length: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Fix 4 — AdvancedDisclosure now wraps only parent page + featured image.
+// WordPress-style collapsible sidebar panel.
 // ---------------------------------------------------------------------------
 
-function summarizeAdvanced({ parentPage }: { parentPage: WpPageOption | null }): string {
-  return parentPage ? `Parent: ${parentPage.title}` : "Parent page";
-}
-
-function AdvancedDisclosure({
-  open,
-  onToggle,
-  summary,
+function SidebarPanel({
+  title,
+  defaultOpen = true,
+  testId,
   children,
 }: {
-  open: boolean;
-  onToggle: () => void;
-  summary: string;
+  title: string;
+  defaultOpen?: boolean;
+  testId?: string;
   children: React.ReactNode;
 }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-md border bg-muted/20">
+    <div
+      className="overflow-hidden rounded-md border bg-card"
+      data-testid={testId}
+    >
       <button
         type="button"
-        onClick={onToggle}
+        onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        data-testid="post-advanced-toggle"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-smooth hover:bg-muted/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        {open ? (
-          <ChevronDown aria-hidden className="h-4 w-4 text-muted-foreground" />
-        ) : (
-          <ChevronRight aria-hidden className="h-4 w-4 text-muted-foreground" />
-        )}
-        <span className="font-medium">More options</span>
-        <span className="truncate text-sm text-muted-foreground">{summary}</span>
+        {title}
+        <ChevronDown
+          aria-hidden
+          className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform",
+            open && "rotate-180",
+          )}
+        />
       </button>
       {open && (
-        <div
-          data-testid="post-advanced-panel"
-          className="opollo-slide-up border-t p-4"
-        >
-          {children}
-        </div>
+        <div className="space-y-3 border-t px-4 py-3">{children}</div>
       )}
     </div>
   );
