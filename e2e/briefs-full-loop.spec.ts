@@ -181,7 +181,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
 
     // 4. Re-render the surface. Approve button on page 0 should appear.
     await page.reload();
-    const page1Card = page.getByRole("heading", { name: /1\. Page 1/ }).locator("..").locator("..");
+    const page1Card = page.getByRole("heading", { name: /1\. Page 1/ }).locator("../../..");
     await expect(page1Card.getByText(/Awaiting review/i).first()).toBeVisible();
     await page1Card.getByRole("button", { name: /approve this page/i }).click();
 
@@ -195,7 +195,7 @@ test.describe("M12-6 briefs — full-loop run", () => {
 
     await page.reload();
     await auditA11y(page, testInfo);
-    const page2Card = page.getByRole("heading", { name: /2\. Page 2/ }).locator("..").locator("..");
+    const page2Card = page.getByRole("heading", { name: /2\. Page 2/ }).locator("../../..");
     await expect(page2Card.getByText(/Awaiting review/i).first()).toBeVisible();
     await page2Card.getByRole("button", { name: /approve this page/i }).click();
 

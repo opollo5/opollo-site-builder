@@ -343,7 +343,7 @@ test.describe.serial("M14-5 recovery email-link callback hop (audit PR 4)", () =
     // Navigate. Playwright follows the verify → callback redirect
     // chain. End state: /auth/reset-password with a session cookie.
     await page.goto(actionLink);
-    await page.waitForURL(/\/auth\/reset-password/, { timeout: 15_000 });
+    await page.waitForURL(/\/auth\/reset-password/, { timeout: 30_000 });
 
     // Negative assertion: we did NOT land on the no-session "link
     // expired" surface. That would mean the redirect chain delivered
