@@ -34,7 +34,6 @@ const VALID_STATES: readonly SocialPostState[] = [
   "approved",
   "rejected",
   "changes_requested",
-  "pending_msp_release",
   "scheduled",
   "publishing",
   "published",

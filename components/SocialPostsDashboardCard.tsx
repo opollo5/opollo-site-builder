@@ -88,13 +88,6 @@ export function SocialPostsDashboardCard({ stats }: Props) {
       emphasis: "rose",
       testId: "stats-failed",
     },
-    {
-      label: "Awaiting MSP release",
-      value: stats.pendingMspRelease,
-      href: "/company/social/posts?state=pending_msp_release",
-      emphasis: "sky",
-      testId: "stats-pending-msp-release",
-    },
   ];
 
   return (

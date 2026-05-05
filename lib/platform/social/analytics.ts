@@ -71,7 +71,6 @@ const STATE_LABELS: Record<string, string> = {
   pending_client_approval: "Awaiting approval",
   approved: "Approved",
   changes_requested: "Changes requested",
-  pending_msp_release: "Awaiting MSP release",
   scheduled: "Scheduled",
   publishing: "Publishing",
   published: "Published",
