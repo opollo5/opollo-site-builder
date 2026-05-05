@@ -15,7 +15,7 @@ export type ImageDimensions = { width: number; height: number };
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 export function readImageDimensions(bytes: Uint8Array): ImageDimensions | null {
-  if (bytes.length < 24) return null;
+  if (bytes.length < 10) return null;
 
   if (matchesAt(bytes, 0, PNG_SIG)) return readPng(bytes);
   if (bytes[0] === 0xff && bytes[1] === 0xd8) return readJpeg(bytes);
