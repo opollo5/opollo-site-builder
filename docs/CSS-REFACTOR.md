@@ -157,8 +157,39 @@ compile but are caught by Phase 6 lint rules.
 
 ---
 
-## Phase 5 — Inline styles audit and cleanup (pending)
+## Phase 5 — Inline styles audit
+
+**Result:** No-op — all 22 inline styles are justified.
+
+Categories found:
+- **Dynamic color/font previews** — `style={{ background: color }}`, `style={{ fontFamily: ... }}` in concept review, design extraction, and brand-editor components. Values come from design tokens or user input; cannot be Tailwind classes.
+- **Dynamic dimensions** — `style={{ width: pct + "%" }}`, `style={{ maxHeight: ... }}` in progress bars and scroll containers. Computed at runtime.
+- **SVG dimensions** — `style={{ width, height }}` in ScoreSparkline. Passed as props.
+- **Email HTML templates** — `lib/email/templates/`. Email clients require inline styles; CSS classes don't work in email.
+
+No changes made. All inline styles are intentional.
 
 ---
 
-## Phase 6 — Lint enforcement (pending)
+## Phase 6 — Lint enforcement
+
+**PR:** (pending)
+**Date:** 2026-05-05
+**Branch:** feat/css-design-system-phase-5
+
+### Changes
+
+- `scripts/audit.ts` (`check5_typography`):
+  - Removed stale `text-xs` check (text-xs is now 15px — not a violation)
+  - Added `arbitraryFontRe` to flag `text-[9px]` through `text-[14px]` as LOW severity
+  - Updated inline `fsPxRe` threshold from 14px to 15px
+  - Updated messages to reference the 15px floor and CSS-REFACTOR.md
+- `components/ConceptReviewCards.tsx` — fixed 4 missed violations (lines 260, 264, 302, 315 — "Micro UI", "Your reference", "Our interpretation" labels)
+
+### Remaining LOW-severity intentional exceptions in audit output
+
+These will appear in `npm run audit:static` but are LOW (non-blocking) and all documented above in Phase 2:
+- Keyboard symbols `<kbd>` (⌘K, ↵, esc)
+- Color swatch badges (`text-[9px]` in ConceptReviewCards, `text-[10px]` in MoodBoardStrip etc.)
+- Notification count badge
+- `components/ui/button.tsx text-[13px]` (design spec)
