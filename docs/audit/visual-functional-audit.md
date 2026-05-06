@@ -160,11 +160,9 @@ Design tokens live in three separate locations with no single source of truth:
 
 No TypeScript-accessible token module exists. Tokens cannot be consumed programmatically (e.g., for the admin settings page dynamic injection). Addressed in PR 2.
 
-### F3 — Hardcoded rgba values in Tailwind classes ⚠️ WARN
+### ~~F3 — Hardcoded rgba values in Tailwind classes~~ ✅ RESOLVED (PR #618, PR #621)
 
-Multiple components use `text-[rgba(255,255,255,0.40)]` and `bg-[rgba(0,229,160,0.08)]` instead of semantic token classes. These are not strictly in violation (they reference the Opollo palette) but increase maintenance surface.
-
-Files: `components/AdminSidebar.tsx`, `components/ui/button.tsx`.
+All hardcoded `rgba(...)` arbitrary-value classes replaced with semantic tokens. Nav components converted in PR #618; `button.tsx` hover shadow (`--pk-glow`) completed in PR #621. No remaining arbitrary rgba values in the component layer.
 
 ### F4 — Optimiser navigation inconsistency ⚠️ WARN
 
@@ -216,7 +214,7 @@ Per CLAUDE.md, all specs call `auditA11y(page, testInfo)` but axe findings are c
 |---|---|---|
 | Sub-16px font violations | 12 locations | HIGH (user-specified requirement) |
 | Design token fragmentation | 1 | MEDIUM |
-| Hardcoded rgba values | 5 locations | LOW |
+| ~~Hardcoded rgba values~~ | ~~5 locations~~ | ~~LOW~~ **RESOLVED PR #618 + #621** |
 | Navigation inconsistency (optimiser) | 1 | LOW |
 | Bundle size warning | 1 | LOW |
 | Missing runtime verification items | 7 | MEDIUM (require live stack) |
@@ -224,5 +222,5 @@ Per CLAUDE.md, all specs call `auditA11y(page, testInfo)` but axe findings are c
 **Action items:**
 - PR 2 fixes F1 + F2 (font minimums, token system)
 - PR 3 fixes F6 + F7 (CSS variable injection, admin settings page)
-- F3, F4, F5 are documented for follow-up
+- ~~F3~~ resolved PR #618 + #621; F4, F5 documented for follow-up
 - Runtime verification items should be covered during next UAT session with `supabase start`
