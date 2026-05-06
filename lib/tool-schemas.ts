@@ -93,7 +93,7 @@ export const ERROR_CODES = [
   // Webhook receiver codes.
   "INVALID_SIGNATURE",
   "RECEIVER_NOT_CONFIGURED",
-  // S8 reconnect — healthy-connection guard.
+  // S8 reconnect -ï¿½ healthy-connection guard.
   "CONFLICT",
 ] as const;
 
