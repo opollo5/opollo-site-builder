@@ -171,7 +171,7 @@ export default function BlueprintReviewPage({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Site Plan Review</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-base text-muted-foreground">
             Review the plan before approving page generation.
           </p>
         </div>

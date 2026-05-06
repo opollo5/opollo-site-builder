@@ -222,7 +222,7 @@ export function CopyExistingExtractionWizard({
           data-testid="copy-existing-design-profile"
         >
           <h2 className="text-sm font-semibold">2 · Review the design profile</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-1 text-base text-muted-foreground">
             Tweak any extracted value that looks wrong. Empty fields land as
             null and the generation prompt falls back to the site theme.
           </p>

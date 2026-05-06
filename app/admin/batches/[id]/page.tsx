@@ -91,7 +91,7 @@ export default async function BatchDetailPage({
   ) {
     return (
       <div className="rounded-md border p-8 text-center">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           This batch belongs to another operator.
         </p>
       </div>

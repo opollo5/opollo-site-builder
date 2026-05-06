@@ -283,7 +283,7 @@ export default async function SystemJobsPage() {
 
       <section className="mt-6">
         <H2>Library maintenance</H2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           One-off and on-demand jobs for the image library. Each batch processes
           up to 10 images; run repeatedly until all images are done.
         </p>
@@ -294,7 +294,7 @@ export default async function SystemJobsPage() {
 
       <section className="mt-6">
         <H2>Queue depth</H2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Pending = waiting for a worker. Running = leased and in flight. Failed
           = terminal failure (no further retries).
         </p>
@@ -374,7 +374,7 @@ export default async function SystemJobsPage() {
 
       <section className="mt-8">
         <H2>Cron schedule</H2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Sourced from <code>vercel.json</code>. Last-run timestamps are not
           mirrored locally — check Vercel Dashboard → Cron Jobs for invocation
           history.

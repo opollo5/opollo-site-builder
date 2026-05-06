@@ -151,7 +151,7 @@ export function ConfirmActionModal({
         <h2 id="confirm-title" className="text-lg font-semibold">
           {title}
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        <p className="mt-1 text-base text-muted-foreground">{description}</p>
 
         {extraContent && <div className="mt-4">{extraContent}</div>}
 

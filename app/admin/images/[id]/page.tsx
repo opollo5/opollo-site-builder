@@ -298,7 +298,7 @@ export default async function AdminImageDetailPage({
             ({usage.length})
           </span>
         </H3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Every WP site this image has been mirrored to via the publish pipeline.
         </p>
         <div className="mt-3" data-testid="image-usage-list">
@@ -377,7 +377,7 @@ export default async function AdminImageDetailPage({
             ({metadata.length})
           </span>
         </H3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           EXIF, licensing notes, model info, and any other per-image attributes
           tracked outside the main row.
         </p>

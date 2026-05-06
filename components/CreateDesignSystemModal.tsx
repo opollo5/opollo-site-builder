@@ -159,7 +159,7 @@ export function CreateDesignSystemModal({
         <h2 id="new-ds-title" className="text-lg font-semibold">
           New design system draft
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Version number is auto-assigned to the next integer. The draft is
           not activated — you can edit components and templates, then activate
           from the list when ready.

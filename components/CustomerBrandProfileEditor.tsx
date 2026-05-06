@@ -133,7 +133,7 @@ export function CustomerBrandProfileEditor({ company, brand }: Props) {
       >
         <Eyebrow id="tier-summary">Setup</Eyebrow>
         <h2 className="mt-1 text-base font-semibold">{brandTierLabel(tier)}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           {brandTierDescription(tier)}
         </p>
         {brand ? (
@@ -157,7 +157,7 @@ export function CustomerBrandProfileEditor({ company, brand }: Props) {
             <h2 id="visual-identity-heading" className="text-base font-semibold">
               Visual identity
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-base text-muted-foreground">
               Colours and fonts. Image generation and compositing read these
               for every output.
             </p>
@@ -219,7 +219,7 @@ export function CustomerBrandProfileEditor({ company, brand }: Props) {
             <h2 id="tone-heading" className="text-base font-semibold">
               Tone of voice
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-base text-muted-foreground">
               The basics. Personality traits, voice examples, and platform
               overrides land in a follow-up.
             </p>
