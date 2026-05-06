@@ -1,0 +1,6 @@
+{
+  "version": "v1",
+  "released_at": "2026-05-04",
+  "model": "claude-sonnet-4-6",
+  "notes": "Initial chat system prompt — site builder operating contract with HC/WR/CS sections."
+}

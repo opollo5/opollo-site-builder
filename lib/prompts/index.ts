@@ -1,5 +1,5 @@
 /**
- * lib/prompts.ts
+ * lib/prompts/index.ts
  *
  * All LLM system prompts for M16 generation passes.
  * These are LOCKED. Do not iterate them during the build.
@@ -10,11 +10,29 @@
  * Treat prompts like database migrations — versioned, deliberate, logged.
  */
 
+import { join } from "node:path";
+
+// ---------------------------------------------------------------------------
+// Chat system prompt versioning
+// ---------------------------------------------------------------------------
+
+export const CHAT_PROMPT_VERSION = "v1";
+
 /**
- * Pass 0+1 — Site Planning
- * Model: MODELS.SITE_PLANNER (Sonnet)
- * One call per site. Returns SitePlan JSON.
+ * Returns the file path for the versioned chat system prompt template.
+ * Reads OPOLLO_PROMPT_VERSION env; falls back to CHAT_PROMPT_VERSION.
  */
+export function resolvePrompt(version?: string): string {
+  const v = version ?? process.env.OPOLLO_PROMPT_VERSION ?? CHAT_PROMPT_VERSION;
+  return join(process.cwd(), "lib", "prompts", v, "system.md");
+}
+
+// ---------------------------------------------------------------------------
+// Pass 0+1 — Site Planning
+// Model: MODELS.SITE_PLANNER (Sonnet)
+// One call per site. Returns SitePlan JSON.
+// ---------------------------------------------------------------------------
+
 export const SITE_PLANNER_SYSTEM_PROMPT = `\
 You are a structured data generator for a website planning system.
 You will receive a website brief and return a SitePlan JSON object.
@@ -76,11 +94,12 @@ REQUIRED JSON SHAPE:
   }
 }`;
 
-/**
- * Pass 2 — Page Document Generation
- * Model: MODELS.PAGE_GENERATOR (Haiku)
- * One call per page. Returns PageDocument JSON.
- */
+// ---------------------------------------------------------------------------
+// Pass 2 — Page Document Generation
+// Model: MODELS.PAGE_GENERATOR (Haiku)
+// One call per page. Returns PageDocument JSON.
+// ---------------------------------------------------------------------------
+
 export const PAGE_GENERATOR_SYSTEM_PROMPT = `\
 You are a structured data generator for a website page system.
 You will receive a page specification and return a PageDocument JSON object.
@@ -138,11 +157,12 @@ REQUIRED JSON SHAPE:
   }
 }`;
 
-/**
- * Pass 2 self-critique prompt (appended after the draft PageDocument)
- * Model: MODELS.PAGE_CRITIQUE (Haiku)
- * Reviews the draft against copy quality rules.
- */
+// ---------------------------------------------------------------------------
+// Pass 2 self-critique prompt (appended after the draft PageDocument)
+// Model: MODELS.PAGE_CRITIQUE (Haiku)
+// Reviews the draft against copy quality rules.
+// ---------------------------------------------------------------------------
+
 export const PAGE_CRITIQUE_PROMPT = `\
 Review the PageDocument above against these copy quality rules.
 Return a JSON array of issues found. Return an empty array [] if none.
@@ -163,11 +183,12 @@ Return format:
   { "sectionId": "<id>", "field": "headline", "issue": "Too generic — does not reference the service" }
 ]`;
 
-/**
- * Pass 2 revise prompt (appended after the critique)
- * Model: MODELS.PAGE_REVISE (Haiku)
- * Applies the critique to produce the final PageDocument.
- */
+// ---------------------------------------------------------------------------
+// Pass 2 revise prompt (appended after the critique)
+// Model: MODELS.PAGE_REVISE (Haiku)
+// Applies the critique to produce the final PageDocument.
+// ---------------------------------------------------------------------------
+
 export const PAGE_REVISE_PROMPT = `\
 You are given a PageDocument and a list of copy issues found by a reviewer.
 Apply the fixes described in the issues list to produce a corrected PageDocument.
@@ -180,11 +201,12 @@ RULES:
 5. All HARD RULES from the original generation prompt still apply.
 6. Return nothing except the JSON object.`;
 
-/**
- * Section regeneration prompt
- * Model: MODELS.SECTION_REGEN (Haiku)
- * Rewrites one section in the context of the surrounding page.
- */
+// ---------------------------------------------------------------------------
+// Section regeneration prompt
+// Model: MODELS.SECTION_REGEN (Haiku)
+// Rewrites one section in the context of the surrounding page.
+// ---------------------------------------------------------------------------
+
 export const SECTION_REGEN_SYSTEM_PROMPT = `\
 You are a structured data generator. You will rewrite ONE section of a
 PageDocument based on an operator note.

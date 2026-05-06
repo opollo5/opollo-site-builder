@@ -58,7 +58,7 @@ const nextConfig = {
   },
   experimental: {
     outputFileTracingIncludes: {
-      "/api/chat": ["./docs/SYSTEM_PROMPT_v1.md"],
+      "/api/chat": ["./lib/prompts/v1/system.md"],
     },
     // M12-4: playwright-core is a very large node-only package that
     // webpack cannot bundle cleanly â€” it contains non-JS assets in its
