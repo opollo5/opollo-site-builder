@@ -585,8 +585,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const canPublish =
     canSaveDraft &&
     metaTitleIsValid &&
-    metaDescriptionIsValid &&
-    featuredImage !== null;
+    metaDescriptionIsValid;
+
+  const publishMissingImage = canPublish && featuredImage === null;
 
   // BL-8 — ⌘S / Ctrl+S triggers Save draft (draft, always safe).
   useEffect(() => {
@@ -953,7 +954,13 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
 
           {publishMode === "publish" && !canPublish && canSaveDraft && (
             <p className="text-sm text-muted-foreground">
-              Add SEO title, meta description, and featured image to publish.
+              Add SEO title and meta description to enable publishing.
+            </p>
+          )}
+
+          {publishMode === "publish" && publishMissingImage && (
+            <p className="rounded-md bg-warning/10 px-3 py-2 text-sm text-warning">
+              No featured image set. Posts without a featured image may not display correctly in WordPress.
             </p>
           )}
 
@@ -964,22 +971,24 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               disabled={primaryDisabled || submitting}
               title={
                 publishMode === "publish" && !canPublish
-                  ? "Fill in SEO title, meta description, and featured image to publish."
+                  ? "Fill in SEO title and meta description to publish."
                   : undefined
               }
             >
               {submitting ? "Saving…" : primaryLabel}
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              disabled={!canSaveDraft || submitting}
-              onClick={handleSaveToOpollo}
-              title="Save as draft in Opollo. Does not publish to WordPress."
-            >
-              {submitting ? "Saving…" : "Save draft"}
-            </Button>
+            {publishMode !== "draft" && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={!canSaveDraft || submitting}
+                onClick={handleSaveToOpollo}
+                title="Save as draft in Opollo. Does not publish to WordPress."
+              >
+                {submitting ? "Saving…" : "Save draft"}
+              </Button>
+            )}
           </div>
 
           <p
