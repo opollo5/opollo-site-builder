@@ -1,32 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { conflict, readJsonBody, respond, routeError, validationError } from "@/lib/http";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderSocialApprovalRequestEmail } from "@/lib/email/templates/social-approval-request";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import {
-  addRecipient,
-  listRecipients,
-} from "@/lib/platform/social/approvals";
+import { addRecipient, listRecipients } from "@/lib/platform/social/approvals";
 import { getServiceRoleClient } from "@/lib/supabase";
-
-// ---------------------------------------------------------------------------
-// S1-6 — GET / POST recipients for a post's open approval_request.
-//
-// We resolve the active approval_request from the post id rather than
-// asking the caller to know the request id directly. V1 only allows
-// one open request per post (the lib + DB don't enforce this — the
-// state machine does: a draft submit creates one, a finalised request
-// can't accept new recipients). When a post is in
-// pending_client_approval there's exactly one open row.
-//
-// POST gate: canDo("submit_for_approval") — same role threshold as
-// submitting (editor+). The reviewer-add affordance lives next to
-// the Submit button on the detail page.
-// GET gate: canDo("view_calendar") — viewer+ can see the audit list.
-// ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -40,42 +21,6 @@ const PostBodySchema = z.object({
   requires_otp: z.boolean().optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: {
-        code,
-        message,
-        retryable: false,
-        ...(details ? { details } : {}),
-      },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
-function statusForCode(code: string): number {
-  switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "NOT_FOUND":
-      return 404;
-    case "INVALID_STATE":
-      return 409;
-    default:
-      return 500;
-  }
-}
-
-// Resolve the open approval_request for a post. "Open" =
-// !revoked_at AND no final_*_at. Returns the request id or null.
 async function resolveOpenRequestId(
   postId: string,
   companyId: string,
@@ -102,16 +47,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  if (!UUID_RE.test(id)) {
-    return errorJson("VALIDATION_FAILED", "id must be a UUID.", 400);
-  }
+  if (!UUID_RE.test(id)) return validationError("id must be a UUID.");
   const companyId = new URL(req.url).searchParams.get("company_id");
   if (!companyId || !UUID_RE.test(companyId)) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id query parameter (uuid) is required.",
-      400,
-    );
+    return validationError("company_id query parameter (uuid) is required.");
   }
 
   const gate = await requireCanDoForApi(companyId, "view_calendar");
@@ -120,34 +59,18 @@ export async function GET(
   const reqRow = await resolveOpenRequestId(id, companyId);
   if (!reqRow) {
     return NextResponse.json(
-      {
-        ok: true,
-        data: { recipients: [], approvalRequestId: null },
-        timestamp: new Date().toISOString(),
-      },
+      { ok: true, data: { recipients: [], approvalRequestId: null }, timestamp: new Date().toISOString() },
       { status: 200 },
     );
   }
 
-  const result = await listRecipients({
-    approvalRequestId: reqRow.id,
-    companyId,
-  });
-  if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
-  }
+  const result = await listRecipients({ approvalRequestId: reqRow.id, companyId });
+  if (!result.ok) return respond(result);
 
   return NextResponse.json(
     {
       ok: true,
-      data: {
-        recipients: result.data.recipients,
-        approvalRequestId: reqRow.id,
-      },
+      data: { recipients: result.data.recipients, approvalRequestId: reqRow.id },
       timestamp: new Date().toISOString(),
     },
     { status: 200 },
@@ -159,34 +82,26 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
-  if (!UUID_RE.test(id)) {
-    return errorJson("VALIDATION_FAILED", "id must be a UUID.", 400);
-  }
+  if (!UUID_RE.test(id)) return validationError("id must be a UUID.");
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = PostBodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
+    return validationError(
       "Body must be { company_id: uuid, email: string, name?: string, requires_otp?: boolean }.",
-      400,
       { issues: parsed.error.issues },
     );
   }
 
-  const gate = await requireCanDoForApi(
-    parsed.data.company_id,
-    "submit_for_approval",
-  );
+  const gate = await requireCanDoForApi(parsed.data.company_id, "submit_for_approval");
   if (gate.kind === "deny") return gate.response;
 
   const reqRow = await resolveOpenRequestId(id, parsed.data.company_id);
   if (!reqRow) {
-    return errorJson(
+    return conflict(
       "INVALID_STATE",
       "Post has no open approval request. Submit the post for approval first.",
-      409,
     );
   }
 
@@ -197,18 +112,8 @@ export async function POST(
     name: parsed.data.name ?? null,
     requiresOtp: parsed.data.requires_otp,
   });
-  if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
-  }
+  if (!result.ok) return respond(result);
 
-  // Look up the company name for the email. Best-effort; if the read
-  // fails we still want the recipient row to exist (operator can
-  // resend manually). The route already authorised access to this
-  // company so service-role read is fine.
   const svc = getServiceRoleClient();
   let companyName = "your team";
   const companyRead = await svc
@@ -220,7 +125,6 @@ export async function POST(
     companyName = companyRead.data.name as string;
   }
 
-  // Look up expires_at on the request for the email body.
   let expiresAt = result.data.recipient.created_at;
   const reqRead = await svc
     .from("social_approval_requests")
@@ -256,28 +160,15 @@ export async function POST(
       recipient_id: result.data.recipient.id,
       err: sendResult.error?.message,
     });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "EMAIL_DELIVERY_FAILED",
-          message:
-            "Recipient was added but email delivery failed. Revoke and re-add, or resend manually.",
-          retryable: false,
-          details: { recipient_id: result.data.recipient.id },
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 502 },
+    return routeError(
+      "EMAIL_DELIVERY_FAILED",
+      "Recipient was added but email delivery failed. Revoke and re-add, or resend manually.",
+      { recipient_id: result.data.recipient.id },
     );
   }
 
   return NextResponse.json(
-    {
-      ok: true,
-      data: { recipient: result.data.recipient },
-      timestamp: new Date().toISOString(),
-    },
+    { ok: true, data: { recipient: result.data.recipient }, timestamp: new Date().toISOString() },
     { status: 201 },
   );
 }

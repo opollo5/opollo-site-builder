@@ -5,8 +5,12 @@ import { z } from "zod";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { approveBriefPage } from "@/lib/brief-runner";
 import {
+  internalError,
+  invalidState,
+  notFound,
   parseBodyWith,
   readJsonBody,
+  routeError,
   validateUuidParam,
   validationError,
 } from "@/lib/http";
@@ -47,21 +51,6 @@ const ApproveBodySchema = z.object({
   summary_addendum: z.string().max(2000).optional(),
 });
 
-function errorEnvelope(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: Request,
   { params }: { params: { brief_id: string; page_id: string } },
@@ -95,26 +84,16 @@ export async function POST(
       page_id: pageIdCheck.value,
       error: pageLookup.error,
     });
-    return errorEnvelope(
-      "INTERNAL_ERROR",
-      "Failed to look up brief_page.",
-      500,
-    );
+    return internalError("Failed to look up brief_page.");
   }
   if (!pageLookup.data) {
-    return errorEnvelope(
-      "NOT_FOUND",
-      `No brief_page ${pageIdCheck.value}.`,
-      404,
-    );
+    return notFound(`No brief_page ${pageIdCheck.value}.`);
   }
   if ((pageLookup.data.brief_id as string) !== briefIdCheck.value) {
     // Path mismatch. 404 (the page doesn't exist under this brief)
     // rather than 400 — prevents enumeration and matches REST semantics.
-    return errorEnvelope(
-      "NOT_FOUND",
+    return notFound(
       `Brief_page ${pageIdCheck.value} does not belong to brief ${briefIdCheck.value}.`,
-      404,
     );
   }
 
@@ -133,20 +112,20 @@ export async function POST(
     });
     switch (result.code) {
       case "NOT_FOUND":
-        return errorEnvelope("NOT_FOUND", result.message, 404);
+        return notFound(result.message);
       case "INVALID_STATE":
         // 409 conflict — resource is not in a state that allows this
         // transition. Operator should refresh + retry.
-        return errorEnvelope("INVALID_STATE", result.message, 409);
+        return invalidState(result.message);
       case "VERSION_CONFLICT":
-        return errorEnvelope("VERSION_CONFLICT", result.message, 409);
+        return routeError("VERSION_CONFLICT", result.message);
       case "INTERNAL_ERROR":
         logger.error("briefs.approve.internal_error", {
           brief_id: briefIdCheck.value,
           page_id: pageIdCheck.value,
           message: result.message,
         });
-        return errorEnvelope("INTERNAL_ERROR", result.message, 500);
+        return internalError(result.message);
     }
   }
 

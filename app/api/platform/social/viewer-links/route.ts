@@ -1,25 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, respond, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import {
-  createViewerLink,
-  listViewerLinks,
-} from "@/lib/platform/social/viewer-links";
-
-// ---------------------------------------------------------------------------
-// S1-15 — viewer-link admin endpoints.
-//
-//   GET /api/platform/social/viewer-links?company_id=&include_inactive=
-//     canDo("manage_invitations") — admin-only.
-//
-//   POST /api/platform/social/viewer-links
-//     Body { company_id, recipient_email?, recipient_name?, expires_at? }
-//     canDo("manage_invitations"). Returns the link row + raw token.
-//     Caller surfaces the URL (origin + /viewer/<rawToken>) to the
-//     admin who shares it externally.
-// ---------------------------------------------------------------------------
+import { createViewerLink, listViewerLinks } from "@/lib/platform/social/viewer-links";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,49 +17,11 @@ const PostBodySchema = z.object({
   expires_at: z.string().datetime().optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: {
-        code,
-        message,
-        retryable: false,
-        ...(details ? { details } : {}),
-      },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
-function statusForCode(code: string): number {
-  switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "NOT_FOUND":
-      return 404;
-    case "INVALID_STATE":
-      return 409;
-    default:
-      return 500;
-  }
-}
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const url = new URL(req.url);
   const companyId = url.searchParams.get("company_id");
   if (!companyId || !UUID_RE.test(companyId)) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id query parameter (uuid) is required.",
-      400,
-    );
+    return validationError("company_id query parameter (uuid) is required.");
   }
   const includeInactive = url.searchParams.get("include_inactive") === "true";
 
@@ -83,41 +29,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (gate.kind === "deny") return gate.response;
 
   const result = await listViewerLinks({ companyId, includeInactive });
-  if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
-  }
+  if (!result.ok) return respond(result);
 
   return NextResponse.json(
-    {
-      ok: true,
-      data: result.data,
-      timestamp: new Date().toISOString(),
-    },
+    { ok: true, data: result.data, timestamp: new Date().toISOString() },
     { status: 200 },
   );
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = PostBodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
+    return validationError(
       "Body must be { company_id: uuid, recipient_email?, recipient_name?, expires_at? }.",
-      400,
       { issues: parsed.error.issues },
     );
   }
 
-  const gate = await requireCanDoForApi(
-    parsed.data.company_id,
-    "manage_invitations",
-  );
+  const gate = await requireCanDoForApi(parsed.data.company_id, "manage_invitations");
   if (gate.kind === "deny") return gate.response;
 
   const result = await createViewerLink({
@@ -127,28 +58,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     expiresAt: parsed.data.expires_at,
     createdBy: gate.userId,
   });
-  if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
-  }
+  if (!result.ok) return respond(result);
 
-  // Build the public URL the admin shares. Origin pinned via
-  // NEXT_PUBLIC_SITE_URL (production-correct), falls back to the
-  // request origin for dev / preview.
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
     new URL(req.url).origin;
-  const url = `${origin}/viewer/${result.data.rawToken}`;
+  const viewerUrl = `${origin}/viewer/${result.data.rawToken}`;
 
   return NextResponse.json(
-    {
-      ok: true,
-      data: { link: result.data.link, url },
-      timestamp: new Date().toISOString(),
-    },
+    { ok: true, data: { link: result.data.link, url: viewerUrl }, timestamp: new Date().toISOString() },
     { status: 201 },
   );
 }

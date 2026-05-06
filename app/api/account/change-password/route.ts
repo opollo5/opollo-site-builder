@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
-import { readJsonBody } from "@/lib/http";
+import { internalError, readJsonBody, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { validatePassword } from "@/lib/password-policy";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
@@ -36,22 +36,6 @@ const BodySchema = z.object({
   new_password: z.string().min(1).max(512),
 });
 
-function jsonError(
-  code: string,
-  message: string,
-  status: number,
-  retryable = false,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 async function verifyCurrentPassword(
   email: string,
   password: string,
@@ -78,22 +62,12 @@ async function verifyCurrentPassword(
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message:
-            "Provide current_password and new_password in the request body.",
-          details: { issues: parsed.error.issues },
-          retryable: true,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
+    return validationError(
+      "Provide current_password and new_password in the request body.",
+      { issues: parsed.error.issues },
     );
   }
 
@@ -101,21 +75,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const user = await getCurrentUser(supabase);
   if (!user) {
     logger.warn("change_password_unauthenticated", { outcome: "no_session" });
-    return jsonError(
-      "UNAUTHORIZED",
-      "Sign in to change your password.",
-      401,
-    );
+    return routeError("UNAUTHORIZED", "Sign in to change your password.");
   }
   if (!user.email) {
     // Defensive — every opollo_users row has an email, but if it ever
     // doesn't we can't verify the current password without one.
     logger.error("change_password_missing_email", { user_id: user.id });
-    return jsonError(
-      "INTERNAL_ERROR",
-      "Account is missing an email; contact an admin.",
-      500,
-    );
+    return internalError("Account is missing an email; contact an admin.");
   }
 
   const rl = await checkRateLimit("login", `user:${user.id}`);
@@ -134,15 +100,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // reject anyway.
   const policy = validatePassword(new_password);
   if (!policy.ok) {
-    return jsonError("PASSWORD_WEAK", policy.message, 422, true);
+    return routeError("PASSWORD_WEAK", policy.message);
   }
 
   if (current_password === new_password) {
-    return jsonError(
+    return routeError(
       "SAME_PASSWORD",
       "New password must be different from your current password.",
-      422,
-      true,
     );
   }
 
@@ -152,11 +116,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       user_id: user.id,
       email: user.email,
     });
-    return jsonError(
+    return routeError(
       "INCORRECT_CURRENT_PASSWORD",
       "Your current password is incorrect.",
-      403,
-      true,
     );
   }
 
@@ -178,7 +140,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         error: error.message,
         code,
       });
-      return jsonError(code, message, 422, true);
+      return routeError(code, message);
     }
 
     logger.info("change_password_success", {
@@ -203,11 +165,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       user_id: user.id,
       error: err instanceof Error ? err.message : String(err),
     });
-    return jsonError(
-      "INTERNAL_ERROR",
-      "Password update failed. Please try again.",
-      500,
-      true,
-    );
+    return internalError("Password update failed. Please try again.");
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";
@@ -37,32 +37,13 @@ const BodySchema = z.object({
 
 const RECONNECTABLE_STATUSES = ["auth_required", "disconnected"] as const;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "Body must be { company_id: uuid, connection_id: uuid }.",
-      400,
-    );
+    return validationError("Body must be { company_id: uuid, connection_id: uuid }.");
   }
 
   const { company_id: companyId, connection_id: connectionId } = parsed.data;
@@ -83,11 +64,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .single();
 
   if (connErr || !conn) {
-    return errorJson(
-      "NOT_FOUND",
-      "Connection not found or does not belong to this company.",
-      404,
-    );
+    return notFound("Connection not found or does not belong to this company.");
   }
 
   const status = conn.status as string;
@@ -96,11 +73,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       status as (typeof RECONNECTABLE_STATUSES)[number],
     )
   ) {
-    return errorJson(
-      "CONFLICT",
-      `Connection is currently "${status}" and does not need reconnecting.`,
-      409,
-    );
+    return invalidState(`Connection is currently "${status}" and does not need reconnecting.`);
   }
 
   const origin =
@@ -122,8 +95,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    const statusCode = result.error.code === "VALIDATION_FAILED" ? 400 : 500;
-    return errorJson(result.error.code, result.error.message, statusCode);
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(
