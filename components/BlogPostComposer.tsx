@@ -532,6 +532,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     const existingTagIds = selectedTags
       .filter((t) => !t.isNew)
       .map((t) => t.id);
+    const newCategoryNames = selectedCategories
+      .filter((c) => c.isNew)
+      .map((c) => c.name);
+    const existingCategoryIds = selectedCategories
+      .filter((c) => !c.isNew)
+      .map((c) => c.id);
     const mode = forceAsDraft ? "draft" : publishMode;
     return {
       title: title.value.trim(),
@@ -543,8 +549,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       meta_title: metaTitle.value.trim() || null,
       status: mode === "schedule" ? "scheduled" : "draft",
       scheduled_at: mode === "schedule" ? scheduledAt : null,
-      wp_category_ids: selectedCategories.map((c) => c.id),
+      wp_category_ids: existingCategoryIds,
       wp_tag_ids: existingTagIds,
+      ...(newCategoryNames.length > 0 ? { wp_new_category_names: newCategoryNames } : {}),
       ...(newTagNames.length > 0 ? { wp_new_tag_names: newTagNames } : {}),
       metadata: lastParse ?? null,
       featured_image_id: featuredImage?.id ?? null,
@@ -1454,7 +1461,6 @@ function WpTaxonomyCombobox({
   const placeholder = loading ? `Loading ${type}…` : `Pick ${type}…`;
 
   const canCreateNew =
-    type === "tags" &&
     inputValue.trim().length > 0 &&
     !options.some(
       (o) => o.name.toLowerCase() === inputValue.trim().toLowerCase(),
@@ -1463,17 +1469,17 @@ function WpTaxonomyCombobox({
       (v) => v.name.toLowerCase() === inputValue.trim().toLowerCase(),
     );
 
-  function addNewTag() {
+  function addNew() {
     const name = inputValue.trim();
     if (!name) return;
-    const newTag: WpTaxonomyOption = {
+    const newItem: WpTaxonomyOption = {
       id: -Date.now(),
       name,
       slug: name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
       count: 0,
       isNew: true,
     };
-    onChange([...value, newTag]);
+    onChange([...value, newItem]);
     setInputValue("");
   }
 
@@ -1521,13 +1527,13 @@ function WpTaxonomyCombobox({
       >
         <Command shouldFilter={true}>
           <CommandInput
-            placeholder={type === "tags" ? `Search or create ${label}…` : `Search ${type}…`}
+            placeholder={`Search or create ${label}…`}
             value={inputValue}
             onValueChange={setInputValue}
             onKeyDown={(e) => {
               if (e.key === "Enter" && canCreateNew) {
                 e.preventDefault();
-                addNewTag();
+                addNew();
               }
             }}
           />
@@ -1540,19 +1546,17 @@ function WpTaxonomyCombobox({
             {canCreateNew && (
               <CommandItem
                 value={`__new__${inputValue}`}
-                onSelect={addNewTag}
+                onSelect={addNew}
                 className="text-primary"
               >
                 <span className="mr-2 text-primary">+</span>
-                Add tag &ldquo;{inputValue.trim()}&rdquo;
+                Add {label} &ldquo;{inputValue.trim()}&rdquo;
               </CommandItem>
             )}
             <CommandEmpty>
               {loading
                 ? "Loading…"
-                : type === "tags"
-                  ? "Type a name to search or create a tag."
-                  : `No ${label}s found.`}
+                : `Type a name to search or create a ${label}.`}
             </CommandEmpty>
             {options.map((option) => (
               <CommandItem
