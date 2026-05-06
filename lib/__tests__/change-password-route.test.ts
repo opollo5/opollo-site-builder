@@ -266,7 +266,7 @@ describe("POST /api/account/change-password: update errors", () => {
     expect(body.error.code).toBe("SAME_PASSWORD");
   });
 
-  it("returns 500 UPDATE_FAILED on a generic supabase error", async () => {
+  it("returns 422 UPDATE_FAILED on a generic supabase error", async () => {
     mockState.updateResult = { error: { message: "service unavailable" } };
     const res = await changePasswordPOST(
       makeRequest({
@@ -274,7 +274,7 @@ describe("POST /api/account/change-password: update errors", () => {
         new_password: NEW_PASSWORD,
       }) as never,
     );
-    expect(res.status).toBe(500); // UPDATE_FAILED maps to 500 via errorCodeToStatus
+    expect(res.status).toBe(422);
     const body = await res.json();
     expect(body.error.code).toBe("UPDATE_FAILED");
   });
