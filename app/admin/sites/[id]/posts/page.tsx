@@ -293,9 +293,21 @@ export default async function SitePostsList({
                     </h2>
                     <p className="mt-0.5 text-sm text-muted-foreground">
                       <code className="font-mono text-xs">/{post.slug}</code>
-                      {post.wp_post_id
-                        ? ` · WP id ${post.wp_post_id}`
-                        : ""}
+                      {post.status === "published" && post.wp_post_id && site.wp_url ? (
+                        <>
+                          {" · "}
+                          <a
+                            href={`${site.wp_url.replace(/\/+$/, "")}/${post.slug}/`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline hover:text-foreground"
+                          >
+                            View live ↗
+                          </a>
+                        </>
+                      ) : post.wp_post_id ? (
+                        ` · WP id ${post.wp_post_id}`
+                      ) : null}
                     </p>
                   </div>
                   <StatusPill

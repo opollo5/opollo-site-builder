@@ -9,6 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AlertTriangle, Check, ChevronDown } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
@@ -720,6 +721,16 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (publishMode === "publish") {
         const wpOk = await handlePublishToWp(postData.id);
         if (!wpOk) return; // Error shown in form; post is saved as draft
+        const liveUrl =
+          siteWpUrl && slug.value
+            ? `${siteWpUrl.replace(/\/+$/, "")}/${slug.value}/`
+            : null;
+        toast.success("Published to WordPress!", {
+          description: liveUrl ? "Your post is now live." : undefined,
+          action: liveUrl
+            ? { label: "View live", onClick: () => window.open(liveUrl, "_blank") }
+            : undefined,
+        });
       }
 
       try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
