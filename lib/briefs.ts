@@ -250,6 +250,7 @@ export async function uploadBrief(
   try {
     return await uploadBriefImpl(input);
   } catch (err) {
+    logger.error("briefs.uploadBrief.uncaught", { err: err instanceof Error ? err.message : String(err) });
     return errorEnvelope("INTERNAL_ERROR", `uploadBrief threw: ${
       err instanceof Error ? err.message : String(err)
     }`);
@@ -288,6 +289,7 @@ async function uploadBriefImpl(
     .neq("status", "removed")
     .maybeSingle();
   if (siteLookup.error) {
+    logger.error("briefs.uploadBrief.site_lookup_failed", { site_id: input.siteId, supabase_error: siteLookup.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to look up site.", {
       details: { supabase_error: siteLookup.error },
     });
@@ -313,6 +315,7 @@ async function uploadBriefImpl(
     .eq("upload_idempotency_key", idempotencyKey)
     .maybeSingle();
   if (existing.error) {
+    logger.error("briefs.uploadBrief.idempotency_query_failed", { site_id: input.siteId, supabase_error: existing.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to query existing briefs.", {
       details: { supabase_error: existing.error },
     });
@@ -354,6 +357,7 @@ async function uploadBriefImpl(
     },
   );
   if (upload.error) {
+    logger.error("briefs.uploadBrief.storage_upload_failed", { brief_id: briefId, site_id: input.siteId, storage_error: upload.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Storage upload failed.", {
       details: { storage_error: upload.error.message },
     });
@@ -414,6 +418,7 @@ async function uploadBriefImpl(
         );
       }
     }
+    logger.error("briefs.uploadBrief.insert_failed", { brief_id: briefId, site_id: input.siteId, supabase_error: insert.error?.message ?? null });
     return errorEnvelope("INTERNAL_ERROR", "Failed to insert brief row.", {
       details: { supabase_error: insert.error ?? null },
     });
@@ -520,6 +525,7 @@ async function uploadBriefImpl(
   if (pageRows.length > 0) {
     const pagesInsert = await svc.from("brief_pages").insert(pageRows);
     if (pagesInsert.error) {
+      logger.error("briefs.uploadBrief.pages_insert_failed", { brief_id: briefId, site_id: input.siteId, page_count: pageRows.length, supabase_error: pagesInsert.error.message });
       return errorEnvelope("INTERNAL_ERROR", "Failed to insert brief_pages.", {
         details: { supabase_error: pagesInsert.error },
       });
@@ -544,6 +550,7 @@ async function uploadBriefImpl(
     .select("id")
     .maybeSingle();
   if (finalize.error) {
+    logger.error("briefs.uploadBrief.finalize_failed", { brief_id: briefId, site_id: input.siteId, supabase_error: finalize.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to finalize brief.", {
       details: { supabase_error: finalize.error },
     });
@@ -588,6 +595,7 @@ export async function getBriefWithPages(
     .is("deleted_at", null)
     .maybeSingle();
   if (briefRes.error) {
+    logger.error("briefs.getBriefWithPages.brief_fetch_failed", { brief_id: briefId, supabase_error: briefRes.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief.", {
       details: { supabase_error: briefRes.error },
     });
@@ -603,6 +611,7 @@ export async function getBriefWithPages(
     .is("deleted_at", null)
     .order("ordinal", { ascending: true });
   if (pagesRes.error) {
+    logger.error("briefs.getBriefWithPages.pages_fetch_failed", { brief_id: briefId, supabase_error: pagesRes.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief pages.", {
       details: { supabase_error: pagesRes.error },
     });
@@ -667,6 +676,7 @@ export async function commitBrief(
   try {
     return await commitBriefImpl(input);
   } catch (err) {
+    logger.error("briefs.commitBrief.uncaught", { brief_id: input.briefId, err: err instanceof Error ? err.message : String(err) });
     return errorEnvelope("INTERNAL_ERROR", `commitBrief threw: ${
       err instanceof Error ? err.message : String(err)
     }`);
@@ -686,6 +696,7 @@ async function commitBriefImpl(
     .is("deleted_at", null)
     .maybeSingle();
   if (briefRes.error) {
+    logger.error("briefs.commitBrief.brief_fetch_failed", { brief_id: input.briefId, supabase_error: briefRes.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief.", {
       details: { supabase_error: briefRes.error },
     });
@@ -738,6 +749,7 @@ async function commitBriefImpl(
     .is("deleted_at", null)
     .order("ordinal", { ascending: true });
   if (pagesRes.error) {
+    logger.error("briefs.commitBrief.pages_fetch_failed", { brief_id: input.briefId, supabase_error: pagesRes.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief pages.", {
       details: { supabase_error: pagesRes.error },
     });
@@ -795,6 +807,7 @@ async function commitBriefImpl(
     .maybeSingle();
 
   if (update.error) {
+    logger.error("briefs.commitBrief.update_failed", { brief_id: input.briefId, supabase_error: update.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to commit brief.", {
       details: { supabase_error: update.error },
     });
@@ -833,6 +846,7 @@ export async function listSiteBriefs(
     .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (error) {
+    logger.error("briefs.listSiteBriefs.query_failed", { site_id: siteId, supabase_error: error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to list briefs.", {
       details: { supabase_error: error },
     });
@@ -890,6 +904,7 @@ export async function estimateBriefRunCost(
     .is("deleted_at", null)
     .maybeSingle();
   if (briefRes.error) {
+    logger.error("briefs.estimateBriefRunCost.brief_fetch_failed", { brief_id: briefId, supabase_error: briefRes.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -936,6 +951,7 @@ export async function startBriefRun(
     .is("deleted_at", null)
     .maybeSingle();
   if (briefRes.error) {
+    logger.error("briefs.startBriefRun.brief_fetch_failed", { brief_id: input.briefId, supabase_error: briefRes.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to fetch brief.", {
       details: { supabase_error: briefRes.error },
     });
@@ -962,6 +978,7 @@ export async function startBriefRun(
     .eq("site_id", brief.site_id)
     .maybeSingle();
   if (budget.error) {
+    logger.error("briefs.startBriefRun.budget_fetch_failed", { brief_id: input.briefId, site_id: brief.site_id, supabase_error: budget.error.message });
     return errorEnvelope("INTERNAL_ERROR", "Failed to fetch tenant budget.", {
       details: { supabase_error: budget.error },
     });
@@ -1010,6 +1027,7 @@ export async function startBriefRun(
         "There is already an active brief_run for this brief. Cancel it before starting a new one.",
       );
     }
+    logger.error("briefs.startBriefRun.run_insert_failed", { brief_id: input.briefId, site_id: brief.site_id, supabase_error: runInsert.error?.message ?? null });
     return errorEnvelope("INTERNAL_ERROR", "Failed to insert brief_run.", {
       details: { supabase_error: runInsert.error ?? null },
     });
