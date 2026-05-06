@@ -2,10 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, respond, validationError } from "@/lib/http";
 import { createPost } from "@/lib/posts";
 import { getServiceRoleClient } from "@/lib/supabase";
-import { errorCodeToStatus } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
 // POST /api/sites/[id]/posts — BP-3 entry-point save-draft.
@@ -55,27 +54,6 @@ const BodySchema = z
   })
   .strict();
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: {
-        code,
-        message,
-        retryable: false,
-        ...(details ? { details } : {}),
-      },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -84,19 +62,14 @@ export async function POST(
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
+    return validationError("Site id must be a UUID.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "Body failed validation.",
-      400,
-      { issues: parsed.error.issues },
-    );
+    return validationError("Body failed validation.", { issues: parsed.error.issues });
   }
 
   // Read the site's active design system version so the post row's
@@ -157,13 +130,7 @@ export async function POST(
   });
 
   if (!result.ok) {
-    const status = errorCodeToStatus(result.error.code);
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      status,
-      result.error.details,
-    );
+    return respond(result);
   }
 
   return NextResponse.json(

@@ -90,6 +90,7 @@ export const ERROR_CODES = [
   "EXPIRED",
   "AUTH_USER_EXISTS",
   "EMAIL_DELIVERY_FAILED",
+  "CONFLICT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -214,6 +215,8 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 410;
     case "EMAIL_DELIVERY_FAILED":
       return 502;
+    case "CONFLICT":
+      return 409;
   }
 }
 
