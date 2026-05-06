@@ -43,13 +43,29 @@ export default async function SiteSettingsPage({
   const site = result.data.site;
 
   const svc = getServiceRoleClient();
-  const useImageLibraryRow = await svc
-    .from("sites")
-    .select("use_image_library")
-    .eq("id", site.id)
-    .maybeSingle();
+  const [useImageLibraryRow, imageCountRow, metadataCountRow] =
+    await Promise.all([
+      svc
+        .from("sites")
+        .select("use_image_library")
+        .eq("id", site.id)
+        .maybeSingle(),
+      svc
+        .from("image_library")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null),
+      svc
+        .from("image_library")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .not("caption", "is", null)
+        .not("alt_text", "is", null),
+    ]);
+
   const useImageLibrary =
     (useImageLibraryRow.data?.use_image_library as boolean | undefined) ?? false;
+  const totalImages = imageCountRow.count ?? 0;
+  const imagesWithMetadata = metadataCountRow.count ?? 0;
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -99,6 +115,8 @@ export default async function SiteSettingsPage({
           <UseImageLibraryToggle
             siteId={site.id}
             initialEnabled={useImageLibrary}
+            totalImages={totalImages}
+            imagesWithMetadata={imagesWithMetadata}
           />
         </div>
       </section>
