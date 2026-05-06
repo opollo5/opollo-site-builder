@@ -230,12 +230,19 @@ export function PostDetailClient({
         <h2 id="preview-heading" className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Content preview
         </h2>
-        {post.generated_html ? (
+        {post.status === "published" && wpFrontendUrl ? (
+          <iframe
+            src={wpFrontendUrl}
+            sandbox="allow-same-origin allow-scripts allow-popups"
+            className="mt-3 h-96 w-full rounded border"
+            title={`Live preview of ${post.title}`}
+          />
+        ) : post.generated_html ? (
           <iframe
             sandbox=""
             srcDoc={post.generated_html}
             className="mt-3 h-96 w-full rounded border"
-            title={`Preview of ${post.title}`}
+            title={`Draft preview of ${post.title}`}
           />
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
