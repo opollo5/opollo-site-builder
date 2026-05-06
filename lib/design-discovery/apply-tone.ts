@@ -101,6 +101,7 @@ export async function applyToneToHomepage(
   if (!homepage || !tone) {
     // Nothing to apply — design + tone must both be approved first.
     // Caller should have checked; we fail soft here.
+    logger.error("design_discovery.apply_tone.missing_inputs", { site_id: siteId, has_html: !!homepage, has_tone: !!tone });
     return {
       ok: false,
       error: {
@@ -124,6 +125,7 @@ export async function applyToneToHomepage(
         .map((s) => ({ kind: s.kind, text: s.text }))
     : [];
   if (!styleGuide) {
+    logger.error("design_discovery.apply_tone.empty_style_guide", { site_id: siteId });
     return {
       ok: false,
       error: {

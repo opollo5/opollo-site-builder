@@ -3,6 +3,7 @@ import {
   type CreatePageData,
   type ToolResponse,
 } from "@/lib/tool-schemas";
+import { logger } from "@/lib/logger";
 import { readWpConfig, wpCreatePage } from "@/lib/wordpress";
 
 export async function executeCreatePage(
@@ -28,6 +29,7 @@ export async function executeCreatePage(
 
   const cfg = readWpConfig();
   if (!cfg.ok) {
+    logger.error("create_page.execute.missing_wp_env_vars", { missing: cfg.missing });
     return {
       ok: false,
       error: {

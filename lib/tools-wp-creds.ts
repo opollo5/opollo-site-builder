@@ -2,6 +2,7 @@ import "server-only";
 
 import { NextResponse } from "next/server";
 
+import { logger } from "@/lib/logger";
 import { getSite } from "@/lib/sites";
 import type { WpCredentialsOverride } from "@/lib/wordpress";
 
@@ -31,6 +32,7 @@ export async function resolveToolWpCreds(
 
   const { site, credentials } = siteResult.data;
   if (!credentials) {
+    logger.error("tools_wp_creds.resolve.no_credentials", { site_id: siteId });
     return {
       ok: false,
       response: NextResponse.json(

@@ -3,6 +3,7 @@ import {
   type PublishPageData,
   type ToolResponse,
 } from "@/lib/tool-schemas";
+import { logger } from "@/lib/logger";
 import { readWpConfig, wpPublishPage } from "@/lib/wordpress";
 
 const DS_VERSION = "1.0.0";
@@ -30,6 +31,7 @@ export async function executePublishPage(
 
   const cfg = readWpConfig();
   if (!cfg.ok) {
+    logger.error("publish_page.execute.missing_wp_env_vars", { missing: cfg.missing });
     return {
       ok: false,
       error: {
