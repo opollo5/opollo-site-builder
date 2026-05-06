@@ -202,8 +202,7 @@ test.describe("sites CRUD", () => {
   test("image-library toggle on settings page is a role=switch pill control", async ({
     page,
   }, testInfo) => {
-    await signInAsAdmin(page);
-
+    // beforeEach already calls signInAsAdmin — no need to repeat it here.
     // Use the pre-seeded "E2E Test Site" to avoid a slow site-creation
     // flow that times out on CI after 80+ prior tests.
     await page.goto("/admin/sites");
