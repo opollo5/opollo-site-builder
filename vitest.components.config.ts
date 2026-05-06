@@ -35,6 +35,20 @@ export default defineConfig({
           "components/__tests__/_next-font-stub.ts",
         ),
       },
+      {
+        find: /^pdf-parse$/,
+        replacement: path.resolve(
+          __dirname,
+          "components/__tests__/_pdf-parse-stub.ts",
+        ),
+      },
+      {
+        find: /^mammoth$/,
+        replacement: path.resolve(
+          __dirname,
+          "components/__tests__/_mammoth-stub.ts",
+        ),
+      },
     ],
   },
   test: {
