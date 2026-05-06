@@ -72,7 +72,7 @@ Sort order: strongest "pick up when" signal at the top. Rows with no signal move
 
 ---
 
-## Component test infra — jsdom + @testing-library/react (opened 2026-04-27 by RS-1 / RS-4)
+## ~~Component test infra — jsdom + @testing-library/react~~ (shipped — `vitest.components.config.ts` + `components/__tests__/`)
 
 **What:** Add `jsdom` (or `happy-dom`), `@testing-library/react`, and a vitest project split (or `environmentMatchGlobs`) so we can run hook + component tests under `lib/__tests__/` (or a new `components/__tests__/`).
 
