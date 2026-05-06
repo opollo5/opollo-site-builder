@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { readJsonBody, validationError } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // POST /api/admin/images/check-existing
@@ -60,6 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .is("deleted_at", null);
 
   if (res.error) {
+    logger.error("images.check_existing.db_failed", { err: res.error.message });
     return NextResponse.json(
       {
         ok: false,

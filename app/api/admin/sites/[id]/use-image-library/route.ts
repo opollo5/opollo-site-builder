@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { readJsonBody, validationError } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // POST /api/admin/sites/[id]/use-image-library
@@ -73,6 +74,7 @@ export async function POST(
     .maybeSingle();
 
   if (upd.error) {
+    logger.error("sites.use_image_library.db_failed", { err: upd.error.message, site_id: params.id });
     return NextResponse.json(
       {
         ok: false,
