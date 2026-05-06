@@ -73,10 +73,12 @@ async function ensureAdminUser(): Promise<void> {
   }
 
   // Trigger in migration 0004 auto-inserts opollo_users on new
-  // auth.users row with role='viewer'. Promote to admin.
+  // auth.users row with role='user'. Promote to super_admin so all
+  // admin surfaces (including super_admin-gated routes like
+  // /admin/settings/design-system) are reachable in E2E specs.
   const { error: roleErr } = await supabase
     .from("opollo_users")
-    .update({ role: "admin" })
+    .update({ role: "super_admin" })
     .eq("id", userId);
   if (roleErr) {
     throw new Error(`opollo_users promote failed: ${roleErr.message}`);

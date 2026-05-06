@@ -39,9 +39,15 @@ test.describe("users admin surface", () => {
     const selfRow = page.getByRole("row", {
       name: new RegExp(E2E_ADMIN_EMAIL),
     });
-    const select = selfRow.getByRole("combobox");
-    // The self row's <select> should be disabled per M2d-2's
-    // UserRoleActionCell guard.
-    await expect(select).toBeDisabled();
+    // super_admin rows render a static badge (no combobox) because the
+    // role is DB-locked by guard_super_admin. admin/user rows render a
+    // disabled combobox (M2d-2 CANNOT_MODIFY_SELF). Both prevent self-
+    // modification; assert whichever variant is present.
+    const comboboxCount = await selfRow.getByRole("combobox").count();
+    if (comboboxCount > 0) {
+      await expect(selfRow.getByRole("combobox")).toBeDisabled();
+    } else {
+      await expect(selfRow.getByText("super_admin")).toBeVisible();
+    }
   });
 });
