@@ -67,14 +67,14 @@ export async function getCurrentPlatformSession(
       .from("platform_users")
       .upsert({ id: userId, email, is_opollo_staff: true }, { onConflict: "id" });
 
-    // Check for staff-selected company cookie before returning company: null.
-    const staffCompany = await resolveStaffSelectedCompany(svc);
+    // Cookie takes priority; fall back to platform_company_users if no cookie.
+    const staffCompany = await resolveStaffCompany(userId, svc);
     return { userId, email, isOpolloStaff: true, company: staffCompany };
   }
 
   if (profileResult.data.is_opollo_staff === true) {
-    // Staff with a platform_users row: still check for the selected company cookie.
-    const staffCompany = await resolveStaffSelectedCompany(svc);
+    // Cookie takes priority; fall back to platform_company_users if no cookie.
+    const staffCompany = await resolveStaffCompany(userId, svc);
     return { userId, email, isOpolloStaff: true, company: staffCompany };
   }
 
@@ -106,6 +106,29 @@ export async function getCurrentCompany(
 ): Promise<CompanyMembership | null> {
   const session = await getCurrentPlatformSession(client);
   return session?.company ?? null;
+}
+
+// For staff users: cookie-selected company takes priority over their actual
+// platform_company_users row. Falls back to the DB row when no cookie is set
+// so staff who are members of Opollo Internal still get company context.
+async function resolveStaffCompany(
+  userId: string,
+  svc: ReturnType<typeof getServiceRoleClient>,
+): Promise<CompanyMembership | null> {
+  const cookieCompany = await resolveStaffSelectedCompany(svc);
+  if (cookieCompany) return cookieCompany;
+
+  const membershipResult = await svc
+    .from("platform_company_users")
+    .select("company_id, role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipResult.error || !membershipResult.data) return null;
+  return {
+    companyId: membershipResult.data.company_id as string,
+    role: membershipResult.data.role as CompanyRole,
+  };
 }
 
 // Reads the staff company-selection cookie and validates the company exists.
