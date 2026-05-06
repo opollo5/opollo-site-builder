@@ -107,6 +107,9 @@ const config: Config = {
         b2: "var(--b2)",
         b3: "var(--b3)",
         "icon-dim": "var(--icon-dim)",
+        "nav-active": "var(--nav-active)",
+        "nav-hover": "var(--nav-hover)",
+        topbar: "var(--topbar-bg)",
       },
       borderRadius: {
         lg: "var(--radius)",

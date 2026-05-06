@@ -41,6 +41,10 @@
     --b3: rgba(255, 255, 255, 0.20);
     /* Dim alpha for inactive icons — between m3 (0.32) and m2 (0.58) */
     --icon-dim: rgba(255, 255, 255, 0.40);
+    /* Nav chrome — semantic aliases so components don't hard-code rgba */
+    --nav-active: rgba(255, 3, 165, 0.10);  /* pk at 10%: active nav item bg  */
+    --nav-hover:  rgba(0, 229, 160, 0.06);  /* gr at 6%:  nav item hover bg   */
+    --topbar-bg:  rgba(4, 4, 10, 0.85);     /* bg at 85%: mobile topbar blur  */
 
     /* ---- Tailwind/shadcn semantic tokens (HSL, always-dark) -------------- */
     --background: 240 37% 4%;           /* --d1  #07070f  card surface       */

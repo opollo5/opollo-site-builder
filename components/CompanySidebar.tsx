@@ -105,15 +105,15 @@ export function CompanySidebar({
           className={cn(
             "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-d1",
             active
-              ? "bg-[rgba(255,3,165,0.10)] text-white font-medium"
-              : "text-m2 hover:bg-[rgba(0,229,160,0.06)] hover:text-gr",
+              ? "bg-nav-active text-white font-medium"
+              : "text-m2 hover:bg-nav-hover hover:text-gr",
           )}
         >
           <Icon
             aria-hidden
             className={cn(
               "h-4 w-4 shrink-0",
-              active ? "text-white" : "text-[rgba(255,255,255,0.40)] group-hover:text-gr",
+              active ? "text-white" : "text-icon-dim group-hover:text-gr",
             )}
           />
           {!collapsed && <span className="truncate">{label}</span>}
@@ -165,7 +165,7 @@ export function CompanySidebar({
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "hidden h-8 w-8 items-center justify-center rounded-md text-[rgba(255,255,255,0.40)] transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
+            "hidden h-8 w-8 items-center justify-center rounded-md text-icon-dim transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
             collapsed && "mx-auto",
           )}
         >
@@ -207,10 +207,10 @@ export function CompanySidebar({
         {companyId && !collapsed && (
           <Link
             href="/company/social/posts?notifications=1"
-            className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+            className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
             data-testid="cnav-notifications"
           >
-            <Bell aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
+            <Bell aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
             <span className="truncate">Notifications</span>
           </Link>
         )}
@@ -218,10 +218,10 @@ export function CompanySidebar({
           <Link
             href="/company/social/posts?notifications=1"
             title="Notifications"
-            className="group flex h-9 w-full items-center justify-center rounded-md text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+            className="group flex h-9 w-full items-center justify-center rounded-md text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
             data-testid="cnav-notifications"
           >
-            <Bell aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
+            <Bell aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
           </Link>
         )}
         {/* Back to admin — Opollo staff only */}
@@ -229,10 +229,10 @@ export function CompanySidebar({
           <Link
             href="/admin/companies"
             title={collapsed ? "Back to admin" : undefined}
-            className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+            className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
             data-testid="cnav-back-to-admin"
           >
-            <ChevronsLeft aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
+            <ChevronsLeft aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
             {!collapsed && <span className="truncate">Back to admin</span>}
           </Link>
         )}
@@ -264,7 +264,7 @@ export function CompanySidebar({
   return (
     <>
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-[rgba(4,4,10,0.85)] px-4 backdrop-blur-[18px] sm:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
         <Link
           href="/company/social/posts"
           className="focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
