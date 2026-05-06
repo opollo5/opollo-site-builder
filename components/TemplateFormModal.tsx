@@ -46,7 +46,7 @@ function FieldError({ message }: { message?: string | null }) {
 
 function FieldWarning({ message }: { message?: string | null }) {
   if (!message) return null;
-  return <p className="mt-1 text-sm text-yellow-700 dark:text-yellow-400">{message}</p>;
+  return <p className="mt-1 text-sm text-yellow-700">{message}</p>;
 }
 
 function initialFromTemplate(t: DesignTemplate): FormState {

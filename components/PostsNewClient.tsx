@@ -326,9 +326,9 @@ function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void 
         <div
           key={draft.siteId}
           role="alert"
-          className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800/40 dark:bg-amber-900/20"
+          className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
         >
-          <span className="text-amber-900 dark:text-amber-200">
+          <span className="text-amber-900">
             Unsaved draft
             {draft.siteName ? (
               <>
@@ -345,7 +345,7 @@ function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void 
             <button
               type="button"
               onClick={() => onResume(draft.siteId)}
-              className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700 dark:text-amber-200 dark:hover:text-amber-100"
+              className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
             >
               Resume
             </button>
@@ -355,7 +355,7 @@ function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void 
             <button
               type="button"
               onClick={() => discard(draft.siteId)}
-              className="text-amber-700 underline underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100"
+              className="text-amber-700 underline underline-offset-2 hover:text-amber-900"
             >
               Discard
             </button>

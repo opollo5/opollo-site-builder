@@ -362,7 +362,7 @@ export function BriefReviewClient({
                     : "These guide every page the generator produces."}
               </p>
               {!hasSiteDefault && !isReadOnly && (
-                <div className="mt-2 rounded-md border border-blue-500/40 bg-blue-500/5 p-2 text-xs text-blue-900 dark:text-blue-200">
+                <div className="mt-2 rounded-md border border-blue-500/40 bg-blue-500/5 p-2 text-xs text-blue-900">
                   <strong>Tip:</strong> brand voice is a property of the
                   whole site — set it once on{" "}
                   <a

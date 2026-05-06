@@ -170,9 +170,9 @@ export function CompanySidebar({
           aria-current={active ? "page" : undefined}
           title={collapsed ? label : undefined}
           className={cn(
-            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-d1",
+            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             active
-              ? "bg-nav-active text-white font-medium"
+              ? "bg-nav-active text-pk font-medium"
               : "text-m2 hover:bg-nav-hover hover:text-gr",
           )}
         >
@@ -180,7 +180,7 @@ export function CompanySidebar({
             aria-hidden
             className={cn(
               "h-4 w-4 shrink-0",
-              active ? "text-white" : "text-icon-dim group-hover:text-gr",
+              active ? "text-pk" : "text-icon-dim group-hover:text-gr",
             )}
           />
           {!collapsed && <span className="truncate">{label}</span>}
@@ -214,7 +214,7 @@ export function CompanySidebar({
         >
           <Building2 aria-hidden className="h-4 w-4 shrink-0 text-icon-dim" />
           {!collapsed && (
-            <span className="truncate text-sm font-medium text-white">
+            <span className="truncate text-sm font-medium text-foreground">
               {companyName ?? "No company"}
             </span>
           )}
@@ -235,7 +235,7 @@ export function CompanySidebar({
         className={cn(
           "group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-smooth",
           "hover:bg-nav-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
-          hasCompany ? "text-white" : "text-m2",
+          hasCompany ? "text-foreground" : "text-m2",
           collapsed ? "justify-center" : "",
         )}
       >
@@ -272,13 +272,13 @@ export function CompanySidebar({
           aria-selected={!companyId}
           type="button"
           onClick={() => selectCompany(null)}
-          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-m3 transition-colors hover:bg-white/[0.06] hover:text-white"
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-m3 transition-colors hover:bg-muted hover:text-foreground"
         >
           {!companyId && <Check className="h-3 w-3 shrink-0 text-pk" aria-hidden />}
           {companyId && <span className="h-3 w-3 shrink-0" aria-hidden />}
           <span className="italic">No company selected</span>
         </button>
-        <div className="border-t border-white/[0.06]" />
+        <div className="border-t border-border" />
 
         {companiesLoading ? (
           <p className="px-3 py-2 text-xs text-m3">Loading…</p>
@@ -297,8 +297,8 @@ export function CompanySidebar({
                     onClick={() => selectCompany(c.id)}
                     className={cn(
                       "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
-                      "hover:bg-white/[0.06]",
-                      isSelected ? "text-pk" : "text-m2 hover:text-white",
+                      "hover:bg-muted",
+                      isSelected ? "text-pk" : "text-m2 hover:text-foreground",
                     )}
                   >
                     {isSelected
@@ -328,7 +328,7 @@ export function CompanySidebar({
   const sidebarBody = (
     <div className="flex h-full flex-col">
       {/* Wordmark + collapse toggle */}
-      <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-3">
+      <div className="flex h-14 items-center justify-between border-b border-border px-3">
         {!collapsed && (
           <Link
             href="/company/social/calendar"
@@ -336,7 +336,7 @@ export function CompanySidebar({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+              src="/logos/opollo-logo-dark.png"
               alt="Opollo"
               width={120}
               className="h-7 w-auto"
@@ -348,7 +348,7 @@ export function CompanySidebar({
           type="button"
           onClick={() => setMobileOpen(false)}
           aria-label="Close navigation"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:hidden"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:hidden"
         >
           <X aria-hidden className="h-5 w-5" />
         </button>
@@ -359,7 +359,7 @@ export function CompanySidebar({
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className={cn(
-            "hidden h-8 w-8 items-center justify-center rounded-md text-icon-dim transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
+            "hidden h-8 w-8 items-center justify-center rounded-md text-icon-dim transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
             collapsed && "mx-auto",
           )}
         >
@@ -407,7 +407,7 @@ export function CompanySidebar({
       </nav>
 
       {/* Footer rail */}
-      <div className="border-t border-white/[0.06] p-2 space-y-0.5">
+      <div className="border-t border-border p-2 space-y-0.5">
         {/* Notification bell — only when user has a company context */}
         {companyId && !collapsed && (
           <Link
@@ -456,7 +456,7 @@ export function CompanySidebar({
         {/* Email label */}
         {!collapsed && (
           <p
-            className="mt-1 truncate border-t border-white/[0.06] pt-2 px-2.5 text-xs text-m3"
+            className="mt-1 truncate border-t border-border pt-2 px-2.5 text-xs text-m3"
             title={email}
           >
             {email}
@@ -469,14 +469,14 @@ export function CompanySidebar({
   return (
     <>
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
         <Link
           href="/company/social/calendar"
           className="focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+            src="/logos/opollo-logo-dark.png"
             alt="Opollo"
             width={120}
             className="h-7 w-auto"
@@ -488,7 +488,7 @@ export function CompanySidebar({
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
           aria-controls="company-sidebar"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           data-testid="company-mobile-nav-button"
         >
           <Menu aria-hidden className="h-5 w-5" />
@@ -510,7 +510,7 @@ export function CompanySidebar({
         id="company-sidebar"
         aria-label="Primary navigation"
         className={cn(
-          "border-r border-white/[0.06] transition-all duration-200",
+          "border-r border-border transition-all duration-200",
           "bg-[linear-gradient(180deg,var(--d1)_0%,var(--bg)_100%)]",
           "fixed inset-y-0 left-0 z-50 w-72 shrink-0 -translate-x-full",
           mobileOpen && "translate-x-0",
