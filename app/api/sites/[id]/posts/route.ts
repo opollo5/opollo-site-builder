@@ -48,6 +48,8 @@ const BodySchema = z
     wp_tag_ids: z.array(z.number().int().nonnegative()).max(20).optional(),
     // New tag names (not yet created in WP); created on publish.
     wp_new_tag_names: z.array(z.string().min(1).max(200)).max(20).optional(),
+    // New category names (not yet created in WP); created on publish.
+    wp_new_category_names: z.array(z.string().min(1).max(200)).max(20).optional(),
     // Pre-composed HTML for "Publish immediately" mode.
     generated_html: z.string().max(500_000).nullable().optional(),
   })
@@ -133,6 +135,9 @@ export async function POST(
       : {}),
     ...(parsed.data.wp_new_tag_names !== undefined
       ? { wp_new_tag_names: parsed.data.wp_new_tag_names }
+      : {}),
+    ...(parsed.data.wp_new_category_names !== undefined
+      ? { wp_new_category_names: parsed.data.wp_new_category_names }
       : {}),
   };
 
