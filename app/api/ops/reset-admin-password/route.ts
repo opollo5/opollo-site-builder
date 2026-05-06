@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { constantTimeEqual } from "@/lib/crypto-compare";
-import { readJsonBody } from "@/lib/http";
+import { forbidden, internalError, notFound, readJsonBody, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -53,32 +53,15 @@ function extractKey(req: Request): string | null {
   return null;
 }
 
-function jsonError(
-  code: string,
-  message: string,
-  status: number,
-  retryable = false,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: Request): Promise<NextResponse> {
   const expected = process.env.OPOLLO_EMERGENCY_KEY;
   if (!expected || expected.length < MIN_KEY_LENGTH) {
     logger.warn("ops_reset_admin_password_not_configured", {
       reason: "OPOLLO_EMERGENCY_KEY unset or too short",
     });
-    return jsonError(
+    return routeError(
       "EMERGENCY_NOT_CONFIGURED",
       "Emergency access is not configured on this deployment.",
-      503,
     );
   }
 
@@ -87,26 +70,16 @@ export async function POST(req: Request): Promise<NextResponse> {
     logger.warn("ops_reset_admin_password_unauthorized", {
       outcome: "bad_key",
     });
-    return jsonError("UNAUTHORIZED", "Invalid emergency key.", 401);
+    return routeError("UNAUTHORIZED", "Invalid emergency key.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message:
-            "Invalid request body. Expected { email, new_password } with a valid email and a password of at least 12 characters.",
-          details: { issues: parsed.error.issues },
-          retryable: true,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
+    return validationError(
+      "Invalid request body. Expected { email, new_password } with a valid email and a password of at least 12 characters.",
+      { issues: parsed.error.issues },
     );
   }
 
@@ -139,12 +112,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         email: normalizedEmail,
         error: opolloErr.message,
       });
-      return jsonError(
-        "INTERNAL_ERROR",
-        "Admin lookup failed. See server logs.",
-        500,
-        true,
-      );
+      return internalError("Admin lookup failed. See server logs.");
     }
 
     if (!opolloUser) {
@@ -152,11 +120,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         email: normalizedEmail,
         outcome: "no_matching_user",
       });
-      return jsonError(
-        "NOT_FOUND",
-        "No admin user found with that email.",
-        404,
-      );
+      return notFound("No admin user found with that email.");
     }
 
     if (opolloUser.role !== "super_admin") {
@@ -165,11 +129,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         role: opolloUser.role,
         outcome: "non_admin_target",
       });
-      return jsonError(
-        "FORBIDDEN",
-        "This endpoint can only reset passwords for users with role='super_admin'.",
-        403,
-      );
+      return forbidden("This endpoint can only reset passwords for users with role='super_admin'.");
     }
 
     const { error: updateErr } = await svc.auth.admin.updateUserById(
@@ -183,12 +143,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         user_id: opolloUser.id,
         error: updateErr.message,
       });
-      return jsonError(
-        "INTERNAL_ERROR",
-        "Password update failed. See server logs.",
-        500,
-        true,
-      );
+      return internalError("Password update failed. See server logs.");
     }
 
     logger.info("ops_reset_admin_password_success", {
@@ -215,11 +170,6 @@ export async function POST(req: Request): Promise<NextResponse> {
       email: normalizedEmail,
       error: message,
     });
-    return jsonError(
-      "INTERNAL_ERROR",
-      "Password reset failed. See server logs.",
-      500,
-      true,
-    );
+    return internalError("Password reset failed. See server logs.");
   }
 }

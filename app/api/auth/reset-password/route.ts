@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
-import { readJsonBody } from "@/lib/http";
+import { internalError, readJsonBody, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { validatePassword } from "@/lib/password-policy";
 
@@ -32,45 +32,17 @@ const BodySchema = z.object({
   new_password: z.string().min(1).max(512),
 });
 
-function jsonError(
-  code: string,
-  message: string,
-  status: number,
-  retryable = false,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message: "Provide a new password.",
-          details: { issues: parsed.error.issues },
-          retryable: true,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
-    );
+    return validationError("Provide a new password.", { issues: parsed.error.issues });
   }
 
   const policy = validatePassword(parsed.data.new_password);
   if (!policy.ok) {
-    return jsonError("PASSWORD_WEAK", policy.message, 422, true);
+    return routeError("PASSWORD_WEAK", policy.message);
   }
 
   const supabase = createRouteAuthClient();
@@ -79,10 +51,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     logger.warn("reset_password_unauthenticated", {
       outcome: "no_session",
     });
-    return jsonError(
+    return routeError(
       "UNAUTHORIZED",
       "Your reset link has expired. Request a new one from the forgot-password page.",
-      401,
     );
   }
 
@@ -104,7 +75,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         error: error.message,
         code,
       });
-      return jsonError(code, message, 422, true);
+      return routeError(code, message);
     }
 
     logger.info("reset_password_success", {
@@ -129,11 +100,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       user_id: user.id,
       error: err instanceof Error ? err.message : String(err),
     });
-    return jsonError(
-      "INTERNAL_ERROR",
-      "Password update failed. Please try again.",
-      500,
-      true,
-    );
+    return internalError("Password update failed. Please try again.");
   }
 }

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
-import { readJsonBody } from "@/lib/http";
+import { internalError, readJsonBody, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -37,22 +37,6 @@ const BodySchema = z.object({
   email: z.string().email().max(320),
 });
 
-function jsonError(
-  code: string,
-  message: string,
-  status: number,
-  retryable = false,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 function successEnvelope(email: string): NextResponse {
   return NextResponse.json(
     {
@@ -69,21 +53,12 @@ function successEnvelope(email: string): NextResponse {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message: "Provide a valid email address.",
-          details: { issues: parsed.error.issues },
-          retryable: true,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
+    return validationError(
+      "Provide a valid email address.",
+      { issues: parsed.error.issues },
     );
   }
 
@@ -137,11 +112,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       email,
       error: err instanceof Error ? err.message : String(err),
     });
-    return jsonError(
-      "INTERNAL_ERROR",
-      "Password reset request failed. Please try again.",
-      500,
-      true,
-    );
+    return internalError("Password reset request failed. Please try again.");
   }
 }

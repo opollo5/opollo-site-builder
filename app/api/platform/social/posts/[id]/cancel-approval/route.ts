@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { cancelApprovalRequest } from "@/lib/platform/social/posts";
 
@@ -29,31 +29,12 @@ const Schema = z.object({
   reason: z.string().max(2000).nullable().optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
-function statusForCode(code: string): number {
+function errorForCode(code: string, message: string): NextResponse {
   switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "NOT_FOUND":
-      return 404;
-    case "INVALID_STATE":
-      return 409;
-    default:
-      return 500;
+    case "VALIDATION_FAILED": return validationError(message);
+    case "NOT_FOUND": return notFound(message);
+    case "INVALID_STATE": return invalidState(message);
+    default: return internalError(message);
   }
 }
 
@@ -63,18 +44,14 @@ export async function POST(
 ): Promise<NextResponse> {
   const { id } = await params;
   if (!UUID_RE.test(id)) {
-    return errorJson("VALIDATION_FAILED", "id must be a UUID.", 400);
+    return validationError("id must be a UUID.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "Body must be { company_id: uuid, reason?: string }.",
-      400,
-    );
+    return validationError("Body must be { company_id: uuid, reason?: string }.");
   }
 
   const gate = await requireCanDoForApi(parsed.data.company_id, "edit_post");
@@ -87,11 +64,7 @@ export async function POST(
     reason: parsed.data.reason ?? null,
   });
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
+    return errorForCode(result.error.code, result.error.message);
   }
 
   return NextResponse.json(

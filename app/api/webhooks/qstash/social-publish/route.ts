@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { internalError, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { fireScheduledPublish } from "@/lib/platform/social/publishing";
 import { verifyQstashSignature } from "@/lib/qstash";
@@ -45,16 +46,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       reason: verify.reason,
     });
     if (verify.reason === "no_receiver") {
-      return errorEnvelope(
+      return routeError(
         "RECEIVER_NOT_CONFIGURED",
         "QSTASH_CURRENT_SIGNING_KEY is not configured.",
-        503,
       );
     }
-    return errorEnvelope(
+    return routeError(
       "INVALID_SIGNATURE",
       "Invalid or missing Upstash-Signature.",
-      401,
     );
   }
 
@@ -62,10 +61,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     parsed = BodySchema.parse(JSON.parse(rawBody));
   } catch (err) {
-    return errorEnvelope(
-      "VALIDATION_FAILED",
+    return validationError(
       `Invalid body: ${err instanceof Error ? err.message : String(err)}`,
-      400,
     );
   }
 
@@ -75,14 +72,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (!result.ok) {
     if (result.error.code === "VALIDATION_FAILED") {
-      return errorEnvelope("VALIDATION_FAILED", result.error.message, 400);
+      return validationError(result.error.message);
     }
     // INTERNAL_ERROR returns 500 so QStash retries.
     logger.error("social.publish.callback.fire_failed", {
       err: result.error.message,
       scheduleEntryId: parsed.scheduleEntryId,
     });
-    return errorEnvelope("INTERNAL_ERROR", result.error.message, 500);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(
@@ -92,20 +89,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     },
     { status: 200 },
-  );
-}
-
-function errorEnvelope(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: status >= 500 },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
   );
 }

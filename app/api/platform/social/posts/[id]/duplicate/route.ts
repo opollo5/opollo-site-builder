@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, notFound, internalError, routeError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { duplicatePost } from "@/lib/platform/social/posts";
@@ -25,46 +25,20 @@ const Schema = z.object({
   company_id: z.string().uuid(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
-function statusForCode(code: string): number {
-  switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "NOT_FOUND":
-      return 404;
-    default:
-      return 500;
-  }
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
   if (!UUID_RE.test(id)) {
-    return errorJson("NOT_FOUND", "Post not found.", 404);
+    return notFound("Post not found.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
-    return errorJson("VALIDATION_FAILED", "company_id (UUID) required.", 400);
+    return validationError("company_id (UUID) required.");
   }
 
   const gate = await requireCanDoForApi(parsed.data.company_id, "create_post");
@@ -72,7 +46,7 @@ export async function POST(
 
   const session = await getCurrentPlatformSession();
   if (!session) {
-    return errorJson("UNAUTHORIZED", "Authentication required.", 401);
+    return routeError("UNAUTHORIZED", "Authentication required.");
   }
 
   const result = await duplicatePost({
@@ -82,11 +56,9 @@ export async function POST(
   });
 
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    if (result.error.code === "NOT_FOUND") return notFound(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(

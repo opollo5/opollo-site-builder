@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { verifyBundlesocialSignature } from "@/lib/bundlesocial";
+import { internalError, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   processBundlesocialWebhook,
@@ -50,16 +51,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       reason: verify.reason,
     });
     if (verify.reason === "no_secret") {
-      return errorEnvelope(
+      return routeError(
         "RECEIVER_NOT_CONFIGURED",
         "BUNDLESOCIAL_WEBHOOK_SIGNING_SECRET is not configured.",
-        503,
       );
     }
-    return errorEnvelope(
+    return routeError(
       "INVALID_SIGNATURE",
       "Invalid or missing x-signature.",
-      401,
     );
   }
 
@@ -67,17 +66,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     parsedBody = JSON.parse(rawBody);
   } catch {
-    return errorEnvelope("VALIDATION_FAILED", "Body is not valid JSON.", 400);
+    return validationError("Body is not valid JSON.");
   }
 
   const envelopeParsed = WebhookEnvelopeSchema.safeParse(parsedBody);
   if (!envelopeParsed.success) {
-    return errorEnvelope(
-      "VALIDATION_FAILED",
+    return validationError(
       `Webhook envelope did not validate: ${envelopeParsed.error.issues
         .map((i) => i.message)
         .join("; ")}`,
-      400,
     );
   }
 
@@ -89,10 +86,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (result.kind === "idempotent_insert_failed") {
     logger.error("bundlesocial.webhook.insert_failed", { message: result.message });
-    return errorEnvelope("INTERNAL_ERROR", result.message, 500);
+    return internalError(result.message);
   }
   if (result.kind === "validation_failed") {
-    return errorEnvelope("VALIDATION_FAILED", result.message, 400);
+    return validationError(result.message);
   }
 
   // ok / already_processed / stored_no_action all return 200; the
@@ -104,20 +101,5 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       timestamp: new Date().toISOString(),
     },
     { status: 200 },
-  );
-}
-
-function errorEnvelope(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: status >= 500 },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
   );
 }

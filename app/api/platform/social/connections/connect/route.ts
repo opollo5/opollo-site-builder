@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import {
   initiateBundlesocialConnect,
@@ -41,36 +41,13 @@ const PostBodySchema = z.object({
     .optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: {
-        code,
-        message,
-        retryable: false,
-        ...(details ? { details } : {}),
-      },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = PostBodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
+    return validationError(
       "Body must be { company_id: uuid, platforms?: SocialPlatform[] }.",
-      400,
       { issues: parsed.error.issues },
     );
   }
@@ -92,8 +69,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     redirectUrl,
   });
   if (!result.ok) {
-    const status = result.error.code === "VALIDATION_FAILED" ? 400 : 500;
-    return errorJson(result.error.code, result.error.message, status);
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(

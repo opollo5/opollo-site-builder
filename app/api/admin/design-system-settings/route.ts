@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { internalError, validationError } from "@/lib/http";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
@@ -46,10 +47,6 @@ const SettingsSchema = z.object({
 
 type Settings = z.infer<typeof SettingsSchema>;
 
-function deny(code: string, message: string, status: number): NextResponse {
-  return NextResponse.json({ ok: false, error: { code, message } }, { status });
-}
-
 export async function GET(): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin"] });
   if (gate.kind === "deny") return gate.response;
@@ -63,7 +60,7 @@ export async function GET(): Promise<NextResponse> {
 
   if (error) {
     logger.error("design_system_settings GET failed", { error: error.message });
-    return deny("DB_ERROR", "Failed to load settings.", 500);
+    return internalError("Failed to load settings.");
   }
 
   return NextResponse.json({ ok: true, settings: data });
@@ -78,11 +75,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
     const json = await req.json();
     parsed = SettingsSchema.parse(json);
   } catch (err) {
-    return deny(
-      "VALIDATION_FAILED",
-      err instanceof Error ? err.message : "Invalid request body.",
-      400,
-    );
+    return validationError(err instanceof Error ? err.message : "Invalid request body.");
   }
 
   const sb = getServiceRoleClient();
@@ -95,7 +88,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
 
   if (fetchErr) {
     logger.error("design_system_settings fetch-for-upsert failed", { error: fetchErr.message });
-    return deny("DB_ERROR", "Failed to load settings.", 500);
+    return internalError("Failed to load settings.");
   }
 
   const payload = {
@@ -113,7 +106,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
 
     if (updateErr) {
       logger.error("design_system_settings update failed", { error: updateErr.message });
-      return deny("DB_ERROR", "Failed to save settings.", 500);
+      return internalError("Failed to save settings.");
     }
   } else {
     const { error: insertErr } = await sb
@@ -122,7 +115,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse> {
 
     if (insertErr) {
       logger.error("design_system_settings insert failed", { error: insertErr.message });
-      return deny("DB_ERROR", "Failed to save settings.", 500);
+      return internalError("Failed to save settings.");
     }
   }
 

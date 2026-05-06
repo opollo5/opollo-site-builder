@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import {
   createMediaAsset,
@@ -33,26 +33,11 @@ const PostBodySchema = z.object({
   bytes: z.number().int().positive().optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const url = new URL(req.url);
   const companyId = url.searchParams.get("company_id");
   if (!companyId || !UUID_RE.test(companyId)) {
-    return errorJson("VALIDATION_FAILED", "company_id required.", 400);
+    return validationError("company_id required.");
   }
   const gate = await requireCanDoForApi(companyId, "view_calendar");
   if (gate.kind === "deny") return gate.response;
@@ -63,7 +48,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const result = await listMediaAssets({ companyId, before, limit });
   if (!result.ok) {
-    return errorJson(result.error.code, result.error.message, 500);
+    return internalError(result.error.message);
   }
   return NextResponse.json(
     {
@@ -77,14 +62,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = PostBodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "Body must be { company_id: uuid, source_url: https url, mime_type?, bytes? }.",
-      400,
-    );
+    return validationError("Body must be { company_id: uuid, source_url: https url, mime_type?, bytes? }.");
   }
 
   const gate = await requireCanDoForApi(parsed.data.company_id, "edit_post");
@@ -98,11 +79,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     uploadedBy: gate.userId,
   });
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      result.error.code === "VALIDATION_FAILED" ? 400 : 500,
-    );
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(

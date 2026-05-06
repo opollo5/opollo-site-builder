@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { validationError } from "@/lib/http";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderBaseEmail } from "@/lib/email/templates/base";
 
@@ -22,17 +23,6 @@ const BodySchema = z
   })
   .strict();
 
-function deny(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    { ok: false, error: { code, message } },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin"] });
   if (gate.kind === "deny") return gate.response;
@@ -42,11 +32,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const json = await req.json();
     parsed = BodySchema.parse(json);
   } catch (err) {
-    return deny(
-      "VALIDATION_FAILED",
-      err instanceof Error ? err.message : "Invalid request body.",
-      400,
-    );
+    return validationError(err instanceof Error ? err.message : "Invalid request body.");
   }
 
   const { html, text } = renderBaseEmail({

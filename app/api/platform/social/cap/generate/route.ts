@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, internalError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
@@ -37,20 +37,13 @@ const BodySchema = z.object({
   count: z.number().int().min(1).max(5).optional(),
 });
 
-function errorJson(code: string, message: string, status: number): NextResponse {
-  return NextResponse.json(
-    { ok: false, error: { code, message, retryable: false }, timestamp: new Date().toISOString() },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
 
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson("VALIDATION_FAILED", "Body must be { company_id: uuid, topics?: string[], platforms?: SocialPlatform[], count?: 1-5 }.", 400);
+    return validationError("Body must be { company_id: uuid, topics?: string[], platforms?: SocialPlatform[], count?: 1-5 }.");
   }
 
   const { company_id: companyId, topics, platforms, count } = parsed.data;
@@ -72,8 +65,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    const status = result.error.code === "VALIDATION_FAILED" ? 400 : 500;
-    return errorJson(result.error.code, result.error.message, status);
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(

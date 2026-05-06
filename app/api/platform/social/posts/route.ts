@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError, internalError, notFound } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import {
   createPostMaster,
@@ -47,36 +47,13 @@ const CreateSchema = z.object({
   source_type: z.enum(["manual", "csv", "cap", "api"]).optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: {
-        code,
-        message,
-        retryable: false,
-        ...(details ? { details } : {}),
-      },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = CreateSchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
+    return validationError(
       "Body must be { company_id: uuid, master_text?: string, link_url?: string, source_type?: 'manual'|'csv'|'cap'|'api' }.",
-      400,
       { issues: parsed.error.issues },
     );
   }
@@ -93,13 +70,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    const status =
-      result.error.code === "VALIDATION_FAILED"
-        ? 400
-        : result.error.code === "NOT_FOUND"
-          ? 404
-          : 500;
-    return errorJson(result.error.code, result.error.message, status);
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    if (result.error.code === "NOT_FOUND") return notFound(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(
@@ -116,18 +89,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const url = new URL(req.url);
   const companyId = url.searchParams.get("company_id");
   if (!companyId) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id query parameter is required.",
-      400,
-    );
+    return validationError("company_id query parameter is required.");
   }
   if (!/^[0-9a-f-]{36}$/i.test(companyId)) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id must be a UUID.",
-      400,
-    );
+    return validationError("company_id must be a UUID.");
   }
 
   const gate = await requireCanDoForApi(companyId, "view_calendar");
@@ -155,11 +120,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      result.error.code === "VALIDATION_FAILED" ? 400 : 500,
-    );
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(

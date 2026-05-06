@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { revokeUserSessions } from "@/lib/auth-revoke";
 import { constantTimeEqual } from "@/lib/crypto-compare";
-import { readJsonBody } from "@/lib/http";
+import { internalError, readJsonBody, routeError, validationError } from "@/lib/http";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -96,60 +96,27 @@ function logEmergencyEvent(event: EmergencyLog): void {
   );
 }
 
-function jsonError(
-  code: string,
-  message: string,
-  status: number,
-  retryable = false,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: Request): Promise<NextResponse> {
   const expected = process.env.OPOLLO_EMERGENCY_KEY;
   if (!expected || expected.length < MIN_KEY_LENGTH) {
     logEmergencyEvent({ ok: false, reason: "not_configured" });
-    return jsonError(
+    return routeError(
       "EMERGENCY_NOT_CONFIGURED",
       "Emergency access is not configured on this deployment.",
-      503,
     );
   }
 
   const provided = extractKey(req);
   if (!provided || !constantTimeEqual(provided, expected)) {
     logEmergencyEvent({ ok: false, reason: "auth_failed" });
-    return jsonError(
-      "UNAUTHORIZED",
-      "Invalid emergency key.",
-      401,
-    );
+    return routeError("UNAUTHORIZED", "Invalid emergency key.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return jsonError("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = ActionSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message: "Invalid emergency action payload.",
-          details: { issues: parsed.error.issues },
-          retryable: true,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
-    );
+    return validationError("Invalid emergency action payload.", { issues: parsed.error.issues });
   }
 
   const svc = getServiceRoleClient();
@@ -220,11 +187,6 @@ export async function POST(req: Request): Promise<NextResponse> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logEmergencyEvent({ ok: false, action, error: message });
-    return jsonError(
-      "INTERNAL_ERROR",
-      "Emergency action failed. See server logs.",
-      500,
-      true,
-    );
+    return internalError("Emergency action failed. See server logs.");
   }
 }

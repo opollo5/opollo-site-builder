@@ -90,6 +90,11 @@ export const ERROR_CODES = [
   "EXPIRED",
   "AUTH_USER_EXISTS",
   "EMAIL_DELIVERY_FAILED",
+  // Webhook receiver codes.
+  "INVALID_SIGNATURE",
+  "RECEIVER_NOT_CONFIGURED",
+  // S8 reconnect — healthy-connection guard.
+  "CONFLICT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -214,6 +219,12 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 410;
     case "EMAIL_DELIVERY_FAILED":
       return 502;
+    case "INVALID_SIGNATURE":
+      return 401;
+    case "RECEIVER_NOT_CONFIGURED":
+      return 503;
+    case "CONFLICT":
+      return 409;
   }
 }
 

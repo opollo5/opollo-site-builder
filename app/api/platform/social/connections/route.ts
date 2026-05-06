@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { validationError, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { listConnections } from "@/lib/platform/social/connections";
 
@@ -19,29 +20,10 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const companyId = new URL(req.url).searchParams.get("company_id");
   if (!companyId || !UUID_RE.test(companyId)) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id query parameter (uuid) is required.",
-      400,
-    );
+    return validationError("company_id query parameter (uuid) is required.");
   }
 
   const gate = await requireCanDoForApi(companyId, "view_calendar");
@@ -49,11 +31,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const result = await listConnections({ companyId });
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      result.error.code === "VALIDATION_FAILED" ? 400 : 500,
-    );
+    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
+    return internalError(result.error.message);
   }
 
   return NextResponse.json(
