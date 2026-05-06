@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 import type { DesignBrief } from "@/lib/design-discovery/design-brief";
@@ -48,6 +49,7 @@ export async function approveDesignDirection(
     .select("id")
     .maybeSingle();
   if (error) {
+    logger.error("design_discovery.approveDesignDirection.update_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: error.message },
@@ -89,6 +91,7 @@ export async function resetDesignDirection(
     .select("id")
     .maybeSingle();
   if (error) {
+    logger.error("design_discovery.resetDesignDirection.update_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: error.message },

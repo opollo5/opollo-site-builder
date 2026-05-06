@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,7 @@ export async function getSetupStatus(
     .neq("status", "removed")
     .maybeSingle();
   if (error) {
+    logger.error("site_setup.getSetupStatus.read_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: {
@@ -128,6 +130,7 @@ export async function setStepStatus(
     .select("id")
     .maybeSingle();
   if (error) {
+    logger.error("site_setup.setStepStatus.update_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: {

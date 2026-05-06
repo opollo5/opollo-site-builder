@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,7 @@ export async function incrementRegenCount(
     .neq("status", "removed")
     .maybeSingle<CountsRow>();
   if (readErr) {
+    logger.error("regen_caps.incrementRegenCount.read_failed", { site_id: siteId, counter, supabase_error: readErr.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: readErr.message },
@@ -116,6 +118,7 @@ export async function incrementRegenCount(
     .select("id")
     .maybeSingle();
   if (writeErr) {
+    logger.error("regen_caps.incrementRegenCount.write_failed", { site_id: siteId, counter, supabase_error: writeErr.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: writeErr.message },
@@ -159,6 +162,7 @@ export async function resetRegenCount(
     .neq("status", "removed")
     .maybeSingle<CountsRow>();
   if (readErr) {
+    logger.error("regen_caps.resetRegenCount.read_failed", { site_id: siteId, counter, supabase_error: readErr.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: readErr.message },
@@ -190,6 +194,7 @@ export async function resetRegenCount(
     .select("id")
     .maybeSingle();
   if (writeErr) {
+    logger.error("regen_caps.resetRegenCount.write_failed", { site_id: siteId, counter, supabase_error: writeErr.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: writeErr.message },
@@ -221,6 +226,7 @@ export async function getRegenCounts(
     .neq("status", "removed")
     .maybeSingle<CountsRow>();
   if (error) {
+    logger.error("regen_caps.getRegenCounts.read_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: error.message },

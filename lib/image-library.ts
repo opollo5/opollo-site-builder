@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -163,9 +164,9 @@ export async function getImage(
   try {
     return await getImageImpl(id);
   } catch (err) {
-    return internalError(
-      `Unhandled error in getImage: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("image_library.getImage.uncaught", { image_id: id, error: msg });
+    return internalError(`Unhandled error in getImage: ${msg}`);
   }
 }
 
@@ -181,6 +182,7 @@ async function getImageImpl(
     .maybeSingle();
 
   if (imageRes.error) {
+    logger.error("image_library.getImageImpl.image_fetch_failed", { image_id: id, supabase_error: imageRes.error.message });
     return internalError("Failed to fetch image.", {
       supabase_error: imageRes.error,
     });
@@ -219,6 +221,7 @@ async function getImageImpl(
     .order("created_at", { ascending: false });
 
   if (usageRes.error) {
+    logger.error("image_library.getImageImpl.usage_fetch_failed", { image_id: id, supabase_error: usageRes.error.message });
     return internalError("Failed to fetch image_usage.", {
       supabase_error: usageRes.error,
     });
@@ -251,6 +254,7 @@ async function getImageImpl(
     .order("key", { ascending: true });
 
   if (metaRes.error) {
+    logger.error("image_library.getImageImpl.metadata_fetch_failed", { image_id: id, supabase_error: metaRes.error.message });
     return internalError("Failed to fetch image_metadata.", {
       supabase_error: metaRes.error,
     });

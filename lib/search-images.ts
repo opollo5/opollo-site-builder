@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import {
   SEARCH_IMAGES_DEFAULT_LIMIT,
@@ -120,6 +121,7 @@ export async function executeSearchImages(
     .limit(limit);
 
   if (error) {
+    logger.error("image_library.search.query_failed", { supabase_error: error.message });
     return {
       ok: false,
       error: {
