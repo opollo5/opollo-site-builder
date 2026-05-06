@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 
 import { SocialCalendarClient } from "@/components/SocialCalendarClient";
-import { H1 } from "@/components/ui/typography";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
+import { listConnections } from "@/lib/platform/social/connections";
 import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
-// /company/social/calendar — monthly grid view.
+// /company/social/calendar — monthly grid view (default social landing).
 //
 // Accepts ?month=YYYY-MM (defaults to current month). Fetches schedule
 // entries for the full 6-row grid (Mon before the 1st through Sun after
@@ -58,20 +59,38 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
   const gridEnd = new Date(gridStart);
   gridEnd.setDate(gridStart.getDate() + 42);
 
-  const result = await listCompanyScheduleEntries({
-    companyId: session.company.companyId,
-    fromIso: gridStart.toISOString(),
-    toIso: gridEnd.toISOString(),
-  });
+  const companyId = session.company.companyId;
+
+  const [entriesResult, connectionsResult, companyRow] = await Promise.all([
+    listCompanyScheduleEntries({
+      companyId,
+      fromIso: gridStart.toISOString(),
+      toIso: gridEnd.toISOString(),
+    }),
+    listConnections({ companyId }),
+    getServiceRoleClient()
+      .from("platform_companies")
+      .select("name")
+      .eq("id", companyId)
+      .maybeSingle(),
+  ]);
+
+  const companyName: string = (companyRow.data as { name: string } | null)?.name ?? "My company";
+
+  const connections =
+    connectionsResult.ok
+      ? connectionsResult.data.connections.map((c) => ({
+          id: c.id,
+          platform: c.platform,
+          display_name: c.display_name,
+        }))
+      : [];
 
   return (
     <main className="mx-auto max-w-5xl p-6">
-      <header className="mb-6">
-        <H1>Calendar</H1>
-      </header>
-      {result.ok ? (
+      {entriesResult.ok ? (
         <SocialCalendarClient
-          entries={result.data.entries.map((e) => ({
+          entries={entriesResult.data.entries.map((e) => ({
             id: e.id,
             post_master_id: e.post_master_id,
             platform: e.platform,
@@ -79,13 +98,15 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
             preview: e.preview,
           }))}
           monthIso={monthIso}
+          connections={connections}
+          companyName={companyName}
         />
       ) : (
         <div
           className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
           role="alert"
         >
-          Failed to load calendar: {result.error.message}
+          Failed to load calendar: {entriesResult.error.message}
         </div>
       )}
     </main>

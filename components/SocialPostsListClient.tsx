@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
+import { CalendarDays, Clock, List } from "lucide-react";
 
 import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
 import type {
   PostMasterListItem,
   SocialPostSource,
@@ -296,6 +298,52 @@ export function SocialPostsListClient({
 
   return (
     <>
+      {/* Breadcrumbs */}
+      <nav aria-label="Breadcrumb" className="mb-4">
+        <ol className="flex items-center gap-1.5 text-sm text-m3">
+          <li>
+            <Link href="/company/social" className="transition-colors hover:text-white">
+              Social
+            </Link>
+          </li>
+          <li aria-hidden>/</li>
+          <li className="font-medium text-white">Posts</li>
+        </ol>
+      </nav>
+
+      {/* View toggle */}
+      <div className="mb-5 flex items-center gap-2">
+        <div
+          className="flex items-center overflow-hidden rounded-lg border border-white/[0.1]"
+          role="group"
+          aria-label="View mode"
+        >
+          <Link
+            href="/company/social/calendar"
+            className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
+          >
+            <CalendarDays className={cn("h-3.5 w-3.5")} aria-hidden />
+            Calendar
+          </Link>
+          <span
+            aria-current="page"
+            className="flex items-center gap-1.5 border-r border-white/[0.1] bg-pk px-3 py-1.5 text-sm text-white"
+          >
+            <List className="h-3.5 w-3.5" aria-hidden />
+            Posts
+          </span>
+          <button
+            disabled
+            aria-disabled="true"
+            title="Coming soon"
+            className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-m3 opacity-40"
+          >
+            <Clock className="h-3.5 w-3.5" aria-hidden />
+            Timeline
+          </button>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <H1>Social posts</H1>
