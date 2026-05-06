@@ -20,6 +20,7 @@ type DbSettings = {
   font_size_xl?: string | null;
   font_display?: string | null;
   font_body?: string | null;
+  radius?: string | null;
   radius_lg?: string | null;
   radius_full?: string | null;
 };
@@ -42,7 +43,9 @@ function buildCssBlock(s: DbSettings): string {
   if (s.font_size_xl)   vars.push(`--font-size-xl: ${s.font_size_xl};`);
   if (s.font_display)   vars.push(`--font-display: ${s.font_display};`);
   if (s.font_body)      vars.push(`--font-body: ${s.font_body};`);
-  if (s.radius_lg)      vars.push(`--radius: ${s.radius_lg};`);
+  // radius_lg takes precedence over legacy radius column (migration 0098 → 0100)
+  const r = s.radius_lg ?? s.radius;
+  if (r)                vars.push(`--radius: ${r};`);
   if (s.radius_full)    vars.push(`--radius-full: ${s.radius_full};`);
   if (vars.length === 0) return "";
   return `:root { ${vars.join(" ")} }`;
@@ -52,10 +55,8 @@ function buildCssBlock(s: DbSettings): string {
  * Reads the global (company_id IS NULL) design_system_settings row and
  * returns a CSS `:root { ... }` override block, or null if no overrides are set.
  *
- * Called once per server-render from app/layout.tsx. Supabase connection is
- * pooled; the query is a point read on a singleton row (~0.5 ms on warm pool).
- * Degrades gracefully: if Supabase is unavailable or the table doesn't exist
- * yet (before migration 0098 runs), returns null and the app uses compiled defaults.
+ * Called once per server-render from app/layout.tsx. Degrades gracefully when
+ * Supabase is unavailable or the table doesn't exist yet (pre-migration).
  */
 export async function getDesignSystemCssOverride(): Promise<string | null> {
   try {
@@ -66,13 +67,12 @@ export async function getDesignSystemCssOverride(): Promise<string | null> {
         "color_pk,color_pk2,color_gr,color_gr2,color_bl,color_am,color_rd," +
         "color_bg,color_d1,color_d2,color_d3,color_d4," +
         "font_size_base,font_size_xl,font_display,font_body," +
-        "radius_lg,radius_full",
+        "radius,radius_lg,radius_full",
       )
       .is("company_id", null)
       .maybeSingle();
 
     if (error) {
-      // Table may not exist yet if migration 0098 hasn't run. Log at debug level.
       logger.debug("design_system_settings read failed (may be pre-migration)", { error: error.message });
       return null;
     }

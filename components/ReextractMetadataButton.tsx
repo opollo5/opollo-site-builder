@@ -9,6 +9,9 @@ type ReextractResult = {
   dimensions_updated: boolean;
   width_px: number | null;
   height_px: number | null;
+  title: string | null;
+  title_updated: boolean;
+  caption_updated: boolean;
   istock_id: string | null;
   istock_id_added: boolean;
   notes: string[];
@@ -46,6 +49,12 @@ export function ReextractMetadataButton({ imageId }: { imageId: string }) {
       const parts: string[] = [];
       if (data.dimensions_updated && data.width_px && data.height_px) {
         parts.push(`Dimensions ${data.width_px}×${data.height_px}px`);
+      }
+      if (data.title_updated && data.title) {
+        parts.push(`Title "${data.title.slice(0, 40)}"`);
+      }
+      if (data.caption_updated) {
+        parts.push("Caption");
       }
       if (data.istock_id_added && data.istock_id) {
         parts.push(`iStock id ${data.istock_id}`);

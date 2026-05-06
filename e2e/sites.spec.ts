@@ -197,3 +197,63 @@ test.describe("sites CRUD", () => {
     await expect(row).toHaveCount(0);
   });
 });
+
+// Fix 5 — image library toggle UX
+test.describe("image library toggle on site settings", () => {
+  test("toggle is a switch control with metadata count and library link", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+
+    // Navigate to the first site's settings page.
+    await page.goto("/admin/sites");
+    const firstSiteLink = page.getByRole("link", { name: /settings/i }).first();
+    // Fall back: navigate via the site list row.
+    if (!(await firstSiteLink.isVisible())) {
+      const rows = page.getByRole("row").filter({ hasText: /active|paused/i });
+      const firstRow = rows.first();
+      await firstRow.getByTestId("site-actions-summary").click();
+      const settingsLink = firstRow.getByRole("menuitem", { name: /settings/i });
+      if (await settingsLink.isVisible()) {
+        await settingsLink.click();
+      } else {
+        // Direct URL navigation — pick the first site id from the page URL.
+        const href = await firstRow
+          .getByRole("link")
+          .first()
+          .getAttribute("href");
+        const siteId = href?.match(/\/admin\/sites\/([^/]+)/)?.[1];
+        if (siteId) await page.goto(`/admin/sites/${siteId}/settings`);
+      }
+    } else {
+      await firstSiteLink.click();
+    }
+
+    await page.waitForURL(/\/admin\/sites\/[^/]+\/settings/);
+
+    // The toggle must be a switch control, not a plain button.
+    const toggle = page.getByTestId("use-image-library-toggle");
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("role", "switch");
+    await expect(toggle).toHaveAttribute("aria-checked");
+
+    // Metadata count label is visible.
+    await expect(
+      page.getByTestId("image-library-metadata-count"),
+    ).toBeVisible();
+
+    // "View image library" link is present.
+    await expect(page.getByTestId("image-library-view-link")).toBeVisible();
+
+    // Toggle can be clicked to change state.
+    const currentChecked = await toggle.getAttribute("aria-checked");
+    await toggle.click();
+    const newChecked = await toggle.getAttribute("aria-checked");
+    expect(newChecked).not.toBe(currentChecked);
+
+    // Restore original state.
+    await toggle.click();
+
+    await auditA11y(page, testInfo);
+  });
+});

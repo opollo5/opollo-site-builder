@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function AdminSettingsIndexPage() {
+export default function AdminSettingsPage() {
   redirect("/admin/settings/design-system");
 }

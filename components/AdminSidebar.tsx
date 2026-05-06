@@ -15,6 +15,7 @@ import {
   LogOut,
   Mail,
   Menu,
+  Palette,
   PenSquare,
   Settings,
   Share2,
@@ -159,10 +160,10 @@ export function AdminSidebar({
           testId: "nav-email-test",
         },
         {
-          label: "Design system",
-          href: "/admin/settings/design-system",
-          icon: Settings,
-          testId: "nav-design-system-settings",
+          label: "Settings",
+          href: "/admin/settings",
+          icon: Palette,
+          testId: "nav-settings",
         },
       ]
     : [];
@@ -204,7 +205,7 @@ export function AdminSidebar({
               "h-4 w-4 shrink-0",
               active
                 ? "text-white"
-                : "text-[rgba(255,255,255,0.40)] group-hover:text-gr",
+                : "text-icon-dim group-hover:text-gr",
             )}
           />
           {!collapsed && <span className="truncate">{label}</span>}
@@ -301,7 +302,7 @@ export function AdminSidebar({
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               className={cn(
-                "hidden h-8 w-8 items-center justify-center rounded-md text-[rgba(255,255,255,0.40)] transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
+                "hidden h-8 w-8 items-center justify-center rounded-md text-icon-dim transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
                 collapsed && "mx-auto",
               )}
             >
@@ -342,17 +343,17 @@ export function AdminSidebar({
           <div className="border-t border-white/[0.06] p-2">
             {!collapsed && (
               <div className="mb-2 flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1.5">
-                <span className="text-sm text-[rgba(255,255,255,0.40)]">
+                <span className="text-sm text-icon-dim">
                   Command palette
                 </span>
                 <span
                   className="flex items-center gap-0.5 text-sm text-m3"
                   aria-hidden
                 >
-                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
+                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-xs">
                     ⌘
                   </kbd>
-                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-[10px]">
+                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-xs">
                     K
                   </kbd>
                 </span>
@@ -369,7 +370,7 @@ export function AdminSidebar({
                 )}
                 data-testid="nav-security"
               >
-                <KeyRound aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
+                <KeyRound aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
                 {!collapsed && <span className="truncate">Account security</span>}
               </Link>
             )}
@@ -384,7 +385,7 @@ export function AdminSidebar({
                 )}
                 data-testid="nav-devices"
               >
-                <Laptop aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
+                <Laptop aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
                 {!collapsed && <span className="truncate">Trusted devices</span>}
               </Link>
             )}
@@ -394,7 +395,7 @@ export function AdminSidebar({
               className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
               data-testid="nav-back-to-builder"
             >
-              <Settings aria-hidden className="h-4 w-4 shrink-0 text-[rgba(255,255,255,0.40)] group-hover:text-gr" />
+              <Settings aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
               {!collapsed && <span className="truncate">Back to builder</span>}
             </Link>
             {user && (
