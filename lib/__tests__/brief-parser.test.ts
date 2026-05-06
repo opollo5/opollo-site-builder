@@ -325,7 +325,62 @@ describe("brief-parser", () => {
   });
 
   // -----------------------------------------------------------------------
-  // 12. Inference idempotency key — same brief_id + sha256 → same key.
+  // 12. Excerpt extraction from `### Excerpt` H3.
+  // -----------------------------------------------------------------------
+  it("excerpt: ### Excerpt section extracted and stripped from source_text", async () => {
+    const src = [
+      "## Home",
+      "",
+      "Long body content about the home page.",
+      "",
+      "### Excerpt",
+      "Friendly homepage for a modern consultancy.",
+      "",
+      "## Contact",
+      "",
+      "Short contact page.",
+    ].join("\n");
+    const result = await parseBriefDocument({
+      briefId: "test-excerpt",
+      source: src,
+      sourceSha256: sha256Hex(src),
+      anthropicCall: stubAnthropic("[]"),
+    });
+    const ok = expectOk(result);
+    expect(ok.pages).toHaveLength(2);
+    const home = ok.pages[0];
+    expect(home.excerpt).toBe("Friendly homepage for a modern consultancy.");
+    expect(home.source_text).not.toContain("### Excerpt");
+    expect(home.source_text).not.toContain("Friendly homepage");
+    expect(ok.pages[1].excerpt).toBeNull();
+  });
+
+  it("excerpt: case-insensitive matching (### EXCERPT)", async () => {
+    const src = "## Home\n\nBody text.\n\n### EXCERPT\nSEO description here.\n";
+    const result = await parseBriefDocument({
+      briefId: "test-excerpt-case",
+      source: src,
+      sourceSha256: sha256Hex(src),
+      anthropicCall: stubAnthropic("[]"),
+    });
+    const ok = expectOk(result);
+    expect(ok.pages[0].excerpt).toBe("SEO description here.");
+  });
+
+  it("excerpt: no ### Excerpt section → null", async () => {
+    const src = "## Home\n\nBody text without an excerpt section.\n";
+    const result = await parseBriefDocument({
+      briefId: "test-no-excerpt",
+      source: src,
+      sourceSha256: sha256Hex(src),
+      anthropicCall: stubAnthropic("[]"),
+    });
+    const ok = expectOk(result);
+    expect(ok.pages[0].excerpt).toBeNull();
+  });
+
+  // -----------------------------------------------------------------------
+  // 13. Inference idempotency key — same brief_id + sha256 → same key.
   //     The key is passed to anthropicCall; tests observe it there.
   // -----------------------------------------------------------------------
   it("inference idempotency: same (brief_id, source_sha256) produces the same Anthropic key", async () => {

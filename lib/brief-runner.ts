@@ -2825,7 +2825,7 @@ export async function approveBriefPage(
   const pageRes = await svc
     .from("brief_pages")
     .select(
-      "id, brief_id, ordinal, page_status, draft_html, title, slug_hint, source_text, version_lock",
+      "id, brief_id, ordinal, page_status, draft_html, title, slug_hint, source_text, excerpt, version_lock",
     )
     .eq("id", input.pageId)
     .is("deleted_at", null)
@@ -2857,6 +2857,7 @@ export async function approveBriefPage(
     title: string;
     slug_hint: string | null;
     source_text: string;
+    excerpt: string | null;
     version_lock: number;
   };
 
@@ -3089,6 +3090,7 @@ async function bridgeApprovedPageToPostIfNeeded(
     slug_hint: string | null;
     draft_html: string | null;
     source_text: string;
+    excerpt: string | null;
   },
   _nowIso: string,
 ): Promise<{ post_id: string | null; failed_bridge_reason: string | null }> {
@@ -3163,6 +3165,11 @@ async function bridgeApprovedPageToPostIfNeeded(
   // 5. Insert the posts row. A 23505 here means another operator raced
   //    us to the same slug — treat as soft failure so approval stays
   //    successful.
+  const rawExcerpt = page.excerpt?.trim() ?? null;
+  const excerptValue =
+    rawExcerpt && rawExcerpt.length > POST_META_DESCRIPTION_MAX
+      ? rawExcerpt.slice(0, POST_META_DESCRIPTION_MAX)
+      : rawExcerpt;
   const insertRes = await svc
     .from("posts")
     .insert({
@@ -3174,6 +3181,7 @@ async function bridgeApprovedPageToPostIfNeeded(
       status: "draft",
       generated_html: page.draft_html,
       content_brief: { source_text: page.source_text, brief_id: page.brief_id },
+      excerpt: excerptValue,
     })
     .select("id")
     .maybeSingle();
