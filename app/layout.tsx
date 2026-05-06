@@ -55,12 +55,16 @@ export default async function RootLayout({
       className={cn(fredoka.variable, manrope.variable, "dark")}
       suppressHydrationWarning
     >
-      {cssOverride && (
-        <head>
-          {/* eslint-disable-next-line react/no-danger */}
-          <style dangerouslySetInnerHTML={{ __html: cssOverride }} />
-        </head>
-      )}
+      <head>
+        {cssOverride && (
+          // Inject per-instance design token overrides from design_system_settings.
+          // eslint-disable-next-line react/no-danger
+          <style
+            id="opollo-design-system-overrides"
+            dangerouslySetInnerHTML={{ __html: cssOverride }}
+          />
+        )}
+      </head>
       <body className="font-body antialiased">{children}</body>
     </html>
   );
