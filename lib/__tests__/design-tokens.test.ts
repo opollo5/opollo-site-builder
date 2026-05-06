@@ -77,6 +77,9 @@ describe("component files", () => {
   const EXEMPT_PATHS = [
     "lib/email/templates/",
     "lib/email/",
+    // Email-sending routes contain inline HTML with inline styles for mail
+    // client compatibility — same exemption rationale as lib/email/.
+    "app/api/admin/email-test/",
     "app/globals.css",
     "styles/tokens.css",
     "seed/",
