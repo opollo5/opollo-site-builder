@@ -207,6 +207,7 @@ function notFound(): ApiResponse<PostMaster> {
 }
 
 function internal(message: string): ApiResponse<PostMaster> {
+  logger.error("social.posts.update.internal_error", { message });
   return {
     ok: false,
     error: {

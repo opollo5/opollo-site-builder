@@ -65,6 +65,7 @@ function validation(message: string): ApiResponse<{ links: ViewerLink[] }> {
 }
 
 function internal(message: string): ApiResponse<{ links: ViewerLink[] }> {
+  logger.error("social.viewer_links.list.internal_error", { message });
   return {
     ok: false,
     error: {

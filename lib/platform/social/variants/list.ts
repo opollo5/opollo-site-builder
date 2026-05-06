@@ -119,6 +119,7 @@ function notFound(): ApiResponse<ListVariantsResult> {
 }
 
 function internal(message: string): ApiResponse<ListVariantsResult> {
+  logger.error("social.variants.list.internal_error", { message });
   return {
     ok: false,
     error: {

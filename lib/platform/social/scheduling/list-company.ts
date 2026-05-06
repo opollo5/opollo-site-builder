@@ -189,6 +189,7 @@ function validation(
 function internal(
   message: string,
 ): ApiResponse<{ entries: CompanyScheduleEntry[] }> {
+  logger.error("social.scheduling.list_company.internal_error", { message });
   return {
     ok: false,
     error: {

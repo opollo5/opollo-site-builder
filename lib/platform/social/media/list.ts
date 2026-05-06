@@ -88,6 +88,7 @@ function validation(message: string): ApiResponse<{ assets: MediaAsset[]; nextCu
 }
 
 function internal(message: string): ApiResponse<{ assets: MediaAsset[]; nextCursor: string | null }> {
+  logger.error("social.media.list.internal_error", { message });
   return {
     ok: false,
     error: {

@@ -100,6 +100,7 @@ function validation(
 function internal(
   message: string,
 ): ApiResponse<{ posts: PostMasterListItem[]; totalCount: number }> {
+  logger.error("social.posts.list.internal_error", { message });
   return {
     ok: false,
     error: {

@@ -136,6 +136,7 @@ function validation(message: string): ApiResponse<InitiateConnectResult> {
 }
 
 function notConfigured(envVar: string): ApiResponse<InitiateConnectResult> {
+  logger.error("social.connections.initiate_connect.not_configured", { env_var: envVar });
   return {
     ok: false,
     error: {
@@ -150,6 +151,7 @@ function notConfigured(envVar: string): ApiResponse<InitiateConnectResult> {
 }
 
 function internal(message: string): ApiResponse<InitiateConnectResult> {
+  logger.error("social.connections.initiate_connect.internal_error", { message });
   return {
     ok: false,
     error: {

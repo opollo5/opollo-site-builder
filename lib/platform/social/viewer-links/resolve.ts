@@ -112,6 +112,7 @@ function internal(message: string): ApiResponse<{
   link: ViewerLink;
   company: { id: string; name: string; timezone: string };
 }> {
+  logger.error("social.viewer_links.resolve.internal_error", { message });
   return {
     ok: false,
     error: {

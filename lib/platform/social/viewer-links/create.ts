@@ -97,6 +97,7 @@ function validation(message: string): ApiResponse<CreateViewerLinkResult> {
 }
 
 function internal(message: string): ApiResponse<CreateViewerLinkResult> {
+  logger.error("social.viewer_links.create.internal_error", { message });
   return {
     ok: false,
     error: {

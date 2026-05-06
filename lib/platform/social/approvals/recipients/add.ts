@@ -176,6 +176,7 @@ function invalidState(message: string): ApiResponse<AddRecipientResult> {
 }
 
 function internal(message: string): ApiResponse<AddRecipientResult> {
+  logger.error("social.approvals.recipients.add.internal_error", { message });
   return {
     ok: false,
     error: {

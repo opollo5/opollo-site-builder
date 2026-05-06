@@ -325,6 +325,7 @@ function validation(message: string): ApiResponse<RetryPublishResult> {
 }
 
 function internal(message: string): ApiResponse<RetryPublishResult> {
+  logger.error("social.publishing.retry.internal_error", { message });
   return {
     ok: false,
     error: {

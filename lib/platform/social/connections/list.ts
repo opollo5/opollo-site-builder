@@ -64,6 +64,7 @@ function validation(
 function internal(
   message: string,
 ): ApiResponse<{ connections: SocialConnection[] }> {
+  logger.error("social.connections.list.internal_error", { message });
   return {
     ok: false,
     error: {

@@ -189,6 +189,7 @@ function notFound<T>(): ApiResponse<T> {
 }
 
 function notConfigured<T>(envVar: string): ApiResponse<T> {
+  logger.error("social.media.upload_to_bundle.not_configured", { env_var: envVar });
   return {
     ok: false,
     error: {
@@ -202,6 +203,7 @@ function notConfigured<T>(envVar: string): ApiResponse<T> {
 }
 
 function internal<T>(message: string): ApiResponse<T> {
+  logger.error("social.media.upload_to_bundle.internal_error", { message });
   return {
     ok: false,
     error: {

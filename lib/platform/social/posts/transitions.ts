@@ -214,6 +214,7 @@ function notFoundWith(
 }
 
 function internal(message: string): ApiResponse<SubmitForApprovalResult> {
+  logger.error("social.posts.transitions.submit_for_approval.internal_error", { message });
   return {
     ok: false,
     error: {
@@ -359,6 +360,7 @@ function reopenInvalidState(
 function reopenInternal(
   message: string,
 ): ApiResponse<ReopenForEditingResult> {
+  logger.error("social.posts.transitions.reopen.internal_error", { message });
   return {
     ok: false,
     error: {
@@ -513,6 +515,7 @@ function cancelNotFound(
 function cancelInternal(
   message: string,
 ): ApiResponse<CancelApprovalResult> {
+  logger.error("social.posts.transitions.cancel.internal_error", { message });
   return {
     ok: false,
     error: {
@@ -605,6 +608,7 @@ function approveNotFound(): ApiResponse<ApprovePostResult> {
   return { ok: false, error: { code: "NOT_FOUND", message: "No post with that id in this company.", retryable: false, suggested_action: "Check the post id." }, timestamp: new Date().toISOString() };
 }
 function approveInternal(message: string): ApiResponse<ApprovePostResult> {
+  logger.error("social.posts.transitions.approve.internal_error", { message });
   return { ok: false, error: { code: "INTERNAL_ERROR", message, retryable: false, suggested_action: "Retry. If the error persists, contact support." }, timestamp: new Date().toISOString() };
 }
 
@@ -682,6 +686,7 @@ function rejectNotFound(): ApiResponse<RejectPostResult> {
   return { ok: false, error: { code: "NOT_FOUND", message: "No post with that id in this company.", retryable: false, suggested_action: "Check the post id." }, timestamp: new Date().toISOString() };
 }
 function rejectInternal(message: string): ApiResponse<RejectPostResult> {
+  logger.error("social.posts.transitions.reject.internal_error", { message });
   return { ok: false, error: { code: "INTERNAL_ERROR", message, retryable: false, suggested_action: "Retry. If the error persists, contact support." }, timestamp: new Date().toISOString() };
 }
 
@@ -759,6 +764,7 @@ function requestChangesNotFound(): ApiResponse<RequestChangesResult> {
   return { ok: false, error: { code: "NOT_FOUND", message: "No post with that id in this company.", retryable: false, suggested_action: "Check the post id." }, timestamp: new Date().toISOString() };
 }
 function requestChangesInternal(message: string): ApiResponse<RequestChangesResult> {
+  logger.error("social.posts.transitions.request_changes.internal_error", { message });
   return { ok: false, error: { code: "INTERNAL_ERROR", message, retryable: false, suggested_action: "Retry. If the error persists, contact support." }, timestamp: new Date().toISOString() };
 }
 

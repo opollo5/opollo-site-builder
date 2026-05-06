@@ -98,6 +98,7 @@ function notFound(): ApiResponse<{ recipients: ApprovalRecipient[] }> {
 function internal(
   message: string,
 ): ApiResponse<{ recipients: ApprovalRecipient[] }> {
+  logger.error("social.approvals.recipients.list.internal_error", { message });
   return {
     ok: false,
     error: {

@@ -126,6 +126,7 @@ function notFound(): ApiResponse<{ deleted: true }> {
 }
 
 function internal(message: string): ApiResponse<{ deleted: true }> {
+  logger.error("social.posts.delete.internal_error", { message });
   return {
     ok: false,
     error: {

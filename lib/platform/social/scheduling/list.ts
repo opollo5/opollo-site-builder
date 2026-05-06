@@ -140,6 +140,7 @@ function notFound(): ApiResponse<{ entries: ScheduleEntryWithPlatform[] }> {
 function internal(
   message: string,
 ): ApiResponse<{ entries: ScheduleEntryWithPlatform[] }> {
+  logger.error("social.scheduling.list.internal_error", { message });
   return {
     ok: false,
     error: {

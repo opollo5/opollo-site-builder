@@ -136,6 +136,7 @@ function validation(message: string): ApiResponse<PostMaster> {
 }
 
 function internal(message: string): ApiResponse<PostMaster> {
+  logger.error("social.posts.create.internal_error", { message });
   return {
     ok: false,
     error: {

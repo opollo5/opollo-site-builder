@@ -121,6 +121,7 @@ function validation(message: string): ApiResponse<CreateMediaAssetResult> {
 }
 
 function internal(message: string): ApiResponse<CreateMediaAssetResult> {
+  logger.error("social.media.create.internal_error", { message });
   return {
     ok: false,
     error: {
