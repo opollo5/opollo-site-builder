@@ -12,7 +12,7 @@ Severity: CRITICAL (blocks ship) | HIGH (fix before merge) | MEDIUM | LOW
 | # | Item | Status |
 |---|------|--------|
 | P1-1 | Transfer-cron dead code deletion (M15-5 #1) | ✅ Done — PR #527 |
-| P1-2 | errorJson() migration to lib/http helpers (M15-4 #14) | 🔄 Deferred — 60+ files, no urgency, tech-debt backlog |
+| P1-2 | errorJson() migration to lib/http helpers (M15-4 #14) | ✅ Done — PRs #681 #684 #685 #686. All routes now use shared `lib/http` helpers. |
 | P1-3 | Lease-coherent CHECK asymmetry M3/M7/M12 (M15-2 #10) | ✅ Done — migration 0087, PR #541 |
 
 ---
