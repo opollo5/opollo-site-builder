@@ -16,14 +16,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // the correct URL + token pulled from env.
 // ---------------------------------------------------------------------------
 
-// vi.mock is hoisted before variable declarations, so the factory must not
-// reference file-scope consts. vi.hoisted() runs early enough to be safe.
-const { mockRedisConstructor } = vi.hoisted(() => ({
+// vi.mock factories are hoisted before const bindings are initialised, so
+// destructuring vi.hoisted() into a const puts the binding in TDZ when the
+// factory runs. Capture the whole object and access the property instead.
+const redisMocks = vi.hoisted(() => ({
   mockRedisConstructor: vi.fn().mockImplementation((opts: object) => opts),
 }));
 
 vi.mock("@upstash/redis", () => ({
-  Redis: mockRedisConstructor,
+  Redis: redisMocks.mockRedisConstructor,
 }));
 
 import {
@@ -35,7 +36,7 @@ const ORIGINAL_URL = process.env.UPSTASH_REDIS_REST_URL;
 const ORIGINAL_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 beforeEach(() => {
-  mockRedisConstructor.mockClear();
+  redisMocks.mockRedisConstructor.mockClear();
   __resetRedisClientForTests();
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
@@ -73,7 +74,7 @@ describe("getRedisClient", () => {
 
     it("does not instantiate Redis when vars are absent", () => {
       getRedisClient();
-      expect(mockRedisConstructor).not.toHaveBeenCalled();
+      expect(redisMocks.mockRedisConstructor).not.toHaveBeenCalled();
     });
   });
 
@@ -89,8 +90,8 @@ describe("getRedisClient", () => {
 
     it("instantiates Redis with the correct URL and token", () => {
       getRedisClient();
-      expect(mockRedisConstructor).toHaveBeenCalledOnce();
-      expect(mockRedisConstructor).toHaveBeenCalledWith({
+      expect(redisMocks.mockRedisConstructor).toHaveBeenCalledOnce();
+      expect(redisMocks.mockRedisConstructor).toHaveBeenCalledWith({
         url: "https://fake.upstash.io",
         token: "fake-token-123",
       });
@@ -100,7 +101,7 @@ describe("getRedisClient", () => {
       const first = getRedisClient();
       const second = getRedisClient();
       expect(first).toBe(second);
-      expect(mockRedisConstructor).toHaveBeenCalledOnce();
+      expect(redisMocks.mockRedisConstructor).toHaveBeenCalledOnce();
     });
   });
 
@@ -128,6 +129,6 @@ describe("__resetRedisClientForTests", () => {
 
     // Now a fresh call should instantiate Redis.
     expect(getRedisClient()).not.toBeNull();
-    expect(mockRedisConstructor).toHaveBeenCalledOnce();
+    expect(redisMocks.mockRedisConstructor).toHaveBeenCalledOnce();
   });
 });
