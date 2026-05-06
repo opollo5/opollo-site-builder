@@ -399,7 +399,7 @@ Option (b) expands the write-safety blast radius significantly — mu-plugin ins
 
 ---
 
-## ~~PDF / .docx brief parser~~ (shipped 2026-05-06, PR #TBD)
+## ~~PDF / .docx brief parser~~ (shipped 2026-05-06, PR #626)
 
 **What:** Extend `lib/brief-parser.ts` to accept `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document` in addition to `text/plain` + `text/markdown`. The existing structural-first + Claude-inference-fallback parser runs against the extracted text; the only new work is the MIME-specific binary → UTF-8 decoder.
 
@@ -509,7 +509,7 @@ Reports live at:
 - ~~**[M15-2 #4] Missing index on regen daily-budget query.**~~ Fixed 2026-05-03 — migration 0080 adds `idx_regen_jobs_created_at` index on `regeneration_jobs(created_at DESC)` supporting the `.gte("created_at", startOfDay)` range predicate in `lib/regeneration-publisher.ts#checkDailyBudget`.
 - ~~**[M15-2 #5] No cancel endpoint for `transfer_jobs`.**~~ Resolved 2026-05-04 — PR #527 migrated away the `cancel_requested_at` column (transfer cron deleted, M15-5 #1 took the "drop" path).
 - ~~**[M15-2 #8] Event-table PK type inconsistency.**~~ Documented 2026-05-04 — PR #533 migration 0086 adds `COMMENT ON TABLE` to all three event tables noting the bigserial/uuid mismatch and normalisation path.
-- **[M15-2 #10] Lease-coherent CHECK asymmetry.** `transfer_job_items_lease_coherent` requires `worker_id IS NOT NULL` in leased states; `generation_job_pages_lease_coherent` + `regeneration_jobs_lease_coherent` don't. Scope: tighten M3/M7 CHECKs after verifying no orphan-leased rows in production.
+- ~~**[M15-2 #10] Lease-coherent CHECK asymmetry.**~~ Migration 0087 (PR #541) dropped and re-added all three CHECKs with `NOT VALID` (generation_job_pages, regeneration_jobs, brief_runs now enforce worker_id IS NOT NULL in active states). VALIDATE step deferred until prod confirms no orphan-leased rows — see migration 0087 inline comment for the exact VALIDATE commands.
 - ~~**[M15-2 #12] `image_usage` RLS excludes viewer.**~~ See M15-5 #12 above — documented in PR #529.
 - ~~**[M15-2 #13, #14] Service-role-only write tables + `opollo_config` read — undocumented at the migration level.**~~ Documented 2026-05-04 — PR #529 migration 0085 adds `COMMENT ON TABLE` for all service-role-only write tables and `opollo_config` anon-read pattern.
 
