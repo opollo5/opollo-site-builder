@@ -88,6 +88,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // 500 so QStash retries — the idempotency layer ensures retries
   // are safe.
   if (result.outcome === "internal_error") {
+    logger.error("invitations.callback.reminder.handler_failed", {
+      message: result.message,
+      invitationId: parsed.invitationId,
+    });
     return NextResponse.json(
       {
         ok: false,

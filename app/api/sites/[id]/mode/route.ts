@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // GET /api/sites/[id]/mode
@@ -47,6 +48,7 @@ export async function GET(
     .maybeSingle();
 
   if (res.error) {
+    logger.error("sites.mode.db_failed", { err: res.error.message, site_id: params.id });
     return NextResponse.json(
       {
         ok: false,

@@ -79,6 +79,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (result.outcome === "internal_error") {
+    logger.error("invitations.callback.expiry.handler_failed", {
+      message: result.message,
+      invitationId: parsed.invitationId,
+    });
     return NextResponse.json(
       {
         ok: false,

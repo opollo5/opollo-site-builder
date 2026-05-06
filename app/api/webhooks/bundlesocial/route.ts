@@ -88,6 +88,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (result.kind === "idempotent_insert_failed") {
+    logger.error("bundlesocial.webhook.insert_failed", { message: result.message });
     return errorEnvelope("INTERNAL_ERROR", result.message, 500);
   }
   if (result.kind === "validation_failed") {
