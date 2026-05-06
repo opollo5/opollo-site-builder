@@ -5,8 +5,9 @@ name: Lighthouse
 # surface is session-gated and testing it would require the full
 # Supabase-in-CI flow that e2e.yml already runs.
 #
-# Assertions are `warn`-only for now. Once we have a few runs of
-# baseline history we'll flip categories:performance to `error`.
+# Assertions: accessibility + best-practices are `error` (structural, stable
+# over many runs). Performance and Core Web Vitals remain `warn` — they vary
+# with render budget and image load on CI infra.
 #
 # Reports upload to Google's temporary public storage (no API keys).
 # Links land as a PR comment via the LHCI GitHub App when installed,

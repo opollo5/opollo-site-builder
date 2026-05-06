@@ -527,7 +527,7 @@ Reports live at:
 
 #### Tech-debt (bundled cleanup, no urgency)
 
-- **[M15-4 #14] 12 local `errorJson()` helpers across route files.** Migration to `lib/http.respond()` / `lib/http.validationError()` incomplete. Large mechanical diff.
+- **[M15-4 #14] Remaining local `errorJson()` helpers across route files.** 11 setup routes migrated to shared helpers in PR #679. ~17 routes remain (admin/batch, admin/batch/[id]/cancel, admin/companies, admin/images/*, admin/sites/[id]/budget, admin/sites/[id]/voice, admin/users/*, approve/*, sites/[id]/*, platform/brand, platform/invitations/*, platform/social/*). Note: `respond()` is only safe when the lib function returns a full `ApiResponse<T>` — routes calling lib functions that return `{ ok:false, error:{ code, message } }` (without timestamp/retryable) need explicit `notFound`/`internalError` routing instead. See PR #679 for the pattern.
 - ~~**[M15-4 #15] 7 copies of `constantTimeEqual` across cron + ops routes.**~~ Extracted to `lib/crypto-compare.ts` 2026-05-03 — PR #510. 9 files deduplicated: cron/budget-reset, cron/optimiser-monitor-rollouts, cron/process-batch, cron/process-brief-runner, cron/process-regenerations, emergency, ops/reset-admin-password, ops/self-probe, and cron/process-transfer (since deleted by PR #527).
 - ~~**[M15-4 #16] `"INVALID_STATE"` error code in `admin/batch/[id]/cancel` not in `ERROR_CODES` enum**.~~ Added to `lib/tool-schemas.ts` ERROR_CODES + errorCodeToStatus 409 mapping (2026-04-29).
 - ~~**[M15-4 #17] `admin/sites/[id]/budget` admin-only while siblings allow admin+operator.**~~ Comment added in route handler explaining the financial-control rationale (2026-04-29).
@@ -590,14 +590,14 @@ Medium / Low findings from Audit 3 (UI + cross-milestone integration) that are d
 - ~~`#7` — `EditPageMetadataModal` no-op submit UX + client-side slug regex~~ (shipped this PR)
 - ~~`#8` — `ComponentFormModal` selector-violations list~~ (shipped this PR)
 - ~~`#9` — Empty-state CTAs in `DesignSystemsTable` / `ComponentsGrid` / `TemplatesTable`~~ (shipped this PR)
-- `#10` — `.env.local.example` optional-vars block (Medium)
-- `#11` — `<Image>` vs `<img>` decision if admin surfaces ever render images (Medium)
+- ~~`#10` — `.env.local.example` optional-vars block~~ (shipped 2026-05-06 — added `# --- Required ---` section header PR #681)
+- ~~`#11` — `<Image>` vs `<img>` decision if admin surfaces ever render images~~ (decision: keep bare `<img>` for external Cloudflare URLs with `eslint-disable-next-line`; `images.unoptimized: true` is set for CVE mitigation so Next.js `<Image>` provides no benefit — PR #681)
 - ~~`#12` — Unify inline validation pattern across modals~~ (shipped this PR)
 - `#13` — Brand tokens in Tailwind (Low — only if admin scope changes)
-- `#14` — `force-dynamic` vs `revalidate: 0` audit (Low)
-- `#15` — Lighthouse thresholds ratchet + `/` route coverage (Low)
+- ~~`#14` — `force-dynamic` vs `revalidate: 0` audit~~ (confirmed 2026-05-06: all API routes use `force-dynamic`; no page route mixes `revalidate = 0`; decision is correct — PR #681)
+- ~~`#15` — Lighthouse thresholds ratchet~~ (ratcheted 2026-05-06: accessibility + best-practices flipped from `warn` to `error` in `lighthouserc.json`; performance/CWV remain `warn`; `/` route is session-gated and can't be added to Lighthouse CI without Supabase-in-CI — PR #681)
 - ~~`#16` — Four `: any` annotations in WP + chat boundary~~ (shipped this PR)
-- `#17` — `docs/PROMPT_VERSIONING.md` vs `lib/prompts/vN/` reconciliation (Low)
+- ~~`#17` — `docs/PROMPT_VERSIONING.md` vs `lib/prompts/vN/` reconciliation~~ (updated 2026-05-06: status note now reflects `lib/prompts.ts` as the current flat module; versioned directory layout remains future work — PR #681)
 - ~~`#18` — Two stale `TODO(M3)` / `TODO(M7)` comments → BACKLOG~~ (shipped this PR)
 - ~~`#20` — Smart-quote / HTML-entity standardisation in empty states~~ (shipped this PR — CTAs replace text references)
 
