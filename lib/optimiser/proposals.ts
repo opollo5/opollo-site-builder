@@ -214,6 +214,7 @@ export async function approveProposal(args: {
     .eq("id", args.proposalId)
     .eq("status", "pending");
   if (updErr) {
+    logger.error("optimiser.proposals.approveProposal.update_failed", { proposal_id: args.proposalId, supabase_error: updErr.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -324,6 +325,7 @@ export async function rejectProposal(args: {
     .eq("id", args.proposalId)
     .eq("status", "pending");
   if (updErr) {
+    logger.error("optimiser.proposals.rejectProposal.update_failed", { proposal_id: args.proposalId, supabase_error: updErr.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
