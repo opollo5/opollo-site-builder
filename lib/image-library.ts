@@ -75,6 +75,7 @@ function internalError(
   message: string,
   details?: Record<string, unknown>,
 ): ApiResponse<never> {
+  logger.error("image_library.internal_error", { message });
   return {
     ok: false,
     error: {

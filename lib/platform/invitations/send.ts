@@ -166,5 +166,6 @@ export async function sendInvitation(
 }
 
 function internal(message: string): SendInvitationResult {
+  logger.error("platform.invitations.send.internal_error", { message });
   return { ok: false, error: { code: "INTERNAL_ERROR", message } };
 }

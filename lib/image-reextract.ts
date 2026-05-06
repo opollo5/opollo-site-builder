@@ -61,6 +61,7 @@ function notFound(msg = "Image not found."): ApiResponse<never> {
 }
 
 function internalError(message: string, details?: Record<string, unknown>): ApiResponse<never> {
+  logger.error("image_reextract.internal_error", { message });
   return {
     ok: false,
     error: {

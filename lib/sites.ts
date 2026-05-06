@@ -46,6 +46,7 @@ function internalError(
   message: string,
   details?: Record<string, unknown>,
 ): ApiResponse<never> {
+  logger.error("sites.internal_error", { message });
   return {
     ok: false,
     error: {

@@ -250,5 +250,6 @@ function validation(message: string): AcceptInvitationResult {
 }
 
 function internal(message: string): AcceptInvitationResult {
+  logger.error("platform.invitations.accept.internal_error", { message });
   return { ok: false, error: { code: "INTERNAL_ERROR", message } };
 }
