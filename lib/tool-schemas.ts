@@ -176,8 +176,9 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "EMERGENCY_NOT_CONFIGURED":
       return 503;
     case "INTERNAL_ERROR":
-    case "UPDATE_FAILED":
       return 500;
+    case "UPDATE_FAILED":
+      return 422;
     case "WP_CREDENTIALS_MISSING":
     case "BLUEPRINT_MISMATCH":
       return 400;

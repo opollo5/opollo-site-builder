@@ -5,8 +5,8 @@ import { createBatchJob } from "@/lib/batch-jobs";
 import {
   conflict,
   internalError,
-  notFound,
   readJsonBody,
+  routeError,
   validationError,
 } from "@/lib/http";
 import { logger } from "@/lib/logger";
@@ -74,7 +74,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       case "VALIDATION_FAILED":
         return validationError(message, details);
       case "TEMPLATE_NOT_FOUND":
-        return notFound(message);
+        return routeError("TEMPLATE_NOT_FOUND", message);
       case "TEMPLATE_NOT_ACTIVE":
       case "IDEMPOTENCY_KEY_CONFLICT":
         return conflict(code, message, details);

@@ -112,7 +112,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         email: normalizedEmail,
         error: opolloErr.message,
       });
-      return internalError("Admin lookup failed. See server logs.");
+      return internalError("Admin lookup failed. See server logs.", true);
     }
 
     if (!opolloUser) {
