@@ -361,8 +361,15 @@ async function processImage(row: ImageRow, index: number, total: number): Promis
   const patch: Record<string, unknown> = { updated_at: now };
   let patched = false;
 
+  const GENERIC_CAPTIONS = new Set(["iStock stock photography"]);
   const setCaption = exifResult?.caption;
-  if (setCaption && (!row.caption || row.caption === "[object Object]" || FORCE)) {
+  if (
+    setCaption &&
+    (!row.caption ||
+      row.caption === "[object Object]" ||
+      GENERIC_CAPTIONS.has(row.caption) ||
+      FORCE)
+  ) {
     patch.caption = setCaption;
     patched = true;
   }
