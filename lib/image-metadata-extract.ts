@@ -256,20 +256,33 @@ export async function runExtractionBatch(opts: {
     }
 
     // Write sidecar metadata rows.
+    // Only write the sentinel when something was actually extracted — writing
+    // it unconditionally would permanently skip images where Sharp / exifr
+    // both yield nothing (sentinel found next run → skipped forever despite
+    // width_px still being null).
+    const didExtractData =
+      meta.width !== null ||
+      meta.caption !== null ||
+      meta.title !== null ||
+      meta.altText !== null ||
+      meta.tags.length > 0;
+
     type MetaRow = {
       image_id: string;
       key: string;
       value_jsonb: unknown;
       updated_at: string;
     };
-    const sidecar: MetaRow[] = [
-      {
-        image_id: imageId,
-        key: "metadata_extracted_at",
-        value_jsonb: now,
-        updated_at: now,
-      },
-    ];
+    const sidecar: MetaRow[] = didExtractData
+      ? [
+          {
+            image_id: imageId,
+            key: "metadata_extracted_at",
+            value_jsonb: now,
+            updated_at: now,
+          },
+        ]
+      : [];
 
     if (meta.dominantR !== null) {
       sidecar.push({
@@ -327,6 +340,35 @@ export async function runExtractionBatch(opts: {
       caption: meta.caption?.slice(0, 60) ?? null,
     });
     saved++;
+  }
+
+  // Title-only backfill: images that have dimensions but no title.
+  // These exist when the image was processed before migration 0099 added the
+  // title column, or when the first extraction run pre-dated EXIF support.
+  // Derive from filename alone — no Cloudflare API call needed.
+  const { data: titleRows } = await svc
+    .from("image_library")
+    .select("id, filename")
+    .is("deleted_at", null)
+    .is("title", null)
+    .not("width_px", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(batchSize);
+
+  for (const row of titleRows ?? []) {
+    const filename = row.filename as string | null;
+    if (!filename) continue;
+    const base = filename.replace(/\.[^.]+$/, "");
+    const m = /^istock[-_](\d+)/i.exec(base);
+    const derived = m
+      ? `iStock Image ${m[1]}`
+      : base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim() || null;
+    if (!derived) continue;
+    await svc
+      .from("image_library")
+      .update({ title: derived, updated_at: now })
+      .eq("id", row.id as string)
+      .is("title", null);
   }
 
   // Count remaining images still needing extraction.
