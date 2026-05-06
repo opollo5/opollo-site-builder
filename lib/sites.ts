@@ -62,9 +62,10 @@ function internalError(
 
 export async function createSite(
   input: RegisterSiteInput,
+  opts?: { createdBy?: string | null },
 ): Promise<ApiResponse<SiteRecord>> {
   try {
-    return await createSiteImpl(input);
+    return await createSiteImpl(input, opts);
   } catch (err) {
     logger.error("sites.createSite.uncaught", { err: err instanceof Error ? err.message : String(err) });
     return internalError(
@@ -75,6 +76,7 @@ export async function createSite(
 
 async function createSiteImpl(
   input: RegisterSiteInput,
+  opts?: { createdBy?: string | null },
 ): Promise<ApiResponse<SiteRecord>> {
   const supabase = getServiceRoleClient();
 
@@ -98,6 +100,8 @@ async function createSiteImpl(
       wp_url: input.wp_url,
       prefix,
       status: "active",
+      created_by: opts?.createdBy ?? null,
+      updated_by: opts?.createdBy ?? null,
     })
     .select()
     .single();

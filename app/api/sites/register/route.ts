@@ -47,7 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json(response, { status: 400 });
   }
 
-  const result = await createSite(parsed.data);
+  const result = await createSite(parsed.data, { createdBy: gate.user?.id ?? null });
   if (!result.ok) logger.error("createSite failed", { code: result.error.code });
   if (result.ok) {
     // Bust the cached server-component render of /admin/sites so the
