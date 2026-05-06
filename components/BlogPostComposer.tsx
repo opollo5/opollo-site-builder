@@ -842,9 +842,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     <form
       id={`blog-post-composer-form-${siteId}`}
       onSubmit={handlePrimarySubmit}
-      className="lg:grid lg:grid-cols-[1fr_300px] lg:items-start lg:gap-8"
+      className="lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-8"
     >
-      {/* ── LEFT: title + editor ── */}
+      {/* ── LEFT: title + editor + SEO ── */}
       <div className="space-y-4">
         {!siteLoading && !siteWpUrl && (
           <Alert variant="destructive" className="flex items-start gap-2">
@@ -860,79 +860,166 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             </span>
           </Alert>
         )}
-        {pendingDraft && (
-          <DraftRestoreBanner
-            savedAt={pendingDraft.savedAt}
-            onRestore={restoreDraft}
-            onDiscard={discardDraft}
-          />
-        )}
 
-        {/* Prominent title field — mirrors WordPress block editor */}
-        <div>
-          <label htmlFor="post-title" className="sr-only">
-            Title
-          </label>
-          <Input
-            id="post-title"
-            className="rounded-none border-0 border-b px-0 text-2xl font-bold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
-            placeholder="Post title"
-            value={title.value}
-            onChange={(e) =>
-              setFieldValue(setTitle, e.target.value, lastParse?.title ?? null, "derived")
-            }
-            disabled={submitting}
-            maxLength={200}
-            aria-invalid={!titleIsValid}
-          />
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <SourceHint source={title.source} />
-            <TitleLengthHint length={title.value.length} valid={titleIsValid} />
-          </div>
-        </div>
-
-        {/* Body editor + file attach */}
-        <div>
-          <div className="flex items-baseline justify-between gap-2">
-            <label className="block text-sm font-medium">Post content</label>
-            <label
-              htmlFor="post-file-attach"
-              className={cn(
-                "cursor-pointer text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline",
-                submitting && "pointer-events-none opacity-50",
-              )}
-              title="Attach Markdown, HTML, plain text, or Word (.docx). Max 10 MB."
-            >
-              Attach file
-              <input
-                id="post-file-attach"
-                type="file"
-                accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                className="sr-only"
-                disabled={submitting}
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) {
-                    setFileReadError(null);
-                    setComposerValue((prev) => ({ ...prev, file: f }));
-                  }
-                  e.target.value = "";
-                }}
-              />
+        {/* Unified editor card: title + content editor + SEO */}
+        <div className="rounded-lg border bg-card p-6">
+          {/* Prominent title field — mirrors WordPress block editor */}
+          <div>
+            <label htmlFor="post-title" className="sr-only">
+              Title
             </label>
+            <Input
+              id="post-title"
+              className="rounded-none border-0 border-b px-0 text-2xl font-bold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+              placeholder="Post title"
+              value={title.value}
+              onChange={(e) =>
+                setFieldValue(setTitle, e.target.value, lastParse?.title ?? null, "derived")
+              }
+              disabled={submitting}
+              maxLength={200}
+              aria-invalid={!titleIsValid}
+            />
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <SourceHint source={title.source} />
+              <TitleLengthHint length={title.value.length} valid={titleIsValid} />
+            </div>
           </div>
-          <RichTextEditor
-            value={composerValue.text}
-            onChange={(html) => setComposerValue((prev) => ({ ...prev, text: html }))}
-            placeholder={`Type, paste, or drop your post.\n\nA YAML front-matter block, inline labels, or HTML meta tags will pre-fill the metadata fields below.`}
-            disabled={submitting}
-            className="mt-1"
-          />
-          {fileReadError && (
-            <p className="mt-1 text-sm text-destructive" role="alert">
-              {fileReadError}
-            </p>
-          )}
+
+          {/* Body editor + file attach — 32px gap from title */}
+          <div className="mt-8">
+            <div className="flex items-baseline justify-between gap-2">
+              <label className="block text-sm font-medium">Post content</label>
+              <label
+                htmlFor="post-file-attach"
+                className={cn(
+                  "cursor-pointer text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline",
+                  submitting && "pointer-events-none opacity-50",
+                )}
+                title="Attach Markdown, HTML, plain text, or Word (.docx). Max 10 MB."
+              >
+                Attach file
+                <input
+                  id="post-file-attach"
+                  type="file"
+                  accept=".md,.html,.txt,.docx,text/markdown,text/html,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="sr-only"
+                  disabled={submitting}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setFileReadError(null);
+                      setComposerValue((prev) => ({ ...prev, file: f }));
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+            <RichTextEditor
+              value={composerValue.text}
+              onChange={(html) => setComposerValue((prev) => ({ ...prev, text: html }))}
+              placeholder={`Type, paste, or drop your post.\n\nA YAML front-matter block, inline labels, or HTML meta tags will pre-fill the metadata fields below.`}
+              disabled={submitting}
+              className="mt-1"
+            />
+            {fileReadError && (
+              <p className="mt-1 text-sm text-destructive" role="alert">
+                {fileReadError}
+              </p>
+            )}
+          </div>
+
+          {/* SEO section — inside left column below editor */}
+          <section
+            className="mt-8 border-t pt-6"
+            data-testid="seo-section"
+            aria-label="SEO settings"
+          >
+            <button
+              type="button"
+              onClick={() => setSeoPanelOpen((v) => !v)}
+              aria-expanded={seoPanelOpen}
+              className="flex w-full items-center justify-between text-left text-sm font-semibold transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              SEO
+              <ChevronDown
+                aria-hidden
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform",
+                  seoPanelOpen && "rotate-180",
+                )}
+              />
+            </button>
+            {seoPanelOpen && <div className="mt-4 space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="post-meta-title" className="block text-sm font-medium">
+                    SEO title
+                  </label>
+                  <Input
+                    id="post-meta-title"
+                    className="mt-1"
+                    value={metaTitle.value}
+                    onChange={(e) =>
+                      setFieldValue(
+                        setMetaTitle,
+                        e.target.value,
+                        lastParse?.meta_title ?? null,
+                        lastParse?.source_map.meta_title ?? "derived",
+                      )
+                    }
+                    disabled={submitting}
+                    maxLength={200}
+                  />
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <SourceHint source={metaTitle.source} />
+                    <MetaTitleLengthHint length={metaTitle.value.length} />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="post-meta-description" className="block text-sm font-medium">
+                    Meta description
+                  </label>
+                  <Textarea
+                    id="post-meta-description"
+                    className="mt-1"
+                    rows={3}
+                    value={metaDescription.value}
+                    onChange={(e) =>
+                      setFieldValue(
+                        setMetaDescription,
+                        e.target.value,
+                        lastParse?.meta_description ?? null,
+                        lastParse?.source_map.meta_description ?? "derived",
+                      )
+                    }
+                    disabled={submitting}
+                    maxLength={400}
+                    aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
+                  />
+                  <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+                    <SourceHint source={metaDescription.source} />
+                    <MetaDescriptionLengthHint length={metaDescription.value.length} />
+                  </div>
+                </div>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Search preview
+                </p>
+                <GoogleSnippetPreview
+                  title={metaTitle.value || title.value}
+                  url={
+                    siteWpUrl && slug.value
+                      ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
+                      : siteWpUrl ?? "https://example.com/"
+                  }
+                  description={metaDescription.value}
+                />
+              </div>
+            </div>}
+          </section>
         </div>
 
         {formError && <Alert variant="destructive">{formError}</Alert>}
@@ -948,12 +1035,39 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
 
       {/* ── RIGHT: document sidebar ── */}
       <aside
-        className="mt-6 space-y-3 lg:mt-0"
+        className="mt-6 space-y-3 lg:mt-0 lg:sticky lg:top-8 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto"
         aria-label="Post settings"
         data-testid="post-sidebar"
       >
         {/* Publish panel */}
         <SidebarPanel title="Publish" defaultOpen testId="sidebar-publish">
+          <div className="flex flex-col gap-2">
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={primaryDisabled || submitting}
+              title={
+                publishMode === "publish" && !canPublish
+                  ? "Fill in SEO title and meta description to publish."
+                  : undefined
+              }
+            >
+              {submitting ? "Saving…" : primaryLabel}
+            </Button>
+            {publishMode !== "draft" && publishMode !== "pending" && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={!canSaveDraft || submitting}
+                onClick={handleSaveToOpollo}
+                title="Save as draft in Opollo. Does not publish to WordPress."
+              >
+                {submitting ? "Saving…" : "Save draft"}
+              </Button>
+            )}
+          </div>
+
           {siteWpUrl && (
             <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
               <span className="shrink-0">Publishing to:</span>
@@ -1025,7 +1139,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
 
           {publishMode === "publish" && !canPublish && canSaveDraft && (
             <p className="text-sm text-muted-foreground">
-              Fill in the SEO fields below to enable publishing.
+              Fill in the SEO fields to enable publishing.
             </p>
           )}
 
@@ -1034,33 +1148,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               No featured image set. Posts without a featured image may not display correctly in WordPress.
             </p>
           )}
-
-          <div className="flex flex-col gap-2">
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={primaryDisabled || submitting}
-              title={
-                publishMode === "publish" && !canPublish
-                  ? "Fill in SEO title and meta description to publish."
-                  : undefined
-              }
-            >
-              {submitting ? "Saving…" : primaryLabel}
-            </Button>
-            {publishMode !== "draft" && publishMode !== "pending" && (
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={!canSaveDraft || submitting}
-                onClick={handleSaveToOpollo}
-                title="Save as draft in Opollo. Does not publish to WordPress."
-              >
-                {submitting ? "Saving…" : "Save draft"}
-              </Button>
-            )}
-          </div>
 
           <p
             aria-hidden
@@ -1298,99 +1385,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           </p>
         </SidebarPanel>
       </aside>
-
-      {/* ── SEO — full width below both columns (Issue 18) ── */}
-      <section
-        className="lg:col-span-2"
-        data-testid="sidebar-seo"
-        aria-label="SEO settings"
-      >
-        <div className="overflow-hidden rounded-md border bg-card">
-          <button
-            type="button"
-            onClick={() => setSeoPanelOpen((v) => !v)}
-            aria-expanded={seoPanelOpen}
-            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            SEO
-            <ChevronDown
-              aria-hidden
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform",
-                seoPanelOpen && "rotate-180",
-              )}
-            />
-          </button>
-          {seoPanelOpen && <div className="space-y-4 border-t px-4 py-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
-            <div className="space-y-3">
-              <div>
-                <label htmlFor="post-meta-title" className="block text-sm font-medium">
-                  SEO title
-                </label>
-                <Input
-                  id="post-meta-title"
-                  className="mt-1"
-                  value={metaTitle.value}
-                  onChange={(e) =>
-                    setFieldValue(
-                      setMetaTitle,
-                      e.target.value,
-                      lastParse?.meta_title ?? null,
-                      lastParse?.source_map.meta_title ?? "derived",
-                    )
-                  }
-                  disabled={submitting}
-                  maxLength={200}
-                />
-                <div className="mt-1 flex items-center justify-between gap-2">
-                  <SourceHint source={metaTitle.source} />
-                  <MetaTitleLengthHint length={metaTitle.value.length} />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="post-meta-description" className="block text-sm font-medium">
-                  Meta description
-                </label>
-                <Textarea
-                  id="post-meta-description"
-                  className="mt-1"
-                  rows={3}
-                  value={metaDescription.value}
-                  onChange={(e) =>
-                    setFieldValue(
-                      setMetaDescription,
-                      e.target.value,
-                      lastParse?.meta_description ?? null,
-                      lastParse?.source_map.meta_description ?? "derived",
-                    )
-                  }
-                  disabled={submitting}
-                  maxLength={400}
-                  aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
-                />
-                <div className="mt-1 flex items-center justify-between gap-2 text-sm">
-                  <SourceHint source={metaDescription.source} />
-                  <MetaDescriptionLengthHint length={metaDescription.value.length} />
-                </div>
-              </div>
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Search preview
-              </p>
-              <GoogleSnippetPreview
-                title={metaTitle.value || title.value}
-                url={
-                  siteWpUrl && slug.value
-                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
-                    : siteWpUrl ?? "https://example.com/"
-                }
-                description={metaDescription.value}
-              />
-            </div>
-          </div>}
-        </div>
-      </section>
 
       <ImagePickerModal
         open={pickerOpen}
