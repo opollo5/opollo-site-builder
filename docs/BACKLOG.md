@@ -397,7 +397,7 @@ Option (b) expands the write-safety blast radius significantly — mu-plugin ins
 
 ---
 
-## PDF / .docx brief parser (deferred from M12-6, 2026-04-24)
+## ~~PDF / .docx brief parser~~ (shipped 2026-05-06, PR #TBD)
 
 **What:** Extend `lib/brief-parser.ts` to accept `application/pdf` and `application/vnd.openxmlformats-officedocument.wordprocessingml.document` in addition to `text/plain` + `text/markdown`. The existing structural-first + Claude-inference-fallback parser runs against the extracted text; the only new work is the MIME-specific binary → UTF-8 decoder.
 
@@ -925,7 +925,7 @@ Other trigger-gated items:
 - "Cloudflare image upload friction → S3 alternative investigation" — POC + migration; trigger is product-readiness audit
 - "Opollo mu-plugin for one-click Kadence install" — XL slice; trigger is first operator wanting one-click setup
 - "Kadence typography + spacing globals sync" — Medium-Large; trigger is operator brand-consistency complaint
-- "PDF / .docx brief parser" — Medium; trigger is first operator request to upload a non-text brief
+- ~~"PDF / .docx brief parser"~~ — shipped 2026-05-06
 - "Auth polish deferred from M14" — trigger is operator pain
 - "Admin top navigation redesign" — Medium UX polish; trigger is product-readiness pass
 

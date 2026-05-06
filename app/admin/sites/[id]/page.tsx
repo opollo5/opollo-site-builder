@@ -310,7 +310,13 @@ export default async function SiteDetailPage({
         <section>
           <div className="flex items-center justify-between">
             <H3>Briefs</H3>
-            <UploadBriefButton siteId={site.id} />
+            <UploadBriefButton
+              siteId={site.id}
+              binaryParsersEnabled={
+                process.env.OPOLLO_BRIEF_BINARY_PARSERS === "1" ||
+                process.env.OPOLLO_BRIEF_BINARY_PARSERS === "true"
+              }
+            />
           </div>
           <div className="mt-2 overflow-x-auto rounded-md border">
             {briefs.length === 0 ? (

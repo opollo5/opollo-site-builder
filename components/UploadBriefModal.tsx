@@ -26,7 +26,9 @@ import { Composer, type ComposerValue } from "@/components/Composer";
 // based on the composer's resolved value. Server side is unchanged.
 // ---------------------------------------------------------------------------
 
-const ACCEPTED_TYPES = ".txt,.md,text/plain,text/markdown";
+const ACCEPTED_TYPES_TEXT = ".txt,.md,text/plain,text/markdown";
+const ACCEPTED_TYPES_BINARY =
+  ".txt,.md,.pdf,.docx,text/plain,text/markdown,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const MAX_BRIEF_BYTES = 10 * 1024 * 1024;
 
 const ERROR_TRANSLATIONS: Record<string, string> = {
@@ -51,10 +53,12 @@ export function UploadBriefModal({
   open,
   siteId,
   onClose,
+  binaryParsersEnabled = false,
 }: {
   open: boolean;
   siteId: string;
   onClose: () => void;
+  binaryParsersEnabled?: boolean;
 }) {
   const router = useRouter();
   // Persist the in-progress brief in localStorage so a refresh / accidental
@@ -310,12 +314,16 @@ export function UploadBriefModal({
                 textareaId="brief-composer"
                 value={composerValue}
                 onChange={setComposerValue}
-                accept={ACCEPTED_TYPES}
+                accept={binaryParsersEnabled ? ACCEPTED_TYPES_BINARY : ACCEPTED_TYPES_TEXT}
                 maxFileBytes={MAX_BRIEF_BYTES}
                 disabled={submitting}
                 onFileRejected={handleFileRejected}
                 placeholder={`Type, paste, or drop a brief.\n\nExample:\n# Site brief\n\n## Page 1: Home\nDescription of the home page...`}
-                acceptHint="Plain text (.txt) or Markdown (.md). Max 10 MB. Drag-drop, paste, or use + to attach."
+                acceptHint={
+                  binaryParsersEnabled
+                    ? "Plain text (.txt), Markdown (.md), PDF (.pdf), or Word (.docx). Max 10 MB. Drag-drop, paste, or use + to attach."
+                    : "Plain text (.txt) or Markdown (.md). Max 10 MB. Drag-drop, paste, or use + to attach."
+                }
                 className="mt-1"
               />
             </div>
