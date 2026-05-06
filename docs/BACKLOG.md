@@ -109,7 +109,7 @@ When path-A rows become stale enough or visually disruptive enough, retire by ru
 
 ---
 
-## ~~Path-B publish gate on Kadence sync drift~~ (shipped 2026-05-06, PR #TBD)
+## ~~Path-B publish gate on Kadence sync drift~~ (shipped 2026-05-06, PR #645)
 
 **Tags:** `path-b`, `m13`, `publish`, `feature-flag`
 
@@ -255,6 +255,8 @@ Verified 2026-04-29: `docs/RUNBOOK.md` already has the full procedure at "Anthro
 **Tags:** `audit`, `observability`, `discipline`
 
 **Status (2026-04-29):** audit infrastructure shipped — `scripts/audit-internal-error-logging.ts` runs the BACKLOG-described grep heuristic and reports file:line for each silent return. Initial run: 64 sites; after the high-impact pass (cron paths + critical mutations: cancel, approve, budget-reset, process-batch, process-regenerations, process-transfer, posts/unpublish), 56 remain. Most remaining are in `lib/briefs.ts` where `errorEnvelope` already captures the underlying error in `details.supabase_error` — the violation is soft (no `logger.error` call) but the data isn't lost.
+
+**Status (2026-05-06):** second sweep (PRs #634, #631) added `logger.error` to the 9 API-route tier violations and 2 billing-critical lib violations (`lib/batch-jobs.ts:reserveBudget` failure, `lib/brief-runner.ts:reserveWithCeiling` failure). As of this sweep, the API routes tier is clean and the billing-critical paths are covered. Remaining violations (audit script reports ~106 total including false positives — `lib/2fa/challenges.ts:61` and `lib/brief-runner.ts:1341` are type definitions, not runtime returns) are concentrated in `lib/briefs.ts` (soft — envelope already captures error in `details.supabase_error`) and new lib files added since the prior sweep. The false positives should be filtered from the audit script output.
 
 **Remaining work — opportunistic:**
 - Run `npx tsx scripts/audit-internal-error-logging.ts` before / during any future PR that touches the listed files; add `logger.error` alongside the envelope return.
