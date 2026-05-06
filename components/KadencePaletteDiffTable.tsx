@@ -64,7 +64,7 @@ function DiffRow({ entry }: { entry: PaletteDiffEntry }) {
       </td>
       <td className="px-3 py-2 text-right">
         {entry.changed ? (
-          <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-sm font-medium text-yellow-900 dark:text-yellow-200">
+          <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-sm font-medium text-yellow-900">
             Changed
           </span>
         ) : (

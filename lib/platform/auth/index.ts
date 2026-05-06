@@ -19,6 +19,7 @@ export {
 export {
   getCurrentPlatformSession,
   getCurrentCompany,
+  STAFF_SELECTED_COMPANY_COOKIE,
 } from "./current-user";
 
 export { minRoleFor, roleSatisfies } from "./permissions";

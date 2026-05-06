@@ -481,7 +481,7 @@ function PreflightBlockedBanner({
   return (
     <div
       role="alert"
-      className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200"
+      className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900"
     >
       <p className="font-medium">{blocker.title}</p>
       <p className="mt-1">{blocker.detail}</p>
@@ -518,7 +518,7 @@ function KadenceInactiveBanner({
   return (
     <div
       role="status"
-      className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200"
+      className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900"
     >
       <p className="font-medium">Kadence isn&apos;t the active theme.</p>
       <p className="mt-1">
@@ -649,7 +649,7 @@ function ReadyState({
       {insufficientProposal && (
         <div
           role="alert"
-          className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900 dark:text-yellow-200"
+          className="rounded-md border border-yellow-500/40 bg-yellow-500/10 p-4 text-sm text-yellow-900"
         >
           <p className="font-medium">
             Active design system doesn&apos;t have enough colors for a Kadence
@@ -679,7 +679,7 @@ function ReadyState({
                 Already synced
               </span>
             ) : (
-              <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-sm font-medium text-yellow-900 dark:text-yellow-200">
+              <span className="inline-flex rounded bg-yellow-500/10 px-2 py-0.5 text-sm font-medium text-yellow-900">
                 {ctx.diff.entries.filter((e) => e.changed).length} slot
                 {ctx.diff.entries.filter((e) => e.changed).length === 1 ? "" : "s"} pending
               </span>

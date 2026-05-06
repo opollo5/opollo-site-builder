@@ -421,7 +421,7 @@ export function BriefRunClient({
             ) : (
               <span
                 role="status"
-                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700"
                 title="This page auto-updates as the runner makes progress"
               >
                 <span

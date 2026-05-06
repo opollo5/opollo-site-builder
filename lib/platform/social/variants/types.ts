@@ -53,6 +53,10 @@ export type UpsertVariantInput = {
   // Empty / whitespace-only collapses to null (resets to "use master").
   // is_custom is derived: non-null variant_text → true; null → false.
   variantText: string | null;
+  // Optional: link this variant to a specific social_connections row.
+  // When provided, connection_id is written to the row. Pass undefined
+  // to leave the existing value untouched on an upsert path.
+  connectionId?: string | null;
   // S1-24: optional media attachments. When present (including empty
   // []), the column is overwritten — pass undefined to leave the
   // existing array untouched on upsert. Each id must reference a

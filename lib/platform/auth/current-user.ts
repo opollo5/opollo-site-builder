@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createRouteAuthClient } from "@/lib/auth";
@@ -8,6 +10,10 @@ import type {
   CompanyRole,
   PlatformSession,
 } from "./types";
+
+// Cookie that Opollo staff can set to "view as" a specific company without
+// permanently joining it. Staff still retain is_opollo_staff=true.
+export const STAFF_SELECTED_COMPANY_COOKIE = "opollo_selected_company_id";
 
 // Resolves the current platform-layer session: identity from auth.users via
 // the cookie-bound client, then platform_users + platform_company_users via
@@ -61,8 +67,15 @@ export async function getCurrentPlatformSession(
       .from("platform_users")
       .upsert({ id: userId, email, is_opollo_staff: true }, { onConflict: "id" });
 
-    // No company membership by default — staff must join a company from /admin/companies.
-    return { userId, email, isOpolloStaff: true, company: null };
+    // Cookie takes priority; fall back to platform_company_users if no cookie.
+    const staffCompany = await resolveStaffCompany(userId, svc);
+    return { userId, email, isOpolloStaff: true, company: staffCompany };
+  }
+
+  if (profileResult.data.is_opollo_staff === true) {
+    // Cookie takes priority; fall back to platform_company_users if no cookie.
+    const staffCompany = await resolveStaffCompany(userId, svc);
+    return { userId, email, isOpolloStaff: true, company: staffCompany };
   }
 
   const membershipResult = await svc
@@ -93,4 +106,56 @@ export async function getCurrentCompany(
 ): Promise<CompanyMembership | null> {
   const session = await getCurrentPlatformSession(client);
   return session?.company ?? null;
+}
+
+// For staff users: cookie-selected company takes priority over their actual
+// platform_company_users row. Falls back to the DB row when no cookie is set
+// so staff who are members of Opollo Internal still get company context.
+async function resolveStaffCompany(
+  userId: string,
+  svc: ReturnType<typeof getServiceRoleClient>,
+): Promise<CompanyMembership | null> {
+  const cookieCompany = await resolveStaffSelectedCompany(svc);
+  if (cookieCompany) return cookieCompany;
+
+  const membershipResult = await svc
+    .from("platform_company_users")
+    .select("company_id, role")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (membershipResult.error || !membershipResult.data) return null;
+  return {
+    companyId: membershipResult.data.company_id as string,
+    role: membershipResult.data.role as CompanyRole,
+  };
+}
+
+// Reads the staff company-selection cookie and validates the company exists.
+// Returns a synthetic admin-role membership so Opollo staff can browse any
+// company's portal without permanently joining it.
+async function resolveStaffSelectedCompany(
+  svc: ReturnType<typeof getServiceRoleClient>,
+): Promise<CompanyMembership | null> {
+  let selectedId: string | undefined;
+  try {
+    selectedId = cookies().get(STAFF_SELECTED_COMPANY_COOKIE)?.value;
+  } catch {
+    // cookies() throws outside of a request context (e.g. during tests).
+    return null;
+  }
+  if (!selectedId || !/^[0-9a-f-]{36}$/i.test(selectedId)) return null;
+
+  const result = await svc
+    .from("platform_companies")
+    .select("id")
+    .eq("id", selectedId)
+    .maybeSingle();
+
+  if (result.error || !result.data) return null;
+
+  return {
+    companyId: selectedId,
+    role: "admin",
+  };
 }

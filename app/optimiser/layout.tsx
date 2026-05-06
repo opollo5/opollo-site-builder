@@ -39,7 +39,7 @@ export default async function OptimiserLayout({
           <span className="flex items-center gap-2 font-semibold tracking-tight">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+              src="/logos/opollo-logo-dark.png"
               alt="Opollo"
               width={80}
               className="h-5 w-auto"
