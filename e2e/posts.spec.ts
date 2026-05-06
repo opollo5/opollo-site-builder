@@ -127,7 +127,7 @@ test.describe("M13-4 posts — admin surface", () => {
       page.getByRole("heading", { level: 1, name: /E2E post/ }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: /generated html/i }),
+      page.getByRole("heading", { name: /content preview/i }),
     ).toBeVisible();
 
     // The preview iframe exists with sandbox="" (security invariant).
