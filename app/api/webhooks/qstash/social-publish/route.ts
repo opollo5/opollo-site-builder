@@ -78,6 +78,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return errorEnvelope("VALIDATION_FAILED", result.error.message, 400);
     }
     // INTERNAL_ERROR returns 500 so QStash retries.
+    logger.error("social.publish.callback.fire_failed", {
+      err: result.error.message,
+      scheduleEntryId: parsed.scheduleEntryId,
+    });
     return errorEnvelope("INTERNAL_ERROR", result.error.message, 500);
   }
 

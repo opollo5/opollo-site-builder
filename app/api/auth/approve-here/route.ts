@@ -105,6 +105,10 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
     .maybeSingle();
   const email = userRow.data?.email as string | undefined;
   if (!email) {
+    logger.error("auth.2fa.approve-here.email_lookup_failed", {
+      challenge_id: parsed.data.challenge_id,
+      supabase_err: userRow.error?.message,
+    });
     return NextResponse.json(
       {
         ok: false,

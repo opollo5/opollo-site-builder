@@ -109,6 +109,10 @@ export async function POST(_req: NextRequest): Promise<NextResponse> {
     userRes.data.user.email ??
     null;
   if (!toEmail) {
+    logger.error("auth.2fa.resend.email_lookup_failed", {
+      user_id: userId,
+      supabase_err: userRow.error?.message,
+    });
     return NextResponse.json(
       { ok: false, error: { code: "INTERNAL_ERROR", message: "Could not resolve user email." } },
       { status: 500 },
