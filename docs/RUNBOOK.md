@@ -736,3 +736,52 @@ Keep the Quick-reference table in sync.
 - Check Vercel deployment logs for seed data — if the E2E admin user or fixture site didn't backfill, specs fail with "user not found" or "site not found."
 - Rerun the failing PR in GitHub Actions if logs are clean (transient Playwright timing issue).
 - If the same test fails twice, open an issue on the spec itself before escalating — likely a race condition or a recent code change broke the locator.
+
+---
+
+## Supabase schema types bootstrap
+
+**Context:** `types/supabase.ts` is a generated file that maps every table/view/function in the live schema to TypeScript types. Once bootstrapped, `lib/supabase.ts`'s `getServiceRoleClient()` returns a `SupabaseClient<Database>` typed client — column drift that would previously surface as a silent `INTERNAL_ERROR` 500 becomes a compile-time error instead. The CI `test` job includes a drift gate that fails when the committed types file diverges from the live schema.
+
+**Why the gate is inactive by default:** The gate only runs when `types/supabase.ts` contains the `@generated` marker that `supabase gen types` emits. The placeholder file shipped with M15-8 does not have this marker, so CI won't fail until the real types file is committed.
+
+**One-time bootstrap (run locally with Docker):**
+
+```bash
+supabase start           # start local stack with all migrations applied
+npm run gen:types        # writes types/supabase.ts (adds @generated marker)
+npm run typecheck        # confirm no new type errors from the generated types
+git add types/supabase.ts
+git commit -m "chore(infra): bootstrap supabase schema types"
+git push
+```
+
+After this commit, the CI gate activates. Every future migration must regenerate the file.
+
+**After every migration:**
+
+```bash
+supabase start           # if not already running
+npm run gen:types        # regenerate
+git add types/supabase.ts
+# commit alongside the migration file in the same PR
+```
+
+**If CI fails with "types/supabase.ts is out of date":**
+
+A migration was pushed without regenerating the types file.
+
+```bash
+supabase start
+npm run gen:types
+git add types/supabase.ts
+git commit -m "chore(infra): regenerate supabase types after migration NNNN"
+git push
+```
+
+**Checking the diff without failing:**
+
+```bash
+supabase gen types typescript --local > /tmp/supabase-check.ts
+diff types/supabase.ts /tmp/supabase-check.ts
+```

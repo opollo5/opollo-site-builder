@@ -15,7 +15,16 @@ Don't use for: data migrations (row rewrites in bulk) — those go under `supaba
 | `lib/__tests__/<slug>.test.ts` | Applied-migration assertions: constraints reject invalid inserts, cascades fire as expected, RLS policies honour the role matrix. |
 | `supabase/rollbacks/README.md` | Add a line if the new migration has subtlety worth warning future operators about. |
 
-If the migration extends a type, schema, or enum that TypeScript reflects, regenerate types after apply.
+After apply, regenerate `types/supabase.ts` so the typed client stays in sync and the CI drift gate passes:
+
+```bash
+supabase start          # if not already running
+npm run gen:types       # overwrites types/supabase.ts
+git add types/supabase.ts
+# commit in the same PR as the migration
+```
+
+If `types/supabase.ts` hasn't been bootstrapped yet (placeholder in place), skip this step — see `docs/RUNBOOK.md` § "Supabase schema types bootstrap".
 
 ## Scaffolding
 

@@ -219,6 +219,25 @@ jobs:
           supabase status | tee /tmp/supabase-status.txt
           echo "---- JSON ----" | tee -a /tmp/supabase-status.txt
           supabase status --output json | tee -a /tmp/supabase-status.txt || true
+      - name: Check Supabase schema type drift
+        run: |
+          # Only active once types/supabase.ts has been bootstrapped with the
+          # real generated output (identified by the "@generated" marker that
+          # `supabase gen types` emits on the first line).  Until bootstrap,
+          # this step is a no-op and prints a reminder.
+          if grep -q '@generated' types/supabase.ts 2>/dev/null; then
+            supabase gen types typescript --local > /tmp/supabase.ts.generated
+            if ! diff -q types/supabase.ts /tmp/supabase.ts.generated > /dev/null; then
+              echo "::error::types/supabase.ts is out of date with the current schema."
+              echo "Run 'supabase start && npm run gen:types' locally, commit types/supabase.ts, and push."
+              diff types/supabase.ts /tmp/supabase.ts.generated || true
+              exit 1
+            fi
+            echo "✓ types/supabase.ts matches the live schema"
+          else
+            echo "⚠ types/supabase.ts not yet bootstrapped — schema drift gate inactive."
+            echo "  See docs/RUNBOOK.md § 'Supabase schema types bootstrap' to activate."
+          fi
       - name: Run Vitest suite
         id: vitest
         run: |
