@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   archiveSite,
@@ -35,21 +35,6 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
 
 export async function GET(
   _req: Request,
@@ -86,11 +71,11 @@ export async function PATCH(
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
+    return validationError("Site id must be a UUID.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = PatchBodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -174,7 +159,7 @@ export async function DELETE(
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
+    return validationError("Site id must be a UUID.");
   }
 
   const result = await archiveSite(params.id);
