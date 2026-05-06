@@ -63,6 +63,13 @@ export const dynamic = "force-dynamic";
 
 const PublishBodySchema = z.object({
   expected_version_lock: z.number().int().nonnegative(),
+  // Optional WP-level controls forwarded from the composer.
+  // wp_status overrides the default "publish" — used for "private" and "pending".
+  wp_status: z.enum(["publish", "private", "pending"]).optional(),
+  wp_password: z.string().max(255).optional(),
+  wp_comment_status: z.enum(["open", "closed"]).optional(),
+  wp_ping_status: z.enum(["open", "closed"]).optional(),
+  wp_author_id: z.number().int().positive().optional(),
 });
 
 function envelope(
@@ -353,6 +360,13 @@ export async function POST(
   const excerptValue = post.excerpt ?? undefined;
   const featuredMediaPatch =
     featuredMediaId !== null ? { featured_media: featuredMediaId } : {};
+  const wpStatus = parsed.data.wp_status ?? "publish";
+  const wpExtras = {
+    ...(parsed.data.wp_comment_status !== undefined ? { comment_status: parsed.data.wp_comment_status } : {}),
+    ...(parsed.data.wp_ping_status !== undefined ? { ping_status: parsed.data.wp_ping_status } : {}),
+    ...(wpStatus === "publish" && parsed.data.wp_password ? { password: parsed.data.wp_password } : {}),
+    ...(parsed.data.wp_author_id !== undefined ? { author: parsed.data.wp_author_id } : {}),
+  };
   const wpResult = post.wp_post_id
     ? await wpUpdatePost(cfg, post.wp_post_id, {
         title: post.title,
@@ -363,7 +377,8 @@ export async function POST(
         ...(allTagIds !== undefined ? { tags: allTagIds } : {}),
         ...(yoastMeta !== undefined ? { meta: yoastMeta } : {}),
         ...featuredMediaPatch,
-        status: "publish",
+        ...wpExtras,
+        status: wpStatus,
       })
     : await wpCreatePost(cfg, {
         title: post.title,
@@ -374,7 +389,8 @@ export async function POST(
         ...(allTagIds !== undefined ? { tags: allTagIds } : {}),
         ...(yoastMeta !== undefined ? { meta: yoastMeta } : {}),
         ...featuredMediaPatch,
-        status: "publish",
+        ...wpExtras,
+        status: wpStatus,
       });
   if (!wpResult.ok) {
     const translated = translateWpError(wpResult);
@@ -403,8 +419,11 @@ export async function POST(
   //    sets wp_post_id; re-publish leaves it intact. Both refresh
   //    published_at.
   const nowIso = new Date().toISOString();
+  // Map WP status to Opollo status: "pending" stays as "pending"; anything
+  // else (publish, private) maps to "published".
+  const opolloStatus = wpStatus === "pending" ? "pending" : "published";
   const updatePatch: Record<string, unknown> = {
-    status: "published",
+    status: opolloStatus,
     published_at: nowIso,
     updated_at: nowIso,
     last_edited_by: gate.user?.id ?? null,

@@ -94,10 +94,34 @@ async function fetchOriginalBytes(cloudflareId: string): Promise<Uint8Array | nu
 type ExifResult = {
   caption: string | null;
   altText: string | null;
+  title: string | null;
   tags: string[];
 };
 
-async function extractExifMetadata(bytes: Uint8Array): Promise<ExifResult> {
+function deriveTitleFromExifAndFilename(
+  meta: Record<string, unknown> | null,
+  filename: string | null,
+): string | null {
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v.trim() : null;
+  if (meta) {
+    const t =
+      str(meta.ObjectName) ??
+      str(meta.Headline) ??
+      str(meta.Title) ??
+      (str(meta["Caption-Abstract"])?.slice(0, 80) ?? null) ??
+      (str(meta.description)?.slice(0, 80) ?? null);
+    if (t) return t;
+  }
+  if (!filename) return null;
+  const base = filename.replace(/\.[^.]+$/, "");
+  const m = /^istock[-_](\d+)/i.exec(base);
+  if (m) return `iStock Image ${m[1]}`;
+  const human = base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return human || null;
+}
+
+async function extractExifMetadata(bytes: Uint8Array, filename: string | null): Promise<ExifResult> {
   try {
     const meta = await exifr.parse(Buffer.from(bytes), {
       iptc: true,
@@ -105,7 +129,7 @@ async function extractExifMetadata(bytes: Uint8Array): Promise<ExifResult> {
       xmp: true,
     });
 
-    if (!meta) return { caption: null, altText: null, tags: [] };
+    if (!meta) return { caption: null, altText: null, title: deriveTitleFromExifAndFilename(null, filename), tags: [] };
 
     // Guard: exifr can return IPTC fields as objects (IptcRecord) rather than
     // plain strings in some firmware-written JPEGs. Using String() on those
@@ -138,10 +162,11 @@ async function extractExifMetadata(bytes: Uint8Array): Promise<ExifResult> {
 
     const caption = rawCaption ? rawCaption.slice(0, 150) || null : null;
     const altText = rawAlt ? rawAlt.slice(0, 100) || null : null;
+    const title = deriveTitleFromExifAndFilename(meta, filename);
 
-    return { caption, altText, tags };
+    return { caption, altText, title, tags };
   } catch {
-    return { caption: null, altText: null, tags: [] };
+    return { caption: null, altText: null, title: deriveTitleFromExifAndFilename(null, filename), tags: [] };
   }
 }
 
@@ -156,10 +181,10 @@ async function main() {
     .from("image_library")
     .select("id", { count: "exact", head: true })
     .is("deleted_at", null)
-    .or("caption.is.null,caption.eq.,caption.eq.[object Object]");
+    .or("caption.is.null,caption.eq.,caption.eq.[object Object],title.is.null");
 
   const total = count ?? 0;
-  console.log(`Images needing captions: ${total}\n`);
+  console.log(`Images needing captions or titles: ${total}\n`);
 
   let processed = 0;
   let exifCount = 0;
@@ -170,9 +195,9 @@ async function main() {
   while (true) {
     const { data: rows, error } = await svc
       .from("image_library")
-      .select("id, cloudflare_id, filename, caption, tags")
+      .select("id, cloudflare_id, filename, caption, title, tags")
       .is("deleted_at", null)
-      .or("caption.is.null,caption.eq.,caption.eq.[object Object]")
+      .or("caption.is.null,caption.eq.,caption.eq.[object Object],title.is.null")
       .order("created_at", { ascending: true })
       .range(offset, offset + BATCH_SIZE - 1);
 
@@ -185,10 +210,13 @@ async function main() {
     for (const row of rows) {
       processed++;
 
-      // Resume-safe: skip if caption already set with a real value.
+      // Resume-safe: skip rows that already have both caption and title.
       // "[object Object]" is treated as absent — it's a bug artefact, not real data.
       const existingCaption = (row.caption as string | null)?.trim() ?? "";
-      if (existingCaption.length > 0 && existingCaption !== "[object Object]") {
+      const captionOk = existingCaption.length > 0 && existingCaption !== "[object Object]";
+      const existingTitle = (row.title as string | null)?.trim() ?? "";
+      const titleOk = existingTitle.length > 0;
+      if (captionOk && titleOk) {
         noData++;
         continue;
       }
@@ -206,8 +234,8 @@ async function main() {
         continue;
       }
 
-      const exif = await extractExifMetadata(bytes);
-      const hasData = Boolean(exif.caption || exif.altText);
+      const exif = await extractExifMetadata(bytes, row.filename as string | null);
+      const hasData = Boolean(exif.caption || exif.altText || exif.title);
 
       if (!hasData) {
         console.log(
@@ -218,27 +246,31 @@ async function main() {
       }
 
       const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
-      if (exif.caption) patch.caption = exif.caption;
+      if (exif.caption && !captionOk) patch.caption = exif.caption;
       if (exif.altText) patch.alt_text = exif.altText;
+      if (exif.title && !titleOk) patch.title = exif.title;
       if (exif.tags.length > 0) {
         const existing = Array.isArray(row.tags) ? (row.tags as string[]) : [];
         patch.tags = Array.from(new Set([...existing, ...exif.tags]));
       }
 
+      if (Object.keys(patch).length === 1) {
+        // Only updated_at — nothing new to write.
+        noData++;
+        continue;
+      }
+
       const { error: updateError } = await svc
         .from("image_library")
         .update(patch)
-        .eq("id", row.id)
-        // Idempotency: only write when caption is still absent or was corrupted
-        // by the [object Object] bug from a previous run.
-        .or("caption.is.null,caption.eq.,caption.eq.[object Object]");
+        .eq("id", row.id);
 
       if (updateError) {
         console.error(`[${processed}/${total}] ${row.id} — DB error: ${updateError.message}`);
         errors++;
       } else {
         console.log(
-          `[${processed}/${total}] ${row.filename ?? row.id} — EXIF ✓  caption="${exif.caption?.slice(0, 60)}" alt="${exif.altText}"`,
+          `[${processed}/${total}] ${row.filename ?? row.id} — EXIF ✓  title="${exif.title?.slice(0, 40)}" caption="${exif.caption?.slice(0, 60)}"`,
         );
         exifCount++;
       }
