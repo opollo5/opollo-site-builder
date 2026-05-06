@@ -587,19 +587,19 @@ No new env vars.
 
 Medium / Low findings from Audit 3 (UI + cross-milestone integration) that are deferred — pick up on the next UI polish pass, or earlier if a related slice naturally touches the same surface. Each item is in the `docs/AUDIT_2026-04-22.md` follow-on audit:
 
-- `#7` — `EditPageMetadataModal` no-op submit UX + client-side slug regex (Medium)
-- `#8` — `ComponentFormModal` selector-violations list (Medium)
-- `#9` — Empty-state CTAs in `DesignSystemsTable` / `ComponentsGrid` (Medium)
+- ~~`#7` — `EditPageMetadataModal` no-op submit UX + client-side slug regex~~ (shipped this PR)
+- ~~`#8` — `ComponentFormModal` selector-violations list~~ (shipped this PR)
+- ~~`#9` — Empty-state CTAs in `DesignSystemsTable` / `ComponentsGrid` / `TemplatesTable`~~ (shipped this PR)
 - `#10` — `.env.local.example` optional-vars block (Medium)
 - `#11` — `<Image>` vs `<img>` decision if admin surfaces ever render images (Medium)
-- `#12` — Unify inline validation pattern across modals (Medium)
+- ~~`#12` — Unify inline validation pattern across modals~~ (shipped this PR)
 - `#13` — Brand tokens in Tailwind (Low — only if admin scope changes)
 - `#14` — `force-dynamic` vs `revalidate: 0` audit (Low)
 - `#15` — Lighthouse thresholds ratchet + `/` route coverage (Low)
 - `#16` — Four `: any` annotations in WP + chat boundary (Low)
 - `#17` — `docs/PROMPT_VERSIONING.md` vs `lib/prompts/vN/` reconciliation (Low)
 - `#18` — Two stale `TODO(M3)` / `TODO(M7)` comments → BACKLOG (Low)
-- `#20` — Smart-quote / HTML-entity standardisation in empty states (Low)
+- ~~`#20` — Smart-quote / HTML-entity standardisation in empty states~~ (shipped this PR — CTAs replace text references)
 
 Trigger to pick up: next UI polish pass, OR before any admin UI brand-scope change.
 

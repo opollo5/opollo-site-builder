@@ -131,6 +131,7 @@ export default function DesignSystemTemplatesPage() {
             templates={state.templates}
             onEdit={(t) => setFormMode({ kind: "edit", template: t })}
             onDelete={(t) => setDeleteTarget(t)}
+            onCreate={() => setFormMode({ kind: "create" })}
           />
         )}
       </div>

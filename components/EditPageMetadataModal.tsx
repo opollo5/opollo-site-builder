@@ -20,6 +20,13 @@ import { Input } from "@/components/ui/input";
 // operation. WP still serves the old URL until the next publish.
 // ---------------------------------------------------------------------------
 
+const SLUG_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+
+function FieldError({ message }: { message?: string | null }) {
+  if (!message) return null;
+  return <p className="mt-1 text-sm text-destructive">{message}</p>;
+}
+
 export type EditPageMetadataModalProps = {
   open: boolean;
   onClose: () => void;
@@ -43,33 +50,44 @@ export function EditPageMetadataModal({
   const [slug, setSlug] = useState(page.slug);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [slugError, setSlugError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setTitle(page.title);
       setSlug(page.slug);
       setError(null);
+      setSlugError(null);
       setSubmitting(false);
     }
   }, [open, page.title, page.slug]);
 
   if (!open) return null;
 
+  const isDirty =
+    title.trim() !== page.title || slug.trim() !== page.slug;
+
+  function handleSlugChange(value: string) {
+    setSlug(value);
+    if (slugError) setSlugError(null);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+
+    const trimmedSlug = slug.trim();
+    if (trimmedSlug !== page.slug && !SLUG_RE.test(trimmedSlug)) {
+      setSlugError("Lowercase letters, digits, and hyphens only. Must start and end with a letter or digit.");
+      return;
+    }
+
+    setSubmitting(true);
 
     const patch: { title?: string; slug?: string } = {};
     const trimmedTitle = title.trim();
-    const trimmedSlug = slug.trim();
     if (trimmedTitle !== page.title) patch.title = trimmedTitle;
     if (trimmedSlug !== page.slug) patch.slug = trimmedSlug;
-
-    if (patch.title === undefined && patch.slug === undefined) {
-      onClose();
-      return;
-    }
 
     try {
       const res = await fetch(
@@ -148,14 +166,15 @@ export function EditPageMetadataModal({
             <Input
               id="ep-slug"
               value={slug}
-              onChange={(e) => setSlug(e.target.value)}
+              onChange={(e) => handleSlugChange(e.target.value)}
               maxLength={100}
               disabled={submitting}
             />
             <p className="mt-1 text-sm text-muted-foreground">
               Lowercase letters, digits, and hyphens only.
             </p>
-            {slugChanged && (
+            <FieldError message={slugError} />
+            {slugChanged && !slugError && (
               <p
                 className="mt-1 text-sm text-yellow-700"
                 data-testid="slug-change-warning"
@@ -166,13 +185,13 @@ export function EditPageMetadataModal({
             )}
           </div>
           {error && (
-            <p
+            <div
               role="alert"
-              className="text-sm text-destructive"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
               data-testid="edit-page-error"
             >
               {error}
-            </p>
+            </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -183,7 +202,7 @@ export function EditPageMetadataModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={submitting}>
+            <Button type="submit" disabled={submitting || !isDirty}>
               {submitting ? "Saving…" : "Save changes"}
             </Button>
           </div>

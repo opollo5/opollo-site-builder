@@ -149,6 +149,7 @@ export default function DesignSystemComponentsPage() {
             components={state.components}
             onEdit={(c) => setFormMode({ kind: "edit", component: c })}
             onDelete={(c) => setDeleteTarget(c)}
+            onCreate={() => setFormMode({ kind: "create" })}
           />
         )}
       </div>

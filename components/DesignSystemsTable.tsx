@@ -36,19 +36,25 @@ export function DesignSystemsTable({
   siteId,
   onActivate,
   onArchive,
+  onCreate,
 }: {
   designSystems: DesignSystem[];
   siteId: string;
   onActivate: (ds: DesignSystem) => void;
   onArchive: (ds: DesignSystem) => void;
+  onCreate?: () => void;
 }) {
   if (designSystems.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No design system versions yet. Click &ldquo;New draft&rdquo; to create the
-          first one.
+          No design system versions yet.
         </p>
+        {onCreate && (
+          <Button className="mt-4" onClick={onCreate}>
+            New draft
+          </Button>
+        )}
       </div>
     );
   }

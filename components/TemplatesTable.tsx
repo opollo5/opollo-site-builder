@@ -17,18 +17,24 @@ export function TemplatesTable({
   templates,
   onEdit,
   onDelete,
+  onCreate,
 }: {
   templates: DesignTemplate[];
   onEdit: (t: DesignTemplate) => void;
   onDelete: (t: DesignTemplate) => void;
+  onCreate?: () => void;
 }) {
   if (templates.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No templates in this design system yet. Click &ldquo;New template&rdquo; to add
-          one.
+          No templates in this design system yet.
         </p>
+        {onCreate && (
+          <Button className="mt-4" onClick={onCreate}>
+            New template
+          </Button>
+        )}
       </div>
     );
   }
