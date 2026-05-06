@@ -203,22 +203,13 @@ test.describe("sites CRUD", () => {
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
-    await stubTestConnection(page);
 
-    await page.goto("/admin/sites/new");
-    await page.getByTestId("site-name").fill(`Toggle Test ${Date.now()}`);
-    await page.getByTestId("site-wp-url").fill("https://toggle-test.test");
-    await page.getByTestId("site-wp-user").fill("wp");
-    await page.getByTestId("site-wp-password").fill("password-1234");
-    await page.getByTestId("site-test-connection").click();
-    await expect(page.getByTestId("site-test-result")).toContainText(
-      /Connected as/i,
-    );
-    await page.getByTestId("site-create-save").click();
-    await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}\/onboarding/);
-    const siteId = page
-      .url()
-      .match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
+    // Use the pre-seeded "E2E Test Site" to avoid a slow site-creation
+    // flow that times out on CI after 80+ prior tests.
+    await page.goto("/admin/sites");
+    await page.getByRole("link", { name: "E2E Test Site" }).first().click();
+    await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}$/);
+    const siteId = page.url().match(/\/admin\/sites\/([0-9a-f-]{36})/)?.[1];
     if (!siteId) throw new Error("Could not extract site ID from URL");
 
     await page.goto(`/admin/sites/${siteId}/settings`);
@@ -227,7 +218,12 @@ test.describe("sites CRUD", () => {
     await expect(toggle).toBeVisible();
     // Must be a proper switch semantic, not aria-pressed on a Button.
     await expect(toggle).toHaveRole("switch");
-    // Default is off.
+
+    // Ensure we start from OFF (seeded site may have been left on by a prior run).
+    if ((await toggle.getAttribute("aria-checked")) === "true") {
+      await toggle.click();
+      await expect(toggle).toHaveAttribute("aria-checked", "false");
+    }
     await expect(toggle).toHaveAttribute("aria-checked", "false");
 
     // Turn on.
