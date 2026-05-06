@@ -245,11 +245,15 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await publishPanel.getByRole("button", { name: /^publish$/i }).click();
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
 
-    // SEO panel is open by default (auto-fill feature); collapsing hides meta title.
-    const seoPanel = page.getByTestId("sidebar-seo");
-    await expect(seoPanel.locator("#post-meta-title")).toBeVisible();
-    await seoPanel.getByRole("button", { name: /^seo$/i }).click();
-    await expect(seoPanel.locator("#post-meta-title")).toHaveCount(0);
+    // SEO section is now full-width below the editor grid (not a collapsible sidebar panel).
+    const seoSection = page.getByTestId("seo-section");
+    await expect(seoSection).toBeVisible();
+    await expect(seoSection.locator("#post-meta-title")).toBeVisible();
+    await expect(seoSection.locator("#post-meta-description")).toBeVisible();
+
+    // Visibility panel (new in WP parity) is open by default.
+    const visibilityPanel = page.getByTestId("sidebar-visibility");
+    await expect(visibilityPanel).toBeVisible();
 
     await auditA11y(page, testInfo);
   });
