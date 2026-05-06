@@ -524,6 +524,10 @@ Reports live at:
 - ~~**[M15-6 #14] Tool lib implementations untested.**~~ Shipped 2026-05-04 — PR #532 adds tests for all 6 executor libs (create-page, list-pages, get-page, update-page, delete-page, publish-page).
 - ~~**[M15-6 #15] `briefs-review.spec.ts` upload→parse→commit E2E is `test.fixme`.**~~ Shipped in M12-6 (2026-05-03).
 - ~~**[M15-6 #17] `health-route.test.ts` only covers happy path.**~~ Shipped 2026-05-04 — PR #531 adds degraded branch + outer-catch tests.
+- ~~**[M15-6 #18] `lib/current-user.ts` — no test.**~~ Shipped 2026-05-06 — PR #692: 12 cases covering 5 conditional branches (flag off, kill-switch on/throws, no session, valid session, flag variants).
+- ~~**[M15-6 #19] `lib/redis.ts` — no test.**~~ Shipped 2026-05-06 — PR #696: 13 cases covering null-return (missing vars), singleton caching, constructor arg forwarding, and `__resetRedisClientForTests` helper.
+- ~~**[M15-6 #20] `lib/http.ts` — no test.**~~ Shipped 2026-05-06 — PR #691: 38 cases covering all 12 exported helpers including `readJsonBody`, `parseBodyWith`, `respond`, `validateUuidParam`, and `withTimeout`.
+- ~~**[M15-6 #21] Utility modules without tests (`utils`, `html-size`, `leadsource-fonts`, `content-schemas`, `design-system-errors`).**~~ Shipped 2026-05-06 — PR #694 (design-system-errors: 27 cases), PR #695 (html-size: 7 cases + utils: 27 cases), PR #696 (leadsource-fonts: 8 cases). `content-schemas` deleted — no test needed.
 
 #### Tech-debt (bundled cleanup, no urgency)
 
