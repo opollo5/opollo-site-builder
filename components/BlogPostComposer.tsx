@@ -261,6 +261,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [lastParse, setLastParse] = useState<BlogPostMetadata | null>(null);
   const [featuredImage, setFeaturedImage] = useState<ImagePickerEntry | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [seoPanelOpen, setSeoPanelOpen] = useState(true);
   const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<DraftSnapshot | null>(null);
@@ -1301,14 +1302,26 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       {/* ── SEO — full width below both columns (Issue 18) ── */}
       <section
         className="lg:col-span-2"
-        data-testid="seo-section"
+        data-testid="sidebar-seo"
         aria-label="SEO settings"
       >
         <div className="overflow-hidden rounded-md border bg-card">
-          <div className="px-4 py-2.5 text-sm font-semibold border-b">
+          <button
+            type="button"
+            onClick={() => setSeoPanelOpen((v) => !v)}
+            aria-expanded={seoPanelOpen}
+            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             SEO
-          </div>
-          <div className="space-y-4 px-4 py-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                seoPanelOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {seoPanelOpen && <div className="space-y-4 border-t px-4 py-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
             <div className="space-y-3">
               <div>
                 <label htmlFor="post-meta-title" className="block text-sm font-medium">
@@ -1375,7 +1388,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 description={metaDescription.value}
               />
             </div>
-          </div>
+          </div>}
         </div>
       </section>
 
