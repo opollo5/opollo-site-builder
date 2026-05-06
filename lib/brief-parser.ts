@@ -55,6 +55,7 @@ export type BriefPageDraft = {
   word_count: number;
   source_span_start: number | null;
   source_span_end: number | null;
+  excerpt: string | null;
 };
 
 export type BriefParseResult =
@@ -180,6 +181,47 @@ function dedentSource(source: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Excerpt extraction — looks for `### Excerpt` (H3, case-insensitive) within
+// a page's body text. If found, returns the text under that heading as the
+// excerpt and removes the heading + its body from source_text so it does not
+// pollute AI generation context.
+// ---------------------------------------------------------------------------
+
+function extractExcerptFromSection(sectionText: string): {
+  excerpt: string | null;
+  cleanedText: string;
+} {
+  const headingRegex = /^[ \t]{0,3}###[ \t]+excerpt[ \t]*$/im;
+  const match = headingRegex.exec(sectionText);
+  if (!match) return { excerpt: null, cleanedText: sectionText };
+
+  const headingLineEnd = sectionText.indexOf("\n", match.index);
+  const afterHeading =
+    headingLineEnd === -1 ? "" : sectionText.slice(headingLineEnd + 1);
+
+  const nextSubsectionRegex = /^[ \t]{0,3}###[ \t]/m;
+  const nextSubsection = nextSubsectionRegex.exec(afterHeading);
+  const excerptBlock = nextSubsection
+    ? afterHeading.slice(0, nextSubsection.index)
+    : afterHeading;
+  const excerptText = excerptBlock.trim();
+
+  const beforeExcerpt = sectionText.slice(0, match.index).trimEnd();
+  const afterExcerptBlock = nextSubsection
+    ? afterHeading.slice(nextSubsection.index)
+    : "";
+  const cleanedParts = [beforeExcerpt, afterExcerptBlock.trim()].filter(
+    Boolean,
+  );
+  const cleanedText = cleanedParts.join("\n\n").trim() || excerptText;
+
+  return {
+    excerpt: excerptText || null,
+    cleanedText: cleanedText || sectionText,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Structural path #1 — markdown H2 delimiters (primary).
 // Every `## <title>` line starts a new page.
 // ---------------------------------------------------------------------------
@@ -261,16 +303,18 @@ function parseByHrule(body: string, offset: number): BriefPageDraft[] {
     const firstLineEnd = text.indexOf("\n");
     const title = (firstLineEnd === -1 ? text : text.slice(0, firstLineEnd)).trim();
     const rest = firstLineEnd === -1 ? "" : text.slice(firstLineEnd + 1).trim();
-    const sourceText = rest.length > 0 ? rest : text;
-    const wordCount = countWords(sourceText);
+    const raw = rest.length > 0 ? rest : text;
+    const { excerpt, cleanedText } = extractExcerptFromSection(raw);
+    const wordCount = countWords(cleanedText);
     pages.push({
       ordinal: ordinal++,
       title: title.replace(/^#+\s*/, "") || `Section ${ordinal}`,
       mode: inferMode(wordCount),
-      source_text: sourceText,
+      source_text: cleanedText,
       word_count: wordCount,
       source_span_start: offset + seg.start,
       source_span_end: offset + seg.end,
+      excerpt,
     });
   }
   return pages;
@@ -307,16 +351,18 @@ function materialisePages(
   for (let i = 0; i < matches.length; i++) {
     const cur = matches[i];
     const nextStart = i + 1 < matches.length ? matches[i + 1].index : body.length;
-    const sectionText = body.slice(cur.lineEnd, nextStart).trim();
-    const wordCount = countWords(sectionText);
+    const raw = body.slice(cur.lineEnd, nextStart).trim();
+    const { excerpt, cleanedText } = extractExcerptFromSection(raw);
+    const wordCount = countWords(cleanedText);
     pages.push({
       ordinal: i,
       title: cur.title,
       mode: inferMode(wordCount),
-      source_text: sectionText,
+      source_text: cleanedText,
       word_count: wordCount,
       source_span_start: offset + cur.index,
       source_span_end: offset + nextStart,
+      excerpt,
     });
   }
   return pages;
@@ -474,6 +520,7 @@ async function runInferenceFallback(opts: {
       word_count: wordCount,
       source_span_start: start,
       source_span_end: nextStart,
+      excerpt: null,
     });
   }
 
@@ -619,6 +666,7 @@ export async function parseBriefDocument(opts: {
           word_count: wordCount,
           source_span_start: 0,
           source_span_end: trimmed.length,
+          excerpt: null,
         },
       ],
       warnings,
