@@ -3,6 +3,7 @@ import {
   type ListPagesData,
   type ToolResponse,
 } from "@/lib/tool-schemas";
+import { logger } from "@/lib/logger";
 import { readWpConfig, wpListPages } from "@/lib/wordpress";
 
 const DS_VERSION = "1.0.0";
@@ -30,6 +31,7 @@ export async function executeListPages(
 
   const cfg = readWpConfig();
   if (!cfg.ok) {
+    logger.error("list_pages.execute.missing_wp_env_vars", { missing: cfg.missing });
     return {
       ok: false,
       error: {
