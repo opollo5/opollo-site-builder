@@ -237,11 +237,11 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await publishPanel.getByRole("button", { name: /^publish$/i }).click();
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
 
-    // SEO panel is collapsed by default; expanding reveals meta title.
+    // SEO panel is open by default (auto-fill feature); collapsing hides meta title.
     const seoPanel = page.getByTestId("sidebar-seo");
-    await expect(seoPanel.locator("#post-meta-title")).toHaveCount(0);
-    await seoPanel.getByRole("button", { name: /^seo$/i }).click();
     await expect(seoPanel.locator("#post-meta-title")).toBeVisible();
+    await seoPanel.getByRole("button", { name: /^seo$/i }).click();
+    await expect(seoPanel.locator("#post-meta-title")).toHaveCount(0);
 
     await auditA11y(page, testInfo);
   });
