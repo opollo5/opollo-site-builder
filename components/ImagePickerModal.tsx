@@ -723,10 +723,9 @@ function ImageGrid({
           >
             <div className="aspect-square w-full overflow-hidden">
               {img.delivery_url ? (
-                // Cloudflare delivery URL with explicit w=/h=/fit= sizing.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  src={`${img.delivery_url}/w=200,h=200,fit=cover`}
+                  src={img.delivery_url}
                   alt={img.alt_text ?? img.caption ?? ""}
                   loading="lazy"
                   className="h-full w-full object-cover transition-smooth group-hover:scale-105"

@@ -983,7 +983,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             <div className="space-y-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`${featuredImage.delivery_url}/w=300,h=200,fit=cover`}
+                src={featuredImage.delivery_url}
                 alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
                 className="aspect-video w-full rounded-md border object-cover"
               />
