@@ -123,8 +123,7 @@ export function CompanySidebar({
   }
 
   const socialLinks: NavItem[] = [
-    { label: "Posts", href: "/company/social/posts", icon: BookOpen, testId: "cnav-posts" },
-    { label: "Calendar", href: "/company/social/calendar", icon: CalendarDays, testId: "cnav-calendar" },
+    { label: "Posts", href: "/company/social/calendar", icon: CalendarDays, testId: "cnav-posts" },
     { label: "Connections", href: "/company/social/connections", icon: Link2, testId: "cnav-connections" },
     { label: "Media", href: "/company/social/media", icon: ImageIcon, testId: "cnav-media" },
     ...(isAdmin ? [{ label: "Sharing", href: "/company/social/sharing", icon: Share2, testId: "cnav-sharing" } as NavItem] : []),
@@ -137,7 +136,7 @@ export function CompanySidebar({
       <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-3">
         {!collapsed && (
           <Link
-            href="/company/social/posts"
+            href="/company/social/calendar"
             className="focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -266,7 +265,7 @@ export function CompanySidebar({
       {/* Mobile top bar */}
       <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
         <Link
-          href="/company/social/posts"
+          href="/company/social/calendar"
           className="focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
