@@ -207,6 +207,7 @@ export async function reextractImageMetadata(
     .maybeSingle();
 
   if (imageRes.error) {
+    logger.error("image_reextract.reextractImageMetadata.image_fetch_failed", { image_id: imageId, supabase_error: imageRes.error.message });
     return internalError("Failed to load image_library row.", {
       supabase_error: imageRes.error,
     });
@@ -383,6 +384,7 @@ export async function reextractImageMetadata(
       .eq("key", "istock_id")
       .maybeSingle();
     if (existing.error) {
+      logger.error("image_reextract.reextractImageMetadata.metadata_read_failed", { image_id: imageId, supabase_error: existing.error.message });
       return internalError("Failed to read image_metadata.", {
         supabase_error: existing.error,
       });
@@ -392,6 +394,7 @@ export async function reextractImageMetadata(
         .from("image_metadata")
         .insert({ image_id: row.id, key: "istock_id", value_jsonb: istockId });
       if (insertErr) {
+        logger.error("image_reextract.reextractImageMetadata.metadata_insert_failed", { image_id: imageId, supabase_error: insertErr.message });
         return internalError("Failed to insert istock_id metadata.", {
           supabase_error: insertErr,
         });
@@ -432,6 +435,7 @@ export async function reextractImageMetadata(
       .eq("version_lock", row.version_lock);
 
     if (updErr) {
+      logger.error("image_reextract.reextractImageMetadata.image_update_failed", { image_id: imageId, supabase_error: updErr.message });
       return internalError("Failed to update image_library.", {
         supabase_error: updErr,
       });
