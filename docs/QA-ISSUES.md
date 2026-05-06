@@ -388,3 +388,21 @@ Issues surfaced during production dogfood on Test Site 2 / test2.leftleads.co.
 | I-2: UI contrast | MEDIUM | Contrast token bump — CSS variable values lifted to meet WCAG AA on key text surfaces. | #640 ✅ |
 | I-7: SEO panel | MEDIUM | SEO title and meta description auto-populate from post title/excerpt on mount; AI generation option added; snippet preview renders live below the fields. | #640 ✅ |
 | I-11: Bulk export | LOW | "Export ZIP" button on post list downloads selected posts as a zip of markdown files. | #640 ✅ |
+
+### Phase 10 continuation — 2026-05-06 (PRs #650–#661)
+
+Second dogfood pass on the blog composer and post list surfaces.
+
+| Issue | Severity | Fix | PR |
+|---|---|---|---|
+| I-13: Publish missing toast + "View live" action | MEDIUM | `toast.success("Published to WordPress!")` with "View live" action added to both `BlogPostComposer` and `PostDetailClient` publish handlers. | #650 ✅ |
+| I-14: Back navigation from post detail | MEDIUM | "← Back to posts" link added to `PostDetailClient` header. | #650 ✅ |
+| I-15: View live link on post list + detail | MEDIUM | Published posts show "View live ↗" link on site posts list; detail page shows "View live ↗" button + WP URL section with live link. | #650 ✅ |
+| I-16: Draft-restore banner + autosave round-trip | MEDIUM | Autosave debounce + `draft-restore-banner` with Restore/Discard confirmed working; E2E spec added and passing. | #651 ✅ |
+| I-17: Featured image should not gate publish | MEDIUM | Removed `featuredImage !== null` from `canPublish`; amber warning shown when publishing without a featured image. | #651 ✅ |
+| I-18: Secondary "Save draft" button hidden in draft mode | LOW | `{publishMode !== "draft" && ...}` guard wraps secondary button; only visible when mode is "publish". E2E spec updated. | #651 ✅ / #656 ✅ |
+| I-19: Post detail — live preview iframe for published posts | MEDIUM | `PostDetailClient` content preview renders live WP iframe when post is published and has `wp_post_id`; sandboxed srcDoc for drafts. | #652 ✅ |
+| I-20: Publish confirm modal removed | MEDIUM | Publish fires directly from `PostDetailClient`; only Unpublish retains confirm modal (destructive action). | #650 ✅ |
+| I-21: WP taxonomy combobox eager-loads on mount | MEDIUM | Lazy-loads on first open using `open` + `loadedRef` guard. Eliminates two simultaneous WP API calls on page load. | #659 ✅ |
+| I-22: ImagePickerModal appends stale results on query change | MEDIUM | `setBrowseOffset(0)` merged into `onChange` handler so both updates batch atomically. Separate `useEffect` removed. | #658 ✅ |
+| I-23: Image title not populated on upload | LOW | Upload route now derives title from EXIF ObjectName/Headline/Title/filename. Backfill script extended to populate missing titles. | #661 ✅ |
