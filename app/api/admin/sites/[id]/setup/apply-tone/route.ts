@@ -1,8 +1,9 @@
 import { revalidatePath } from "next/cache";
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { applyToneToHomepage } from "@/lib/design-discovery/apply-tone";
+import { validateUuidParam } from "@/lib/http";
 
 // POST /api/admin/sites/[id]/setup/apply-tone
 //
@@ -17,19 +18,6 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function errorJson(code: string, message: string, status: number): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   _req: NextRequest,
   { params }: { params: { id: string } },
@@ -37,9 +25,8 @@ export async function POST(
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
-  if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
-  }
+  const uuidCheck = validateUuidParam(params.id, "id");
+  if (!uuidCheck.ok) return uuidCheck.response;
 
   const result = await applyToneToHomepage(params.id);
   if (!result.ok) {
@@ -50,8 +37,6 @@ export async function POST(
         timestamp: new Date().toISOString(),
       },
       // 200 even on failure so the client treats it as a soft skip
-      // — the spec says "If API call fails: silently skip, show
-      // original approved concept, do not block flow or show error."
       { status: 200 },
     );
   }
