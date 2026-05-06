@@ -2,7 +2,7 @@
 /**
  * scripts/audit.ts — Static analysis: catch logic errors before UAT.
  *
- * Eight checks (HIGH | MEDIUM | LOW severity):
+ * Ten checks (HIGH | MEDIUM | LOW severity):
  *   1. Middleware public paths              HIGH
  *   2. Admin API gate coverage              MEDIUM
  *   3. DB column references                 MEDIUM
@@ -11,6 +11,8 @@
  *   6. Env var coverage                     LOW
  *   7. Unauthenticated API routes           HIGH
  *   8. Missing error handling on writes     MEDIUM
+ *   9. Dead routes                          LOW
+ *  10. Hardcoded design token values        LOW
  *
  * Output:
  *   - Per-issue lines: FILE:LINE — CATEGORY — message
@@ -614,19 +616,15 @@ function check5_typography(): Issue[] {
   const issues: Issue[] = [];
   const roots = ["app", "components", "lib"];
 
-  // Arbitrary Tailwind font sizes below 15px — text-[10px] through text-[14px].
-  // text-xs and text-sm are VALID (both compile to 15px via tailwind.config.ts).
-  // Known intentional exceptions at <15px:
-  //   - .lbl eyebrow labels (10px per design spec) — uses CSS class, not Tailwind
-  //   - .btn-pk / .btn-ghost (13px per design spec) — uses CSS class, not Tailwind
+  // Arbitrary Tailwind font sizes below 16px — text-[10px] through text-[15px].
+  // text-xs and text-sm are VALID (both compile to 1rem/16px via tailwind.config.ts).
+  // Known intentional exceptions at <16px:
+  //   - .lbl eyebrow labels (0.75rem/12px per design spec) — CSS class, not Tailwind
   //   - keyboard shortcut symbols (<kbd>) — decorative chrome
-  //   - color swatch labels in design-wizard — decorative
-  //   - notification count badge (layout-constrained 16px circle)
-  //   - components/ui/button.tsx text-[13px] — design spec button text
-  const arbitraryFontRe = /\btext-\[([0-9]|1[0-4])px\]/;
-  // Inline fontSize below 15px.
+  const arbitraryFontRe = /\btext-\[([0-9]|1[0-5])px\]/;
+  // Inline fontSize below 16px.
   const fsPxRe =
-    /fontSize\s*:\s*["']?(0\.[0-7]\d*rem|[1-9]px|1[0-4]px|0\.[0-7]\d*em)["']?/;
+    /fontSize\s*:\s*["']?(0\.[0-7]\d*rem|[1-9]px|1[0-5]px|0\.[0-7]\d*em)["']?/;
 
   for (const root of roots) {
     const dir = join(REPO_ROOT, root);
@@ -645,7 +643,7 @@ function check5_typography(): Issue[] {
             file: rel,
             line: i + 1,
             message:
-              "Arbitrary sub-15px font size — use text-xs (15px) instead, or document as intentional exception in CSS-REFACTOR.md",
+              "Arbitrary sub-16px font size — use text-xs (1rem/16px) instead, or document as intentional exception in CSS-REFACTOR.md",
           });
         }
         if (fsPxRe.test(stripped)) {
@@ -654,7 +652,7 @@ function check5_typography(): Issue[] {
             severity: "LOW",
             file: rel,
             line: i + 1,
-            message: "Inline fontSize is below the 15px floor (RULES.md #7)",
+            message: "Inline fontSize is below the 16px floor (RULES.md #7)",
           });
         }
       });
@@ -1030,6 +1028,59 @@ function check9_deadRoutes(): Issue[] {
 }
 
 // ============================================================================
+// Check 10 — Hardcoded design token values (LOW)
+// ============================================================================
+
+/**
+ * Flags Tailwind arbitrary-value classes that embed hex colour literals,
+ * e.g. `text-[#ff03a5]` or `bg-[#00e5a0]`. These should reference CSS
+ * variables (`text-pk`, `bg-gr`) or the semantic aliases declared in
+ * tailwind.config.ts. The check is LOW severity because some one-off
+ * values (e.g. hover states, opacity variants) are legitimate — the output
+ * is a candidates list for review.
+ *
+ * Exclude: tokens.css / tailwind.config.ts (canonical definitions),
+ *          the design-system tokens source file, and test fixtures.
+ */
+function check10_hardcodedDesignValues(): Issue[] {
+  const issues: Issue[] = [];
+  const roots = ["app", "components", "lib"];
+  const SKIP_FILES = new Set([
+    "tailwind.config.ts",
+    "tokens.ts",
+    "tokens.css",
+    "globals.css",
+  ]);
+
+  // Matches text-[#...], bg-[#...], border-[#...], ring-[#...], etc.
+  const hexClassRe = /\b(?:text|bg|border|ring|shadow|fill|stroke)-\[#[0-9a-fA-F]{3,8}\]/g;
+
+  for (const root of roots) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".ts", ".tsx", ".css"])) {
+      const rel = relPath(file);
+      if (SKIP_FILES.has(rel.split("/").pop() ?? "")) continue;
+      if (file.includes("__tests__") || file.includes(".test.")) continue;
+      const lines = readSafe(file).split(/\r?\n/);
+      lines.forEach((ln, i) => {
+        const m = ln.match(hexClassRe);
+        if (m) {
+          issues.push({
+            category: "hardcoded-design-values",
+            severity: "LOW",
+            file: rel,
+            line: i + 1,
+            message: `Hardcoded hex colour in Tailwind class (${m[0]}) — prefer a CSS-variable alias (text-pk, bg-gr, etc.) or add to tailwind.config.ts`,
+          });
+        }
+      });
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
 // Output
 // ============================================================================
 
@@ -1098,7 +1149,7 @@ function printResults(issues: Issue[]): boolean {
 // ============================================================================
 
 function main(): void {
-  console.log("scripts/audit.ts — running 8 static checks...\n");
+  console.log("scripts/audit.ts — running 10 static checks...\n");
 
   const all: Issue[] = [
     ...check1_middlewarePublicPaths(),
@@ -1110,6 +1161,7 @@ function main(): void {
     ...check7_unauthenticatedApi(),
     ...check8_errorHandling(),
     ...check9_deadRoutes(),
+    ...check10_hardcodedDesignValues(),
   ];
 
   const failed = printResults(all);

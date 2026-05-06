@@ -111,6 +111,11 @@ test.describe("/admin/posts/new — top-level entry", () => {
       .first();
     await firstOption.click();
 
+    // Sidebar document panels are visible from the start.
+    await expect(page.getByTestId("post-sidebar")).toBeVisible();
+    await expect(page.getByTestId("sidebar-publish")).toBeVisible();
+    await expect(page.getByTestId("sidebar-permalink")).toBeVisible();
+
     // Type into the composer (TipTap ProseMirror). Use pressSequentially so
     // TipTap's key-event handlers fire and update the React state that the
     // autosave debounce watches.
@@ -190,6 +195,53 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await page.getByTestId("draft-discard-button").click();
     await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
     await expect(page.locator("#post-title")).toHaveValue("");
+
+    await auditA11y(page, testInfo);
+  });
+
+  // Issue 3 — WordPress sidebar layout.
+  test("sidebar panels are visible and collapsible", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/posts/new");
+
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    // All default-open panels are visible.
+    const publishPanel = page.getByTestId("sidebar-publish");
+    const permalinkPanel = page.getByTestId("sidebar-permalink");
+    const categoriesPanel = page.getByTestId("sidebar-categories");
+    const tagsPanel = page.getByTestId("sidebar-tags");
+    const featuredImagePanel = page.getByTestId("sidebar-featured-image");
+
+    await expect(publishPanel).toBeVisible();
+    await expect(permalinkPanel).toBeVisible();
+    await expect(categoriesPanel).toBeVisible();
+    await expect(tagsPanel).toBeVisible();
+    await expect(featuredImagePanel).toBeVisible();
+
+    // Publish panel contains action buttons.
+    await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
+    await expect(publishPanel.getByRole("button", { name: /save to opollo/i })).toBeVisible();
+
+    // Clicking the Publish panel header collapses it.
+    await publishPanel.getByRole("button", { name: /^publish$/i }).click();
+    await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toHaveCount(0);
+
+    // Clicking again expands it.
+    await publishPanel.getByRole("button", { name: /^publish$/i }).click();
+    await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
+
+    // SEO panel is collapsed by default; expanding reveals meta title.
+    const seoPanel = page.getByTestId("sidebar-seo");
+    await expect(seoPanel.locator("#post-meta-title")).toHaveCount(0);
+    await seoPanel.getByRole("button", { name: /^seo$/i }).click();
+    await expect(seoPanel.locator("#post-meta-title")).toBeVisible();
 
     await auditA11y(page, testInfo);
   });
