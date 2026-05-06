@@ -111,6 +111,9 @@ const config: Config = {
         "nav-hover": "var(--nav-hover)",
         topbar: "var(--topbar-bg)",
       },
+      boxShadow: {
+        'pk-glow': '0 4px 24px var(--pk-glow)',
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

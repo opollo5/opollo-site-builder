@@ -45,6 +45,7 @@
     --nav-active: rgba(255, 3, 165, 0.10);  /* pk at 10%: active nav item bg  */
     --nav-hover:  rgba(0, 229, 160, 0.06);  /* gr at 6%:  nav item hover bg   */
     --topbar-bg:  rgba(4, 4, 10, 0.85);     /* bg at 85%: mobile topbar blur  */
+    --pk-glow:    rgba(255, 3, 165, 0.40);  /* pk at 40%: button hover shadow */
 
     /* ---- Tailwind/shadcn semantic tokens (HSL, always-dark) -------------- */
     --background: 240 37% 4%;           /* --d1  #07070f  card surface       */
