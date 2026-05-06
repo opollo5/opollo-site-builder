@@ -609,7 +609,7 @@ Medium / Low findings from Audit 3 (UI + cross-milestone integration) that are d
 
 #### Ex-TODO deferred items (moved from code, per #18)
 
-- **`loadActiveRegistry()` site-keyed LRU cache** (`lib/system-prompt.ts`) — Site-keyed LRU with 5-min TTL around `loadActiveRegistry()` would eliminate redundant DB reads during batch runs (~40 per site). Performance-only; correctness unaffected at current load. Trigger: observable latency spike in Axiom on batch ticks, or `/api/health` slow-DS-load counter.
+- ~~**`loadActiveRegistry()` site-keyed LRU cache** (`lib/system-prompt.ts`)~~ Shipped 2026-05-06, PR #699. Module-level `Map<siteId, {ts, value}>` with 5-min TTL; reduces a 40-page batch from ~120 DB reads to ~3. Null-results cached too.
 - **Kill-switch edge-propagation hardening** (`lib/auth-kill-switch.ts`) — Per-serverless-instance cache means the 5s TTL is the effective global propagation bound. Candidates: edge KV (immediate invalidation) or a signed cookie the emergency route issues that middleware trusts for the kill-switch window. Trigger: fleet grows to where warm-pool turnover is too slow to be operationally reliable during an active incident.
 
 Trigger to pick up: next UI polish pass, OR before any admin UI brand-scope change.
