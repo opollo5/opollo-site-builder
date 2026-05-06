@@ -260,6 +260,8 @@ Verified 2026-04-29: `docs/RUNBOOK.md` already has the full procedure at "Anthro
 
 **Status (2026-05-06, PR #662):** third sweep covered 12 remaining lib files across design-discovery (`apply-tone`, `approve-design`, `design-brief`, `regen-caps`), image library, image re-extract, search images, site setup, platform notifications, social posts duplicate, regeneration publisher, and regeneration worker. All previously-silent `INTERNAL_ERROR` returns in those files now emit `logger.error` before returning the envelope. Billing-critical paths and API routes remain clean. `lib/briefs.ts` soft violations deferred (envelope captures error; no data loss).
 
+**Status (2026-05-06, PRs #670, #671, #672):** fourth sweep completed. Core libs (`lib/sites.ts`, `lib/tools-wp-creds.ts`, 5 tool executors, `lib/design-discovery/apply-tone.ts`), all 34 `lib/platform/social/` files, and the remaining core libs (`lib/design-system-errors.ts`, `lib/image-library.ts`, `lib/image-reextract.ts`, `lib/invites.ts`, `lib/pages.ts`, `lib/platform/companies/{create,get}.ts`, `lib/platform/invitations/{accept,send}.ts`, `lib/posts.ts`, `lib/sites.ts`). Audit script now reports only **6 entries**, all TypeScript return-type annotations that are genuine false positives. The long tail is effectively closed.
+
 **Remaining work — opportunistic:**
 - Run `npx tsx scripts/audit-internal-error-logging.ts` before / during any future PR that touches the listed files; add `logger.error` alongside the envelope return.
 - ESLint rule (`no-silent-internal-error`) deferred — would catch new violations at PR time. Worth picking up if violations accumulate again.
