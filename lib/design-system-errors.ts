@@ -1,4 +1,5 @@
 import type { ZodError } from "zod";
+import { logger } from "@/lib/logger";
 import type { ApiResponse, ToolError } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
@@ -131,6 +132,7 @@ export function internalError(
   message: string,
   details?: Record<string, unknown>,
 ): ApiResponse<never> {
+  logger.error("design_system_errors.internal_error", { message });
   return {
     ok: false,
     error: {

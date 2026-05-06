@@ -85,6 +85,7 @@ function internalError(
   message: string,
   details?: Record<string, unknown>,
 ): ApiResponse<never> {
+  logger.error("pages.internal_error", { message });
   return {
     ok: false,
     error: {

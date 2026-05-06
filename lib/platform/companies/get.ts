@@ -182,6 +182,7 @@ export async function getPlatformCompany(
 }
 
 function internal(message: string): ApiResponse<CompanyDetail> {
+  logger.error("platform.companies.get.internal_error", { message });
   return {
     ok: false,
     error: {

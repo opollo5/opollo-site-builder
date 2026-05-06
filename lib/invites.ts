@@ -339,6 +339,7 @@ function internalError(message: string): {
   ok: false;
   error: { code: "INTERNAL_ERROR"; message: string };
 } {
+  logger.error("invites.internal_error", { message });
   return {
     ok: false,
     error: { code: "INTERNAL_ERROR", message },

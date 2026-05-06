@@ -129,6 +129,7 @@ function validation(message: string): ApiResponse<PlatformCompany> {
 }
 
 function internal(message: string): ApiResponse<PlatformCompany> {
+  logger.error("platform.companies.create.internal_error", { message });
   return {
     ok: false,
     error: {
