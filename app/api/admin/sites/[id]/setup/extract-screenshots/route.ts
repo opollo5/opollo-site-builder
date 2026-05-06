@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { extractFromScreenshots } from "@/lib/design-discovery/extract-screenshots";
-import { readJsonBody } from "@/lib/http";
+import { internalError, readJsonBody, validateUuidParam, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
@@ -52,23 +52,6 @@ const BodySchema = z.object({
     .max(5),
 });
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -76,12 +59,11 @@ export async function POST(
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
-  if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
-  }
+  const uuidCheck = validateUuidParam(params.id, "id");
+  if (!uuidCheck.ok) return uuidCheck.response;
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -109,11 +91,7 @@ export async function POST(
       site_id: params.id,
       message: err instanceof Error ? err.message : String(err),
     });
-    return errorJson(
-      "INTERNAL_ERROR",
-      err instanceof Error ? err.message : "Vision extraction failed.",
-      500,
-    );
+    return internalError(err instanceof Error ? err.message : "Vision extraction failed.");
   }
 
   if (!result.ok) {

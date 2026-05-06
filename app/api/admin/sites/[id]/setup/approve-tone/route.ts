@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
-import { readJsonBody } from "@/lib/http";
+import { internalError, notFound, readJsonBody, validateUuidParam, validationError } from "@/lib/http";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // POST /api/admin/sites/[id]/setup/approve-tone — admin-gated.
@@ -13,8 +13,6 @@ import { getServiceRoleClient } from "@/lib/supabase";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const ToneSchema = z.object({
   formality_level: z.number().min(1).max(5),
@@ -48,17 +46,6 @@ const BodySchema = z.object({
   approved_samples: z.array(SampleSchema).max(5),
 });
 
-function errorJson(code: string, message: string, status: number): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -66,12 +53,11 @@ export async function POST(
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
-  if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
-  }
+  const uuidCheck = validateUuidParam(params.id, "id");
+  if (!uuidCheck.ok) return uuidCheck.response;
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
@@ -105,10 +91,10 @@ export async function POST(
     .select("id")
     .maybeSingle();
   if (error) {
-    return errorJson("INTERNAL_ERROR", error.message, 500);
+    return internalError(error.message);
   }
   if (!data) {
-    return errorJson("NOT_FOUND", `No active site found with id ${params.id}.`, 404);
+    return notFound(`No active site found with id ${params.id}.`);
   }
 
   revalidatePath(`/admin/sites/${params.id}/setup`);

@@ -6,7 +6,7 @@ import {
   DesignBriefSchema,
   saveDesignBrief,
 } from "@/lib/design-discovery/design-brief";
-import { readJsonBody } from "@/lib/http";
+import { internalError, notFound, readJsonBody, validateUuidParam, validationError } from "@/lib/http";
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/sites/[id]/setup/save-brief
@@ -22,23 +22,6 @@ import { readJsonBody } from "@/lib/http";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -46,12 +29,11 @@ export async function POST(
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
-  if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
-  }
+  const uuidCheck = validateUuidParam(params.id, "id");
+  if (!uuidCheck.ok) return uuidCheck.response;
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const wrapper = body as { brief?: unknown; advance_status?: unknown };
   const parsed = DesignBriefSchema.safeParse(wrapper?.brief ?? null);
   if (!parsed.success) {
@@ -74,11 +56,8 @@ export async function POST(
     advanceStatus: wrapper.advance_status === true,
   });
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      result.error.code === "NOT_FOUND" ? 404 : 500,
-    );
+    const { code, message } = result.error;
+    return code === "NOT_FOUND" ? notFound(message) : internalError(message);
   }
 
   revalidatePath(`/admin/sites/${params.id}/setup`);

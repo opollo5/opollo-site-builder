@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { DesignBriefSchema } from "@/lib/design-discovery/design-brief";
 import { generateConcepts } from "@/lib/design-discovery/generate-concepts";
-import { readJsonBody } from "@/lib/http";
+import { internalError, notFound, readJsonBody, validateUuidParam, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getSite } from "@/lib/sites";
 
@@ -28,23 +28,6 @@ export const dynamic = "force-dynamic";
 // default route timeout to make sure the response lands.
 export const maxDuration = 120;
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -52,12 +35,11 @@ export async function POST(
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
-  if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
-  }
+  const uuidCheck = validateUuidParam(params.id, "id");
+  if (!uuidCheck.ok) return uuidCheck.response;
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const wrapper = body as { brief?: unknown };
   const parsed = DesignBriefSchema.safeParse(wrapper?.brief ?? null);
   if (!parsed.success) {
@@ -78,11 +60,8 @@ export async function POST(
 
   const siteResult = await getSite(params.id);
   if (!siteResult.ok) {
-    return errorJson(
-      siteResult.error.code,
-      siteResult.error.message,
-      siteResult.error.code === "NOT_FOUND" ? 404 : 500,
-    );
+    const { code, message } = siteResult.error;
+    return code === "NOT_FOUND" ? notFound(message) : internalError(message);
   }
   const site = siteResult.data.site;
 
@@ -97,11 +76,7 @@ export async function POST(
       site_id: site.id,
       message: err instanceof Error ? err.message : String(err),
     });
-    return errorJson(
-      "INTERNAL_ERROR",
-      err instanceof Error ? err.message : "Concept generation failed.",
-      500,
-    );
+    return internalError(err instanceof Error ? err.message : "Concept generation failed.");
   }
 
   if (result.concepts.length === 0) {

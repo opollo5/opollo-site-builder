@@ -48,6 +48,36 @@ export function validationError(
   return NextResponse.json(body, { status: 400 });
 }
 
+// 404 Not Found
+export function notFound(message: string): NextResponse {
+  const body: ToolError = {
+    ok: false,
+    error: {
+      code: "NOT_FOUND",
+      message,
+      retryable: false,
+      suggested_action: "Verify the resource ID and try again.",
+    },
+    timestamp: now(),
+  };
+  return NextResponse.json(body, { status: 404 });
+}
+
+// 500 Internal Error (for catch blocks and unrecoverable DB errors)
+export function internalError(message: string): NextResponse {
+  const body: ToolError = {
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message,
+      retryable: false,
+      suggested_action: "An unexpected error occurred. Try again later.",
+    },
+    timestamp: now(),
+  };
+  return NextResponse.json(body, { status: 500 });
+}
+
 // Pull a UUID out of the route params or return a 400. Used by every
 // [id]-style dynamic route.
 export function validateUuidParam(
