@@ -2,6 +2,7 @@ import "server-only";
 
 import { logger } from "@/lib/logger";
 import { getSite } from "@/lib/sites";
+import { getServiceRoleClient } from "@/lib/supabase";
 import { translateWpError } from "@/lib/error-translations";
 import {
   wpGetMe,
@@ -196,5 +197,70 @@ function translateWpErrorToBlocker(
       detail: translated.detail,
       nextAction: translated.nextAction,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Path-B publish gate — Kadence sync freshness check.
+//
+// Gated by FEATURE_PATH_B_PUBLISH_GATE env var (default off).
+// Only applies to new_design sites — copy_existing sites don't use
+// Kadence palette sync so the check is a no-op for them.
+//
+// Blocks publish when:
+//   - flag is on
+//   - site_mode === 'new_design'
+//   - kadence_globals_synced_at IS NULL (never synced)
+//
+// Callers receive a typed result; the 409 KADENCE_SYNC_DRIFT_BLOCKED
+// response code is defined here so all publish-path routes use the
+// same wire format.
+// ---------------------------------------------------------------------------
+
+export type KadenceSyncCheckResult =
+  | { blocked: false }
+  | {
+      blocked: true;
+      code: "KADENCE_SYNC_DRIFT_BLOCKED";
+      message: string;
+      appearanceUrl: string;
+    };
+
+export async function checkKadenceSyncFresh(
+  site_id: string,
+): Promise<KadenceSyncCheckResult> {
+  const flag = process.env.FEATURE_PATH_B_PUBLISH_GATE;
+  if (flag !== "true" && flag !== "1") return { blocked: false };
+
+  const svc = getServiceRoleClient();
+  const res = await svc
+    .from("sites")
+    .select("site_mode, kadence_globals_synced_at")
+    .eq("id", site_id)
+    .maybeSingle();
+
+  if (res.error) {
+    logger.error("site_preflight.kadence_sync_check_failed", {
+      site_id,
+      error: res.error,
+    });
+    // Fail open — don't block publish on a DB read error.
+    return { blocked: false };
+  }
+
+  const row = res.data as {
+    site_mode: string | null;
+    kadence_globals_synced_at: string | null;
+  } | null;
+
+  if (!row || row.site_mode !== "new_design") return { blocked: false };
+  if (row.kadence_globals_synced_at !== null) return { blocked: false };
+
+  return {
+    blocked: true,
+    code: "KADENCE_SYNC_DRIFT_BLOCKED",
+    message:
+      "Palette not yet synced. Run palette sync in the Appearance panel before publishing.",
+    appearanceUrl: `/admin/sites/${site_id}/appearance`,
   };
 }

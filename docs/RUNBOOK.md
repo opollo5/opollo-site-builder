@@ -529,6 +529,39 @@ Log the provisioning date + vendor account IDs somewhere persistent; each rotati
 
 ---
 
+## publish-blocked-no-palette-sync — 409 KADENCE_SYNC_DRIFT_BLOCKED on post publish
+
+**Severity:** BLOCKED PUBLISH — operator cannot publish until resolved.
+
+**Symptom:** Operator clicks Publish on a post for a `new_design` site and gets
+a 409 response. JSON body: `{ "error": { "code": "KADENCE_SYNC_DRIFT_BLOCKED",
+"message": "Palette not yet synced. Run palette sync in the Appearance panel before publishing." } }`.
+The Appearance panel also shows a red "Palette sync required before publishing"
+alert.
+
+**Trigger:** `FEATURE_PATH_B_PUBLISH_GATE=true` + `sites.site_mode = 'new_design'`
++ `sites.kadence_globals_synced_at IS NULL`.  
+Gate is **off** when the env var is unset. `copy_existing` sites are never gated.
+
+**Source:** `lib/site-preflight.ts::checkKadenceSyncFresh` + step 2.5 in
+`app/api/sites/[id]/posts/[post_id]/publish/route.ts`.
+
+**Resolution:**
+1. Navigate to **Admin → Sites → [site] → Appearance**.
+2. Run **Palette Sync** (confirm the diff and click Sync). Once successful,
+   `kadence_globals_synced_at` will be non-null.
+3. Re-attempt publish — the gate will clear.
+
+**If palette sync itself is failing:** see the `kadence-customizer-drift` entry
+below for the `WP_STATE_DRIFTED` / `KADENCE_NOT_ACTIVE` troubleshooting paths.
+
+**To disable the gate temporarily** (e.g. during an incident): set
+`FEATURE_PATH_B_PUBLISH_GATE=` (empty/unset) in the Vercel project env and
+redeploy. The gate is fail-open on DB errors by design — a transient DB
+read failure does NOT block publishing.
+
+---
+
 ## kadence-customizer-drift — palette sync hits WP_STATE_DRIFTED
 
 **Severity (path B, post-2026-04-29):** **CONTENT BUG**, not polish. Under path B (decision PR #192), Opollo emits content fragments and the host theme owns visual tokens (palette, fonts, spacing). Kadence palette sync IS the visual contract — drift between the design-system tokens and the WP-side palette means published Opollo content renders with the wrong colours. Treat sync-drift incidents at the same urgency as a runner regression. Prior framing of "polish" is obsolete.

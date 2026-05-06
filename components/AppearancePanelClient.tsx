@@ -76,6 +76,7 @@ export function AppearancePanelClient({
   initialKadenceGlobalsSyncedAt,
   initialSiteVersionLock,
   initialEvents,
+  publishGateEnabled = false,
 }: {
   siteId: string;
   siteName: string;
@@ -84,6 +85,7 @@ export function AppearancePanelClient({
   initialKadenceGlobalsSyncedAt: string | null;
   initialSiteVersionLock: number;
   initialEvents: AppearanceEventRow[];
+  publishGateEnabled?: boolean;
 }) {
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>("loading");
@@ -394,6 +396,7 @@ export function AppearancePanelClient({
           ctx={ctx}
           kadenceInstalledAt={initialKadenceInstalledAt}
           kadenceGlobalsSyncedAt={kadenceGlobalsSyncedAt}
+          publishGateEnabled={publishGateEnabled}
           actionState={actionState}
           lastSyncEventId={lastSyncEventId}
           onSyncClick={() => setConfirmOpen("sync")}
@@ -561,6 +564,7 @@ function ReadyState({
   ctx,
   kadenceInstalledAt,
   kadenceGlobalsSyncedAt,
+  publishGateEnabled,
   actionState,
   lastSyncEventId,
   onSyncClick,
@@ -570,6 +574,7 @@ function ReadyState({
   ctx: PreflightContext;
   kadenceInstalledAt: string | null;
   kadenceGlobalsSyncedAt: string | null;
+  publishGateEnabled: boolean;
   actionState: ActionState;
   lastSyncEventId: string | null;
   onSyncClick: () => void;
@@ -626,6 +631,20 @@ function ReadyState({
           </Button>
         </div>
       </div>
+
+      {publishGateEnabled && kadenceGlobalsSyncedAt === null && (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          <p className="font-medium">Palette sync required before publishing</p>
+          <p className="mt-1">
+            Publishing is blocked until the Kadence palette has been synced at
+            least once. Sync the palette below — this only needs to happen once
+            per design-system version.
+          </p>
+        </div>
+      )}
 
       {insufficientProposal && (
         <div

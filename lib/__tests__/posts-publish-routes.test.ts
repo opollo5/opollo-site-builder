@@ -450,3 +450,134 @@ describe("POST /api/sites/[id]/posts/[post_id]/unpublish", () => {
     expect(body.error.code).toBe("INVALID_STATE");
   });
 });
+
+describe("POST /api/sites/[id]/posts/[post_id]/publish — path-B Kadence sync gate", () => {
+  const GATE_KEY = "FEATURE_PATH_B_PUBLISH_GATE";
+  let origGate: string | undefined;
+  beforeEach(() => { origGate = process.env[GATE_KEY]; });
+  afterEach(() => {
+    if (origGate === undefined) delete process.env[GATE_KEY];
+    else process.env[GATE_KEY] = origGate;
+  });
+
+  async function setSiteMode(
+    siteId: string,
+    opts: { site_mode: string | null; kadence_globals_synced_at: string | null },
+  ) {
+    const svc = getServiceRoleClient();
+    await svc.from("sites").update(opts).eq("id", siteId);
+  }
+
+  it("blocks with 409 KADENCE_SYNC_DRIFT_BLOCKED when flag on + new_design + never synced", async () => {
+    process.env[GATE_KEY] = "true";
+    const site = await seedSiteWithCreds();
+    await setSiteMode(site.id, { site_mode: "new_design", kadence_globals_synced_at: null });
+    const { postId, versionLock } = await seedDraftPost({ siteId: site.id, slug: "gate-block" });
+
+    mockFetch({
+      "/wp-json/wp/v2/users/me": {
+        status: 200,
+        body: { id: 7, username: "u", capabilities: { edit_posts: true, upload_files: true } },
+      },
+    });
+
+    const res = await publishPOST(
+      new Request(`http://localhost/api/sites/${site.id}/posts/${postId}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expected_version_lock: versionLock }),
+      }),
+      { params: { id: site.id, post_id: postId } },
+    );
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as { error: { code: string } };
+    expect(body.error.code).toBe("KADENCE_SYNC_DRIFT_BLOCKED");
+  });
+
+  it("allows publish when flag on + new_design + kadence_globals_synced_at set", async () => {
+    process.env[GATE_KEY] = "true";
+    const site = await seedSiteWithCreds();
+    await setSiteMode(site.id, {
+      site_mode: "new_design",
+      kadence_globals_synced_at: new Date().toISOString(),
+    });
+    const { postId, versionLock } = await seedDraftPost({ siteId: site.id, slug: "gate-synced" });
+
+    mockFetch({
+      "/wp-json/wp/v2/users/me": {
+        status: 200,
+        body: { id: 7, username: "u", capabilities: { edit_posts: true, upload_files: true } },
+      },
+      "/wp-json/wp/v2/posts": {
+        status: 201,
+        body: { id: 99, slug: "gate-synced", status: "publish", link: "https://example.com/?p=99" },
+      },
+    });
+
+    const res = await publishPOST(
+      new Request(`http://localhost/api/sites/${site.id}/posts/${postId}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expected_version_lock: versionLock }),
+      }),
+      { params: { id: site.id, post_id: postId } },
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("allows publish for copy_existing site even with flag on + no sync", async () => {
+    process.env[GATE_KEY] = "true";
+    const site = await seedSiteWithCreds();
+    await setSiteMode(site.id, { site_mode: "copy_existing", kadence_globals_synced_at: null });
+    const { postId, versionLock } = await seedDraftPost({ siteId: site.id, slug: "gate-copy" });
+
+    mockFetch({
+      "/wp-json/wp/v2/users/me": {
+        status: 200,
+        body: { id: 7, username: "u", capabilities: { edit_posts: true, upload_files: true } },
+      },
+      "/wp-json/wp/v2/posts": {
+        status: 201,
+        body: { id: 88, slug: "gate-copy", status: "publish", link: "https://example.com/?p=88" },
+      },
+    });
+
+    const res = await publishPOST(
+      new Request(`http://localhost/api/sites/${site.id}/posts/${postId}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expected_version_lock: versionLock }),
+      }),
+      { params: { id: site.id, post_id: postId } },
+    );
+    expect(res.status).toBe(200);
+  });
+
+  it("allows publish when flag off even for new_design + no sync", async () => {
+    delete process.env[GATE_KEY];
+    const site = await seedSiteWithCreds();
+    await setSiteMode(site.id, { site_mode: "new_design", kadence_globals_synced_at: null });
+    const { postId, versionLock } = await seedDraftPost({ siteId: site.id, slug: "gate-off" });
+
+    mockFetch({
+      "/wp-json/wp/v2/users/me": {
+        status: 200,
+        body: { id: 7, username: "u", capabilities: { edit_posts: true, upload_files: true } },
+      },
+      "/wp-json/wp/v2/posts": {
+        status: 201,
+        body: { id: 77, slug: "gate-off", status: "publish", link: "https://example.com/?p=77" },
+      },
+    });
+
+    const res = await publishPOST(
+      new Request(`http://localhost/api/sites/${site.id}/posts/${postId}/publish`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ expected_version_lock: versionLock }),
+      }),
+      { params: { id: site.id, post_id: postId } },
+    );
+    expect(res.status).toBe(200);
+  });
+});
