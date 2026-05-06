@@ -9,14 +9,14 @@
  * violation, but they catch the most common regressions:
  *   - Hardcoded hex colours in className / style attributes in components
  *   - Arbitrary Tailwind text-[Xpx] values in component files
- *   - Sub-16px font-size values in tokens.ts itself
+ *   - Sub-16px font-size values in tokens.ts itself (except the eyebrow exception)
  */
 
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 
-import { typography } from "@/lib/design-system/tokens";
+import { typography, buildCssVariableBlock } from "@/lib/design-system/tokens";
 
 const REPO_ROOT = join(__dirname, "..", "..");
 
@@ -48,18 +48,25 @@ function rel(p: string): string {
   return relative(REPO_ROOT, p).replace(/\\/g, "/");
 }
 
-// ─── Test 1: tokens.ts font sizes are all ≥ 16px ─────────────────────────────
+// ─── Test 1: tokens.ts font sizes are all ≥ 16px (except documented eyebrow exception) ──
 
 describe("design-system/tokens.ts", () => {
-  it("has no font size below 16px (1rem)", () => {
+  it("has no font size below 16px (1rem) except the documented eyebrow exception", () => {
     const violations: string[] = [];
     for (const [key, value] of Object.entries(typography.fontSize)) {
+      // eyebrow is a documented design exception (0.75rem/12px — sits above headings;
+      // 16px would invert the visual hierarchy)
+      if (key === "eyebrow") continue;
       const px = parseToPx(value);
       if (px !== null && px < 16) {
         violations.push(`typography.fontSize.${key} = ${value} (${px}px) — below 16px minimum`);
       }
     }
     expect(violations).toEqual([]);
+  });
+
+  it("eyebrow is 0.75rem (12px — documented design exception)", () => {
+    expect(typography.fontSize.eyebrow).toBe("0.75rem");
   });
 });
 
@@ -71,7 +78,31 @@ function parseToPx(value: string): number | null {
   return null;
 }
 
-// ─── Test 2: no raw hex in component className/style props ───────────────────
+// ─── Test 2: buildCssVariableBlock ───────────────────────────────────────────
+
+describe("buildCssVariableBlock", () => {
+  it("returns empty string for empty overrides", () => {
+    expect(buildCssVariableBlock({})).toBe("");
+  });
+
+  it("emits a :root block with supplied values", () => {
+    const result = buildCssVariableBlock({ colorPk: "#ff0000", radiusLg: "8px" });
+    expect(result).toContain("--pk: #ff0000");
+    expect(result).toContain("--radius: 8px");
+    expect(result).toMatch(/^:root \{/);
+  });
+
+  it("supports legacy radius key for backwards compatibility", () => {
+    const result = buildCssVariableBlock({ radius: "12px" });
+    expect(result).toContain("--radius: 12px");
+  });
+
+  it("omits undefined keys", () => {
+    expect(buildCssVariableBlock({ colorPk: "#ff0000" })).not.toContain("--gr");
+  });
+});
+
+// ─── Test 3: no raw hex in component className/style props ───────────────────
 
 describe("component files", () => {
   const EXEMPT_PATHS = [

@@ -4,6 +4,8 @@ import { Fragment } from "react";
 
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { DownloadImageButton } from "@/components/DownloadImageButton";
+import { ImageDeleteButton } from "@/components/ImageDeleteButton";
+import { ImageDetailLightbox } from "@/components/ImageDetailLightbox";
 import { ReextractMetadataButton } from "@/components/ReextractMetadataButton";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -134,14 +136,14 @@ export default async function AdminImageDetailPage({
       <Breadcrumbs
         crumbs={[
           { label: "Images", href: backHref },
-          { label: image.caption?.slice(0, 60) ?? image.filename ?? image.id },
+          { label: image.title ?? image.caption?.slice(0, 60) ?? image.filename ?? image.id },
         ]}
       />
 
       <div className="mt-4 flex items-start justify-between gap-4">
         <div>
           <H1>
-            {image.filename ?? "Untitled image"}
+            {image.title ?? image.filename ?? "Untitled image"}
           </H1>
           <p className="text-sm text-muted-foreground">
             Imported {formatDate(image.created_at)}
@@ -179,6 +181,9 @@ export default async function AdminImageDetailPage({
           <ImageArchiveButton
             image={{ id: image.id, deleted_at: image.deleted_at }}
           />
+          {image.deleted_at && (
+            <ImageDeleteButton imageId={image.id} />
+          )}
           <Link
             href={backHref}
             className="text-sm text-muted-foreground hover:text-foreground"
@@ -214,14 +219,15 @@ export default async function AdminImageDetailPage({
                 alt=""
                 className="h-10 w-10 rounded object-cover"
               />
-              <a
-                href={thumbUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="hover:underline"
-              >
-                Open
-              </a>
+              <ImageDetailLightbox
+                src={thumbUrl}
+                alt={image.alt_text ?? image.filename ?? "Library image"}
+                title={image.title}
+                caption={image.caption}
+                tags={image.tags}
+                width_px={image.width_px}
+                height_px={image.height_px}
+              />
             </div>
           )}
         </div>
@@ -230,6 +236,12 @@ export default async function AdminImageDetailPage({
           className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"
           data-testid="image-detail-fields"
         >
+          <dt className="text-muted-foreground">Title</dt>
+          <dd>
+            {image.title ?? (
+              <span className="text-muted-foreground">(not set)</span>
+            )}
+          </dd>
           <dt className="text-muted-foreground">Caption</dt>
           <dd>
             {image.caption ?? (

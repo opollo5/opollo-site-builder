@@ -273,16 +273,12 @@ async function getSiteImpl(
     });
   }
   if (!cred) {
+    // Site exists but credentials were wiped (e.g. migration 0056). Return
+    // ok:true with null credentials so the edit page can still load and let
+    // the operator re-enter them — rather than serving a 404.
     return {
-      ok: false,
-      error: {
-        code: "NOT_FOUND",
-        message: `Site ${id} has no credentials row.`,
-        details: { id },
-        retryable: false,
-        suggested_action:
-          "Data integrity issue — re-register the site or restore credentials.",
-      },
+      ok: true,
+      data: { site: site as SiteRecord, credentials: null },
       timestamp: now(),
     };
   }
@@ -507,22 +503,41 @@ export async function updateSiteCredentials(
       }
     }
 
-    const { error } = await supabase
-      .from("site_credentials")
-      .update(update)
-      .eq("site_id", id);
-    if (error) {
-      return internalError("Failed to update site credentials.", {
-        supabase_error: error,
-      });
+    // Migration 0056 deleted every site_credentials row. A plain UPDATE
+    // silently does nothing when there is no existing row. Use UPSERT when
+    // we have a full credential set (both user + encrypted password) so the
+    // row is created if missing; fall back to UPDATE for partial patches.
+    const hasFullCredentials =
+      patch.wp_user !== undefined && patch.wp_app_password !== undefined;
+
+    if (hasFullCredentials) {
+      const { error } = await supabase
+        .from("site_credentials")
+        .upsert({ site_id: id, ...update }, { onConflict: "site_id" });
+      if (error) {
+        return internalError("Failed to upsert site credentials.", {
+          supabase_error: error,
+        });
+      }
+    } else {
+      const { error } = await supabase
+        .from("site_credentials")
+        .update(update)
+        .eq("site_id", id);
+      if (error) {
+        return internalError("Failed to update site credentials.", {
+          supabase_error: error,
+        });
+      }
     }
 
-    // Bump the parent sites.updated_at so the list page's "updated"
-    // column reflects the credential rotation.
+    // After a successful credential save, flip pending_pairing → active.
+    // Only touches pending_pairing — paused/active/removed are left alone.
     await supabase
       .from("sites")
-      .update({ updated_at: new Date().toISOString() })
-      .eq("id", id);
+      .update({ status: "active", updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("status", "pending_pairing");
 
     return { ok: true, data: { updated: true }, timestamp: now() };
   } catch (err) {

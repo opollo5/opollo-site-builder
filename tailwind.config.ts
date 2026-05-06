@@ -106,6 +106,7 @@ const config: Config = {
         b1: "var(--b1)",
         b2: "var(--b2)",
         b3: "var(--b3)",
+        "icon-dim": "var(--icon-dim)",
       },
       borderRadius: {
         lg: "var(--radius)",

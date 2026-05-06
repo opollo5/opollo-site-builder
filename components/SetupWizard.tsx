@@ -1,9 +1,9 @@
 "use client";
 
+import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Check, ChevronRight, Loader2, Palette, Volume2 } from "lucide-react";
+import { Check, Loader2, Palette, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ApprovedDesignReadout } from "@/components/ConceptRefinementView";
@@ -14,6 +14,7 @@ import {
 } from "@/components/DesignDirectionInputs";
 import { ToneOfVoiceInputs } from "@/components/ToneOfVoiceInputs";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import type { Industry } from "@/lib/design-discovery/industry-defaults";
 import type { SetupStatus, SetupStep, SetupStepStatus } from "@/lib/site-setup";
 
@@ -59,8 +60,8 @@ function statusLabel(s: SetupStepStatus): string {
 
 export function SetupWizard({ siteId, step, status }: Props) {
   return (
-    <div className="space-y-6" data-testid="setup-wizard">
-      <ProgressStrip step={step} status={status} siteId={siteId} />
+    <div className="space-y-8" data-testid="setup-wizard">
+      <WizardStepper step={step} status={status} siteId={siteId} />
       {step === 1 && <Step1 siteId={siteId} status={status} />}
       {step === 2 && <Step2 siteId={siteId} status={status} />}
       {step === 3 && <Step3 siteId={siteId} status={status} />}
@@ -68,7 +69,12 @@ export function SetupWizard({ siteId, step, status }: Props) {
   );
 }
 
-function ProgressStrip({
+// ---------------------------------------------------------------------------
+// Numbered step indicator with connecting lines and gating.
+// A step is accessible only when all preceding steps are complete.
+// ---------------------------------------------------------------------------
+
+function WizardStepper({
   step,
   status,
   siteId,
@@ -77,63 +83,109 @@ function ProgressStrip({
   status: SetupStatus;
   siteId: string;
 }) {
-  // A step is "complete" if its status column is approved or skipped.
-  // Step 3 is "complete" when both prior steps are complete.
   const stepComplete = (n: SetupStep): boolean => {
-    if (n === 1) {
+    if (n === 1)
       return (
         status.design_direction_status === "approved" ||
         status.design_direction_status === "skipped"
       );
-    }
-    if (n === 2) {
+    if (n === 2)
       return (
         status.tone_of_voice_status === "approved" ||
         status.tone_of_voice_status === "skipped"
       );
-    }
+    return stepComplete(1) && stepComplete(2);
+  };
+
+  // Step N is navigable only when all steps before it are done.
+  const stepAccessible = (n: SetupStep): boolean => {
+    if (n === 1) return true;
+    if (n === 2) return stepComplete(1);
     return stepComplete(1) && stepComplete(2);
   };
 
   return (
-    <ol className="flex items-center gap-1 text-sm" aria-label="Setup progress">
-      {STEPS.map((s, i) => {
-        const active = s.n === step;
-        const done = stepComplete(s.n);
-        const Icon = done ? Check : s.icon;
-        return (
-          <li
-            key={s.n}
-            className="flex items-center gap-1"
-            data-testid={`setup-progress-step-${s.n}`}
-            data-active={active ? "true" : "false"}
-            data-complete={done ? "true" : "false"}
-          >
-            <Link
-              href={`/admin/sites/${siteId}/setup?step=${s.n}`}
-              className={[
-                "flex items-center gap-1.5 rounded-md border px-2.5 py-1 transition-smooth",
+    <nav aria-label="Setup progress" data-testid="setup-wizard-stepper">
+      <ol className="flex w-full items-start">
+        {STEPS.map((s, i) => {
+          const active = s.n === step;
+          const done = stepComplete(s.n);
+          const accessible = stepAccessible(s.n);
+          const isLast = i === STEPS.length - 1;
+
+          const circle = (
+            <span
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-full border-2 text-sm font-bold transition-colors",
                 active
-                  ? "border-foreground bg-foreground text-background"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : done
-                    ? "border-success/40 bg-success/10 text-success"
-                    : "border-muted bg-muted/30 text-muted-foreground",
-                "hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              ].join(" ")}
+                    ? "border-success bg-success/10 text-success"
+                    : "border-border bg-background text-muted-foreground/50",
+              )}
+              aria-current={active ? "step" : undefined}
             >
-              <Icon aria-hidden className="h-3.5 w-3.5" />
-              <span className="font-medium">{s.label}</span>
-            </Link>
-            {i < STEPS.length - 1 && (
-              <ChevronRight
-                aria-hidden
-                className="h-4 w-4 shrink-0 text-muted-foreground"
-              />
-            )}
-          </li>
-        );
-      })}
-    </ol>
+              {done && !active ? (
+                <Check aria-hidden className="h-4 w-4" />
+              ) : (
+                s.n
+              )}
+            </span>
+          );
+
+          return (
+            <Fragment key={s.n}>
+              <li
+                className="flex flex-none flex-col items-center gap-1"
+                data-testid={`setup-progress-step-${s.n}`}
+                data-active={active ? "true" : "false"}
+                data-complete={done ? "true" : "false"}
+              >
+                {accessible ? (
+                  <Link
+                    href={`/admin/sites/${siteId}/setup?step=${s.n}`}
+                    className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {circle}
+                  </Link>
+                ) : (
+                  <span
+                    className="cursor-not-allowed opacity-60"
+                    aria-disabled="true"
+                  >
+                    {circle}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    "text-xs font-medium",
+                    active
+                      ? "text-foreground"
+                      : done
+                        ? "text-success"
+                        : "text-muted-foreground/60",
+                  )}
+                >
+                  {s.label}
+                </span>
+              </li>
+
+              {/* Connecting line between step circles */}
+              {!isLast && (
+                <li
+                  role="presentation"
+                  aria-hidden
+                  className={cn(
+                    "mt-[1.125rem] h-px flex-1",
+                    done ? "bg-success/40" : "bg-border",
+                  )}
+                />
+              )}
+            </Fragment>
+          );
+        })}
+      </ol>
+    </nav>
   );
 }
 

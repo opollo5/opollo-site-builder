@@ -13,6 +13,7 @@
  *   - No hardcoded hex colours in app/ or components/ (use token keys)
  *   - No arbitrary Tailwind text-[Xpx] values (use token classes)
  *   - Minimum font size: 1rem (16px) on all operator-facing surfaces
+ *     Exception: eyebrow .lbl (0.75rem/12px — hierarchy-critical design exception)
  *
  * To add a token: add it here first, then use it.
  * Never add raw values directly in a component.
@@ -56,6 +57,9 @@ export const colors = {
   m3: "rgba(255, 255, 255, 0.32)",
   m4: "rgba(255, 255, 255, 0.18)",
 
+  /** Dim alpha for inactive icons — between m3 (0.32) and m2 (0.58) */
+  iconDim: "rgba(255, 255, 255, 0.40)",
+
   /** Border/surface alpha ramps */
   b1: "rgba(255, 255, 255, 0.06)",
   b2: "rgba(255, 255, 255, 0.12)",
@@ -65,8 +69,12 @@ export const colors = {
 // ─── Typography ─────────────────────────────────────────────────────────────
 
 export const typography = {
-  /** Font size scale. 16px is the absolute minimum for operator-facing text. */
+  /** Font size scale.
+   * 16px is the absolute minimum for operator-facing text.
+   * Exception: eyebrow .lbl (0.75rem/12px — hierarchy-critical; sits above headings).
+   */
   fontSize: {
+    eyebrow: "0.75rem", // 12px — documented design exception (.lbl eyebrow label)
     xs:   "1rem",      // 16px — minimum
     sm:   "1rem",      // 16px — minimum
     base: "1rem",      // 16px — standard body
@@ -191,7 +199,8 @@ export type OverridableTokenKey =
   | "fontDisplay"
   | "fontBody"
   | "radiusLg"
-  | "radiusFull";
+  | "radiusFull"
+  | "radius";
 
 export interface TokenOverrides {
   colorPk?: string;
@@ -212,6 +221,8 @@ export interface TokenOverrides {
   fontBody?: string;
   radiusLg?: string;
   radiusFull?: string;
+  /** @deprecated Use radiusLg instead. Kept for backwards compat with older settings rows. */
+  radius?: string;
 }
 
 /**
@@ -238,6 +249,7 @@ export function buildCssVariableBlock(overrides: TokenOverrides): string {
   if (overrides.fontDisplay)  vars.push(`--font-display: ${overrides.fontDisplay};`);
   if (overrides.fontBody)     vars.push(`--font-body: ${overrides.fontBody};`);
   if (overrides.radiusLg)     vars.push(`--radius: ${overrides.radiusLg};`);
+  else if (overrides.radius)  vars.push(`--radius: ${overrides.radius};`);
   if (overrides.radiusFull)   vars.push(`--radius-full: ${overrides.radiusFull};`);
 
   if (vars.length === 0) return "";

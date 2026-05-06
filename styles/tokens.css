@@ -5,7 +5,7 @@
  * TypeScript source of truth: lib/design-system/tokens.ts
  *
  * Rules enforced by lint + CI (see audit:static and .eslintrc):
- * - Minimum font size: 16px (all operator-facing text)
+ * - Minimum font size: 16px (text-xs = text-sm = text-base = 1rem; eyebrow .lbl is 0.75rem — design exception)
  * - No hardcoded hex colours — use semantic tokens below
  * - No arbitrary Tailwind text-[Xpx] values
  *
@@ -16,9 +16,8 @@
 
 :root {
   /* ── Typography scale ────────────────────────────────────────────
-   * 16px is the absolute minimum for all operator-facing text.
-   * text-xs and text-sm both resolve to 1rem (16px).
-   * This is enforced in tailwind.config.ts.
+   * 16px is the absolute minimum — text-xs = text-sm = text-base = 1rem.
+   * NEVER use font sizes below 16px on operator surfaces (eyebrow .lbl is 0.75rem, design exception).
    * ─────────────────────────────────────────────────────────────── */
   --font-size-xs:   1rem;      /* 16px — minimum */
   --font-size-sm:   1rem;      /* 16px — minimum */

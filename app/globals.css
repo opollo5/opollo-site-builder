@@ -39,6 +39,8 @@
     --b1: rgba(255, 255, 255, 0.06);
     --b2: rgba(255, 255, 255, 0.12);
     --b3: rgba(255, 255, 255, 0.20);
+    /* Dim alpha for inactive icons — between m3 (0.32) and m2 (0.58) */
+    --icon-dim: rgba(255, 255, 255, 0.40);
 
     /* ---- Tailwind/shadcn semantic tokens (HSL, always-dark) -------------- */
     --background: 240 37% 4%;           /* --d1  #07070f  card surface       */
@@ -104,12 +106,13 @@
  * Used directly in JSX alongside Tailwind utilities.
  * ------------------------------------------------------------------------- */
 
-/* Eyebrow label — green dash prefix, uppercase tracking */
+/* Eyebrow label — green dash prefix, uppercase tracking.
+   0.75rem (12px) design exception: sits ABOVE headings; 16px would invert the hierarchy. */
 .lbl {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: var(--font-size-xs, 1rem);
+  font-size: 0.75rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.20em;
@@ -153,7 +156,7 @@
   border: none;
   border-radius: 100px;
   font-family: inherit;
-  font-size: var(--font-size-base, 1rem);
+  font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -182,7 +185,7 @@
   border: 1px solid var(--b3);
   border-radius: 100px;
   font-family: inherit;
-  font-size: var(--font-size-base, 1rem);
+  font-size: 1rem;
   font-weight: 600;
   padding: 10px 24px;
   cursor: pointer;
@@ -218,10 +221,10 @@
  *   <H1>      page heading          text-xl  font-display  ~20px
  *   <H2>      section heading       text-base font-display ~16px
  *   <H3>      sub-section / card    text-sm  font-display  ~14px
- *   <Eyebrow> .lbl                  16px     font-body 700 uppercase
- *   Body      p / td / form values  font-body 400          16px floor
+ *   <Eyebrow> .lbl                  0.75rem  font-body 700 uppercase (12px design exception)
+ *   Body      p / td / form values  font-body 400          1rem = 16px floor
  *
- * 16px is the absolute minimum on all operator surfaces.
+ * 16px is the absolute minimum on operator surfaces.
  * font-mono reserved for literal data (IDs, cost values, code tokens).
  * ------------------------------------------------------------------------- */
 
@@ -358,19 +361,18 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Readability floor (updated 2026-05-06).
- *
- * text-sm → 16px, text-xs → 16px. Lucide icons floored at 20px.
- * Minimum enforced in tailwind.config.ts + lib/design-system/tokens.ts.
+ * Operator-readability floor — 16px minimum (raised 2026-05-06).
+ * text-xs = text-sm = 1rem. Lucide icons floored at 20px.
+ * Only exception: .lbl eyebrow (0.75rem/12px — hierarchy-critical).
  * ------------------------------------------------------------------------- */
 
 .text-xs {
   font-size: 1rem;
-  line-height: 1.5rem;
+  line-height: 1.5;
 }
 .text-sm {
   font-size: 1rem;
-  line-height: 1.5rem;
+  line-height: 1.5;
 }
 
 svg.lucide {

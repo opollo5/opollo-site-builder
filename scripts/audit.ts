@@ -12,7 +12,7 @@
  *   7. Unauthenticated API routes           HIGH
  *   8. Missing error handling on writes     MEDIUM
  *   9. Dead routes                          LOW
- *  10. Hardcoded design values              LOW
+ *  10. Hardcoded design token values        LOW
  *
  * Output:
  *   - Per-issue lines: FILE:LINE — CATEGORY — message
@@ -618,7 +618,9 @@ function check5_typography(): Issue[] {
 
   // Arbitrary Tailwind font sizes below 16px — text-[10px] through text-[15px].
   // text-xs, text-sm, and text-base are VALID (all compile to 16px via tailwind.config.ts).
-  // 16px is the absolute minimum for all operator-facing text (updated 2026-05-06).
+  // Known intentional exceptions at <16px:
+  //   - .lbl eyebrow labels (0.75rem/12px per design spec) — CSS class, not Tailwind
+  //   - keyboard shortcut symbols (<kbd>) — decorative chrome
   const arbitraryFontRe = /\btext-\[([0-9]|1[0-5])px\]/;
   // Inline fontSize below 16px.
   const fsPxRe =
@@ -641,7 +643,7 @@ function check5_typography(): Issue[] {
             file: rel,
             line: i + 1,
             message:
-              "Arbitrary sub-16px font size — use text-xs (16px minimum per lib/design-system/tokens.ts) instead",
+              "Arbitrary sub-16px font size — use text-xs (1rem/16px) instead, or document as intentional exception (see lib/design-system/tokens.ts)",
           });
         }
         if (fsPxRe.test(stripped)) {
@@ -1026,73 +1028,94 @@ function check9_deadRoutes(): Issue[] {
 }
 
 // ============================================================================
-// Check 10 — Hardcoded design values in component files (LOW)
+// Check 10 — Hardcoded design token values (LOW)
 // ============================================================================
 
 /**
- * Flags hardcoded hex colours and arbitrary px font sizes in className or
- * style props within app/ and components/. Values in:
- *   - email templates (lib/email/templates/) — exempt (inline HTML)
- *   - CSS files (globals.css, tokens.css) — exempt (intentional token layer)
- *   - test/fixture files — exempt (already excluded by SKIP_DIRS)
- *   - seed/ directory — exempt (WordPress template CSS)
+ * Flags two classes of hardcoded design values:
  *
- * Correct approach: add the value to lib/design-system/tokens.ts + use the
- * corresponding Tailwind class (e.g. text-pk, bg-gr, border-b3).
+ * (a) Tailwind arbitrary-value classes that embed hex colour literals,
+ *     e.g. `text-[#ff03a5]` or `bg-[#00e5a0]`. These should reference CSS
+ *     variables (`text-pk`, `bg-gr`) or the semantic aliases declared in
+ *     tailwind.config.ts.
+ *
+ * (b) Hardcoded hex colours in className or style props in component files,
+ *     e.g. `className="... #ff03a5 ..."` or `style={{ color: "#ff03a5" }}`.
+ *     Use a Tailwind token class (text-pk, bg-gr) or a CSS var from
+ *     lib/design-system/tokens.ts instead.
+ *
+ * The check is LOW severity. Some one-off values (hover states, opacity
+ * variants, email templates) are legitimate — the output is a candidates
+ * list for review.
+ *
+ * Exclude: tokens.css / tailwind.config.ts (canonical definitions),
+ *          the design-system tokens source file, test fixtures,
+ *          email templates, seed data, and public assets.
  */
 function check10_hardcodedDesignValues(): Issue[] {
   const issues: Issue[] = [];
 
-  // Hex pattern that looks like it's inside a className or style string.
-  // Matches #xxx and #xxxxxx but not css-variable definitions (--foo: #...).
-  // Allow-list: globals.css and tokens.css are the intentional token layer.
-  const hexRe = /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/;
+  const SKIP_FILES = new Set([
+    "tailwind.config.ts",
+    "tokens.ts",
+    "tokens.css",
+    "globals.css",
+  ]);
 
-  // Arbitrary Tailwind px font-size pattern text-[Npx].
-  const arbitraryTextRe = /\btext-\[\d+px\]/;
-
-  const EXEMPT_PATHS = [
+  const EXEMPT_PATH_FRAGMENTS = [
     "lib/email/templates/",
     "lib/email/",
-    "app/globals.css",
-    "styles/tokens.css",
+    "app/api/admin/email-test/",
     "seed/",
     "public/",
   ];
 
-  for (const root of ["app", "components"]) {
+  // (a) Tailwind arbitrary hex classes: text-[#...], bg-[#...], etc.
+  const hexClassRe = /\b(?:text|bg|border|ring|shadow|fill|stroke)-\[#[0-9a-fA-F]{3,8}\]/g;
+
+  // (b) Hex colour in className / style prop contexts.
+  const hexRe = /#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})\b/;
+
+  const roots = ["app", "components", "lib"];
+  for (const root of roots) {
     const dir = join(REPO_ROOT, root);
     if (!existsSync(dir)) continue;
-    for (const file of walkFiles(dir, [".ts", ".tsx"])) {
+    for (const file of walkFiles(dir, [".ts", ".tsx", ".css"])) {
       const rel = relPath(file);
-      if (EXEMPT_PATHS.some((p) => rel.includes(p))) continue;
+      if (SKIP_FILES.has(rel.split("/").pop() ?? "")) continue;
+      if (file.includes("__tests__") || file.includes(".test.")) continue;
+      if (EXEMPT_PATH_FRAGMENTS.some((p) => rel.includes(p))) continue;
+
       const lines = readSafe(file).split(/\r?\n/);
       const state = { inBlock: false };
+
       lines.forEach((ln, i) => {
-        const stripped = stripComments(ln, state, false);
-        // Only flag hex values that appear inside className strings or style objects.
-        if (
-          hexRe.test(stripped) &&
-          /className|style\s*=|style\s*:/.test(stripped)
-        ) {
+        const stripped = stripComments(ln, state, file.endsWith(".css"));
+
+        // (a) Arbitrary Tailwind hex class.
+        const hexClassMatches = stripped.match(hexClassRe);
+        if (hexClassMatches) {
           issues.push({
             category: "hardcoded-design-values",
             severity: "LOW",
             file: rel,
             line: i + 1,
-            message:
-              "Hardcoded hex colour in className/style — use a Tailwind token class (text-pk, bg-gr, etc.) or a CSS var from lib/design-system/tokens.ts",
+            message: `Hardcoded hex colour in Tailwind class (${hexClassMatches[0]}) — prefer a CSS-variable alias (text-pk, bg-gr, etc.) or add to tailwind.config.ts`,
           });
         }
-        if (arbitraryTextRe.test(stripped)) {
-          issues.push({
-            category: "hardcoded-design-values",
-            severity: "LOW",
-            file: rel,
-            line: i + 1,
-            message:
-              "Arbitrary Tailwind text-[Xpx] — use text-xs / text-sm / text-base (all 16px min) from lib/design-system/tokens.ts",
-          });
+
+        // (b) Hex in className/style prop (only app/ + components/, not lib/).
+        if (root !== "lib" && !file.endsWith(".css")) {
+          if (hexRe.test(stripped) && /className|style\s*[=:]/.test(stripped)) {
+            issues.push({
+              category: "hardcoded-design-values",
+              severity: "LOW",
+              file: rel,
+              line: i + 1,
+              message:
+                "Hardcoded hex colour in className/style — use a Tailwind token class (text-pk, bg-gr, etc.) or a CSS var from lib/design-system/tokens.ts",
+            });
+          }
         }
       });
     }

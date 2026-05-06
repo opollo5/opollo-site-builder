@@ -25,7 +25,7 @@ const buttonVariants = cva(
         secondary:
           "bg-white/[0.08] text-foreground hover:bg-white/[0.12] active:translate-y-px",
         ghost:
-          "bg-transparent text-muted-foreground hover:bg-[rgba(0,229,160,0.08)] hover:text-gr",
+          "bg-transparent text-muted-foreground hover:bg-[var(--gr-soft)] hover:text-gr",
         link: "text-pk underline-offset-4 hover:underline",
       },
       size: {
