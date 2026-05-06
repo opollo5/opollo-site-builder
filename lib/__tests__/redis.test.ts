@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // destructuring vi.hoisted() into a const puts the binding in TDZ when the
 // factory runs. Capture the whole object and access the property instead.
 const redisMocks = vi.hoisted(() => ({
-  mockRedisConstructor: vi.fn().mockImplementation((opts: object) => opts),
+  mockRedisConstructor: vi.fn().mockImplementation(function(opts: object) { return opts; }),
 }));
 
 vi.mock("@upstash/redis", () => ({
