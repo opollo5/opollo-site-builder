@@ -8,6 +8,8 @@ import {
   listPostMasters,
   type SocialPostState,
 } from "@/lib/platform/social/posts";
+import { listConnections } from "@/lib/platform/social/connections";
+import { upsertVariant } from "@/lib/platform/social/variants/upsert";
 
 // ---------------------------------------------------------------------------
 // S1-2 — HTTP API for social_post_master.
@@ -45,6 +47,9 @@ const CreateSchema = z.object({
   master_text: z.string().max(10_000).optional(),
   link_url: z.string().url().max(2048).optional(),
   source_type: z.enum(["manual", "csv", "cap", "api"]).optional(),
+  // Optional: IDs of social_connections rows. For each, a variant row is
+  // created with the connection's platform + connection_id set.
+  connection_ids: z.array(z.string().uuid()).max(20).optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -73,6 +78,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
     if (result.error.code === "NOT_FOUND") return notFound(result.error.message);
     return internalError(result.error.message);
+  }
+
+  // If connection_ids were supplied, create variants for each.
+  const connectionIds = parsed.data.connection_ids;
+  if (connectionIds && connectionIds.length > 0) {
+    const connectionsResult = await listConnections({ companyId: parsed.data.company_id });
+    if (connectionsResult.ok) {
+      const connectionMap = new Map(connectionsResult.data.connections.map((c) => [c.id, c]));
+      await Promise.all(
+        connectionIds.map(async (connId) => {
+          const conn = connectionMap.get(connId);
+          if (!conn) return; // unknown / wrong-company connection — skip silently
+          await upsertVariant({
+            postMasterId: result.data.id,
+            companyId: parsed.data.company_id,
+            platform: conn.platform,
+            variantText: null,
+            connectionId: conn.id,
+          });
+        }),
+      );
+    }
   }
 
   return NextResponse.json(

@@ -8,6 +8,7 @@ import {
 } from "@/components/CompanySidebar";
 import { Toaster } from "@/components/ui/toaster";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 export default async function CompanyLayout({
   children,
@@ -25,6 +26,18 @@ export default async function CompanyLayout({
   const initialCollapsed =
     cookies().get(COMPANY_SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
 
+  // Fetch company name for the sidebar header.
+  let companyName: string | null = null;
+  if (session.company?.companyId) {
+    const svc = getServiceRoleClient();
+    const { data } = await svc
+      .from("platform_companies")
+      .select("name")
+      .eq("id", session.company.companyId)
+      .maybeSingle();
+    companyName = (data as { name: string } | null)?.name ?? null;
+  }
+
   return (
     <div className="min-h-screen bg-canvas text-foreground sm:flex">
       <a
@@ -38,6 +51,7 @@ export default async function CompanyLayout({
         isOpolloStaff={session.isOpolloStaff}
         isAdmin={isAdmin}
         companyId={session.company?.companyId ?? null}
+        companyName={companyName}
         initialCollapsed={initialCollapsed}
       />
       <main
