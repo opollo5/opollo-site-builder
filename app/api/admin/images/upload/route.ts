@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse, type NextRequest } from "next/server";
+import sharp from "sharp";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import {
@@ -149,7 +150,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const cloudflareId = `opollo/upload/${randomUUID()}`;
   const filename = file.name || `${cloudflareId}.bin`;
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const dims = readImageDimensions(bytes);
+
+  // Sharp is more reliable across all JPEG encodings; fall back to the pure
+  // header parser only when Sharp itself throws (e.g. unsupported variant).
+  let dims: { width: number; height: number } | null = null;
+  try {
+    const meta = await sharp(Buffer.from(bytes)).metadata();
+    if (meta.width && meta.height) dims = { width: meta.width, height: meta.height };
+  } catch {
+    dims = readImageDimensions(bytes);
+  }
 
   // Extract EXIF/IPTC/XMP metadata. NEVER block the upload on failure.
   let exifCaption: string | null = null;

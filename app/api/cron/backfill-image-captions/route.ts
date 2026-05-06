@@ -174,7 +174,8 @@ export async function GET(req: NextRequest) {
       .from("image_library")
       .update(patch)
       .eq("id", row.id)
-      .is("caption", null); // idempotency guard
+      // Match the same set the SELECT picked: null, empty, or "[object Object]"
+      .or("caption.is.null,caption.eq.,caption.eq.[object Object]");
 
     if (updateErr) {
       logger.error("backfill.update_failed", { image_id: row.id, error: updateErr.message });

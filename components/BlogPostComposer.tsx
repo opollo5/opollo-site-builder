@@ -860,6 +860,13 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             </span>
           </Alert>
         )}
+        {pendingDraft && (
+          <DraftRestoreBanner
+            savedAt={pendingDraft.savedAt}
+            onRestore={restoreDraft}
+            onDiscard={discardDraft}
+          />
+        )}
 
         {/* Unified editor card: title + content editor + SEO */}
         <div className="rounded-lg border bg-card p-6">
