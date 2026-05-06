@@ -112,6 +112,28 @@ export function isDesignSystemV2Enabled(): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// In-process TTL cache for the registry.
+//
+// loadActiveRegistry is called once per page-tick during batch runs. A 40-page
+// batch makes 120 identical DB reads (getActiveDS + listComponents + listTemplates).
+// Caching for 5 min per site_id reduces that to 3 reads total per warm instance.
+// Warm-pool persistence is a bonus; the primary win is within a single request.
+// ---------------------------------------------------------------------------
+
+type RegistryEntry = {
+  ts: number;
+  value: {
+    ds: DesignSystem;
+    components: DesignComponent[];
+    templates: DesignTemplate[];
+  } | null;
+};
+
+const REGISTRY_CACHE_TTL_MS = 5 * 60 * 1000;
+const registryCache = new Map<string, RegistryEntry>();
+
+// ---------------------------------------------------------------------------
 // Registry loader — the one place in M1d that hits Supabase.
 //
 // Returns null if the site has no active design system, so callers can fall
@@ -127,6 +149,11 @@ export async function loadActiveRegistry(
   components: DesignComponent[];
   templates: DesignTemplate[];
 } | null> {
+  const cached = registryCache.get(site_id);
+  if (cached && Date.now() - cached.ts < REGISTRY_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
   const dsRes = await getActiveDesignSystem(site_id);
   if (!dsRes.ok) {
     logger.error("system_prompt.load_active_ds_failed", {
@@ -135,7 +162,10 @@ export async function loadActiveRegistry(
     });
     return null;
   }
-  if (dsRes.data === null) return null;
+  if (dsRes.data === null) {
+    registryCache.set(site_id, { ts: Date.now(), value: null });
+    return null;
+  }
 
   const ds = dsRes.data;
   const [compRes, tmplRes] = await Promise.all([
@@ -160,7 +190,9 @@ export async function loadActiveRegistry(
     return null;
   }
 
-  return { ds, components: compRes.data, templates: tmplRes.data };
+  const value = { ds, components: compRes.data, templates: tmplRes.data };
+  registryCache.set(site_id, { ts: Date.now(), value });
+  return value;
 }
 
 // ---------------------------------------------------------------------------
