@@ -24,6 +24,7 @@ import { executePublishPage } from "@/lib/publish-page";
 import { executeSearchImages } from "@/lib/search-images";
 import { executeUpdatePage } from "@/lib/update-page";
 import { buildSystemPromptForSite } from "@/lib/system-prompt";
+import { CHAT_PROMPT_VERSION } from "@/lib/prompts";
 import { getSite } from "@/lib/sites";
 import { traceAnthropicStream } from "@/lib/langfuse";
 import { logger } from "@/lib/logger";
@@ -238,6 +239,7 @@ export async function POST(req: Request) {
               iter,
               site_id: siteLogId,
               using_env_fallback: !hasActiveSiteId,
+              prompt_version: CHAT_PROMPT_VERSION,
             },
             input: {
               system_prompt_bytes: systemPrompt.length,
