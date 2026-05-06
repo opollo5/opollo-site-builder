@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -144,6 +145,7 @@ export async function listPagesForSite(
   try {
     return await listPagesForSiteImpl(siteId, params);
   } catch (err) {
+    logger.error("pages.listPagesForSite.uncaught", { site_id: siteId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in listPagesForSite: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -179,6 +181,7 @@ async function listPagesForSiteImpl(
   }
   const dataRes = await dataQuery;
   if (dataRes.error) {
+    logger.error("pages.listPagesForSite.data_query_failed", { site_id: siteId, supabase_error: dataRes.error.message });
     return internalError("Failed to list pages.", {
       supabase_error: dataRes.error,
     });
@@ -198,6 +201,7 @@ async function listPagesForSiteImpl(
   }
   const countRes = await countQuery;
   if (countRes.error) {
+    logger.error("pages.listPagesForSite.count_query_failed", { site_id: siteId, supabase_error: countRes.error.message });
     return internalError("Failed to count pages.", {
       supabase_error: countRes.error,
     });
@@ -225,6 +229,7 @@ export async function getPage(
   try {
     return await getPageImpl(siteId, pageId);
   } catch (err) {
+    logger.error("pages.getPage.uncaught", { site_id: siteId, page_id: pageId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in getPage: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -259,6 +264,7 @@ export async function updatePageMetadata(
   try {
     return await updatePageMetadataImpl(siteId, pageId, input);
   } catch (err) {
+    logger.error("pages.updatePageMetadata.uncaught", { site_id: siteId, page_id: pageId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in updatePageMetadata: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -314,6 +320,7 @@ async function updatePageMetadataImpl(
         timestamp: now(),
       };
     }
+    logger.error("pages.updatePageMetadata.update_failed", { site_id: siteId, page_id: pageId, supabase_error: res.error.message });
     return internalError("Failed to update page metadata.", {
       supabase_error: res.error,
     });
@@ -329,6 +336,7 @@ async function updatePageMetadataImpl(
       .eq("site_id", siteId)
       .maybeSingle();
     if (existsRes.error) {
+      logger.error("pages.updatePageMetadata.recheck_failed", { site_id: siteId, page_id: pageId, supabase_error: existsRes.error.message });
       return internalError("Failed to re-check page after update.", {
         supabase_error: existsRes.error,
       });
@@ -391,6 +399,7 @@ async function getPageImpl(
     .maybeSingle();
 
   if (pageRes.error) {
+    logger.error("pages.getPage.page_fetch_failed", { site_id: siteId, page_id: pageId, supabase_error: pageRes.error.message });
     return internalError("Failed to fetch page.", {
       supabase_error: pageRes.error,
     });
@@ -431,11 +440,13 @@ async function getPageImpl(
   ]);
 
   if (templateRes.error) {
+    logger.error("pages.getPage.template_fetch_failed", { site_id: siteId, page_id: pageId, template_id: row.template_id, supabase_error: templateRes.error.message });
     return internalError("Failed to fetch template.", {
       supabase_error: templateRes.error,
     });
   }
   if (siteRes.error) {
+    logger.error("pages.getPage.site_fetch_failed", { site_id: siteId, page_id: pageId, supabase_error: siteRes.error.message });
     return internalError("Failed to fetch site.", {
       supabase_error: siteRes.error,
     });

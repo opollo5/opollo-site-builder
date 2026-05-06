@@ -163,8 +163,8 @@ and component-level code paths. Typecheck ✓ Lint ✓.
 
 | # | File | Issue | Suggested fix |
 |---|------|-------|---------------|
-| B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | Move to a named constant or config table; recalibrate against Sonnet pricing |
-| B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | Low risk (admin-only), but validate `site_name` doesn't contain `{{...}}` in `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
+| B-5 | `lib/brief-runner.ts:2507,2628` | `projectedIterationCostCents = 10`, `projectedRevCostCents = 15` hardcoded — will drift from actual model pricing | ✅ Fixed — `VISUAL_PROJECTION_CRITIQUE_CENTS = 10` / `VISUAL_PROJECTION_REVISE_CENTS = 15` named constants in `lib/visual-review.ts` |
+| B-7 | `lib/system-prompt.ts:44–55` | `replaceAll` template substitution: if `site_name` contains a later template token (e.g. `{{prefix}}`), it double-expands — prompt injection by a trusted admin | ✅ Fixed — `TEMPLATE_TOKEN_RE = /\{\{[^}]+\}\}/` refine added to `siteNameSchema` in `lib/tool-schemas.ts`; applied via `RegisterSiteInputSchema` / `UpdateSiteBasicsSchema` |
 | B-8 | `app/api/approve/[token]/decision/route.ts` | No rate limiter on public token endpoint — 256-bit entropy makes brute-force infeasible, but defence-in-depth gap | ✅ Fixed PR #560 — `approval_decision` limiter (20 req/h per-IP) added to `lib/rate-limit.ts` + route |
 
 ---
@@ -381,10 +381,10 @@ Issues surfaced during production dogfood on Test Site 2 / test2.leftleads.co.
 | I-3: "No categorys found." typo + no category creation | MEDIUM | Fixed typo; added inline category creation (same UX as tags — `+` badge, stored as `wp_new_category_names`, created via `wpCreateCategory()` at publish time). | #637 ✅ |
 | I-4: Tags create flow | MEDIUM | `canCreateNew` now enabled for categories too; both comboboxes show "Add category/tag" affordance. | #637 ✅ |
 
-### Not fixed / deferred
+### Fixed in PR #640
 
-| Issue | Reason |
-|---|---|
-| I-2: UI contrast | Requires design-token audit; no WCAG failure found in a quick check — deferred to dedicated polish slice |
-| I-7: SEO panel | Fields exist (SEO title + meta description in collapsed panel, Yoast meta pushed to WP). Auto-populate + AI generation are new features; deferred |
-| I-11: Bulk export | New feature; deferred |
+| Issue | Severity | Fix | PR |
+|---|---|---|---|
+| I-2: UI contrast | MEDIUM | Contrast token bump — CSS variable values lifted to meet WCAG AA on key text surfaces. | #640 ✅ |
+| I-7: SEO panel | MEDIUM | SEO title and meta description auto-populate from post title/excerpt on mount; AI generation option added; snippet preview renders live below the fields. | #640 ✅ |
+| I-11: Bulk export | LOW | "Export ZIP" button on post list downloads selected posts as a zip of markdown files. | #640 ✅ |
