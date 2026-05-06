@@ -84,6 +84,41 @@ const SOURCE_HINTS: Record<ParseSource, string> = {
   none: "",
 };
 
+// Extract first plain-text paragraph from HTML for meta-description seeding.
+function extractFirstParagraph(html: string): string {
+  const match = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(html);
+  if (!match) return "";
+  return match[1].replace(/<[^>]+>/g, "").trim();
+}
+
+// Google SERP snippet preview — purely visual, no interaction.
+function GoogleSnippetPreview({
+  title,
+  url,
+  description,
+}: {
+  title: string;
+  url: string;
+  description: string;
+}) {
+  const displayTitle = title || "Post title";
+  const displayDesc = description || "Meta description will appear here.";
+  return (
+    <div className="rounded border border-border bg-background p-3 font-sans text-sm">
+      <div
+        className="truncate text-base font-medium leading-snug text-[#1a0dab]"
+        title={displayTitle}
+      >
+        {displayTitle.length > 60 ? displayTitle.slice(0, 60) + "…" : displayTitle}
+      </div>
+      <div className="mt-0.5 truncate text-xs text-[#006621]">{url}</div>
+      <div className="mt-1 line-clamp-2 text-xs text-[#545454]">
+        {displayDesc.length > 160 ? displayDesc.slice(0, 160) + "…" : displayDesc}
+      </div>
+    </div>
+  );
+}
+
 const ERROR_TRANSLATIONS: Record<string, string> = {
   UNIQUE_VIOLATION:
     "A post with this slug already exists on this site. Pick a different slug.",
@@ -337,6 +372,29 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   // Only re-run when title changes; slug setter is stable.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title.value]);
+
+  // Issue 7 — auto-populate SEO title from "{Post title} - {Site name}" when
+  // the operator hasn't touched the field and the parser didn't fill it.
+  useEffect(() => {
+    if (!metaTitle.touched && metaTitle.value === "" && title.value.trim() && siteName) {
+      setMetaTitle({ value: `${title.value.trim()} - ${siteName}`, source: "derived", touched: false });
+    }
+  // Re-run only when title or siteName changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title.value, siteName]);
+
+  // Issue 7 — auto-populate meta description from first paragraph when the
+  // operator hasn't touched the field and the parser didn't fill it.
+  useEffect(() => {
+    if (!metaDescription.touched && metaDescription.value === "") {
+      const firstP = extractFirstParagraph(composerValue.text);
+      if (firstP) {
+        setMetaDescription({ value: firstP, source: "first_paragraph", touched: false });
+      }
+    }
+  // Re-run when composerValue.text changes (debounced upstream via parse effect).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerValue.text]);
 
   // Debounced re-parse on every text change.
   useEffect(() => {
@@ -1040,8 +1098,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           )}
         </SidebarPanel>
 
-        {/* SEO panel — collapsed by default (secondary metadata) */}
-        <SidebarPanel title="SEO" defaultOpen={false} testId="sidebar-seo">
+        {/* SEO panel — open by default; auto-populates from title + first paragraph */}
+        <SidebarPanel title="SEO" defaultOpen={true} testId="sidebar-seo">
           <div className="space-y-3">
             <div>
               <label htmlFor="post-meta-title" className="block text-sm font-medium">
@@ -1095,6 +1153,20 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 <SourceHint source={metaDescription.source} />
                 <MetaDescriptionLengthHint length={metaDescription.value.length} />
               </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Search preview
+              </p>
+              <GoogleSnippetPreview
+                title={metaTitle.value || title.value}
+                url={
+                  siteWpUrl && slug.value
+                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
+                    : siteWpUrl ?? "https://example.com/"
+                }
+                description={metaDescription.value}
+              />
             </div>
           </div>
         </SidebarPanel>
