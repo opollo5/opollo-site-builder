@@ -18,8 +18,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // vi.mock is hoisted before variable declarations, so the factory must not
 // reference file-scope consts. vi.hoisted() runs early enough to be safe.
+// Must be a regular function (not arrow) so `new Redis(...)` is constructable.
 const { mockRedisConstructor } = vi.hoisted(() => ({
-  mockRedisConstructor: vi.fn().mockImplementation((opts: object) => opts),
+  mockRedisConstructor: vi.fn().mockImplementation(function (opts: object) { return opts; }),
 }));
 
 vi.mock("@upstash/redis", () => ({
