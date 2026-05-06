@@ -258,6 +258,8 @@ Verified 2026-04-29: `docs/RUNBOOK.md` already has the full procedure at "Anthro
 
 **Status (2026-05-06):** second sweep (PRs #634, #631) added `logger.error` to the 9 API-route tier violations and 2 billing-critical lib violations (`lib/batch-jobs.ts:reserveBudget` failure, `lib/brief-runner.ts:reserveWithCeiling` failure). As of this sweep, the API routes tier is clean and the billing-critical paths are covered. Remaining violations (audit script reports ~106 total including false positives — `lib/2fa/challenges.ts:61` and `lib/brief-runner.ts:1341` are type definitions, not runtime returns) are concentrated in `lib/briefs.ts` (soft — envelope already captures error in `details.supabase_error`) and new lib files added since the prior sweep. The false positives should be filtered from the audit script output.
 
+**Status (2026-05-06, PR #662):** third sweep covered 12 remaining lib files across design-discovery (`apply-tone`, `approve-design`, `design-brief`, `regen-caps`), image library, image re-extract, search images, site setup, platform notifications, social posts duplicate, regeneration publisher, and regeneration worker. All previously-silent `INTERNAL_ERROR` returns in those files now emit `logger.error` before returning the envelope. Billing-critical paths and API routes remain clean. `lib/briefs.ts` soft violations deferred (envelope captures error; no data loss).
+
 **Remaining work — opportunistic:**
 - Run `npx tsx scripts/audit-internal-error-logging.ts` before / during any future PR that touches the listed files; add `logger.error` alongside the envelope return.
 - ESLint rule (`no-silent-internal-error`) deferred — would catch new violations at PR time. Worth picking up if violations accumulate again.
