@@ -1,17 +1,22 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   BarChart2,
   Bell,
   BookOpen,
+  Building2,
   CalendarDays,
+  Check,
   ChevronsLeft,
   ChevronsRight,
+  ChevronsUpDown,
+  ExternalLink,
   Image as ImageIcon,
   Link2,
+  List,
   LogOut,
   Menu,
   Share2,
@@ -23,12 +28,11 @@ import {
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// Company sidebar — matches the admin sidebar's dark gradient rail visually
-// (same tokens: d1/bg gradient, pk active, gr hover) but is purpose-built
-// for /company/* routes.
+// Company sidebar — customer-facing nav for /company/* routes.
 //
-// Collapse state: persisted in cookie opollo_company_sidebar_collapsed
-// so SSR + first client paint match (no hydration flash).
+// Collapse state: persisted in cookie opollo_company_sidebar_collapsed.
+// Company selection for Opollo staff: persisted server-side via the
+// opollo_selected_company_id cookie (set by /api/platform/companies/switch).
 // ---------------------------------------------------------------------------
 
 export const COMPANY_SIDEBAR_COLLAPSED_COOKIE = "opollo_company_sidebar_collapsed";
@@ -41,11 +45,19 @@ type NavItem = {
   testId?: string;
 };
 
+type Company = {
+  id: string;
+  name: string;
+  domain: string | null;
+  is_opollo_internal: boolean;
+};
+
 type Props = {
   email: string;
   isOpolloStaff: boolean;
   isAdmin: boolean;
   companyId: string | null;
+  companyName: string | null;
   initialCollapsed?: boolean;
 };
 
@@ -54,11 +66,20 @@ export function CompanySidebar({
   isOpolloStaff,
   isAdmin,
   companyId,
+  companyName,
   initialCollapsed = false,
 }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Company selector state (Opollo staff only)
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [companiesLoading, setCompaniesLoading] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  const selectorRef = useRef<HTMLDivElement>(null);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -75,6 +96,7 @@ export function CompanySidebar({
 
   useEffect(() => {
     setMobileOpen(false);
+    setSelectorOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -85,6 +107,51 @@ export function CompanySidebar({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [mobileOpen]);
+
+  // Close selector on outside click
+  useEffect(() => {
+    if (!selectorOpen) return;
+    function onPointerDown(e: PointerEvent) {
+      if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) {
+        setSelectorOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [selectorOpen]);
+
+  // Fetch company list on first open (staff only)
+  async function openSelector() {
+    if (!isOpolloStaff) return;
+    setSelectorOpen((v) => !v);
+    if (companies.length === 0 && !companiesLoading) {
+      setCompaniesLoading(true);
+      try {
+        const res = await fetch("/api/platform/companies/list");
+        const json = (await res.json()) as { ok: boolean; data?: { companies: Company[] } };
+        if (json.ok && json.data) setCompanies(json.data.companies);
+      } finally {
+        setCompaniesLoading(false);
+      }
+    }
+  }
+
+  async function selectCompany(id: string | null) {
+    if (switching) return;
+    setSwitching(true);
+    setSelectorOpen(false);
+    try {
+      await fetch("/api/platform/companies/switch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: id }),
+      });
+      // Full page reload so the server re-reads the cookie and re-renders.
+      router.refresh();
+    } finally {
+      setSwitching(false);
+    }
+  }
 
   function isActive(href: string): boolean {
     return pathname === href || pathname.startsWith(href + "/");
@@ -123,12 +190,140 @@ export function CompanySidebar({
   }
 
   const socialLinks: NavItem[] = [
-    { label: "Posts", href: "/company/social/calendar", icon: CalendarDays, testId: "cnav-posts" },
+    { label: "Calendar", href: "/company/social/calendar", icon: CalendarDays, testId: "cnav-calendar" },
+    { label: "Posts", href: "/company/social/posts", icon: List, testId: "cnav-posts" },
     { label: "Connections", href: "/company/social/connections", icon: Link2, testId: "cnav-connections" },
     { label: "Media", href: "/company/social/media", icon: ImageIcon, testId: "cnav-media" },
     ...(isAdmin ? [{ label: "Sharing", href: "/company/social/sharing", icon: Share2, testId: "cnav-sharing" } as NavItem] : []),
     { label: "Analytics", href: "/company/social/analytics", icon: BarChart2, testId: "cnav-analytics" },
   ];
+
+  // -- Company selector button (collapsed: icon only, expanded: name + chevron)
+  function CompanySelectorButton() {
+    const hasCompany = !!companyName;
+
+    if (!isOpolloStaff) {
+      // Non-staff: static display only
+      return (
+        <div
+          className={cn(
+            "flex items-center gap-2 rounded-md px-2.5 py-1.5",
+            collapsed ? "justify-center" : "",
+          )}
+          title={collapsed ? (companyName ?? "No company") : undefined}
+        >
+          <Building2 aria-hidden className="h-4 w-4 shrink-0 text-icon-dim" />
+          {!collapsed && (
+            <span className="truncate text-sm font-medium text-white">
+              {companyName ?? "No company"}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    // Staff: interactive selector
+    return (
+      <button
+        type="button"
+        onClick={openSelector}
+        disabled={switching}
+        aria-haspopup="listbox"
+        aria-expanded={selectorOpen}
+        aria-label={`Company: ${companyName ?? "None selected"}`}
+        title={collapsed ? (companyName ?? "Select company") : undefined}
+        className={cn(
+          "group flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-smooth",
+          "hover:bg-nav-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+          hasCompany ? "text-white" : "text-m2",
+          collapsed ? "justify-center" : "",
+        )}
+      >
+        <Building2 aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
+        {!collapsed && (
+          <>
+            <span className="flex-1 truncate text-left font-medium">
+              {switching ? "Switching…" : (companyName ?? "Select company")}
+            </span>
+            <ChevronsUpDown aria-hidden className="h-3.5 w-3.5 shrink-0 opacity-50" />
+          </>
+        )}
+      </button>
+    );
+  }
+
+  // -- Dropdown list of companies
+  function CompanySelectorDropdown() {
+    if (!selectorOpen || !isOpolloStaff) return null;
+
+    return (
+      <div
+        className={cn(
+          "absolute z-50 mt-1 overflow-hidden rounded-md border border-border",
+          "bg-popover text-popover-foreground shadow-xl",
+          collapsed ? "left-16 w-56" : "left-2 right-2",
+        )}
+        role="listbox"
+        aria-label="Select company"
+      >
+        {/* Clear / no company option */}
+        <button
+          role="option"
+          aria-selected={!companyId}
+          type="button"
+          onClick={() => selectCompany(null)}
+          className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-m3 transition-colors hover:bg-white/[0.06] hover:text-white"
+        >
+          {!companyId && <Check className="h-3 w-3 shrink-0 text-pk" aria-hidden />}
+          {companyId && <span className="h-3 w-3 shrink-0" aria-hidden />}
+          <span className="italic">No company selected</span>
+        </button>
+        <div className="border-t border-white/[0.06]" />
+
+        {companiesLoading ? (
+          <p className="px-3 py-2 text-xs text-m3">Loading…</p>
+        ) : companies.length === 0 ? (
+          <p className="px-3 py-2 text-xs text-m3">No companies found.</p>
+        ) : (
+          <ul className="max-h-64 overflow-y-auto">
+            {companies.map((c) => {
+              const isSelected = c.id === companyId;
+              return (
+                <li key={c.id}>
+                  <button
+                    role="option"
+                    aria-selected={isSelected}
+                    type="button"
+                    onClick={() => selectCompany(c.id)}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors",
+                      "hover:bg-white/[0.06]",
+                      isSelected ? "text-pk" : "text-m2 hover:text-white",
+                    )}
+                  >
+                    {isSelected
+                      ? <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      : <span className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{c.name}</p>
+                      {c.domain && (
+                        <p className="truncate text-xs opacity-50">{c.domain}</p>
+                      )}
+                    </div>
+                    {c.is_opollo_internal && (
+                      <span className="shrink-0 rounded px-1 py-0.5 text-xs font-medium bg-gr/20 text-gr">
+                        Internal
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   const sidebarBody = (
     <div className="flex h-full flex-col">
@@ -178,6 +373,17 @@ export function CompanySidebar({
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-2" aria-label="Company navigation">
+        {/* Company selector */}
+        <div className="mb-3 mt-1 relative" ref={selectorRef}>
+          {!collapsed && (
+            <p className="lbl px-2.5 mb-1">
+              {isOpolloStaff ? "Client" : "Company"}
+            </p>
+          )}
+          <CompanySelectorButton />
+          <CompanySelectorDropdown />
+        </div>
+
         {/* Social section */}
         <div className="mb-1 mt-2">
           {!collapsed && <p className="lbl px-2.5">Social</p>}
@@ -188,7 +394,7 @@ export function CompanySidebar({
           ))}
         </ul>
 
-        {/* Top-level links */}
+        {/* Account section */}
         <div className="mb-1 mt-4">
           {!collapsed && <p className="lbl px-2.5">Account</p>}
         </div>
@@ -223,16 +429,16 @@ export function CompanySidebar({
             <Bell aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
           </Link>
         )}
-        {/* Back to admin — Opollo staff only */}
+        {/* Admin panel link — Opollo staff only */}
         {isOpolloStaff && (
           <Link
             href="/admin/companies"
-            title={collapsed ? "Back to admin" : undefined}
+            title={collapsed ? "Admin panel" : undefined}
             className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
-            data-testid="cnav-back-to-admin"
+            data-testid="cnav-admin-panel"
           >
-            <ChevronsLeft aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
-            {!collapsed && <span className="truncate">Back to admin</span>}
+            <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
+            {!collapsed && <span className="truncate">Admin panel</span>}
           </Link>
         )}
         {/* Sign out */}

@@ -7,6 +7,7 @@ import { CalendarDays, Clock, List } from "lucide-react";
 
 import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
+import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
@@ -150,6 +151,8 @@ export function SocialPostsListClient({
   const [showCAPGenerate, setShowCAPGenerate] = useState(false);
   const [masterText, setMasterText] = useState("");
   const [linkUrl, setLinkUrl] = useState("");
+  const [selectedConnectionIds, setSelectedConnectionIds] = useState<string[]>([]);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState(initialQ);
@@ -194,6 +197,11 @@ export function SocialPostsListClient({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
+    setProfileError(null);
+    if (selectedConnectionIds.length === 0) {
+      setProfileError("Select at least one profile to post to.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -204,6 +212,7 @@ export function SocialPostsListClient({
           company_id: companyId,
           master_text: masterText.trim() || undefined,
           link_url: linkUrl.trim() || undefined,
+          connection_ids: selectedConnectionIds,
         }),
       });
       const json = (await res.json()) as
@@ -217,6 +226,7 @@ export function SocialPostsListClient({
       setPosts((prev) => [json.data.post, ...prev]);
       setMasterText("");
       setLinkUrl("");
+      setSelectedConnectionIds([]);
       setShowCreate(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -408,46 +418,65 @@ export function SocialPostsListClient({
       {showCreate && canCreate ? (
         <form
           onSubmit={handleCreate}
-          className="mt-4 rounded-lg border bg-card p-4"
+          className="mt-4 rounded-lg border bg-card p-4 space-y-4"
           data-testid="new-post-form"
         >
-          <label className="block text-sm font-medium" htmlFor="master_text">
-            Post copy
-          </label>
-          <textarea
-            id="master_text"
-            className="mt-1 w-full rounded-md border bg-background p-2 text-sm"
-            rows={4}
-            placeholder="What do you want to post?"
-            value={masterText}
-            onChange={(e) => setMasterText(e.target.value)}
-            data-testid="new-post-master-text"
+          {/* Profile selection — required */}
+          <ProfileSelector
+            companyId={companyId}
+            selected={selectedConnectionIds}
+            onChange={(ids) => {
+              setSelectedConnectionIds(ids);
+              if (ids.length > 0) setProfileError(null);
+            }}
+            error={profileError}
           />
-          <label
-            className="mt-3 block text-sm font-medium"
-            htmlFor="link_url"
-          >
-            Link URL (optional)
-          </label>
-          <input
-            id="link_url"
-            type="url"
-            className="mt-1 w-full rounded-md border bg-background p-2 text-sm"
-            placeholder="https://example.com/article"
-            value={linkUrl}
-            onChange={(e) => setLinkUrl(e.target.value)}
-            data-testid="new-post-link-url"
-          />
+
+          {/* Post copy */}
+          <div>
+            <label className="block text-sm font-medium" htmlFor="master_text">
+              Post copy
+            </label>
+            <textarea
+              id="master_text"
+              className="mt-1 w-full rounded-md border bg-background p-2 text-sm"
+              rows={4}
+              placeholder="What do you want to post?"
+              value={masterText}
+              onChange={(e) => setMasterText(e.target.value)}
+              data-testid="new-post-master-text"
+            />
+          </div>
+
+          {/* Link URL */}
+          <div>
+            <label
+              className="block text-sm font-medium"
+              htmlFor="link_url"
+            >
+              Link URL (optional)
+            </label>
+            <input
+              id="link_url"
+              type="url"
+              className="mt-1 w-full rounded-md border bg-background p-2 text-sm"
+              placeholder="https://example.com/article"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              data-testid="new-post-link-url"
+            />
+          </div>
+
           {error ? (
             <p
-              className="mt-3 text-sm text-destructive"
+              className="text-sm text-destructive"
               role="alert"
               data-testid="new-post-error"
             >
               {error}
             </p>
           ) : null}
-          <div className="mt-4 flex items-center gap-2">
+          <div className="flex items-center gap-2">
             <Button type="submit" disabled={submitting} data-testid="new-post-submit">
               {submitting ? "Saving…" : "Save draft"}
             </Button>
@@ -457,6 +486,8 @@ export function SocialPostsListClient({
               onClick={() => {
                 setShowCreate(false);
                 setError(null);
+                setProfileError(null);
+                setSelectedConnectionIds([]);
               }}
             >
               Cancel

@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createRouteAuthClient } from "@/lib/auth";
@@ -8,6 +10,10 @@ import type {
   CompanyRole,
   PlatformSession,
 } from "./types";
+
+// Cookie that Opollo staff can set to "view as" a specific company without
+// permanently joining it. Staff still retain is_opollo_staff=true.
+export const STAFF_SELECTED_COMPANY_COOKIE = "opollo_selected_company_id";
 
 // Resolves the current platform-layer session: identity from auth.users via
 // the cookie-bound client, then platform_users + platform_company_users via
@@ -61,8 +67,15 @@ export async function getCurrentPlatformSession(
       .from("platform_users")
       .upsert({ id: userId, email, is_opollo_staff: true }, { onConflict: "id" });
 
-    // No company membership by default — staff must join a company from /admin/companies.
-    return { userId, email, isOpolloStaff: true, company: null };
+    // Check for staff-selected company cookie before returning company: null.
+    const staffCompany = await resolveStaffSelectedCompany(svc);
+    return { userId, email, isOpolloStaff: true, company: staffCompany };
+  }
+
+  if (profileResult.data.is_opollo_staff === true) {
+    // Staff with a platform_users row: still check for the selected company cookie.
+    const staffCompany = await resolveStaffSelectedCompany(svc);
+    return { userId, email, isOpolloStaff: true, company: staffCompany };
   }
 
   const membershipResult = await svc
@@ -93,4 +106,33 @@ export async function getCurrentCompany(
 ): Promise<CompanyMembership | null> {
   const session = await getCurrentPlatformSession(client);
   return session?.company ?? null;
+}
+
+// Reads the staff company-selection cookie and validates the company exists.
+// Returns a synthetic admin-role membership so Opollo staff can browse any
+// company's portal without permanently joining it.
+async function resolveStaffSelectedCompany(
+  svc: ReturnType<typeof getServiceRoleClient>,
+): Promise<CompanyMembership | null> {
+  let selectedId: string | undefined;
+  try {
+    selectedId = cookies().get(STAFF_SELECTED_COMPANY_COOKIE)?.value;
+  } catch {
+    // cookies() throws outside of a request context (e.g. during tests).
+    return null;
+  }
+  if (!selectedId || !/^[0-9a-f-]{36}$/i.test(selectedId)) return null;
+
+  const result = await svc
+    .from("platform_companies")
+    .select("id")
+    .eq("id", selectedId)
+    .maybeSingle();
+
+  if (result.error || !result.data) return null;
+
+  return {
+    companyId: selectedId,
+    role: "admin",
+  };
 }

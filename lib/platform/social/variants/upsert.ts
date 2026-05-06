@@ -112,6 +112,9 @@ export async function upsertVariant(
     variant_text: cleaned,
     is_custom: isCustom,
   };
+  if (input.connectionId !== undefined) {
+    row.connection_id = input.connectionId;
+  }
   if (input.mediaAssetIds !== undefined) {
     row.media_asset_ids = input.mediaAssetIds;
   }
