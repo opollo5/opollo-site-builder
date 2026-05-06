@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   checkBudgetResetBacklog,
+  checkRedis,
   checkSupabase,
 } from "@/lib/health-checks";
 import { logger } from "@/lib/logger";
@@ -57,12 +58,16 @@ export async function GET(): Promise<NextResponse> {
   // an error-shaped result), we still return a structured 503 instead
   // of an unhandled-rejection 500 with no body shape.
   try {
-    const [supabase, backlog] = await Promise.all([
+    const [supabase, backlog, redis] = await Promise.all([
       checkSupabase(),
       checkBudgetResetBacklog(),
+      checkRedis(),
     ]);
 
-    const allOk = supabase.result === "ok" && backlog.result === "ok";
+    const allOk =
+      supabase.result === "ok" &&
+      backlog.result === "ok" &&
+      redis.result === "ok";
     const body = {
       status: allOk ? "ok" : "degraded",
       checks: {
@@ -74,6 +79,10 @@ export async function GET(): Promise<NextResponse> {
         budget_reset_backlog_sample: backlog.sample,
         budget_reset_backlog_latency_ms: backlog.latency_ms,
         ...(backlog.error ? { budget_reset_backlog_error: backlog.error } : {}),
+        redis: redis.result,
+        redis_configured: redis.configured,
+        redis_latency_ms: redis.latency_ms,
+        ...(redis.error ? { redis_error: redis.error } : {}),
       },
       build: {
         commit: process.env.VERCEL_GIT_COMMIT_SHA ?? "local",
