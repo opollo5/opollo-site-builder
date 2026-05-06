@@ -84,6 +84,7 @@ export async function applyToneToHomepage(
     .neq("status", "removed")
     .maybeSingle();
   if (error) {
+    logger.error("design_discovery.apply_tone.site_read_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: error.message },
@@ -193,6 +194,7 @@ export async function applyToneToHomepage(
     .select("id")
     .maybeSingle();
   if (upd.error) {
+    logger.error("design_discovery.apply_tone.update_failed", { site_id: siteId, supabase_error: upd.error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: upd.error.message },

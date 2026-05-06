@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // DESIGN-DISCOVERY — design brief schema + persistence.
@@ -94,6 +95,7 @@ export async function saveDesignBrief(
     .select("id")
     .maybeSingle();
   if (error) {
+    logger.error("design_discovery.saveDesignBrief.update_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: error.message },
@@ -122,6 +124,7 @@ export async function getDesignBrief(
     .neq("status", "removed")
     .maybeSingle();
   if (error) {
+    logger.error("design_discovery.getDesignBrief.read_failed", { site_id: siteId, supabase_error: error.message });
     return {
       ok: false,
       error: { code: "INTERNAL_ERROR", message: error.message },

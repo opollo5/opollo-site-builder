@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -40,6 +41,7 @@ export async function duplicatePost(input: {
     .maybeSingle();
 
   if (source.error) {
+    logger.error("duplicate_post.source_read_failed", { post_id: input.postId, company_id: input.companyId, supabase_error: source.error.message });
     return internal(`Failed to read source post: ${source.error.message}`);
   }
   if (!source.data) {
@@ -62,6 +64,7 @@ export async function duplicatePost(input: {
     .eq("post_master_id", input.postId);
 
   if (variants.error) {
+    logger.error("duplicate_post.variants_read_failed", { post_id: input.postId, company_id: input.companyId, supabase_error: variants.error.message });
     return internal(`Failed to read variants: ${variants.error.message}`);
   }
 
@@ -79,6 +82,7 @@ export async function duplicatePost(input: {
     .single();
 
   if (newMaster.error) {
+    logger.error("duplicate_post.master_insert_failed", { post_id: input.postId, company_id: input.companyId, supabase_error: newMaster.error.message });
     return internal(`Failed to create duplicate post: ${newMaster.error.message}`);
   }
 
@@ -99,6 +103,7 @@ export async function duplicatePost(input: {
       .insert(variantRows);
 
     if (variantInsert.error) {
+      logger.error("duplicate_post.variants_insert_failed", { post_id: input.postId, new_post_id: newPostId, company_id: input.companyId, supabase_error: variantInsert.error.message });
       return internal(`Post created but variants failed to copy: ${variantInsert.error.message}`);
     }
   }

@@ -303,6 +303,7 @@ export async function processRegenJobAnthropic(
     .eq("id", jobId)
     .maybeSingle();
   if (jobRes.error || !jobRes.data) {
+    logger.error("regeneration.worker.job_lookup_failed", { job_id: jobId, supabase_error: jobRes.error?.message ?? "no row" });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -327,6 +328,7 @@ export async function processRegenJobAnthropic(
     .eq("id", jobRes.data.page_id)
     .maybeSingle();
   if (pageRes.error || !pageRes.data) {
+    logger.error("regeneration.worker.page_lookup_failed", { job_id: jobId, supabase_error: pageRes.error?.message ?? "no row" });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -359,6 +361,7 @@ export async function processRegenJobAnthropic(
     .eq("id", jobRes.data.site_id)
     .maybeSingle();
   if (siteRes.error || !siteRes.data) {
+    logger.error("regeneration.worker.site_lookup_failed", { job_id: jobId, supabase_error: siteRes.error?.message ?? "no row" });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -448,6 +451,7 @@ export async function processRegenJobAnthropic(
     },
   });
   if (eventInsert.error) {
+    logger.error("regeneration.worker.event_write_failed", { job_id: jobId, type: "anthropic_response_received", supabase_error: eventInsert.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -471,6 +475,7 @@ export async function processRegenJobAnthropic(
     })
     .eq("id", jobId);
   if (costUpdate.error) {
+    logger.error("regeneration.worker.cost_update_failed", { job_id: jobId, supabase_error: costUpdate.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
