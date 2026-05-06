@@ -35,16 +35,14 @@ When a session starts a migration, reserve the number here before writing the fi
 - 0010 — Session A — M5-1 component gallery schema (branch: feat/m5-1-component-gallery-schema)
 ```
 
-- 0013 — M12-1 briefs schema: `briefs`, `brief_pages`, `brief_runs`, `site_conventions` + `site-briefs` Storage bucket. Executing on `feat/m12-1-briefs-schema`.
-- 0017 — M12-2 brand_voice + design_direction columns on briefs. Executing on `feat/m12-2-brand-voice-site-conventions`.
+- ~~0013 — M12-1 briefs schema.~~ Shipped in #98.
+- ~~0017 — M12-2 brand_voice + design_direction columns on briefs.~~ Shipped in #107.
 - ~~0019 — M13-1 posts schema.~~ Shipped in #142.
 - ~~0021 — M13-3 briefs.content_type column.~~ Shipped in #145.
 - ~~0070 — P1 Platform Foundation (platform_* + social_* schema + RLS).~~ Shipped in #376 + #377.
 - ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
-- 0072 — Session A — S1-7 record_approval_decision transactional function (branch: feat/s1-7-approval-viewer)
-- ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
 - ~~0072 — S1-7 record_approval_decision transactional function.~~ Shipped in #415.
-- 0073 — Session A — S1-10 cancel_post_approval transactional function (branch: feat/s1-10-cancel-approval)
+- ~~0073 — S1-10 cancel_post_approval transactional function.~~ Shipped (0073_cancel_post_approval_fn.sql in main).
 
 ## Claim block template
 

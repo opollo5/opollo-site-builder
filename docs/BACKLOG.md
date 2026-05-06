@@ -269,7 +269,7 @@ Verified 2026-04-29: `docs/RUNBOOK.md` already has the full procedure at "Anthro
 
 ---
 
-## Existing CI E2E suite has been red since at least PR #149 (deferred from audit triage, 2026-04-27)
+## ~~Existing CI E2E suite has been red since at least PR #149~~ (resolved 2026-05-06, PRs #582 + #595–#599)
 
 **Tags:** `e2e`, `ci`, `audit`
 
