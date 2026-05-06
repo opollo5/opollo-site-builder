@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, FileText, Layers } from "lucide-react";
 
 import { BlogPostComposer } from "@/components/BlogPostComposer";
@@ -18,7 +18,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { SiteListItem } from "@/lib/tool-schemas";
-import { cn } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
 
 // BL-1 — Client shell for /admin/posts/new.
 //
@@ -45,6 +45,13 @@ export function PostsNewClient({ sites }: PostsNewClientProps) {
   return (
     <div className="space-y-6">
       <ModeTabs mode={mode} onModeChange={setMode} />
+
+      <PendingDraftsNotice
+        onResume={(id) => {
+          setSiteId(id);
+          setMode("single");
+        }}
+      />
 
       <SitePicker
         sites={sites}
@@ -248,4 +255,113 @@ function hostnameOf(url: string): string {
   } catch {
     return url;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Issue 17 — PendingDraftsNotice.
+//
+// Scans localStorage for opollo:post-draft:* keys on mount and shows a
+// banner for any draft that has content. The operator can resume (which
+// selects that site + opens the composer) or discard the saved state.
+// ---------------------------------------------------------------------------
+
+interface PendingDraft {
+  siteId: string;
+  siteName?: string;
+  savedAt: number;
+}
+
+function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void }) {
+  const [drafts, setDrafts] = useState<PendingDraft[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const found: PendingDraft[] = [];
+    const PREFIX = "opollo:post-draft:";
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (!key?.startsWith(PREFIX)) continue;
+        const id = key.slice(PREFIX.length);
+        if (!id) continue;
+        try {
+          const raw = window.localStorage.getItem(key);
+          if (!raw) continue;
+          const snap = JSON.parse(raw) as {
+            v?: number;
+            savedAt?: number;
+            siteName?: string;
+            composerText?: string;
+            title?: { value?: string };
+          };
+          if (snap?.v !== 1) continue;
+          // Only surface drafts that have actual content.
+          const hasContent =
+            (snap.title?.value?.trim().length ?? 0) > 0 ||
+            (snap.composerText?.replace(/<[^>]+>/g, "").trim().length ?? 0) > 0;
+          if (!hasContent) continue;
+          found.push({ siteId: id, siteName: snap.siteName, savedAt: snap.savedAt ?? 0 });
+        } catch {
+          // Corrupt entry — skip.
+        }
+      }
+    } catch {
+      // localStorage inaccessible in some contexts.
+    }
+    setDrafts(found);
+  }, []);
+
+  function discard(siteId: string) {
+    try {
+      window.localStorage.removeItem(`opollo:post-draft:${siteId}`);
+    } catch {}
+    setDrafts((prev) => prev.filter((d) => d.siteId !== siteId));
+  }
+
+  if (drafts.length === 0) return null;
+
+  return (
+    <div className="space-y-2" data-testid="pending-drafts-notice">
+      {drafts.map((draft) => (
+        <div
+          key={draft.siteId}
+          role="alert"
+          className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800/40 dark:bg-amber-900/20"
+        >
+          <span className="text-amber-900 dark:text-amber-200">
+            Unsaved draft
+            {draft.siteName ? (
+              <>
+                {" "}
+                for <span className="font-medium">{draft.siteName}</span>
+              </>
+            ) : null}
+            {draft.savedAt > 0 ? (
+              <> from {formatRelativeTime(new Date(draft.savedAt).toISOString())}</>
+            ) : null}
+            .
+          </span>
+          <div className="flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onResume(draft.siteId)}
+              className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700 dark:text-amber-200 dark:hover:text-amber-100"
+            >
+              Resume
+            </button>
+            <span aria-hidden className="text-amber-400">
+              ·
+            </span>
+            <button
+              type="button"
+              onClick={() => discard(draft.siteId)}
+              className="text-amber-700 underline underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }
