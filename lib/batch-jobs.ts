@@ -183,6 +183,7 @@ async function assertTemplateForActiveSite(
     .maybeSingle();
 
   if (error) {
+    logger.error("batch_jobs.assertTemplateForActiveSite.lookup_failed", { site_id, template_id, supabase_error: error.message });
     return errorResult(
       "INTERNAL_ERROR",
       `Template lookup failed: ${error.message}`,
@@ -280,6 +281,7 @@ export async function createBatchJob(
       if (!row) {
         // Extremely unlikely: row vanished between INSERT conflict and
         // SELECT. Treat as a retry-worthy internal error.
+        logger.error("batch_jobs.create.idempotency_row_vanished", { site_id: input.site_id, idempotency_key: input.idempotency_key });
         return errorResult(
           "INTERNAL_ERROR",
           "Idempotency key conflicted but the existing job could not be fetched.",
@@ -378,6 +380,7 @@ export async function createBatchJob(
       // ignore secondary rollback failure
     }
     const message = err instanceof Error ? err.message : String(err);
+    logger.error("batch_jobs.create.uncaught", { site_id: input.site_id, error: message });
     return errorResult(
       "INTERNAL_ERROR",
       `Batch creation failed: ${message}`,
