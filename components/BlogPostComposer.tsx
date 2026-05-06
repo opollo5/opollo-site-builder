@@ -128,13 +128,13 @@ function GoogleSnippetPreview({
   return (
     <div className="rounded border border-border bg-background p-3 font-sans text-sm">
       <div
-        className="truncate text-base font-medium leading-snug text-[#1a0dab]"
+        className="truncate text-base font-medium leading-snug text-serp-title"
         title={displayTitle}
       >
         {displayTitle.length > 60 ? displayTitle.slice(0, 60) + "…" : displayTitle}
       </div>
-      <div className="mt-0.5 truncate text-xs text-[#006621]">{url}</div>
-      <div className="mt-1 line-clamp-2 text-xs text-[#545454]">
+      <div className="mt-0.5 truncate text-xs text-serp-url">{url}</div>
+      <div className="mt-1 line-clamp-2 text-xs text-serp-desc">
         {displayDesc.length > 160 ? displayDesc.slice(0, 160) + "…" : displayDesc}
       </div>
     </div>

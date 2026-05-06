@@ -110,6 +110,12 @@ const config: Config = {
         "nav-active": "var(--nav-active)",
         "nav-hover": "var(--nav-hover)",
         topbar: "var(--topbar-bg)",
+        /* Google SERP preview mimicry — used only in the SEO panel snippet */
+        serp: {
+          title: "#1a0dab",
+          url: "#006621",
+          desc: "#545454",
+        },
       },
       boxShadow: {
         'pk-glow': '0 4px 24px var(--pk-glow)',
