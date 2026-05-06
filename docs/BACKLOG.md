@@ -262,6 +262,8 @@ Verified 2026-04-29: `docs/RUNBOOK.md` already has the full procedure at "Anthro
 
 **Status (2026-05-06, PRs #670, #671, #672):** fourth sweep completed. Core libs (`lib/sites.ts`, `lib/tools-wp-creds.ts`, 5 tool executors, `lib/design-discovery/apply-tone.ts`), all 34 `lib/platform/social/` files, and the remaining core libs (`lib/design-system-errors.ts`, `lib/image-library.ts`, `lib/image-reextract.ts`, `lib/invites.ts`, `lib/pages.ts`, `lib/platform/companies/{create,get}.ts`, `lib/platform/invitations/{accept,send}.ts`, `lib/posts.ts`, `lib/sites.ts`). Audit script now reports only **6 entries**, all TypeScript return-type annotations that are genuine false positives. The long tail is effectively closed.
 
+**Status (2026-05-06, PR #690):** false-positive sweep complete. `SKIP_FILES` excludes `lib/http.ts` (the factory, not a consumer); `isTypeAnnotationFalsePositive()` discriminates semicolon-terminated strings and union-type prefixes; `LOG_HORIZON` raised 8 → 20. Script now exits 0 cleanly on the full codebase.
+
 **Remaining work — opportunistic:**
 - Run `npx tsx scripts/audit-internal-error-logging.ts` before / during any future PR that touches the listed files; add `logger.error` alongside the envelope return.
 - ESLint rule (`no-silent-internal-error`) deferred — would catch new violations at PR time. Worth picking up if violations accumulate again.
@@ -429,7 +431,7 @@ Option (b) expands the write-safety blast radius significantly — mu-plugin ins
 
 Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 stays focused on password reset; these get picked up when they actually cost someone time.
 
-- **Invite TTL + revocation.** `app/api/admin/users/invite` generates a Supabase invite link but has no expiry beyond Supabase's built-in, and no "cancel pending invite" admin action. Pick up trigger: an admin mistakenly invites the wrong email and can't revoke. Scope: new `invites` table with `expires_at` + `revoked_at`, a DELETE route, and an admin-UI "pending invites" row list.
+- ~~**Invite TTL + revocation.**~~ Shipped 2026-04-30, PR #313 (AUTH-FOUNDATION P3.3). `invites` table with `expires_at` + `status` (pending/accepted/revoked/expired), `POST /api/admin/invites` via `createInvite()` (custom token + SHA-256 hash, 72h TTL), `DELETE /api/admin/invites/[id]` via `revokeInvite()`, and `PendingInvitesTable` component on `/admin/users`. Old `POST /api/admin/users/invite` (Supabase `generateLink`) is the M2d-3 legacy path; the new route is the canonical one.
 - ~~**Session expiry pre-warning.**~~ Shipped 2026-05-06. `components/SessionExpiryWarning.tsx` mounts in the admin layout and shows a sonner warning toast 5 min before JWT expiry; "Extend session" button hits `GET /api/auth/ping` which lets middleware refresh the cookie.
 
 ## UX polish deferred from M15 (2026-04-24)
