@@ -65,6 +65,7 @@ export async function createSite(
   try {
     return await createSiteImpl(input);
   } catch (err) {
+    logger.error("sites.createSite.uncaught", { err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in createSite: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -116,6 +117,7 @@ async function createSiteImpl(
         timestamp: now(),
       };
     }
+    logger.error("sites.createSite.insert_failed", { supabase_error: siteErr?.message ?? null });
     return internalError("Failed to insert site row.", {
       supabase_error: siteErr ?? null,
     });
@@ -132,6 +134,7 @@ async function createSiteImpl(
     keyVersion = enc.keyVersion;
   } catch (err) {
     await rollbackSite(siteRow.id);
+    logger.error("sites.createSite.encryption_failed", { site_id: siteRow.id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Encryption failed: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -147,6 +150,7 @@ async function createSiteImpl(
 
   if (credErr) {
     await rollbackSite(siteRow.id);
+    logger.error("sites.createSite.credentials_insert_failed", { site_id: siteRow.id, supabase_error: credErr.message });
     return internalError("Failed to insert site credentials row.", {
       supabase_error: credErr,
     });
@@ -184,6 +188,7 @@ export async function listSites(): Promise<ApiResponse<{ sites: SiteListItem[] }
   try {
     return await listSitesImpl();
   } catch (err) {
+    logger.error("sites.listSites.uncaught", { err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in listSites: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -199,6 +204,7 @@ async function listSitesImpl(): Promise<ApiResponse<{ sites: SiteListItem[] }>> 
     .order("updated_at", { ascending: false });
 
   if (error) {
+    logger.error("sites.listSites.query_failed", { supabase_error: error.message });
     return internalError("Failed to list sites.", { supabase_error: error });
   }
 
@@ -216,6 +222,7 @@ export async function getSite(
   try {
     return await getSiteImpl(id, opts);
   } catch (err) {
+    logger.error("sites.getSite.uncaught", { site_id: id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in getSite: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -236,6 +243,7 @@ async function getSiteImpl(
     .maybeSingle();
 
   if (siteErr) {
+    logger.error("sites.getSite.site_fetch_failed", { site_id: id, supabase_error: siteErr.message });
     return internalError("Failed to fetch site.", { supabase_error: siteErr });
   }
   if (!site) {
@@ -268,6 +276,7 @@ async function getSiteImpl(
     .maybeSingle();
 
   if (credErr) {
+    logger.error("sites.getSite.credentials_fetch_failed", { site_id: id, supabase_error: credErr.message });
     return internalError("Failed to fetch site credentials.", {
       supabase_error: credErr,
     });
@@ -289,6 +298,7 @@ async function getSiteImpl(
     const iv = parseBytea(cred.iv);
     wp_app_password = decrypt(ciphertext, iv, cred.key_version);
   } catch (err) {
+    logger.error("sites.getSite.decryption_failed", { site_id: id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Credential decryption failed: ${err instanceof Error ? err.message : String(err)}`,
       { site_id: id },
@@ -419,6 +429,7 @@ export async function updateSiteBasics(
       .select()
       .maybeSingle();
     if (error) {
+      logger.error("sites.updateSiteBasics.update_failed", { site_id: id, supabase_error: error.message });
       return internalError("Failed to update site.", {
         supabase_error: error,
       });
@@ -438,6 +449,7 @@ export async function updateSiteBasics(
     }
     return { ok: true, data: data as SiteRecord, timestamp: now() };
   } catch (err) {
+    logger.error("sites.updateSiteBasics.uncaught", { site_id: id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in updateSiteBasics: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -467,6 +479,7 @@ export async function updateSiteCredentials(
       .neq("status", "removed")
       .maybeSingle();
     if (siteCheck.error) {
+      logger.error("sites.updateSiteCredentials.site_lookup_failed", { site_id: id, supabase_error: siteCheck.error.message });
       return internalError("Failed to look up site.", {
         supabase_error: siteCheck.error,
       });
@@ -497,6 +510,7 @@ export async function updateSiteCredentials(
         update.iv = toByteaLiteral(enc.iv);
         update.key_version = enc.keyVersion;
       } catch (err) {
+        logger.error("sites.updateSiteCredentials.encryption_failed", { site_id: id, err: err instanceof Error ? err.message : String(err) });
         return internalError(
           `Encryption failed: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -515,6 +529,7 @@ export async function updateSiteCredentials(
         .from("site_credentials")
         .upsert({ site_id: id, ...update }, { onConflict: "site_id" });
       if (error) {
+        logger.error("sites.updateSiteCredentials.upsert_failed", { site_id: id, supabase_error: error.message });
         return internalError("Failed to upsert site credentials.", {
           supabase_error: error,
         });
@@ -525,6 +540,7 @@ export async function updateSiteCredentials(
         .update(update)
         .eq("site_id", id);
       if (error) {
+        logger.error("sites.updateSiteCredentials.update_failed", { site_id: id, supabase_error: error.message });
         return internalError("Failed to update site credentials.", {
           supabase_error: error,
         });
@@ -541,6 +557,7 @@ export async function updateSiteCredentials(
 
     return { ok: true, data: { updated: true }, timestamp: now() };
   } catch (err) {
+    logger.error("sites.updateSiteCredentials.uncaught", { site_id: id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in updateSiteCredentials: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -595,6 +612,7 @@ export async function updateSiteVoice(
       .maybeSingle();
 
     if (error) {
+      logger.error("sites.updateSiteVoice.update_failed", { site_id: id, supabase_error: error.message });
       return internalError("Failed to update site voice.", {
         supabase_error: error,
       });
@@ -641,6 +659,7 @@ export async function updateSiteVoice(
     }
     return { ok: true, data: data as SiteRecord, timestamp: now() };
   } catch (err) {
+    logger.error("sites.updateSiteVoice.uncaught", { site_id: id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in updateSiteVoice: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -669,6 +688,7 @@ export async function archiveSite(
       .select("id")
       .maybeSingle();
     if (error) {
+      logger.error("sites.archiveSite.update_failed", { site_id: id, supabase_error: error.message });
       return internalError("Failed to archive site.", {
         supabase_error: error,
       });
@@ -689,6 +709,7 @@ export async function archiveSite(
     }
     return { ok: true, data: { id: data.id as string }, timestamp: now() };
   } catch (err) {
+    logger.error("sites.archiveSite.uncaught", { site_id: id, err: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in archiveSite: ${err instanceof Error ? err.message : String(err)}`,
     );

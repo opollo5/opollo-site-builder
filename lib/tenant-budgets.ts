@@ -2,6 +2,7 @@ import "server-only";
 
 import { Client } from "pg";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -61,6 +62,7 @@ export async function reserveBudget(
   projectedCents: number,
 ): Promise<ReserveBudgetResult> {
   if (projectedCents < 0) {
+    logger.error("tenant_budgets.reserveBudget.negative_projected_cents", { site_id: siteId, projected_cents: projectedCents });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -96,6 +98,7 @@ export async function reserveBudget(
   );
   const row = locked.rows[0];
   if (!row) {
+    logger.error("tenant_budgets.reserveBudget.row_missing_after_upsert", { site_id: siteId });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -179,6 +182,7 @@ export async function releaseBudget(
   refundCents: number,
 ): Promise<{ ok: true } | { ok: false; code: "INTERNAL_ERROR"; message: string }> {
   if (refundCents < 0) {
+    logger.error("tenant_budgets.releaseBudget.negative_refund_cents", { site_id: siteId, refund_cents: refundCents });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -422,6 +426,7 @@ export async function updateTenantBudget(
     .maybeSingle();
 
   if (res.error) {
+    logger.error("tenant_budgets.updateTenantBudget.update_failed", { site_id: siteId, supabase_error: res.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
