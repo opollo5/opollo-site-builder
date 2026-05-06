@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -237,6 +238,7 @@ export async function createPost(
     }
     return await createPostImpl(parsed.data);
   } catch (err) {
+    logger.error("posts.createPost.uncaught", { site_id: input.site_id, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in createPost: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -292,6 +294,7 @@ async function createPostImpl(
         timestamp: now(),
       };
     }
+    logger.error("posts.createPost.insert_failed", { site_id: input.site_id, supabase_error: res.error.message });
     return internalError("Failed to create post.", { supabase_error: res.error });
   }
   const row = res.data as Record<string, unknown>;
@@ -316,6 +319,7 @@ export async function listPostsForSite(
   try {
     return await listPostsForSiteImpl(siteId, params);
   } catch (err) {
+    logger.error("posts.listPostsForSite.uncaught", { site_id: siteId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in listPostsForSite: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -348,6 +352,7 @@ async function listPostsForSiteImpl(
   }
   const dataRes = await dataQuery;
   if (dataRes.error) {
+    logger.error("posts.listPostsForSite.data_query_failed", { site_id: siteId, supabase_error: dataRes.error.message });
     return internalError("Failed to list posts.", { supabase_error: dataRes.error });
   }
 
@@ -366,6 +371,7 @@ async function listPostsForSiteImpl(
   }
   const countRes = await countQuery;
   if (countRes.error) {
+    logger.error("posts.listPostsForSite.count_query_failed", { site_id: siteId, supabase_error: countRes.error.message });
     return internalError("Failed to count posts.", { supabase_error: countRes.error });
   }
 
@@ -389,6 +395,7 @@ export async function getPost(
   try {
     return await getPostImpl(siteId, postId, opts);
   } catch (err) {
+    logger.error("posts.getPost.uncaught", { site_id: siteId, post_id: postId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in getPost: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -410,6 +417,7 @@ async function getPostImpl(
   const postRes = await postQuery.maybeSingle();
 
   if (postRes.error) {
+    logger.error("posts.getPost.post_fetch_failed", { site_id: siteId, post_id: postId, supabase_error: postRes.error.message });
     return internalError("Failed to fetch post.", { supabase_error: postRes.error });
   }
   if (!postRes.data) {
@@ -445,9 +453,11 @@ async function getPostImpl(
   ]);
 
   if (templateRes.error) {
+    logger.error("posts.getPost.template_fetch_failed", { site_id: siteId, post_id: postId, template_id: row.template_id, supabase_error: templateRes.error.message });
     return internalError("Failed to fetch template.", { supabase_error: templateRes.error });
   }
   if (siteRes.error) {
+    logger.error("posts.getPost.site_fetch_failed", { site_id: siteId, post_id: postId, supabase_error: siteRes.error.message });
     return internalError("Failed to fetch site.", { supabase_error: siteRes.error });
   }
   const siteRow = siteRes.data as { name: string; wp_url: string } | null;
@@ -499,6 +509,7 @@ export async function updatePostMetadata(
       patch: parsed.data,
     });
   } catch (err) {
+    logger.error("posts.updatePostMetadata.uncaught", { site_id: siteId, post_id: postId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in updatePostMetadata: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -561,6 +572,7 @@ async function updatePostMetadataImpl(
         timestamp: now(),
       };
     }
+    logger.error("posts.updatePostMetadata.update_failed", { site_id: siteId, post_id: postId, supabase_error: res.error.message });
     return internalError("Failed to update post metadata.", { supabase_error: res.error });
   }
 
@@ -595,6 +607,7 @@ async function disambiguateMissingUpdate(
     .eq("site_id", siteId)
     .maybeSingle();
   if (existsRes.error) {
+    logger.error("posts.updatePostMetadata.recheck_failed", { site_id: siteId, post_id: postId, supabase_error: existsRes.error.message });
     return internalError("Failed to re-check post after update.", {
       supabase_error: existsRes.error,
     });
@@ -659,6 +672,7 @@ export async function softDeletePost(
   try {
     return await softDeletePostImpl(siteId, postId, input);
   } catch (err) {
+    logger.error("posts.softDeletePost.uncaught", { site_id: siteId, post_id: postId, error: err instanceof Error ? err.message : String(err) });
     return internalError(
       `Unhandled error in softDeletePost: ${err instanceof Error ? err.message : String(err)}`,
     );
@@ -688,6 +702,7 @@ async function softDeletePostImpl(
     .maybeSingle();
 
   if (res.error) {
+    logger.error("posts.softDeletePost.update_failed", { site_id: siteId, post_id: postId, supabase_error: res.error.message });
     return internalError("Failed to soft-delete post.", { supabase_error: res.error });
   }
   if (!res.data) {
@@ -700,6 +715,7 @@ async function softDeletePostImpl(
       // Shouldn't happen — if the row exists with the expected version
       // and isn't archived, the UPDATE above would have matched. Map
       // to INTERNAL_ERROR so the caller sees a distinct signal.
+      logger.error("posts.softDeletePost.zero_rows_contradiction", { site_id: siteId, post_id: postId, expected_version: input.expected_version });
       return internalError(
         "softDeletePost: UPDATE returned zero rows but follow-up SELECT matched.",
         { site_id: siteId, post_id: postId },
