@@ -16,8 +16,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // the correct URL + token pulled from env.
 // ---------------------------------------------------------------------------
 
-// Capture constructor calls so we can inspect which arguments were used.
-const mockRedisConstructor = vi.fn().mockImplementation((opts: object) => opts);
+// vi.mock is hoisted before variable declarations, so the factory must not
+// reference file-scope consts. vi.hoisted() runs early enough to be safe.
+const { mockRedisConstructor } = vi.hoisted(() => ({
+  mockRedisConstructor: vi.fn().mockImplementation((opts: object) => opts),
+}));
 
 vi.mock("@upstash/redis", () => ({
   Redis: mockRedisConstructor,
