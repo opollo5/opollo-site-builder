@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { createRouteAuthClient } from "@/lib/auth";
 import {
   AdminSidebar,
   SIDEBAR_COLLAPSED_COOKIE,
 } from "@/components/AdminSidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DebugFooter } from "@/components/DebugFooter";
+import { SessionExpiryWarning } from "@/components/SessionExpiryWarning";
 import { Toaster } from "@/components/ui/toaster";
 
 // Shared shell for every page under /admin.
@@ -53,6 +55,14 @@ export default async function AdminLayout({
   const initialCollapsed =
     cookies().get(SIDEBAR_COLLAPSED_COOKIE)?.value === "1";
 
+  // Pass session expiry to the client component so it can warn the operator
+  // 5 minutes before the JWT expires. getSession() is a local decode (no
+  // network); null when auth is in kill-switch / no-session mode.
+  const {
+    data: { session },
+  } = await createRouteAuthClient().auth.getSession();
+  const sessionExpiresAt = session?.expires_at ?? null;
+
   return (
     <div className="min-h-screen bg-canvas text-foreground sm:flex">
       {/* C-3 — skip-to-content link. Visually hidden until focused. */}
@@ -80,6 +90,7 @@ export default async function AdminLayout({
       </main>
       <Toaster />
       <CommandPalette />
+      <SessionExpiryWarning expiresAt={sessionExpiresAt} />
       {isSuperAdmin && (
         <DebugFooter
           buildSha={process.env.VERCEL_GIT_COMMIT_SHA ?? null}

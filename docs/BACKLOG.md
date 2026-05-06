@@ -430,7 +430,7 @@ Option (b) expands the write-safety blast radius significantly — mu-plugin ins
 Surfaced by the M14 auth-gap audit. Deferred with Steven's explicit call: M14 stays focused on password reset; these get picked up when they actually cost someone time.
 
 - **Invite TTL + revocation.** `app/api/admin/users/invite` generates a Supabase invite link but has no expiry beyond Supabase's built-in, and no "cancel pending invite" admin action. Pick up trigger: an admin mistakenly invites the wrong email and can't revoke. Scope: new `invites` table with `expires_at` + `revoked_at`, a DELETE route, and an admin-UI "pending invites" row list.
-- **Session expiry pre-warning.** Middleware redirects to `/login` when the JWT expires; no "session about to expire" UI, no session-extend prompt. Pick up trigger: an operator loses mid-workflow state because of an expiry they didn't see coming. Scope: client-side expiry timer + pre-expiry toast + "extend session" action that refreshes the token.
+- ~~**Session expiry pre-warning.**~~ Shipped 2026-05-06. `components/SessionExpiryWarning.tsx` mounts in the admin layout and shows a sonner warning toast 5 min before JWT expiry; "Extend session" button hits `GET /api/auth/ping` which lets middleware refresh the cookie.
 
 ## UX polish deferred from M15 (2026-04-24)
 
