@@ -1222,3 +1222,27 @@ export async function wpCreateTag(
   return { ok: true, ...toTaxonomyItem(parsed.body) };
 }
 
+// ---------- wpCreateCategory ----------
+
+export type WpCreateCategoryResult = WpResult<WpTaxonomyItem>;
+
+export async function wpCreateCategory(
+  cfg: WpConfig,
+  name: string,
+): Promise<WpCreateCategoryResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(cfg, "/wp-json/wp/v2/categories", {
+      method: "POST",
+      body: JSON.stringify({ name, slug: name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "") }),
+    });
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<unknown>(res);
+  if (!parsed.ok) return parsed;
+  return { ok: true, ...toTaxonomyItem(parsed.body) };
+}
+
