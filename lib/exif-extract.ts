@@ -26,6 +26,8 @@ export async function extractExifFields(
 ): Promise<ExifFields | null> {
   const raw = (await parseExif(buffer, {
     tiff: true,
+    exif: true,
+    gps: true,
     xmp: true,
     iptc: true,
     icc: false,
