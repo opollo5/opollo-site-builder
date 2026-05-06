@@ -10,7 +10,10 @@ import {
   validateUuidParam,
 } from "@/lib/http";
 import { logger } from "@/lib/logger";
-import { preflightSitePublish } from "@/lib/site-preflight";
+import {
+  checkKadenceSyncFresh,
+  preflightSitePublish,
+} from "@/lib/site-preflight";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { getSite } from "@/lib/sites";
 import {
@@ -161,6 +164,26 @@ export async function POST(
       preflight.blocker.detail,
       403,
       { blocker: preflight.blocker },
+    );
+  }
+
+  // 2.5. Path-B publish gate — Kadence palette sync check.
+  //
+  // Gated by FEATURE_PATH_B_PUBLISH_GATE (default off). When on, a
+  // new_design site that has never synced its palette is refused publish
+  // with 409 KADENCE_SYNC_DRIFT_BLOCKED so the operator is directed to
+  // the Appearance panel first.
+  const syncCheck = await checkKadenceSyncFresh(siteIdCheck.value);
+  if (syncCheck.blocked) {
+    logger.info("posts.publish.kadence_sync_drift_blocked", {
+      site_id: siteIdCheck.value,
+      post_id: postIdCheck.value,
+    });
+    return envelope(
+      "KADENCE_SYNC_DRIFT_BLOCKED",
+      syncCheck.message,
+      409,
+      { appearance_url: syncCheck.appearanceUrl },
     );
   }
 

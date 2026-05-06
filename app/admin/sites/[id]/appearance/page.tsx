@@ -129,6 +129,9 @@ export default async function SiteAppearancePage({
 
   // new_design — preserve the existing Kadence-aware panel verbatim.
   const events = await listAppearanceEventsForSite(params.id, 20);
+  const publishGateEnabled =
+    process.env.FEATURE_PATH_B_PUBLISH_GATE === "true" ||
+    process.env.FEATURE_PATH_B_PUBLISH_GATE === "1";
 
   return (
     <main className="mx-auto max-w-5xl p-6">
@@ -141,6 +144,7 @@ export default async function SiteAppearancePage({
         initialKadenceGlobalsSyncedAt={modeRow.kadence_globals_synced_at}
         initialSiteVersionLock={modeRow.version_lock}
         initialEvents={events}
+        publishGateEnabled={publishGateEnabled}
       />
     </main>
   );

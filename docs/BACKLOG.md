@@ -109,7 +109,7 @@ When path-A rows become stale enough or visually disruptive enough, retire by ru
 
 ---
 
-## Path-B publish gate on Kadence sync drift (path B, opened 2026-04-29 by PB-8)
+## ~~Path-B publish gate on Kadence sync drift~~ (shipped 2026-05-06, PR #TBD)
 
 **Tags:** `path-b`, `m13`, `publish`, `feature-flag`
 
@@ -161,7 +161,7 @@ For high-fidelity preview, fetch the customer's actual theme CSS bundle and inli
 
 ---
 
-## Post meta description via WP excerpt (path B, opened 2026-04-29 by PB-1)
+## ~~Post meta description via WP excerpt~~ (shipped 2026-05-06, PR #635)
 
 **Tags:** `path-b`, `m13`, `posts`, `seo`
 
