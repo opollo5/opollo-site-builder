@@ -228,7 +228,7 @@ export default async function PageDetail({
             ({regenJobs.length})
           </span>
         </H3>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-base text-muted-foreground">
           Each row is one operator-triggered re-run against the current design
           system. Cost + tokens come from Anthropic; failures carry their
           terminal code. In-flight jobs auto-refresh while the Re-generate

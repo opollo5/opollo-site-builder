@@ -174,7 +174,7 @@ export function AddSiteModal({
         <h2 id="add-site-title" className="text-lg font-semibold">
           Add new site
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Register a WordPress site. The app password is encrypted before
           storage.
         </p>

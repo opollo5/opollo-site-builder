@@ -76,7 +76,7 @@ export default function DesignSystemIndexPage() {
         <div className="flex items-center justify-between">
           <div>
             <H1>Versions (advanced)</H1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-base text-muted-foreground">
               One version is active at a time. Edit drafts before activating —
               activation is atomic and archives the previous active version.
             </p>
@@ -212,7 +212,7 @@ function ModeSummaryCard({
         data-testid="design-system-copy-existing"
       >
         <H3>Copy existing site</H3>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <p className="mt-1 text-base text-muted-foreground">
           Generated content uses the existing theme&apos;s class names and
           colours.{" "}
           {hasProfile
@@ -243,7 +243,7 @@ function ModeSummaryCard({
       data-testid="design-system-new-design"
     >
       <H3>New design</H3>
-      <p className="mt-1 text-sm text-muted-foreground">
+      <p className="mt-1 text-base text-muted-foreground">
         {approved
           ? "Design direction approved. Tokens, concepts, and tone of voice are wired into generation."
           : "Design setup hasn't finished yet — open the wizard to pick a direction and tone of voice."}

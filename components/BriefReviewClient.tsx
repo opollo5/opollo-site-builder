@@ -354,7 +354,7 @@ export function BriefReviewClient({
               <h2 id="voice-direction-heading" className="text-base font-semibold">
                 Brand voice &amp; design direction
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-base text-muted-foreground">
                 {hasSiteDefault && !voiceOverrideOpen
                   ? "Inheriting from site defaults. Expand to customize for this brief."
                   : hasSiteDefault
@@ -477,7 +477,7 @@ export function BriefReviewClient({
             <h2 id="model-tier-heading" className="text-base font-semibold">
               Model tier
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-base text-muted-foreground">
               Pick the Claude model for text generation and for the visual
               review critique. Sonnet is the default for both — Opus is
               reserved for complex-judgment briefs. See the cost estimate on

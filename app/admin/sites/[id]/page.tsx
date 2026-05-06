@@ -526,7 +526,7 @@ export default async function SiteDetailPage({
               <Layers aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Appearance</H3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-base text-muted-foreground">
                   Sync the active DS palette to Kadence on this site&apos;s
                   WordPress install.
                 </p>
@@ -546,7 +546,7 @@ export default async function SiteDetailPage({
               <LayoutTemplate aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Site Plan</H3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-base text-muted-foreground">
                   Review and approve the AI-generated page blueprint before
                   running batch generation.
                 </p>
@@ -566,7 +566,7 @@ export default async function SiteDetailPage({
               <FileText aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Shared Content</H3>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-base text-muted-foreground">
                   Reusable content objects — CTAs, testimonials, and FAQ items
                   shared across generated pages.
                 </p>
@@ -593,7 +593,7 @@ export default async function SiteDetailPage({
                     <StatusPill kind="brief_parsing" label="Not set" />
                   )}
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-1 text-base text-muted-foreground">
                   Brand voice &amp; design direction defaults that every new
                   brief inherits.
                 </p>
