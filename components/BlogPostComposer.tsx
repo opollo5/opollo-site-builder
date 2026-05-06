@@ -84,6 +84,41 @@ const SOURCE_HINTS: Record<ParseSource, string> = {
   none: "",
 };
 
+// Extract first plain-text paragraph from HTML for meta-description seeding.
+function extractFirstParagraph(html: string): string {
+  const match = /<p[^>]*>([\s\S]*?)<\/p>/i.exec(html);
+  if (!match) return "";
+  return match[1].replace(/<[^>]+>/g, "").trim();
+}
+
+// Google SERP snippet preview — purely visual, no interaction.
+function GoogleSnippetPreview({
+  title,
+  url,
+  description,
+}: {
+  title: string;
+  url: string;
+  description: string;
+}) {
+  const displayTitle = title || "Post title";
+  const displayDesc = description || "Meta description will appear here.";
+  return (
+    <div className="rounded border border-border bg-background p-3 font-sans text-sm">
+      <div
+        className="truncate text-base font-medium leading-snug text-[#1a0dab]"
+        title={displayTitle}
+      >
+        {displayTitle.length > 60 ? displayTitle.slice(0, 60) + "…" : displayTitle}
+      </div>
+      <div className="mt-0.5 truncate text-xs text-[#006621]">{url}</div>
+      <div className="mt-1 line-clamp-2 text-xs text-[#545454]">
+        {displayDesc.length > 160 ? displayDesc.slice(0, 160) + "…" : displayDesc}
+      </div>
+    </div>
+  );
+}
+
 const ERROR_TRANSLATIONS: Record<string, string> = {
   UNIQUE_VIOLATION:
     "A post with this slug already exists on this site. Pick a different slug.",
@@ -338,6 +373,29 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title.value]);
 
+  // Issue 7 — auto-populate SEO title from "{Post title} - {Site name}" when
+  // the operator hasn't touched the field and the parser didn't fill it.
+  useEffect(() => {
+    if (!metaTitle.touched && metaTitle.value === "" && title.value.trim() && siteName) {
+      setMetaTitle({ value: `${title.value.trim()} - ${siteName}`, source: "derived", touched: false });
+    }
+  // Re-run only when title or siteName changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title.value, siteName]);
+
+  // Issue 7 — auto-populate meta description from first paragraph when the
+  // operator hasn't touched the field and the parser didn't fill it.
+  useEffect(() => {
+    if (!metaDescription.touched && metaDescription.value === "") {
+      const firstP = extractFirstParagraph(composerValue.text);
+      if (firstP) {
+        setMetaDescription({ value: firstP, source: "first_paragraph", touched: false });
+      }
+    }
+  // Re-run when composerValue.text changes (debounced upstream via parse effect).
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerValue.text]);
+
   // Debounced re-parse on every text change.
   useEffect(() => {
     if (composerValue.text.length === 0) {
@@ -508,7 +566,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     metaDescriptionIsValid &&
     featuredImage !== null;
 
-  // BL-8 — ⌘S / Ctrl+S triggers Save to Opollo (draft, always safe).
+  // BL-8 — ⌘S / Ctrl+S triggers Save draft (draft, always safe).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isCmdS =
@@ -532,6 +590,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     const existingTagIds = selectedTags
       .filter((t) => !t.isNew)
       .map((t) => t.id);
+    const newCategoryNames = selectedCategories
+      .filter((c) => c.isNew)
+      .map((c) => c.name);
+    const existingCategoryIds = selectedCategories
+      .filter((c) => !c.isNew)
+      .map((c) => c.id);
     const mode = forceAsDraft ? "draft" : publishMode;
     return {
       title: title.value.trim(),
@@ -543,8 +607,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       meta_title: metaTitle.value.trim() || null,
       status: mode === "schedule" ? "scheduled" : "draft",
       scheduled_at: mode === "schedule" ? scheduledAt : null,
-      wp_category_ids: selectedCategories.map((c) => c.id),
+      wp_category_ids: existingCategoryIds,
       wp_tag_ids: existingTagIds,
+      ...(newCategoryNames.length > 0 ? { wp_new_category_names: newCategoryNames } : {}),
       ...(newTagNames.length > 0 ? { wp_new_tag_names: newTagNames } : {}),
       metadata: lastParse ?? null,
       featured_image_id: featuredImage?.id ?? null,
@@ -879,9 +944,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               className="w-full"
               disabled={!canSaveDraft || submitting}
               onClick={handleSaveToOpollo}
-              title="Save to Opollo as a draft without publishing to WordPress."
+              title="Save as draft in Opollo. Does not publish to WordPress."
             >
-              {submitting ? "Saving…" : "Save to Opollo"}
+              {submitting ? "Saving…" : "Save draft"}
             </Button>
           </div>
 
@@ -983,7 +1048,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             <div className="space-y-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`${featuredImage.delivery_url}/w=300,h=200,fit=cover`}
+                src={featuredImage.delivery_url}
                 alt={featuredImage.alt_text ?? featuredImage.caption ?? ""}
                 className="aspect-video w-full rounded-md border object-cover"
               />
@@ -1033,8 +1098,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           )}
         </SidebarPanel>
 
-        {/* SEO panel — collapsed by default (secondary metadata) */}
-        <SidebarPanel title="SEO" defaultOpen={false} testId="sidebar-seo">
+        {/* SEO panel — open by default; auto-populates from title + first paragraph */}
+        <SidebarPanel title="SEO" defaultOpen={true} testId="sidebar-seo">
           <div className="space-y-3">
             <div>
               <label htmlFor="post-meta-title" className="block text-sm font-medium">
@@ -1088,6 +1153,20 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 <SourceHint source={metaDescription.source} />
                 <MetaDescriptionLengthHint length={metaDescription.value.length} />
               </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Search preview
+              </p>
+              <GoogleSnippetPreview
+                title={metaTitle.value || title.value}
+                url={
+                  siteWpUrl && slug.value
+                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
+                    : siteWpUrl ?? "https://example.com/"
+                }
+                description={metaDescription.value}
+              />
             </div>
           </div>
         </SidebarPanel>
@@ -1454,7 +1533,6 @@ function WpTaxonomyCombobox({
   const placeholder = loading ? `Loading ${type}…` : `Pick ${type}…`;
 
   const canCreateNew =
-    type === "tags" &&
     inputValue.trim().length > 0 &&
     !options.some(
       (o) => o.name.toLowerCase() === inputValue.trim().toLowerCase(),
@@ -1463,17 +1541,17 @@ function WpTaxonomyCombobox({
       (v) => v.name.toLowerCase() === inputValue.trim().toLowerCase(),
     );
 
-  function addNewTag() {
+  function addNew() {
     const name = inputValue.trim();
     if (!name) return;
-    const newTag: WpTaxonomyOption = {
+    const newItem: WpTaxonomyOption = {
       id: -Date.now(),
       name,
       slug: name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
       count: 0,
       isNew: true,
     };
-    onChange([...value, newTag]);
+    onChange([...value, newItem]);
     setInputValue("");
   }
 
@@ -1521,13 +1599,13 @@ function WpTaxonomyCombobox({
       >
         <Command shouldFilter={true}>
           <CommandInput
-            placeholder={type === "tags" ? `Search or create ${label}…` : `Search ${type}…`}
+            placeholder={`Search or create ${label}…`}
             value={inputValue}
             onValueChange={setInputValue}
             onKeyDown={(e) => {
               if (e.key === "Enter" && canCreateNew) {
                 e.preventDefault();
-                addNewTag();
+                addNew();
               }
             }}
           />
@@ -1540,19 +1618,17 @@ function WpTaxonomyCombobox({
             {canCreateNew && (
               <CommandItem
                 value={`__new__${inputValue}`}
-                onSelect={addNewTag}
+                onSelect={addNew}
                 className="text-primary"
               >
                 <span className="mr-2 text-primary">+</span>
-                Add tag &ldquo;{inputValue.trim()}&rdquo;
+                Add {label} &ldquo;{inputValue.trim()}&rdquo;
               </CommandItem>
             )}
             <CommandEmpty>
               {loading
                 ? "Loading…"
-                : type === "tags"
-                  ? "Type a name to search or create a tag."
-                  : `No ${label}s found.`}
+                : `Type a name to search or create a ${label}.`}
             </CommandEmpty>
             {options.map((option) => (
               <CommandItem
