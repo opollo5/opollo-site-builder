@@ -1,9 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderPlatformInviteEmail } from "@/lib/email/templates/platform-invite";
+import {
+  conflict,
+  internalError,
+  notFound,
+  readJsonBody,
+  routeError,
+  validationError,
+} from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   enqueueInvitationCallbacks,
@@ -52,39 +59,14 @@ const SendInviteSchema = z.object({
   role: z.enum(["admin", "approver", "editor", "viewer"]),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = SendInviteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message:
-            "Body must be { company_id: uuid, email: string, role: 'admin'|'approver'|'editor'|'viewer' }.",
-          details: { issues: parsed.error.issues },
-          retryable: false,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
+    return validationError(
+      "Body must be { company_id: uuid, email: string, role: 'admin'|'approver'|'editor'|'viewer' }.",
+      { issues: parsed.error.issues },
     );
   }
 
@@ -106,18 +88,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     logger.error("platform.invitations.send.company_lookup_failed", {
       err: companyResult.error.message,
     });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to read company.",
-      500,
-    );
+    return internalError("Failed to read company.");
   }
   if (!companyResult.data) {
-    return errorJson(
-      "COMPANY_NOT_FOUND",
-      "No company with that id.",
-      404,
-    );
+    return notFound("No company with that id.");
   }
 
   // Resolve inviter email for the email body. Best-effort — if missing,
@@ -138,15 +112,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    const code = result.error.code;
-    const status =
-      code === "VALIDATION_FAILED"
-        ? 400
-        : code === "ACTIVE_MEMBERSHIP_EXISTS" ||
-            code === "PENDING_INVITE_EXISTS"
-          ? 409
-          : 500;
-    return errorJson(code, result.error.message, status);
+    const { code, message } = result.error;
+    if (code === "VALIDATION_FAILED") return validationError(message);
+    if (code === "ACTIVE_MEMBERSHIP_EXISTS" || code === "PENDING_INVITE_EXISTS") {
+      return conflict(code, message);
+    }
+    return internalError(message);
   }
 
   // Build accept URL. Configurable per environment via NEXT_PUBLIC_SITE_URL;
@@ -177,20 +148,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       invitation_id: result.invitation.id,
       err: sendResult.error?.message,
     });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "EMAIL_DELIVERY_FAILED",
-          message:
-            "Invitation was created but email delivery failed. Revoke and resend, or wait for the day-3 reminder.",
-          retryable: false,
-          details: { invitation_id: result.invitation.id },
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 502 },
-    );
+    return routeError("EMAIL_DELIVERY_FAILED", "Invitation was created but email delivery failed. Revoke and resend, or wait for the day-3 reminder.", { invitation_id: result.invitation.id });
   }
 
   // Schedule the day-3 reminder + day-14 expiry callbacks via QStash.

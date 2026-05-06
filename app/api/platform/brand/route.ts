@@ -1,7 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import {
+  internalError,
+  readJsonBody,
+  routeError,
+  validationError,
+} from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { isOpolloStaff } from "@/lib/platform/auth";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
@@ -71,21 +76,6 @@ const PatchSchema = z.object({
   change_summary: z.string().min(1).max(500).nullable().optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 function parseCompanyId(req: NextRequest): string | null {
   const id = new URL(req.url).searchParams.get("company_id");
   if (!id) return null;
@@ -97,11 +87,7 @@ function parseCompanyId(req: NextRequest): string | null {
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const companyId = parseCompanyId(req);
   if (!companyId) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id query param must be a UUID.",
-      400,
-    );
+    return validationError("company_id query param must be a UUID.");
   }
 
   const gate = await requireCanDoForApi(companyId, "edit_company_settings");
@@ -121,30 +107,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 export async function PATCH(req: NextRequest): Promise<NextResponse> {
   const companyId = parseCompanyId(req);
   if (!companyId) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "company_id query param must be a UUID.",
-      400,
-    );
+    return validationError("company_id query param must be a UUID.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = PatchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message:
-            "Body must be { fields: BrandProfilePatch, change_summary?: string }.",
-          details: { issues: parsed.error.issues },
-          retryable: false,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
+    return validationError(
+      "Body must be { fields: BrandProfilePatch, change_summary?: string }.",
+      { issues: parsed.error.issues },
     );
   }
 
@@ -158,10 +130,9 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   if (parsed.data.fields.content_restrictions !== undefined) {
     const staff = await isOpolloStaff(gate.supabase);
     if (!staff) {
-      return errorJson(
+      return routeError(
         "STAFF_ONLY_FIELD",
         "content_restrictions can only be modified by Opollo staff. Contact support to request a change.",
-        403,
       );
     }
   }
@@ -174,8 +145,10 @@ export async function PATCH(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    const status = result.error.code === "VALIDATION_FAILED" ? 400 : 500;
-    return errorJson(result.error.code, result.error.message, status);
+    if (result.error.code === "VALIDATION_FAILED") {
+      return validationError(result.error.message);
+    }
+    return internalError(result.error.message);
   }
 
   logger.info("platform.brand.update.ok", {
