@@ -1,4 +1,5 @@
 import { getServiceRoleClient } from "@/lib/supabase";
+import { getRedisClient } from "@/lib/redis";
 
 // ---------------------------------------------------------------------------
 // Health-probe helpers. Each function returns a bounded, typed envelope the
@@ -33,6 +34,35 @@ export async function checkSupabase(): Promise<{
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return { result: "fail", latency_ms: Date.now() - start, error: message };
+  }
+}
+
+// Redis (Upstash) reachability probe.
+// Returns ok immediately when UPSTASH env vars are absent — the rate limiter
+// already fails open in that case, so unconfigured is not a degraded state.
+// When vars are present but PING fails, the caller should surface "degraded".
+export async function checkRedis(): Promise<{
+  result: CheckResult;
+  latency_ms: number;
+  configured: boolean;
+  error?: string;
+}> {
+  const start = Date.now();
+  const client = getRedisClient();
+  if (!client) {
+    return { result: "ok", latency_ms: 0, configured: false };
+  }
+  try {
+    await client.ping();
+    return { result: "ok", latency_ms: Date.now() - start, configured: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      result: "fail",
+      latency_ms: Date.now() - start,
+      configured: true,
+      error: message,
+    };
   }
 }
 
