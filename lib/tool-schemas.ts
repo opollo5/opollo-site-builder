@@ -93,7 +93,7 @@ export const ERROR_CODES = [
   // Webhook receiver codes.
   "INVALID_SIGNATURE",
   "RECEIVER_NOT_CONFIGURED",
-  // S8 reconnect — healthy-connection guard.
+  // S8 reconnect ï¿½ healthy-connection guard.
   "CONFLICT",
 ] as const;
 
@@ -282,6 +282,8 @@ export type SiteRecord = {
   version_lock: number;
   // DESIGN-SYSTEM-OVERHAUL â€” null when onboarding hasn't picked a mode yet.
   site_mode: "copy_existing" | "new_design" | null;
+  created_by: string | null;
+  updated_by: string | null;
 };
 
 export type SiteListItem = {
