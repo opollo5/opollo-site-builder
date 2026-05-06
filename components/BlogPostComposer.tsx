@@ -508,7 +508,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     metaDescriptionIsValid &&
     featuredImage !== null;
 
-  // BL-8 — ⌘S / Ctrl+S triggers Save to Opollo (draft, always safe).
+  // BL-8 — ⌘S / Ctrl+S triggers Save draft (draft, always safe).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const isCmdS =
@@ -879,9 +879,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               className="w-full"
               disabled={!canSaveDraft || submitting}
               onClick={handleSaveToOpollo}
-              title="Save to Opollo as a draft without publishing to WordPress."
+              title="Save as draft in Opollo. Does not publish to WordPress."
             >
-              {submitting ? "Saving…" : "Save to Opollo"}
+              {submitting ? "Saving…" : "Save draft"}
             </Button>
           </div>
 
