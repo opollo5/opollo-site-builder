@@ -66,6 +66,30 @@ export const ERROR_CODES = [
   "WP_CREDENTIALS_MISSING",
   "BLUEPRINT_NOT_FOUND",
   "BLUEPRINT_MISMATCH",
+  // M15-4 #14 — codes promoted from local errorJson helpers.
+  "STAFF_ONLY_FIELD",
+  "CANNOT_MODIFY_SELF",
+  "SUPER_ADMIN_LOCKED",
+  "LAST_ADMIN",
+  "FETCH_FAILED",
+  "URL_BLOCKED",
+  "UPSTREAM_RETRYABLE",
+  "UPSTREAM_REJECTED",
+  "UNSUPPORTED_TYPE",
+  "FILE_TOO_LARGE",
+  "ACTIVE_MEMBERSHIP_EXISTS",
+  "PENDING_INVITE_EXISTS",
+  "ALREADY_ACCEPTED",
+  "ALREADY_REVOKED",
+  "COMPANY_NOT_FOUND",
+  "INVALID_TOKEN",
+  "TOKEN_EXPIRED",
+  "INVALID_STEP",
+  "EMAIL_MISMATCH",
+  "REVOKED",
+  "EXPIRED",
+  "AUTH_USER_EXISTS",
+  "EMAIL_DELIVERY_FAILED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -154,6 +178,42 @@ export function errorCodeToStatus(code: ErrorCode): number {
       return 400;
     case "BLUEPRINT_NOT_FOUND":
       return 404;
+    // M15-4 #14 — promoted from local errorJson helpers.
+    case "STAFF_ONLY_FIELD":
+      return 403;
+    case "CANNOT_MODIFY_SELF":
+    case "SUPER_ADMIN_LOCKED":
+    case "LAST_ADMIN":
+    case "ACTIVE_MEMBERSHIP_EXISTS":
+    case "PENDING_INVITE_EXISTS":
+    case "ALREADY_ACCEPTED":
+    case "ALREADY_REVOKED":
+      return 409;
+    case "FETCH_FAILED":
+    case "UPSTREAM_RETRYABLE":
+      return 502;
+    case "URL_BLOCKED":
+    case "UPSTREAM_REJECTED":
+      return 400;
+    case "UNSUPPORTED_TYPE":
+      return 415;
+    case "FILE_TOO_LARGE":
+      return 413;
+    case "COMPANY_NOT_FOUND":
+      return 404;
+    case "INVALID_TOKEN":
+    case "TOKEN_EXPIRED":
+      return 401;
+    case "INVALID_STEP":
+    case "EMAIL_MISMATCH":
+      return 400;
+    case "REVOKED":
+    case "AUTH_USER_EXISTS":
+      return 409;
+    case "EXPIRED":
+      return 410;
+    case "EMAIL_DELIVERY_FAILED":
+      return 502;
   }
 }
 

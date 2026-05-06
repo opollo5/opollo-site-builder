@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { countActiveAdmins } from "@/lib/auth";
 import { revokeUserSessions } from "@/lib/auth-revoke";
+import { conflict, internalError, notFound, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -44,21 +45,6 @@ const BAN_FOREVER = "876000h";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   _req: Request,
   { params }: { params: { id: string } },
@@ -71,15 +57,11 @@ export async function POST(
 
   const userId = params.id;
   if (!UUID_RE.test(userId)) {
-    return errorJson("VALIDATION_FAILED", "User id must be a UUID.", 400);
+    return validationError("User id must be a UUID.");
   }
 
   if (gate.user && gate.user.id === userId) {
-    return errorJson(
-      "CANNOT_MODIFY_SELF",
-      "You cannot revoke your own access. Ask another admin.",
-      409,
-    );
+    return conflict("CANNOT_MODIFY_SELF", "You cannot revoke your own access. Ask another admin.");
   }
 
   const svc = getServiceRoleClient();
@@ -91,14 +73,10 @@ export async function POST(
     .maybeSingle();
   if (fetchErr) {
     logger.error("admin.users.revoke.fetch_failed", { user_id: userId, error: fetchErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to read user. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to read user. Please try again or contact support with the request id from the response headers.");
   }
   if (!target) {
-    return errorJson("NOT_FOUND", "No user with that id.", 404);
+    return notFound("No user with that id.");
   }
 
   if (target.role === "admin") {
@@ -108,18 +86,10 @@ export async function POST(
     const adminCount = await countActiveAdmins();
     if (!adminCount.ok) {
       logger.error("admin.users.revoke.count_failed", { user_id: userId, error: adminCount.error });
-      return errorJson(
-        "INTERNAL_ERROR",
-        "Failed to count active admins. Please try again or contact support with the request id from the response headers.",
-        500,
-      );
+      return internalError("Failed to count active admins. Please try again or contact support with the request id from the response headers.");
     }
     if (adminCount.count <= 1) {
-      return errorJson(
-        "LAST_ADMIN",
-        "Refusing to revoke the last active admin. Promote another admin first, or use the emergency route.",
-        409,
-      );
+      return conflict("LAST_ADMIN", "Refusing to revoke the last active admin. Promote another admin first, or use the emergency route.");
     }
   }
 
@@ -128,11 +98,7 @@ export async function POST(
   });
   if (banErr) {
     logger.error("admin.users.revoke.ban_failed", { user_id: userId, error: banErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to ban user. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to ban user. Please try again or contact support with the request id from the response headers.");
   }
 
   try {
@@ -142,11 +108,7 @@ export async function POST(
     // if the session sweep fails. Surface it so operators know to
     // retry, but don't lie about success.
     logger.error("admin.users.revoke.session_sweep_failed", { user_id: userId, error: err });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "User banned, but session sweep failed. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("User banned, but session sweep failed. Please try again or contact support with the request id from the response headers.");
   }
 
   return NextResponse.json(

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody } from "@/lib/http";
+import { notFound, readJsonBody, respond, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { dispatch } from "@/lib/platform/notifications";
 import { recordApprovalDecision } from "@/lib/platform/social/approvals";
@@ -33,55 +33,23 @@ const Schema = z.object({
   comment: z.string().max(2000).nullable().optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
-function statusForCode(code: string): number {
-  switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "NOT_FOUND":
-      return 404;
-    case "INVALID_STATE":
-      return 409;
-    default:
-      return 500;
-  }
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ): Promise<NextResponse> {
   const { token } = await params;
   if (!TOKEN_RE.test(token)) {
-    return errorJson("NOT_FOUND", "This approval link is invalid.", 404);
+    return notFound("This approval link is invalid.");
   }
 
   const rl = await checkRateLimit("approval_decision", `ip:${getClientIp(req)}`);
   if (!rl.ok) return rateLimitExceeded(rl);
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "Body must be { decision: 'approved'|'rejected'|'changes_requested', comment?: string }.",
-      400,
-    );
+    return validationError("Body must be { decision: 'approved'|'rejected'|'changes_requested', comment?: string }.");
   }
 
   // Best-effort capture of audit fields. Behind a proxy, x-forwarded-
@@ -101,11 +69,7 @@ export async function POST(
   });
 
   if (!result.ok) {
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      statusForCode(result.error.code),
-    );
+    return respond(result);
   }
 
   // Notify the submitter + company admins when the decision finalises

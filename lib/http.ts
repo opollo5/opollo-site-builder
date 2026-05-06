@@ -4,6 +4,7 @@ import { logger } from "@/lib/logger";
 import {
   errorCodeToStatus,
   type ApiResponse,
+  type ErrorCode,
   type ToolError,
 } from "@/lib/tool-schemas";
 
@@ -76,6 +77,65 @@ export function internalError(message: string): NextResponse {
     timestamp: now(),
   };
   return NextResponse.json(body, { status: 500 });
+}
+
+// 403 Forbidden
+export function forbidden(message: string): NextResponse {
+  const body: ToolError = {
+    ok: false,
+    error: {
+      code: "FORBIDDEN",
+      message,
+      retryable: false,
+      suggested_action: "Contact an administrator if you believe this is an error.",
+    },
+    timestamp: now(),
+  };
+  return NextResponse.json(body, { status: 403 });
+}
+
+// 409 Invalid State — resource is in a state that does not allow this operation
+export function invalidState(message: string): NextResponse {
+  const body: ToolError = {
+    ok: false,
+    error: {
+      code: "INVALID_STATE",
+      message,
+      retryable: false,
+      suggested_action: "The resource is in a state that does not allow this operation.",
+    },
+    timestamp: now(),
+  };
+  return NextResponse.json(body, { status: 409 });
+}
+
+// 409 Conflict for domain-specific codes already in ERROR_CODES
+export function conflict(
+  code: ErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+): NextResponse {
+  const body: ToolError = {
+    ok: false,
+    error: { code, message, details, retryable: false, suggested_action: "Resolve the conflict and retry." },
+    timestamp: now(),
+  };
+  return NextResponse.json(body, { status: errorCodeToStatus(code) ?? 409 });
+}
+
+// 400 / 413 / 415 / 502 — for codes that aren't covered by the named helpers
+// above. Looks up the HTTP status from the canonical errorCodeToStatus map.
+export function routeError(
+  code: ErrorCode,
+  message: string,
+  details?: Record<string, unknown>,
+): NextResponse {
+  const body: ToolError = {
+    ok: false,
+    error: { code, message, details, retryable: false, suggested_action: "See the error code for guidance." },
+    timestamp: now(),
+  };
+  return NextResponse.json(body, { status: errorCodeToStatus(code) ?? 500 });
 }
 
 // Pull a UUID out of the route params or return a 400. Used by every

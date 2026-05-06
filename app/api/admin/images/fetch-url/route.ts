@@ -9,6 +9,7 @@ import {
   deliveryUrl,
   uploadImageFromBytes,
 } from "@/lib/cloudflare-images";
+import { internalError, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { assertSafeUrl, SsrfBlockedError } from "@/lib/ssrf-guard";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -36,27 +37,6 @@ const BodySchema = z.object({
   url: z.string().url().max(2048),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: {
-        code,
-        message,
-        retryable: code === "UPSTREAM_RETRYABLE",
-        ...(details ? { details } : {}),
-      },
-      timestamp: new Date().toISOString(),
-    },
-    { status, headers: { "cache-control": "no-store" } },
-  );
-}
-
 async function fetchWithTimeout(
   url: string,
   init: RequestInit,
@@ -78,7 +58,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await req.json().catch(() => null);
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
-    return errorJson("VALIDATION_FAILED", "Body must be { url: string }.", 400);
+    return validationError("Body must be { url: string }.");
   }
   const url = parsed.data.url;
 
@@ -91,12 +71,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         reason: err.reason,
         ...(err.details ?? {}),
       });
-      return errorJson(
-        "URL_BLOCKED",
-        "That URL points to an internal or unsupported address.",
-        400,
-        { reason: err.reason },
-      );
+      return routeError("URL_BLOCKED", "That URL points to an internal or unsupported address.", { reason: err.reason });
     }
     throw err;
   }
@@ -110,34 +85,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       FETCH_TIMEOUT_MS,
     );
   } catch (err) {
-    return errorJson(
-      "FETCH_FAILED",
-      `HEAD probe failed: ${err instanceof Error ? err.message : String(err)}`,
-      502,
-    );
+    return routeError("FETCH_FAILED", `HEAD probe failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!headRes.ok) {
-    return errorJson(
-      "FETCH_FAILED",
-      `Source server returned ${headRes.status} on HEAD.`,
-      502,
-    );
+    return routeError("FETCH_FAILED", `Source server returned ${headRes.status} on HEAD.`);
   }
   const contentType = headRes.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith(ALLOWED_MIME_PREFIX)) {
-    return errorJson(
-      "UNSUPPORTED_TYPE",
-      `URL serves "${contentType || "unknown"}" — not an image.`,
-      415,
-    );
+    return routeError("UNSUPPORTED_TYPE", `URL serves "${contentType || "unknown"}" — not an image.`);
   }
   const contentLength = Number(headRes.headers.get("content-length") ?? "0");
   if (Number.isFinite(contentLength) && contentLength > MAX_BYTES) {
-    return errorJson(
-      "FILE_TOO_LARGE",
-      `Source advertises ${Math.round(contentLength / 1024 / 1024)} MB — over the 10 MB cap.`,
-      413,
-    );
+    return routeError("FILE_TOO_LARGE", `Source advertises ${Math.round(contentLength / 1024 / 1024)} MB — over the 10 MB cap.`);
   }
 
   // GET the bytes.
@@ -145,31 +104,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     getRes = await fetchWithTimeout(url, { method: "GET" }, FETCH_TIMEOUT_MS);
   } catch (err) {
-    return errorJson(
-      "FETCH_FAILED",
-      `GET failed: ${err instanceof Error ? err.message : String(err)}`,
-      502,
-    );
+    return routeError("FETCH_FAILED", `GET failed: ${err instanceof Error ? err.message : String(err)}`);
   }
   if (!getRes.ok) {
-    return errorJson(
-      "FETCH_FAILED",
-      `Source server returned ${getRes.status} on GET.`,
-      502,
-    );
+    return routeError("FETCH_FAILED", `Source server returned ${getRes.status} on GET.`);
   }
   const bytes = new Uint8Array(await getRes.arrayBuffer());
   if (bytes.byteLength === 0) {
-    return errorJson("FETCH_FAILED", "Source returned an empty body.", 502);
+    return routeError("FETCH_FAILED", "Source returned an empty body.");
   }
   if (bytes.byteLength > MAX_BYTES) {
     // HEAD may have been honest about size, then GET returned more
     // (chunked, no content-length). Hard cap regardless.
-    return errorJson(
-      "FILE_TOO_LARGE",
-      `Fetched body is ${Math.round(bytes.byteLength / 1024 / 1024)} MB — over the 10 MB cap.`,
-      413,
-    );
+    return routeError("FILE_TOO_LARGE", `Fetched body is ${Math.round(bytes.byteLength / 1024 / 1024)} MB — over the 10 MB cap.`);
   }
 
   // Upload to Cloudflare.
@@ -198,13 +145,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         cf_code: err.code,
         retryable: err.retryable,
       });
-      return errorJson(
+      return routeError(
         err.retryable ? "UPSTREAM_RETRYABLE" : "UPSTREAM_REJECTED",
         `Cloudflare upload failed (${err.code}).`,
-        err.retryable ? 502 : 400,
       );
     }
-    return errorJson("INTERNAL_ERROR", "Cloudflare upload failed.", 500);
+    return internalError("Cloudflare upload failed.");
   }
 
   const supabase = getServiceRoleClient();
@@ -243,11 +189,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         );
       }
     }
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Image fetched but failed to save in library.",
-      500,
-    );
+    return internalError("Image fetched but failed to save in library.");
   }
 
   return NextResponse.json(

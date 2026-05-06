@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { internalError, respond, routeError, validationError } from "@/lib/http";
 import { getSite } from "@/lib/sites";
 import { wpListPages, type WpConfig } from "@/lib/wordpress";
 
@@ -24,21 +25,6 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status, headers: { "cache-control": "no-store" } },
-  );
-}
-
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -47,7 +33,7 @@ export async function GET(
   if (gate.kind === "deny") return gate.response;
 
   if (!UUID_RE.test(params.id)) {
-    return errorJson("VALIDATION_FAILED", "Site id must be a UUID.", 400);
+    return validationError("Site id must be a UUID.");
   }
 
   const url = new URL(req.url);
@@ -55,19 +41,11 @@ export async function GET(
 
   const siteRes = await getSite(params.id, { includeCredentials: true });
   if (!siteRes.ok) {
-    return errorJson(
-      siteRes.error.code,
-      siteRes.error.message,
-      siteRes.error.code === "NOT_FOUND" ? 404 : 500,
-    );
+    return respond(siteRes);
   }
   const creds = siteRes.data.credentials;
   if (!creds) {
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Site has no WP credentials.",
-      500,
-    );
+    return internalError("Site has no WP credentials.");
   }
   const cfg: WpConfig = {
     baseUrl: siteRes.data.site.wp_url,
@@ -80,7 +58,7 @@ export async function GET(
     ...(q ? { search: q } : {}),
   });
   if (!wp.ok) {
-    return errorJson(wp.code, wp.message, 502);
+    return routeError(wp.code, wp.message, wp.details);
   }
 
   return NextResponse.json(

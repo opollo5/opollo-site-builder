@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { conflict, internalError, notFound, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
@@ -9,7 +10,6 @@ import {
   rateLimitExceeded,
 } from "@/lib/rate-limit";
 import { enqueueRegenJob } from "@/lib/regeneration-publisher";
-import { errorCodeToStatus } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
 // POST /api/admin/sites/[id]/pages/[pageId]/regenerate — M7-4.
@@ -33,22 +33,6 @@ export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false, ...(details ? { details } : {}) },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string; pageId: string } },
@@ -63,11 +47,7 @@ export async function POST(
   if (!rl.ok) return rateLimitExceeded(rl);
 
   if (!UUID_RE.test(params.id) || !UUID_RE.test(params.pageId)) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "Site id and page id must be UUIDs.",
-      400,
-    );
+    return validationError("Site id and page id must be UUIDs.");
   }
 
   const result = await enqueueRegenJob({
@@ -78,8 +58,15 @@ export async function POST(
 
   if (!result.ok) {
     logger.error("enqueueRegenJob failed", { code: result.code });
-    const status = errorCodeToStatus(result.code);
-    return errorJson(result.code, result.message, status, result.details);
+    switch (result.code) {
+      case "NOT_FOUND":
+        return notFound(result.message);
+      case "REGEN_ALREADY_IN_FLIGHT":
+      case "BUDGET_EXCEEDED":
+        return conflict(result.code, result.message, result.details);
+      default:
+        return internalError(result.message);
+    }
   }
 
   revalidatePath(`/admin/sites/${params.id}/pages/${params.pageId}`);

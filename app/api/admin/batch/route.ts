@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { createBatchJob } from "@/lib/batch-jobs";
-import { readJsonBody } from "@/lib/http";
+import {
+  conflict,
+  internalError,
+  notFound,
+  readJsonBody,
+  validationError,
+} from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
@@ -27,42 +33,6 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  details?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false, ...(details ?? {}) },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
-function errorStatusFor(
-  code: Awaited<ReturnType<typeof createBatchJob>>["ok"] extends true
-    ? never
-    : string,
-): number {
-  switch (code) {
-    case "VALIDATION_FAILED":
-      return 400;
-    case "TEMPLATE_NOT_FOUND":
-      return 404;
-    case "TEMPLATE_NOT_ACTIVE":
-      return 409;
-    case "IDEMPOTENCY_KEY_CONFLICT":
-      return 422;
-    case "INTERNAL_ERROR":
-    default:
-      return 500;
-  }
-}
-
 export async function POST(req: Request): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
@@ -73,15 +43,13 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   const idempotencyKey = req.headers.get("idempotency-key");
   if (!idempotencyKey || idempotencyKey.trim() === "") {
-    return errorJson(
-      "VALIDATION_FAILED",
+    return validationError(
       "Idempotency-Key header is required. Every batch-create call must carry one so a retry cannot double-submit a billed job.",
-      400,
     );
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = body as {
     site_id?: unknown;
     template_id?: unknown;
@@ -101,12 +69,18 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   if (!result.ok) {
     logger.error("createBatchJob failed", { code: result.error.code });
-    return errorJson(
-      result.error.code,
-      result.error.message,
-      errorStatusFor(result.error.code),
-      result.error.details,
-    );
+    const { code, message, details } = result.error;
+    switch (code) {
+      case "VALIDATION_FAILED":
+        return validationError(message, details);
+      case "TEMPLATE_NOT_FOUND":
+        return notFound(message);
+      case "TEMPLATE_NOT_ACTIVE":
+      case "IDEMPOTENCY_KEY_CONFLICT":
+        return conflict(code, message, details);
+      default:
+        return internalError(message);
+    }
   }
 
   return NextResponse.json(

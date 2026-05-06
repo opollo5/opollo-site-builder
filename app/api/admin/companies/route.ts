@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
-import { readJsonBody } from "@/lib/http";
+import { readJsonBody, respond, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { createPlatformCompany } from "@/lib/platform/companies";
 
@@ -31,42 +31,17 @@ const CreateCompanySchema = z.object({
   timezone: z.string().min(1).max(64).optional(),
 });
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = CreateCompanySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message:
-            "Body must be { name: string, slug?: string, domain?: string|null, timezone?: string }.",
-          details: { issues: parsed.error.issues },
-          retryable: false,
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
+    return validationError(
+      "Body must be { name: string, slug?: string, domain?: string|null, timezone?: string }.",
+      { issues: parsed.error.issues },
     );
   }
 
@@ -79,20 +54,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   });
 
   if (!result.ok) {
-    const code = result.error.code;
-    const status =
-      code === "VALIDATION_FAILED"
-        ? 400
-        : code === "ALREADY_EXISTS"
-          ? 409
-          : 500;
-    if (status >= 500) {
+    if (result.error.code === "INTERNAL_ERROR") {
       logger.error("admin.companies.create.failed", {
-        code,
+        code: result.error.code,
         message: result.error.message,
       });
     }
-    return errorJson(code, result.error.message, status);
+    return respond(result);
   }
 
   // Revalidate the list page so the new company appears on next render.
