@@ -220,10 +220,6 @@ export function ImagePickerModal({
     };
   }, [open, tab, browseQuery, browseOffset]);
 
-  useEffect(() => {
-    setBrowseOffset(0);
-  }, [browseQuery]);
-
   function handleSelect(image: ImagePickerEntry) {
     onSelect(image);
     onClose();
@@ -296,7 +292,7 @@ export function ImagePickerModal({
               type="search"
               placeholder="Search by caption, alt, or filename"
               value={browseQuery}
-              onChange={(e) => setBrowseQuery(e.target.value)}
+              onChange={(e) => { setBrowseQuery(e.target.value); setBrowseOffset(0); }}
               aria-label="Search images"
             />
             {browseError && (
