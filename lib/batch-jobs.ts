@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { Client } from "pg";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import {
   PROJECTED_COST_PER_BATCH_SLOT_CENTS,
@@ -324,6 +325,11 @@ export async function createBatchJob(
           projected_cents: reservation.projected_cents,
         });
       }
+      logger.error("batch_jobs.create.budget_reserve_failed", {
+        err: reservation.message,
+        site_id: input.site_id,
+        projected_cents: projectedCents,
+      });
       return errorResult("INTERNAL_ERROR", reservation.message);
     }
 

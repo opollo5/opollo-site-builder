@@ -1922,6 +1922,11 @@ async function processPagePassLoop(
             },
           };
         }
+        logger.error("brief_runner.budget_reserve_failed", {
+          err: reserve.message,
+          site_id: brief.site_id,
+          brief_run_id: run.id,
+        });
         return {
           ok: false,
           code: "INTERNAL_ERROR",
