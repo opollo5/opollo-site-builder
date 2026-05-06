@@ -1530,8 +1530,10 @@ function WpTaxonomyCombobox({
   const [options, setOptions] = useState<WpTaxonomyOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
 
   useEffect(() => {
+    if (!open || loadedRef.current) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -1548,6 +1550,7 @@ function WpTaxonomyCombobox({
         if (!cancelled) {
           if (payload?.ok) {
             setOptions(payload.data.items);
+            loadedRef.current = true;
           } else {
             setError(
               payload?.ok === false
@@ -1567,7 +1570,7 @@ function WpTaxonomyCombobox({
     return () => {
       cancelled = true;
     };
-  }, [siteId, type]);
+  }, [open, siteId, type]);
 
   const selectedIds = useMemo(() => new Set(value.map((v) => v.id)), [value]);
   const label = type === "categories" ? "category" : "tag";
