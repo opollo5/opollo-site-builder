@@ -9,6 +9,7 @@ import { listTemplates, type DesignTemplate } from "@/lib/templates";
 import { buildDesignContextPrefix } from "@/lib/design-discovery/build-injection";
 import { renderRegistryBlock } from "@/lib/design-system-prompt";
 import { logger } from "@/lib/logger";
+import { resolvePrompt } from "@/lib/prompts";
 
 export type SystemPromptContext = {
   site_name: string;
@@ -24,17 +25,11 @@ export type SystemPromptContext = {
   session_recent_pages: string;
 };
 
-const TEMPLATE_PATH = join(
-  process.cwd(),
-  "docs",
-  "SYSTEM_PROMPT_v1.md",
-);
-
 let cachedTemplate: string | null = null;
 
 function loadTemplate(): string {
   if (cachedTemplate !== null) return cachedTemplate;
-  cachedTemplate = readFileSync(TEMPLATE_PATH, "utf-8");
+  cachedTemplate = readFileSync(resolvePrompt(), "utf-8");
   return cachedTemplate;
 }
 
