@@ -221,7 +221,7 @@ describe("POST /api/admin/batch — createBatchJob error mapping", () => {
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(404);
     const body = await res.json();
-    expect(body.error.code).toBe("TEMPLATE_NOT_FOUND");
+    expect(body.error.code).toBe("NOT_FOUND"); // route uses notFound() helper which emits NOT_FOUND code
   });
 
   it("returns 409 on TEMPLATE_NOT_ACTIVE", async () => {
