@@ -63,7 +63,27 @@ describe("No sub-16px arbitrary font sizes in source", () => {
     it(`${path.relative(ROOT, file)} has no text-[<16px]`, () => {
       const content = fs.readFileSync(file, "utf-8");
       const match = content.match(subMinFontRe);
-      if (match) throw new Error(`sub-16px font "${match[0]}" in ${path.relative(ROOT, file)}`);
+      if (match) {
+        throw new Error(
+          `Found sub-16px arbitrary text size "${match[0]}" in ${path.relative(ROOT, file)}`,
+        );
+      }
+    });
+  }
+});
+
+const hexInClassRe = /(?:className|style)=[^>]*#[0-9a-fA-F]{3,8}(?!\s*;)/;
+
+describe("No hardcoded hex colours in className/style", () => {
+  for (const file of SRC_FILES) {
+    it(`${path.relative(ROOT, file)} has no hex in className/style`, () => {
+      const content = fs.readFileSync(file, "utf-8");
+      const match = content.match(hexInClassRe);
+      if (match) {
+        throw new Error(
+          `Found hex colour in className/style in ${path.relative(ROOT, file)}: ${match[0].slice(0, 80)}`,
+        );
+      }
     });
   }
 });
