@@ -100,6 +100,29 @@ async function generateAiCaption(
   }
 }
 
+function deriveTitle(
+  raw: Record<string, unknown> | null,
+  filename: string | null,
+): string | null {
+  const str = (v: unknown): string | null =>
+    typeof v === "string" && v.trim() ? v.trim() : null;
+  if (raw) {
+    const t =
+      str(raw.ObjectName) ??
+      str(raw.Headline) ??
+      str(raw.Title) ??
+      (str(raw["Caption-Abstract"])?.slice(0, 80) ?? null) ??
+      (str(raw.description)?.slice(0, 80) ?? null);
+    if (t) return t;
+  }
+  if (!filename) return null;
+  const base = filename.replace(/\.[^.]+$/, "");
+  const m = /^istock[-_](\d+)/i.exec(base);
+  if (m) return `iStock Image ${m[1]}`;
+  const human = base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return human || null;
+}
+
 function errorJson(
   code: string,
   message: string,
@@ -239,6 +262,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const insertRow = {
     cloudflare_id: cfRecord.id,
     filename,
+    title: deriveTitle(exifRaw, filename),
     source: "upload" as const,
     source_ref: filename,
     bytes: file.size,
@@ -253,7 +277,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     .from("image_library")
     .insert(insertRow)
     .select(
-      "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at",
+      "id, cloudflare_id, filename, title, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at",
     )
     .single();
 
@@ -264,7 +288,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const existing = await supabase
         .from("image_library")
         .select(
-          "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at",
+          "id, cloudflare_id, filename, title, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at",
         )
         .eq("cloudflare_id", cfRecord.id)
         .maybeSingle();
