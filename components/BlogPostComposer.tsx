@@ -197,6 +197,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [featuredImage, setFeaturedImage] = useState<ImagePickerEntry | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<DraftSnapshot | null>(null);
   const [draftRestoredAt, setDraftRestoredAt] = useState<number | null>(null);
   const [fileReadError, setFileReadError] = useState<string | null>(null);
   const [permalinkStructure, setPermalinkStructure] = useState<string | null>(null);
@@ -212,7 +214,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   // Hydration guard — restore-from-localStorage runs once, AFTER mount.
   const restoredRef = useRef(false);
 
-  // BL-2 — restore from localStorage on mount.
+  // BL-2 — check for a saved draft on mount; show a banner rather than silently pre-filling.
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
@@ -226,20 +228,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         restoredRef.current = true;
         return;
       }
-      if (typeof parsed.composerText === "string") {
-        setComposerValue({ text: parsed.composerText, file: null });
-      }
-      if (parsed.title) setTitle(parsed.title);
-      if (parsed.slug) setSlug(parsed.slug);
-      if (parsed.metaTitle) setMetaTitle(parsed.metaTitle);
-      if (parsed.metaDescription) setMetaDescription(parsed.metaDescription);
-      if (parsed.parentPage !== undefined) setParentPage(parsed.parentPage);
-      if (parsed.featuredImage !== undefined) setFeaturedImage(parsed.featuredImage);
-      if (parsed.publishMode) setPublishMode(parsed.publishMode);
-      if (parsed.scheduledAt) setScheduledAt(parsed.scheduledAt);
-      if (parsed.selectedCategories) setSelectedCategories(parsed.selectedCategories);
-      if (parsed.selectedTags) setSelectedTags(parsed.selectedTags);
-      setDraftRestoredAt(parsed.savedAt);
+      setPendingDraft(parsed);
     } catch {
       try {
         window.localStorage.removeItem(draftStorageKey(siteId));
@@ -457,7 +446,28 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     setScheduledAt(defaultScheduledAt());
     setSelectedCategories([]);
     setSelectedTags([]);
+    setPendingDraft(null);
   }, [siteId]);
+
+  const restoreDraft = useCallback(() => {
+    if (!pendingDraft) return;
+    if (typeof pendingDraft.composerText === "string") {
+      setComposerValue({ text: pendingDraft.composerText, file: null });
+    }
+    if (pendingDraft.title) setTitle(pendingDraft.title);
+    if (pendingDraft.slug) setSlug(pendingDraft.slug);
+    if (pendingDraft.metaTitle) setMetaTitle(pendingDraft.metaTitle);
+    if (pendingDraft.metaDescription) setMetaDescription(pendingDraft.metaDescription);
+    if (pendingDraft.parentPage !== undefined) setParentPage(pendingDraft.parentPage);
+    if (pendingDraft.featuredImage !== undefined) setFeaturedImage(pendingDraft.featuredImage);
+    if (pendingDraft.publishMode) setPublishMode(pendingDraft.publishMode);
+    if (pendingDraft.scheduledAt) setScheduledAt(pendingDraft.scheduledAt);
+    if (pendingDraft.selectedCategories) setSelectedCategories(pendingDraft.selectedCategories);
+    if (pendingDraft.selectedTags) setSelectedTags(pendingDraft.selectedTags);
+    setDraftRestoredAt(pendingDraft.savedAt);
+    if (pendingDraft.parentPage) setShowAdvanced(true);
+    setPendingDraft(null);
+  }, [pendingDraft]);
 
   function setFieldValue(
     setter: typeof setTitle,
@@ -678,6 +688,13 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               </a>
             </span>
           </Alert>
+        )}
+        {pendingDraft && (
+          <DraftRestoreBanner
+            savedAt={pendingDraft.savedAt}
+            onRestore={restoreDraft}
+            onDiscard={discardDraft}
+          />
         )}
 
         {/* Prominent title field — mirrors WordPress block editor */}
@@ -1263,6 +1280,54 @@ function SidebarPanel({
       {open && (
         <div className="space-y-3 border-t px-4 py-3">{children}</div>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// BL-2 — Pending-draft banner (replaces silent pre-fill).
+// ---------------------------------------------------------------------------
+
+function DraftRestoreBanner({
+  savedAt,
+  onRestore,
+  onDiscard,
+}: {
+  savedAt: number;
+  onRestore: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <div
+      data-testid="draft-restore-banner"
+      role="alert"
+      className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm dark:border-amber-800/40 dark:bg-amber-900/20"
+    >
+      <span className="text-amber-900 dark:text-amber-200">
+        You have an unsaved draft from{" "}
+        {formatRelativeTime(new Date(savedAt).toISOString())}.
+      </span>
+      <div className="flex shrink-0 items-center gap-3">
+        <button
+          type="button"
+          data-testid="draft-restore-button"
+          onClick={onRestore}
+          className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700 dark:text-amber-200 dark:hover:text-amber-100"
+        >
+          Restore
+        </button>
+        <span aria-hidden className="text-amber-400">
+          ·
+        </span>
+        <button
+          type="button"
+          data-testid="draft-discard-button"
+          onClick={onDiscard}
+          className="text-amber-700 underline underline-offset-2 hover:text-amber-900 dark:text-amber-300 dark:hover:text-amber-100"
+        >
+          Discard
+        </button>
+      </div>
     </div>
   );
 }

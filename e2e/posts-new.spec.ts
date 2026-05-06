@@ -96,8 +96,8 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await auditA11y(page, testInfo);
   });
 
-  // BL-2 — autosave round-trip.
-  test("autosave persists across reload", async ({
+  // BL-2 autosave + draft-restore banner round-trip.
+  test("autosave persists across reload; draft-restore banner lets operator restore or discard", async ({
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
@@ -128,11 +128,11 @@ test.describe("/admin/posts/new — top-level entry", () => {
     // started. "Saving…" fires immediately; "Saved ·" fires after the 800ms
     // debounce callback runs.
     await expect(page.getByTestId("post-save-status")).toContainText(
-      /saved ·/i,
+      /saved/i,
       { timeout: 8000 },
     );
 
-    // Reload — the snapshot should rehydrate the title + body.
+    // Reload — the draft should NOT be silently pre-filled; the banner appears.
     await page.reload();
 
     // The site picker resets to "Pick a site…" because the page
@@ -144,17 +144,57 @@ test.describe("/admin/posts/new — top-level entry", () => {
       .first()
       .click();
 
-    await expect(page.locator("#post-title")).toHaveValue(
-      /autosave probe/i,
-    );
+    // The banner surfaces before content is restored.
+    await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
+    // Title + editor are still blank while the banner is showing.
+    await expect(page.locator("#post-title")).toHaveValue("");
+
+    // Click Restore — content should populate.
+    await page.getByTestId("draft-restore-button").click();
+    await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
+    await expect(page.locator("#post-title")).toHaveValue(/autosave probe/i);
     await expect(page.locator(".ProseMirror")).toContainText(
       /hello world body for autosave probe/i,
     );
 
-    // "Draft restored" status surfaces with a Discard control.
+    await auditA11y(page, testInfo);
+  });
+
+  test("draft-restore banner discard clears the stored draft", async ({
+    page,
+  }, testInfo) => {
+    await signInAsAdmin(page);
+    await page.goto("/admin/posts/new");
+
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    const composer = page.locator(".ProseMirror");
+    await composer.click();
+    await composer.pressSequentially("Draft to be discarded.");
+    await page.locator("#post-title").fill("Discard me");
+
     await expect(page.getByTestId("post-save-status")).toContainText(
-      /draft restored|saved/i,
+      /saved/i,
+      { timeout: 8000 },
     );
+
+    await page.reload();
+    await page.getByTestId("posts-new-site-picker").click();
+    await page
+      .locator('[data-testid^="posts-new-site-option-"]')
+      .first()
+      .click();
+
+    await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
+
+    // Discard — banner disappears, editor remains blank.
+    await page.getByTestId("draft-discard-button").click();
+    await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
+    await expect(page.locator("#post-title")).toHaveValue("");
 
     await auditA11y(page, testInfo);
   });
