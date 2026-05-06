@@ -226,8 +226,15 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await expect(featuredImagePanel).toBeVisible();
 
     // Publish panel contains action buttons.
+    // In default "draft" mode the primary button is "Save as Draft".
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
-    await expect(publishPanel.getByRole("button", { name: /save draft/i })).toBeVisible();
+
+    // Switch to "Publish immediately" to reveal the secondary "Save draft" button.
+    await publishPanel.getByRole("radio", { name: /publish immediately/i }).click();
+    await expect(publishPanel.getByRole("button", { name: /^save draft$/i })).toBeVisible();
+    // Restore draft mode for the collapse assertions below.
+    await publishPanel.getByRole("radio", { name: /save as draft/i }).click();
+    await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
 
     // Clicking the Publish panel header collapses it.
     await publishPanel.getByRole("button", { name: /^publish$/i }).click();
