@@ -90,6 +90,9 @@ export function ComponentFormModal({
   const [fieldErrors, setFieldErrors] = useState<
     Partial<Record<keyof FormState, string>>
   >({});
+  const [cssViolations, setCssViolations] = useState<
+    Array<{ selector?: string; line?: number }>
+  >([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -97,6 +100,7 @@ export function ComponentFormModal({
     if (open) {
       setForm(initial);
       setFieldErrors({});
+      setCssViolations([]);
       setFormError(null);
     }
   }, [open, initial]);
@@ -116,6 +120,9 @@ export function ComponentFormModal({
     setForm((prev) => ({ ...prev, [key]: value }));
     if (fieldErrors[key]) {
       setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
+    }
+    if (key === "css" && cssViolations.length > 0) {
+      setCssViolations([]);
     }
   }
 
@@ -230,11 +237,9 @@ export function ComponentFormModal({
           prefix?: string;
         };
         if (Array.isArray(details.violations) && details.violations.length > 0) {
-          const pretty = details.violations
-            .map((v) => `${v.selector ?? "?"} (line ${v.line ?? "?"})`)
-            .join(", ");
+          setCssViolations(details.violations);
           setFieldErrors({
-            css: `Selectors not prefixed with ${details.prefix ?? "site prefix"}-: ${pretty}`,
+            css: `${details.violations.length} selector${details.violations.length === 1 ? "" : "s"} not prefixed with \`${details.prefix ?? "site prefix"}-\`:`,
           });
           setSubmitting(false);
           return;
@@ -362,6 +367,16 @@ export function ComponentFormModal({
               disabled={submitting}
             />
             <FieldError message={fieldErrors.css} />
+            {cssViolations.length > 0 && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm text-destructive">
+                {cssViolations.map((v, i) => (
+                  <li key={i}>
+                    <code>{v.selector ?? "?"}</code>
+                    {v.line != null ? ` (line ${v.line})` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
             <p className="mt-1 text-sm text-muted-foreground">
               Every class selector must use the site&apos;s scope prefix (e.g.
               .ls-*). The server rejects unscoped CSS at submit time.

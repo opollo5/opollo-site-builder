@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import type { DesignComponent } from "@/lib/components";
 
+
 function countRequiredFields(schema: unknown): number {
   if (!schema || typeof schema !== "object") return 0;
   const required = (schema as { required?: unknown }).required;
@@ -16,18 +17,24 @@ export function ComponentsGrid({
   components,
   onEdit,
   onDelete,
+  onCreate,
 }: {
   components: DesignComponent[];
   onEdit: (c: DesignComponent) => void;
   onDelete: (c: DesignComponent) => void;
+  onCreate?: () => void;
 }) {
   if (components.length === 0) {
     return (
       <div className="rounded-md border border-dashed p-8 text-center">
         <p className="text-sm text-muted-foreground">
-          No components in this design system yet. Click &ldquo;New component&rdquo; to add
-          one.
+          No components in this design system yet.
         </p>
+        {onCreate && (
+          <Button className="mt-4" onClick={onCreate}>
+            New component
+          </Button>
+        )}
       </div>
     );
   }

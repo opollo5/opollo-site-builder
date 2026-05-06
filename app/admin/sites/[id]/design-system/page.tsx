@@ -90,6 +90,7 @@ export default function DesignSystemIndexPage() {
             siteId={site.id}
             onActivate={(ds) => setAction({ kind: "activate", ds })}
             onArchive={(ds) => setAction({ kind: "archive", ds })}
+            onCreate={() => setCreateOpen(true)}
           />
         </div>
 
