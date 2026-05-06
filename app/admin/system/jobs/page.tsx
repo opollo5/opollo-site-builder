@@ -5,6 +5,7 @@ import path from "node:path";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { H1, H2, Lead } from "@/components/ui/typography";
 import { StatusPill } from "@/components/ui/status-pill";
+import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -68,6 +69,10 @@ const CRON_DESCRIPTIONS: Record<string, string> = {
   "/api/cron/optimiser-extract-patterns": "Mine successful proposals for reusable patterns.",
   "/api/cron/optimiser-sync-vercel-logs":
     "Pull Vercel function-error logs to surface bad deploys earlier.",
+  "/api/cron/extract-image-metadata":
+    "Extracts dimensions, dominant colour, and EXIF/IPTC metadata from original Cloudflare blobs. Writes to image_library + image_metadata. Idempotent — skips already-processed images.",
+  "/api/cron/backfill-image-captions":
+    "EXIF-only caption backfill for images that have a Cloudflare ID but no caption/alt_text yet.",
 };
 
 function describeSchedule(schedule: string): string {
@@ -275,6 +280,17 @@ export default async function SystemJobsPage() {
           than 2 minutes or failed rows present. Check the table below.
         </div>
       )}
+
+      <section className="mt-6">
+        <H2>Library maintenance</H2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          One-off and on-demand jobs for the image library. Each batch processes
+          up to 10 images; run repeatedly until all images are done.
+        </p>
+        <div className="mt-3">
+          <ImageMetadataJobTrigger />
+        </div>
+      </section>
 
       <section className="mt-6">
         <H2>Queue depth</H2>

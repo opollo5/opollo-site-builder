@@ -106,6 +106,48 @@ test.describe("setup wizard shell", () => {
     await expect(page.getByRole("heading", { name })).toBeVisible();
   });
 
+  test("wizard stepper shows numbered circles; step 2 is gated until step 1 is done", async ({
+    page,
+  }, testInfo) => {
+    const name = `Stepper Gate ${Date.now()}`;
+    const id = await createSiteAndOpenSetup(page, name);
+    await page.waitForURL(new RegExp(`/admin/sites/${id}/setup\\?step=1`));
+
+    // Stepper is visible with step 1 active.
+    const stepper = page.getByTestId("setup-wizard-stepper");
+    await expect(stepper).toBeVisible();
+
+    const step1Item = page.getByTestId("setup-progress-step-1");
+    const step2Item = page.getByTestId("setup-progress-step-2");
+    const step3Item = page.getByTestId("setup-progress-step-3");
+
+    await expect(step1Item).toHaveAttribute("data-active", "true");
+    await expect(step2Item).toHaveAttribute("data-active", "false");
+    await expect(step3Item).toHaveAttribute("data-active", "false");
+
+    // Step 2 is not yet accessible — circle is wrapped in a span[aria-disabled].
+    await expect(step2Item.locator('[aria-disabled="true"]')).toBeVisible();
+    // Step 1 circle is a link (accessible).
+    await expect(step1Item.locator("a")).toBeVisible();
+
+    await auditA11y(page, testInfo);
+
+    // Skip step 1 — step 2 should become accessible.
+    await page.getByTestId("setup-step-1-skip").click();
+    await page.waitForURL(new RegExp(`/admin/sites/${id}/setup\\?step=2`));
+
+    await expect(step1Item).toHaveAttribute("data-complete", "true");
+    await expect(step2Item).toHaveAttribute("data-active", "true");
+    // Step 1 circle now shows a checkmark state (data-complete=true).
+    await expect(step1Item).toHaveAttribute("data-complete", "true");
+    // Step 2 circle is now a link.
+    await expect(step2Item.locator("a")).toBeVisible();
+    // Step 3 still gated.
+    await expect(step3Item.locator('[aria-disabled="true"]')).toBeVisible();
+
+    await auditA11y(page, testInfo);
+  });
+
   test("returning to setup with both steps skipped resumes at step 3", async ({
     page,
   }) => {

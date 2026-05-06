@@ -103,6 +103,10 @@
     {
       "path": "/api/cron/backfill-image-captions",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/extract-image-metadata",
+      "schedule": "* * * * *"
     }
   ]
 }

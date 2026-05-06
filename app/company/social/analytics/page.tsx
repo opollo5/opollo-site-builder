@@ -1,8 +1,25 @@
+import nextDynamic from "next/dynamic";
 import { redirect } from "next/navigation";
 
-import { SocialAnalyticsClient } from "@/components/SocialAnalyticsClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getSocialAnalytics } from "@/lib/platform/social/analytics";
+
+const SocialAnalyticsClient = nextDynamic(
+  () =>
+    import("@/components/SocialAnalyticsClient").then(
+      (m) => m.SocialAnalyticsClient,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="animate-pulse space-y-4 p-6">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-32 rounded-lg bg-muted" />
+        ))}
+      </div>
+    ),
+  },
+);
 
 // ---------------------------------------------------------------------------
 // /company/social/analytics — company-scoped social analytics page.
