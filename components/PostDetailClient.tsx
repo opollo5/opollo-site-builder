@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -60,9 +61,11 @@ export function PostDetailClient({
 
   const canUnpublish = post.status === "published" && post.wp_post_id !== null;
 
+  const wpBase = siteWpUrl.replace(/\/+$/, "");
   const wpFrontendUrl = post.wp_post_id
-    ? `${siteWpUrl.replace(/\/+$/, "")}/?p=${post.wp_post_id}`
+    ? `${wpBase}/?p=${post.wp_post_id}`
     : null;
+  const expectedUrl = `${wpBase}/${post.slug}`;
 
   async function handlePublish() {
     setActionState("publishing");
@@ -86,6 +89,7 @@ export function PostDetailClient({
       };
       if (res.ok && payload.ok) {
         setPublishOpen(false);
+        toast.success("Post published to WordPress.");
         router.refresh();
         return;
       }
@@ -122,6 +126,7 @@ export function PostDetailClient({
       };
       if (res.ok && payload.ok) {
         setUnpublishOpen(false);
+        toast.success("Post moved to WordPress trash. You can re-publish any time.");
         router.refresh();
         return;
       }
@@ -205,7 +210,7 @@ export function PostDetailClient({
         className="rounded-lg border p-4"
       >
         <h2 id="preview-heading" className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          Generated HTML
+          Content preview
         </h2>
         {post.generated_html ? (
           <iframe
@@ -216,8 +221,7 @@ export function PostDetailClient({
           />
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            No generated HTML yet. The post will populate when the brief runner
-            lands a draft for this page and the operator approves it.
+            No content yet. Save a draft from the composer to see a preview here.
           </p>
         )}
       </section>
@@ -225,25 +229,35 @@ export function PostDetailClient({
       {post.excerpt && (
         <section className="rounded-lg border p-4">
           <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            Excerpt
+            Excerpt / Meta description
           </h2>
           <p className="mt-2 text-sm">{post.excerpt}</p>
         </section>
       )}
 
-      {wpFrontendUrl && post.status === "published" && (
-        <p className="text-sm text-muted-foreground">
-          Live on WordPress:{" "}
-          <a
-            href={wpFrontendUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:no-underline"
-          >
-            {wpFrontendUrl}
-          </a>
-        </p>
-      )}
+      <section className="rounded-lg border p-4">
+        <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          WordPress URL
+        </h2>
+        {post.status === "published" && wpFrontendUrl ? (
+          <p className="mt-2 text-sm">
+            <a
+              href={wpFrontendUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:no-underline"
+            >
+              {wpFrontendUrl}
+            </a>
+            <span className="ml-2 text-muted-foreground">(live)</span>
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-muted-foreground">
+            Expected URL after publish:{" "}
+            <span className="font-mono">{expectedUrl}</span>
+          </p>
+        )}
+      </section>
 
       {publishOpen && (
         <ConfirmModal
