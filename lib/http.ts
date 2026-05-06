@@ -65,13 +65,13 @@ export function notFound(message: string): NextResponse {
 }
 
 // 500 Internal Error (for catch blocks and unrecoverable DB errors)
-export function internalError(message: string): NextResponse {
+export function internalError(message: string, retryable = false): NextResponse {
   const body: ToolError = {
     ok: false,
     error: {
       code: "INTERNAL_ERROR",
       message,
-      retryable: false,
+      retryable,
       suggested_action: "An unexpected error occurred. Try again later.",
     },
     timestamp: now(),
