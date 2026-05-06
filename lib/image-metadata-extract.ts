@@ -77,6 +77,7 @@ type ImageMeta = {
   dominantR: number | null;
   dominantG: number | null;
   dominantB: number | null;
+  title: string | null;
   caption: string | null;
   altText: string | null;
   tags: string[];
@@ -106,6 +107,7 @@ async function extractMetadata(bytes: Uint8Array): Promise<ImageMeta> {
   }
 
   // exifr: IPTC/XMP/EXIF
+  let title: string | null = null;
   let caption: string | null = null;
   let altText: string | null = null;
   let tags: string[] = [];
@@ -121,6 +123,11 @@ async function extractMetadata(bytes: Uint8Array): Promise<ImageMeta> {
 
     if (parsed) {
       exifRaw = parsed as Record<string, unknown>;
+
+      title =
+        safeStr(parsed.ObjectName, 100) ??
+        safeStr(parsed.Headline, 100) ??
+        safeStr(parsed.Title, 100);
 
       caption =
         safeStr(parsed["Caption-Abstract"], 150) ??
@@ -145,7 +152,7 @@ async function extractMetadata(bytes: Uint8Array): Promise<ImageMeta> {
     // non-fatal
   }
 
-  return { width, height, dominantR, dominantG, dominantB, caption, altText, tags, exifRaw };
+  return { width, height, dominantR, dominantG, dominantB, title, caption, altText, tags, exifRaw };
 }
 
 // ---------------------------------------------------------------------------
@@ -159,6 +166,13 @@ export async function runExtractionBatch(opts: {
 }): Promise<ExtractionBatchResult> {
   const { accountId, apiToken, batchSize = 10 } = opts;
   const svc = getServiceRoleClient();
+
+  logger.info("extract.batch_start", {
+    batch_size: batchSize,
+    has_account_id: !!accountId,
+    has_api_token: !!apiToken,
+    has_delivery_hash: !!process.env.CLOUDFLARE_IMAGES_HASH,
+  });
   const now = new Date().toISOString();
 
   // Primary idempotency: only rows that don't have dimensions yet.
@@ -219,6 +233,7 @@ export async function runExtractionBatch(opts: {
     const patch: Record<string, unknown> = { updated_at: now };
     if (meta.width !== null) patch.width_px = meta.width;
     if (meta.height !== null) patch.height_px = meta.height;
+    if (meta.title) patch.title = meta.title;
     if (meta.caption) patch.caption = meta.caption;
     if (meta.altText) patch.alt_text = meta.altText;
     if (meta.tags.length > 0) {

@@ -43,6 +43,7 @@ export type ImageListItem = {
   id: string;
   cloudflare_id: string | null;
   filename: string | null;
+  title: string | null;
   caption: string | null;
   alt_text: string | null;
   tags: string[];
@@ -63,7 +64,7 @@ export type ListImagesResult = {
 };
 
 const LIGHT_IMAGE_FIELDS =
-  "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at";
+  "id, cloudflare_id, filename, title, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at";
 
 function now(): string {
   return new Date().toISOString();
@@ -112,6 +113,7 @@ function rowToItem(row: Record<string, unknown>): ImageListItem {
     id: row.id as string,
     cloudflare_id: (row.cloudflare_id as string | null) ?? null,
     filename: (row.filename as string | null) ?? null,
+    title: (row.title as string | null) ?? null,
     caption: (row.caption as string | null) ?? null,
     alt_text: (row.alt_text as string | null) ?? null,
     tags: (row.tags as string[] | null) ?? [],
@@ -153,7 +155,7 @@ export type ImageDetail = {
 };
 
 const DETAIL_IMAGE_FIELDS =
-  "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at, version_lock";
+  "id, cloudflare_id, filename, title, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at, version_lock";
 
 export async function getImage(
   id: string,
@@ -339,7 +341,7 @@ async function updateImageMetadataImpl(
     .eq("id", id)
     .eq("version_lock", input.expected_version)
     .select(
-      "id, cloudflare_id, filename, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at, version_lock",
+      "id, cloudflare_id, filename, title, caption, alt_text, tags, source, source_ref, width_px, height_px, bytes, deleted_at, created_at, version_lock",
     )
     .maybeSingle();
 
@@ -618,6 +620,116 @@ export async function restoreImage(
       `Unhandled error in restoreImage: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Hard delete (permanent — removes from Cloudflare + Supabase).
+// ---------------------------------------------------------------------------
+
+export type HardDeleteResult = { id: string };
+
+export async function hardDeleteImage(
+  id: string,
+  opts: { deletedBy?: string | null } = {},
+): Promise<ApiResponse<HardDeleteResult>> {
+  try {
+    return await hardDeleteImageImpl(id, opts);
+  } catch (err) {
+    return internalError(
+      `Unhandled error in hardDeleteImage: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+}
+
+async function hardDeleteImageImpl(
+  id: string,
+  opts: { deletedBy?: string | null },
+): Promise<ApiResponse<HardDeleteResult>> {
+  const supabase = getServiceRoleClient();
+
+  const existsRes = await supabase
+    .from("image_library")
+    .select("id, cloudflare_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (existsRes.error) {
+    return internalError("Failed to look up image.", { supabase_error: existsRes.error });
+  }
+  if (!existsRes.data) {
+    return {
+      ok: false,
+      error: {
+        code: "NOT_FOUND",
+        message: `No image found with id ${id}.`,
+        details: { id },
+        retryable: false,
+        suggested_action: "Verify the image id.",
+      },
+      timestamp: now(),
+    };
+  }
+
+  const cloudflareId = existsRes.data.cloudflare_id as string | null;
+
+  // Delete from Cloudflare first — if this fails we abort rather than
+  // orphaning storage.
+  if (cloudflareId) {
+    const { deleteImage: cfDelete } = await import("@/lib/cloudflare-images");
+    await cfDelete(cloudflareId);
+  }
+
+  // Delete image_usage rows (FK ON DELETE NO ACTION — must go first).
+  const { error: usageErr } = await supabase
+    .from("image_usage")
+    .delete()
+    .eq("image_id", id);
+  if (usageErr) {
+    return internalError("Failed to remove image_usage rows.", { supabase_error: usageErr });
+  }
+
+  // Delete the image_library row (image_metadata cascades automatically).
+  const { error: libErr } = await supabase
+    .from("image_library")
+    .delete()
+    .eq("id", id);
+  if (libErr) {
+    return internalError("Failed to delete image_library row.", { supabase_error: libErr });
+  }
+
+  return { ok: true, data: { id }, timestamp: now() };
+}
+
+// ---------------------------------------------------------------------------
+// Bulk hard delete (permanent).
+// ---------------------------------------------------------------------------
+
+export type BulkHardDeleteResult = {
+  deleted: string[];
+  errors: Array<{ id: string; message: string }>;
+};
+
+export async function bulkHardDeleteImages(
+  ids: string[],
+  opts: { deletedBy?: string | null } = {},
+): Promise<ApiResponse<BulkHardDeleteResult>> {
+  const deleted: string[] = [];
+  const errors: Array<{ id: string; message: string }> = [];
+
+  for (const id of ids) {
+    const result = await hardDeleteImage(id, opts);
+    if (result.ok) {
+      deleted.push(id);
+    } else {
+      errors.push({ id, message: result.error.message });
+    }
+  }
+
+  return {
+    ok: true,
+    data: { deleted, errors },
+    timestamp: now(),
+  };
 }
 
 export async function listImages(

@@ -409,6 +409,41 @@ export async function getImage(
   });
 }
 
+/**
+ * DELETE /accounts/{id}/images/v1/{cloudflareId}
+ *
+ * Permanently removes the image from Cloudflare Images. Throws
+ * CloudflareCallError on failure (same classification as uploadImage).
+ * A 404 is treated as success — the image is already gone.
+ */
+export async function deleteImage(
+  cloudflareId: string,
+  opts: UploadOptions = {},
+): Promise<void> {
+  const config = opts.config ?? readCloudflareConfig();
+  const endpoint = `${CLOUDFLARE_API_ROOT}/accounts/${config.accountId}/images/v1/${encodeURIComponent(cloudflareId)}`;
+
+  const call: CloudflareFetchFn =
+    opts.fetchImpl ?? ((url, init) => httpCall(url, init, opts.timeoutMs));
+
+  const res = await call(endpoint, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${config.apiToken}` },
+  });
+
+  // 404 = already deleted; treat as success.
+  if (res.status === 404) return;
+
+  if (!res.ok) {
+    const { code, retryable } = classifyHttpStatus(res.status);
+    throw new CloudflareCallError(
+      code,
+      `Cloudflare delete failed (HTTP ${res.status})`,
+      { retryable, httpStatus: res.status },
+    );
+  }
+}
+
 // Constructs the delivery URL for a variant. Not needed by the upload
 // worker but useful for M4-7's WP transfer stage and ad-hoc inspection.
 export function deliveryUrl(
