@@ -14,6 +14,7 @@ import { preflightSitePublish } from "@/lib/site-preflight";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { getSite } from "@/lib/sites";
 import {
+  wpCreateCategory,
   wpCreatePost,
   wpCreateTag,
   wpUpdatePost,
@@ -254,9 +255,32 @@ export async function POST(
       ? (post.metadata as Record<string, unknown>)
       : {};
 
-  const wpCategoryIds = Array.isArray(metaObj.wp_category_ids)
+  const existingCategoryIds = Array.isArray(metaObj.wp_category_ids)
     ? (metaObj.wp_category_ids as number[])
-    : undefined;
+    : [];
+
+  const newCategoryNames = Array.isArray(metaObj.wp_new_category_names)
+    ? (metaObj.wp_new_category_names as string[])
+    : [];
+
+  const createdCategoryIds: number[] = [];
+  for (const catName of newCategoryNames) {
+    const catResult = await wpCreateCategory(cfg, catName);
+    if (catResult.ok) {
+      createdCategoryIds.push(catResult.id);
+    } else {
+      logger.warn("posts.publish.wp_category_create_failed", {
+        post_id: postIdCheck.value,
+        category_name: catName,
+        wp_code: catResult.code,
+      });
+    }
+  }
+
+  const allCategoryIds =
+    existingCategoryIds.length > 0 || createdCategoryIds.length > 0
+      ? [...existingCategoryIds, ...createdCategoryIds]
+      : undefined;
 
   const existingTagIds = Array.isArray(metaObj.wp_tag_ids)
     ? (metaObj.wp_tag_ids as number[])
@@ -312,7 +336,7 @@ export async function POST(
         slug: post.slug,
         content: post.generated_html,
         ...(excerptValue !== undefined ? { excerpt: excerptValue } : {}),
-        ...(wpCategoryIds !== undefined ? { categories: wpCategoryIds } : {}),
+        ...(allCategoryIds !== undefined ? { categories: allCategoryIds } : {}),
         ...(allTagIds !== undefined ? { tags: allTagIds } : {}),
         ...(yoastMeta !== undefined ? { meta: yoastMeta } : {}),
         ...featuredMediaPatch,
@@ -323,7 +347,7 @@ export async function POST(
         slug: post.slug,
         content: post.generated_html,
         ...(excerptValue !== undefined ? { excerpt: excerptValue } : {}),
-        ...(wpCategoryIds !== undefined ? { categories: wpCategoryIds } : {}),
+        ...(allCategoryIds !== undefined ? { categories: allCategoryIds } : {}),
         ...(allTagIds !== undefined ? { tags: allTagIds } : {}),
         ...(yoastMeta !== undefined ? { meta: yoastMeta } : {}),
         ...featuredMediaPatch,
