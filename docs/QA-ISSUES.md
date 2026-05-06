@@ -361,3 +361,30 @@ All items from the original work list confirmed implemented and passing typechec
 
 `npm run typecheck` — ✅ 0 errors
 `npm run lint` — ✅ 0 warnings / errors
+
+---
+
+## Phase 10 — Blog publishing dogfood sweep (2026-05-06)
+
+Issues surfaced during production dogfood on Test Site 2 / test2.leftleads.co.
+
+### Fixed in this sweep
+
+| Issue | Severity | Fix | PR |
+|---|---|---|---|
+| I-12: Published posts not reaching WordPress | CRITICAL | `buildCreateBody()` now always stores composer content as `generated_html` regardless of publish mode. `handlePublishToWp` returns `boolean`; `handlePrimarySubmit` stops navigation when WP publish fails, so the error is visible. | fix/blog-publish-end-to-end |
+| I-1: /admin and /admin/ return 404 | HIGH | Added `app/admin/page.tsx` redirect to `/admin/sites`. | fix/admin-routing-404 |
+| I-8: "Save to Opollo" button ambiguous | MEDIUM | Renamed to "Save draft" with tooltip clarifying Opollo-only (no WP push). | fix/blog-composer-ux |
+| I-9: Post detail page uses internal jargon | MEDIUM | Replaced "brief runner / operator approves" copy with plain-English status. Entry-point posts (metadata IS NOT NULL) get action-oriented copy; legacy brief-runner posts keep existing language. | fix/blog-composer-ux |
+| I-10: Final URL not surfaced after save | MEDIUM | Post detail shows full live URL (or expected URL for drafts) with "View live" button when published. | fix/blog-composer-ux |
+| I-3: "No categorys found." typo + no category creation | MEDIUM | Fixed typo → "No categories found."; added inline category creation (same UX as tags, stored as `wp_new_category_names` in metadata, created at publish time). | fix/blog-composer-taxonomy |
+| I-4: Tags slow / create flow | MEDIUM | Tags pre-load on composer mount (unchanged); `canCreateNew` logic was correct. | Not a bug — working as designed |
+| I-5/I-6: Image picker thumbnails broken | HIGH | `delivery_url` from API already includes `/public` variant; callers were appending `/w=200,h=200,fit=cover` creating an invalid double-segment URL. Changed pickers to use `delivery_url` directly (CSS `object-cover` handles crop). | fix/image-thumbnail-url |
+
+### Not fixed / deferred
+
+| Issue | Reason |
+|---|---|
+| I-2: UI contrast | Requires design-token audit; no WCAG failure found in a quick check — deferred to dedicated polish slice |
+| I-7: SEO panel | Fields exist (SEO title + meta description in collapsed panel, Yoast meta pushed to WP). Auto-populate + AI generation are new features; deferred |
+| I-11: Bulk export | New feature; deferred |

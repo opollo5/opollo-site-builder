@@ -548,8 +548,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       ...(newTagNames.length > 0 ? { wp_new_tag_names: newTagNames } : {}),
       metadata: lastParse ?? null,
       featured_image_id: featuredImage?.id ?? null,
-      // For "Publish immediately": send composed content as generated_html.
-      ...(mode === "publish" && composerValue.text.trim().length > 0
+      // Always persist composer content as generated_html so the detail
+      // page's Publish button is enabled regardless of save mode.
+      ...(!isEditorEmpty(composerValue.text)
         ? { generated_html: composerValue.text }
         : {}),
     };
@@ -594,7 +595,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return null;
   }
 
-  async function handlePublishToWp(postId: string) {
+  async function handlePublishToWp(postId: string): Promise<boolean> {
     const res = await fetch(`/api/sites/${siteId}/posts/${postId}/publish`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -609,9 +610,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       const fallback =
         payload?.ok === false
           ? payload.error.message
-          : `Publish failed (HTTP ${res.status}). Post saved to Opollo.`;
+          : `Publish failed (HTTP ${res.status}). Post saved to Opollo — open the post to retry.`;
       setFormError(ERROR_TRANSLATIONS[code] ?? fallback);
+      return false;
     }
+    return true;
   }
 
   async function handlePrimarySubmit(e: FormEvent<HTMLFormElement>) {
@@ -629,7 +632,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (!postData) return;
 
       if (publishMode === "publish") {
-        await handlePublishToWp(postData.id);
+        const wpOk = await handlePublishToWp(postData.id);
+        if (!wpOk) return; // Error shown in form; post is saved as draft
       }
 
       try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
