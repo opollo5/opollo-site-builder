@@ -3,10 +3,10 @@
 // PLACEHOLDER — schema types not yet bootstrapped.
 //
 // Until this file is replaced with the real generated output, the Supabase
-// client is typed as `any` (same behaviour as before M15-8).  The CI drift
-// gate is inactive while this placeholder is in place — it only activates
-// once the file contains the `@generated` marker that `supabase gen types`
-// emits on the first line.
+// client is typed as `any` (same behaviour as before M15-8). The CI drift
+// gate is inactive while this placeholder is in place — it activates once
+// `supabase gen types` has run and replaced this file (the generated output
+// starts with a marker on the first line that CI scans for).
 //
 // Bootstrap (one-time, requires Docker + local stack running):
 //
