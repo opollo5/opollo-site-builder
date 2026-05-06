@@ -194,8 +194,8 @@ export function AdminSidebar({
           className={cn(
             "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-d1",
             active
-              ? "bg-[rgba(255,3,165,0.10)] text-white font-medium"
-              : "text-m2 hover:bg-[rgba(0,229,160,0.06)] hover:text-gr",
+              ? "bg-nav-active text-white font-medium"
+              : "text-m2 hover:bg-nav-hover hover:text-gr",
           )}
         >
           <Icon
@@ -216,7 +216,7 @@ export function AdminSidebar({
   return (
     <>
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-[rgba(4,4,10,0.85)] px-4 backdrop-blur-[18px] sm:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
         <Link
           href="/admin/sites"
           className="focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
@@ -363,9 +363,9 @@ export function AdminSidebar({
                 href="/account/security"
                 title={collapsed ? "Account security" : undefined}
                 className={cn(
-                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActiveRoute("/account/security") &&
-                    "bg-[rgba(255,3,165,0.10)] text-white font-medium",
+                    "bg-nav-active text-white font-medium",
                 )}
                 data-testid="nav-security"
               >
@@ -378,9 +378,9 @@ export function AdminSidebar({
                 href="/account/devices"
                 title={collapsed ? "Trusted devices" : undefined}
                 className={cn(
-                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+                  "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActiveRoute("/account/devices") &&
-                    "bg-[rgba(255,3,165,0.10)] text-white font-medium",
+                    "bg-nav-active text-white font-medium",
                 )}
                 data-testid="nav-devices"
               >
@@ -391,7 +391,7 @@ export function AdminSidebar({
             <Link
               href="/"
               title={collapsed ? "Back to builder" : undefined}
-              className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-[rgba(0,229,160,0.06)] hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+              className="group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
               data-testid="nav-back-to-builder"
             >
               <Settings aria-hidden className="h-4 w-4 shrink-0 text-icon-dim group-hover:text-gr" />
