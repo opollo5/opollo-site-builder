@@ -1386,6 +1386,99 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         </SidebarPanel>
       </aside>
 
+      {/* ── SEO — full width below both columns (Issue 18) ── */}
+      <section
+        className="lg:col-span-2"
+        data-testid="seo-section"
+        aria-label="SEO settings"
+      >
+        <div className="overflow-hidden rounded-md border bg-card">
+          <button
+            type="button"
+            onClick={() => setSeoPanelOpen((v) => !v)}
+            aria-expanded={seoPanelOpen}
+            className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            SEO
+            <ChevronDown
+              aria-hidden
+              className={cn(
+                "h-4 w-4 text-muted-foreground transition-transform",
+                seoPanelOpen && "rotate-180",
+              )}
+            />
+          </button>
+          {seoPanelOpen && <div className="space-y-4 border-t px-4 py-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="post-meta-title" className="block text-sm font-medium">
+                  SEO title
+                </label>
+                <Input
+                  id="post-meta-title"
+                  className="mt-1"
+                  value={metaTitle.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setMetaTitle,
+                      e.target.value,
+                      lastParse?.meta_title ?? null,
+                      lastParse?.source_map.meta_title ?? "derived",
+                    )
+                  }
+                  disabled={submitting}
+                  maxLength={200}
+                />
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <SourceHint source={metaTitle.source} />
+                  <MetaTitleLengthHint length={metaTitle.value.length} />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="post-meta-description" className="block text-sm font-medium">
+                  Meta description
+                </label>
+                <Textarea
+                  id="post-meta-description"
+                  className="mt-1"
+                  rows={3}
+                  value={metaDescription.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setMetaDescription,
+                      e.target.value,
+                      lastParse?.meta_description ?? null,
+                      lastParse?.source_map.meta_description ?? "derived",
+                    )
+                  }
+                  disabled={submitting}
+                  maxLength={400}
+                  aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
+                />
+                <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+                  <SourceHint source={metaDescription.source} />
+                  <MetaDescriptionLengthHint length={metaDescription.value.length} />
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Search preview
+              </p>
+              <GoogleSnippetPreview
+                title={metaTitle.value || title.value}
+                url={
+                  siteWpUrl && slug.value
+                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
+                    : siteWpUrl ?? "https://example.com/"
+                }
+                description={metaDescription.value}
+              />
+            </div>
+          </div>}
+        </div>
+      </section>
+
       <ImagePickerModal
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
