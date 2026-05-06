@@ -227,7 +227,7 @@ test.describe("/admin/posts/new — top-level entry", () => {
 
     // Publish panel contains action buttons.
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
-    await expect(publishPanel.getByRole("button", { name: /save to opollo/i })).toBeVisible();
+    await expect(publishPanel.getByRole("button", { name: /save draft/i })).toBeVisible();
 
     // Clicking the Publish panel header collapses it.
     await publishPanel.getByRole("button", { name: /^publish$/i }).click();

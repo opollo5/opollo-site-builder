@@ -150,6 +150,7 @@ export type BriefPageRow = {
   source_span_start: number | null;
   source_span_end: number | null;
   source_text: string;
+  excerpt: string | null;
   word_count: number;
   operator_notes: string | null;
   version_lock: number;
@@ -511,6 +512,7 @@ async function uploadBriefImpl(
     word_count: p.word_count,
     source_span_start: p.source_span_start,
     source_span_end: p.source_span_end,
+    excerpt: p.excerpt ?? null,
     created_by: input.uploadedBy,
     updated_by: input.uploadedBy,
   }));
