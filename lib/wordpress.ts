@@ -616,6 +616,14 @@ export type WpCreatePostInput = {
   featured_media?: number;
   /** Raw WP `meta` object. Yoast / RankMath / SEOPress meta fields go here. */
   meta?: Record<string, unknown>;
+  /** Whether comments are open or closed. */
+  comment_status?: "open" | "closed";
+  /** Whether trackbacks/pingbacks are open or closed. */
+  ping_status?: "open" | "closed";
+  /** Password for password-protected posts. */
+  password?: string;
+  /** WP user ID to assign as the post author. */
+  author?: number;
 };
 
 export type WpUpdatePostFields = {
@@ -628,6 +636,10 @@ export type WpUpdatePostFields = {
   tags?: number[];
   featured_media?: number;
   meta?: Record<string, unknown>;
+  comment_status?: "open" | "closed";
+  ping_status?: "open" | "closed";
+  password?: string;
+  author?: number;
 };
 
 export type WpPostRecord = {
@@ -717,6 +729,10 @@ function buildCreatePostBody(input: WpCreatePostInput): Record<string, unknown> 
   if (input.tags !== undefined) body.tags = input.tags;
   if (input.featured_media !== undefined) body.featured_media = input.featured_media;
   if (input.meta !== undefined) body.meta = input.meta;
+  if (input.comment_status !== undefined) body.comment_status = input.comment_status;
+  if (input.ping_status !== undefined) body.ping_status = input.ping_status;
+  if (input.password !== undefined) body.password = input.password;
+  if (input.author !== undefined) body.author = input.author;
   return body;
 }
 
@@ -731,6 +747,10 @@ function buildUpdatePostBody(fields: WpUpdatePostFields): Record<string, unknown
   if (fields.tags !== undefined) body.tags = fields.tags;
   if (fields.featured_media !== undefined) body.featured_media = fields.featured_media;
   if (fields.meta !== undefined) body.meta = fields.meta;
+  if (fields.comment_status !== undefined) body.comment_status = fields.comment_status;
+  if (fields.ping_status !== undefined) body.ping_status = fields.ping_status;
+  if (fields.password !== undefined) body.password = fields.password;
+  if (fields.author !== undefined) body.author = fields.author;
   return body;
 }
 
@@ -1246,3 +1266,44 @@ export async function wpCreateCategory(
   return { ok: true, ...toTaxonomyItem(parsed.body) };
 }
 
+// ---------------------------------------------------------------------------
+// WP users — for BlogPostComposer author picker.
+// ---------------------------------------------------------------------------
+
+export type WpUserItem = {
+  id: number;
+  name: string;
+  slug: string;
+};
+
+export type WpListUsersResult = WpResult<{ items: WpUserItem[] }>;
+
+function toUserItem(raw: unknown): WpUserItem {
+  const r = raw as Record<string, unknown>;
+  return {
+    id: Number(r.id ?? 0),
+    name: typeof r.name === "string" ? r.name.trim() : String(r.slug ?? ""),
+    slug: String(r.slug ?? ""),
+  };
+}
+
+export async function wpListUsers(cfg: WpConfig): Promise<WpListUsersResult> {
+  let res: Response;
+  try {
+    res = await wpFetch(
+      cfg,
+      "/wp-json/wp/v2/users?per_page=100&_fields=id,name,slug",
+      { method: "GET" },
+    );
+  } catch (err) {
+    return networkError(err);
+  }
+  const mapped = await mapHttpErrorToWpError(res);
+  if (mapped) return mapped;
+  const parsed = await parseJsonOrError<unknown[]>(res);
+  if (!parsed.ok) return parsed;
+  return {
+    ok: true,
+    items: (Array.isArray(parsed.body) ? parsed.body : []).map(toUserItem),
+  };
+}

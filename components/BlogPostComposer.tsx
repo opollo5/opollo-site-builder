@@ -202,7 +202,8 @@ function isEditorEmpty(html: string): boolean {
   return html.replace(/<[^>]+>/g, "").trim().length === 0;
 }
 
-type PublishMode = "publish" | "draft" | "schedule";
+type PublishMode = "publish" | "draft" | "schedule" | "pending";
+type Visibility = "public" | "private" | "password";
 
 function defaultScheduledAt(): string {
   const d = new Date();
@@ -226,6 +227,13 @@ interface DraftSnapshot {
   scheduledAt?: string;
   selectedCategories?: WpTaxonomyOption[];
   selectedTags?: WpTaxonomyOption[];
+  siteName?: string;
+  // Issue 19 — WP controls
+  visibility?: Visibility;
+  postPassword?: string;
+  commentStatus?: "open" | "closed";
+  pingStatus?: "open" | "closed";
+  wpAuthorId?: number | null;
 }
 
 function draftStorageKey(siteId: string): string {
@@ -268,6 +276,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   // Fix 6 — WP categories + tags.
   const [selectedCategories, setSelectedCategories] = useState<WpTaxonomyOption[]>([]);
   const [selectedTags, setSelectedTags] = useState<WpTaxonomyOption[]>([]);
+  // Issue 19 — WP controls.
+  const [visibility, setVisibility] = useState<Visibility>("public");
+  const [postPassword, setPostPassword] = useState<string>("");
+  const [commentStatus, setCommentStatus] = useState<"open" | "closed">("open");
+  const [pingStatus, setPingStatus] = useState<"open" | "closed">("open");
+  const [wpAuthorId, setWpAuthorId] = useState<number | null>(null);
   // Hydration guard — restore-from-localStorage runs once, AFTER mount.
   const restoredRef = useRef(false);
 
@@ -479,6 +493,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         scheduledAt,
         selectedCategories,
         selectedTags,
+        siteName: siteName ?? undefined,
+        visibility,
+        postPassword,
+        commentStatus,
+        pingStatus,
+        wpAuthorId,
       };
       try {
         window.localStorage.setItem(
@@ -503,6 +523,12 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     scheduledAt,
     selectedCategories,
     selectedTags,
+    siteName,
+    visibility,
+    postPassword,
+    commentStatus,
+    pingStatus,
+    wpAuthorId,
     siteId,
     submitting,
   ]);
@@ -526,6 +552,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     setScheduledAt(defaultScheduledAt());
     setSelectedCategories([]);
     setSelectedTags([]);
+    setVisibility("public");
+    setPostPassword("");
+    setCommentStatus("open");
+    setPingStatus("open");
+    setWpAuthorId(null);
     setPendingDraft(null);
   }, [siteId]);
 
@@ -544,6 +575,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     if (pendingDraft.scheduledAt) setScheduledAt(pendingDraft.scheduledAt);
     if (pendingDraft.selectedCategories) setSelectedCategories(pendingDraft.selectedCategories);
     if (pendingDraft.selectedTags) setSelectedTags(pendingDraft.selectedTags);
+    if (pendingDraft.visibility) setVisibility(pendingDraft.visibility);
+    if (pendingDraft.postPassword) setPostPassword(pendingDraft.postPassword);
+    if (pendingDraft.commentStatus) setCommentStatus(pendingDraft.commentStatus);
+    if (pendingDraft.pingStatus) setPingStatus(pendingDraft.pingStatus);
+    if (pendingDraft.wpAuthorId !== undefined) setWpAuthorId(pendingDraft.wpAuthorId);
     setDraftRestoredAt(pendingDraft.savedAt);
     if (pendingDraft.parentPage) setShowAdvanced(true);
     setPendingDraft(null);
@@ -586,6 +622,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     canSaveDraft &&
     metaTitleIsValid &&
     metaDescriptionIsValid;
+
+  // Pending review only needs title + content (same requirements as draft).
+  const canSubmitPending = canSaveDraft;
 
   const publishMissingImage = canPublish && featuredImage === null;
 
@@ -644,6 +683,26 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     };
   }
 
+  // Build the WP-control overrides forwarded to the publish route.
+  function buildWpPublishExtras(): Record<string, unknown> {
+    const extras: Record<string, unknown> = {};
+    // Visibility drives the WP status override.
+    if (visibility === "private") {
+      extras.wp_status = "private";
+    } else if (publishMode === "pending") {
+      extras.wp_status = "pending";
+    } else {
+      extras.wp_status = "publish";
+    }
+    if (visibility === "password" && postPassword.trim()) {
+      extras.wp_password = postPassword.trim();
+    }
+    if (commentStatus !== "open") extras.wp_comment_status = commentStatus;
+    if (pingStatus !== "open") extras.wp_ping_status = pingStatus;
+    if (wpAuthorId !== null) extras.wp_author_id = wpAuthorId;
+    return extras;
+  }
+
   async function submitToOpollo(forceAsDraft = false): Promise<{ id: string; edit_url: string } | null> {
     const body = await buildCreateBody(forceAsDraft);
     const baseSlug = body.slug as string;
@@ -687,7 +746,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     const res = await fetch(`/api/sites/${siteId}/posts/${postId}/publish`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ expected_version_lock: 0 }),
+      body: JSON.stringify({ expected_version_lock: 0, ...buildWpPublishExtras() }),
     });
     const payload = (await res.json().catch(() => null)) as
       | { ok: true; data: unknown }
@@ -719,19 +778,23 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       const postData = await submitToOpollo();
       if (!postData) return;
 
-      if (publishMode === "publish") {
+      if (publishMode === "publish" || publishMode === "pending") {
         const wpOk = await handlePublishToWp(postData.id);
         if (!wpOk) return; // Error shown in form; post is saved as draft
-        const liveUrl =
-          siteWpUrl && slug.value
-            ? `${siteWpUrl.replace(/\/+$/, "")}/${slug.value}/`
-            : null;
-        toast.success("Published to WordPress!", {
-          description: liveUrl ? "Your post is now live." : undefined,
-          action: liveUrl
-            ? { label: "View live", onClick: () => window.open(liveUrl, "_blank") }
-            : undefined,
-        });
+        if (publishMode === "publish") {
+          const liveUrl =
+            siteWpUrl && slug.value && visibility !== "private"
+              ? `${siteWpUrl.replace(/\/+$/, "")}/${slug.value}/`
+              : null;
+          toast.success("Published to WordPress!", {
+            description: liveUrl ? "Your post is now live." : undefined,
+            action: liveUrl
+              ? { label: "View live", onClick: () => window.open(liveUrl, "_blank") }
+              : undefined,
+          });
+        } else {
+          toast.success("Submitted for review in WordPress.");
+        }
       }
 
       try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
@@ -766,8 +829,13 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       ? "Publish to WordPress"
       : publishMode === "schedule"
         ? "Schedule Post"
-        : "Save as Draft";
-  const primaryDisabled = publishMode === "publish" ? !canPublish : !canSaveDraft;
+        : publishMode === "pending"
+          ? "Submit for Review"
+          : "Save as Draft";
+  const primaryDisabled =
+    publishMode === "publish" ? !canPublish :
+    publishMode === "pending" ? !canSubmitPending :
+    !canSaveDraft;
 
   return (
     <form
@@ -910,7 +978,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           <div>
             <p className="mb-2 text-sm font-medium">Status</p>
             <div className="space-y-1.5">
-              {(["draft", "publish", "schedule"] as const).map((mode) => (
+              {(["draft", "publish", "pending", "schedule"] as const).map((mode) => (
                 <label
                   key={mode}
                   className="flex cursor-pointer items-center gap-2 text-sm"
@@ -928,7 +996,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                     ? "Save as draft"
                     : mode === "publish"
                       ? "Publish immediately"
-                      : "Schedule for later"}
+                      : mode === "pending"
+                        ? "Submit for review"
+                        : "Schedule for later"}
                 </label>
               ))}
             </div>
@@ -954,7 +1024,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
 
           {publishMode === "publish" && !canPublish && canSaveDraft && (
             <p className="text-sm text-muted-foreground">
-              Add SEO title and meta description to enable publishing.
+              Fill in the SEO fields below to enable publishing.
             </p>
           )}
 
@@ -977,7 +1047,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             >
               {submitting ? "Saving…" : primaryLabel}
             </Button>
-            {publishMode !== "draft" && (
+            {publishMode !== "draft" && publishMode !== "pending" && (
               <Button
                 type="button"
                 variant="outline"
@@ -1139,76 +1209,77 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           )}
         </SidebarPanel>
 
-        {/* SEO panel — open by default; auto-populates from title + first paragraph */}
-        <SidebarPanel title="SEO" defaultOpen={true} testId="sidebar-seo">
-          <div className="space-y-3">
-            <div>
-              <label htmlFor="post-meta-title" className="block text-sm font-medium">
-                SEO title
+        {/* Visibility panel */}
+        <SidebarPanel title="Visibility" defaultOpen testId="sidebar-visibility">
+          <div className="space-y-1.5">
+            {(["public", "private", "password"] as const).map((v) => (
+              <label key={v} className="flex cursor-pointer items-center gap-2 text-sm">
+                <input
+                  type="radio"
+                  name={`visibility-${siteId}`}
+                  value={v}
+                  checked={visibility === v}
+                  onChange={() => setVisibility(v)}
+                  disabled={submitting}
+                  className="accent-primary"
+                />
+                {v === "public" ? "Public" : v === "private" ? "Private" : "Password protected"}
+              </label>
+            ))}
+          </div>
+          {visibility === "password" && (
+            <div className="mt-2">
+              <label htmlFor="post-password" className="block text-sm font-medium">
+                Password
               </label>
               <Input
-                id="post-meta-title"
+                id="post-password"
+                type="text"
                 className="mt-1"
-                value={metaTitle.value}
-                onChange={(e) =>
-                  setFieldValue(
-                    setMetaTitle,
-                    e.target.value,
-                    lastParse?.meta_title ?? null,
-                    lastParse?.source_map.meta_title ?? "derived",
-                  )
-                }
+                value={postPassword}
+                onChange={(e) => setPostPassword(e.target.value)}
                 disabled={submitting}
-                maxLength={200}
+                maxLength={255}
+                placeholder="Enter post password…"
+                autoComplete="off"
               />
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <SourceHint source={metaTitle.source} />
-                <MetaTitleLengthHint length={metaTitle.value.length} />
-              </div>
             </div>
-            <div>
-              <label
-                htmlFor="post-meta-description"
-                className="block text-sm font-medium"
-              >
-                Meta description
-              </label>
-              <Textarea
-                id="post-meta-description"
-                className="mt-1"
-                rows={3}
-                value={metaDescription.value}
-                onChange={(e) =>
-                  setFieldValue(
-                    setMetaDescription,
-                    e.target.value,
-                    lastParse?.meta_description ?? null,
-                    lastParse?.source_map.meta_description ?? "derived",
-                  )
-                }
+          )}
+        </SidebarPanel>
+
+        {/* Author panel */}
+        <SidebarPanel title="Author" defaultOpen={false} testId="sidebar-author">
+          <WpUserCombobox
+            siteId={siteId}
+            value={wpAuthorId}
+            onChange={setWpAuthorId}
+            disabled={submitting}
+          />
+        </SidebarPanel>
+
+        {/* Discussion panel */}
+        <SidebarPanel title="Discussion" defaultOpen={false} testId="sidebar-discussion">
+          <div className="space-y-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={commentStatus === "open"}
+                onChange={(e) => setCommentStatus(e.target.checked ? "open" : "closed")}
                 disabled={submitting}
-                maxLength={400}
-                aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
+                className="accent-primary"
               />
-              <div className="mt-1 flex items-center justify-between gap-2 text-sm">
-                <SourceHint source={metaDescription.source} />
-                <MetaDescriptionLengthHint length={metaDescription.value.length} />
-              </div>
-            </div>
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Search preview
-              </p>
-              <GoogleSnippetPreview
-                title={metaTitle.value || title.value}
-                url={
-                  siteWpUrl && slug.value
-                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
-                    : siteWpUrl ?? "https://example.com/"
-                }
-                description={metaDescription.value}
+              Allow comments
+            </label>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={pingStatus === "open"}
+                onChange={(e) => setPingStatus(e.target.checked ? "open" : "closed")}
+                disabled={submitting}
+                className="accent-primary"
               />
-            </div>
+              Allow pingbacks &amp; trackbacks
+            </label>
           </div>
         </SidebarPanel>
 
@@ -1226,6 +1297,87 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           </p>
         </SidebarPanel>
       </aside>
+
+      {/* ── SEO — full width below both columns (Issue 18) ── */}
+      <section
+        className="lg:col-span-2"
+        data-testid="seo-section"
+        aria-label="SEO settings"
+      >
+        <div className="overflow-hidden rounded-md border bg-card">
+          <div className="px-4 py-2.5 text-sm font-semibold border-b">
+            SEO
+          </div>
+          <div className="space-y-4 px-4 py-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="post-meta-title" className="block text-sm font-medium">
+                  SEO title
+                </label>
+                <Input
+                  id="post-meta-title"
+                  className="mt-1"
+                  value={metaTitle.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setMetaTitle,
+                      e.target.value,
+                      lastParse?.meta_title ?? null,
+                      lastParse?.source_map.meta_title ?? "derived",
+                    )
+                  }
+                  disabled={submitting}
+                  maxLength={200}
+                />
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <SourceHint source={metaTitle.source} />
+                  <MetaTitleLengthHint length={metaTitle.value.length} />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="post-meta-description" className="block text-sm font-medium">
+                  Meta description
+                </label>
+                <Textarea
+                  id="post-meta-description"
+                  className="mt-1"
+                  rows={3}
+                  value={metaDescription.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setMetaDescription,
+                      e.target.value,
+                      lastParse?.meta_description ?? null,
+                      lastParse?.source_map.meta_description ?? "derived",
+                    )
+                  }
+                  disabled={submitting}
+                  maxLength={400}
+                  aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
+                />
+                <div className="mt-1 flex items-center justify-between gap-2 text-sm">
+                  <SourceHint source={metaDescription.source} />
+                  <MetaDescriptionLengthHint length={metaDescription.value.length} />
+                </div>
+              </div>
+            </div>
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Search preview
+              </p>
+              <GoogleSnippetPreview
+                title={metaTitle.value || title.value}
+                url={
+                  siteWpUrl && slug.value
+                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
+                    : siteWpUrl ?? "https://example.com/"
+                }
+                description={metaDescription.value}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
 
       <ImagePickerModal
         open={pickerOpen}
@@ -1699,6 +1851,130 @@ function WpTaxonomyCombobox({
                     {option.count}
                   </span>
                 )}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Issue 19 — WpUserCombobox: single-select for post author.
+// ---------------------------------------------------------------------------
+
+interface WpUserOption {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+function WpUserCombobox({
+  siteId,
+  value,
+  onChange,
+  disabled,
+}: {
+  siteId: string;
+  value: number | null;
+  onChange: (id: number | null) => void;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [options, setOptions] = useState<WpUserOption[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const loadedRef = useRef(false);
+
+  useEffect(() => {
+    if (!open || loadedRef.current) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    void (async () => {
+      try {
+        const res = await fetch(`/api/sites/${siteId}/wp-users`, { cache: "no-store" });
+        const payload = (await res.json().catch(() => null)) as
+          | { ok: true; data: { items: WpUserOption[] } }
+          | { ok: false; error: { message: string } }
+          | null;
+        if (!cancelled) {
+          if (payload?.ok) {
+            setOptions(payload.data.items);
+            loadedRef.current = true;
+          } else {
+            setError(
+              payload?.ok === false
+                ? payload.error.message
+                : "Failed to load authors.",
+            );
+          }
+        }
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [open, siteId]);
+
+  const selectedUser = options.find((u) => u.id === value) ?? null;
+
+  return (
+    <Popover open={open} onOpenChange={(next) => !disabled && setOpen(next)}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="mt-1 flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-sm transition-smooth focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+        >
+          <span className={selectedUser ? "" : "text-muted-foreground"}>
+            {loading && !selectedUser
+              ? "Loading authors…"
+              : selectedUser
+                ? selectedUser.name
+                : "Use site default"}
+          </span>
+          <ChevronDown aria-hidden className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        sideOffset={4}
+        className="w-[var(--radix-popover-trigger-width)] max-h-60 overflow-y-auto p-0"
+      >
+        <Command>
+          <CommandInput placeholder="Search authors…" />
+          <CommandList>
+            {error && (
+              <div role="alert" className="px-3 py-2 text-sm text-destructive">{error}</div>
+            )}
+            <CommandEmpty>{loading ? "Loading…" : "No authors found."}</CommandEmpty>
+            <CommandItem
+              value="__default__"
+              onSelect={() => { onChange(null); setOpen(false); }}
+            >
+              <Check
+                aria-hidden
+                className={cn("mr-2 h-4 w-4 shrink-0", value === null ? "opacity-100" : "opacity-0")}
+              />
+              Use site default
+            </CommandItem>
+            {options.map((user) => (
+              <CommandItem
+                key={user.id}
+                value={`${user.name} ${user.slug}`}
+                onSelect={() => { onChange(user.id); setOpen(false); }}
+              >
+                <Check
+                  aria-hidden
+                  className={cn("mr-2 h-4 w-4 shrink-0", value === user.id ? "opacity-100" : "opacity-0")}
+                />
+                <span className="flex-1 truncate">{user.name}</span>
               </CommandItem>
             ))}
           </CommandList>
