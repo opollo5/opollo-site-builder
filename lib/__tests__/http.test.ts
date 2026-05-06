@@ -122,10 +122,10 @@ describe("conflict", () => {
     expect(body.error.details).toEqual({ email: "a@b.com" });
   });
 
-  it("falls back to 409 when the code has no explicit HTTP mapping", async () => {
-    // BUDGET_EXCEEDED maps to 402; test a code that maps to something else.
+  it("uses errorCodeToStatus for codes with a non-409 mapping", async () => {
+    // BUDGET_EXCEEDED maps to 429 (rate-limit / budget family).
     const res = conflict("BUDGET_EXCEEDED", "Over budget.");
-    expect(res.status).toBe(402);
+    expect(res.status).toBe(429);
   });
 });
 
