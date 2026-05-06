@@ -85,11 +85,31 @@ const SOURCE_HINTS: Record<ParseSource, string> = {
 };
 
 // Extract first plain-text paragraph from HTML for meta-description seeding.
-// Uses DOMParser so only textContent is returned, never raw HTML (CodeQL safe).
+// Pure string walk — no DOM API, no regex replace — avoids both CodeQL rules
+// (js/incomplete-multi-char-sanitization and js/xss).
 function extractFirstParagraph(html: string): string {
-  if (typeof window === "undefined") return "";
-  const doc = new DOMParser().parseFromString(html, "text/html");
-  return doc.querySelector("p")?.textContent?.trim() ?? "";
+  const pMatch = /<p[\s>]/.exec(html);
+  if (!pMatch) return "";
+  const tagEnd = html.indexOf(">", pMatch.index);
+  if (tagEnd === -1) return "";
+  const contentEnd = html.indexOf("</p>", tagEnd);
+  if (contentEnd === -1) return "";
+  let text = "";
+  let inTag = false;
+  let quote = "";
+  for (let i = tagEnd + 1; i < contentEnd; i++) {
+    const ch = html[i];
+    if (inTag) {
+      if (quote) { if (ch === quote) quote = ""; }
+      else if (ch === '"' || ch === "'") { quote = ch; }
+      else if (ch === ">") { inTag = false; }
+    } else if (ch === "<") {
+      inTag = true;
+    } else {
+      text += ch;
+    }
+  }
+  return text.trim();
 }
 
 // Google SERP snippet preview — purely visual, no interaction.
