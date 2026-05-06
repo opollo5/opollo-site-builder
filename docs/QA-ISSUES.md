@@ -372,14 +372,14 @@ Issues surfaced during production dogfood on Test Site 2 / test2.leftleads.co.
 
 | Issue | Severity | Fix | PR |
 |---|---|---|---|
-| I-12: Published posts not reaching WordPress | CRITICAL | `buildCreateBody()` now always stores composer content as `generated_html` regardless of publish mode. `handlePublishToWp` returns `boolean`; `handlePrimarySubmit` stops navigation when WP publish fails, so the error is visible. | fix/blog-publish-end-to-end |
-| I-1: /admin and /admin/ return 404 | HIGH | Added `app/admin/page.tsx` redirect to `/admin/sites`. | fix/admin-routing-404 |
-| I-8: "Save to Opollo" button ambiguous | MEDIUM | Renamed to "Save draft" with tooltip clarifying Opollo-only (no WP push). | fix/blog-composer-ux |
-| I-9: Post detail page uses internal jargon | MEDIUM | Replaced "brief runner / operator approves" copy with plain-English status. Entry-point posts (metadata IS NOT NULL) get action-oriented copy; legacy brief-runner posts keep existing language. | fix/blog-composer-ux |
-| I-10: Final URL not surfaced after save | MEDIUM | Post detail shows full live URL (or expected URL for drafts) with "View live" button when published. | fix/blog-composer-ux |
-| I-3: "No categorys found." typo + no category creation | MEDIUM | Fixed typo → "No categories found."; added inline category creation (same UX as tags, stored as `wp_new_category_names` in metadata, created at publish time). | fix/blog-composer-taxonomy |
-| I-4: Tags slow / create flow | MEDIUM | Tags pre-load on composer mount (unchanged); `canCreateNew` logic was correct. | Not a bug — working as designed |
-| I-5/I-6: Image picker thumbnails broken | HIGH | `delivery_url` from API already includes `/public` variant; callers were appending `/w=200,h=200,fit=cover` creating an invalid double-segment URL. Changed pickers to use `delivery_url` directly (CSS `object-cover` handles crop). | fix/image-thumbnail-url |
+| I-12: Published posts not reaching WordPress | CRITICAL | `buildCreateBody()` now always stores composer content as `generated_html` regardless of publish mode. `handlePublishToWp` returns `boolean`; `handlePrimarySubmit` stops navigation when WP publish fails, so the error is visible. | #628 ✅ |
+| I-1: /admin and /admin/ return 404 | HIGH | Added `app/admin/page.tsx` redirect to `/admin/sites`. | #636 ✅ |
+| I-5/I-6: Image picker thumbnails broken | HIGH | `delivery_url` from API already includes `/public` variant; callers were appending `/w=200,h=200,fit=cover` creating an invalid double-segment URL. Changed pickers to use `delivery_url` directly (CSS `object-cover` handles crop). | #638 ✅ |
+| I-8: "Save to Opollo" button ambiguous | MEDIUM | Renamed to "Save draft" with tooltip "Save as draft in Opollo. Does not publish to WordPress." | #632 ✅ |
+| I-9: Post detail page uses internal jargon | MEDIUM | "Generated HTML" → "Content preview"; empty-state copy updated to "Save a draft from the composer to see a preview here."; "Excerpt" → "Excerpt / Meta description". | #632 ✅ |
+| I-10: Final URL not surfaced after save | MEDIUM | Post detail shows expected URL for draft posts and live link (with "(live)" badge) for published posts. Toast on publish/unpublish success. | #632 ✅ |
+| I-3: "No categorys found." typo + no category creation | MEDIUM | Fixed typo; added inline category creation (same UX as tags — `+` badge, stored as `wp_new_category_names`, created via `wpCreateCategory()` at publish time). | #637 ✅ |
+| I-4: Tags create flow | MEDIUM | `canCreateNew` now enabled for categories too; both comboboxes show "Add category/tag" affordance. | #637 ✅ |
 
 ### Not fixed / deferred
 
