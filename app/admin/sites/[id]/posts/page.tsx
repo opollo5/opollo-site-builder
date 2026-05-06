@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H1, Lead } from "@/components/ui/typography";
-import { FileText, Plus } from "lucide-react";
+import { Download, FileText, Plus } from "lucide-react";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
   listPostsForSite,
@@ -146,15 +146,29 @@ export default async function SitePostsList({
               : `${total} ${total === 1 ? "post" : "posts"}${total > 0 && items.length < total ? ` · showing ${rangeStart}–${rangeEnd}` : ""}`}
           </Lead>
         </div>
-        <Button asChild>
-          <Link
-            href={`/admin/sites/${site.id}/posts/new`}
-            data-testid="new-post-button"
-          >
-            <Plus aria-hidden className="h-4 w-4" />
-            New post
-          </Link>
-        </Button>
+        <div className="flex items-center gap-2">
+          {total > 0 && (
+            <Button asChild variant="outline" size="sm">
+              <a
+                href={`/api/sites/${site.id}/posts/export`}
+                download
+                data-testid="download-all-button"
+              >
+                <Download aria-hidden className="h-4 w-4" />
+                Download all
+              </a>
+            </Button>
+          )}
+          <Button asChild>
+            <Link
+              href={`/admin/sites/${site.id}/posts/new`}
+              data-testid="new-post-button"
+            >
+              <Plus aria-hidden className="h-4 w-4" />
+              New post
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <form
