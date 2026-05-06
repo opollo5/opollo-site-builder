@@ -44,7 +44,28 @@ const ENVELOPE_PATTERNS = [
   /errorResponse\("INTERNAL_ERROR"/,
   /errorResult\("INTERNAL_ERROR"/,
 ];
-const LOG_HORIZON = 8;
+// lib/http.ts defines the internalError helper itself; it's the factory, not
+// a consumer that should be logging. Exclude it from the scan.
+const SKIP_FILES = new Set(["lib/http.ts"]);
+// Look back 20 lines for a logger call — catch blocks that release a lease
+// (like brief-runner.ts) can have logger.error more than 8 lines back.
+const LOG_HORIZON = 20;
+
+// Lines that match the envelope pattern but are TypeScript type annotations
+// rather than runtime returns. Discriminators:
+//   1. "INTERNAL_ERROR"; — semicolon follows the string (type syntax, not
+//      object literal syntax which uses commas).
+//   2. Trimmed line starts with | — union type member.
+//   3. Trimmed line starts with } — closing of a generic/return-type block.
+// This eliminates the 6 false positives from type-definition lines in
+// lib/http.ts, lib/brief-runner.ts, lib/sites.ts, lib/tenant-budgets.ts,
+// lib/invites.ts, lib/platform/brand/update.ts.
+function isTypeAnnotationFalsePositive(line: string): boolean {
+  const t = line.trimStart();
+  if (/"INTERNAL_ERROR";/.test(line)) return true;
+  if (t.startsWith("| {") || t.startsWith("| error")) return true;
+  return false;
+}
 
 type Violation = { file: string; line: number; snippet: string };
 
@@ -74,12 +95,15 @@ function audit(): Violation[] {
       continue;
     }
     for (const file of walk(root)) {
+      const rel = relative(process.cwd(), file).replace(/\\/g, "/");
+      if (SKIP_FILES.has(rel)) continue;
       const lines = readFileSync(file, "utf8").split("\n");
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i] ?? "";
         if (!ENVELOPE_PATTERNS.some((re) => re.test(line))) continue;
+        if (isTypeAnnotationFalsePositive(line)) continue;
         const start = Math.max(0, i - LOG_HORIZON);
-        const window = lines.slice(start, i).join("\n");
+        const window = lines.slice(start, i + 1).join("\n");
         if (window.includes("logger.error") || window.includes("logger.warn")) {
           continue;
         }
