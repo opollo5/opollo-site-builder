@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { estimateBriefRunCostCents } from "@/lib/anthropic-pricing";
+import { decodePdf, decodeDocx } from "@/lib/brief-binary-decode";
 import { parseBriefDocument, type BriefPageDraft, type ParserWarning } from "@/lib/brief-parser";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -21,8 +22,21 @@ import type { ApiResponse, ErrorCode } from "@/lib/tool-schemas";
 export const BRIEF_STORAGE_BUCKET = "site-briefs";
 export const BRIEF_MAX_BYTES = 10 * 1024 * 1024; // 10 MB (matches CHECK on briefs.source_size_bytes).
 export const BRIEF_MAX_CONTENT_TOKENS = 60_000; // Approximate cap per parent plan §Whole-doc context.
-export const BRIEF_ALLOWED_MIME_TYPES = ["text/plain", "text/markdown"] as const;
+export const BRIEF_TEXT_MIME_TYPES = ["text/plain", "text/markdown"] as const;
+export const BRIEF_BINARY_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+] as const;
+export const BRIEF_ALLOWED_MIME_TYPES = [
+  ...BRIEF_TEXT_MIME_TYPES,
+  ...BRIEF_BINARY_MIME_TYPES,
+] as const;
 export type BriefMimeType = (typeof BRIEF_ALLOWED_MIME_TYPES)[number];
+
+function binaryParsersEnabled(): boolean {
+  const v = process.env.OPOLLO_BRIEF_BINARY_PARSERS;
+  return v === "1" || v === "true";
+}
 
 export type BriefRow = {
   id: string;
@@ -254,8 +268,15 @@ async function uploadBriefImpl(
   if (input.bytes.byteLength > BRIEF_MAX_BYTES) {
     return errorEnvelope("BRIEF_TOO_LARGE", `Brief exceeds the ${BRIEF_MAX_BYTES}-byte cap.`);
   }
-  if (!BRIEF_ALLOWED_MIME_TYPES.includes(input.mimeType)) {
+  const isBinaryType = (BRIEF_BINARY_MIME_TYPES as readonly string[]).includes(input.mimeType);
+  if (!BRIEF_ALLOWED_MIME_TYPES.includes(input.mimeType as BriefMimeType)) {
     return errorEnvelope("BRIEF_UNSUPPORTED_TYPE", `Unsupported MIME type: ${input.mimeType}.`);
+  }
+  if (isBinaryType && !binaryParsersEnabled()) {
+    return errorEnvelope(
+      "BRIEF_UNSUPPORTED_TYPE",
+      "PDF and Word document uploads are not enabled on this instance. Upload a plain-text (.txt) or Markdown (.md) file instead.",
+    );
   }
 
   // Site exists + not soft-deleted.
@@ -397,8 +418,37 @@ async function uploadBriefImpl(
     });
   }
 
-  // 5. Parse synchronously.
-  const sourceText = new TextDecoder("utf-8", { fatal: false }).decode(input.bytes);
+  // 5. Decode bytes to UTF-8 text.
+  // Text types: standard UTF-8 decode. Binary types: delegate to the
+  // CJS parser helpers (pdf-parse / mammoth) which are runtime-loaded
+  // via dynamic import so webpack never bundles their native assets.
+  let sourceText: string;
+  if (input.mimeType === "application/pdf") {
+    const decoded = await decodePdf(input.bytes);
+    if (!decoded.ok) {
+      logger.warn("PDF decode failed", { briefId, detail: decoded.detail });
+      await svc
+        .from("briefs")
+        .update({ status: "failed_parse", parse_failure_code: decoded.code, parse_failure_detail: decoded.detail, parser_warnings: [], updated_at: now() })
+        .eq("id", briefId);
+      return { ok: true, data: { brief_id: briefId, site_id: input.siteId, status: "failed_parse", parser_mode: null, review_url: briefReviewUrl(input.siteId, briefId), replay: false }, timestamp: now() };
+    }
+    sourceText = decoded.text;
+  } else if (input.mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    const decoded = await decodeDocx(input.bytes);
+    if (!decoded.ok) {
+      logger.warn("DOCX decode failed", { briefId, detail: decoded.detail });
+      await svc
+        .from("briefs")
+        .update({ status: "failed_parse", parse_failure_code: decoded.code, parse_failure_detail: decoded.detail, parser_warnings: [], updated_at: now() })
+        .eq("id", briefId);
+      return { ok: true, data: { brief_id: briefId, site_id: input.siteId, status: "failed_parse", parser_mode: null, review_url: briefReviewUrl(input.siteId, briefId), replay: false }, timestamp: now() };
+    }
+    sourceText = decoded.text;
+  } else {
+    sourceText = new TextDecoder("utf-8", { fatal: false }).decode(input.bytes);
+  }
+
   const parseResult = await parseBriefDocument({
     briefId,
     source: sourceText,

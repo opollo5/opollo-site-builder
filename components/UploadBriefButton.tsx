@@ -17,7 +17,13 @@ import { UploadBriefModal } from "@/components/UploadBriefModal";
 // client-side router.refresh() in that exact path. Adding the listener
 // at the site-detail surface (not inside the modal) means it fires for
 // any back-nav into the site page, not just back-from-review.
-export function UploadBriefButton({ siteId }: { siteId: string }) {
+export function UploadBriefButton({
+  siteId,
+  binaryParsersEnabled = false,
+}: {
+  siteId: string;
+  binaryParsersEnabled?: boolean;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
@@ -42,7 +48,12 @@ export function UploadBriefButton({ siteId }: { siteId: string }) {
       >
         Upload brief
       </Button>
-      <UploadBriefModal open={open} siteId={siteId} onClose={() => setOpen(false)} />
+      <UploadBriefModal
+        open={open}
+        siteId={siteId}
+        onClose={() => setOpen(false)}
+        binaryParsersEnabled={binaryParsersEnabled}
+      />
     </>
   );
 }
