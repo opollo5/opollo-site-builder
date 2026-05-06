@@ -52,7 +52,7 @@ export default async function RootLayout({
   return (
     <html
       lang="en"
-      className={cn(fredoka.variable, manrope.variable, "dark")}
+      className={cn(fredoka.variable, manrope.variable)}
       suppressHydrationWarning
     >
       <head>
