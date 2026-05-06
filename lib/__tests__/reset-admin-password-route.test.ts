@@ -481,7 +481,7 @@ describe("POST /api/ops/reset-admin-password: supabase errors", () => {
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.error.code).toBe("INTERNAL_ERROR");
-    expect(body.error.retryable).toBe(true);
+    expect(body.error.retryable).toBe(false);
     expect(mockState.updateCalls).toHaveLength(0);
   });
 
