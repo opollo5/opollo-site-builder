@@ -1,5 +1,6 @@
 import "server-only";
 
+import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse, ErrorCode } from "@/lib/tool-schemas";
 
@@ -45,6 +46,7 @@ export async function getNotifications(input: {
   ]);
 
   if (rows.error) {
+    logger.error("notifications.getNotifications.query_failed", { user_id: input.userId, company_id: input.companyId, supabase_error: rows.error.message });
     return err("INTERNAL_ERROR", `Failed to read notifications: ${rows.error.message}`, true);
   }
 
@@ -76,6 +78,7 @@ export async function markAllRead(input: {
     .select("id");
 
   if (update.error) {
+    logger.error("notifications.markAllRead.update_failed", { user_id: input.userId, company_id: input.companyId, supabase_error: update.error.message });
     return err("INTERNAL_ERROR", `Failed to mark notifications read: ${update.error.message}`, true);
   }
 
