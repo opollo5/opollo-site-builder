@@ -292,19 +292,20 @@ function rawString(value: unknown): string {
   return "";
 }
 
-function toPageListItem(raw: any): PageListItem {
+function toPageListItem(raw: unknown): PageListItem {
+  const r = raw as Record<string, unknown>;
   return {
-    page_id: Number(raw.id),
-    title: renderedString(raw.title),
-    slug: typeof raw.slug === "string" ? raw.slug : "",
-    status: typeof raw.status === "string" ? raw.status : "",
+    page_id: Number(r.id),
+    title: renderedString(r.title),
+    slug: typeof r.slug === "string" ? r.slug : "",
+    status: typeof r.status === "string" ? r.status : "",
     parent_id:
-      typeof raw.parent === "number" && raw.parent > 0 ? raw.parent : null,
+      typeof r.parent === "number" && r.parent > 0 ? r.parent : null,
     modified_date:
-      typeof raw.modified_gmt === "string"
-        ? raw.modified_gmt
-        : typeof raw.modified === "string"
-          ? raw.modified
+      typeof r.modified_gmt === "string"
+        ? r.modified_gmt
+        : typeof r.modified === "string"
+          ? r.modified
           : "",
   };
 }
@@ -682,37 +683,38 @@ export type WpUpdatePostResult = WpResult<WpUpdatePostData>;
 export type WpGetPostResult = WpResult<WpPostRecord>;
 export type WpDeletePostResult = WpResult<WpDeletePostData>;
 
-function toPostRecord(raw: any): WpPostRecord {
-  const categories = Array.isArray(raw?.categories)
-    ? (raw.categories as unknown[])
+function toPostRecord(raw: unknown): WpPostRecord {
+  const r = raw as Record<string, unknown>;
+  const categories = Array.isArray(r.categories)
+    ? (r.categories as unknown[])
         .map((n) => Number(n))
         .filter((n) => Number.isFinite(n))
     : [];
-  const tags = Array.isArray(raw?.tags)
-    ? (raw.tags as unknown[])
+  const tags = Array.isArray(r.tags)
+    ? (r.tags as unknown[])
         .map((n) => Number(n))
         .filter((n) => Number.isFinite(n))
     : [];
   const featured =
-    typeof raw?.featured_media === "number" && raw.featured_media > 0
-      ? raw.featured_media
+    typeof r.featured_media === "number" && r.featured_media > 0
+      ? r.featured_media
       : null;
   return {
-    post_id: Number(raw?.id),
-    title: rawString(raw?.title),
-    slug: typeof raw?.slug === "string" ? raw.slug : "",
-    content: rawString(raw?.content),
-    excerpt: rawString(raw?.excerpt),
-    status: typeof raw?.status === "string" ? raw.status : "",
+    post_id: Number(r.id),
+    title: rawString(r.title),
+    slug: typeof r.slug === "string" ? r.slug : "",
+    content: rawString(r.content),
+    excerpt: rawString(r.excerpt),
+    status: typeof r.status === "string" ? r.status : "",
     categories,
     tags,
     featured_media: featured,
-    link: typeof raw?.link === "string" ? raw.link : "",
+    link: typeof r.link === "string" ? r.link : "",
     modified_date:
-      typeof raw?.modified_gmt === "string"
-        ? raw.modified_gmt
-        : typeof raw?.modified === "string"
-          ? raw.modified
+      typeof r.modified_gmt === "string"
+        ? r.modified_gmt
+        : typeof r.modified === "string"
+          ? r.modified
           : "",
   };
 }

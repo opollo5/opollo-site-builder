@@ -596,10 +596,15 @@ Medium / Low findings from Audit 3 (UI + cross-milestone integration) that are d
 - `#13` — Brand tokens in Tailwind (Low — only if admin scope changes)
 - `#14` — `force-dynamic` vs `revalidate: 0` audit (Low)
 - `#15` — Lighthouse thresholds ratchet + `/` route coverage (Low)
-- `#16` — Four `: any` annotations in WP + chat boundary (Low)
+- ~~`#16` — Four `: any` annotations in WP + chat boundary~~ (shipped this PR)
 - `#17` — `docs/PROMPT_VERSIONING.md` vs `lib/prompts/vN/` reconciliation (Low)
-- `#18` — Two stale `TODO(M3)` / `TODO(M7)` comments → BACKLOG (Low)
+- ~~`#18` — Two stale `TODO(M3)` / `TODO(M7)` comments → BACKLOG~~ (shipped this PR)
 - ~~`#20` — Smart-quote / HTML-entity standardisation in empty states~~ (shipped this PR — CTAs replace text references)
+
+#### Ex-TODO deferred items (moved from code, per #18)
+
+- **`loadActiveRegistry()` site-keyed LRU cache** (`lib/system-prompt.ts`) — Site-keyed LRU with 5-min TTL around `loadActiveRegistry()` would eliminate redundant DB reads during batch runs (~40 per site). Performance-only; correctness unaffected at current load. Trigger: observable latency spike in Axiom on batch ticks, or `/api/health` slow-DS-load counter.
+- **Kill-switch edge-propagation hardening** (`lib/auth-kill-switch.ts`) — Per-serverless-instance cache means the 5s TTL is the effective global propagation bound. Candidates: edge KV (immediate invalidation) or a signed cookie the emergency route issues that middleware trusts for the kill-switch window. Trigger: fleet grows to where warm-pool turnover is too slow to be operationally reliable during an active incident.
 
 Trigger to pick up: next UI polish pass, OR before any admin UI brand-scope change.
 
