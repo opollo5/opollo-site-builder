@@ -3,82 +3,82 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
- * Opollo Design System — always-dark token layer.
+ * Opollo Design System — soft-light token layer.
  *
  * Raw hex vars (--pk, --gr, --bl, etc.) are for direct use in Opollo
  * component classes. Tailwind/shadcn semantic vars (--background, etc.)
  * are HSL approximations of the same palette so every shadcn primitive
- * inherits the dark theme automatically.
+ * inherits the light theme automatically.
  *
- * Light mode does not exist. The <html> element carries class="dark"
- * unconditionally, which activates Tailwind's dark: variants everywhere.
+ * Brand accent colors (pink --pk, green --gr) are preserved.
+ * The <html> element no longer carries class="dark".
  * ------------------------------------------------------------------------- */
 @layer base {
   :root {
     /* ---- Opollo raw hex tokens ----------------------------------------- */
     --pk: #ff03a5;
     --pk2: #cc0084;
-    --pk-soft: rgba(255, 3, 165, 0.12);
-    --gr: #00e5a0;
-    --gr2: #00c48a;
-    --gr-soft: rgba(0, 229, 160, 0.10);
-    --bl: #4da6ff;
-    --bl-soft: rgba(77, 166, 255, 0.10);
-    --am: #ffb300;
-    --rd: #ff4d6d;
-    --bg: #04040a;
-    --d1: #07070f;
-    --d2: #0b0b18;
-    --d3: #10101e;
-    --d4: #161624;
+    --pk-soft: rgba(255, 3, 165, 0.08);
+    --gr: #00c48a;           /* slightly deeper green for legibility on white */
+    --gr2: #009e72;
+    --gr-soft: rgba(0, 196, 138, 0.08);
+    --bl: #2563eb;           /* deeper blue — better on white */
+    --bl-soft: rgba(37, 99, 235, 0.08);
+    --am: #d97706;           /* amber shifted darker for light bg */
+    --rd: #dc2626;           /* red shifted darker for light bg */
+    --bg: #f9fafb;           /* page base — soft off-white */
+    --d1: #ffffff;           /* card surface — white */
+    --d2: #f9fafb;           /* card surface 2 — off-white */
+    --d3: #f3f4f6;           /* elevated panel — light hover grey */
+    --d4: #e5e7eb;           /* hover/elevated — border grey */
     --white: #ffffff;
-    --m1: rgba(255, 255, 255, 0.92);
-    --m2: rgba(255, 255, 255, 0.58);
-    --m3: rgba(255, 255, 255, 0.32);
-    --m4: rgba(255, 255, 255, 0.18);
-    --b1: rgba(255, 255, 255, 0.06);
-    --b2: rgba(255, 255, 255, 0.12);
-    --b3: rgba(255, 255, 255, 0.20);
-    /* Dim alpha for inactive icons — between m3 (0.32) and m2 (0.58) */
-    --icon-dim: rgba(255, 255, 255, 0.40);
-    /* Nav chrome — semantic aliases so components don't hard-code rgba */
-    --nav-active: rgba(255, 3, 165, 0.10);  /* pk at 10%: active nav item bg  */
-    --nav-hover:  rgba(0, 229, 160, 0.06);  /* gr at 6%:  nav item hover bg   */
-    --topbar-bg:  rgba(4, 4, 10, 0.85);     /* bg at 85%: mobile topbar blur  */
-    --pk-glow:    rgba(255, 3, 165, 0.40);  /* pk at 40%: button hover shadow */
+    --m1: rgba(31, 41, 55, 0.95);    /* primary body text — near-black */
+    --m2: rgba(107, 114, 128, 1);    /* secondary — medium grey */
+    --m3: rgba(156, 163, 175, 1);    /* labels/metadata — light grey */
+    --m4: rgba(209, 213, 219, 1);    /* disabled — very light grey */
+    --b1: rgba(0, 0, 0, 0.05);       /* default divider */
+    --b2: rgba(0, 0, 0, 0.10);       /* hover/focus border */
+    --b3: rgba(0, 0, 0, 0.18);       /* active/strong border */
+    /* Dim alpha for inactive icons */
+    --icon-dim: rgba(107, 114, 128, 0.7);
+    /* Nav chrome */
+    --nav-active: rgba(255, 3, 165, 0.08);   /* pk tint: active nav item bg */
+    --nav-hover:  rgba(0, 196, 138, 0.08);   /* gr tint: nav item hover bg  */
+    --topbar-bg:  rgba(249, 250, 251, 0.92); /* near-white topbar blur       */
+    --pk-glow:    rgba(255, 3, 165, 0.30);   /* pk glow: button hover shadow */
 
-    /* ---- Tailwind/shadcn semantic tokens (HSL, always-dark) -------------- */
-    --background: 240 37% 4%;           /* --d1  #07070f  card surface       */
-    --foreground: 0 0% 92%;             /* --m1  rgba(255,255,255,0.92)       */
-    --card: 240 37% 4%;                 /* --d1                               */
-    --card-foreground: 0 0% 92%;
-    --popover: 240 31% 9%;              /* --d3  #10101e  elevated panel      */
-    --popover-foreground: 0 0% 92%;
-    --primary: 322 100% 50%;            /* --pk  #ff03a5                      */
+    /* ---- Tailwind/shadcn semantic tokens (HSL, light) ------------------- */
+    --background: 0 0% 100%;             /* #ffffff  white card/panel surface */
+    --foreground: 220 26% 18%;           /* #1f2937  near-black text          */
+    --card: 0 0% 100%;                   /* #ffffff                           */
+    --card-foreground: 220 26% 18%;
+    --popover: 0 0% 100%;                /* #ffffff                           */
+    --popover-foreground: 220 26% 18%;
+    --primary: 322 100% 50%;             /* --pk  #ff03a5                     */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 24% 11%;           /* --d4  #161624  hover/elevated      */
-    --secondary-foreground: 0 0% 92%;
-    --muted: 240 31% 9%;                /* --d3                               */
-    --muted-foreground: 0 0% 58%;       /* --m2  rgba(255,255,255,0.58)       */
-    --accent: 240 24% 11%;              /* --d4                               */
-    --accent-foreground: 0 0% 92%;
-    --destructive: 350 100% 65%;        /* --rd  #ff4d6d                      */
+    --secondary: 220 14% 96%;            /* #f3f4f6  hover grey               */
+    --secondary-foreground: 220 26% 18%;
+    --muted: 220 14% 96%;                /* #f3f4f6                           */
+    --muted-foreground: 220 9% 46%;      /* #6b7280  medium grey              */
+    --accent: 220 14% 96%;               /* #f3f4f6                           */
+    --accent-foreground: 220 26% 18%;
+    --destructive: 0 84% 50%;            /* #dc2626  red                      */
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 24%;               /* ≈ 18% white overlay — WCAG AA 3:1  */
-    --input: 240 4% 34%;                /* ≈ 32% white overlay — WCAG AA 3:1  */
-    --ring: 162 100% 45%;               /* --gr  #00e5a0  focus ring = green  */
+    --border: 220 13% 91%;               /* #e5e7eb  light border             */
+    --input: 220 13% 91%;                /* #e5e7eb                           */
+    --ring: 162 100% 45%;                /* #00e5a0  green focus ring         */
     --radius: 0.5rem;
 
-    /* canvas = page base, one notch deeper than card surface */
-    --canvas: 240 43% 3%;               /* --bg  #04040a                      */
+    /* canvas = page base, slightly off-white vs pure-white card surfaces */
+    --canvas: 210 20% 98%;               /* #f9fafb  soft off-white           */
 
-    /* status tokens — Opollo palette */
-    --success: 162 100% 45%;            /* --gr  green                        */
-    --success-foreground: 240 43% 3%;
-    --warning: 42 100% 50%;             /* --am  amber                        */
-    --warning-foreground: 240 43% 3%;
-    --info: 211 100% 65%;               /* --bl  blue                         */
-    --info-foreground: 240 43% 3%;
+    /* status tokens */
+    --success: 160 61% 38%;              /* #00c48a  green (legible on white) */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 44%;               /* #d97706  amber                    */
+    --warning-foreground: 0 0% 100%;
+    --info: 221 83% 53%;                 /* #2563eb  blue                     */
+    --info-foreground: 0 0% 100%;
   }
 }
 
