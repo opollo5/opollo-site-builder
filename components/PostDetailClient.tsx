@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -15,22 +16,19 @@ import type { PreflightResult } from "@/lib/site-preflight";
 // M13-4 — post detail + publish/unpublish controls.
 //
 // Renders:
-//   - Title + slug + status pill + WP post id
+//   - Back to posts link + title + slug + status pill + WP post id
 //   - Preflight blocker (translated) when preflight failed
 //   - Rendered HTML preview in <iframe sandbox="">
-//   - Publish button (disabled when preflight blocks OR post has no
-//     generated_html)
+//   - Publish button (fires directly, no confirm modal — additive action)
 //   - Unpublish button (only when status='published'), behind a
 //     confirm modal naming the WP URL that will be trashed
+//   - View live button when published
 //   - Inline error surface for API failures
 //
-// Assistive-operator-flow contract: every destructive action goes
-// through a confirm modal that names the exact consequence. Publish
-// is NOT gated behind a modal because it's additive (trashable via WP
-// if the operator changes their mind). Unpublish IS gated because
-// while WP's trash is recoverable, the operator seeing a modal before
-// the trash action keeps the "visible-to-readers → not-visible"
-// transition explicit.
+// Assistive-operator-flow contract: Publish is NOT gated behind a modal
+// because it's additive (trashable via WP if the operator changes their
+// mind). Unpublish IS gated because the "visible-to-readers → not-visible"
+// transition warrants an explicit confirmation step.
 // ---------------------------------------------------------------------------
 
 type ActionState = "idle" | "publishing" | "unpublishing";
@@ -50,7 +48,6 @@ export function PostDetailClient({
   const [actionState, setActionState] = useState<ActionState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [unpublishOpen, setUnpublishOpen] = useState(false);
-  const [publishOpen, setPublishOpen] = useState(false);
 
   const preflightBlocked = preflight.ok === false;
   const canPublish =
@@ -88,8 +85,12 @@ export function PostDetailClient({
         };
       };
       if (res.ok && payload.ok) {
-        setPublishOpen(false);
-        toast.success("Post published to WordPress.");
+        toast.success("Published to WordPress!", {
+          description: wpFrontendUrl ? "Your post is now live." : undefined,
+          action: wpFrontendUrl
+            ? { label: "View live", onClick: () => window.open(wpFrontendUrl, "_blank") }
+            : undefined,
+        });
         router.refresh();
         return;
       }
@@ -146,7 +147,13 @@ export function PostDetailClient({
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <H1>{post.title}</H1>
+          <Link
+            href={`/admin/sites/${siteId}/posts`}
+            className="text-sm text-muted-foreground underline hover:text-foreground"
+          >
+            ← Back to posts
+          </Link>
+          <H1 className="mt-2">{post.title}</H1>
           <p className="mt-1 text-sm text-muted-foreground">
             <code className="text-sm">/{post.slug}</code>
             {" · "}
@@ -160,13 +167,24 @@ export function PostDetailClient({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {post.status === "published" && wpFrontendUrl && (
+            <Button type="button" variant="outline" asChild>
+              <a href={wpFrontendUrl} target="_blank" rel="noreferrer">
+                View live ↗
+              </a>
+            </Button>
+          )}
           {canPublish && (
             <Button
               type="button"
-              onClick={() => setPublishOpen(true)}
+              onClick={handlePublish}
               disabled={actionState !== "idle"}
             >
-              {post.wp_post_id ? "Re-publish to WP" : "Publish to WP"}
+              {actionState === "publishing"
+                ? "Publishing…"
+                : post.wp_post_id
+                  ? "Re-publish to WP"
+                  : "Publish to WP"}
             </Button>
           )}
           {canUnpublish && (
@@ -258,22 +276,6 @@ export function PostDetailClient({
           </p>
         )}
       </section>
-
-      {publishOpen && (
-        <ConfirmModal
-          title={post.wp_post_id ? "Re-publish to WordPress?" : "Publish to WordPress?"}
-          body={
-            post.wp_post_id
-              ? `This overwrites the live WP post at ${wpFrontendUrl ?? "the same URL"} with the current Opollo draft. WP keeps the previous version as a revision; nothing is deleted.`
-              : `Publishes this post to ${siteWpUrl}. The post becomes visible to readers immediately. You can unpublish later from this screen.`
-          }
-          confirmLabel={actionState === "publishing" ? "Publishing…" : "Publish"}
-          destructive={false}
-          onCancel={() => setPublishOpen(false)}
-          onConfirm={handlePublish}
-          submitting={actionState === "publishing"}
-        />
-      )}
 
       {unpublishOpen && (
         <ConfirmModal
