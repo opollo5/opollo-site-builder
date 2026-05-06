@@ -406,3 +406,15 @@ Second dogfood pass on the blog composer and post list surfaces.
 | I-21: WP taxonomy combobox eager-loads on mount | MEDIUM | Lazy-loads on first open using `open` + `loadedRef` guard. Eliminates two simultaneous WP API calls on page load. | #659 ✅ |
 | I-22: ImagePickerModal appends stale results on query change | MEDIUM | `setBrowseOffset(0)` merged into `onChange` handler so both updates batch atomically. Separate `useEffect` removed. | #658 ✅ |
 | I-23: Image title not populated on upload | LOW | Upload route now derives title from EXIF ObjectName/Headline/Title/filename. Backfill script extended to populate missing titles. | #661 ✅ |
+
+---
+
+## Phase 11 — Blog composer WP parity + draft discovery (2026-05-06, PR #664)
+
+Third dogfood pass. Issues surfaced during a follow-up session on the blog composer.
+
+| Issue | Severity | Fix | PR |
+|---|---|---|---|
+| II-17: Unsaved drafts not discoverable | MEDIUM | `PendingDraftsNotice` added to `PostsNewClient`. Scans `localStorage` for `opollo:post-draft:*` keys on mount; surfaces amber banner per draft with site name + relative timestamp. Resume selects site + sets single mode; Discard removes the key. | #664 ✅ |
+| II-18: SEO panel buried in sidebar | MEDIUM | SEO `SidebarPanel` removed from `<aside>`. New full-width `<section className="lg:col-span-2">` added below the editor/sidebar grid with left/right split (title+meta left, Google snippet preview right). | #664 ✅ |
+| II-19: Composer missing WP parity controls | MEDIUM | Visibility panel (Public / Private / Password Protected + conditional password input), Author panel (`WpUserCombobox` lazy-loads `/api/sites/[id]/wp-users`), Discussion panel (Allow comments + Allow pingbacks checkboxes). All values wired to publish route via `buildWpPublishExtras()`. `PublishBodySchema` extended with `wp_status`, `wp_password`, `wp_comment_status`, `wp_ping_status`, `wp_author_id`. "Submit for Review" mode wires `pending` WP status. | #664 ✅ |
