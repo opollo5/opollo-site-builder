@@ -148,6 +148,7 @@ export async function publishRegenJob(
     return await publishRegenJobImpl(jobId, generatedHtml, wp);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    logger.error("regeneration.publishRegenJob.uncaught", { job_id: jobId, error: message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -173,6 +174,7 @@ async function publishRegenJobImpl(
     .eq("id", jobId)
     .maybeSingle();
   if (jobRes.error || !jobRes.data) {
+    logger.error("regeneration.publishRegenJob.job_lookup_failed", { job_id: jobId, supabase_error: jobRes.error?.message ?? "no row" });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -190,6 +192,7 @@ async function publishRegenJobImpl(
     .eq("id", job.page_id)
     .maybeSingle();
   if (pageRes.error || !pageRes.data) {
+    logger.error("regeneration.publishRegenJob.page_lookup_failed", { job_id: jobId, page_id: job.page_id, supabase_error: pageRes.error?.message ?? "no row" });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -205,6 +208,7 @@ async function publishRegenJobImpl(
     .eq("id", job.site_id)
     .maybeSingle();
   if (siteRes.error || !siteRes.data) {
+    logger.error("regeneration.publishRegenJob.site_lookup_failed", { job_id: jobId, site_id: job.site_id, supabase_error: siteRes.error?.message ?? "no row" });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -220,6 +224,7 @@ async function publishRegenJobImpl(
     .select("type, payload")
     .eq("regeneration_job_id", jobId);
   if (eventsRes.error) {
+    logger.error("regeneration.publishRegenJob.events_lookup_failed", { job_id: jobId, supabase_error: eventsRes.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -407,6 +412,7 @@ async function publishRegenJobImpl(
         },
       });
     if (eventWrite.error) {
+      logger.error("regeneration.publishRegenJob.event_write_failed", { job_id: jobId, type: "wp_put_succeeded", supabase_error: eventWrite.error.message });
       return {
         ok: false,
         code: "INTERNAL_ERROR",
@@ -430,6 +436,7 @@ async function publishRegenJobImpl(
     .maybeSingle();
 
   if (pagesUpdate.error) {
+    logger.error("regeneration.publishRegenJob.pages_update_failed", { job_id: jobId, page_id: page.id, supabase_error: pagesUpdate.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -631,6 +638,7 @@ export async function enqueueRegenJob(
     .eq("site_id", input.site_id)
     .maybeSingle();
   if (pageRes.error) {
+    logger.error("regeneration.enqueueRegenJob.page_lookup_failed", { site_id: input.site_id, page_id: input.page_id, supabase_error: pageRes.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -656,6 +664,7 @@ export async function enqueueRegenJob(
     .select("cost_usd_cents")
     .gte("created_at", startOfDay.toISOString());
   if (budgetRes.error) {
+    logger.error("regeneration.enqueueRegenJob.budget_lookup_failed", { site_id: input.site_id, page_id: input.page_id, supabase_error: budgetRes.error.message });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
@@ -710,6 +719,8 @@ export async function enqueueRegenJob(
           },
         };
       }
+      logger.error("regeneration.enqueueRegenJob.budget_reservation_failed", { site_id: input.site_id, page_id: input.page_id, error: reservation.message });
+      logger.error("regeneration.enqueue.budget_reserve_failed", { site_id: input.site_id, error: reservation.message });
       return {
         ok: false,
         code: "INTERNAL_ERROR",
@@ -754,6 +765,8 @@ export async function enqueueRegenJob(
         details: { page_id: input.page_id },
       };
     }
+    logger.error("regeneration.enqueueRegenJob.insert_failed", { site_id: input.site_id, page_id: input.page_id, error: pgErr.message ?? String(err) });
+    logger.error("regeneration.enqueue.insert_failed", { site_id: input.site_id, page_id: input.page_id, error: pgErr.message ?? String(err) });
     return {
       ok: false,
       code: "INTERNAL_ERROR",
