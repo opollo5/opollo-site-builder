@@ -196,7 +196,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       ok: true,
       data: {
         items,
-        total: items.length,
+        total: result.data.total,
         limit: result.data.limit,
         offset: result.data.offset,
         // R1-5 — suggestion context. UI uses this to render the

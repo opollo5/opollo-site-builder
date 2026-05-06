@@ -401,19 +401,20 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     })();
   }, [siteId]);
 
-  // Fix 2 — auto-generate slug from title when slug is blank and untouched.
+  // Fix 2 — auto-generate slug from title whenever title changes, as long as
+  // the operator hasn't manually edited the slug field.
   useEffect(() => {
-    if (!slug.touched && slug.value === "" && title.value.trim().length > 0) {
+    if (!slug.touched && title.value.trim().length > 0) {
       setSlug({ value: generateSlug(title.value), source: "derived", touched: false });
     }
   // Only re-run when title changes; slug setter is stable.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title.value]);
 
-  // Issue 7 — auto-populate SEO title from "{Post title} - {Site name}" when
-  // the operator hasn't touched the field and the parser didn't fill it.
+  // Issue 7 — auto-populate SEO title from "{Post title} - {Site name}" whenever
+  // title changes, as long as the operator hasn't manually edited the SEO title field.
   useEffect(() => {
-    if (!metaTitle.touched && metaTitle.value === "" && title.value.trim() && siteName) {
+    if (!metaTitle.touched && title.value.trim() && siteName) {
       setMetaTitle({ value: `${title.value.trim()} - ${siteName}`, source: "derived", touched: false });
     }
   // Re-run only when title or siteName changes.
@@ -789,16 +790,19 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               : null;
           toast.success("Published to WordPress!", {
             description: liveUrl ? "Your post is now live." : undefined,
+            duration: 5000,
             action: liveUrl
               ? { label: "View live", onClick: () => window.open(liveUrl, "_blank") }
               : undefined,
           });
         } else {
-          toast.success("Submitted for review in WordPress.");
+          toast.success("Submitted for review in WordPress.", { duration: 5000 });
         }
       }
 
       try { window.localStorage.removeItem(draftStorageKey(siteId)); } catch {}
+      // Small delay so the toast has time to paint before the router transitions.
+      await new Promise<void>((resolve) => setTimeout(resolve, 400));
       router.push(postData.edit_url);
     } catch (err) {
       setFormError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
@@ -842,7 +846,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     <form
       id={`blog-post-composer-form-${siteId}`}
       onSubmit={handlePrimarySubmit}
-      className="lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-8"
+      className="lg:grid lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start lg:gap-6"
     >
       {/* ── LEFT: title + editor + SEO ── */}
       <div className="space-y-4">
@@ -958,7 +962,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 )}
               />
             </button>
-            {seoPanelOpen && <div className="mt-4 space-y-4 sm:grid sm:grid-cols-2 sm:gap-6 sm:space-y-0">
+            {seoPanelOpen && <div className="mt-4 space-y-4">
               <div className="space-y-3">
                 <div>
                   <label htmlFor="post-meta-title" className="block text-sm font-medium">

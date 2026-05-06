@@ -342,16 +342,16 @@ export async function runExtractionBatch(opts: {
     saved++;
   }
 
-  // Title-only backfill: images that have dimensions but no title.
-  // These exist when the image was processed before migration 0099 added the
-  // title column, or when the first extraction run pre-dated EXIF support.
+  // Title-only backfill: any image with no title, regardless of whether
+  // dimensions have been extracted yet. Covers (a) images processed before
+  // migration 0099 added the title column, (b) bulk-imported images that
+  // haven't gone through the Cloudflare EXIF extraction yet.
   // Derive from filename alone — no Cloudflare API call needed.
   const { data: titleRows } = await svc
     .from("image_library")
     .select("id, filename")
     .is("deleted_at", null)
     .is("title", null)
-    .not("width_px", "is", null)
     .order("created_at", { ascending: true })
     .limit(batchSize);
 

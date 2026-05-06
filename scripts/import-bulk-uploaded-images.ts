@@ -58,6 +58,16 @@ type CsvRow = {
 
 const BATCH_SIZE = 500;
 
+const ISTOCK_RE = /^istock[-_](\d{6,})/i;
+
+function deriveTitle(filename: string): string | null {
+  const base = filename.replace(/\.[^.]+$/, "");
+  const m = ISTOCK_RE.exec(base);
+  if (m) return `iStock Image ${m[1]}`;
+  const human = base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return human || null;
+}
+
 function die(msg: string): never {
   console.error(`ERROR: ${msg}`);
   process.exit(1);
@@ -288,6 +298,7 @@ async function main(): Promise<number> {
     const payload = slice.map((r) => ({
       cloudflare_id: r.cloudflare_id,
       filename: r.filename,
+      title: deriveTitle(r.filename),
       source: "upload" as const,
       source_ref: r.filename,
       bytes: r.filesize_bytes,
