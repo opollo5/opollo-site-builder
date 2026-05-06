@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import { internalError, notFound, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -24,21 +25,6 @@ export const dynamic = "force-dynamic";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   _req: Request,
   { params }: { params: { id: string } },
@@ -51,7 +37,7 @@ export async function POST(
 
   const userId = params.id;
   if (!UUID_RE.test(userId)) {
-    return errorJson("VALIDATION_FAILED", "User id must be a UUID.", 400);
+    return validationError("User id must be a UUID.");
   }
 
   const svc = getServiceRoleClient();
@@ -63,14 +49,10 @@ export async function POST(
     .maybeSingle();
   if (fetchErr) {
     logger.error("admin.users.reinstate.fetch_failed", { user_id: userId, error: fetchErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to read user. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to read user. Please try again or contact support with the request id from the response headers.");
   }
   if (!target) {
-    return errorJson("NOT_FOUND", "No user with that id.", 404);
+    return notFound("No user with that id.");
   }
 
   // ban_duration: 'none' clears the ban. Supabase quietly accepts this
@@ -80,11 +62,7 @@ export async function POST(
   });
   if (unbanErr) {
     logger.error("admin.users.reinstate.unban_failed", { user_id: userId, error: unbanErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to unban user. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to unban user. Please try again or contact support with the request id from the response headers.");
   }
 
   if (!target.revoked_at) {
@@ -104,11 +82,7 @@ export async function POST(
     .eq("id", userId);
   if (clearErr) {
     logger.error("admin.users.reinstate.clear_revoked_failed", { user_id: userId, error: clearErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to reinstate user. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to reinstate user. Please try again or contact support with the request id from the response headers.");
   }
 
   return NextResponse.json(

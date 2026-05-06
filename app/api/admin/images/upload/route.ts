@@ -10,6 +10,7 @@ import {
   uploadImageFromBytes,
 } from "@/lib/cloudflare-images";
 import { extractExifFields } from "@/lib/exif-extract";
+import { internalError, routeError, validationError } from "@/lib/http";
 import { readImageDimensions } from "@/lib/image-dimensions";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -123,49 +124,26 @@ function deriveTitle(
   return human || null;
 }
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: code !== "VALIDATION_FAILED" },
-      timestamp: new Date().toISOString(),
-    },
-    { status, headers: { "cache-control": "no-store" } },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
 
   const form = await req.formData().catch(() => null);
   if (!form) {
-    return errorJson("VALIDATION_FAILED", "Request body must be multipart/form-data.", 400);
+    return validationError("Request body must be multipart/form-data.");
   }
   const file = form.get("file");
   if (!(file instanceof File)) {
-    return errorJson("VALIDATION_FAILED", "Field `file` is required and must be a File.", 400);
+    return validationError("Field `file` is required and must be a File.");
   }
   if (file.size === 0) {
-    return errorJson("VALIDATION_FAILED", "Uploaded file is empty.", 400);
+    return validationError("Uploaded file is empty.");
   }
   if (file.size > MAX_BYTES) {
-    return errorJson(
-      "FILE_TOO_LARGE",
-      `Image exceeds the 10 MB cap (got ${Math.round(file.size / 1024 / 1024)} MB).`,
-      413,
-    );
+    return routeError("FILE_TOO_LARGE", `Image exceeds the 10 MB cap (got ${Math.round(file.size / 1024 / 1024)} MB).`);
   }
   if (!file.type.startsWith(ALLOWED_MIME_PREFIX)) {
-    return errorJson(
-      "UNSUPPORTED_TYPE",
-      `Uploaded file is "${file.type || "unknown"}". Pick a JPEG, PNG, GIF, or WebP image.`,
-      415,
-    );
+    return routeError("UNSUPPORTED_TYPE", `Uploaded file is "${file.type || "unknown"}". Pick a JPEG, PNG, GIF, or WebP image.`);
   }
 
   const cloudflareId = `opollo/upload/${randomUUID()}`;
@@ -241,21 +219,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         retryable: err.retryable,
         detail: err.message,
       });
-      return errorJson(
+      return routeError(
         err.retryable ? "UPSTREAM_RETRYABLE" : "UPSTREAM_REJECTED",
         `Cloudflare upload failed (${err.code}). ${err.retryable ? "Try again." : "Pick a different image."}`,
-        err.retryable ? 502 : 400,
       );
     }
     logger.error("image.upload.unexpected", {
       cloudflare_id: cloudflareId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Cloudflare upload failed unexpectedly.",
-      500,
-    );
+    return internalError("Cloudflare upload failed unexpectedly.");
   }
 
   const supabase = getServiceRoleClient();
@@ -310,11 +283,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       cloudflare_id: cfRecord.id,
       error: ins.error.message,
     });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Image uploaded to Cloudflare but failed to save in library.",
-      500,
-    );
+    return internalError("Image uploaded to Cloudflare but failed to save in library.");
   }
 
   // Persist raw EXIF object in image_metadata for later inspection /

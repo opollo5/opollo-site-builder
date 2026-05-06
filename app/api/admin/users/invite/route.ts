@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
-import { readJsonBody } from "@/lib/http";
+import { conflict, internalError, readJsonBody, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
@@ -59,22 +59,6 @@ function safeNext(raw: string | undefined): string {
   return raw;
 }
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  extra?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false, ...(extra ?? {}) },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireAdminForApi({ roles: ["super_admin", "admin"] });
   if (gate.kind === "deny") return gate.response;
@@ -84,22 +68,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (!rl.ok) return rateLimitExceeded(rl);
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = InviteSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message: "Body must be { email: string; next?: string }.",
-          details: { issues: parsed.error.issues },
-          retryable: false, // VALIDATION_FAILED is not retryable — same input loops forever (M15-4 #5)
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
-    );
+    return validationError("Body must be { email: string; next?: string }.", { issues: parsed.error.issues });
   }
 
   const email = parsed.data.email.trim().toLowerCase();
@@ -142,18 +114,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       status === 422 ||
       /already (registered|exists)/i.test(error.message)
     ) {
-      return errorJson(
-        "ALREADY_EXISTS",
-        "A user with that email already exists. Promote or revoke them from the users list instead.",
-        409,
-      );
+      return conflict("ALREADY_EXISTS", "A user with that email already exists. Promote or revoke them from the users list instead.");
     }
     logger.error("admin.users.invite.generate_failed", { error });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to generate invite. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to generate invite. Please try again or contact support with the request id from the response headers.");
   }
 
   const actionLink = data?.properties?.action_link ?? null;

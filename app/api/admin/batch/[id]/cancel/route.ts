@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
+import {
+  conflict,
+  forbidden,
+  internalError,
+  notFound,
+  validationError,
+} from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -30,21 +37,6 @@ export const dynamic = "force-dynamic";
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function POST(
   _req: Request,
   { params }: { params: { id: string } },
@@ -54,7 +46,7 @@ export async function POST(
 
   const jobId = params.id;
   if (!UUID_RE.test(jobId)) {
-    return errorJson("VALIDATION_FAILED", "Job id must be a UUID.", 400);
+    return validationError("Job id must be a UUID.");
   }
 
   const svc = getServiceRoleClient();
@@ -66,14 +58,12 @@ export async function POST(
     .maybeSingle();
   if (readErr) {
     logger.error("admin.batch.cancel.read_failed", { job_id: jobId, error: readErr });
-    return errorJson(
-      "INTERNAL_ERROR",
+    return internalError(
       "Failed to read job. Please try again or contact support with the request id from the response headers.",
-      500,
     );
   }
   if (!existing) {
-    return errorJson("NOT_FOUND", "No job with that id.", 404);
+    return notFound("No job with that id.");
   }
 
   // super_admin can cancel any job; admin can only cancel their own.
@@ -82,11 +72,7 @@ export async function POST(
     gate.user.role !== "super_admin" &&
     existing.created_by !== gate.user.id
   ) {
-    return errorJson(
-      "FORBIDDEN",
-      "Operators can only cancel batches they created.",
-      403,
-    );
+    return forbidden("Operators can only cancel batches they created.");
   }
 
   if (existing.status === "cancelled") {
@@ -107,11 +93,7 @@ export async function POST(
   ) {
     // Terminal statuses (succeeded, failed) can't be cancelled — the
     // batch is already done.
-    return errorJson(
-      "INVALID_STATE",
-      `Job in status '${existing.status}' cannot be cancelled.`,
-      409,
-    );
+    return conflict("INVALID_STATE", `Job in status '${existing.status}' cannot be cancelled.`);
   }
 
   // Flip job status + set cancel_requested_at. No ELSE — we just
@@ -129,10 +111,8 @@ export async function POST(
     .eq("id", jobId);
   if (jobErr) {
     logger.error("admin.batch.cancel.update_failed", { job_id: jobId, error: jobErr });
-    return errorJson(
-      "INTERNAL_ERROR",
+    return internalError(
       "Failed to cancel job. Please try again or contact support with the request id from the response headers.",
-      500,
     );
   }
 
@@ -154,10 +134,8 @@ export async function POST(
     .eq("state", "pending");
   if (slotsErr) {
     logger.error("admin.batch.cancel.slots_failed", { job_id: jobId, error: slotsErr });
-    return errorJson(
-      "INTERNAL_ERROR",
+    return internalError(
       "Failed to mark pending slots skipped. Please try again or contact support with the request id from the response headers.",
-      500,
     );
   }
 

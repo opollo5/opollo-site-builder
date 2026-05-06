@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { countActiveAdmins } from "@/lib/auth";
-import { readJsonBody } from "@/lib/http";
+import { conflict, internalError, notFound, readJsonBody, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -53,22 +53,6 @@ const RoleSchema = z.object({
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function errorJson(
-  code: string,
-  message: string,
-  status: number,
-  extra?: Record<string, unknown>,
-): NextResponse {
-  return NextResponse.json(
-    {
-      ok: false,
-      error: { code, message, retryable: false, ...(extra ?? {}) },
-      timestamp: new Date().toISOString(),
-    },
-    { status },
-  );
-}
-
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } },
@@ -81,40 +65,20 @@ export async function PATCH(
 
   const userId = params.id;
   if (!UUID_RE.test(userId)) {
-    return errorJson(
-      "VALIDATION_FAILED",
-      "User id must be a UUID.",
-      400,
-    );
+    return validationError("User id must be a UUID.");
   }
 
   const body = await readJsonBody(req);
-  if (body === undefined) return errorJson("VALIDATION_FAILED", "Request body must be valid JSON.", 400);
+  if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = RoleSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: {
-          code: "VALIDATION_FAILED",
-          message: "Body must be { role: 'admin' | 'user' }.",
-          details: { issues: parsed.error.issues },
-          retryable: false, // VALIDATION_FAILED is not retryable — same input loops forever (M15-4 #5)
-        },
-        timestamp: new Date().toISOString(),
-      },
-      { status: 400 },
-    );
+    return validationError("Body must be { role: 'admin' | 'user' }.", { issues: parsed.error.issues });
   }
   const targetRole = parsed.data.role;
 
   // Self-modification guard — only enforceable when we know the caller.
   if (gate.user && gate.user.id === userId) {
-    return errorJson(
-      "CANNOT_MODIFY_SELF",
-      "You cannot change your own role. Ask another admin.",
-      409,
-    );
+    return conflict("CANNOT_MODIFY_SELF", "You cannot change your own role. Ask another admin.");
   }
 
   const svc = getServiceRoleClient();
@@ -126,14 +90,10 @@ export async function PATCH(
     .maybeSingle();
   if (fetchErr) {
     logger.error("admin.users.role.fetch_failed", { user_id: userId, error: fetchErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to read user. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to read user. Please try again or contact support with the request id from the response headers.");
   }
   if (!target) {
-    return errorJson("NOT_FOUND", "No user with that id.", 404);
+    return notFound("No user with that id.");
   }
 
   const currentRole = target.role as "super_admin" | "admin" | "user";
@@ -142,11 +102,7 @@ export async function PATCH(
   // hi@opollo.com row; surface a clean 409 here so the UI doesn't
   // see a generic 500.
   if (currentRole === "super_admin") {
-    return errorJson(
-      "SUPER_ADMIN_LOCKED",
-      "Super admin cannot be modified.",
-      409,
-    );
+    return conflict("SUPER_ADMIN_LOCKED", "Super admin cannot be modified.");
   }
   if (currentRole === targetRole) {
     return NextResponse.json(
@@ -167,18 +123,10 @@ export async function PATCH(
     const adminCount = await countActiveAdmins();
     if (!adminCount.ok) {
       logger.error("admin.users.role.count_failed", { user_id: userId, error: adminCount.error });
-      return errorJson(
-        "INTERNAL_ERROR",
-        "Failed to count active admins. Please try again or contact support with the request id from the response headers.",
-        500,
-      );
+      return internalError("Failed to count active admins. Please try again or contact support with the request id from the response headers.");
     }
     if (adminCount.count <= 1) {
-      return errorJson(
-        "LAST_ADMIN",
-        "Refusing to demote the last remaining active admin. Promote another admin first, or use the emergency route.",
-        409,
-      );
+      return conflict("LAST_ADMIN", "Refusing to demote the last remaining active admin. Promote another admin first, or use the emergency route.");
     }
   }
 
@@ -188,11 +136,7 @@ export async function PATCH(
     .eq("id", userId);
   if (updateErr) {
     logger.error("admin.users.role.update_failed", { user_id: userId, error: updateErr });
-    return errorJson(
-      "INTERNAL_ERROR",
-      "Failed to update role. Please try again or contact support with the request id from the response headers.",
-      500,
-    );
+    return internalError("Failed to update role. Please try again or contact support with the request id from the response headers.");
   }
 
   return NextResponse.json(
