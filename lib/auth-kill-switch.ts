@@ -25,9 +25,6 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // state) — the effective global propagation bound is 5s + warm-pool
 // turnover.
 //
-// TODO(M7 fleet infra): revisit. Candidates: edge KV / Supabase realtime
-// broadcast for immediate invalidation; or a signed cookie the emergency
-// route issues that middleware trusts for the kill-switch window.
 // ---------------------------------------------------------------------------
 
 const TTL_MS = 5_000;

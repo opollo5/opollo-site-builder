@@ -127,14 +127,15 @@ export async function POST(req: Request) {
   const rl = await checkRateLimit("chat", rlId);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  let body: any;
+  let body: unknown;
   try {
     body = await req.json();
   } catch {
     return errorResponse("VALIDATION_FAILED", "Request body must be JSON.", 400);
   }
+  const b = body as Record<string, unknown>;
 
-  const messages = body?.messages;
+  const messages = b?.messages;
   if (!Array.isArray(messages) || messages.length === 0) {
     return errorResponse(
       "VALIDATION_FAILED",
@@ -143,7 +144,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const activeSiteIdRaw = body?.activeSiteId;
+  const activeSiteIdRaw = b?.activeSiteId;
   const hasActiveSiteId =
     typeof activeSiteIdRaw === "string" && activeSiteIdRaw.trim().length > 0;
 
@@ -213,10 +214,10 @@ export async function POST(req: Request) {
       };
 
       try {
-        let convo: Anthropic.MessageParam[] = messages.map((m: any) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        let convo: Anthropic.MessageParam[] = messages.map((m) => {
+          const msg = m as { role: "user" | "assistant"; content: string };
+          return { role: msg.role, content: msg.content };
+        });
 
         let stopReason: string | null = null;
 

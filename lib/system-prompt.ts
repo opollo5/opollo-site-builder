@@ -120,8 +120,6 @@ export function isDesignSystemV2Enabled(): boolean {
 // the known failure modes and we translate those to null + log.
 // ---------------------------------------------------------------------------
 
-// TODO(M3): consider site-keyed LRU with 5-min TTL around loadActiveRegistry().
-// Expected to matter when batch generator makes ~40 consecutive reads per site.
 export async function loadActiveRegistry(
   site_id: string,
 ): Promise<{
