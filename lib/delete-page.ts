@@ -3,6 +3,7 @@ import {
   type DeletePageData,
   type ToolResponse,
 } from "@/lib/tool-schemas";
+import { logger } from "@/lib/logger";
 import { readWpConfig, wpDeletePage } from "@/lib/wordpress";
 
 const DS_VERSION = "1.0.0";
@@ -36,6 +37,7 @@ export async function executeDeletePage(
 
   const cfg = readWpConfig();
   if (!cfg.ok) {
+    logger.error("delete_page.execute.missing_wp_env_vars", { missing: cfg.missing });
     return {
       ok: false,
       error: {

@@ -390,6 +390,7 @@ async function generateUniquePrefix(
   for (const c of candidates) {
     if (!(await prefixExists(c))) return { ok: true, prefix: c };
   }
+  logger.error("sites.generateUniquePrefix.exhausted", { name, attempted: candidates.length });
   return {
     ok: false,
     error: {

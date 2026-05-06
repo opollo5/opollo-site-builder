@@ -3,6 +3,7 @@ import {
   type ToolResponse,
   type UpdatePageData,
 } from "@/lib/tool-schemas";
+import { logger } from "@/lib/logger";
 import {
   readWpConfig,
   wpGetPage,
@@ -37,6 +38,7 @@ export async function executeUpdatePage(
 
   const cfg = readWpConfig();
   if (!cfg.ok) {
+    logger.error("update_page.execute.missing_wp_env_vars", { missing: cfg.missing });
     return {
       ok: false,
       error: {
