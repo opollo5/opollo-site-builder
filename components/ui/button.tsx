@@ -17,7 +17,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-gradient-to-r from-pk to-pk2 text-white text-base font-bold uppercase tracking-[0.05em] hover:brightness-110 hover:-translate-y-px hover:shadow-[0_4px_24px_rgba(255,3,165,0.40)] active:translate-y-0 active:shadow-none",
+          "bg-gradient-to-r from-pk to-pk2 text-white text-base font-bold uppercase tracking-[0.05em] hover:brightness-110 hover:-translate-y-px hover:shadow-pk-glow active:translate-y-0 active:shadow-none",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:translate-y-px",
         outline:
