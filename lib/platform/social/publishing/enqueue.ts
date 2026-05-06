@@ -182,6 +182,7 @@ function validation<T>(message: string): ApiResponse<T> {
 }
 
 function internal<T>(message: string): ApiResponse<T> {
+  logger.error("social.publishing.enqueue.internal_error", { message });
   return {
     ok: false,
     error: {

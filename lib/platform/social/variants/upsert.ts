@@ -173,6 +173,7 @@ function notFound(): ApiResponse<PostVariant> {
 }
 
 function internal(message: string): ApiResponse<PostVariant> {
+  logger.error("social.variants.upsert.internal_error", { message });
   return {
     ok: false,
     error: {

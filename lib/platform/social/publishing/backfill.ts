@@ -129,6 +129,7 @@ function validation(message: string): ApiResponse<BackfillResult> {
 }
 
 function internal(message: string): ApiResponse<BackfillResult> {
+  logger.error("social.publishing.backfill.internal_error", { message });
   return {
     ok: false,
     error: {

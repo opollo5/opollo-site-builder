@@ -231,6 +231,7 @@ export async function syncBundlesocialConnections(
 }
 
 function notConfigured(envVar: string): ApiResponse<SyncConnectionsResult> {
+  logger.error("social.connections.sync.not_configured", { env_var: envVar });
   return {
     ok: false,
     error: {
@@ -244,6 +245,7 @@ function notConfigured(envVar: string): ApiResponse<SyncConnectionsResult> {
 }
 
 function internal(message: string): ApiResponse<SyncConnectionsResult> {
+  logger.error("social.connections.sync.internal_error", { message });
   return {
     ok: false,
     error: {

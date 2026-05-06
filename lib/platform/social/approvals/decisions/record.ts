@@ -277,6 +277,7 @@ function notFound<T>(message: string): ApiResponse<T> {
 }
 
 function internal<T>(message: string): ApiResponse<T> {
+  logger.error("social.approvals.decisions.record.internal_error", { message });
   return {
     ok: false,
     error: {

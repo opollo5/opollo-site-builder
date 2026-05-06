@@ -108,6 +108,7 @@ function invalidState(message: string): ApiResponse<ViewerLink> {
 }
 
 function internal(message: string): ApiResponse<ViewerLink> {
+  logger.error("social.viewer_links.revoke.internal_error", { message });
   return {
     ok: false,
     error: {

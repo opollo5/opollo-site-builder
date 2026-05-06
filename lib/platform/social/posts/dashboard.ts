@@ -136,6 +136,7 @@ function validation(message: string): ApiResponse<SocialPostsStats> {
 }
 
 function internal(message: string): ApiResponse<SocialPostsStats> {
+  logger.error("social.posts.dashboard.internal_error", { message });
   return {
     ok: false,
     error: {

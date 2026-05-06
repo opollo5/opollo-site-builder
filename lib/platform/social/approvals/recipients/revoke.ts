@@ -137,6 +137,7 @@ function alreadyRevoked(): ApiResponse<ApprovalRecipient> {
 }
 
 function internal(message: string): ApiResponse<ApprovalRecipient> {
+  logger.error("social.approvals.recipients.revoke.internal_error", { message });
   return {
     ok: false,
     error: {

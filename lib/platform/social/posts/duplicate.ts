@@ -116,6 +116,7 @@ export async function duplicatePost(input: {
 }
 
 function internal(message: string): ApiResponse<{ newPostId: string }> {
+  logger.error("social.posts.duplicate.internal_error", { message });
   return {
     ok: false,
     error: {

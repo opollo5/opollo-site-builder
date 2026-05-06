@@ -106,6 +106,7 @@ function notFound(): ApiResponse<{ events: ApprovalEvent[] }> {
 }
 
 function internal(message: string): ApiResponse<{ events: ApprovalEvent[] }> {
+  logger.error("social.approvals.events.list.internal_error", { message });
   return {
     ok: false,
     error: {

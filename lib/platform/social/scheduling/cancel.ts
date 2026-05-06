@@ -159,6 +159,7 @@ function invalidState(message: string): ApiResponse<ScheduleEntry> {
 }
 
 function internal(message: string): ApiResponse<ScheduleEntry> {
+  logger.error("social.scheduling.cancel.internal_error", { message });
   return {
     ok: false,
     error: {

@@ -441,6 +441,7 @@ function validation(message: string): ApiResponse<FirePublishResult> {
 }
 
 function internal(message: string): ApiResponse<FirePublishResult> {
+  logger.error("social.publishing.fire.internal_error", { message });
   return {
     ok: false,
     error: {

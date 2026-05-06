@@ -239,6 +239,7 @@ function invalidState(message: string): ApiResponse<ScheduleEntryWithPlatform> {
 }
 
 function internal(message: string): ApiResponse<ScheduleEntryWithPlatform> {
+  logger.error("social.scheduling.create.internal_error", { message });
   return {
     ok: false,
     error: {
