@@ -286,12 +286,12 @@ describe("M12-1: briefs / brief_pages / brief_runs / site_conventions", () => {
     const { id: siteId } = await seedSite({ prefix: "m12j" });
     const svc = getServiceRoleClient();
     const res = await svc.from("briefs").insert({
-      site_id: siteId, title: "PDF",
-      source_storage_path: makeStoragePath("pdf"),
-      source_mime_type: "application/pdf",
+      site_id: siteId, title: "Zip",
+      source_storage_path: makeStoragePath("zip"),
+      source_mime_type: "application/zip",
       source_size_bytes: 100,
       source_sha256: "0".repeat(64),
-      upload_idempotency_key: makeIdempKey("pdf"),
+      upload_idempotency_key: makeIdempKey("zip"),
     });
     expect(res.error?.code).toBe("23514");
   });
