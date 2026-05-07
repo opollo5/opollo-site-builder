@@ -1,5 +1,45 @@
 # Spec run blockers
 
+## Spec 11 / 12 / 05-conditional / 14 PR B+C / 08 sweep — deferred from 2026-05-08 master-brief run
+
+**Date:** 2026-05-08
+
+The 2026-05-08 master brief covered eight specs (06, 07, 09, 08, 11, 12, 14, plus a conditional Spec 05 PR C). This session shipped six PRs against the truly-independent specs; the rest are deferred for the reasons below.
+
+### Spec 11 — Yoast-style SEO panel (deferred)
+
+Depends on Spec 10 (composer right-sidebar panel primitive). Spec 10 is being executed by a parallel session and is not yet in main. Once Spec 10 lands, Spec 11 can ship per its plan in the master brief: Google search preview at top, live length progress bars under SEO title + meta description (heuristic thresholds with qualifying language — "typically good" not "ideal"), no collapsible header, field order Google preview → SEO title → Slug → Meta description, Mobile/Desktop toggle dropped.
+
+### Spec 12 — Composer typography + column width (deferred)
+
+Depends on Spec 13 (composer right column work that frees the layout's right edge). Spec 13 is also in flight on a parallel session. Once Spec 13 lands: title input 40px desktop / 32px mobile (700 weight), body editor 18px / 1.7, prose-style overrides scoped to `.composer-editor-content` in `app/globals.css`, main column 760–800px desktop with 300px sidebar + 32–40px gap. **Composer-only — do NOT change the published post renderer.**
+
+### Spec 05 PR C (conditional) — caption-quality follow-up (deferred)
+
+The master brief gates this PR on >5% of `image_library` rows missing captions in production telemetry. The parallel session has already landed Spec 05 polish work (#752, #753, #754, #756 — picker debounce + suggest RPC vector array fix + bounded fetches + spec-aligned empty state). The caption-quality PR is conditional on Axiom telemetry that doesn't yet exist; defer until the data is available.
+
+### Spec 14 PRs B and C (deferred — manual review)
+
+PR A (#763) ships the warning modal + final banner + `useSessionExpiry` hook. PRs B (activity tracking + 15-minute non-renewable grace + multi-tab leader-elected auto-save with dirty-state guard + visibility-aware cadence) and C (cybersecurity-explainer re-login page) are scope-large and benefit from sequential review. PR A on its own is a strict UX improvement over today's corner toast and reviews independently.
+
+**To execute (PR B):** `lib/hooks/use-activity.ts` (60s active window; keydown / mousedown / pointerdown / touchstart — NOT mousemove). Extend `useSessionExpiry` with a 15-minute non-renewable grace timer that starts at T-0 and does NOT reset on activity. Add a `useAutoSave` hook with three load-bearing safeguards: (1) dirty-state guard so unchanged state doesn't fire saves, (2) BroadcastChannel-or-localStorage leader election so multi-tab doesn't hammer the API, (3) visibility-aware cadence (60s/30s/15s, half-rate when document.hidden). Auto-save sweep: post composer (verify cadence-bumping wired up), site builder (add if missing), multi-field forms > 30s of work. Surfaces lacking auto-save log a `_blockers.md` entry instead of silent skip.
+
+**To execute (PR C):** `app/auth/expired/page.tsx` with the cybersecurity-explainer copy (three-bullet rationale for the 48h cap). Cap-driven logouts redirect there; user-initiated sign-out / suspension / password change route to the standard login page. Inline modal challenge from the SessionExpiryWatcher's `onReauthenticate` if Supabase Auth supports it; else redirect with `returnTo`.
+
+### Spec 08 surface sweep (deferred)
+
+The primitive layer shipped (#762 — `SuccessMoment`, `useFirstTime`, `celebrate`, `toastSuccess`). The Tier-1 surface integration (post-publish hero in `PostDetailClient`, first-site-connection on the sites list, first-customer-onboarded, batch-completion at the batch-runner output) is left for a follow-up. The parallel session has Spec 08 work in flight on `BriefRunClient`'s brief-run-completed surface; once that lands, sweep the remaining surfaces.
+
+### Trusted-devices feature reconsideration after 48h cap (Spec 14 follow-up)
+
+Spec 14 PR A applies the 48h session cap to all sessions including trusted devices. This effectively reduces what `trusted_devices` means on this codebase — it remains a skip-2FA flag but no longer controls TTL. Steven should decide whether the feature has remaining value and either rename it (e.g. `mfa_remembered_devices`) or remove it.
+
+### Image-search latency baseline (Spec 05 follow-up)
+
+The master brief's Spec 05 P95 < 300ms target is aspirational ("not a hard SLA"). Real production P95 depends on Supabase region, vector index config, and embedding-call path. No telemetry exists yet to verify against. Once `/api/images/suggest` has been live for >24h, query Axiom for request duration P95; if above 300ms, investigate (likely fixes: hnsw index params, regional Supabase replica, or pre-compute warm cache).
+
+---
+
 ## Spec 04 — Optimiser PageHeader sweep (TODO, do after `feat/optimiser` merges to main)
 
 **Date:** 2026-05-08

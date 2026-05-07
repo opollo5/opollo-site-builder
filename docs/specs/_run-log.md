@@ -96,3 +96,52 @@ Spec 04 — PageHeader slot-order flip + polish + complete migration.
 | 04 | #750 (PR E) | Final routes + drain `PAGE_HEADER_DEFERRED_ROUTES` to [] | feat/spec04-pr-e-migrate-final | merged into PR D's branch (`99ac09ba`) | merged-stacked |
 
 PR E was stacked on PR D's branch; auto-merge consumed it without going through main, so PR D (#749) is the cumulative head carrying every Spec 04 change. When #749 squash-merges to main, GitHub's squash-dedup auto-closes #744/#747/#748 (their content is identical to D's first three commits).
+
+---
+
+# Spec autonomous-run log — 2026-05-08 (cont.) — composer polish + sitewide UX + asset handling + session policy
+
+Six PRs landed against the 2026-05-08 master brief covering Specs 06, 07, 08, 09, and 14 PR A. Specs 11 / 12 / 14 PR B+C / 05 conditional / 08 surface-sweep deferred — see `_blockers.md`.
+
+| Spec | PR # | Title | Branch | State |
+|---|---|---|---|---|
+| 06 | #755 | platform-aware keyboard shortcuts | feat/spec06-platform-keyboard-shortcuts | merged |
+| 09 | #757 | seo-friendly image filenames + alt text on wp publish | feat/spec09-image-filename-alt-text | merged |
+| 07-A | #758 | content-preview fix — empty-state detection + scoped styles | feat/spec07-pr-a-content-preview | merged |
+| 07-B | #760 | loading-button primitive + use-async-action hook + sweep | feat/spec07-pr-b-loading-button | merged |
+| 08 (primitives) | #762 | success-moment primitive + first-time hook + celebrate helper | feat/spec08-success-moments-v2 | merged |
+| 14-A | #763 | session-expiry warning modal + final banner + hook | feat/spec14-pr-a-session-expiry-warning | open — manual review |
+
+## What shipped
+
+### Spec 06 — Platform-aware keyboard shortcuts (#755)
+
+`lib/hooks/use-platform.ts` (`usePlatform()` + pure `detectPlatform()` + `useModKey()` for HTML title= attrs) and `components/ui/kbd.tsx` (`<Kbd keys={["mod","K"]}>`) defer Mac glyphs until hydration completes — eliminating the one-frame ⌘ flash on Windows. Sweep: `primary-nav` (⌘K hint), `BlogPostComposer` (⌘S save-draft hint), `BulkUploadPanel` (⌘↵ run hint), `RichTextEditor` toolbar tooltips (Bold / Italic / Undo / Redo via `useModKey()`). 8-case unit test in `lib/__tests__/use-platform.test.ts`. TipTap / Monaco / CodeMirror keybindings untouched — those libraries manage cross-platform internally. Comment-only ⌘ occurrences left as-is (developer-only).
+
+### Spec 09 — SEO-friendly image filenames + alt text (#757)
+
+`lib/utils/slugify.ts` — `generateImageFilename(postTitle, originalFilename, imageIndex, postId)`: first-5-words slugified, `-N` suffix for `imageIndex > 0`, deterministic 4-char FNV-1a hash for collision-resistance, 80-char total cap. Same `(postId, imageIndex)` → same filename → clean re-publish overwrite. `lib/seo/alt-text.ts` — `deriveAltText({seoTitle, siteName, postTitleFallback})`: strips trailing ` - {site}` / ` | {site}` / ` – {site}` / ` — {site}` (spec order). `lib/wp-featured-media.ts` extended with optional `uploadFilename` + `altText`; after media POST returns id, calls `POST /wp-json/wp/v2/media/{id}` with `{alt_text, title}` (soft failure: logged, swallowed — featured image already attached). Plumbed into `app/api/sites/[id]/posts/[post_id]/publish/route.ts`. 22 unit-test cases.
+
+### Spec 07 PR A — Content-preview fix (#758)
+
+Root cause: the truthy `post.generated_html ?` check rendered the iframe even when Tiptap's empty-marker `<p></p>` was saved — operators saw a blank pane and reported "preview is broken." Fix: `isHtmlEffectivelyEmpty(html)` strips tags + nbsp + zero-width chars before deciding; `wrapPreviewDocument(rawHtml)` wraps `generated_html` in a minimal styled HTML doc so the iframe renders with sensible typography even before site-level CSS loads. Empty-state copy → spec wording: "No content yet — add content via the post editor." Iframe height bumped `h-96` → `h-[32rem]`. Sanitisation provenance: content via `<iframe sandbox="">` (no allow-scripts / allow-same-origin / allow-forms) — stricter than DOMPurify + `dangerouslySetInnerHTML`.
+
+### Spec 07 PR B — LoadingButton primitive + useAsyncAction hook (#760)
+
+`components/ui/loading-button.tsx` wraps `<Button>` with NavIcon spinner inside the button face, `aria-busy`, disabled-while-loading, optional `loadingText` override. Spinner uses Linearicons `sync` + `animate-spin` (per CLAUDE.md the lucide-react path is gone). `lib/hooks/use-async-action.ts` — `useAsyncAction(action, {timeoutMs, onSuccess, onError, onTimeout})` with three load-bearing safeguards: in-flight ref de-dupe, hard UI-side timeout via `Promise.race`, error surfacing (never silent-swallow). Applied to PostDetailClient (Publish-to-WP) and BulkUploadPanel (Save N drafts). Underlying server actions untouched.
+
+### Spec 08 — Success moments (primitives layer) (#762)
+
+`components/ui/success-moment.tsx` — Tier-1 above-the-fold success block with optional `firstTimeKey` gate. First-time renders fire `celebrate()` once + use `firstTimeTitle` copy; subsequent visits stay quiet. NavIcon checkmark, primary + secondary CTA slots, brand-greens tint. `lib/hooks/use-first-time.ts` — localStorage-backed first-time detection per arbitrary key, private-mode safe via try/catch. `lib/celebrate.ts` — subtle confetti only (30 particles, 40 spread, 25 startVelocity, brand colors). Always respects `prefers-reduced-motion`. Per the brief's production-tested heuristic, medium / big intensities are NOT emitted by default. `lib/toast-success.ts` — Tier-2 toast helper. Dependency: `canvas-confetti ^1.9.4` + `@types/canvas-confetti ^1.9.0`. Surface integration deferred (parallel session has BriefRunClient surface in flight; sweep remaining Tier-1 surfaces in a follow-up).
+
+### Spec 14 PR A — Session expiry warning modal + final banner (#763, manual review)
+
+`lib/hooks/use-session-expiry.ts` reads the active Supabase session's `expires_at`, polls every 30s, returns `{expiresAt, minutesRemaining, expired, hydrated}` and subscribes to `onAuthStateChange`. `components/session/session-expiry-modal.tsx` — centred dialog when `minutesRemaining ≤ 120m`, cybersecurity copy explaining the 48h cap, "Remind me later" snoozes 30 minutes (component state, not localStorage). `components/session/session-expiry-banner.tsx` — undismissable sticky-top banner when `minutesRemaining ≤ 5m`. `components/session/session-expiry-watcher.tsx` mounts both, wires `onReauthenticate` to `/login?returnTo=<current>`. `app/admin/layout.tsx` replaces the corner-toast `SessionExpiryWarning` with the new watcher. **48-hour TTL itself requires Supabase dashboard config** (Auth → JWT expiry → 172800s); the client hook is TTL-agnostic.
+
+## Parallel-session friction
+
+Run-time observation, not a new finding: per memory's "Parallel sessions, single clone — git HEAD races, staged files can get swept into the other session's commit," the parallel session frequently swept HEAD between branches and reverted in-progress edits to existing files (PostDetailClient, admin/layout, etc.) during this run. Mitigation: stage + commit + push as a single atomic command sequence; create branches off `origin/main` (not local main); minimize the read-window between edit and commit. All six merged PRs ended up clean despite the friction.
+
+## Blockers
+
+See `_blockers.md` — Spec 11 (waits on Spec 10), Spec 12 (waits on Spec 13), Spec 05 PR C (gated on telemetry), Spec 14 PRs B+C (manual review, deferred), Spec 08 surface sweep, trusted-devices reconsideration, image-search latency baseline.
