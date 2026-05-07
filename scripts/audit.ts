@@ -2,7 +2,7 @@
 /**
  * scripts/audit.ts — Static analysis: catch logic errors before UAT.
  *
- * Thirteen checks (HIGH | MEDIUM | LOW severity):
+ * Fifteen checks (HIGH | MEDIUM | LOW severity):
  *   1. Middleware public paths              HIGH
  *   2. Admin API gate coverage              MEDIUM
  *   3. DB column references                 MEDIUM
@@ -16,6 +16,8 @@
  *  11. Headings use PageHeader              HIGH (Spec 02 §3.1)
  *  12. Breadcrumb required when PageHeader  HIGH (Spec 02 §3.2)
  *  13. No raw <h1> in pages                 HIGH (Spec 02 §3.3)
+ *  14. Milestones registry current          LOW
+ *  15. Docs index up-to-date               LOW
  *
  * Output:
  *   - Per-issue lines: FILE:LINE — CATEGORY — message
@@ -32,8 +34,9 @@
  * are intentionally narrow so that any HIGH hit is worth investigating.
  */
 
+import * as fs from "node:fs";
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
-import { join, relative, dirname } from "node:path";
+import { join, relative, dirname, basename } from "node:path";
 
 // ============================================================================
 // Types + constants
@@ -1320,11 +1323,91 @@ function check13_noRawH1InPages(): Issue[] {
 }
 
 // ============================================================================
+// Check 14 — milestone registry current (LOW)
+// Every plan file under docs/plans/ should have a row in docs/registry/milestones.md.
+// ============================================================================
+
+function check14_milestonesRegistryCurrent(): Issue[] {
+  const issues: Issue[] = [];
+  const registryPath = "docs/registry/milestones.md";
+  if (!existsSync(registryPath)) {
+    issues.push({
+      category: "milestones-registry-current",
+      severity: "LOW",
+      file: registryPath,
+      line: 0,
+      message: "docs/registry/milestones.md is missing — create it.",
+    });
+    return issues;
+  }
+  const registryContent = readSafe(registryPath);
+  let planFiles: string[] = [];
+  try {
+    planFiles = readdirSync("docs/plans")
+      .filter((f) => f.endsWith(".md"))
+      .map((f) => join("docs/plans", f));
+  } catch {
+    return issues;
+  }
+  for (const planFile of planFiles) {
+    const base = basename(planFile);
+    if (!registryContent.includes(base)) {
+      issues.push({
+        category: "milestones-registry-current",
+        severity: "LOW",
+        file: planFile,
+        line: 0,
+        message: `${base} has no row in docs/registry/milestones.md — add an entry.`,
+      });
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
+// Check 15 — docs index up-to-date (LOW)
+// docs/README.md must exist and reference key architecture docs.
+// ============================================================================
+
+function check15_docsIndexUpToDate(): Issue[] {
+  const issues: Issue[] = [];
+  const indexPath = "docs/README.md";
+  if (!existsSync(indexPath)) {
+    issues.push({
+      category: "docs-index-up-to-date",
+      severity: "LOW",
+      file: indexPath,
+      line: 0,
+      message: "docs/README.md is missing — create the docs index.",
+    });
+    return issues;
+  }
+  const content = readSafe(indexPath);
+  const requiredRefs = [
+    "docs/architecture/ARCHITECTURE.md",
+    "docs/architecture/RULES.md",
+    "docs/runbooks/RUNBOOK.md",
+  ];
+  for (const ref of requiredRefs) {
+    if (!content.includes(ref)) {
+      issues.push({
+        category: "docs-index-up-to-date",
+        severity: "LOW",
+        file: indexPath,
+        line: 0,
+        message: `docs/README.md does not reference ${ref} — add it to the index.`,
+      });
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
 function main(): void {
-  console.log("scripts/audit.ts — running 13 static checks...\n");
+  console.log("scripts/audit.ts — running 15 static checks...\n");
 
   const all: Issue[] = [
     ...check1_middlewarePublicPaths(),
@@ -1340,6 +1423,8 @@ function main(): void {
     ...check11_headingsUsePageHeader(),
     ...check12_breadcrumbRequiredWithPageHeader(),
     ...check13_noRawH1InPages(),
+    ...check14_milestonesRegistryCurrent(),
+    ...check15_docsIndexUpToDate(),
   ];
 
   const failed = printResults(all);
