@@ -2,7 +2,10 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
-import { extractDesignFromUrl } from "@/lib/copy-existing-extract";
+import {
+  extractBlogStyling,
+  extractDesignFromUrl,
+} from "@/lib/copy-existing-extract";
 import { readJsonBody, validationError } from "@/lib/http";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -21,6 +24,11 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const BodySchema = z
   .object({
     extra_pages: z.array(z.string().url()).max(5).optional(),
+    // Spec 03 §1.2 — operator-supplied blog post URLs for blog-styling
+    // extraction. Up to 3; same-origin filtering happens in the
+    // extractor itself, not here, so the wizard can surface "ignored
+    // due to different domain" notes uniformly.
+    blog_urls: z.array(z.string().url()).max(3).optional(),
   })
   .optional();
 
@@ -109,6 +117,17 @@ export async function POST(
   const result = await extractDesignFromUrl(site.wp_url, {
     existingPages: parsed.data?.extra_pages,
   });
+
+  // Spec 03 — secondary pass: if the operator supplied blog URLs, run
+  // the blog-styling extractor and attach the result to the design.
+  // No blog URLs → blog_styling stays absent, the wizard renders the
+  // section as empty + collapsed.
+  const blogUrls = parsed.data?.blog_urls ?? [];
+  if (result.ok && blogUrls.length > 0) {
+    const blog = await extractBlogStyling(site.wp_url, blogUrls);
+    result.design.blog_styling = blog.blog_styling;
+    result.notes = [...result.notes, ...blog.notes];
+  }
 
   return NextResponse.json(
     { ok: true, data: result, timestamp: new Date().toISOString() },
