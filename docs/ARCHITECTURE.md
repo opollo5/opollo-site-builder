@@ -142,7 +142,7 @@ Operators get **Approve** / **Revise with note** / **Cancel run**. Approve write
 - What the appearance panel shows (`AppearancePanelClient` for new_design with Kadence preflight; `ExtractedProfilePanel` for copy_existing).
 - Which design context gets injected into the brief-runner prompt:
   - **`new_design`** — `design_tokens` + `homepage_concept_html` + `tone_of_voice` (gated on `DESIGN_CONTEXT_ENABLED`).
-  - **`copy_existing`** — `extracted_design` + `extracted_css_classes` (always on; mode is the gate).
+  - **`copy_existing`** — `extracted_design` + `extracted_css_classes` (always on; mode is the gate). When `extracted_design.blog_styling` is calibrated (Spec 03) AND the runner passes `content_type='post'` to `buildDesignContextPrefix()`, an additional `<blog_content_classes>` block is emitted alongside `<existing_theme_context>`. Pages and uncalibrated sites do not get the block.
   - **NULL** — pre-PR-10 fallback, no design context unless `DESIGN_CONTEXT_ENABLED` is on.
 
 `lib/design-discovery/build-injection.ts` orchestrates the dispatch. Don't centralise design-context construction back into a single path — the mode-aware split is intentional.
