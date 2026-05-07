@@ -78,6 +78,30 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ---
 
+## 10. Admin pages use the shared PageHeader primitive
+
+**Rule.** All authenticated admin pages must use the shared PageHeader component to ensure consistent typographic hierarchy and breadcrumb structure across the platform. Concretely: every `app/admin/**/page.tsx` and `app/account/**/page.tsx` file MUST `import { PageHeader } from "@/components/ui/page-header"` and render its compound slots (`<PageHeader.Breadcrumb>`, `<PageHeader.Title>`, optional Subtitle / Meta / Actions) in the component tree. Audit script `headings-use-page-header` (HIGH) enforces presence at PR time. New admin / account pages join the rule by default; the deferred-routes allowlist in `scripts/audit.ts` (`PAGE_HEADER_DEFERRED_ROUTES`) carries the legacy routes from PR 2's partial sweep — entries get removed as each route is migrated.
+
+**Incident (Spec 02, 2026-05-07).** PageHeader / PageShell / Breadcrumb landed in PR 1 of Spec 02. PR 2 swept the top 8 operator-traffic routes (sites list, site detail edit, onboarding, setup, setup/extract, posts, settings); the remaining 29 admin routes plus 2 account routes are deferred to a follow-up sweep (see `docs/specs/_blockers.md`). Audit rule lands in PR 3 with the deferred allowlist so the rule starts firing as soon as the follow-up migrates each route.
+
+---
+
+## 11. Breadcrumbs are required when a page imports PageHeader
+
+**Rule.** Breadcrumbs are required because the platform's nested navigation depth (`Admin > Sites > Site > Setup > Step`) cannot be inferred from the URL alone. If a `page.tsx` imports `PageHeader`, it MUST render `<PageHeader.Breadcrumb>` in its JSX. Audit script `breadcrumb-required-when-page-header` (HIGH) enforces. Pages outside admin / account (public marketing, login chrome) don't import PageHeader and are unaffected.
+
+**Incident (Spec 02, 2026-05-07).** Same workstream as Rule #10. Operators on the run page have lost track of which site they were on more than once — no breadcrumb on that surface meant 5-deep navigation depth without trail. The rule prevents that class of UX failure from regressing on any PageHeader-adopting page.
+
+---
+
+## 12. Raw h1 tags are forbidden in page.tsx
+
+**Rule.** Raw `<h1>` JSX tags appearing directly in `app/admin/**/page.tsx` or `app/account/**/page.tsx` outside of `<PageHeader.Title>` are forbidden — they bypass the type scale defined in `app/globals.css` (`.text-page-title` 28px / 24px mobile) and create accessibility issues with multiple page-level h1s. Audit script `no-raw-h1-in-pages` (HIGH) enforces JSX-tag-positionally. Excluded from rule scope: `app/api/**`, `app/**/_components/**`, polymorphic `<Component as="h1" />` patterns, and pages that already render an `<h1>` inside a `<PageHeader.Title>` window. Variable-assigned `<h1>` then passed into PageHeader does not fire — see Spec 02 §3.3 rule scope.
+
+**Incident (Spec 02, 2026-05-07).** Same workstream as Rules #10 and #11. The pre-PageHeader admin surfaces had 30+ `<H1>` instances scattered across page files with inconsistent custom class soup. Rule #12 prevents new instances; PR 2's sweep removed them on the migrated routes; the deferred-routes allowlist in the audit script keeps legacy h1s tolerated until each is migrated.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.
