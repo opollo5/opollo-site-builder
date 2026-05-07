@@ -1058,6 +1058,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           <div className="flex flex-col gap-2">
             <Button
               type="submit"
+              size="sm"
               className="w-full"
               disabled={primaryDisabled || submitting}
               title={
@@ -1071,6 +1072,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             {publishMode !== "draft" && publishMode !== "pending" && (
               <Button
                 type="button"
+                size="sm"
                 variant="outline"
                 className="w-full"
                 disabled={!canSaveDraft || submitting}
