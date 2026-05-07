@@ -2,7 +2,7 @@
 /**
  * scripts/audit.ts — Static analysis: catch logic errors before UAT.
  *
- * Ten checks (HIGH | MEDIUM | LOW severity):
+ * Thirteen checks (HIGH | MEDIUM | LOW severity):
  *   1. Middleware public paths              HIGH
  *   2. Admin API gate coverage              MEDIUM
  *   3. DB column references                 MEDIUM
@@ -13,6 +13,9 @@
  *   8. Missing error handling on writes     MEDIUM
  *   9. Dead routes                          LOW
  *  10. Hardcoded design token values        LOW
+ *  11. Headings use PageHeader              HIGH (Spec 02 §3.1)
+ *  12. Breadcrumb required when PageHeader  HIGH (Spec 02 §3.2)
+ *  13. No raw <h1> in pages                 HIGH (Spec 02 §3.3)
  *
  * Output:
  *   - Per-issue lines: FILE:LINE — CATEGORY — message
@@ -1145,11 +1148,182 @@ function printResults(issues: Issue[]): boolean {
 }
 
 // ============================================================================
+// Spec 02 §3 — PageHeader audit rules.
+// ============================================================================
+
+// Routes deferred from Spec 02 PR 2's adoption sweep. Tracked in
+// docs/specs/_blockers.md. Allowlist runs at HIGH severity for the
+// migrated routes; deferred routes are scoped out until the follow-up
+// sweep migrates them. Once a route here adopts PageHeader, REMOVE it
+// from this list — that's how the rule progressively widens.
+const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
+  // /admin/* deferred routes (29 of 37)
+  "app/admin/page.tsx",
+  "app/admin/batches/page.tsx",
+  "app/admin/batches/[id]/page.tsx",
+  "app/admin/companies/page.tsx",
+  "app/admin/companies/new/page.tsx",
+  "app/admin/companies/[id]/page.tsx",
+  "app/admin/email-test/page.tsx",
+  "app/admin/images/page.tsx",
+  "app/admin/images/[id]/page.tsx",
+  "app/admin/posts/new/page.tsx",
+  "app/admin/settings/page.tsx",
+  "app/admin/settings/design-system/page.tsx",
+  "app/admin/sites/[id]/page.tsx",
+  "app/admin/sites/[id]/appearance/page.tsx",
+  "app/admin/sites/[id]/blueprints/review/page.tsx",
+  "app/admin/sites/[id]/briefs/[brief_id]/review/page.tsx",
+  "app/admin/sites/[id]/briefs/[brief_id]/run/page.tsx",
+  "app/admin/sites/[id]/content/page.tsx",
+  "app/admin/sites/[id]/design-system/page.tsx",
+  "app/admin/sites/[id]/design-system/components/page.tsx",
+  "app/admin/sites/[id]/design-system/preview/page.tsx",
+  "app/admin/sites/[id]/design-system/templates/page.tsx",
+  "app/admin/sites/[id]/pages/page.tsx",
+  "app/admin/sites/[id]/pages/[pageId]/page.tsx",
+  "app/admin/sites/[id]/posts/new/page.tsx",
+  "app/admin/sites/[id]/posts/[post_id]/page.tsx",
+  "app/admin/system/jobs/page.tsx",
+  "app/admin/users/page.tsx",
+  "app/admin/users/audit/page.tsx",
+  // /account/* deferred (the operator account-management surface; same
+  // mechanical migration as /admin/* but kept out of PR 2's scope).
+  "app/account/devices/page.tsx",
+  "app/account/security/page.tsx",
+];
+
+function isPageHeaderDeferred(rel: string): boolean {
+  return PAGE_HEADER_DEFERRED_ROUTES.includes(rel.replace(/\\/g, "/"));
+}
+
+function isPageHeaderEnforcedRoute(rel: string): boolean {
+  // Normalise Windows separators (the audit walker uses node:path which
+  // can produce "\" on Windows) so the allowlist match is OS-agnostic.
+  const norm = rel.replace(/\\/g, "/");
+  if (!norm.startsWith("app/admin/") && !norm.startsWith("app/account/")) {
+    return false;
+  }
+  if (!norm.endsWith("/page.tsx")) return false;
+  return !PAGE_HEADER_DEFERRED_ROUTES.includes(norm);
+}
+
+function check11_headingsUsePageHeader(): Issue[] {
+  const issues: Issue[] = [];
+  const roots = ["app/admin", "app/account"];
+  for (const root of roots) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".tsx"])) {
+      const rel = relPath(file);
+      if (!isPageHeaderEnforcedRoute(rel)) continue;
+      const src = readSafe(file);
+      // Match either an `import { PageHeader } …` named import or a
+      // typed `import …, { PageHeader …}` form. The path is fixed.
+      const hasImport =
+        /import\s*(?:type\s+)?\{[^}]*\bPageHeader\b[^}]*\}\s*from\s*["']@\/components\/ui\/page-header["']/.test(
+          src,
+        );
+      if (!hasImport) {
+        issues.push({
+          category: "headings-use-page-header",
+          severity: "HIGH",
+          file: rel,
+          line: 1,
+          message:
+            "Admin/account page must import PageHeader from @/components/ui/page-header (Spec 02 §3.1).",
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+function check12_breadcrumbRequiredWithPageHeader(): Issue[] {
+  const issues: Issue[] = [];
+  const roots = ["app/admin", "app/account"];
+  for (const root of roots) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".tsx"])) {
+      const rel = relPath(file);
+      if (!rel.replace(/\\/g, "/").endsWith("/page.tsx")) continue;
+      const src = readSafe(file);
+      const importsPageHeader =
+        /import\s*(?:type\s+)?\{[^}]*\bPageHeader\b[^}]*\}\s*from\s*["']@\/components\/ui\/page-header["']/.test(
+          src,
+        );
+      if (!importsPageHeader) continue;
+      const usesBreadcrumb = /<PageHeader\.Breadcrumb\b/.test(src);
+      if (!usesBreadcrumb) {
+        issues.push({
+          category: "breadcrumb-required-when-page-header",
+          severity: "HIGH",
+          file: rel,
+          line: 1,
+          message:
+            "page.tsx imports PageHeader but is missing <PageHeader.Breadcrumb> (Spec 02 §3.2).",
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+function check13_noRawH1InPages(): Issue[] {
+  const issues: Issue[] = [];
+  const roots = ["app/admin", "app/account"];
+  // Match a literal JSX `<h1>` opening tag (with attrs allowed). Skip
+  // closing tags. Self-closing not relevant for h1. The rule is JSX-tag
+  // positional; flow-analysis-style cases (assigning <h1>… to a
+  // variable then passing into PageHeader.Title) do not fire — see
+  // Spec 02 §3.3 rule scope.
+  const h1OpenRe = /<h1\b[^>]*>/;
+  for (const root of roots) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".tsx"])) {
+      const rel = relPath(file);
+      const norm = rel.replace(/\\/g, "/");
+      if (!norm.endsWith("/page.tsx")) continue;
+      // Excluded scope per Spec 02 §3.3: app/api, _components private dirs.
+      if (norm.includes("/_components/")) continue;
+      // Allowlist deferred routes from PR 2's partial sweep — see the
+      // PAGE_HEADER_DEFERRED_ROUTES list above. Once a deferred route
+      // adopts PageHeader, remove it from that list and this check
+      // starts firing on it.
+      if (isPageHeaderDeferred(rel)) continue;
+      const lines = readSafe(file).split(/\r?\n/);
+      lines.forEach((ln, i) => {
+        if (h1OpenRe.test(ln)) {
+          // Allow when the surrounding source nests the h1 inside a
+          // PageHeader.Title element on the same or adjacent line. Cheap
+          // heuristic: peek 2 lines back.
+          const window = lines
+            .slice(Math.max(0, i - 2), i + 1)
+            .join("\n");
+          if (/<PageHeader\.Title\b/.test(window)) return;
+          issues.push({
+            category: "no-raw-h1-in-pages",
+            severity: "HIGH",
+            file: rel,
+            line: i + 1,
+            message:
+              "Raw <h1> in page.tsx — wrap inside <PageHeader.Title> instead (Spec 02 §3.3).",
+          });
+        }
+      });
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
 function main(): void {
-  console.log("scripts/audit.ts — running 10 static checks...\n");
+  console.log("scripts/audit.ts — running 13 static checks...\n");
 
   const all: Issue[] = [
     ...check1_middlewarePublicPaths(),
@@ -1162,6 +1336,9 @@ function main(): void {
     ...check8_errorHandling(),
     ...check9_deadRoutes(),
     ...check10_hardcodedDesignValues(),
+    ...check11_headingsUsePageHeader(),
+    ...check12_breadcrumbRequiredWithPageHeader(),
+    ...check13_noRawH1InPages(),
   ];
 
   const failed = printResults(all);

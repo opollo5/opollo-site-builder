@@ -304,6 +304,7 @@ Pages under `app/admin/*` are server components by default. Promote to client on
 - shadcn/ui primitives in `components/ui/*`. Don't create a custom Button when `Button` exists.
 - Status pills go through `components/ui/status-pill.tsx` — adding a new status means adding to the kind union + STATUS_MAP.
 - Typography minimum: `text-base` (16px) for body, `text-sm` (15px after the 2026-05-03 floor bump) for helper. `text-xs` is forbidden and overridden to 15px sitewide via `app/globals.css`. Lucide icons floor at 20px (`svg.lucide`) — same source.
+- **Page chrome** (Spec 02): admin and account pages compose `components/ui/page-header.tsx` (compound component with `Breadcrumb` / `Title` / `Subtitle` / `Meta` / `Actions` slots) inside `components/ui/page-shell.tsx` (1280px max-width frame). `components/ui/breadcrumb.tsx` is the standalone breadcrumb primitive. The page-heading type scale (`.text-page-title` 28px, `.text-section-title` 20px, `.text-subsection` 16px) lives in `app/globals.css` alongside the body / helper floors. Audit rules `headings-use-page-header`, `breadcrumb-required-when-page-header`, and `no-raw-h1-in-pages` (HIGH severity, all in `scripts/audit.ts`) enforce the contract on every PR.
 
 ### 13.4 Toast pattern
 
@@ -376,8 +377,8 @@ These traps will catch a "dead code" sweep. Don't delete:
 - **Path B** (PB-1+) — fragments-only generation, inline CSS budget capped at 200 chars, mandatory `data-opollo` wrapper, site-prefixed classes. See `docs/plans/path-b-migration-parent.md`. The model's system prompt enforces this in `lib/brief-runner.ts:574-609`. Don't reintroduce full-document generation paths.
 - **DESIGN-SYSTEM-OVERHAUL** — see § 5. Site mode dispatch is the load-bearing piece.
 - **AUTH-FOUNDATION (P1–P4)** — the role rename, invites table, login_challenges + trusted_devices, audit log, are all current state. The full picture is in `CLAUDE.md` AUTH-FOUNDATION section + UAT-CHECKLIST § 1.
-- **PLATFORM-AUDIT** — `npm run audit:static` runs `scripts/audit.ts` which ships a static-analysis suite (middleware coverage, auth gates, db references, migration sanity, typography, env vars, error handling, dead routes). HIGH severity gates CI. Adding a new check is a small PR; loosening an existing one needs `docs/RULES.md` justification.
-- **Optimiser** — see § 2. Currently on `feat/optimiser` branch, not main.
+- **PLATFORM-AUDIT** — `npm run audit:static` runs `scripts/audit.ts` which ships a static-analysis suite (middleware coverage, auth gates, db references, migration sanity, typography, env vars, error handling, dead routes). HIGH severity gates CI. Adding a new check is a small PR; loosening an existing one needs `docs/RULES.md` justification. Spec 02 added three more HIGH rules: `headings-use-page-header`, `breadcrumb-required-when-page-header`, `no-raw-h1-in-pages`. Allowlist for the routes still pending PageHeader migration lives in `scripts/audit.ts:PAGE_HEADER_DEFERRED_ROUTES`.
+- **Optimiser** — see § 2. Currently on `feat/optimiser` branch, not main. **TODO** (Spec 02 PR 2 §2.1): once the optimiser branch merges to main, sweep its routes to adopt PageHeader / PageShell — they were intentionally skipped from PR 2's adoption sweep because they live on a separate feature branch.
 
 ---
 
@@ -466,6 +467,7 @@ Today operators see everything. The "viewer" role is a legacy tier with no opera
 | Data conventions | `docs/DATA_CONVENTIONS.md` |
 | Prompt versioning | `docs/PROMPT_VERSIONING.md`, `lib/prompts/v*` |
 | UAT checklist | `docs/UAT-CHECKLIST.md` (round-by-round procedure) |
+| Page chrome / breadcrumbs | `components/ui/{page-header,breadcrumb,page-shell}.tsx`, `app/globals.css` (`.text-page-title` / `.text-section-title` / `.text-subsection`) |
 
 ---
 
