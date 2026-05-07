@@ -7,7 +7,6 @@ import { readJsonBody, validationError } from "@/lib/http";
 import {
   EmbeddingNotConfiguredError,
   embedText,
-  vectorToLiteral,
 } from "@/lib/images/embed";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -151,12 +150,16 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const embedInput = composeEmbedInput(postTitle, postBody);
 
   // Try to embed the query. Failures degrade to keyword-only.
-  let queryVectorLiteral: string | null = null;
+  // Pass as a JS number[] (Supabase pgvector idiomatic — see
+  // https://supabase.com/docs/guides/ai/vector-columns). PostgREST
+  // binds it to the `vector(1536)` parameter via pgvector's implicit
+  // float[] → vector cast, which avoids the text→vector path that
+  // pgvector doesn't ship a cast for.
+  let queryVector: number[] | null = null;
   let embedFailureReason: string | null = null;
   if (embedInput) {
     try {
-      const vec = await embedText(embedInput);
-      queryVectorLiteral = vectorToLiteral(vec);
+      queryVector = await embedText(embedInput);
     } catch (err) {
       if (err instanceof EmbeddingNotConfiguredError) {
         embedFailureReason = "not_configured";
@@ -170,7 +173,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  if (!keywordQuery && !queryVectorLiteral) {
+  if (!keywordQuery && !queryVector) {
     // Both sides empty → no DB call. Defensive: shouldn't happen given the
     // earlier "both empty" early-return.
     return NextResponse.json(
@@ -187,7 +190,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const svc = getServiceRoleClient();
   const { data, error } = await svc.rpc("hybrid_search_images", {
     p_keyword_query: keywordQuery || null,
-    p_query_vector: queryVectorLiteral,
+    p_query_vector: queryVector,
     p_limit: limit,
     p_exclude_ids: excludeIds,
   });
@@ -249,8 +252,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     has_title: postTitle.trim().length > 0,
     body_chars: postBody.length,
     keyword_query_chars: keywordQuery.length,
-    query_embedded: queryVectorLiteral !== null,
-    keyword_only: queryVectorLiteral === null,
+    query_embedded: queryVector !== null,
+    keyword_only: queryVector === null,
     embed_failure: embedFailureReason,
     elapsed_ms: elapsedMs,
     result_count: images.length,
@@ -267,8 +270,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       ok: true,
       data: {
         images,
-        queryEmbedded: queryVectorLiteral !== null,
-        keywordOnly: queryVectorLiteral === null,
+        queryEmbedded: queryVector !== null,
+        keywordOnly: queryVector === null,
         elapsedMs,
       },
       timestamp: new Date().toISOString(),
