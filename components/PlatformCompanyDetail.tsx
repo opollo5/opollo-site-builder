@@ -6,7 +6,7 @@ import { Users, Globe, CheckCircle, Clock, Send, Share2 } from "lucide-react";
 
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
-import { H1, Lead } from "@/components/ui/typography";
+import { H1 } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
 
@@ -27,7 +27,7 @@ export function PlatformCompanyDetail({
   joinAction?: ((formData: FormData) => Promise<void>) | null;
 }) {
   const { company, members, pending_invitations, stats } = detail;
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<Tab>("members");
 
   return (
     <div className="space-y-6">
@@ -50,13 +50,17 @@ export function PlatformCompanyDetail({
             </span>
           ) : null}
         </div>
-        <Lead className="mt-1">
-          {company.domain ? (
-            <span className="font-mono text-sm">{company.domain}</span>
-          ) : (
-            <span className="text-muted-foreground">No domain set</span>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <span
+            className="font-mono"
+            data-testid="company-detail-slug"
+          >
+            {company.slug}
+          </span>
+          {company.domain && (
+            <span className="font-mono">{company.domain}</span>
           )}
-        </Lead>
+        </div>
       </header>
 
       {isOpolloStaff && (
@@ -282,12 +286,7 @@ function SettingsTab({ company }: { company: CompanyDetail["company"] }) {
       <dl className="grid grid-cols-1 gap-3 p-4 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">Slug</dt>
-          <dd
-            className="font-mono"
-            data-testid="company-detail-slug"
-          >
-            {company.slug}
-          </dd>
+          <dd className="font-mono">{company.slug}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Timezone</dt>
