@@ -96,7 +96,7 @@ export async function getCurrentPlatformSession(
   return {
     userId,
     email,
-    isOpolloStaff: profileResult.data.is_opollo_staff === true,
+    isOpolloStaff: false,
     company,
   };
 }
