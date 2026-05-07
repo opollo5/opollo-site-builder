@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlertTriangle, Check, ChevronDown } from "lucide-react";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -857,7 +857,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         )}
         {!siteLoading && !siteWpUrl && (
           <Alert variant="destructive" className="flex items-start gap-2">
-            <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
+            <NavIcon name="warning" size={16} className="mt-0.5 shrink-0" />
             <span>
               No WordPress site connected — this post will be saved as a draft in Opollo only.{" "}
               <a
@@ -959,10 +959,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               className="flex w-full items-center justify-between text-left text-sm font-semibold transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               SEO
-              <ChevronDown
-                aria-hidden
+              <NavIcon
+                name="chevron-down"
+                size={16}
                 className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform",
+                  "text-muted-foreground transition-transform",
                   seoPanelOpen && "rotate-180",
                 )}
               />
@@ -1568,10 +1569,11 @@ function SidebarPanel({
         className="flex w-full items-center justify-between px-4 py-2.5 text-left text-sm font-semibold transition-colors hover:bg-muted/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         {title}
-        <ChevronDown
-          aria-hidden
+        <NavIcon
+          name="chevron-down"
+          size={16}
           className={cn(
-            "h-4 w-4 text-muted-foreground transition-transform",
+            "text-muted-foreground transition-transform",
             open && "rotate-180",
           )}
         />
@@ -1805,9 +1807,10 @@ function WpTaxonomyCombobox({
                 ))
               : placeholder}
           </span>
-          <ChevronDown
-            aria-hidden
-            className="mt-1 h-4 w-4 shrink-0 text-muted-foreground"
+          <NavIcon
+            name="chevron-down"
+            size={16}
+            className="mt-1 shrink-0 text-muted-foreground"
           />
         </button>
       </PopoverTrigger>
@@ -1861,10 +1864,11 @@ function WpTaxonomyCombobox({
                   }
                 }}
               >
-                <Check
-                  aria-hidden
+                <NavIcon
+                  name="check"
+                  size={16}
                   className={cn(
-                    "mr-2 h-4 w-4 shrink-0",
+                    "mr-2 shrink-0",
                     selectedIds.has(option.id) ? "opacity-100" : "opacity-0",
                   )}
                 />
@@ -1962,7 +1966,7 @@ function WpUserCombobox({
                 ? selectedUser.name
                 : "Use site default"}
           </span>
-          <ChevronDown aria-hidden className="h-4 w-4 text-muted-foreground" />
+          <NavIcon name="chevron-down" size={16} className="text-muted-foreground" />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -1981,9 +1985,10 @@ function WpUserCombobox({
               value="__default__"
               onSelect={() => { onChange(null); setOpen(false); }}
             >
-              <Check
-                aria-hidden
-                className={cn("mr-2 h-4 w-4 shrink-0", value === null ? "opacity-100" : "opacity-0")}
+              <NavIcon
+                name="check"
+                size={16}
+                className={cn("mr-2 shrink-0", value === null ? "opacity-100" : "opacity-0")}
               />
               Use site default
             </CommandItem>
@@ -1993,9 +1998,10 @@ function WpUserCombobox({
                 value={`${user.name} ${user.slug}`}
                 onSelect={() => { onChange(user.id); setOpen(false); }}
               >
-                <Check
-                  aria-hidden
-                  className={cn("mr-2 h-4 w-4 shrink-0", value === user.id ? "opacity-100" : "opacity-0")}
+                <NavIcon
+                  name="check"
+                  size={16}
+                  className={cn("mr-2 shrink-0", value === user.id ? "opacity-100" : "opacity-0")}
                 />
                 <span className="flex-1 truncate">{user.name}</span>
               </CommandItem>
@@ -2170,9 +2176,10 @@ function WpPageCombobox({
           <span className={value ? "" : "text-muted-foreground"}>
             {value ? `${value.title} (${value.slug})` : "Pick a parent page…"}
           </span>
-          <ChevronDown
-            aria-hidden
-            className="ml-2 h-4 w-4 text-muted-foreground"
+          <NavIcon
+            name="chevron-down"
+            size={16}
+            className="ml-2 text-muted-foreground"
           />
         </button>
       </PopoverTrigger>

@@ -1,7 +1,6 @@
-import { Users } from "lucide-react";
-
 import type { AdminUserRow } from "@/app/api/admin/users/list/route";
 import { EmptyState } from "@/components/ui/empty-state";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { UserRoleActionCell } from "@/components/UserRoleActionCell";
 import { UserStatusActionCell } from "@/components/UserStatusActionCell";
 
@@ -37,7 +36,7 @@ export function UsersTable({
   if (users.length === 0) {
     return (
       <EmptyState
-        icon={Users}
+        icon={<NavIcon name="users" size={20} />}
         iconLabel="No users"
         title="No users yet"
         body={

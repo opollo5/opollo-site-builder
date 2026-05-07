@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useId, useRef, useState } from "react";
-import { ImagePlus, Loader2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
 // ScreenshotUploadZone — Step-1 image upload affordance.
@@ -174,7 +174,7 @@ export function ScreenshotUploadZone({
             data-testid="screenshot-upload-busy"
             aria-live="polite"
           >
-            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+            <NavIcon name="sync" size={14} className="animate-spin" />
             Reading your images…
           </span>
         )}
@@ -214,10 +214,7 @@ export function ScreenshotUploadZone({
         ].join(" ")}
         data-testid="screenshot-upload-dropzone"
       >
-        <ImagePlus
-          aria-hidden
-          className="h-6 w-6 text-muted-foreground"
-        />
+        <NavIcon name="picture" size={24} className="text-muted-foreground" />
         <p className="mt-2 text-sm">
           {remaining > 0
             ? "Drop images here, or click to browse"
@@ -279,7 +276,7 @@ export function ScreenshotUploadZone({
                 aria-label={`Remove ${s.file_name}`}
                 data-testid="screenshot-upload-remove"
               >
-                <X aria-hidden className="h-3 w-3" />
+                <NavIcon name="cross" size={12} />
               </Button>
               <p
                 className="truncate px-1.5 py-0.5 text-xs text-muted-foreground"

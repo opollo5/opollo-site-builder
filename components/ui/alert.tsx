@@ -1,27 +1,15 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
-import {
-  CircleAlert,
-  CircleCheck,
-  Info,
-  TriangleAlert,
-  type LucideIcon,
-} from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
 // A-6 — Alert primitive.
 //
-// Extracts the inline alert pattern repeated across the codebase
-// (`rounded-md border border-X/40 bg-X/10 p-3 text-sm text-X` for
-// each of destructive / warning / success / info). CVA-driven so
-// consumers pass `variant="warning"` and the icon, border, bg, and
-// text colour resolve together.
-//
-// Always carries role="alert" (errors) or role="status" (info /
-// success / warning). Default icon per variant; consumers can
-// override via the `icon` prop.
+// CVA-driven so consumers pass `variant="warning"` and the icon, border,
+// bg, and text colour resolve together. Default icon per variant; pass
+// `icon={null}` to suppress, or `icon={<NavIcon name="..." />}` to override.
 // ---------------------------------------------------------------------------
 
 const alertVariants = cva(
@@ -42,14 +30,14 @@ const alertVariants = cva(
   },
 );
 
-const VARIANT_ICON: Record<
+const VARIANT_ICON_NAME: Record<
   NonNullable<VariantProps<typeof alertVariants>["variant"]>,
-  LucideIcon
+  string
 > = {
-  info: Info,
-  success: CircleCheck,
-  warning: TriangleAlert,
-  destructive: CircleAlert,
+  info: "question-circle",
+  success: "checkmark-circle",
+  warning: "warning",
+  destructive: "warning",
 };
 
 const VARIANT_ROLE: Record<
@@ -65,8 +53,8 @@ const VARIANT_ROLE: Record<
 export interface AlertProps
   extends Omit<React.HTMLAttributes<HTMLDivElement>, "title">,
     VariantProps<typeof alertVariants> {
-  /** Override the default icon for this variant. */
-  icon?: LucideIcon | null;
+  /** Override the default icon for this variant. Pass `null` to suppress. */
+  icon?: React.ReactNode | null;
   /** Optional title — renders as a bolder line above the body. */
   title?: React.ReactNode;
 }
@@ -77,7 +65,18 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
     ref,
   ) {
     const v = variant ?? "info";
-    const Icon = icon === null ? null : (icon ?? VARIANT_ICON[v]);
+    const renderedIcon =
+      icon === null
+        ? null
+        : icon !== undefined
+          ? icon
+          : (
+              <NavIcon
+                name={VARIANT_ICON_NAME[v]}
+                size={16}
+                className="mt-0.5 shrink-0"
+              />
+            );
     return (
       <div
         ref={ref}
@@ -85,9 +84,7 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
         className={cn(alertVariants({ variant }), className)}
         {...props}
       >
-        {Icon && (
-          <Icon aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
-        )}
+        {renderedIcon}
         <div className="min-w-0 flex-1">
           {title && (
             <p className="font-medium leading-tight">{title}</p>

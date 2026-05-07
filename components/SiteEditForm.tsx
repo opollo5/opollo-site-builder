@@ -2,12 +2,12 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { CheckCircle2, HelpCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
 
 // AUTH-FOUNDATION P2.3 — Edit form for /admin/sites/[id]/edit.
@@ -386,7 +386,7 @@ export function SiteEditForm({
           >
             {testResult.kind === "testing" ? (
               <>
-                <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                <NavIcon name="sync" size={14} className="animate-spin" />
                 Testing…
               </>
             ) : (
@@ -447,10 +447,11 @@ function TestResultPanel({
         data-matches-current={matchesCurrent ? "true" : "false"}
       >
         <div className="flex items-start gap-2">
-          <CheckCircle2
-            aria-hidden
+          <NavIcon
+            name="checkmark-circle"
+            size={16}
             className={cn(
-              "h-4 w-4 shrink-0",
+              "shrink-0",
               matchesCurrent ? "text-success" : "text-warning",
             )}
           />
@@ -492,9 +493,10 @@ function ApplicationPasswordTooltip() {
       tabIndex={0}
       aria-label="Where to generate a WordPress Application Password"
     >
-      <HelpCircle
-        aria-hidden
-        className="h-3.5 w-3.5 text-muted-foreground transition-smooth group-hover:text-foreground group-focus:text-foreground"
+      <NavIcon
+        name="question-circle"
+        size={14}
+        className="text-muted-foreground transition-smooth group-hover:text-foreground group-focus:text-foreground"
       />
       <span
         role="tooltip"

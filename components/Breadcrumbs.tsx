@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
 // Shared breadcrumb trail. Last crumb is the current page (renders as
@@ -39,9 +40,10 @@ export function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
               </span>
             )}
             {!isLast && (
-              <ChevronRight
-                aria-hidden
-                className="h-3 w-3 text-muted-foreground/60"
+              <NavIcon
+                name="chevron-right"
+                size={12}
+                className="text-muted-foreground/60"
               />
             )}
           </span>

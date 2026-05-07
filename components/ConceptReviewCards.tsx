@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Monitor, Smartphone } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import type { ConceptError, ConceptResult } from "@/components/DesignDirectionInputs";
 
 // ---------------------------------------------------------------------------
@@ -196,7 +196,7 @@ function ConceptCard({
             aria-pressed={view === "desktop"}
             data-testid={`concept-view-desktop-${concept.direction}`}
           >
-            <Monitor aria-hidden className="h-3 w-3" />
+            <NavIcon name="desktop" size={12} />
             Desktop
           </button>
           <button
@@ -211,7 +211,7 @@ function ConceptCard({
             aria-pressed={view === "mobile"}
             data-testid={`concept-view-mobile-${concept.direction}`}
           >
-            <Smartphone aria-hidden className="h-3 w-3" />
+            <NavIcon name="smartphone" size={12} />
             Mobile
           </button>
         </div>

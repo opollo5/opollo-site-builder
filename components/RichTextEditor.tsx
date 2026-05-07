@@ -6,20 +6,8 @@ import Link from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
 import CharacterCount from "@tiptap/extension-character-count";
 import { useEffect, useRef, useState } from "react";
-import {
-  Bold,
-  Italic,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  Quote,
-  Link2,
-  Undo,
-  Redo,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   Dialog,
   DialogContent,
@@ -126,14 +114,14 @@ export function RichTextEditor({
           active={editor?.isActive("bold")}
           title="Bold (⌘B)"
         >
-          <Bold className="h-3.5 w-3.5" />
+          <NavIcon name="bold" size={14} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleItalic().run()}
           active={editor?.isActive("italic")}
           title="Italic (⌘I)"
         >
-          <Italic className="h-3.5 w-3.5" />
+          <NavIcon name="italic" size={14} />
         </ToolbarButton>
         <Divider />
         <ToolbarButton
@@ -141,21 +129,21 @@ export function RichTextEditor({
           active={editor?.isActive("heading", { level: 1 })}
           title="Heading 1"
         >
-          <Heading1 className="h-3.5 w-3.5" />
+          <span className="font-mono text-[11px] font-semibold leading-none">H1</span>
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
           active={editor?.isActive("heading", { level: 2 })}
           title="Heading 2"
         >
-          <Heading2 className="h-3.5 w-3.5" />
+          <span className="font-mono text-[11px] font-semibold leading-none">H2</span>
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
           active={editor?.isActive("heading", { level: 3 })}
           title="Heading 3"
         >
-          <Heading3 className="h-3.5 w-3.5" />
+          <span className="font-mono text-[11px] font-semibold leading-none">H3</span>
         </ToolbarButton>
         <Divider />
         <ToolbarButton
@@ -163,21 +151,21 @@ export function RichTextEditor({
           active={editor?.isActive("bulletList")}
           title="Bullet list"
         >
-          <List className="h-3.5 w-3.5" />
+          <NavIcon name="list" size={14} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleOrderedList().run()}
           active={editor?.isActive("orderedList")}
           title="Numbered list"
         >
-          <ListOrdered className="h-3.5 w-3.5" />
+          <NavIcon name="list2" size={14} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleBlockquote().run()}
           active={editor?.isActive("blockquote")}
           title="Blockquote"
         >
-          <Quote className="h-3.5 w-3.5" />
+          <NavIcon name="quote-open" size={14} />
         </ToolbarButton>
         <Divider />
         <ToolbarButton
@@ -191,7 +179,7 @@ export function RichTextEditor({
           active={editor?.isActive("link")}
           title="Link"
         >
-          <Link2 className="h-3.5 w-3.5" />
+          <NavIcon name="link2" size={14} />
         </ToolbarButton>
         <Divider />
         <ToolbarButton
@@ -199,14 +187,14 @@ export function RichTextEditor({
           disabled={!editor?.can().undo()}
           title="Undo (⌘Z)"
         >
-          <Undo className="h-3.5 w-3.5" />
+          <NavIcon name="undo" size={14} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().redo().run()}
           disabled={!editor?.can().redo()}
           title="Redo (⌘⇧Z)"
         >
-          <Redo className="h-3.5 w-3.5" />
+          <NavIcon name="redo" size={14} />
         </ToolbarButton>
 
         {/* Word count — right-aligned */}

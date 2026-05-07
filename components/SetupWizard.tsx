@@ -3,8 +3,9 @@
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Palette, Volume2 } from "lucide-react";
 import { toast } from "sonner";
+
+import { NavIcon } from "@/components/ui/nav-icon";
 
 import { ApprovedDesignReadout } from "@/components/ConceptRefinementView";
 import {
@@ -39,10 +40,10 @@ interface Props {
   status: SetupStatus;
 }
 
-const STEPS: Array<{ n: SetupStep; label: string; icon: typeof Palette }> = [
-  { n: 1, label: "Design direction", icon: Palette },
-  { n: 2, label: "Tone of voice", icon: Volume2 },
-  { n: 3, label: "Done", icon: Check },
+const STEPS: Array<{ n: SetupStep; label: string; iconName: string }> = [
+  { n: 1, label: "Design direction", iconName: "palette" },
+  { n: 2, label: "Tone of voice", iconName: "volume" },
+  { n: 3, label: "Done", iconName: "check" },
 ];
 
 function statusLabel(s: SetupStepStatus): string {
@@ -126,7 +127,7 @@ function WizardStepper({
               aria-current={active ? "step" : undefined}
             >
               {done && !active ? (
-                <Check aria-hidden className="h-4 w-4" />
+                <NavIcon name="check" size={16} />
               ) : (
                 s.n
               )}
@@ -267,7 +268,7 @@ function SkipButton({
     >
       {busy ? (
         <>
-          <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+          <NavIcon name="sync" size={14} className="animate-spin" />
           Skipping…
         </>
       ) : (

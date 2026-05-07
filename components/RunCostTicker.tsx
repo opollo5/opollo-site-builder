@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Info, X } from "lucide-react";
-
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 import type { BriefPageRow } from "@/lib/briefs";
 
 // ---------------------------------------------------------------------------
@@ -138,9 +137,9 @@ export function RunCostTicker({
             )}
           >
             {expanded ? (
-              <X aria-hidden className="h-5 w-5" />
+              <NavIcon name="cross" size={20} />
             ) : (
-              <Info aria-hidden className="h-5 w-5" />
+              <NavIcon name="question-circle" size={20} />
             )}
             <span className="sr-only">
               {expanded ? "Close run details" : "Open run details"}

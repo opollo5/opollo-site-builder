@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Sparkles } from "lucide-react";
+
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // OnboardingReminderBanner — DESIGN-SYSTEM-OVERHAUL PR 6.
 //
@@ -17,7 +18,7 @@ export function OnboardingReminderBanner({ siteId }: { siteId: string }) {
       role="status"
       data-testid="onboarding-reminder-banner"
     >
-      <Sparkles aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+      <NavIcon name="magic-wand" size={16} className="mt-0.5 shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
         <p className="font-medium">Finish setting up this site.</p>
         <p className="mt-0.5 text-sm text-muted-foreground">

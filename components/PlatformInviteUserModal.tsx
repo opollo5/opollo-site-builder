@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   Dialog,
   DialogContent,
@@ -137,7 +137,7 @@ export function PlatformInviteUserModal({
           setOpen(true);
         }}
       >
-        <Plus aria-hidden className="h-4 w-4" />
+        <NavIcon name="plus" size={16} />
         Invite user
       </Button>
 

@@ -1,7 +1,7 @@
-import { Building2 } from "lucide-react";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { NavIcon } from "@/components/ui/nav-icon";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 
 // /company/social/* — session + company guard.
@@ -24,7 +24,7 @@ export default async function CompanySocialLayout({
     if (session.isOpolloStaff) {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-center">
-          <Building2 className="h-9 w-9 text-m3" aria-hidden />
+          <NavIcon name="apartment" size={36} className="text-m3" />
           <p className="text-base font-medium">Select a company to continue</p>
           <p className="max-w-xs text-sm text-m3">
             Use the company selector in the Social navigation panel to choose a

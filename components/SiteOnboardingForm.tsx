@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, UploadCloud } from "lucide-react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 type Mode = "copy_existing" | "new_design";
 
@@ -12,21 +12,21 @@ const OPTIONS: Array<{
   mode: Mode;
   title: string;
   blurb: string;
-  Icon: typeof UploadCloud;
+  iconName: string;
 }> = [
   {
     mode: "copy_existing",
     title: "Upload content to an existing site",
     blurb:
       "This site already has a WordPress theme. We'll extract its design so new content matches it seamlessly.",
-    Icon: UploadCloud,
+    iconName: "cloud-upload",
   },
   {
     mode: "new_design",
     title: "Build a new website",
     blurb:
       "We'll help you design the site from scratch — concepts, colours, tone of voice, and a complete CSS system.",
-    Icon: Sparkles,
+    iconName: "magic-wand",
   },
 ];
 
@@ -68,7 +68,7 @@ export function SiteOnboardingForm({ siteId }: { siteId: string }) {
   return (
     <div className="mt-6 space-y-4" data-testid="site-onboarding-form">
       <div className="grid gap-4 md:grid-cols-2">
-        {OPTIONS.map(({ mode, title, blurb, Icon }) => {
+        {OPTIONS.map(({ mode, title, blurb, iconName }) => {
           const isSelected = selected === mode;
           return (
             <button
@@ -83,11 +83,10 @@ export function SiteOnboardingForm({ siteId }: { siteId: string }) {
               data-testid={`site-onboarding-option-${mode}`}
               aria-pressed={isSelected}
             >
-              <Icon
-                aria-hidden
-                className={`h-6 w-6 ${
-                  isSelected ? "text-primary" : "text-muted-foreground"
-                }`}
+              <NavIcon
+                name={iconName}
+                size={24}
+                className={isSelected ? "text-primary" : "text-muted-foreground"}
               />
               <div>
                 <p className="text-base font-medium">{title}</p>
