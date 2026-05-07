@@ -33,6 +33,46 @@ import type { PreflightResult } from "@/lib/site-preflight";
 
 type ActionState = "idle" | "publishing" | "unpublishing";
 
+// Spec 07 PR A — Tiptap saves blank documents as "<p></p>" / "<p><br></p>",
+// which the previous truthy check rendered as a blank iframe. Strip tags +
+// nbsp + zero-width chars before deciding.
+function isHtmlEffectivelyEmpty(html: string | null | undefined): boolean {
+  if (!html) return true;
+  const stripped = html
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;|&#160;| |​|‌|‍|﻿/g, "")
+    .trim();
+  return stripped.length === 0;
+}
+
+// Spec 07 PR A — wrap generated_html in a minimal styled document so the
+// iframe preview renders with sensible typography even before any
+// site-level CSS is loaded.
+//
+// Sanitisation note: rendering happens in <iframe sandbox=""> with NO
+// allow-scripts / allow-same-origin / allow-forms — the browser blocks
+// every active content type. This is stricter than DOMPurify-plus-
+// dangerouslySetInnerHTML because nothing inside the frame can execute
+// or reach the parent. Provenance: relying on browser-native sandbox
+// per https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/iframe#sandbox.
+function wrapPreviewDocument(rawHtml: string): string {
+  const styles = [
+    "body{margin:16px;font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;font-size:15px;line-height:1.6;color:#111827}",
+    "h1{font-size:24px;line-height:1.25;margin:0 0 12px;font-weight:700}",
+    "h2{font-size:20px;line-height:1.3;margin:20px 0 10px;font-weight:700}",
+    "h3{font-size:18px;line-height:1.35;margin:16px 0 8px;font-weight:600}",
+    "p{margin:0 0 12px}",
+    "ul,ol{margin:0 0 12px 20px;padding:0}",
+    "li{margin:4px 0}",
+    "blockquote{margin:0 0 12px;padding:8px 12px;border-left:3px solid #e5e7eb;color:#374151}",
+    "code{background:#f3f4f6;padding:1px 4px;border-radius:3px;font-size:14px;font-family:ui-monospace,monospace}",
+    "pre{background:#f3f4f6;padding:12px;border-radius:6px;overflow:auto;font-size:13px}",
+    "img{max-width:100%;height:auto}",
+    "a{color:#2563eb;text-decoration:underline}",
+  ].join("");
+  return `<!doctype html><html><head><meta charset="utf-8"><style>${styles}</style></head><body>${rawHtml}</body></html>`;
+}
+
 export function PostDetailClient({
   siteId,
   siteWpUrl,
@@ -237,16 +277,16 @@ export function PostDetailClient({
             className="mt-3 h-96 w-full rounded border"
             title={`Live preview of ${post.title}`}
           />
-        ) : post.generated_html ? (
+        ) : !isHtmlEffectivelyEmpty(post.generated_html) ? (
           <iframe
             sandbox=""
-            srcDoc={post.generated_html}
-            className="mt-3 h-96 w-full rounded border"
+            srcDoc={wrapPreviewDocument(post.generated_html ?? "")}
+            className="mt-3 h-[32rem] w-full rounded border"
             title={`Draft preview of ${post.title}`}
           />
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            No content yet. Save a draft from the composer to see a preview here.
+            No content yet — add content via the post editor.
           </p>
         )}
       </section>
