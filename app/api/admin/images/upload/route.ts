@@ -13,6 +13,7 @@ import {
 import { extractExifFields } from "@/lib/exif-extract";
 import { internalError, routeError, validationError } from "@/lib/http";
 import { readImageDimensions } from "@/lib/image-dimensions";
+import { embedAndStoreImage, refreshImageEmbedding } from "@/lib/images/embed";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -94,6 +95,10 @@ async function generateAiCaption(
       })
       .eq("id", imageId)
       .is("caption", null);
+
+    // Spec 05 — refresh the caption embedding now that the AI caption
+    // has landed. Best-effort; no-op when OPENAI_API_KEY isn't set.
+    void refreshImageEmbedding(imageId, svc);
   } catch (err) {
     logger.warn("image.upload.ai_caption_failed", {
       image_id: imageId,
@@ -316,6 +321,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // one asynchronously via Anthropic vision (fire-and-forget).
   if (!exifCaption && ins.data?.id && file.type.startsWith("image/")) {
     void generateAiCaption(ins.data.id, bytes, file.type);
+  } else if (ins.data?.id) {
+    // Spec 05 — when we already have a caption (EXIF path) the AI caption
+    // hook never runs, so embed here. Fire-and-forget; no-op when
+    // OPENAI_API_KEY isn't set.
+    void embedAndStoreImage(
+      ins.data.id,
+      {
+        caption: exifCaption,
+        alt: exifAltText,
+        tags: exifTags,
+        title: insertRow.title,
+        filename,
+      },
+      supabase,
+    );
   }
 
   return NextResponse.json(

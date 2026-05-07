@@ -12,7 +12,9 @@ import {
   softDeleteImage,
   updateImageMetadata,
 } from "@/lib/image-library";
+import { refreshImageEmbedding } from "@/lib/images/embed";
 import { logger } from "@/lib/logger";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // PATCH /api/admin/images/[id] — M5-3.
@@ -115,6 +117,10 @@ export async function PATCH(
   // reflect the edit on the next render.
   revalidatePath("/admin/images");
   revalidatePath(`/admin/images/${params.id}`);
+
+  // Spec 05 — caption / alt / tags changed, so the embedding is stale.
+  // Fire-and-forget; no-op when OPENAI_API_KEY isn't set.
+  void refreshImageEmbedding(params.id, getServiceRoleClient());
 
   return respond(result);
 }
