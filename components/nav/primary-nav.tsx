@@ -13,10 +13,12 @@ import {
 } from "./nav-config";
 
 // ---------------------------------------------------------------------------
-// Primary Nav — left rail, always visible at 70px on desktop.
-// Icon stacked above label. Active item uses a single subtle background
-// tint (bg-nav-active) — no border, no text-color shift, no other signal.
-// Mobile: shown as part of the off-canvas drawer managed by NavShellClient.
+// Primary Nav — left rail. Two-state desktop:
+//   • Expanded: 112px, icon stacked over full-text label.
+//   • Collapsed: 64px, icon only; full label appears as a native title
+//     tooltip on hover.
+// Active item uses bg-nav-active only (no border, text-color shift, etc.).
+// Mobile: rendered through the off-canvas drawer in NavShellClient.
 // ---------------------------------------------------------------------------
 
 interface PrimaryNavProps {
@@ -26,6 +28,10 @@ interface PrimaryNavProps {
   isSectionNavVisible: boolean;
   mobile?: boolean;
   onMobileNavItemClick?: () => void;
+  /** Desktop collapse state. Hides labels, renders icons only. */
+  collapsed?: boolean;
+  /** Toggle handler — renders the chevron button when provided. */
+  onCollapseToggle?: () => void;
 }
 
 export function PrimaryNav({
@@ -34,6 +40,8 @@ export function PrimaryNav({
   onSectionNavToggle,
   mobile = false,
   onMobileNavItemClick,
+  collapsed = false,
+  onCollapseToggle,
 }: PrimaryNavProps) {
   const visibleItems = filterPrimaryItems(primaryNavItems, navContext);
   const hasUser = !!navContext.email;
@@ -43,7 +51,10 @@ export function PrimaryNav({
     const hasSectionNav = item.sectionNav !== null;
 
     const itemClass = cn(
-      "group flex w-full flex-col items-center gap-1 rounded-md px-1 py-3 transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+      "group flex w-full items-center rounded-md transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+      collapsed
+        ? "justify-center px-1 py-2.5"
+        : "flex-col gap-1 px-1 py-3",
       isActive
         ? "bg-nav-active text-foreground"
         : "text-m2 hover:bg-nav-hover hover:text-gr",
@@ -69,7 +80,7 @@ export function PrimaryNav({
             className={itemClass}
           >
             <NavIcon name={item.icon} size={20} className={iconClass} />
-            <span className={labelClass}>{item.label}</span>
+            {!collapsed && <span className={labelClass}>{item.label}</span>}
           </button>
         </li>
       );
@@ -86,26 +97,38 @@ export function PrimaryNav({
           className={itemClass}
         >
           <NavIcon name={item.icon} size={20} className={iconClass} />
-          <span className={labelClass}>{item.label}</span>
+          {!collapsed && <span className={labelClass}>{item.label}</span>}
         </Link>
       </li>
     );
   }
 
+  // Desktop width: 112px expanded, 64px collapsed. Mobile drawer is full-width.
+  // Width transitions are intentional — section nav + content shift in lockstep.
+  const railWidthClass = mobile
+    ? "w-full"
+    : collapsed
+      ? "w-[64px] shrink-0"
+      : "w-[112px] shrink-0";
+
   return (
     <nav
       data-testid="primary-nav"
       aria-label="Primary navigation"
+      data-collapsed={!mobile && collapsed ? "true" : "false"}
       className={cn(
         "flex flex-col border-r border-border bg-[linear-gradient(180deg,var(--d1)_0%,var(--bg)_100%)]",
-        mobile ? "w-full" : "w-[70px] shrink-0",
+        !mobile && "transition-[width] duration-150 ease-out",
+        railWidthClass,
       )}
     >
-      {/* Round Opollo logo — fixed 36×36 in the rail header */}
+      {/* Round Opollo logo + (desktop) collapse toggle */}
       <div
         className={cn(
-          "flex items-center justify-center border-b border-border",
-          mobile ? "h-14 px-4 justify-start" : "h-14",
+          "flex items-center border-b border-border",
+          mobile
+            ? "h-14 px-4 justify-start"
+            : "h-14 justify-center",
         )}
       >
         <Link
@@ -123,6 +146,24 @@ export function PrimaryNav({
           />
         </Link>
       </div>
+
+      {/* Desktop-only collapse toggle, sits just below the logo bar so it's
+          equally reachable in both rail widths. */}
+      {!mobile && onCollapseToggle && (
+        <div className="flex items-center justify-end border-b border-border px-1.5 py-1">
+          <button
+            type="button"
+            onClick={onCollapseToggle}
+            aria-expanded={!collapsed}
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+            title={collapsed ? "Expand navigation" : "Collapse navigation"}
+            data-testid="nav-collapse-toggle"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-m3 transition-smooth hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          >
+            <NavIcon name={collapsed ? "chevron-right" : "chevron-left"} size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Primary items */}
       <ul
@@ -147,10 +188,17 @@ export function PrimaryNav({
                 <div
                   key={item.key}
                   title="Command palette (⌘K)"
-                  className="flex flex-col items-center gap-1 rounded-md px-1 py-2 text-m3"
+                  className={cn(
+                    "flex items-center rounded-md px-1 py-2 text-m3",
+                    collapsed
+                      ? "justify-center"
+                      : "flex-col gap-1",
+                  )}
                 >
                   <NavIcon name={item.icon} size={20} className="text-icon-dim" />
-                  <span className="text-xs font-mono leading-none">⌘K</span>
+                  {!collapsed && (
+                    <span className="text-xs font-mono leading-none">⌘K</span>
+                  )}
                 </div>
               );
             }
@@ -160,14 +208,21 @@ export function PrimaryNav({
                 <form key={item.key} action="/logout" method="POST">
                   <button
                     type="submit"
-                    title="Sign out"
+                    title={item.label}
                     data-testid={item.testId}
-                    className="group flex w-full flex-col items-center gap-1 rounded-md px-1 py-2 transition-smooth text-destructive hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+                    className={cn(
+                      "group flex w-full items-center rounded-md px-1 py-2 transition-smooth text-destructive hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
+                      collapsed
+                        ? "justify-center"
+                        : "flex-col gap-1",
+                    )}
                   >
                     <NavIcon name={item.icon} size={20} className="shrink-0" />
-                    <span className="text-xs font-medium leading-none truncate w-full text-center">
-                      {item.label}
-                    </span>
+                    {!collapsed && (
+                      <span className="text-xs font-medium leading-none truncate w-full text-center">
+                        {item.label}
+                      </span>
+                    )}
                   </button>
                 </form>
               );
@@ -176,8 +231,8 @@ export function PrimaryNav({
             return null;
           })}
 
-          {/* Email truncated at very bottom */}
-          {navContext.email && (
+          {/* Email truncated at very bottom — hidden when collapsed (no room) */}
+          {!collapsed && navContext.email && (
             <p
               className="mt-1 truncate border-t border-border pt-1.5 px-1 text-xs text-m3 text-center"
               title={navContext.email}
