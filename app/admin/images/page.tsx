@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { BulkImageUpload } from "@/components/BulkImageUpload";
 import { ImagesTable } from "@/components/ImagesTable";
+import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -160,6 +161,12 @@ export default async function AdminImagesPage({
       </div>
 
       {!parsed.deleted && <BulkImageUpload />}
+
+      {!parsed.deleted && (
+        <div className="mt-4">
+          <ImageMetadataJobTrigger />
+        </div>
+      )}
 
       <form
         method="GET"

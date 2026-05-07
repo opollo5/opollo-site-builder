@@ -44,7 +44,7 @@ export async function POST() {
   }
 
   try {
-    const result = await runExtractionBatch({ accountId, apiToken, batchSize: 10 });
+    const result = await runExtractionBatch({ accountId, apiToken, batchSize: 25 });
     return NextResponse.json(result);
   } catch (err) {
     logger.error("extract.admin_post_error", {
