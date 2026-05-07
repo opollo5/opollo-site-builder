@@ -383,7 +383,7 @@ const PREVIEW_HTML = `<!DOCTYPE html>
   --m1: rgba(255,255,255,0.92); --m2: rgba(255,255,255,0.58);
   --b1: rgba(255,255,255,0.06); --b2: rgba(255,255,255,0.12); --b3: rgba(255,255,255,0.20);
   --font-size-base: 1rem; --font-size-xl: 1.25rem;
-  --font-display: Fredoka, sans-serif; --font-body: Manrope, sans-serif;
+  --font-display: Sora, sans-serif; --font-body: Inter, sans-serif;
   --radius: 0.5rem; --radius-full: 9999px;
 }
 *, *::before, *::after { box-sizing: border-box; }
