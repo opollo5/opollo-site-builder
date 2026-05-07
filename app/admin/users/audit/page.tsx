@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { formatRelativeTime } from "@/lib/utils";
@@ -45,22 +46,20 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
   const totalPages = count ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : 1;
 
   return (
-    <>
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <H1>User audit log</H1>
-          <Lead className="mt-0.5">
-            Append-only record of every user-management action.
-            super_admin only.
-          </Lead>
-        </div>
-        <Link
-          href="/admin/users"
-          className="rounded-md border px-3 py-2 text-sm transition-smooth hover:bg-muted"
-        >
-          ← Back to users
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Users", href: "/admin/users" },
+            { label: "Audit log" },
+          ]}
+        />
+        <PageHeader.Title>User audit log</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Append-only record of every user-management action. super_admin only.
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {error ? (
         <Alert variant="destructive" className="mt-6" title="Failed to load audit log">
@@ -153,6 +152,6 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
           )}
         </>
       )}
-    </>
+    </PageShell>
   );
 }

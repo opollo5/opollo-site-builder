@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BlogPostComposer } from "@/components/BlogPostComposer";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -39,25 +39,25 @@ export default async function BlogPostEntryPage({
   const site = result.data.site;
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Posts", href: `/admin/sites/${site.id}/posts` },
-          { label: "New post" },
-        ]}
-      />
-      <H1 className="mt-2">New blog post</H1>
-      <Lead className="mt-1">
-        Paste a markdown / HTML / YAML-fronted post. We&apos;ll parse the
-        metadata into the fields below — every value is editable before you
-        save the draft.
-      </Lead>
-
-      <div className="mt-6">
-        <BlogPostComposer siteId={site.id} />
-      </div>
-    </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Posts", href: `/admin/sites/${site.id}/posts` },
+            { label: "New post" },
+          ]}
+        />
+        <PageHeader.Title>New blog post</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Paste a markdown / HTML / YAML-fronted post. We&apos;ll parse the
+          metadata into the fields below — every value is editable before you
+          save the draft.
+        </PageHeader.Subtitle>
+      </PageHeader>
+      <BlogPostComposer siteId={site.id} />
+    </PageShell>
   );
 }

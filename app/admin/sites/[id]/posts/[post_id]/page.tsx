@@ -1,7 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PostDetailClient } from "@/components/PostDetailClient";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getPost } from "@/lib/posts";
 import { preflightSitePublish } from "@/lib/site-preflight";
@@ -75,21 +76,25 @@ export default async function PostDetailPage({
   const preflight = await preflightSitePublish(params.id);
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Posts", href: `/admin/sites/${site.id}/posts` },
-          { label: post.title },
-        ]}
-      />
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Posts", href: `/admin/sites/${site.id}/posts` },
+            { label: post.title },
+          ]}
+        />
+        <PageHeader.Title>{post.title}</PageHeader.Title>
+      </PageHeader>
       <PostDetailClient
         siteId={site.id}
         siteWpUrl={site.wp_url}
         post={post}
         preflight={preflight}
       />
-    </main>
+    </PageShell>
   );
 }

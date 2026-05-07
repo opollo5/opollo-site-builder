@@ -1,5 +1,20 @@
 # Spec run blockers
 
+## Spec 04 — Optimiser PageHeader sweep (TODO, do after `feat/optimiser` merges to main)
+
+**Date:** 2026-05-08
+
+**Spec section in tension:** Spec 04 PR E aimed to drain `PAGE_HEADER_DEFERRED_ROUTES` to `[]` for every admin-tier route. The optimiser module lives on the long-running `feat/optimiser` branch and is **out of scope** for this workstream by explicit instruction.
+
+**What this leaves open:**
+
+- Routes under `app/optimiser/**/page.tsx` will need the same Title → Breadcrumb → Subtitle → Meta → Actions migration once `feat/optimiser` merges into main.
+- The audit script's `headings-use-page-header` rule scopes to `app/admin/` and `app/account/` only; it does NOT walk `app/optimiser/`. So nothing fires today, but the moment Steven adds the optimiser to the audit roots, every optimiser page.tsx will surface as HIGH.
+
+**To execute:** after `feat/optimiser` lands, walk every `app/optimiser/**/page.tsx`, migrate header chrome to PageHeader (matching the patterns used in PRs B–E), then extend the `roots` array in `check11_headingsUsePageHeader`, `check12_breadcrumbRequiredWithPageHeader`, and `check13_noRawH1InPages` from `["app/admin", "app/account"]` to `["app/admin", "app/account", "app/optimiser"]`. PR 4 of the optimiser cleanup is the natural place.
+
+---
+
 ## Spec 02 PR 2 — partial admin-route adoption sweep (8 of 37 routes)
 
 **Date:** 2026-05-07
