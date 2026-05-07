@@ -35,9 +35,9 @@ test.describe("/admin/settings/design-system", () => {
   test("nav link routes to the page and token editor renders", async ({
     page,
   }, testInfo) => {
-    await page.goto("/admin/sites");
+    await page.goto("/admin/users/audit");
 
-    // super_admin sees the Design system nav link.
+    // super_admin sees the Design system nav link (in Admin section nav).
     const navLink = page.getByTestId("nav-design-system-settings");
     await expect(navLink).toBeVisible();
     await navLink.click();

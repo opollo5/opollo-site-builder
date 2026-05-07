@@ -185,8 +185,8 @@ export function NavShellClient({
         </div>
       </div>
 
-      {/* Desktop layout */}
-      <div className="hidden sm:flex h-full w-full overflow-hidden">
+      {/* Desktop nav panels (hidden on mobile) */}
+      <div className="hidden sm:flex shrink-0 h-full">
         {/* Primary nav rail */}
         <PrimaryNav
           navContext={navContext}
@@ -203,29 +203,17 @@ export function NavShellClient({
             onToggle={handleCollapseToggle}
           />
         )}
+      </div>
 
-        {/* Content */}
+      {/* Content column — single render for both desktop and mobile */}
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Spacer clears the fixed mobile top bar */}
+        <div aria-hidden className="h-14 shrink-0 sm:hidden" />
         <main
           id={skipToId}
           tabIndex={-1}
           className={cn(
-            "min-w-0 flex-1 overflow-auto scroll-mt-4 focus:outline-none",
-            contentPadding,
-          )}
-        >
-          <div className={cn("mx-auto", `max-w-${contentMaxWidth}`)}>
-            {children}
-          </div>
-        </main>
-      </div>
-
-      {/* Mobile content */}
-      <div className="flex w-full flex-col overflow-hidden pt-14 sm:hidden">
-        <main
-          id={`${skipToId}-mobile`}
-          tabIndex={-1}
-          className={cn(
-            "min-w-0 flex-1 overflow-auto scroll-mt-4 focus:outline-none",
+            "flex-1 overflow-auto scroll-mt-4 focus:outline-none",
             contentPadding,
           )}
         >
