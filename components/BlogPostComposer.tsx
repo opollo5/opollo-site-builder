@@ -14,6 +14,7 @@ import { NavIcon } from "@/components/ui/nav-icon";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import {
   Command,
@@ -1170,8 +1171,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             aria-hidden
             className="flex items-center justify-center gap-0.5 text-sm text-muted-foreground"
           >
-            <kbd className="rounded border bg-muted px-1 font-mono text-xs">⌘</kbd>
-            <kbd className="rounded border bg-muted px-1 font-mono text-xs">S</kbd>
+            <Kbd keys={["mod", "S"]} />
             <span className="ml-1">to save draft</span>
           </p>
         </SidebarPanel>

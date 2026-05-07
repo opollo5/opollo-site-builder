@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
+import { Kbd } from "@/components/ui/kbd";
 import { NavIcon } from "@/components/ui/nav-icon";
 import {
   bottomNavItems,
@@ -187,7 +188,7 @@ export function PrimaryNav({
               return (
                 <div
                   key={item.key}
-                  title="Command palette (⌘K)"
+                  title="Command palette"
                   className={cn(
                     "flex items-center rounded-md px-1 py-2 text-m3",
                     collapsed
@@ -197,7 +198,7 @@ export function PrimaryNav({
                 >
                   <NavIcon name={item.icon} size={20} className="text-icon-dim" />
                   {!collapsed && (
-                    <span className="text-xs font-mono leading-none">⌘K</span>
+                    <Kbd keys={["mod", "K"]} className="border-0 bg-transparent px-0 py-0 text-xs leading-none" />
                   )}
                 </div>
               );
