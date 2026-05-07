@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppearancePanelClient } from "@/components/AppearancePanelClient";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ExtractedProfilePanel } from "@/components/ExtractedProfilePanel";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listAppearanceEventsForSite } from "@/lib/appearance-events";
 import { getSite } from "@/lib/sites";
@@ -80,24 +80,23 @@ export default async function SiteAppearancePage({
     version_lock: number;
   };
 
-  const breadcrumbs = (
-    <Breadcrumbs
-      crumbs={[
-        { label: "Sites", href: "/admin/sites" },
-        { label: site.name, href: `/admin/sites/${site.id}` },
-        { label: "Appearance" },
-      ]}
-    />
-  );
+  const headerSegments = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Sites", href: "/admin/sites" },
+    { label: site.name, href: `/admin/sites/${site.id}` },
+    { label: "Appearance" },
+  ];
 
   if (modeRow.site_mode === null) {
     return (
-      <main className="mx-auto max-w-5xl p-6">
-        {breadcrumbs}
-        <div className="mt-6 max-w-2xl">
-          <H1>{site.name}</H1>
-          <Lead className="mt-1">Appearance</Lead>
-          <Alert className="mt-6" title="Finish setting up this site first">
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb segments={headerSegments} />
+          <PageHeader.Title>{site.name}</PageHeader.Title>
+          <PageHeader.Subtitle>Appearance</PageHeader.Subtitle>
+        </PageHeader>
+        <div className="max-w-2xl">
+          <Alert title="Finish setting up this site first">
             Pick whether we&apos;re uploading content to an existing WordPress
             theme or building a fresh design before opening Appearance.
             Generation styling and the rest of setup follow from this choice.
@@ -108,14 +107,17 @@ export default async function SiteAppearancePage({
             </Link>
           </Button>
         </div>
-      </main>
+      </PageShell>
     );
   }
 
   if (modeRow.site_mode === "copy_existing") {
     return (
-      <main className="mx-auto max-w-5xl p-6">
-        {breadcrumbs}
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb segments={headerSegments} />
+          <PageHeader.Title>Appearance · {site.name}</PageHeader.Title>
+        </PageHeader>
         <ExtractedProfilePanel
           siteId={site.id}
           siteName={site.name}
@@ -123,7 +125,7 @@ export default async function SiteAppearancePage({
           extractedDesign={modeRow.extracted_design}
           extractedClasses={modeRow.extracted_css_classes}
         />
-      </main>
+      </PageShell>
     );
   }
 
@@ -134,8 +136,11 @@ export default async function SiteAppearancePage({
     process.env.FEATURE_PATH_B_PUBLISH_GATE === "1";
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      {breadcrumbs}
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb segments={headerSegments} />
+        <PageHeader.Title>Appearance · {site.name}</PageHeader.Title>
+      </PageHeader>
       <AppearancePanelClient
         siteId={site.id}
         siteName={site.name}
@@ -146,6 +151,6 @@ export default async function SiteAppearancePage({
         initialEvents={events}
         publishGateEnabled={publishGateEnabled}
       />
-    </main>
+    </PageShell>
   );
 }

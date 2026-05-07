@@ -1162,16 +1162,10 @@ function printResults(issues: Issue[]): boolean {
 // don't.
 const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
   // /admin/* deferred routes — drains as Spec 04 PRs B–E migrate.
-  // PR B (batch 1): removed admin index, batches/*, companies/*, email-test,
-  //                  images. /admin/page.tsx → moved to EXEMPT below.
-  "app/admin/images/[id]/page.tsx",
-  "app/admin/posts/new/page.tsx",
-  "app/admin/settings/page.tsx",
-  "app/admin/settings/design-system/page.tsx",
-  "app/admin/sites/[id]/page.tsx",
-  "app/admin/sites/[id]/appearance/page.tsx",
-  "app/admin/sites/[id]/blueprints/review/page.tsx",
-  "app/admin/sites/[id]/briefs/[brief_id]/review/page.tsx",
+  // PR B (batch 1): admin index, batches/*, companies/*, email-test, images.
+  // PR C (batch 2): images/[id], posts/new, settings/design-system,
+  //                  sites/[id], sites/[id]/appearance, blueprints/review,
+  //                  briefs/[brief_id]/review. /admin/settings → EXEMPT.
   "app/admin/sites/[id]/briefs/[brief_id]/run/page.tsx",
   "app/admin/sites/[id]/content/page.tsx",
   "app/admin/sites/[id]/design-system/page.tsx",
@@ -1205,6 +1199,9 @@ const PAGE_HEADER_EXEMPT_ROUTES: readonly string[] = [
   // PageHeader would be dead code. The file is a single
   // `redirect("/admin/sites")` call (Spec 04 PR B).
   "app/admin/page.tsx",
+  // reason: redirect-only — `redirect("/admin/settings/design-system")`.
+  // No chrome to host (Spec 04 PR C).
+  "app/admin/settings/page.tsx",
 ];
 
 function isPageHeaderDeferred(rel: string): boolean {

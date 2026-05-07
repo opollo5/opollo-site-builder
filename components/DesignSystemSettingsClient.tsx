@@ -185,17 +185,12 @@ export function DesignSystemSettingsClient({ initialSettings }: Props) {
     return values[key] ?? DEFAULTS[key] ?? "";
   }
 
+  // PageHeader (title + subtitle + breadcrumb) lives in
+  // app/admin/settings/design-system/page.tsx via Spec 04 migration.
+  // This component renders the action row + form below the header.
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-xl font-semibold">Design system settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Override design tokens globally. Changes inject CSS variables at the root layout
-            level — all operator surfaces update immediately after save.
-          </p>
-        </div>
+      <div className="flex items-start justify-end gap-4">
         <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
