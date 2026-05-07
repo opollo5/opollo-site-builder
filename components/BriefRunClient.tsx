@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/status-pill";
 import { Textarea } from "@/components/ui/textarea";
 import { RunCostTicker } from "@/components/RunCostTicker";
+import { SuccessMoment } from "@/components/ui/success-moment";
 import type {
   BriefPageCritiqueEntry,
   BriefPageQualityFlag,
@@ -495,6 +496,19 @@ export function BriefRunClient({
         >
           {activeRun.failure_detail && <p>{activeRun.failure_detail}</p>}
         </Alert>
+      )}
+
+      {activeRun?.status === "succeeded" && (
+        <SuccessMoment
+          firstTimeKey={`brief-run:${brief.id}`}
+          title="Run complete"
+          firstTimeTitle={`All ${sortedPages.length} ${sortedPages.length === 1 ? "page" : "pages"} generated`}
+          subtitle="Pages have been approved and published to your WordPress site."
+          primaryAction={{
+            label: "View site pages",
+            href: `/admin/sites/${siteId}/pages`,
+          }}
+        />
       )}
 
       <section aria-label="Pages">
