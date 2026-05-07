@@ -28,6 +28,10 @@ scripts/output/
 .claude/settings.local.json
 .claude/settings.json.txt
 .claude/worktrees/
+
+# Local brand handoff + design source files (not production code)
+assets/
+CLAUDE_CODE_STRICT_PROMPT.md
 .claude/scheduled_tasks.lock
 
 # Supabase CLI temp dir (project ref cache, etc.). Ephemeral.

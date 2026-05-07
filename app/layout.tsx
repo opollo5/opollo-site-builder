@@ -1,23 +1,7 @@
 import type { Metadata } from "next";
-import { Fredoka, Manrope } from "next/font/google";
-import { cn } from "@/lib/utils";
 import { getDesignSystemCssOverride } from "@/lib/design-system/get-override";
 import "@/styles/tokens.css";
 import "./globals.css";
-
-const fredoka = Fredoka({
-  subsets: ["latin"],
-  weight: ["500", "600", "700"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const manrope = Manrope({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-body",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "Opollo Site Builder",
@@ -50,12 +34,22 @@ export default async function RootLayout({
 }) {
   const cssOverride = await getDesignSystemCssOverride();
   return (
-    <html
-      lang="en"
-      className={cn(fredoka.variable, manrope.variable)}
-      suppressHydrationWarning
-    >
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&family=JetBrains+Mono:wght@400;500&display=swap"
+        />
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link rel="stylesheet" href="/styles/ds.css" />
         {cssOverride && (
           // Inject per-instance design token overrides from design_system_settings.
           // eslint-disable-next-line react/no-danger
@@ -65,7 +59,7 @@ export default async function RootLayout({
           />
         )}
       </head>
-      <body className="font-body antialiased">{children}</body>
+      <body className="antialiased">{children}</body>
     </html>
   );
 }
