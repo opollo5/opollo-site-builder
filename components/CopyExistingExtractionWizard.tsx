@@ -1,12 +1,34 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { formatRelativeTime } from "@/lib/utils";
 
 type LayoutDensity = "compact" | "medium" | "spacious";
+
+type BlogStyling = {
+  source_blog_urls: string[];
+  article_container: string | null;
+  paragraph: string | null;
+  link_in_body: string | null;
+  blockquote: string | null;
+  unordered_list: string | null;
+  ordered_list: string | null;
+  list_item: string | null;
+  figure: string | null;
+  figcaption: string | null;
+  code_inline: string | null;
+  code_block: string | null;
+  hr: string | null;
+  article_h2: string | null;
+  article_h3: string | null;
+  article_h4: string | null;
+  notes: string[];
+  extracted_at: string;
+};
 
 type ExtractedDesign = {
   colors: {
@@ -21,6 +43,7 @@ type ExtractedDesign = {
   visual_tone: string;
   screenshot_url: string | null;
   source_pages: string[];
+  blog_styling?: BlogStyling | null;
 };
 
 type ExtractedCssClasses = {
@@ -44,7 +67,35 @@ const EMPTY_DESIGN: ExtractedDesign = {
   visual_tone: "Neutral",
   screenshot_url: null,
   source_pages: [],
+  blog_styling: null,
 };
+
+const BLOG_STYLING_BUCKETS = [
+  { group: "Container", keys: ["article_container"] as const },
+  { group: "Text", keys: ["paragraph", "link_in_body"] as const },
+  { group: "Headings", keys: ["article_h2", "article_h3", "article_h4"] as const },
+  { group: "Lists", keys: ["unordered_list", "ordered_list", "list_item"] as const },
+  { group: "Media", keys: ["figure", "figcaption"] as const },
+  { group: "Block elements", keys: ["blockquote", "hr"] as const },
+  { group: "Code", keys: ["code_inline", "code_block"] as const },
+] as const;
+
+type BlogStylingKey =
+  | "article_container"
+  | "paragraph"
+  | "link_in_body"
+  | "blockquote"
+  | "unordered_list"
+  | "ordered_list"
+  | "list_item"
+  | "figure"
+  | "figcaption"
+  | "code_inline"
+  | "code_block"
+  | "hr"
+  | "article_h2"
+  | "article_h3"
+  | "article_h4";
 
 const EMPTY_CLASSES: ExtractedCssClasses = {
   container: null,
@@ -75,6 +126,7 @@ export function CopyExistingExtractionWizard({
   existingClasses: unknown;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const seededDesign = isExtractedDesign(existingDesign) ? existingDesign : null;
   const seededClasses = isExtractedCssClasses(existingClasses) ? existingClasses : null;
   const [design, setDesign] = useState<ExtractedDesign>(seededDesign ?? EMPTY_DESIGN);
@@ -88,6 +140,79 @@ export function CopyExistingExtractionWizard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+
+  // Spec 03 §1.3 — blog-styling sub-flow state.
+  const [blogStylingExpanded, setBlogStylingExpanded] = useState<boolean>(
+    () => searchParams?.get("focus") === "blog-styling",
+  );
+  const [blogUrls, setBlogUrls] = useState<[string, string, string]>([
+    seededDesign?.blog_styling?.source_blog_urls?.[0] ?? "",
+    seededDesign?.blog_styling?.source_blog_urls?.[1] ?? "",
+    seededDesign?.blog_styling?.source_blog_urls?.[2] ?? "",
+  ]);
+  const [blogExtracting, setBlogExtracting] = useState(false);
+
+  // Auto-expand the section when ?focus=blog-styling lands in the URL,
+  // even after the initial render (e.g., after the operator clicks the
+  // preflight banner link from another page).
+  useEffect(() => {
+    if (searchParams?.get("focus") === "blog-styling") {
+      setBlogStylingExpanded(true);
+    }
+  }, [searchParams]);
+
+  function setBlogUrl(idx: 0 | 1 | 2, value: string) {
+    setBlogUrls((prev) => {
+      const next = [...prev] as [string, string, string];
+      next[idx] = value;
+      return next;
+    });
+  }
+
+  function setBlogStylingValue(key: BlogStylingKey, value: string) {
+    setDesign((prev) => {
+      const current: BlogStyling = prev.blog_styling ?? {
+        source_blog_urls: blogUrls.filter((u) => u.trim().length > 0),
+        article_container: null,
+        paragraph: null,
+        link_in_body: null,
+        blockquote: null,
+        unordered_list: null,
+        ordered_list: null,
+        list_item: null,
+        figure: null,
+        figcaption: null,
+        code_inline: null,
+        code_block: null,
+        hr: null,
+        article_h2: null,
+        article_h3: null,
+        article_h4: null,
+        notes: [],
+        extracted_at: new Date().toISOString(),
+      };
+      const next: BlogStyling = { ...current, [key]: value.trim() || null };
+      return { ...prev, blog_styling: next };
+    });
+  }
+
+  // Same-origin client-side check for the blog-URL inputs.
+  function blogUrlSameOrigin(value: string): boolean {
+    if (!value.trim()) return true;
+    try {
+      const candidate = new URL(value).hostname.toLowerCase();
+      const primary = new URL(siteUrl).hostname.toLowerCase();
+      // Subdomains allowed: candidate must end with primary's
+      // registrable-ish suffix. Conservative check: same hostname OR
+      // shares the trailing 2+ labels.
+      if (candidate === primary) return true;
+      const candidateSuffix = candidate.split(".").slice(-2).join(".");
+      const primarySuffix = primary.split(".").slice(-2).join(".");
+      return candidateSuffix === primarySuffix;
+    } catch {
+      return false;
+    }
+  }
 
   function parseExtraPages(text: string): string[] {
     return text
@@ -107,6 +232,7 @@ export function CopyExistingExtractionWizard({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           extra_pages: parseExtraPages(extraPagesText),
+          blog_urls: blogUrls.filter((u) => u.trim().length > 0),
         }),
       });
       const payload = (await res.json().catch(() => null)) as
@@ -130,6 +256,59 @@ export function CopyExistingExtractionWizard({
       setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setExtracting(false);
+    }
+  }
+
+  async function runBlogStylingExtraction() {
+    setBlogExtracting(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/sites/${siteId}/setup/extract`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          extra_pages: parseExtraPages(extraPagesText),
+          blog_urls: blogUrls.filter((u) => u.trim().length > 0),
+        }),
+      });
+      const payload = (await res.json().catch(() => null)) as
+        | { ok: true; data: ExtractionResponse }
+        | { ok: false; error: { code: string; message: string } }
+        | null;
+      if (!res.ok || !payload?.ok) {
+        setError(
+          payload && payload.ok === false
+            ? payload.error.message
+            : `Blog-styling extraction failed (HTTP ${res.status}).`,
+        );
+        return;
+      }
+      const result = payload.data;
+      // Merge blog_styling into existing design without replacing the
+      // landing-page extraction. If the design itself was empty
+      // (operator hadn't run primary extraction yet), seed it from the
+      // result.
+      setDesign((prev) => ({
+        ...result.design,
+        // preserve operator-edited values on existing fields when they
+        // had results; only the blog_styling sub-tree is the new info.
+        colors: hasResults ? prev.colors : result.design.colors,
+        fonts: hasResults ? prev.fonts : result.design.fonts,
+        layout_density: hasResults ? prev.layout_density : result.design.layout_density,
+        visual_tone: hasResults ? prev.visual_tone : result.design.visual_tone,
+        screenshot_url: hasResults ? prev.screenshot_url : result.design.screenshot_url,
+        source_pages: hasResults ? prev.source_pages : result.design.source_pages,
+        blog_styling: result.design.blog_styling ?? null,
+      }));
+      if (!hasResults) {
+        setCssClasses(result.css_classes);
+        setHasResults(true);
+      }
+      setNotes(result.notes);
+    } catch (err) {
+      setError(`Network error: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setBlogExtracting(false);
     }
   }
 
@@ -361,6 +540,19 @@ export function CopyExistingExtractionWizard({
         </section>
       )}
 
+      <BlogStylingSection
+        siteUrl={siteUrl}
+        expanded={blogStylingExpanded}
+        setExpanded={setBlogStylingExpanded}
+        blogUrls={blogUrls}
+        setBlogUrl={setBlogUrl}
+        sameOrigin={blogUrlSameOrigin}
+        blogStyling={design.blog_styling ?? null}
+        setBlogStylingValue={setBlogStylingValue}
+        extracting={blogExtracting}
+        runExtraction={runBlogStylingExtraction}
+      />
+
       {error && (
         <Alert variant="destructive" title="Couldn't complete that step">
           {error}
@@ -407,5 +599,163 @@ function ClassInput({
         data-testid={`copy-existing-class-${label.toLowerCase()}`}
       />
     </label>
+  );
+}
+
+function BlogStylingSection({
+  siteUrl,
+  expanded,
+  setExpanded,
+  blogUrls,
+  setBlogUrl,
+  sameOrigin,
+  blogStyling,
+  setBlogStylingValue,
+  extracting,
+  runExtraction,
+}: {
+  siteUrl: string;
+  expanded: boolean;
+  setExpanded: (next: boolean) => void;
+  blogUrls: [string, string, string];
+  setBlogUrl: (idx: 0 | 1 | 2, value: string) => void;
+  sameOrigin: (value: string) => boolean;
+  blogStyling: BlogStyling | null;
+  setBlogStylingValue: (key: BlogStylingKey, value: string) => void;
+  extracting: boolean;
+  runExtraction: () => Promise<void>;
+}) {
+  const hasAnyUrl = blogUrls.some((u) => u.trim().length > 0);
+  const ageLabel =
+    blogStyling?.extracted_at
+      ? `Calibrated ${formatRelativeTime(blogStyling.extracted_at)}`
+      : null;
+  void siteUrl; // referenced via sameOrigin closure
+  return (
+    <section
+      className="rounded-md border bg-background p-4"
+      data-testid="copy-existing-blog-styling"
+    >
+      <header className="flex items-start justify-between gap-3">
+        <div>
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="text-sm font-semibold hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            data-testid="blog-styling-toggle"
+            aria-expanded={expanded}
+          >
+            Blog styling (optional) {expanded ? "▾" : "▸"}
+          </button>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Calibrate how blog posts are styled on your existing site
+          </p>
+          {ageLabel && (
+            <p className="mt-1 text-sm text-muted-foreground">{ageLabel}</p>
+          )}
+        </div>
+      </header>
+
+      {expanded && (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Paste 1–3 example blog post URLs from this site. We&apos;ll
+            learn how your blog posts are styled and apply that to
+            generated content. Optional but recommended for sites that
+            publish blogs.
+          </p>
+
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => {
+              const idx = i as 0 | 1 | 2;
+              const value = blogUrls[idx];
+              const sameOriginOk = sameOrigin(value);
+              return (
+                <label
+                  key={i}
+                  className="flex flex-col gap-1 text-sm"
+                  htmlFor={`blog-url-${i + 1}`}
+                >
+                  <span className="text-muted-foreground">
+                    Blog URL {i + 1}
+                    {i === 0 && " (required to extract)"}
+                  </span>
+                  <input
+                    id={`blog-url-${i + 1}`}
+                    type="url"
+                    inputMode="url"
+                    value={value}
+                    onChange={(e) => setBlogUrl(idx, e.target.value)}
+                    placeholder={`https://example.com/blog/post-${i + 1}`}
+                    className="rounded border bg-background px-2 py-1 text-sm"
+                    data-testid={`blog-url-${i + 1}`}
+                  />
+                  {!sameOriginOk && (
+                    <span className="text-sm text-destructive">
+                      Must be on the same site
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+          </div>
+
+          <div>
+            <Button
+              type="button"
+              onClick={() => void runExtraction()}
+              disabled={extracting || !hasAnyUrl}
+              data-testid="blog-styling-extract-run"
+            >
+              {extracting
+                ? "Extracting…"
+                : blogStyling
+                  ? "Re-extract"
+                  : "Extract blog styling"}
+            </Button>
+          </div>
+
+          {blogStyling && (
+            <div className="space-y-4">
+              {BLOG_STYLING_BUCKETS.map((group) => (
+                <div key={group.group}>
+                  <h3 className="text-base font-semibold">{group.group}</h3>
+                  <div className="mt-2 grid gap-2 md:grid-cols-2">
+                    {group.keys.map((key) => (
+                      <label
+                        key={key}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <span className="w-32 text-muted-foreground">
+                          {key.replace(/_/g, " ")}
+                        </span>
+                        <input
+                          type="text"
+                          value={blogStyling[key] ?? ""}
+                          onChange={(e) =>
+                            setBlogStylingValue(key, e.target.value)
+                          }
+                          placeholder="(none)"
+                          className="flex-1 rounded border bg-background px-2 py-1 font-mono text-sm"
+                          data-testid={`blog-styling-${key}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {blogStyling.notes.length > 0 && (
+                <ul className="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+                  {blogStyling.notes.map((note, i) => (
+                    <li key={i}>{note}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

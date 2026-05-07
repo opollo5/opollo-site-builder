@@ -23,6 +23,43 @@ const ColorSchema = z.string().trim().min(3).max(40).nullable();
 const FontSchema = z.string().trim().min(1).max(120).nullable();
 const ClassNameSchema = z.string().trim().min(1).max(120).nullable();
 
+// Spec 03 §1.4 — single-CSS-class-per-bucket regex. Operator-edited
+// values that include spaces or multiple class tokens get rejected
+// with a clear message. Null is allowed.
+const SingleCssClassSchema = z
+  .string()
+  .trim()
+  .max(120)
+  .regex(
+    /^[a-zA-Z_][a-zA-Z0-9_-]*$/,
+    "Bucket values must be a single CSS class name. Pick the most semantic one.",
+  )
+  .nullable();
+
+const BlogStylingSchema = z
+  .object({
+    source_blog_urls: z.array(z.string().url()).max(3),
+    article_container: SingleCssClassSchema,
+    paragraph: SingleCssClassSchema,
+    link_in_body: SingleCssClassSchema,
+    blockquote: SingleCssClassSchema,
+    unordered_list: SingleCssClassSchema,
+    ordered_list: SingleCssClassSchema,
+    list_item: SingleCssClassSchema,
+    figure: SingleCssClassSchema,
+    figcaption: SingleCssClassSchema,
+    code_inline: SingleCssClassSchema,
+    code_block: SingleCssClassSchema,
+    hr: SingleCssClassSchema,
+    article_h2: SingleCssClassSchema,
+    article_h3: SingleCssClassSchema,
+    article_h4: SingleCssClassSchema,
+    notes: z.array(z.string()).max(50),
+    extracted_at: z.string().datetime(),
+  })
+  .nullable()
+  .optional();
+
 const ExtractedDesignSchema = z.object({
   colors: z.object({
     primary: ColorSchema,
@@ -39,6 +76,7 @@ const ExtractedDesignSchema = z.object({
   visual_tone: z.string().trim().min(1).max(80),
   screenshot_url: z.string().url().nullable(),
   source_pages: z.array(z.string().url()).max(10),
+  blog_styling: BlogStylingSchema,
 });
 
 const ExtractedCssClassesSchema = z.object({
