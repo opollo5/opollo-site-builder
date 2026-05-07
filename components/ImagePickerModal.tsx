@@ -50,6 +50,27 @@ interface ListResponse {
   };
 }
 
+interface SuggestResponse {
+  ok: true;
+  data: {
+    images: Array<{
+      id: string;
+      url: string | null;
+      thumbnailUrl: string | null;
+      caption: string | null;
+      altText: string | null;
+      filename: string | null;
+      title: string | null;
+      score: number;
+      keywordScore: number;
+      semanticScore: number;
+    }>;
+    queryEmbedded: boolean;
+    keywordOnly: boolean;
+    elapsedMs: number;
+  };
+}
+
 type Tab = "suggested" | "browse" | "upload";
 
 interface ImagePickerModalProps {
@@ -63,8 +84,16 @@ interface ImagePickerModalProps {
    * `${title} ${body-snippet-weighted-toward-title}` and passes it
    * here. Picker uses it to drive the Suggested tab without needing a
    * persisted post id.
+   *
+   * Spec 05: when `suggestionTitle` / `suggestionBody` are also passed,
+   * the picker prefers them and routes the Suggested tab through the
+   * new /api/images/suggest hybrid-ranking endpoint. `suggestionContext`
+   * remains as a fallback for callers that haven't been updated yet.
    */
   suggestionContext?: string | null;
+  /** Spec 05 — title + body for hybrid-ranking suggestions. */
+  suggestionTitle?: string | null;
+  suggestionBody?: string | null;
 }
 
 export function ImagePickerModal({
@@ -73,9 +102,15 @@ export function ImagePickerModal({
   onSelect,
   forPostId,
   suggestionContext,
+  suggestionTitle,
+  suggestionBody,
 }: ImagePickerModalProps) {
+  const hasTitleOrBody =
+    (suggestionTitle !== undefined && suggestionTitle !== null && suggestionTitle.trim().length > 0) ||
+    (suggestionBody !== undefined && suggestionBody !== null && suggestionBody.trim().length > 0);
   const hasSuggestionSource =
     (forPostId !== undefined && forPostId !== null && forPostId.length > 0) ||
+    hasTitleOrBody ||
     (suggestionContext !== undefined &&
       suggestionContext !== null &&
       suggestionContext.length > 0);
@@ -114,20 +149,76 @@ export function ImagePickerModal({
   // Suggested tab fetch — runs on open + when context changes.
   // 500ms debounce so typing in the title doesn't fire a request
   // on every keystroke.
+  //
+  // Spec 05: prefer the new hybrid-ranking endpoint when we have a
+  // postId or explicit title/body. Falls back to the legacy
+  // suggest_from-based call only for callers that pass `suggestionContext`
+  // alone (older surfaces that haven't been migrated to title/body yet).
   useEffect(() => {
     if (!open || tab !== "suggested" || !hasSuggestionSource) return;
     const ctrl = new AbortController();
     if (suggestInFlightRef.current) suggestInFlightRef.current.abort();
     suggestInFlightRef.current = ctrl;
 
+    const useHybrid = Boolean(forPostId) || hasTitleOrBody;
+
     const timerId = setTimeout(async () => {
       setSuggestLoading(true);
       setSuggestError(null);
       try {
+        if (useHybrid) {
+          const body: Record<string, unknown> = { limit: 6 };
+          if (forPostId) body.postId = forPostId;
+          if (suggestionTitle) body.postTitle = suggestionTitle;
+          if (suggestionBody) body.postBody = suggestionBody;
+          const res = await fetch("/api/images/suggest", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+            signal: ctrl.signal,
+            cache: "no-store",
+          });
+          if (ctrl.signal.aborted) return;
+          const payload = (await res.json().catch(() => null)) as
+            | SuggestResponse
+            | { ok: false; error: { code: string; message: string } }
+            | null;
+          if (!payload?.ok) {
+            setSuggestError(
+              payload?.ok === false
+                ? payload.error.message
+                : `Failed to load suggestions (HTTP ${res.status}).`,
+            );
+            return;
+          }
+          // Map hybrid results to the existing ImagePickerEntry shape so
+          // the rest of the modal renders unchanged.
+          const items: ImagePickerEntry[] = payload.data.images.map((img) => ({
+            id: img.id,
+            cloudflare_id: null,
+            filename: img.filename,
+            title: img.title,
+            caption: img.caption,
+            alt_text: img.altText,
+            tags: [],
+            source: "istock" as const,
+            source_ref: null,
+            width_px: null,
+            height_px: null,
+            bytes: null,
+            deleted_at: null,
+            created_at: "",
+            delivery_url: img.url,
+          }));
+          setSuggestItems(items);
+          setSuggestBasedOn(suggestionTitle?.trim() || null);
+          setSuggestFallback(false);
+          return;
+        }
+
+        // Legacy path (suggestionContext only).
         const params = new URLSearchParams();
-        if (forPostId) {
-          params.set("for_post", forPostId);
-        } else if (suggestionContext) {
+        if (suggestionContext) {
           params.set("suggest_from", suggestionContext);
         }
         params.set("limit", "6");
@@ -165,7 +256,16 @@ export function ImagePickerModal({
       clearTimeout(timerId);
       ctrl.abort();
     };
-  }, [open, tab, hasSuggestionSource, forPostId, suggestionContext]);
+  }, [
+    open,
+    tab,
+    hasSuggestionSource,
+    hasTitleOrBody,
+    forPostId,
+    suggestionContext,
+    suggestionTitle,
+    suggestionBody,
+  ]);
 
   // Browse tab fetch — debounced on query / paginated on offset.
   useEffect(() => {
