@@ -7,7 +7,11 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { PrimaryNav } from "./primary-nav";
-import { SectionNav, SECTION_NAV_COLLAPSED_COOKIE } from "./section-nav";
+import { SectionNav } from "./section-nav";
+import {
+  PRIMARY_NAV_COLLAPSED_COOKIE,
+  SECTION_NAV_COLLAPSED_COOKIE,
+} from "./nav-shell-cookies";
 import {
   filterPrimaryItems,
   filterSectionItems,
@@ -17,22 +21,28 @@ import {
 } from "./nav-config";
 
 // ---------------------------------------------------------------------------
-// NavShellClient — manages mobile drawer + section-nav collapse state.
-// Rendered by the server NavShell; receives children as a prop (RSC pattern).
+// NavShellClient — manages mobile drawer + the two desktop collapse states
+// (primary rail, section panel). Rendered by the server NavShell; receives
+// children + initial collapse states (read from cookies) as props so SSR
+// matches first paint.
 // ---------------------------------------------------------------------------
 
 const SECTION_NAV_LS_KEY = "opollo:section-nav:collapsed";
+const PRIMARY_NAV_LS_KEY = "opollo:nav:collapsed";
 
-function persistSectionNavCollapsed(next: boolean) {
+function persistCookie(name: string, next: boolean) {
   try {
-    window.localStorage.setItem(SECTION_NAV_LS_KEY, next ? "1" : "0");
-  } catch {
-    /* localStorage disabled */
-  }
-  try {
-    document.cookie = `${SECTION_NAV_COLLAPSED_COOKIE}=${next ? "1" : "0"}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
+    document.cookie = `${name}=${next ? "1" : "0"}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`;
   } catch {
     /* cookieless context */
+  }
+}
+
+function persistLocalStorage(key: string, next: boolean) {
+  try {
+    window.localStorage.setItem(key, next ? "1" : "0");
+  } catch {
+    /* localStorage disabled */
   }
 }
 
@@ -40,6 +50,7 @@ interface NavShellClientProps {
   children: React.ReactNode;
   navContext: NavUserContext;
   initialSectionNavCollapsed: boolean;
+  initialPrimaryNavCollapsed: boolean;
   skipToId: string;
   contentMaxWidth: string;
   contentPadding: string;
@@ -49,6 +60,7 @@ export function NavShellClient({
   children,
   navContext,
   initialSectionNavCollapsed,
+  initialPrimaryNavCollapsed,
   skipToId,
   contentMaxWidth,
   contentPadding,
@@ -58,6 +70,9 @@ export function NavShellClient({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sectionNavCollapsed, setSectionNavCollapsed] = useState(
     initialSectionNavCollapsed,
+  );
+  const [primaryNavCollapsed, setPrimaryNavCollapsed] = useState(
+    initialPrimaryNavCollapsed,
   );
 
   useEffect(() => {
@@ -90,15 +105,26 @@ export function NavShellClient({
 
     setSectionNavCollapsed((prev) => {
       const next = !prev;
-      persistSectionNavCollapsed(next);
+      persistLocalStorage(SECTION_NAV_LS_KEY, next);
+      persistCookie(SECTION_NAV_COLLAPSED_COOKIE, next);
       return next;
     });
   }
 
-  function handleCollapseToggle() {
+  function handleSectionCollapseToggle() {
     setSectionNavCollapsed((prev) => {
       const next = !prev;
-      persistSectionNavCollapsed(next);
+      persistLocalStorage(SECTION_NAV_LS_KEY, next);
+      persistCookie(SECTION_NAV_COLLAPSED_COOKIE, next);
+      return next;
+    });
+  }
+
+  function handlePrimaryCollapseToggle() {
+    setPrimaryNavCollapsed((prev) => {
+      const next = !prev;
+      persistLocalStorage(PRIMARY_NAV_LS_KEY, next);
+      persistCookie(PRIMARY_NAV_COLLAPSED_COOKIE, next);
       return next;
     });
   }
@@ -192,13 +218,15 @@ export function NavShellClient({
           activeSectionKey={activeSectionKey}
           onSectionNavToggle={handleSectionNavToggle}
           isSectionNavVisible={hasSectionNav && !sectionNavCollapsed}
+          collapsed={primaryNavCollapsed}
+          onCollapseToggle={handlePrimaryCollapseToggle}
         />
 
         {hasSectionNav && (
           <SectionNav
             navContext={navContext}
             collapsed={sectionNavCollapsed}
-            onToggle={handleCollapseToggle}
+            onToggle={handleSectionCollapseToggle}
           />
         )}
       </div>

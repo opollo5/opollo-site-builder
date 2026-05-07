@@ -22,7 +22,10 @@ import { CompanySelector } from "./company-selector";
 // text-color shift, per the two-level-nav spec.
 // ---------------------------------------------------------------------------
 
-export const SECTION_NAV_COLLAPSED_COOKIE = "opollo_section_nav_collapsed";
+// Re-export so existing callers (NavShellClient) keep working. Source of
+// truth for both nav cookies is `nav-shell-cookies.ts` so server components
+// can import them without crossing the "use client" boundary.
+export { SECTION_NAV_COLLAPSED_COOKIE } from "./nav-shell-cookies";
 
 interface SectionNavProps {
   navContext: NavUserContext;
