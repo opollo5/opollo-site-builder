@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { CopyExistingExtractionWizard } from "@/components/CopyExistingExtractionWizard";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -69,24 +69,24 @@ export default async function CopyExistingExtractPage({
   }
 
   return (
-    <>
-      <Breadcrumbs
-        crumbs={[
-          { label: "Admin", href: "/admin/sites" },
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Extract design" },
-        ]}
-      />
-
-      <div className="mt-4 max-w-3xl">
-        <H1>Extract design from {site.wp_url}</H1>
-        <Lead className="mt-2">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Extract design" },
+          ]}
+        />
+        <PageHeader.Title>Extract design from {site.wp_url}</PageHeader.Title>
+        <PageHeader.Subtitle>
           We&apos;ll fetch your live site and pull out the colours, fonts, and
           common CSS class names so generated content matches the existing
           theme. Review and tweak before saving.
-        </Lead>
-
+        </PageHeader.Subtitle>
+      </PageHeader>
+      <div className="max-w-3xl">
         <CopyExistingExtractionWizard
           siteId={site.id}
           siteUrl={site.wp_url}
@@ -94,6 +94,6 @@ export default async function CopyExistingExtractPage({
           existingClasses={site.extracted_css_classes}
         />
       </div>
-    </>
+    </PageShell>
   );
 }

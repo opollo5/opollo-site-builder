@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SetupWizard } from "@/components/SetupWizard";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   computeResumeStep,
@@ -89,28 +89,31 @@ export default async function SiteSetupPage({
   const step: SetupStep = requested;
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Setup" },
-        ]}
-      />
-      <H1 className="mt-2">Set up {site.name}</H1>
-      <Lead className="mt-1">
-        A two-step setup that gives every generated page a consistent
-        look and voice. Skip any step to fall back to the default
-        styles — you can return any time.
-      </Lead>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Setup" },
+          ]}
+        />
+        <PageHeader.Title>Set up {site.name}</PageHeader.Title>
+        <PageHeader.Subtitle>
+          A two-step setup that gives every generated page a consistent
+          look and voice. Skip any step to fall back to the default
+          styles — you can return any time.
+        </PageHeader.Subtitle>
+      </PageHeader>
 
-      <div className="mt-6">
+      <div className="mx-auto max-w-4xl">
         <SetupWizard
           siteId={site.id}
           step={step}
           status={status}
         />
       </div>
-    </div>
+    </PageShell>
   );
 }

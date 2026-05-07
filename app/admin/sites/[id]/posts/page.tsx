@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBanner";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
-import { H1, Lead } from "@/components/ui/typography";
 import { NavIcon } from "@/components/ui/nav-icon";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
@@ -135,28 +135,25 @@ export default async function SitePostsList({
   const blogStyleBlocker = await checkBlogStylingCalibrated(site.id, "post");
   const blogGateBlocked = blogStyleBlocker !== null;
 
+  const subtitle =
+    total === 0
+      ? "No posts on this site yet."
+      : `${total} ${total === 1 ? "post" : "posts"}${total > 0 && items.length < total ? ` · showing ${rangeStart}–${rangeEnd}` : ""}`;
+
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Posts" },
-        ]}
-      />
-
-      {blogGateBlocked && <BlogStyleCalibrationBanner siteId={site.id} />}
-
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <H1>Posts</H1>
-          <Lead className="mt-0.5">
-            {total === 0
-              ? "No posts on this site yet."
-              : `${total} ${total === 1 ? "post" : "posts"}${total > 0 && items.length < total ? ` · showing ${rangeStart}–${rangeEnd}` : ""}`}
-          </Lead>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Posts" },
+          ]}
+        />
+        <PageHeader.Title>Posts</PageHeader.Title>
+        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
+        <PageHeader.Actions>
           {total > 0 && (
             <Button asChild variant="outline" size="sm">
               <a
@@ -191,8 +188,12 @@ export default async function SitePostsList({
               </Link>
             </Button>
           )}
-        </div>
-      </div>
+        </PageHeader.Actions>
+      </PageHeader>
+
+      {blogGateBlocked && <BlogStyleCalibrationBanner siteId={site.id} />}
+
+      <main className="mx-auto max-w-5xl">
 
       <form
         method="get"
@@ -383,6 +384,7 @@ export default async function SitePostsList({
           )}
         </nav>
       )}
-    </main>
+      </main>
+    </PageShell>
   );
 }
