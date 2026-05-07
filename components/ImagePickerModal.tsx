@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import {
@@ -35,6 +35,11 @@ import type { ImageListItem } from "@/lib/image-library";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const SUGGEST_DEBOUNCE_MS = 500;
+// Spec 05: only the first 200 chars of body materially affect the
+// suggestion ranking (title carries most signal; body's first paragraph
+// carries the rest). Compare a fingerprint of (title + first 200 body
+// chars) so typing past that doesn't keep firing embed calls.
+const SUGGEST_BODY_FINGERPRINT_CHARS = 200;
 const PAGE_SIZE = 24;
 
 export interface ImagePickerEntry extends ImageListItem {
@@ -108,6 +113,15 @@ export function ImagePickerModal({
   const hasTitleOrBody =
     (suggestionTitle !== undefined && suggestionTitle !== null && suggestionTitle.trim().length > 0) ||
     (suggestionBody !== undefined && suggestionBody !== null && suggestionBody.trim().length > 0);
+  // Stable fingerprint over title + first-N body chars. The fetch effect's
+  // dep array reads this so further keystrokes past N don't re-fire.
+  const suggestionFingerprint = useMemo(() => {
+    const t = (suggestionTitle ?? "").trim();
+    const b = (suggestionBody ?? "")
+      .trim()
+      .slice(0, SUGGEST_BODY_FINGERPRINT_CHARS);
+    return `${t} ${b}`;
+  }, [suggestionTitle, suggestionBody]);
   const hasSuggestionSource =
     (forPostId !== undefined && forPostId !== null && forPostId.length > 0) ||
     hasTitleOrBody ||
@@ -256,6 +270,10 @@ export function ImagePickerModal({
       clearTimeout(timerId);
       ctrl.abort();
     };
+    // Spec 05: gate the dep array on the fingerprint, not the raw title /
+    // body. Typing past the first 200 body chars no longer re-fires the
+    // fetch — the embed cost stays bounded.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     open,
     tab,
@@ -263,8 +281,7 @@ export function ImagePickerModal({
     hasTitleOrBody,
     forPostId,
     suggestionContext,
-    suggestionTitle,
-    suggestionBody,
+    suggestionFingerprint,
   ]);
 
   // Browse tab fetch — debounced on query / paginated on offset.
@@ -381,6 +398,7 @@ export function ImagePickerModal({
             items={suggestItems}
             basedOn={suggestBasedOn}
             fallbackToRecent={suggestFallback}
+            hasInput={hasTitleOrBody || Boolean(forPostId)}
             onSelect={handleSelect}
           />
         )}
@@ -442,6 +460,7 @@ function SuggestedPanel({
   items,
   basedOn,
   fallbackToRecent,
+  hasInput,
   onSelect,
 }: {
   loading: boolean;
@@ -449,12 +468,18 @@ function SuggestedPanel({
   items: ImagePickerEntry[];
   basedOn: string | null;
   fallbackToRecent: boolean;
+  hasInput: boolean;
   onSelect: (image: ImagePickerEntry) => void;
 }) {
   return (
     <div className="mt-4 space-y-3">
       <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-        {fallbackToRecent ? (
+        {!hasInput ? (
+          <>
+            Start typing — suggestions will appear once your post has a title
+            or content.
+          </>
+        ) : fallbackToRecent ? (
           <>No post content yet — showing your recent uploads.</>
         ) : basedOn ? (
           <>
@@ -494,9 +519,9 @@ function SuggestedPanel({
             onSelect={onSelect}
             colsClass="sm:grid-cols-3 md:grid-cols-5"
           />
-          {!loading && items.length === 0 && (
+          {!loading && items.length === 0 && hasInput && (
             <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-              No suggestions yet. Try Browse or Upload above.
+              No matches yet. Try Browse or Upload above.
             </p>
           )}
         </>
