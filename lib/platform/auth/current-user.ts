@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-// v3
 
 import { createRouteAuthClient } from "@/lib/auth";
 import { getServiceRoleClient } from "@/lib/supabase";
