@@ -3,6 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { reextractImageMetadata } from "@/lib/image-reextract";
+import { refreshImageEmbedding } from "@/lib/images/embed";
+import { getServiceRoleClient } from "@/lib/supabase";
 import { errorCodeToStatus } from "@/lib/tool-schemas";
 
 // POST /api/admin/images/[id]/reextract
@@ -51,6 +53,10 @@ export async function POST(
 
   revalidatePath(`/admin/images/${params.id}`);
   revalidatePath("/admin/images");
+
+  // Spec 05 — title / caption may have changed; refresh embedding.
+  // Fire-and-forget; no-op when OPENAI_API_KEY isn't set.
+  void refreshImageEmbedding(params.id, getServiceRoleClient());
 
   return NextResponse.json(result, { status: 200 });
 }
