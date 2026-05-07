@@ -372,3 +372,62 @@ Read the image-generation skill before touching anything in `lib/image/`.
 | bundle.social, webhooks, publishing, retries | `bundle-social-integration` |
 | Approval tokens, snapshots, state machine | `approval-workflow-patterns` |
 | Ideogram, compositing, quality checks, failure handling | `image-generation` |
+
+---
+
+## Navigation Architecture (two-level, locked 2026-05-07)
+
+### Pattern
+Two-level persistent navigation: narrow primary rail (70px) + conditional section panel (220px).
+
+```
+┌──────────┬────────────┬─────────────────────┐
+│ PRIMARY  │  SECTION   │  CONTENT AREA       │
+│  70px    │  220px     │  flex-1             │
+│  always  │  when      │                     │
+│  visible │  section   │                     │
+│          │  has items │                     │
+└──────────┴────────────┴─────────────────────┘
+```
+
+### Rules — NEVER break these
+
+1. **NEVER render navigation in `page.tsx` or child `layout.tsx` files.** All nav lives in `components/nav/`.
+2. **Single source of truth.** All nav items are defined in `components/nav/nav-config.ts`. No scattered nav item definitions.
+3. **Icons: Lucide React only, outlined, via `NavIcon` wrapper.** Import `NavIcon` from `components/ui/nav-icon.tsx`. Never import Lucide icons directly in nav files.
+4. **Use `NavShell` in every authenticated layout.** Pass a `NavUserContext` object. Do not use the deleted `AdminSidebar` / `CompanySidebar`.
+5. **Adding a new top-level section:** add a `PrimaryNavItem` to `primaryNavItems` in `nav-config.ts`. If it has sub-pages, add a `SectionNavConfig`. Update `e2e/navigation.spec.ts` with the new routes.
+6. **Adding a page to an existing section:** add a `SectionNavItem` to the relevant group in `nav-config.ts`. No other files need to change.
+7. **No separate CSS files for navigation.** Tailwind utility classes only.
+8. **Collapse state persisted** in cookie `opollo_section_nav_collapsed`. NavShell reads it server-side; NavShellClient persists it on toggle.
+
+### File map
+
+| File | Purpose |
+|---|---|
+| `components/nav/nav-config.ts` | All nav items + role filters + active-section helper |
+| `components/nav/primary-nav.tsx` | Left 70px rail (Client Component) |
+| `components/nav/section-nav.tsx` | 220px section panel (Client Component) |
+| `components/nav/nav-shell-client.tsx` | Mobile state + desktop composition (Client Component) |
+| `components/nav/nav-shell.tsx` | Server wrapper: reads cookies, exports `NavShell` + `NavUserContext` |
+| `components/nav/company-selector.tsx` | Company switcher (shown in Social section nav for Opollo staff) |
+| `components/ui/nav-icon.tsx` | Lucide icon wrapper — use for EVERY nav icon |
+
+### Adding a new authenticated section (e.g. Reports)
+
+```ts
+// In nav-config.ts — add to primaryNavItems:
+{
+  key: "reports",
+  label: "Reports",
+  icon: BarChart2,       // from lucide-react
+  href: "/reports",
+  pathPrefixes: ["/reports"],
+  testId: "nav-reports",
+  sectionNav: null,      // or a SectionNavConfig if it has sub-pages
+}
+
+// In the new layout:
+import { NavShell, type NavUserContext } from "@/components/nav/nav-shell";
+// ... build navContext ... pass to NavShell
+```
