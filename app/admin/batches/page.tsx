@@ -1,17 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { BatchesTable, type BatchRow } from "@/components/BatchesTable";
 import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
 import { Alert } from "@/components/ui/alert";
-import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/ui/page-shell";
-import {
-  StatusPill,
-  jobStatusKind,
-} from "@/components/ui/status-pill";
-import { NavIcon } from "@/components/ui/nav-icon";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -26,37 +21,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-type BatchRow = {
-  id: string;
-  site_name: string;
-  template_name: string;
-  status: string;
-  requested_count: number;
-  succeeded_count: number;
-  failed_count: number;
-  created_at: string;
-  created_by_email: string | null;
-  total_cost_usd_cents: number;
-};
-
-// StatusBadge folded to A-4's StatusPill primitive. See call site below.
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function formatCostCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
+// BatchRow + status mapping live in components/BatchesTable.tsx — the
+// presentation moved client-side as part of Spec 18 PR C.
 
 export default async function AdminBatchesPage({
   searchParams,
@@ -231,68 +197,9 @@ export default async function AdminBatchesPage({
       )}
 
       <div>
-        {rows.length === 0 ? (
-          <EmptyState
-            icon={<NavIcon name="tree" size={20} />}
-            iconLabel="No batches"
-            title="No batches yet"
-            body={
-              <>
-                Run a batch to generate multiple pages from a template
-                against the active design system.
-              </>
-            }
-          />
-        ) : (
-          <div className="overflow-x-auto rounded-md border">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 text-left text-sm text-muted-foreground">
-                  <th className="px-3 py-2 font-medium">Site / Template</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Progress</th>
-                  <th className="px-3 py-2 font-medium">Cost</th>
-                  <th className="px-3 py-2 font-medium">Created</th>
-                  <th className="px-3 py-2 font-medium">By</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2">
-                      <Link
-                        href={`/admin/batches/${r.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {r.site_name}
-                      </Link>
-                      <div className="text-sm text-muted-foreground">
-                        {r.template_name}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <StatusPill kind={jobStatusKind(r.status as Parameters<typeof jobStatusKind>[0])} />
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {r.succeeded_count} ok · {r.failed_count} fail ·{" "}
-                      {r.requested_count} total
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {formatCostCents(r.total_cost_usd_cents)}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {formatDate(r.created_at)}
-                    </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
-                      {r.created_by_email ?? "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <BatchesTable rows={rows} />
       </div>
     </PageShell>
   );
 }
+

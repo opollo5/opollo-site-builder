@@ -1,22 +1,43 @@
-import Link from "next/link";
+"use client";
 
-import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
+import { useRouter } from "next/navigation";
+
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
+import { NavIcon } from "@/components/ui/nav-icon";
+import { Pill, type PillVariant } from "@/components/ui/pill";
+import { TableCell } from "@/components/ui/table-cell";
 import type { PageListItem } from "@/lib/pages";
 import { formatRelativeTime } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// M6-1 — pure presentation of the pages list.
+// Spec 18 PR C — PagesTable migration.
 //
-// Each row links to the detail page (M6-2 wires the target route);
-// until that ships, the link points at the placeholder route. Actions
-// column is reserved for M6-3 (edit) and a future "Open in WP admin"
-// shortcut.
+// Replaced bespoke <table> + StatusPill with the canonical DataTable.
+//
+// Visual contract:
+//   - Title / Slug → TableCell.Stack (title + /slug as secondary).
+//   - Type         → Pill (info) — page_type is taxonomic, treat as
+//                    `info` (blue) since neutral is reserved for "no
+//                    semantic value" and these all carry meaning.
+//   - Status       → Pill (success Published, neutral Draft, warning
+//                    Scheduled). Status comes from the M6-1 page-status
+//                    enum which mirrors post-status.
+//   - DS version   → TableCell.Mono.
+//   - Updated      → TableCell.Secondary (relative time).
+//
+// Row click navigates to the page detail surface.
 // ---------------------------------------------------------------------------
 
 type PagesTableProps = {
   items: PageListItem[];
   siteId: string;
   backHref?: string;
+};
+
+const STATUS_VARIANT: Record<string, PillVariant> = {
+  published: "success",
+  draft: "neutral",
+  scheduled: "warning",
 };
 
 function buildDetailHref(
@@ -31,65 +52,57 @@ function buildDetailHref(
 }
 
 export function PagesTable({ items, siteId, backHref }: PagesTableProps) {
-  if (items.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed p-8 text-center">
-        <p className="text-sm text-muted-foreground">
-          No pages match these filters.
-        </p>
-      </div>
-    );
-  }
+  const router = useRouter();
+
+  const columns: ColumnDef<PageListItem>[] = [
+    {
+      key: "title",
+      header: "Title",
+      cell: (p) => (
+        <TableCell.Stack primary={p.title} secondary={`/${p.slug}`} />
+      ),
+    },
+    {
+      key: "type",
+      header: "Type",
+      cell: (p) => <Pill variant="info">{p.page_type.replace(/_/g, " ")}</Pill>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (p) => (
+        <Pill variant={STATUS_VARIANT[p.status] ?? "neutral"}>{p.status}</Pill>
+      ),
+    },
+    {
+      key: "ds_version",
+      header: "DS version",
+      cell: (p) => <TableCell.Mono>v{p.design_system_version}</TableCell.Mono>,
+    },
+    {
+      key: "updated",
+      header: "Updated",
+      cell: (p) => (
+        <TableCell.Secondary>{formatRelativeTime(p.updated_at)}</TableCell.Secondary>
+      ),
+    },
+  ];
 
   return (
-    <div className="overflow-hidden rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-4 py-2 font-medium">Title</th>
-            <th className="px-4 py-2 font-medium">Type</th>
-            <th className="px-4 py-2 font-medium">Status</th>
-            <th className="px-4 py-2 font-medium">DS version</th>
-            <th className="px-4 py-2 font-medium">Updated</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((p) => (
-            <tr
-              key={p.id}
-              className="border-b last:border-b-0 hover:bg-muted/40"
-              data-testid="page-row"
-              data-page-id={p.id}
-            >
-              <td className="px-4 py-3 align-top">
-                <Link
-                  href={buildDetailHref(siteId, p.id, backHref)}
-                  className="font-medium hover:underline"
-                  data-testid="page-row-link"
-                >
-                  {p.title}
-                </Link>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  /{p.slug}
-                </div>
-              </td>
-              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
-                {p.page_type.replace(/_/g, " ")}
-              </td>
-              <td className="px-4 py-3 align-top">
-                {/* page status taxonomy is identical to post (draft / published) */}
-                <StatusPill kind={postStatusKind(p.status as Parameters<typeof postStatusKind>[0])} className="capitalize" />
-              </td>
-              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
-                v{p.design_system_version}
-              </td>
-              <td className="px-4 py-3 align-top text-sm text-muted-foreground">
-                {formatRelativeTime(p.updated_at)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      data={items}
+      columns={columns}
+      rowKey={(p) => p.id}
+      onRowClick={(p) =>
+        router.push(buildDetailHref(siteId, p.id, backHref))
+      }
+      testId="pages-table"
+      emptyState={{
+        icon: <NavIcon name="file-empty" size={20} />,
+        iconLabel: "No pages",
+        title: "No pages match these filters",
+        body: <>Adjust the filters above or run a batch to generate pages.</>,
+      }}
+    />
   );
 }
