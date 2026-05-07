@@ -83,9 +83,7 @@ CREATE POLICY platform_company_member_read ON sites
     company_id IS NOT NULL
     AND company_id IN (
       SELECT company_id FROM platform_company_users
-       WHERE user_id = (
-         SELECT id FROM platform_users WHERE auth_user_id = auth.uid()
-       )
+       WHERE user_id = auth.uid()
          AND deleted_at IS NULL
     )
   );
