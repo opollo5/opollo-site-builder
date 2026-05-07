@@ -85,7 +85,9 @@ function isIstock(filename: string | null): boolean {
 // Main
 // ---------------------------------------------------------------------------
 
-const FETCH_PAGE = 500;
+// PostgREST .in([...N UUIDs]) generates a URL that exceeds server limits at N>~100.
+// Use range()-based pagination to fetch rows in pages without the .in() issue.
+const PAGE_SIZE = 200;
 const CONCURRENCY = 25;
 
 type Row = {
@@ -131,28 +133,25 @@ async function main(): Promise<number> {
   if (args.dryRun) { console.log("Dry-run — no writes."); return 0; }
   if (!args.confirm) { process.stderr.write("Pass --confirm to write.\n"); return 2; }
 
-  // Collect all IDs in order, then fetch rows in pages.
-  const { data: idData, error: idErr } = await svc
-    .from("image_library")
-    .select("id")
-    .is("deleted_at", null)
-    .is("title", null)
-    .order("created_at", { ascending: true })
-    .limit(cap);
-  if (idErr) { console.error(`ID fetch failed: ${idErr.message}`); return 1; }
-  const ids = (idData ?? []).map((r) => r.id as string);
-
   let updated = 0;
   let skipped = 0;
   const now = new Date().toISOString();
+  let totalProcessed = 0;
 
-  for (let pageStart = 0; pageStart < ids.length; pageStart += FETCH_PAGE) {
-    const pageIds = ids.slice(pageStart, pageStart + FETCH_PAGE);
+  // Always fetch from offset 0: as we update rows they leave the title=NULL
+  // filtered set, so the "next page" is always the first PAGE_SIZE remaining rows.
+  // Using an incrementing offset would skip rows equal to what we just removed.
+  while (totalProcessed < cap) {
+    const pageLimit = Math.min(PAGE_SIZE, cap - totalProcessed);
     const { data: rows, error: rowErr } = await svc
       .from("image_library")
       .select("id, filename, caption, alt_text, tags")
-      .in("id", pageIds);
-    if (rowErr) { console.error(`Batch fetch failed: ${rowErr.message}`); return 1; }
+      .is("deleted_at", null)
+      .is("title", null)
+      .order("created_at", { ascending: true })
+      .range(0, pageLimit - 1);
+    if (rowErr) { console.error(`Page fetch failed: ${rowErr.message}`); return 1; }
+    if (!rows || rows.length === 0) break;
 
     // Build per-row patches.
     type Patch = {
@@ -194,15 +193,16 @@ async function main(): Promise<number> {
       );
     }
 
-    const soFar = pageStart + pageIds.length;
-    console.log(`  ${soFar}/${ids.length} processed — updated so far: ${updated}`);
+    totalProcessed += rows.length;
+    console.log(`  ${totalProcessed}/${cap} processed — updated so far: ${updated}`);
+    if (rows.length < pageLimit) break; // last page
   }
 
   console.log(
     [
       "",
       "--- Done ---",
-      `Processed: ${ids.length}`,
+      `Processed: ${totalProcessed}`,
       `Updated:   ${updated}`,
       `Skipped:   ${skipped} (no derivable title)`,
     ].join("\n"),

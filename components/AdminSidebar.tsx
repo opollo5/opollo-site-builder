@@ -192,9 +192,9 @@ export function AdminSidebar({
           aria-current={active ? "page" : undefined}
           title={collapsed ? label : undefined}
           className={cn(
-            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-d1",
+            "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr focus-visible:ring-offset-2 focus-visible:ring-offset-background",
             active
-              ? "bg-nav-active text-white font-medium"
+              ? "bg-nav-active text-pk font-medium"
               : "text-m2 hover:bg-nav-hover hover:text-gr",
           )}
         >
@@ -203,7 +203,7 @@ export function AdminSidebar({
             className={cn(
               "h-4 w-4 shrink-0",
               active
-                ? "text-white"
+                ? "text-pk"
                 : "text-icon-dim group-hover:text-gr",
             )}
           />
@@ -216,14 +216,14 @@ export function AdminSidebar({
   return (
     <>
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-white/[0.06] bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
+      <div className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-topbar px-4 backdrop-blur-[18px] sm:hidden">
         <Link
           href="/admin/sites"
           className="focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+            src="/logos/opollo-logo-dark.png"
             alt="Opollo"
             width={120}
             className="h-7 w-auto"
@@ -235,7 +235,7 @@ export function AdminSidebar({
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
           aria-controls="admin-sidebar"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           data-testid="admin-mobile-nav-button"
         >
           <Menu aria-hidden className="h-5 w-5" />
@@ -257,8 +257,7 @@ export function AdminSidebar({
         id="admin-sidebar"
         aria-label="Primary"
         className={cn(
-          // Opollo sidebar: dark gradient bg, rgba-white right border
-          "border-r border-white/[0.06] transition-all duration-200",
+          "border-r border-border transition-all duration-200",
           "bg-[linear-gradient(180deg,var(--d1)_0%,var(--bg)_100%)]",
           // Mobile: fixed off-canvas
           "fixed inset-y-0 left-0 z-50 w-72 shrink-0 -translate-x-full",
@@ -270,7 +269,7 @@ export function AdminSidebar({
       >
         <div className="flex h-full flex-col">
           {/* Wordmark + collapse toggle */}
-          <div className="flex h-14 items-center justify-between border-b border-white/[0.06] px-3">
+          <div className="flex h-14 items-center justify-between border-b border-border px-3">
             {!collapsed && (
               <Link
                 href="/admin/sites"
@@ -278,7 +277,7 @@ export function AdminSidebar({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src="https://opollo.com/wp-content/uploads/2024/05/opollo-logo.svg"
+                  src="/logos/opollo-logo-dark.png"
                   alt="Opollo"
                   width={120}
                   className="h-7 w-auto"
@@ -290,7 +289,7 @@ export function AdminSidebar({
               type="button"
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:hidden"
             >
               <X aria-hidden className="h-5 w-5" />
             </button>
@@ -301,7 +300,7 @@ export function AdminSidebar({
               aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
               className={cn(
-                "hidden h-8 w-8 items-center justify-center rounded-md text-icon-dim transition-smooth hover:bg-b1 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
+                "hidden h-8 w-8 items-center justify-center rounded-md text-icon-dim transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr sm:inline-flex",
                 collapsed && "mx-auto",
               )}
             >
@@ -339,9 +338,9 @@ export function AdminSidebar({
           </nav>
 
           {/* Footer rail */}
-          <div className="border-t border-white/[0.06] p-2">
+          <div className="border-t border-border p-2">
             {!collapsed && (
-              <div className="mb-2 flex items-center justify-between rounded-md bg-white/[0.04] px-2 py-1.5">
+              <div className="mb-2 flex items-center justify-between rounded-md bg-muted/50 px-2 py-1.5">
                 <span className="text-sm text-icon-dim">
                   Command palette
                 </span>
@@ -349,10 +348,10 @@ export function AdminSidebar({
                   className="flex items-center gap-0.5 text-sm text-m3"
                   aria-hidden
                 >
-                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-xs">
+                  <kbd className="rounded border border-border bg-background px-1 font-mono text-xs">
                     ⌘
                   </kbd>
-                  <kbd className="rounded border border-white/[0.12] bg-white/[0.06] px-1 font-mono text-xs">
+                  <kbd className="rounded border border-border bg-background px-1 font-mono text-xs">
                     K
                   </kbd>
                 </span>
@@ -365,7 +364,7 @@ export function AdminSidebar({
                 className={cn(
                   "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActiveRoute("/account/security") &&
-                    "bg-nav-active text-white font-medium",
+                    "bg-nav-active text-pk font-medium",
                 )}
                 data-testid="nav-security"
               >
@@ -380,7 +379,7 @@ export function AdminSidebar({
                 className={cn(
                   "group flex h-9 items-center gap-3 rounded-md px-2.5 text-sm text-m2 transition-smooth hover:bg-nav-hover hover:text-gr focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActiveRoute("/account/devices") &&
-                    "bg-nav-active text-white font-medium",
+                    "bg-nav-active text-pk font-medium",
                 )}
                 data-testid="nav-devices"
               >
@@ -412,7 +411,7 @@ export function AdminSidebar({
             )}
             {user && !collapsed && (
               <p
-                className="mt-2 truncate border-t border-white/[0.06] pt-2 px-2.5 text-xs text-m3"
+                className="mt-2 truncate border-t border-border pt-2 px-2.5 text-xs text-m3"
                 title={user.email}
               >
                 {user.email}

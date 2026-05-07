@@ -157,7 +157,7 @@ export function ConfirmActionModal({
 
         {warnings && warnings.length > 0 && (
           <div
-            className="mt-4 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-900 dark:text-yellow-200"
+            className="mt-4 rounded-md border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-900"
             role="status"
           >
             <p className="font-medium">Completed with warnings:</p>

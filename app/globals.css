@@ -3,82 +3,82 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
- * Opollo Design System — always-dark token layer.
+ * Opollo Design System — soft-light token layer.
  *
  * Raw hex vars (--pk, --gr, --bl, etc.) are for direct use in Opollo
  * component classes. Tailwind/shadcn semantic vars (--background, etc.)
  * are HSL approximations of the same palette so every shadcn primitive
- * inherits the dark theme automatically.
+ * inherits the light theme automatically.
  *
- * Light mode does not exist. The <html> element carries class="dark"
- * unconditionally, which activates Tailwind's dark: variants everywhere.
+ * Dark mode is not active. The <html> element does NOT carry class="dark".
+ * Brand colors (pink/green) are deepened slightly for WCAG AA on white.
  * ------------------------------------------------------------------------- */
 @layer base {
   :root {
     /* ---- Opollo raw hex tokens ----------------------------------------- */
     --pk: #ff03a5;
     --pk2: #cc0084;
-    --pk-soft: rgba(255, 3, 165, 0.12);
-    --gr: #00e5a0;
-    --gr2: #00c48a;
-    --gr-soft: rgba(0, 229, 160, 0.10);
-    --bl: #4da6ff;
-    --bl-soft: rgba(77, 166, 255, 0.10);
-    --am: #ffb300;
-    --rd: #ff4d6d;
-    --bg: #04040a;
-    --d1: #07070f;
-    --d2: #0b0b18;
-    --d3: #10101e;
-    --d4: #161624;
+    --pk-soft: rgba(255, 3, 165, 0.10);
+    --gr: #00875a;                          /* deepened teal — WCAG AA on white */
+    --gr2: #006644;
+    --gr-soft: rgba(0, 135, 90, 0.12);
+    --bl: #0077e6;                          /* deeper blue for white bg */
+    --bl-soft: rgba(0, 119, 230, 0.10);
+    --am: #d97706;                          /* amber-600 — readable on white */
+    --rd: #dc2626;                          /* red-600 — readable on white */
+    --bg: #f9fafb;                          /* page canvas */
+    --d1: #ffffff;                          /* card / sidebar surface */
+    --d2: #f9fafb;                          /* off-white */
+    --d3: #f3f4f6;                          /* gray-100 */
+    --d4: #e5e7eb;                          /* gray-200 */
     --white: #ffffff;
-    --m1: rgba(255, 255, 255, 0.92);
-    --m2: rgba(255, 255, 255, 0.58);
-    --m3: rgba(255, 255, 255, 0.32);
-    --m4: rgba(255, 255, 255, 0.18);
-    --b1: rgba(255, 255, 255, 0.06);
-    --b2: rgba(255, 255, 255, 0.12);
-    --b3: rgba(255, 255, 255, 0.20);
-    /* Dim alpha for inactive icons — between m3 (0.32) and m2 (0.58) */
-    --icon-dim: rgba(255, 255, 255, 0.40);
+    --m1: rgba(17, 24, 39, 0.95);           /* near-black body text */
+    --m2: rgba(107, 114, 128, 1);           /* gray-500 secondary text */
+    --m3: rgba(156, 163, 175, 1);           /* gray-400 tertiary */
+    --m4: rgba(209, 213, 219, 1);           /* gray-300 disabled */
+    --b1: rgba(0, 0, 0, 0.04);             /* very subtle bg */
+    --b2: rgba(0, 0, 0, 0.08);             /* light bg */
+    --b3: rgba(0, 0, 0, 0.15);             /* border */
+    /* Dim alpha for inactive icons */
+    --icon-dim: rgba(107, 114, 128, 0.80);
     /* Nav chrome — semantic aliases so components don't hard-code rgba */
     --nav-active: rgba(255, 3, 165, 0.10);  /* pk at 10%: active nav item bg  */
-    --nav-hover:  rgba(0, 229, 160, 0.06);  /* gr at 6%:  nav item hover bg   */
-    --topbar-bg:  rgba(4, 4, 10, 0.85);     /* bg at 85%: mobile topbar blur  */
-    --pk-glow:    rgba(255, 3, 165, 0.40);  /* pk at 40%: button hover shadow */
+    --nav-hover:  rgba(0, 135, 90, 0.08);   /* gr at 8%:  nav item hover bg   */
+    --topbar-bg:  rgba(255, 255, 255, 0.92);/* white at 92%: mobile topbar    */
+    --pk-glow:    rgba(255, 3, 165, 0.20);  /* pk at 20%: button hover shadow */
 
-    /* ---- Tailwind/shadcn semantic tokens (HSL, always-dark) -------------- */
-    --background: 240 37% 4%;           /* --d1  #07070f  card surface       */
-    --foreground: 0 0% 92%;             /* --m1  rgba(255,255,255,0.92)       */
-    --card: 240 37% 4%;                 /* --d1                               */
-    --card-foreground: 0 0% 92%;
-    --popover: 240 31% 9%;              /* --d3  #10101e  elevated panel      */
-    --popover-foreground: 0 0% 92%;
-    --primary: 322 100% 50%;            /* --pk  #ff03a5                      */
+    /* ---- Tailwind/shadcn semantic tokens (HSL, light theme) -------------- */
+    --background: 0 0% 100%;               /* white card surface              */
+    --foreground: 220 26% 18%;             /* --m1 near-black                 */
+    --card: 0 0% 100%;
+    --card-foreground: 220 26% 18%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 26% 18%;
+    --primary: 322 100% 50%;               /* --pk  #ff03a5                   */
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 24% 11%;           /* --d4  #161624  hover/elevated      */
-    --secondary-foreground: 0 0% 92%;
-    --muted: 240 31% 9%;                /* --d3                               */
-    --muted-foreground: 0 0% 58%;       /* --m2  rgba(255,255,255,0.58)       */
-    --accent: 240 24% 11%;              /* --d4                               */
-    --accent-foreground: 0 0% 92%;
-    --destructive: 350 100% 65%;        /* --rd  #ff4d6d                      */
+    --secondary: 220 14% 96%;              /* --d3  #f3f4f6                   */
+    --secondary-foreground: 220 26% 18%;
+    --muted: 220 14% 96%;                  /* --d3                            */
+    --muted-foreground: 220 9% 46%;        /* --m2  gray-500                  */
+    --accent: 220 13% 91%;                 /* --d4  #e5e7eb                   */
+    --accent-foreground: 220 26% 18%;
+    --destructive: 0 84% 50%;              /* --rd  #dc2626                   */
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 24%;               /* ≈ 18% white overlay — WCAG AA 3:1  */
-    --input: 240 4% 34%;                /* ≈ 32% white overlay — WCAG AA 3:1  */
-    --ring: 162 100% 45%;               /* --gr  #00e5a0  focus ring = green  */
+    --border: 220 13% 91%;                 /* #e5e7eb                         */
+    --input: 220 13% 91%;
+    --ring: 157 100% 32%;                  /* --gr  #00875a focus ring        */
     --radius: 0.5rem;
 
-    /* canvas = page base, one notch deeper than card surface */
-    --canvas: 240 43% 3%;               /* --bg  #04040a                      */
+    /* canvas = page base, one notch softer than card surface */
+    --canvas: 210 20% 98%;                 /* --bg  #f9fafb                   */
 
-    /* status tokens — Opollo palette */
-    --success: 162 100% 45%;            /* --gr  green                        */
-    --success-foreground: 240 43% 3%;
-    --warning: 42 100% 50%;             /* --am  amber                        */
-    --warning-foreground: 240 43% 3%;
-    --info: 211 100% 65%;               /* --bl  blue                         */
-    --info-foreground: 240 43% 3%;
+    /* status tokens — Opollo palette (deepened for light bg) */
+    --success: 157 100% 32%;               /* --gr  deep teal                 */
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;                 /* --am  amber                     */
+    --warning-foreground: 0 0% 100%;
+    --info: 211 100% 45%;                  /* --bl  deep blue                 */
+    --info-foreground: 0 0% 100%;
   }
 }
 
@@ -172,7 +172,7 @@
 .btn-pk:hover {
   filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 4px 24px rgba(255, 3, 165, 0.40);
+  box-shadow: 0 4px 24px rgba(255, 3, 165, 0.25);
 }
 .btn-pk:active {
   transform: translateY(0);
@@ -204,19 +204,19 @@
 /* Mesh gradient — atmospheric hero background */
 .mesh {
   background:
-    radial-gradient(ellipse at 15% 50%, rgba(255, 3, 165, 0.15) 0%, transparent 55%),
-    radial-gradient(ellipse at 85% 20%, rgba(0, 229, 160, 0.10) 0%, transparent 55%),
-    radial-gradient(ellipse at 50% 85%, rgba(77, 166, 255, 0.08) 0%, transparent 50%);
+    radial-gradient(ellipse at 15% 50%, rgba(255, 3, 165, 0.10) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 20%, rgba(0, 135, 90, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 50% 85%, rgba(0, 119, 230, 0.06) 0%, transparent 50%);
   animation: mesh-drift 14s ease-in-out infinite;
 }
 
 /* ---------------------------------------------------------------------------
  * A-2 — Semantic status colors (documentation).
  *
- *   success  bg-success/10 text-success     green  #00e5a0
- *   warning  bg-warning/10 text-warning     amber  #ffb300
- *   info     bg-info/10 text-info           blue   #4da6ff
- *   error    bg-destructive/10 text-destructive  red  #ff4d6d
+ *   success  bg-success/10 text-success     teal   #00875a
+ *   warning  bg-warning/10 text-warning     amber  #d97706
+ *   info     bg-info/10 text-info           blue   #0077e6
+ *   error    bg-destructive/10 text-destructive  red  #dc2626
  *   neutral  bg-muted text-muted-foreground
  * ------------------------------------------------------------------------- */
 

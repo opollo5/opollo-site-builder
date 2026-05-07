@@ -89,7 +89,7 @@ export function RichTextEditor({
       },
       attributes: {
         class:
-          "prose prose-sm dark:prose-invert max-w-none min-h-[400px] px-3 py-2 focus:outline-none",
+          "prose prose-sm max-w-none min-h-[400px] px-3 py-2 focus:outline-none",
       },
     },
   });
