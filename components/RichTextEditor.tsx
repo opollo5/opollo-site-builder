@@ -129,21 +129,21 @@ export function RichTextEditor({
           active={editor?.isActive("heading", { level: 1 })}
           title="Heading 1"
         >
-          <span className="font-mono text-[11px] font-semibold leading-none">H1</span>
+          <span className="font-mono text-xs font-semibold leading-none">H1</span>
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
           active={editor?.isActive("heading", { level: 2 })}
           title="Heading 2"
         >
-          <span className="font-mono text-[11px] font-semibold leading-none">H2</span>
+          <span className="font-mono text-xs font-semibold leading-none">H2</span>
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleHeading({ level: 3 }).run()}
           active={editor?.isActive("heading", { level: 3 })}
           title="Heading 3"
         >
-          <span className="font-mono text-[11px] font-semibold leading-none">H3</span>
+          <span className="font-mono text-xs font-semibold leading-none">H3</span>
         </ToolbarButton>
         <Divider />
         <ToolbarButton
