@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
-import { H1, Lead } from "@/components/ui/typography";
 import { ComponentFormModal, type ComponentFormMode } from "@/components/ComponentFormModal";
 import { ComponentsGrid } from "@/components/ComponentsGrid";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
@@ -110,21 +110,28 @@ export default function DesignSystemComponentsPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <H1>Components</H1>
-          <Lead className="mt-0.5">
-            Registered on design system v{selectedDs.version} (
-            {selectedDs.status}).
-          </Lead>
-        </div>
-        <Button
-          onClick={() => setFormMode({ kind: "create" })}
-          disabled={state.status !== "ready" && state.status !== "error"}
-        >
-          New component
-        </Button>
-      </div>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Design system" },
+            { label: "Components" },
+          ]}
+        />
+        <PageHeader.Title>Components</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Registered on design system v{selectedDs.version} (
+          {selectedDs.status}).
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button
+            onClick={() => setFormMode({ kind: "create" })}
+            disabled={state.status !== "ready" && state.status !== "error"}
+          >
+            New component
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
 
       <div className="mt-6">
         {state.status === "loading" && <TableSkeleton rows={5} cols={4} />}

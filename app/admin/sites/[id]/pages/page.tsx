@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { PagesTable } from "@/components/PagesTable";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_PAGES_DEFAULT_LIMIT,
@@ -130,31 +130,23 @@ export default async function SitePagesList({
   const rangeEnd = Math.min(offset + limit, total);
 
   return (
-    <>
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${params.id}` },
-          { label: "Pages" },
-        ]}
-      />
-
-      <div className="mt-4 flex items-start justify-between gap-4">
-        <div>
-          <H1>Pages</H1>
-          <Lead className="mt-0.5">
-            {total === 0
-              ? `No pages generated for ${site.name} yet.`
-              : `${total} ${total === 1 ? "page" : "pages"} generated for ${site.name}.`}
-          </Lead>
-        </div>
-        <Link
-          href={`/admin/sites/${params.id}`}
-          className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-        >
-          ← Site detail
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${params.id}` },
+            { label: "Pages" },
+          ]}
+        />
+        <PageHeader.Title>Pages</PageHeader.Title>
+        <PageHeader.Subtitle>
+          {total === 0
+            ? `No pages generated for ${site.name} yet.`
+            : `${total} ${total === 1 ? "page" : "pages"} generated for ${site.name}.`}
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       <form
         method="GET"
@@ -270,6 +262,6 @@ export default async function SitePagesList({
           backHref={buildHref(params.id, parsed, {})}
         />
       </div>
-    </>
+    </PageShell>
   );
 }

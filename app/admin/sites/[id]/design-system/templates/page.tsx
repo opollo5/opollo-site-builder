@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
-import { H1, Lead } from "@/components/ui/typography";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { TemplateFormModal, type TemplateFormMode } from "@/components/TemplateFormModal";
 import { TemplatesTable } from "@/components/TemplatesTable";
@@ -96,21 +96,28 @@ export default function DesignSystemTemplatesPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between">
-        <div>
-          <H1>Templates</H1>
-          <Lead className="mt-0.5">
-            Page-type templates on design system v{selectedDs.version} (
-            {selectedDs.status}).
-          </Lead>
-        </div>
-        <Button
-          onClick={() => setFormMode({ kind: "create" })}
-          disabled={state.status !== "ready" && state.status !== "error"}
-        >
-          New template
-        </Button>
-      </div>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Design system" },
+            { label: "Templates" },
+          ]}
+        />
+        <PageHeader.Title>Templates</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Page-type templates on design system v{selectedDs.version} (
+          {selectedDs.status}).
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button
+            onClick={() => setFormMode({ kind: "create" })}
+            disabled={state.status !== "ready" && state.status !== "error"}
+          >
+            New template
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
 
       <div className="mt-6">
         {state.status === "loading" && <TableSkeleton rows={5} cols={4} />}
