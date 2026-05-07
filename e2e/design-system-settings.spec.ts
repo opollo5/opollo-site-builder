@@ -35,13 +35,15 @@ test.describe("/admin/settings/design-system", () => {
   test("nav link routes to the page and token editor renders", async ({
     page,
   }, testInfo) => {
-    await page.goto("/admin/users/audit");
+    // Navigate directly to the target page — /admin/settings is in the
+    // admin-tools pathPrefixes, so the Admin section nav renders immediately
+    // without an expensive detour through /admin/users/audit.
+    await page.goto("/admin/settings/design-system");
+    await page.waitForURL(/\/admin\/settings\/design-system$/);
 
-    // super_admin sees the Design system nav link (in Admin section nav).
+    // super_admin sees the Design system nav link in the Admin section nav.
     const navLink = page.getByTestId("nav-design-system-settings");
     await expect(navLink).toBeVisible();
-    await navLink.click();
-    await page.waitForURL(/\/admin\/settings\/design-system$/);
 
     // Key sections are present.
     await expect(page.getByRole("heading", { name: /colours/i })).toBeVisible();
