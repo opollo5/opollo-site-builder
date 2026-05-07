@@ -222,6 +222,45 @@ const WP_HTTP_CODE_TABLE: Record<
   },
 };
 
+// Spec 01 §3.1 — short toast copy for the "Test Connection" dropdown
+// action in /admin/sites. The richer translateWpError() output is
+// shaped for the publish-failure banner (title + detail + nextAction);
+// the dropdown action only ever gets one line of toast text, so
+// keep this mapper focused on the short-message-per-code shape.
+//
+// Codes here mirror what testSiteConnection() (lib/sites.ts) returns,
+// which is the union of TestConnectionResult error codes plus the
+// helper-internal codes NO_CREDENTIALS / NOT_FOUND / INTERNAL_ERROR.
+const TEST_CONNECTION_TOAST_MESSAGES: Record<string, string> = {
+  AUTH_FAILED:
+    "WordPress rejected the credentials. Update the username or Application Password.",
+  REST_UNREACHABLE:
+    "Could not reach WordPress. Check the site URL and credentials.",
+  INSUFFICIENT_ROLE:
+    "WordPress user lacks publish capability. Use an administrator or editor account.",
+  NETWORK:
+    "Network error reaching WordPress. Verify the site URL and DNS.",
+  INVALID_URL:
+    "The site URL is not parseable. Open the edit page to fix it.",
+  WP_ERROR:
+    "WordPress returned an unexpected error. Open the edit page to retest.",
+  NO_CREDENTIALS:
+    "This site has no stored credentials yet. Open the edit page to enter a username + Application Password.",
+  NOT_FOUND: "This site no longer exists. Refresh the list.",
+  INTERNAL_ERROR:
+    "Could not reach WordPress. Check the site URL and credentials.",
+};
+
+const TEST_CONNECTION_FALLBACK_MESSAGE =
+  "Could not reach WordPress. Check the site URL and credentials.";
+
+export function translateTestConnectionErrorCode(code: string): string {
+  return (
+    TEST_CONNECTION_TOAST_MESSAGES[code] ??
+    TEST_CONNECTION_FALLBACK_MESSAGE
+  );
+}
+
 /**
  * Translate a `WpError` into an operator-facing message triple. The
  * WP-level `rest_*` code (if available) takes priority over the HTTP

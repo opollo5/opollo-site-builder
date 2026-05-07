@@ -117,12 +117,9 @@ const STATUS_MAP: Record<StatusKind, StatusEntry> = {
 
   // Site
   site_active: { label: "Connected", tone: "success" },
-  // UAT (2026-05-03) — "pending pairing" is internal jargon. Operators
-  // see this on every freshly-added site that hasn't yet had its WP
-  // credentials saved + verified, so rename to "Setup incomplete".
-  // Tone left neutral because it isn't a problem — it's a "next action
-  // lives here" state.
-  site_pending_pairing: { label: "Setup incomplete", tone: "neutral" },
+  // Spec 01 (2026-05-07) — operator-facing label is "Not Connected".
+  // Tone neutral because it's a "next action lives here" state, not a problem.
+  site_pending_pairing: { label: "Not Connected", tone: "neutral" },
   site_paused: { label: "Paused", tone: "warning" },
   site_removed: { label: "Removed", tone: "error" },
 

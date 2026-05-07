@@ -1,61 +1,170 @@
+"use client";
+
 import Link from "next/link";
-import { Globe, Plus } from "lucide-react";
+import { ArrowDown, ArrowUp, Globe, Plus } from "lucide-react";
 
 import { SiteActionsMenu } from "@/components/SiteActionsMenu";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  StatusPill,
+  siteStatusKind,
+} from "@/components/ui/status-pill";
+import type {
+  ListSitesOptions,
+  SiteSortColumn,
+  SiteSortDir,
+} from "@/lib/sites";
 import type { SiteListItem } from "@/lib/tool-schemas";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
-// B-2 — Sites list polish.
+// Spec 01 — Sites admin cleanup.
 //
-// Density: row height tightened to ~44px (px-3 py-2). Status cell
-// keeps the dot + text pattern (distinct from StatusPill — chosen for
-// the list-density, single-state context).
-// Empty state folded to A-6's EmptyState primitive.
-// Hover surface uses the .transition-smooth token for a less abrupt
-// background flip.
-// Status colors lean on A-2's success/warning tokens for AA-pass
-// contrast against tinted backgrounds.
+// - StatusCell now defers to StatusPill (the centralised pill primitive)
+//   so the operator-visible label respects STATUS_MAP. No more inline
+//   `status.replace(/_/g, " ")` leaking the enum value as English.
+// - Pending-pairing rows render an inline `Connect →` link in the
+//   Status cell, deep-linking to the edit page with ?focus=credentials
+//   so the credentials section auto-scrolls + focuses on mount.
+// - Headers are clickable: ?sort=<col>&dir=<asc|desc>. Three-state
+//   toggle: idle → asc → desc → cleared (revert to default order).
+//   Filter params are preserved when changing sort.
+// - "Updated" column dropped; replaced by "Last tested" backed by
+//   sites.last_connection_test_at (migration 0106).
 // ---------------------------------------------------------------------------
 
-function statusDotClass(status: string): string {
-  switch (status) {
-    case "active":
-      return "bg-success";
-    case "pending_pairing":
-      return "bg-muted-foreground/40";
-    case "paused":
-      return "bg-warning";
-    case "removed":
-      return "bg-muted-foreground/30";
-    default:
-      return "bg-destructive";
-  }
+interface SitesTableProps {
+  sites: SiteListItem[];
+  sort: SiteSortColumn | null;
+  dir: SiteSortDir | null;
+  filter: ListSitesOptions["status"];
+  isSuperAdmin: boolean;
+  onCreateClick?: () => void;
 }
 
-function StatusCell({ status }: { status: string }) {
+type Column = {
+  key: SiteSortColumn;
+  label: string;
+};
+
+const SORTABLE_HEADERS: Column[] = [
+  { key: "name", label: "Name" },
+  { key: "company_name", label: "Company" },
+  { key: "wp_url", label: "WP URL" },
+  { key: "status", label: "Status" },
+  { key: "last_connection_test_at", label: "Last tested" },
+];
+
+function buildHeaderHref(
+  column: SiteSortColumn,
+  currentSort: SiteSortColumn | null,
+  currentDir: SiteSortDir | null,
+  filter: ListSitesOptions["status"],
+): string {
+  // Three-state toggle:
+  //   no sort on this column      → ?sort=col&dir=asc
+  //   sort=col & dir=asc          → ?sort=col&dir=desc
+  //   sort=col & dir=desc         → clear sort (revert to default)
+  const params = new URLSearchParams();
+  if (filter) params.set("status", filter);
+
+  if (currentSort !== column) {
+    params.set("sort", column);
+    params.set("dir", "asc");
+  } else if (currentDir === "asc") {
+    params.set("sort", column);
+    params.set("dir", "desc");
+  } // else: leave sort/dir off → default order
+
+  const qs = params.toString();
+  return qs.length > 0 ? `/admin/sites?${qs}` : "/admin/sites";
+}
+
+function StatusCell({ status, siteId }: { status: string; siteId: string }) {
   return (
     <span className="inline-flex items-center gap-2 text-sm">
-      <span
-        aria-hidden="true"
-        className={cn(
-          "inline-block h-2 w-2 rounded-full",
-          statusDotClass(status),
-        )}
+      <StatusPill
+        kind={siteStatusKind(status as Parameters<typeof siteStatusKind>[0])}
       />
-      <span className="capitalize">{status.replace(/_/g, " ")}</span>
+      {status === "pending_pairing" && (
+        <Link
+          href={`/admin/sites/${encodeURIComponent(siteId)}/edit?focus=credentials`}
+          data-testid={`site-connect-link-${siteId}`}
+          className="text-sm text-primary underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        >
+          Connect →
+        </Link>
+      )}
     </span>
   );
 }
 
-interface SitesTableProps {
-  sites: SiteListItem[];
-  onCreateClick?: () => void;
+function LastTestedCell({ value }: { value: string | null }) {
+  if (!value) {
+    return <span className="text-sm text-muted-foreground">Never tested</span>;
+  }
+  let iso: string;
+  try {
+    iso = new Date(value).toISOString();
+  } catch {
+    iso = value;
+  }
+  return (
+    <span
+      className="text-sm text-muted-foreground"
+      title={iso}
+      data-screenshot-mask
+    >
+      Tested {formatRelativeTime(value)}
+    </span>
+  );
 }
 
-export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
+function SortHeader({
+  column,
+  label,
+  sort,
+  dir,
+  filter,
+}: {
+  column: SiteSortColumn;
+  label: string;
+  sort: SiteSortColumn | null;
+  dir: SiteSortDir | null;
+  filter: ListSitesOptions["status"];
+}) {
+  const active = sort === column;
+  const href = buildHeaderHref(column, sort, dir, filter);
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      data-testid={`sites-sort-${column}`}
+      aria-sort={
+        active ? (dir === "desc" ? "descending" : "ascending") : "none"
+      }
+      className="inline-flex items-center gap-1 transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+    >
+      {label}
+      {active && dir === "desc" && (
+        <ArrowDown aria-hidden className="h-5 w-5" />
+      )}
+      {active && dir !== "desc" && (
+        <ArrowUp aria-hidden className="h-5 w-5" />
+      )}
+    </Link>
+  );
+}
+
+export function SitesTable({
+  sites,
+  sort,
+  dir,
+  filter,
+  isSuperAdmin,
+  onCreateClick,
+}: SitesTableProps) {
   if (sites.length === 0) {
     return (
       <EmptyState
@@ -91,11 +200,17 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
       <table className="w-full text-sm">
         <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
-            <th className="px-3 py-2 font-medium">Name</th>
-            <th className="px-3 py-2 font-medium">Company</th>
-            <th className="px-3 py-2 font-medium">WP URL</th>
-            <th className="px-3 py-2 font-medium">Status</th>
-            <th className="px-3 py-2 font-medium">Updated</th>
+            {SORTABLE_HEADERS.map((col) => (
+              <th key={col.key} className="px-3 py-2 font-medium">
+                <SortHeader
+                  column={col.key}
+                  label={col.label}
+                  sort={sort}
+                  dir={dir}
+                  filter={filter}
+                />
+              </th>
+            ))}
             <th className="w-10 px-2 py-2"></th>
           </tr>
         </thead>
@@ -103,7 +218,11 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
           {sites.map((s) => (
             <tr
               key={s.id}
-              className="group border-b transition-smooth last:border-b-0 hover:bg-muted/40"
+              className={cn(
+                "group border-b transition-smooth last:border-b-0 hover:bg-muted/40",
+              )}
+              data-status={s.status}
+              data-testid={`sites-row-${s.id}`}
             >
               <td className="px-3 py-2 font-medium">
                 <Link
@@ -131,12 +250,10 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
                 </a>
               </td>
               <td className="px-3 py-2">
-                <StatusCell status={s.status} />
+                <StatusCell status={s.status} siteId={s.id} />
               </td>
-              <td className="px-3 py-2 text-sm text-muted-foreground">
-                <span data-screenshot-mask>
-                  {formatRelativeTime(s.updated_at)}
-                </span>
+              <td className="px-3 py-2">
+                <LastTestedCell value={s.last_connection_test_at} />
               </td>
               <td
                 className="px-2 py-2 text-right"
@@ -146,6 +263,7 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
                   siteId={s.id}
                   name={s.name}
                   wpUrl={s.wp_url}
+                  canDelete={isSuperAdmin}
                 />
               </td>
             </tr>

@@ -294,6 +294,9 @@ export type SiteListItem = {
   prefix: string;
   status: string;
   last_successful_operation_at: string | null;
+  // Spec 01: set by POST /api/sites/[id]/test-connection on success.
+  // NULL = operator has never run a successful connection test.
+  last_connection_test_at: string | null;
   updated_at: string;
   company_id?: string | null;
   company_name?: string | null;
