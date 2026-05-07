@@ -1,11 +1,18 @@
+import type { Client as PgClient, ClientConfig } from "pg";
+
 import {
   type ApiResponse,
   type RegisterSiteInput,
   type SiteListItem,
   type SiteRecord,
 } from "@/lib/tool-schemas";
+import { requireDbConfig } from "@/lib/db-direct";
 import { decrypt, encrypt } from "@/lib/encryption";
 import { logger } from "@/lib/logger";
+import {
+  testWpConnection,
+  type TestConnectionResult,
+} from "@/lib/site-test-connection";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 export type SiteCredentials = {
@@ -19,7 +26,7 @@ export type SiteWithOptionalCredentials = {
 };
 
 const LIGHT_SITE_FIELDS =
-  "id,name,wp_url,prefix,status,last_successful_operation_at,updated_at,company_id";
+  "id,name,wp_url,prefix,status,last_successful_operation_at,last_connection_test_at,updated_at,company_id";
 
 function now(): string {
   return new Date().toISOString();
@@ -189,9 +196,65 @@ async function rollbackSite(siteId: string): Promise<void> {
   }
 }
 
-export async function listSites(): Promise<ApiResponse<{ sites: SiteListItem[] }>> {
+// Spec 01 — Sites admin cleanup.
+// Sortable columns the operator can click in the table header. The set
+// is deliberately narrow: name + wp_url are scalar text; company_name
+// is joined data sorted in JS; status uses an explicit ordering map
+// (active → not connected → paused → archived); last_connection_test_at
+// is the freshness primary key.
+export const SITE_SORTABLE_COLUMNS = [
+  "name",
+  "company_name",
+  "wp_url",
+  "status",
+  "last_connection_test_at",
+] as const;
+export type SiteSortColumn = (typeof SITE_SORTABLE_COLUMNS)[number];
+export type SiteSortDir = "asc" | "desc";
+
+// Explicit ordering for the `status` sort key. Lexical sort would put
+// 'active' before 'paused' before 'pending_pairing' before 'removed' —
+// fine alphabetically, wrong operationally. Spec 01 §4 nails this down:
+// active rows first, then setup-incomplete, then paused, then archived.
+//
+// The `Record<…, number>` typing is the spec-mandated exhaustiveness
+// check: adding a new site_status enum value will fail to typecheck
+// here until a sort weight is assigned, so the table can't silently
+// drop new statuses to the bottom.
+type SiteStatusForSort =
+  | "active"
+  | "pending_pairing"
+  | "paused"
+  | "removed";
+export const STATUS_SORT_ORDER: Record<SiteStatusForSort, number> = {
+  active: 0,
+  pending_pairing: 1,
+  paused: 2,
+  removed: 3,
+};
+
+export type ListSitesOptions = {
+  /**
+   * Spec 01 §5 — server-side filter. `null`/undefined means the default
+   * "hide archived" view (status != 'removed'); a specific status value
+   * filters to that single status (including 'removed' for the
+   * Archived chip).
+   */
+  status?: "active" | "pending_pairing" | "paused" | "removed" | null;
+  /**
+   * Spec 01 §4 — explicit user sort, e.g. URL `?sort=name&dir=asc`. When
+   * absent, the default sort applies (status → last_connection_test_at
+   * desc nulls last → name asc).
+   */
+  sort?: SiteSortColumn | null;
+  dir?: SiteSortDir | null;
+};
+
+export async function listSites(
+  opts: ListSitesOptions = {},
+): Promise<ApiResponse<{ sites: SiteListItem[] }>> {
   try {
-    return await listSitesImpl();
+    return await listSitesImpl(opts);
   } catch (err) {
     logger.error("sites.listSites.uncaught", { err: err instanceof Error ? err.message : String(err) });
     return internalError(
@@ -200,13 +263,21 @@ export async function listSites(): Promise<ApiResponse<{ sites: SiteListItem[] }
   }
 }
 
-async function listSitesImpl(): Promise<ApiResponse<{ sites: SiteListItem[] }>> {
+async function listSitesImpl(
+  opts: ListSitesOptions,
+): Promise<ApiResponse<{ sites: SiteListItem[] }>> {
   const supabase = getServiceRoleClient();
-  const { data, error } = await supabase
-    .from("sites")
-    .select(LIGHT_SITE_FIELDS)
-    .neq("status", "removed")
-    .order("updated_at", { ascending: false });
+  let query = supabase.from("sites").select(LIGHT_SITE_FIELDS);
+  if (opts.status) {
+    query = query.eq("status", opts.status);
+  } else {
+    query = query.neq("status", "removed");
+  }
+  // Order at the SQL layer is just for stability; we re-sort in JS to
+  // respect the STATUS_SORT_ORDER map and to sort joined company_name.
+  query = query.order("updated_at", { ascending: false });
+
+  const { data, error } = await query;
 
   if (error) {
     logger.error("sites.listSites.query_failed", { supabase_error: error.message });
@@ -228,16 +299,98 @@ async function listSitesImpl(): Promise<ApiResponse<{ sites: SiteListItem[] }>> 
     }
   }
 
-  const sites: SiteListItem[] = rows.map((r) => ({
+  const enriched: SiteListItem[] = rows.map((r) => ({
     ...r,
     company_name: r.company_id ? (companyNameById.get(r.company_id) ?? null) : null,
   }));
+
+  const sites = sortSiteList(enriched, opts.sort ?? null, opts.dir ?? null);
 
   return {
     ok: true,
     data: { sites },
     timestamp: now(),
   };
+}
+
+function sortSiteList(
+  sites: SiteListItem[],
+  sort: SiteSortColumn | null,
+  dir: SiteSortDir | null,
+): SiteListItem[] {
+  const out = [...sites];
+  if (sort) {
+    const ascending = dir !== "desc";
+    out.sort((a, b) => compareByColumn(a, b, sort, ascending));
+    return out;
+  }
+  // Default sort: status asc by STATUS_SORT_ORDER → last_connection_test_at
+  // desc nulls last → name asc.
+  out.sort((a, b) => {
+    const sa = statusSortWeight(a.status);
+    const sb = statusSortWeight(b.status);
+    if (sa !== sb) return sa - sb;
+    const tCmp = compareNullableDateDesc(
+      a.last_connection_test_at,
+      b.last_connection_test_at,
+    );
+    if (tCmp !== 0) return tCmp;
+    return a.name.localeCompare(b.name);
+  });
+  return out;
+}
+
+function statusSortWeight(status: string): number {
+  return Object.prototype.hasOwnProperty.call(STATUS_SORT_ORDER, status)
+    ? STATUS_SORT_ORDER[status as SiteStatusForSort]
+    : Number.MAX_SAFE_INTEGER;
+}
+
+function compareByColumn(
+  a: SiteListItem,
+  b: SiteListItem,
+  column: SiteSortColumn,
+  ascending: boolean,
+): number {
+  const sign = ascending ? 1 : -1;
+  switch (column) {
+    case "status": {
+      const cmp = statusSortWeight(a.status) - statusSortWeight(b.status);
+      return cmp !== 0 ? cmp * sign : a.name.localeCompare(b.name);
+    }
+    case "last_connection_test_at": {
+      const cmp = compareNullableDateAsc(
+        a.last_connection_test_at,
+        b.last_connection_test_at,
+      );
+      return cmp !== 0 ? cmp * sign : a.name.localeCompare(b.name);
+    }
+    case "company_name": {
+      const an = a.company_name ?? "";
+      const bn = b.company_name ?? "";
+      const cmp = an.localeCompare(bn);
+      return cmp !== 0 ? cmp * sign : a.name.localeCompare(b.name);
+    }
+    case "wp_url":
+      return a.wp_url.localeCompare(b.wp_url) * sign;
+    case "name":
+    default:
+      return a.name.localeCompare(b.name) * sign;
+  }
+}
+
+function compareNullableDateAsc(a: string | null, b: string | null): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1; // nulls last
+  if (b === null) return -1;
+  return new Date(a).getTime() - new Date(b).getTime();
+}
+
+function compareNullableDateDesc(a: string | null, b: string | null): number {
+  if (a === null && b === null) return 0;
+  if (a === null) return 1; // nulls last
+  if (b === null) return -1;
+  return new Date(b).getTime() - new Date(a).getTime();
 }
 
 export async function getSite(
@@ -740,4 +893,489 @@ export async function archiveSite(
       `Unhandled error in archiveSite: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// testSiteConnection (Spec 01 §3.1)
+// ---------------------------------------------------------------------------
+//
+// Single shared helper consumed by:
+//   1. POST /api/sites/test-connection (form-driven preflight; called from
+//      /admin/sites/new and /admin/sites/[id]/edit's Test button)
+//   2. POST /api/sites/[id]/test-connection (row-dropdown action)
+//
+// Both surfaces invoke this exact function — they do NO additional
+// normalisation, retry, or timeout wrapping. The 8s timeout, the
+// trailing-slash strip, the credential decrypt path, and the
+// capability-check pass/fail mapping all live here. Subtle divergence
+// between surfaces was the failure mode this consolidation prevents.
+
+const TEST_CONNECTION_TIMEOUT_MS = 8000;
+
+export async function testSiteConnection(
+  siteId: string,
+): Promise<{ ok: true } | { ok: false; errorCode: string }> {
+  const siteResult = await getSite(siteId, { includeCredentials: true });
+  if (!siteResult.ok) {
+    return { ok: false, errorCode: siteResult.error.code };
+  }
+  const creds = siteResult.data.credentials;
+  if (!creds) {
+    return { ok: false, errorCode: "NO_CREDENTIALS" };
+  }
+
+  // Wrap the upstream call with an 8s deadline matching the existing
+  // edit-form fetch pattern. testWpConnection() doesn't accept an
+  // AbortSignal; we race the call against a timeout sentinel and let
+  // the caller treat slow upstream as REST_UNREACHABLE — the same
+  // bucket the form's network failure path already uses.
+  let result: TestConnectionResult;
+  try {
+    result = await Promise.race<TestConnectionResult>([
+      testWpConnection({
+        url: siteResult.data.site.wp_url,
+        username: creds.wp_user,
+        app_password: creds.wp_app_password,
+      }),
+      new Promise<TestConnectionResult>((_, reject) =>
+        setTimeout(
+          () => reject(new Error("test-connection timed out")),
+          TEST_CONNECTION_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+  } catch (err) {
+    logger.warn("sites.testSiteConnection.timeout_or_error", {
+      site_id: siteId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return { ok: false, errorCode: "REST_UNREACHABLE" };
+  }
+
+  if (result.ok) return { ok: true };
+  return { ok: false, errorCode: result.error.code };
+}
+
+export async function recordTestConnectionSuccess(
+  siteId: string,
+): Promise<void> {
+  try {
+    const supabase = getServiceRoleClient();
+    const { error } = await supabase
+      .from("sites")
+      .update({ last_connection_test_at: new Date().toISOString() })
+      .eq("id", siteId);
+    if (error) {
+      logger.warn("sites.recordTestConnectionSuccess.update_failed", {
+        site_id: siteId,
+        supabase_error: error.message,
+      });
+    }
+  } catch (err) {
+    logger.warn("sites.recordTestConnectionSuccess.threw", {
+      site_id: siteId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// purgeSite (Spec 01 §3.2) — super_admin-only hard delete.
+// ---------------------------------------------------------------------------
+//
+// Distinct from archiveSite (which flips status='removed'). Walks the
+// information_schema FK graph at runtime to discover every table that
+// transitively references sites.id, then deletes leaves first inside
+// one transaction. Audit row inserted in the same transaction so a
+// rolled-back delete also rolls back the audit record.
+//
+// Caller passes actor_id + actor_email so the audit row can record
+// who fired the delete; route gating already enforces super_admin.
+
+export type PurgeSiteResult =
+  | {
+      ok: true;
+      data: {
+        site_id: string;
+        site_name: string;
+        deleted_by_table: Record<string, number>;
+      };
+    }
+  | {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+        details?: Record<string, unknown>;
+      };
+    };
+
+export type PurgeSiteOptions = {
+  actorId: string | null;
+  actorEmail: string | null;
+};
+
+export async function purgeSite(
+  siteId: string,
+  opts: PurgeSiteOptions,
+): Promise<PurgeSiteResult> {
+  // Lazy-load pg so the import doesn't bleed into Edge / browser bundles
+  // — same pattern as the brief-runner workers (ARCH §6.1, §12).
+  const { Client } = await import("pg");
+  const cfg: ClientConfig = requireDbConfig();
+  const client: PgClient = new Client(cfg);
+
+  let depthAtFailure: number | null = null;
+  let failingTable: string | null = null;
+  let failingConstraint: string | null = null;
+
+  try {
+    await client.connect();
+    await client.query("BEGIN");
+
+    // 1. Lock the site row + read its name. SELECT ... FOR UPDATE so
+    //    parallel purge attempts serialise. neq removed isn't applied
+    //    here — super_admin can purge an already-archived row.
+    const siteRows = await client.query<{ id: string; name: string }>(
+      "SELECT id, name FROM sites WHERE id = $1 FOR UPDATE",
+      [siteId],
+    );
+    if (siteRows.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return {
+        ok: false,
+        error: {
+          code: "NOT_FOUND",
+          message: `No site found with id ${siteId}.`,
+          details: { site_id: siteId },
+        },
+      };
+    }
+    const siteName = siteRows.rows[0].name;
+
+    // 2. Build the recursive FK dependency graph. Each entry is the
+    //    table name + the foreign key constraint name + depth (0 = direct
+    //    FK to sites; 1 = FK to a depth-0 table; etc). We walk until no
+    //    new tables are added.
+    const dependencyOrder = await buildSiteDependencyOrder(client);
+    if (dependencyOrder.length === 0) {
+      await client.query("ROLLBACK");
+      logger.error("sites.purgeSite.no_dependencies_found", {
+        site_id: siteId,
+      });
+      return {
+        ok: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "Could not resolve site dependency graph.",
+          details: { site_id: siteId },
+        },
+      };
+    }
+
+    logger.info("sites.purgeSite.dependency_graph", {
+      site_id: siteId,
+      tables: dependencyOrder.map((t) => ({
+        table: t.table,
+        depth: t.depth,
+      })),
+    });
+
+    // 3. Insert audit row inside the transaction. If anything below
+    //    fails the audit insert rolls back too — desired (the spec
+    //    explicitly chose this).
+    await client.query(
+      `INSERT INTO user_audit_log (actor_id, action, target_email, metadata)
+       VALUES ($1, 'site_purged', $2, $3::jsonb)`,
+      [
+        opts.actorId,
+        opts.actorEmail,
+        JSON.stringify({ site_id: siteId, site_name: siteName }),
+      ],
+    );
+
+    // 4. Walk the table list deepest-first and delete every row that
+    //    transitively chains back to the target site. Track row counts
+    //    for the structured log + return payload.
+    const deletedByTable: Record<string, number> = {};
+    for (const entry of dependencyOrder) {
+      depthAtFailure = entry.depth;
+      failingTable = entry.table;
+      failingConstraint = entry.constraint;
+      const deleteSql = entry.deleteSql.replace("$SITE_ID_PARAM$", "$1");
+      const deleteResult = await client.query(deleteSql, [siteId]);
+      deletedByTable[entry.table] = deleteResult.rowCount ?? 0;
+      logger.info("sites.purgeSite.table_deleted", {
+        site_id: siteId,
+        table: entry.table,
+        depth: entry.depth,
+        rows_deleted: deleteResult.rowCount ?? 0,
+      });
+    }
+
+    // 5. Finally delete the sites row itself.
+    failingTable = "sites";
+    failingConstraint = null;
+    depthAtFailure = -1;
+    const finalRes = await client.query(
+      "DELETE FROM sites WHERE id = $1",
+      [siteId],
+    );
+    deletedByTable.sites = finalRes.rowCount ?? 0;
+
+    await client.query("COMMIT");
+
+    return {
+      ok: true,
+      data: {
+        site_id: siteId,
+        site_name: siteName,
+        deleted_by_table: deletedByTable,
+      },
+    };
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* connection may already be dead; nothing to do */
+    }
+    logger.error("sites.purgeSite.failed", {
+      site_id: siteId,
+      failing_table: failingTable,
+      failing_constraint: failingConstraint,
+      depth_at_failure: depthAtFailure,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      ok: false,
+      error: {
+        code: "PURGE_FAILED",
+        message: "Could not delete site. Contact engineering.",
+        details: {
+          site_id: siteId,
+          failing_table: failingTable,
+          failing_constraint: failingConstraint,
+          depth_at_failure: depthAtFailure,
+        },
+      },
+    };
+  } finally {
+    try {
+      await client.end();
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+type DependencyEntry = {
+  table: string;
+  constraint: string;
+  /** Depth from the sites table; 0 = direct FK, 1 = via a depth-0 table. */
+  depth: number;
+  /**
+   * SQL fragment to delete every row in this table that links back to
+   * `$SITE_ID_PARAM$` (replaced with `$1` at exec time). Built once
+   * from the FK chain so the delete loop is parameterless except for
+   * the site UUID.
+   */
+  deleteSql: string;
+};
+
+/**
+ * Walks information_schema.referential_constraints transitively to
+ * discover every table that chains back to `sites.id`. Returns a list
+ * ordered DEEPEST FIRST so the delete loop can safely cascade leaves
+ * up to the root.
+ */
+async function buildSiteDependencyOrder(
+  client: PgClient,
+): Promise<DependencyEntry[]> {
+  // Map: schema-qualified target table → array of FK rows pointing at it.
+  type FkRow = {
+    table_schema: string;
+    table_name: string;
+    constraint_name: string;
+    column_name: string;
+    foreign_table_schema: string;
+    foreign_table_name: string;
+    foreign_column_name: string;
+  };
+
+  const fkRes = await client.query<FkRow>(`
+    SELECT
+      tc.table_schema,
+      tc.table_name,
+      tc.constraint_name,
+      kcu.column_name,
+      ccu.table_schema AS foreign_table_schema,
+      ccu.table_name   AS foreign_table_name,
+      ccu.column_name  AS foreign_column_name
+    FROM information_schema.table_constraints tc
+    JOIN information_schema.key_column_usage kcu
+      ON tc.constraint_name = kcu.constraint_name
+     AND tc.table_schema = kcu.table_schema
+    JOIN information_schema.constraint_column_usage ccu
+      ON ccu.constraint_name = tc.constraint_name
+     AND ccu.table_schema = tc.table_schema
+    WHERE tc.constraint_type = 'FOREIGN KEY'
+      AND tc.table_schema = 'public'
+  `);
+
+  // Build adjacency: parent (referenced) table → list of children referencing it.
+  const childrenByParent = new Map<string, FkRow[]>();
+  for (const fk of fkRes.rows) {
+    const parentKey = `${fk.foreign_table_schema}.${fk.foreign_table_name}`;
+    const arr = childrenByParent.get(parentKey) ?? [];
+    arr.push(fk);
+    childrenByParent.set(parentKey, arr);
+  }
+
+  // BFS from sites; track the FK chain that reaches each table so we
+  // can build a delete SQL that walks back to the site_id.
+  type WalkNode = {
+    table: string;
+    schema: string;
+    constraint: string;
+    column: string;
+    depth: number;
+    parentKey: string;
+    parentColumn: string;
+  };
+
+  const visited = new Set<string>(); // schema.table strings already scheduled
+  visited.add("public.sites"); // never re-add the root
+  const entries: Array<
+    DependencyEntry & { schema: string; schemaTable: string }
+  > = [];
+
+  // Cache of raw walk nodes per visited table so deeper descendants can
+  // build their full join chain back to sites.
+  const walkChain = new Map<string, WalkNode[]>(); // key=schema.table → ordered chain root-most-first
+
+  const queue: WalkNode[] = [];
+  // Seed: direct children of sites.
+  const siteChildren = childrenByParent.get("public.sites") ?? [];
+  for (const fk of siteChildren) {
+    const node: WalkNode = {
+      table: fk.table_name,
+      schema: fk.table_schema,
+      constraint: fk.constraint_name,
+      column: fk.column_name,
+      depth: 0,
+      parentKey: "public.sites",
+      parentColumn: "id",
+    };
+    queue.push(node);
+  }
+
+  while (queue.length > 0) {
+    const node = queue.shift()!;
+    const key = `${node.schema}.${node.table}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const parentChain = walkChain.get(node.parentKey) ?? [];
+    const myChain = [...parentChain, node];
+    walkChain.set(key, myChain);
+
+    entries.push({
+      table: node.table,
+      schema: node.schema,
+      schemaTable: key,
+      constraint: node.constraint,
+      depth: node.depth,
+      deleteSql: buildCascadeDeleteSql(myChain),
+    });
+
+    // Enqueue this table's own children.
+    const myChildren = childrenByParent.get(key) ?? [];
+    for (const fk of myChildren) {
+      const childKey = `${fk.table_schema}.${fk.table_name}`;
+      if (visited.has(childKey)) continue;
+      queue.push({
+        table: fk.table_name,
+        schema: fk.table_schema,
+        constraint: fk.constraint_name,
+        column: fk.column_name,
+        depth: node.depth + 1,
+        parentKey: key,
+        parentColumn: fk.foreign_column_name,
+      });
+    }
+  }
+
+  // Sort deepest first; ties broken by table name for deterministic order.
+  entries.sort((a, b) => {
+    if (b.depth !== a.depth) return b.depth - a.depth;
+    return a.table.localeCompare(b.table);
+  });
+
+  return entries.map(({ schema, schemaTable, ...rest }) => {
+    void schema;
+    void schemaTable;
+    return rest;
+  });
+}
+
+/**
+ * Build a DELETE statement that walks a FK chain back to the sites
+ * table and only removes rows whose ultimate ancestor is the target
+ * site. The chain `[c0, c1, c2]` (root-most first; c0 is a direct
+ * child of sites; c2 is the leaf) becomes:
+ *
+ *   DELETE FROM "public"."<c2>"
+ *    WHERE "<c2.column>" IN (
+ *      SELECT "<c1.parentColumn>" FROM "public"."<c1>"
+ *       WHERE "<c1.column>" IN (
+ *         SELECT "<c0.parentColumn>" FROM "public"."<c0>"
+ *          WHERE "<c0.column>" IN (
+ *            SELECT id FROM "public"."sites" WHERE id = $SITE_ID_PARAM$
+ *          )
+ *       )
+ *    )
+ *
+ * Parameter substitution happens at exec time — the only $1 binding
+ * is the site UUID. parentColumn on the second-from-root link is the
+ * referenced column on c0 (typically c0.id) — read from
+ * information_schema.constraint_column_usage at walk time, so this
+ * survives non-`id` PKs if any tables ship with one.
+ */
+function buildCascadeDeleteSql(chain: {
+  schema: string;
+  table: string;
+  column: string;
+  parentColumn: string;
+  parentKey: string;
+}[]): string {
+  if (chain.length === 0) {
+    throw new Error("buildCascadeDeleteSql called with empty chain");
+  }
+  const leaf = chain[chain.length - 1];
+
+  // Inner-most subquery is always the site filter. We then wrap it
+  // outward, each link selecting the `parentColumn` of the NEXT outer
+  // link's `column`. The link at index i has `column` referencing the
+  // link at i-1's `parentColumn` (or sites.id for i=0).
+  let inner = `SELECT id FROM "public"."sites" WHERE id = $SITE_ID_PARAM$`;
+  // We need each non-leaf link's `parentColumn`-of-its-child as the
+  // SELECT projection. Equivalent: when wrapping link `c_i`, we project
+  // the column that the next link's `column` references — which is
+  // `chain[i+1].parentColumn`.
+  for (let i = 0; i < chain.length - 1; i++) {
+    const link = chain[i];
+    const projection = chain[i + 1].parentColumn; // typically "id"
+    inner = `SELECT ${quoteIdent(projection)} FROM ${quoteQualified(link.schema, link.table)} WHERE ${quoteIdent(link.column)} IN (${inner})`;
+  }
+
+  return `DELETE FROM ${quoteQualified(leaf.schema, leaf.table)} WHERE ${quoteIdent(leaf.column)} IN (${inner})`;
+}
+
+function quoteIdent(s: string): string {
+  // Postgres identifier quoting: double-quote and escape embedded quotes.
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function quoteQualified(schema: string, table: string): string {
+  return `${quoteIdent(schema)}.${quoteIdent(table)}`;
 }

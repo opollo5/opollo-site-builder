@@ -8,7 +8,7 @@ import {
   rateLimitExceeded,
 } from "@/lib/rate-limit";
 import { testWpConnection } from "@/lib/site-test-connection";
-import { getSite } from "@/lib/sites";
+import { getSite, recordTestConnectionSuccess } from "@/lib/sites";
 
 // AUTH-FOUNDATION P2.1 + P2.3 — POST /api/sites/test-connection.
 //
@@ -79,8 +79,10 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   let testInput: { url: string; username: string; app_password: string };
+  let storedSiteId: string | null = null;
 
   if ("site_id" in parsed.data) {
+    storedSiteId = parsed.data.site_id;
     const siteResult = await getSite(parsed.data.site_id, {
       includeCredentials: true,
     });
@@ -117,6 +119,15 @@ export async function POST(req: Request): Promise<NextResponse> {
   }
 
   const result = await testWpConnection(testInput);
+
+  // Spec 01 §6 — when an operator successfully tests stored credentials
+  // (site_id branch only; the explicit-credentials branch has no site
+  // row to update yet), stamp last_connection_test_at = now() so the
+  // sites list shows the freshness signal.
+  if (result.ok && storedSiteId !== null) {
+    await recordTestConnectionSuccess(storedSiteId);
+  }
+
   // 200 either way — the API succeeded; the WP connection result is
   // in the body. The form differentiates on `ok` not on HTTP status.
   return NextResponse.json(result);

@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { CheckCircle2, HelpCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -79,6 +79,7 @@ export function SiteEditForm({
   hasStoredCredentials: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [form, setForm] = useState<FormState>({
     name: site.name,
     wp_url: site.wp_url,
@@ -90,6 +91,26 @@ export function SiteEditForm({
   const [testResult, setTestResult] = useState<TestResult>({ kind: "idle" });
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Spec 01 §2 — `?focus=credentials` deep-link from the Sites list
+  // "Connect →" affordance. Scroll the credentials section into view
+  // and shift keyboard focus to the WP username field so a keyboard
+  // user gets the same affordance as a click-driven one.
+  const credentialsSectionRef = useRef<HTMLDivElement | null>(null);
+  const wpUserInputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    if (searchParams?.get("focus") !== "credentials") return;
+    // Wait one paint frame so layout has settled before we measure +
+    // scroll. The spec calls this out explicitly.
+    const raf = requestAnimationFrame(() => {
+      credentialsSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      wpUserInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [searchParams]);
 
   function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -271,25 +292,31 @@ export function SiteEditForm({
         />
       </div>
 
-      <div>
-        <label
-          htmlFor="edit-site-wp-user"
-          className="block text-sm font-medium"
-        >
-          WordPress username
-        </label>
-        <Input
-          id="edit-site-wp-user"
-          required
-          maxLength={100}
-          value={form.wp_user}
-          onChange={(e) => setField("wp_user", e.target.value)}
-          disabled={submitting}
-          autoComplete="off"
-          className="mt-1"
-          data-testid="site-wp-user"
-        />
-      </div>
+      <div
+        id="credentials-section"
+        ref={credentialsSectionRef}
+        className="space-y-4"
+      >
+        <div>
+          <label
+            htmlFor="edit-site-wp-user"
+            className="block text-sm font-medium"
+          >
+            WordPress username
+          </label>
+          <Input
+            id="edit-site-wp-user"
+            required
+            maxLength={100}
+            value={form.wp_user}
+            onChange={(e) => setField("wp_user", e.target.value)}
+            disabled={submitting}
+            autoComplete="off"
+            className="mt-1"
+            data-testid="site-wp-user"
+            ref={wpUserInputRef}
+          />
+        </div>
 
       <div>
         <label
@@ -371,6 +398,7 @@ export function SiteEditForm({
           result={testResult}
           matchesCurrent={testPassedForCurrent}
         />
+      </div>
       </div>
 
       {submitError && (

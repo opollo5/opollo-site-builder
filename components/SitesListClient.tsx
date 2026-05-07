@@ -5,21 +5,30 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 
 import { MenuProvider } from "@/components/SiteActionsMenu";
+import { SitesFilterChips } from "@/components/SitesFilterChips";
 import { SitesTable } from "@/components/SitesTable";
 import { Button } from "@/components/ui/button";
 import { H1, Lead } from "@/components/ui/typography";
+import type { SiteSortColumn, SiteSortDir, ListSitesOptions } from "@/lib/sites";
 import type { SiteListItem } from "@/lib/tool-schemas";
 
 // Client island for /admin/sites. The server component renders the
-// initial list; this shell owns the "Add new site" CTA.
-//
-// AUTH-FOUNDATION P2.2: the modal-based AddSiteModal flow was
-// replaced with a single-page guided form at /admin/sites/new (the
-// guided flow needs the test-connection round-trip + capability
-// check, which doesn't fit the snappy modal pattern). The "New site"
-// button is now a Link.
+// initial list; this shell owns the "Add new site" CTA, the filter
+// chip row, and threads sort/filter URL state through to SitesTable.
 
-export function SitesListClient({ sites }: { sites: SiteListItem[] }) {
+export function SitesListClient({
+  sites,
+  filter,
+  sort,
+  dir,
+  isSuperAdmin,
+}: {
+  sites: SiteListItem[];
+  filter: ListSitesOptions["status"];
+  sort: SiteSortColumn | null;
+  dir: SiteSortDir | null;
+  isSuperAdmin: boolean;
+}) {
   const router = useRouter();
 
   return (
@@ -42,9 +51,17 @@ export function SitesListClient({ sites }: { sites: SiteListItem[] }) {
       </div>
 
       <div className="mt-4">
+        <SitesFilterChips activeFilter={filter} sort={sort} dir={dir} />
+      </div>
+
+      <div className="mt-4">
         <MenuProvider>
           <SitesTable
             sites={sites}
+            sort={sort}
+            dir={dir}
+            filter={filter}
+            isSuperAdmin={isSuperAdmin}
             onCreateClick={() => router.push("/admin/sites/new")}
           />
         </MenuProvider>
