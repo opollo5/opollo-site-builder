@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { Button } from "@/components/ui/button";
+import { Kbd } from "@/components/ui/kbd";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -394,12 +395,7 @@ Body of second post.`}
           aria-hidden
           className="hidden items-center gap-0.5 text-sm text-muted-foreground sm:inline-flex"
         >
-          <kbd className="rounded border bg-muted px-1 font-mono text-xs">
-            ⌘
-          </kbd>
-          <kbd className="rounded border bg-muted px-1 font-mono text-xs">
-            ↵
-          </kbd>
+          <Kbd keys={["mod", "enter"]} />
         </span>
         <Button
           type="button"

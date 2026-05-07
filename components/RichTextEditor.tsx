@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useModKey } from "@/lib/hooks/use-platform";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -52,6 +53,9 @@ export function RichTextEditor({
 }: RichTextEditorProps) {
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const linkInputRef = useRef<HTMLInputElement>(null);
+  const mod = useModKey();
+  // Shift glyph kept on Mac, "Shift+" elsewhere. Joined with "+" on non-Mac.
+  const shiftZ = mod === "⌘" ? "⇧Z" : "+Shift+Z";
 
   const editor = useEditor({
     extensions: [
@@ -112,14 +116,14 @@ export function RichTextEditor({
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleBold().run()}
           active={editor?.isActive("bold")}
-          title="Bold (⌘B)"
+          title={`Bold (${mod}${mod === "⌘" ? "B" : "+B"})`}
         >
           <NavIcon name="bold" size={14} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleItalic().run()}
           active={editor?.isActive("italic")}
-          title="Italic (⌘I)"
+          title={`Italic (${mod}${mod === "⌘" ? "I" : "+I"})`}
         >
           <NavIcon name="italic" size={14} />
         </ToolbarButton>
@@ -185,14 +189,14 @@ export function RichTextEditor({
         <ToolbarButton
           onClick={() => editor?.chain().focus().undo().run()}
           disabled={!editor?.can().undo()}
-          title="Undo (⌘Z)"
+          title={`Undo (${mod}${mod === "⌘" ? "Z" : "+Z"})`}
         >
           <NavIcon name="undo" size={14} />
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().redo().run()}
           disabled={!editor?.can().redo()}
-          title="Redo (⌘⇧Z)"
+          title={`Redo (${mod}${shiftZ})`}
         >
           <NavIcon name="redo" size={14} />
         </ToolbarButton>
