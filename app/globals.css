@@ -384,3 +384,45 @@
   font-size: 1rem;
   line-height: 1.5;
 }
+
+/* ---------------------------------------------------------------------------
+ * Page heading scale — Spec 02.
+ *
+ * Typographic ceiling on top of the body/helper floor above. Used by
+ * the PageHeader / PageShell primitives and (per Spec 02 §1.4) by
+ * card titles + section headers across the admin surface.
+ *
+ * Mapping:
+ *   .text-page-title    → PageHeader.Title
+ *   .text-section-title → card titles, section headers within a page
+ *   .text-subsection    → subsections within cards (e.g. blog-styling
+ *                          section sub-headings in the extract wizard)
+ *
+ * Mobile: page title scales down to 24px under 640px.
+ * ------------------------------------------------------------------------- */
+
+.text-page-title {
+  font-size: 28px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.text-section-title {
+  font-size: 20px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.text-subsection {
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .text-page-title {
+    font-size: 24px;
+  }
+}
