@@ -17,6 +17,7 @@ import {
   sendInvitation,
 } from "@/lib/platform/invitations";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     "manage_invitations",
   );
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("invite", `user:${gate.userId}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   // Look up the company record for the email body. Service-role bypasses
   // RLS — the gate above already authorised access to this companyId.
