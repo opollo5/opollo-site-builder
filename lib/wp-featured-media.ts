@@ -39,6 +39,21 @@ export interface UploadFeaturedMediaInput {
   filename?: string | null;
   /** Stable marker WP persists as the file title; lets re-publish recover via search. */
   marker: string;
+  /**
+   * Spec 09 — SEO-friendly filename built from the post title + a
+   * collision-resistant short hash. When supplied, overrides the
+   * `${marker}.${ext}` filename used for the multipart upload. The
+   * extension still comes from the Cloudflare-fetched payload so the
+   * caller doesn't need to know the source MIME type.
+   */
+  uploadFilename?: string | null;
+  /**
+   * Spec 09 — alt text + WP-side title for the uploaded media. Set via a
+   * follow-up PATCH (WP REST `multipart` doesn't accept `alt_text` on
+   * the initial upload). PATCH failure is logged and swallowed so the
+   * publish itself doesn't fail just because metadata didn't stick.
+   */
+  altText?: string | null;
 }
 
 export interface UploadedMediaResult {
@@ -98,11 +113,14 @@ export async function uploadFeaturedMedia(
   const { bytes, mimeType, filename: cfFilename } = await fetchCloudflareBytes(
     input.cloudflareId,
   );
-  // Use the stable marker as the filename so re-publish + WP-side
-  // search can find the existing media without a separate metadata
-  // round-trip.
   const ext = (cfFilename.split(".").pop() ?? "jpg").toLowerCase();
-  const filename = `${input.marker}.${ext}`;
+  // Spec 09: prefer the SEO-friendly filename when supplied; otherwise
+  // fall back to `${marker}.${ext}` for backwards-compat with brief-runner
+  // posts that don't go through the new pipeline yet.
+  const filename =
+    input.uploadFilename && input.uploadFilename.trim().length > 0
+      ? input.uploadFilename.trim()
+      : `${input.marker}.${ext}`;
 
   const ab = new ArrayBuffer(bytes.byteLength);
   new Uint8Array(ab).set(new Uint8Array(bytes));
@@ -179,8 +197,50 @@ export async function uploadFeaturedMedia(
       false,
     );
   }
+
+  // Spec 09 — set alt_text + title via PATCH /media/{id} when provided.
+  // Soft failure: log and continue. The featured media is already
+  // attached to the post; missing alt text is a SEO regression but not
+  // a publish blocker.
+  if (input.altText && input.altText.trim().length > 0) {
+    await patchMediaMetadata(cfg, obj.id, input.altText.trim());
+  }
+
   return {
     wp_media_id: obj.id,
     source_url: typeof obj.source_url === "string" ? obj.source_url : "",
   };
+}
+
+async function patchMediaMetadata(
+  cfg: WpConfig,
+  mediaId: number,
+  altText: string,
+): Promise<void> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${cfg.baseUrl}/wp-json/wp/v2/media/${mediaId}`, {
+      method: "POST", // WP REST accepts POST for partial update; PATCH is also valid.
+      headers: {
+        Authorization: basicAuthHeader(cfg.user, cfg.appPassword),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ alt_text: altText, title: altText }),
+      signal: ctrl.signal,
+    });
+    if (!res.ok) {
+      logger.warn("wp.featured_media.alt_text_patch_failed", {
+        media_id: mediaId,
+        status: res.status,
+      });
+    }
+  } catch (err) {
+    logger.warn("wp.featured_media.alt_text_patch_error", {
+      media_id: mediaId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 }

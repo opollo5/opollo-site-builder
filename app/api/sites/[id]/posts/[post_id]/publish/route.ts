@@ -27,6 +27,8 @@ import {
   uploadFeaturedMedia,
   WpFeaturedMediaError,
 } from "@/lib/wp-featured-media";
+import { deriveAltText } from "@/lib/seo/alt-text";
+import { generateImageFilename } from "@/lib/utils/slugify";
 
 // ---------------------------------------------------------------------------
 // M13-4 — POST /api/sites/[id]/posts/[post_id]/publish
@@ -202,7 +204,7 @@ export async function POST(
   if (!siteRes.ok) {
     return envelope(siteRes.error.code, siteRes.error.message, 500);
   }
-  const siteRow = siteRes.data.site as { wp_url: string };
+  const siteRow = siteRes.data.site as { wp_url: string; name: string | null };
   const creds = siteRes.data.credentials;
   if (!creds) {
     return envelope(
@@ -252,11 +254,40 @@ export async function POST(
       );
     }
     const marker = `opollo-post-${post.id.replace(/-/g, "")}`;
+    // Spec 09 — derive SEO-friendly filename + alt text from post / site
+    // context. Featured image is index 0; user-provided alt text on the
+    // image library row would override this if present, but the featured
+    // pipeline doesn't surface that today (markdown body images are
+    // separate). Falls back gracefully when SEO title or site name is
+    // empty.
+    const metaObjForAlt =
+      post.metadata !== null &&
+      typeof post.metadata === "object" &&
+      !Array.isArray(post.metadata)
+        ? (post.metadata as Record<string, unknown>)
+        : {};
+    const seoTitleForAlt =
+      typeof metaObjForAlt.meta_title_override === "string"
+        ? metaObjForAlt.meta_title_override
+        : null;
+    const altText = deriveAltText({
+      seoTitle: seoTitleForAlt,
+      siteName: siteRow.name,
+      postTitleFallback: post.title,
+    });
+    const uploadFilename = generateImageFilename(
+      post.title,
+      (imgRes.data.filename as string | null) ?? null,
+      0,
+      post.id,
+    );
     try {
       const uploaded = await uploadFeaturedMedia(cfg, {
         cloudflareId: imgRes.data.cloudflare_id as string,
         filename: (imgRes.data.filename as string | null) ?? null,
         marker,
+        uploadFilename,
+        altText,
       });
       featuredMediaId = uploaded.wp_media_id;
       stampedFeaturedMedia = true;
