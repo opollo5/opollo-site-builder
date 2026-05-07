@@ -92,6 +92,7 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
         <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-3 py-2 font-medium">Name</th>
+            <th className="px-3 py-2 font-medium">Company</th>
             <th className="px-3 py-2 font-medium">WP URL</th>
             <th className="px-3 py-2 font-medium">Status</th>
             <th className="px-3 py-2 font-medium">Updated</th>
@@ -112,6 +113,11 @@ export function SitesTable({ sites, onCreateClick }: SitesTableProps) {
                 >
                   {s.name}
                 </Link>
+              </td>
+              <td className="px-3 py-2 text-sm text-muted-foreground">
+                {s.company_name ?? (
+                  <span className="italic text-destructive/70">Unassigned</span>
+                )}
               </td>
               <td className="px-3 py-2 text-muted-foreground">
                 <a

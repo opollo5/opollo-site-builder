@@ -34,10 +34,19 @@ export type CompanyPendingInvitation = {
   created_at: string;
 };
 
+export type CompanyStats = {
+  member_count: number;
+  social_connection_count: number;
+  pending_post_count: number;
+  approved_post_count: number;
+  published_post_count: number;
+};
+
 export type CompanyDetail = {
   company: PlatformCompany;
   members: CompanyMember[];
   pending_invitations: CompanyPendingInvitation[];
+  stats: CompanyStats;
 };
 
 const UUID_RE =
@@ -61,9 +70,8 @@ export async function getPlatformCompany(
 
   const svc = getServiceRoleClient();
 
-  // Three queries in parallel: company, members (joined to platform_users
-  // for email + name), pending invitations.
-  const [companyResult, membersResult, invitationsResult] = await Promise.all([
+  // Five queries in parallel: company, members, pending invitations, social connections, post counts.
+  const [companyResult, membersResult, invitationsResult, connectionsResult, postsResult] = await Promise.all([
     svc
       .from("platform_companies")
       .select(
@@ -84,6 +92,17 @@ export async function getPlatformCompany(
       .eq("company_id", id)
       .eq("status", "pending")
       .order("created_at", { ascending: false }),
+    svc
+      .from("social_connections")
+      .select("id", { count: "exact", head: true })
+      .eq("company_id", id)
+      .is("deleted_at", null),
+    svc
+      .from("social_post_master")
+      .select("state", { count: "exact" })
+      .eq("company_id", id)
+      .is("deleted_at", null)
+      .in("state", ["pending_approval", "approved", "published"]),
   ]);
 
   if (companyResult.error) {
@@ -121,6 +140,12 @@ export async function getPlatformCompany(
       `Failed to load invitations: ${invitationsResult.error.message}`,
     );
   }
+  // Stats queries are non-fatal — degrade gracefully if they fail.
+  const connectionCount = connectionsResult.error ? 0 : (connectionsResult.count ?? 0);
+  const allPosts = postsResult.error ? [] : (postsResult.data ?? []);
+  const pendingPostCount = allPosts.filter((p) => (p as { state: string }).state === "pending_approval").length;
+  const approvedPostCount = allPosts.filter((p) => (p as { state: string }).state === "approved").length;
+  const publishedPostCount = allPosts.filter((p) => (p as { state: string }).state === "published").length;
 
   // Resolve member emails + names via a single follow-up query keyed by
   // user_id (no embed → no PGRST ambiguity).
@@ -176,6 +201,13 @@ export async function getPlatformCompany(
       company: companyResult.data as PlatformCompany,
       members,
       pending_invitations: pending,
+      stats: {
+        member_count: members.length,
+        social_connection_count: connectionCount,
+        pending_post_count: pendingPostCount,
+        approved_post_count: approvedPostCount,
+        published_post_count: publishedPostCount,
+      },
     },
     timestamp: new Date().toISOString(),
   };

@@ -6,5 +6,6 @@ export type {
   CompanyDetail,
   CompanyMember,
   CompanyPendingInvitation,
+  CompanyStats,
 } from "./get";
 export type { PlatformCompany, PlatformCompanyListItem } from "./types";
