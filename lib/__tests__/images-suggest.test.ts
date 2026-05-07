@@ -106,10 +106,10 @@ async function seedImages(): Promise<void> {
   expect(createdImageIds.length).toBe(SEEDED_IMAGES.length);
 }
 
+// Persist a deterministic mock embedding for one seeded image so cosine
+// similarity is meaningful when the route's mocked embedText returns a
+// vector for similar text.
 async function setEmbedding(id: string, source: string): Promise<void> {
-  // Compute the deterministic mock embedding for this image's "source"
-  // string and persist it. This lets us verify the route returns the
-  // semantically-closest image when we query with a similar string.
   const seed = source
     .split("")
     .reduce((h, c) => Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0, 2166136261);
