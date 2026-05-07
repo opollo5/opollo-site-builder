@@ -18,6 +18,7 @@
     "test:e2e:update-snapshots": "playwright test --update-snapshots",
     "screenshots": "RUN_SCREENSHOTS=1 playwright test screenshots.spec.ts",
     "audit:static": "tsx scripts/audit.ts",
+    "backfill:image-embeddings": "tsx scripts/backfill-image-embeddings.ts",
     "gen:types": "supabase gen types typescript --local > types/supabase.ts",
     "analyze": "ANALYZE=true next build",
     "prepare": "husky"
