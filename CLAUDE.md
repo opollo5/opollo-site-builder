@@ -6,9 +6,11 @@ A chat interface that generates WordPress pages for Opollo's clients.
 
 ## How to work
 - Work autonomously. Don't ask for permission for normal coding tasks.
+- **Docs index:** `docs/README.md` is the navigable map of the docs/ tree — consult it first when you need to find a document.
 - **Before starting a task that matches a pattern, read `docs/patterns/<pattern-name>.md` first.** The patterns folder is the playbook for recurring shapes — files, tests, PR structure, known pitfalls. If no pattern matches, proceed from first principles and note whether the task is a candidate for a new pattern.
-- **For operations tasks** (deploy rollback, key rotation, stuck incident, missing migration, env-var provisioning) — consult `docs/RUNBOOK.md` before acting. Do not freelance on destructive or irreversible operations.
-- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline, secret-handling discipline) — see `docs/RULES.md`. Each rule has the incident that taught it.
+- **For operations tasks** (deploy rollback, key rotation, stuck incident, missing migration, env-var provisioning) — consult `docs/runbooks/RUNBOOK.md` before acting. Do not freelance on destructive or irreversible operations.
+- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline, secret-handling discipline) — see `docs/architecture/RULES.md`. Each rule has the incident that taught it.
+- **Spec brief preservation:** when Steven pastes a spec into a new session, save it immediately to `docs/specs/<NN>-<slug>.md` before starting work. A spec living only in the conversation context is lost when context rolls. If no spec file yet exists, write it from the pasted text before opening the first PR.
 - After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
 - When reporting back, give me a one-paragraph summary, not a blow-by-blow.
 - After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
@@ -120,7 +122,7 @@ A plan without a populated "Risks identified and mitigated" section is not ready
 - `npm run test` — Vitest
 - `npm run test:coverage` — Vitest with V8 coverage (60% line / 55% branch baseline)
 - `npm run test:e2e` — Playwright (requires `supabase start`)
-- `npm run audit:static` — static-analysis script (`scripts/audit.ts`) catching middleware/auth/db/migration/typography/env-var/error-handling/dead-route class errors before runtime. **HIGH severity gates CI.** Per `docs/RULES.md` rule #8 — see also the PLATFORM-AUDIT workstream PRs (#386, #389, #392, #394, #396, #398, #400, #402).
+- `npm run audit:static` — static-analysis script (`scripts/audit.ts`) catching middleware/auth/db/migration/typography/env-var/error-handling/dead-route class errors before runtime. **HIGH severity gates CI.** Per `docs/architecture/RULES.md` rule #8 — see also the PLATFORM-AUDIT workstream PRs (#386, #389, #392, #394, #396, #398, #400, #402).
 - `npm run analyze` — production build with @next/bundle-analyzer reports
 
 ## DX hygiene
@@ -219,8 +221,8 @@ flash blank on first paint.
 - Don't loop me in on routine errors — fix and retry
 - Do loop me in on design decisions or scope questions
 - Keep PRs small enough to review in 5 minutes
-- **RUNBOOK is load-bearing for incident response. Code that changes a blocker code, audit event name, or error envelope MUST update the matching `docs/RUNBOOK.md` entry in the same PR.**
-- **Never print env-var values or connection strings to tool output.** Any command that reads from `.env.local`, env, or another secret source runs with `2>$null` (PowerShell) / `2>/dev/null` (bash). Pass values via variables — never inline them into the visible command, never `Write-Output`/`Write-Host`/`echo` them, never paste a connection string into a chat update. If you need to confirm a value is set, print only its length or a hash prefix. Tool output that surfaces a secret (CLI parse errors, `--debug` flags, verbose logs) gets piped through a redactor before it reaches the conversation. Full rule + incident: `docs/RULES.md` #9.
+- **RUNBOOK is load-bearing for incident response. Code that changes a blocker code, audit event name, or error envelope MUST update the matching `docs/runbooks/RUNBOOK.md` entry in the same PR.**
+- **Never print env-var values or connection strings to tool output.** Any command that reads from `.env.local`, env, or another secret source runs with `2>$null` (PowerShell) / `2>/dev/null` (bash). Pass values via variables — never inline them into the visible command, never `Write-Output`/`Write-Host`/`echo` them, never paste a connection string into a chat update. If you need to confirm a value is set, print only its length or a hash prefix. Tool output that surfaces a secret (CLI parse errors, `--debug` flags, verbose logs) gets piped through a redactor before it reaches the conversation. Full rule + incident: `docs/architecture/RULES.md` #9.
 
 ## Performance standards
 - **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`
@@ -239,17 +241,17 @@ flash blank on first paint.
 ## Data + AI conventions
 Lives in dedicated docs so this file doesn't sprawl:
 
-- `docs/DATA_CONVENTIONS.md` — soft-delete (`deleted_at` + `deleted_by`),
+- `docs/architecture/DATA_CONVENTIONS.md` — soft-delete (`deleted_at` + `deleted_by`),
   audit columns (`created_at` / `updated_at` / `created_by` / `updated_by`),
   `version_lock` for optimistic concurrency, `supabase/data-migrations/`
   contract. Forward-facing; existing tables fold in on the next natural
   migration.
-- `docs/PROMPT_VERSIONING.md` — `lib/prompts/vN/` layout, per-version
+- `docs/architecture/PROMPT_VERSIONING.md` — `lib/prompts/vN/` layout, per-version
   immutability, eval harness under `__evals__/`, prompt injection
   defense via tagged inputs, per-tenant cost budgets spec, Langfuse
   integration. Cutover is its own sub-slice (blocked on
   `LANGFUSE_*` env provisioning for the shipping path).
-- `docs/RUNBOOK.md` — on-call playbook: deploy rollback, auth
+- `docs/runbooks/RUNBOOK.md` — on-call playbook: deploy rollback, auth
   break-glass, batch cancellation, WP publish failures, Supabase
   quota, security incident response.
 
