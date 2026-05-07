@@ -55,6 +55,157 @@ interface SiteContextRow {
   extracted_css_classes: Record<string, unknown> | null;
 }
 
+// Spec 03 PR 3 — operator-calibrated blog content classes injected
+// alongside <existing_theme_context> for content_type='post' runs on
+// copy_existing sites. Stored on extracted_design.blog_styling.
+interface BlogStylingRow {
+  source_blog_urls?: string[];
+  article_container?: string | null;
+  paragraph?: string | null;
+  link_in_body?: string | null;
+  blockquote?: string | null;
+  unordered_list?: string | null;
+  ordered_list?: string | null;
+  list_item?: string | null;
+  figure?: string | null;
+  figcaption?: string | null;
+  code_inline?: string | null;
+  code_block?: string | null;
+  hr?: string | null;
+  article_h2?: string | null;
+  article_h3?: string | null;
+  article_h4?: string | null;
+}
+
+const BLOG_BUCKET_FALLBACK_TAGS: Record<keyof BlogStylingRow, string> = {
+  source_blog_urls: "",
+  article_container: "<article>",
+  paragraph: "<p>",
+  link_in_body: "",
+  blockquote: "<blockquote>",
+  unordered_list: "<ul>",
+  ordered_list: "<ol>",
+  list_item: "<li>",
+  figure: "<figure>",
+  figcaption: "<figcaption>",
+  code_inline: "<code>",
+  code_block: "<pre><code>",
+  hr: "<hr>",
+  article_h2: "<h2>",
+  article_h3: "<h3>",
+  article_h4: "<h4>",
+};
+
+function renderBlogClassLine(
+  key: keyof BlogStylingRow,
+  value: string | null | undefined,
+): string {
+  if (key === "source_blog_urls") return "";
+  if (typeof value === "string" && value.length > 0) {
+    return `${key}: .${value}`;
+  }
+  if (key === "link_in_body") {
+    return `${key}: (none)`;
+  }
+  const fallbackTag = BLOG_BUCKET_FALLBACK_TAGS[key];
+  return `${key}: (none — use plain ${fallbackTag})`;
+}
+
+function renderBlogContentClassesBlock(blog: BlogStylingRow): string {
+  const orderedKeys: Array<keyof BlogStylingRow> = [
+    "article_container",
+    "paragraph",
+    "link_in_body",
+    "blockquote",
+    "unordered_list",
+    "ordered_list",
+    "list_item",
+    "figure",
+    "figcaption",
+    "code_inline",
+    "code_block",
+    "hr",
+    "article_h2",
+    "article_h3",
+    "article_h4",
+  ];
+  const lines: string[] = [
+    "<blog_content_classes>",
+    "When generating blog post content (long-form articles), use these existing CSS classes",
+    "on the matching elements. Drop the `.` prefix when applying as className. If a bucket",
+    "is null, fall back to plain semantic tags without a class.",
+    "",
+  ];
+  for (const key of orderedKeys) {
+    const value = blog[key];
+    lines.push(renderBlogClassLine(key, value as string | null | undefined));
+  }
+  lines.push("");
+  lines.push(
+    "These classes were extracted from your existing blog posts. Use them verbatim — do",
+  );
+  lines.push(
+    "not invent variants. Do not introduce inline CSS for elements that have a class above.",
+  );
+  lines.push("</blog_content_classes>");
+  return lines.join("\n");
+}
+
+function blogStylingHasUsableData(
+  blog: BlogStylingRow | null | undefined,
+): blog is BlogStylingRow {
+  if (!blog || typeof blog !== "object") return false;
+  if (
+    Array.isArray(blog.source_blog_urls) &&
+    blog.source_blog_urls.length === 0
+  ) {
+    // Operator submitted but extraction produced nothing — bucket
+    // values still count if any were filled in manually.
+    const bucketKeys: Array<keyof BlogStylingRow> = [
+      "article_container",
+      "paragraph",
+      "link_in_body",
+      "blockquote",
+      "unordered_list",
+      "ordered_list",
+      "list_item",
+      "figure",
+      "figcaption",
+      "code_inline",
+      "code_block",
+      "hr",
+      "article_h2",
+      "article_h3",
+      "article_h4",
+    ];
+    return bucketKeys.some(
+      (k) => typeof blog[k] === "string" && (blog[k] as string).length > 0,
+    );
+  }
+  if (!Array.isArray(blog.source_blog_urls)) return false;
+  // At least one bucket must have a non-null value to be useful.
+  const bucketKeys: Array<keyof BlogStylingRow> = [
+    "article_container",
+    "paragraph",
+    "link_in_body",
+    "blockquote",
+    "unordered_list",
+    "ordered_list",
+    "list_item",
+    "figure",
+    "figcaption",
+    "code_inline",
+    "code_block",
+    "hr",
+    "article_h2",
+    "article_h3",
+    "article_h4",
+  ];
+  return bucketKeys.some(
+    (k) => typeof blog[k] === "string" && (blog[k] as string).length > 0,
+  );
+}
+
 export async function loadSiteDesignContext(
   siteId: string,
 ): Promise<SiteContextRow | null> {
@@ -115,13 +266,17 @@ function samplesBlock(tone: Record<string, unknown>): string {
   return out.join("\n");
 }
 
-function renderCopyExistingInjection(row: SiteContextRow): string {
+function renderCopyExistingInjection(
+  row: SiteContextRow,
+  contentType?: "post" | "page",
+): string {
   const design = (row.extracted_design ?? null) as
     | {
         colors?: Record<string, string | null>;
         fonts?: Record<string, string | null>;
         layout_density?: string | null;
         visual_tone?: string | null;
+        blog_styling?: BlogStylingRow | null;
       }
     | null;
   const classes = (row.extracted_css_classes ?? null) as
@@ -192,17 +347,33 @@ function renderCopyExistingInjection(row: SiteContextRow): string {
     "If a bucket above is missing, fall back to plain semantic tags without a class.",
   );
   lines.push("</existing_theme_context>");
+
+  // Spec 03 PR 3 — append <blog_content_classes> for content_type='post'
+  // runs only, alongside (not instead of) the landing-page block.
+  // Pages still need landing-page class context; posts need both.
+  if (
+    contentType === "post" &&
+    design?.blog_styling &&
+    blogStylingHasUsableData(design.blog_styling)
+  ) {
+    const blogBlock = renderBlogContentClassesBlock(design.blog_styling);
+    return `${lines.join("\n")}\n${blogBlock}`;
+  }
+
   return lines.join("\n");
 }
 
-export function renderInjection(row: SiteContextRow | null): string {
+export function renderInjection(
+  row: SiteContextRow | null,
+  contentType?: "post" | "page",
+): string {
   if (!row) return "";
 
   // copy_existing pathway runs regardless of DESIGN_CONTEXT_ENABLED —
   // it's gated by site_mode itself, which is only set after the
   // operator opts in via /onboarding.
   if (row.site_mode === "copy_existing") {
-    return renderCopyExistingInjection(row) + "\n\n";
+    return renderCopyExistingInjection(row, contentType) + "\n\n";
   }
 
   // new_design pathway — preserve the original DESIGN-DISCOVERY
@@ -271,17 +442,20 @@ export function renderInjection(row: SiteContextRow | null): string {
 // Returns "" on early exit so callers don't have to pre-check.
 export async function buildDesignContextPrefix(
   siteId: string,
+  contentType?: "post" | "page",
 ): Promise<string> {
   const row = await loadSiteDesignContext(siteId);
   if (!row) return "";
-  if (row.site_mode === "copy_existing") return renderInjection(row);
+  if (row.site_mode === "copy_existing") {
+    return renderInjection(row, contentType);
+  }
   if (row.site_mode === "new_design") {
     if (!isDesignContextEnabled()) return "";
-    return renderInjection(row);
+    return renderInjection(row, contentType);
   }
   // site_mode IS NULL — preserve the pre-PR-10 fallback exactly so a
   // half-onboarded site doesn't suddenly start pulling discovery
   // context.
   if (!isDesignContextEnabled()) return "";
-  return renderInjection(row);
+  return renderInjection(row, contentType);
 }
