@@ -1407,11 +1407,8 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
         onSelect={(image) => setFeaturedImage(image)}
-        suggestionContext={
-          title.value.trim().length > 0 || !isEditorEmpty(composerValue.text)
-            ? `${title.value} ${title.value} ${title.value} ${composerValue.text.replace(/<[^>]+>/g, " ").slice(0, 400)}`.trim()
-            : null
-        }
+        suggestionTitle={title.value}
+        suggestionBody={composerValue.text.replace(/<[^>]+>/g, " ")}
       />
     </form>
   );
