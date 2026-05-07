@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H1 } from "@/components/ui/typography";
 import type { PostDetail } from "@/lib/posts";
@@ -215,17 +216,15 @@ export function PostDetailClient({
             </Button>
           )}
           {canPublish && (
-            <Button
+            <LoadingButton
               type="button"
               onClick={handlePublish}
-              disabled={actionState !== "idle"}
+              disabled={actionState !== "idle" && actionState !== "publishing"}
+              loading={actionState === "publishing"}
+              loadingText="Publishing…"
             >
-              {actionState === "publishing"
-                ? "Publishing…"
-                : post.wp_post_id
-                  ? "Re-publish to WP"
-                  : "Publish to WP"}
-            </Button>
+              {post.wp_post_id ? "Re-publish to WP" : "Publish to WP"}
+            </LoadingButton>
           )}
           {canUnpublish && (
             <Button

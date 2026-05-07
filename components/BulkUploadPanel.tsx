@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Button } from "@/components/ui/button";
 import { Kbd } from "@/components/ui/kbd";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -397,18 +398,18 @@ Body of second post.`}
         >
           <Kbd keys={["mod", "enter"]} />
         </span>
-        <Button
+        <LoadingButton
           type="button"
           onClick={() => void runPublish()}
-          disabled={running || acceptedCount === 0 || summary.runnable === 0}
+          disabled={acceptedCount === 0 || summary.runnable === 0}
+          loading={running}
+          loadingText={`Saving ${summary.runningIndex}/${summary.runnable}…`}
           data-testid="bulk-publish-button"
         >
-          {running
-            ? `Saving ${summary.runningIndex}/${summary.runnable}…`
-            : summary.runnable === 0 && summary.savedCount > 0
-              ? "All saved"
-              : `Save ${summary.runnable} draft${summary.runnable === 1 ? "" : "s"}`}
-        </Button>
+          {summary.runnable === 0 && summary.savedCount > 0
+            ? "All saved"
+            : `Save ${summary.runnable} draft${summary.runnable === 1 ? "" : "s"}`}
+        </LoadingButton>
       </div>
     </div>
   );
