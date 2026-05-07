@@ -80,3 +80,19 @@ Vitest + Playwright suites added per spec but not run locally — ARCH §14.1 do
 ## Run-log file metadata
 
 Final summary written by the autonomous spec runner; PRs all auto-squash-merged via `gh pr merge --auto --squash` per the project's main-branch protection settings.
+
+---
+
+# Spec autonomous-run log — 2026-05-08
+
+Spec 04 — PageHeader slot-order flip + polish + complete migration.
+
+| Spec | PR # | Title | Branch | Commit on main | State |
+|---|---|---|---|---|---|
+| 04 | TBD (PR A) | Slot-order flip + polish + rhythm + exempt allowlist | feat/spec04-pr-a-page-header-flip | TBD | TBD |
+| 04 | TBD (PR B) | Migrate batch 1 | feat/spec04-pr-b-migrate-batch-1 | TBD | TBD |
+| 04 | TBD (PR C) | Migrate batch 2 | feat/spec04-pr-c-migrate-batch-2 | TBD | TBD |
+| 04 | TBD (PR D) | Migrate batch 3 | feat/spec04-pr-d-migrate-batch-3 | TBD | TBD |
+| 04 | TBD (PR E) | Final routes + drain `PAGE_HEADER_DEFERRED_ROUTES` to [] | feat/spec04-pr-e-migrate-final | TBD | TBD |
+
+(Filled in as each PR squash-merges.)

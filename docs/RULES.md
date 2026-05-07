@@ -80,9 +80,14 @@ Sort: strongest "if you skip this, production breaks" signal at the top.
 
 ## 10. Admin pages use the shared PageHeader primitive
 
-**Rule.** All authenticated admin pages must use the shared PageHeader component to ensure consistent typographic hierarchy and breadcrumb structure across the platform. Concretely: every `app/admin/**/page.tsx` and `app/account/**/page.tsx` file MUST `import { PageHeader } from "@/components/ui/page-header"` and render its compound slots (`<PageHeader.Breadcrumb>`, `<PageHeader.Title>`, optional Subtitle / Meta / Actions) in the component tree. Audit script `headings-use-page-header` (HIGH) enforces presence at PR time. New admin / account pages join the rule by default; the deferred-routes allowlist in `scripts/audit.ts` (`PAGE_HEADER_DEFERRED_ROUTES`) carries the legacy routes from PR 2's partial sweep — entries get removed as each route is migrated.
+**Rule.** All authenticated admin pages must use the shared PageHeader component to ensure consistent typographic hierarchy and breadcrumb structure across the platform. Concretely: every `app/admin/**/page.tsx` and `app/account/**/page.tsx` file MUST `import { PageHeader } from "@/components/ui/page-header"` and render its compound slots (`<PageHeader.Title>`, `<PageHeader.Breadcrumb>`, optional Subtitle / Meta / Actions) in the component tree. Slot order is enforced by the component (Title → Breadcrumb → Subtitle → Meta → Actions; Spec 04 amendment, 2026-05-08), so the JSX child order does not matter. Audit script `headings-use-page-header` (HIGH) enforces presence at PR time.
 
-**Incident (Spec 02, 2026-05-07).** PageHeader / PageShell / Breadcrumb landed in PR 1 of Spec 02. PR 2 swept the top 8 operator-traffic routes (sites list, site detail edit, onboarding, setup, setup/extract, posts, settings); the remaining 29 admin routes plus 2 account routes are deferred to a follow-up sweep (see `docs/specs/_blockers.md`). Audit rule lands in PR 3 with the deferred allowlist so the rule starts firing as soon as the follow-up migrates each route.
+There are TWO allowlists in `scripts/audit.ts`:
+
+- `PAGE_HEADER_DEFERRED_ROUTES` is **temporary** — routes pending migration. Entries get removed as each route adopts PageHeader. Should reach `[]` when Spec 04 completes. New entries here = regression — don't add.
+- `PAGE_HEADER_EXEMPT_ROUTES` is **permanent** — routes that legitimately can't fit PageHeader (full-bleed editor, modal-style page, custom chrome that doesn't pair with the shell). Each entry must include a comment explaining why. The bar is high; default is migrate.
+
+**Incident (Spec 02, 2026-05-07; amended Spec 04, 2026-05-08).** PageHeader / PageShell / Breadcrumb landed in PR 1 of Spec 02. PR 2 swept the top 8 operator-traffic routes; 31 routes deferred via `PAGE_HEADER_DEFERRED_ROUTES`. Audit rule lands in PR 3 with the allowlist so the rule starts firing as soon as the follow-up migrates each route. Spec 04 (2026-05-08) flipped the slot order, applied the polish pass (rhythm + weight 700), and completes the deferred sweep — `PAGE_HEADER_DEFERRED_ROUTES` drains to `[]` by the end of Spec 04. The permanent `PAGE_HEADER_EXEMPT_ROUTES` list lands in Spec 04 PR A as a separate, narrower escape hatch.
 
 ---
 

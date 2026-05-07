@@ -6,27 +6,35 @@ import {
 } from "@/components/ui/breadcrumb";
 import { cn } from "@/lib/utils";
 
-// Spec 02 §1.1 — PageHeader compound component.
+// Spec 02 §1.1 + Spec 04 (2026-05-08) — PageHeader compound component.
 //
 // Compound layout (visual order is enforced regardless of JSX order):
 //
-//   ┌──────────────────────────────────────────────────────┐
-//   │ Admin › Sites › Test Site 2                         │  Breadcrumb (text-sm muted)
-//   │                                                      │
-//   │ Test Site 2                       [Run Batch]        │  Title row + Actions right-aligned
-//   │ Optional one-line description.                       │  Subtitle (text-base muted)
-//   │ ● Active · https://test2... · Tested 2h ago         │  Meta row (small inline items)
-//   └──────────────────────────────────────────────────────┘
+//   ┌──────────────────────────────────────────────────────────┐
+//   │ Test Site 2                              [Run Batch]     │  Title row · Actions right-aligned, vertically centered
+//   │   ↑ 20px gap                                              │
+//   │ Admin › Sites › Test Site 2                              │  Breadcrumb (text-sm muted)
+//   │   ↑ 8px gap (or 20px from title if breadcrumb absent)    │
+//   │ Optional one-line description.                            │  Subtitle (text-base muted)
+//   │   ↑ 12px gap                                              │
+//   │ ● Active · https://test2... · Tested 2h ago             │  Meta row (text-sm muted, inline)
+//   └──────────────────────────────────────────────────────────┘
 //                       [32px gap to PageShell.Content]
 //
-// Detection is via `displayName`, NOT reference equality. Reference
-// equality breaks under HMR, when subcomponents are wrapped in
+// Slot order is enforced by render order in this component, not by JSX
+// child position. Detection is via `displayName`, NOT reference equality:
+// reference equality breaks under HMR, when subcomponents are wrapped in
 // `forwardRef`/`memo`, and when modules are duplicated across bundles.
-// Each subcomponent sets a stable `displayName` matching the slot key.
 //
 // Title presence is enforced as a runtime invariant in development
-// only (console.error, never throws). The audit:static rule from
-// PR 3 of this spec enforces presence at the build layer.
+// only (console.error, never throws). The `headings-use-page-header`
+// audit rule (Spec 02 PR 3) enforces presence at the build layer.
+//
+// Spec 04 amendment (2026-05-08): slot order reversed from
+// Breadcrumb→Title→… to Title→Breadcrumb→…, and the rhythm spec
+// (20/8/12/32 gaps) added. Title weight bumped 600→700 in
+// app/globals.css. Consumer JSX is unchanged — slot identity
+// (displayName) drives the order, not the JSX order.
 
 const SLOT_NAMES = {
   Breadcrumb: "PageHeaderBreadcrumb",
@@ -37,11 +45,6 @@ const SLOT_NAMES = {
 } as const;
 
 type SlotKey = keyof typeof SLOT_NAMES;
-
-interface SlotMatch {
-  slot: SlotKey;
-  element: React.ReactElement;
-}
 
 function unwrapFragments(children: React.ReactNode): React.ReactNode[] {
   // One level of unwrap so <><Title /></> works the same as a direct
@@ -124,25 +127,40 @@ export function PageHeader({ children, className }: PageHeaderProps) {
     }
   }
 
+  // Rhythm gaps below the title row, conditional on which slots are
+  // present so the rhythm collapses cleanly when slots are missing:
+  //   first-rendered-slot-after-title → mt-5  (20px)
+  //   subtitle when breadcrumb shown   → mt-2  (8px)
+  //   meta when subtitle shown         → mt-3  (12px)
+  //   meta when only breadcrumb shown  → mt-2  (8px)
+  //   meta with neither breadcrumb nor subtitle → mt-5 (20px)
+  const subtitleGap = slots.Breadcrumb ? "mt-2" : "mt-5";
+  const metaGap = slots.Subtitle
+    ? "mt-3"
+    : slots.Breadcrumb
+      ? "mt-2"
+      : "mt-5";
+
   return (
     <header className={cn("mb-8", className)}>
-      {slots.Breadcrumb}
-      <div
-        className={cn(
-          "mt-2 flex flex-wrap items-start justify-between gap-3",
-        )}
-      >
-        <div className="min-w-0 flex-1">
-          {slots.Title}
-          {slots.Subtitle && <div className="mt-1">{slots.Subtitle}</div>}
-        </div>
+      {/* Title row — Actions sit on the same horizontal axis, right-aligned,
+          vertically centered with the title. flex-wrap so very long titles
+          can push Actions onto a second row at narrow widths instead of
+          clipping. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">{slots.Title}</div>
         {slots.Actions && (
           <div className="flex shrink-0 items-center gap-2">
             {slots.Actions}
           </div>
         )}
       </div>
-      {slots.Meta && <div className="mt-2">{slots.Meta}</div>}
+
+      {slots.Breadcrumb && <div className="mt-5">{slots.Breadcrumb}</div>}
+      {slots.Subtitle && (
+        <div className={subtitleGap}>{slots.Subtitle}</div>
+      )}
+      {slots.Meta && <div className={metaGap}>{slots.Meta}</div>}
     </header>
   );
 }

@@ -1,5 +1,7 @@
 # Spec 02 — Platform PageHeader, breadcrumbs, type scale
 
+> **2026-05-08 amendment:** slot order reversed to Title → Breadcrumb → Subtitle → Meta → Actions. Rhythm spec added (20/8/12/32 gaps). Title weight bumped 600→700. See Spec 04 PR A.
+
 **Owner:** Steven
 **Audience:** Claude Code
 **Mode:** Autonomous build. Do not stop to ask questions. Every decision is locked. Pause only for genuinely missing env vars or contradictions with `docs/ARCHITECTURE.md`.

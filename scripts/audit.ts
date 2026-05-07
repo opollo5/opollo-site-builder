@@ -1154,8 +1154,12 @@ function printResults(issues: Issue[]): boolean {
 // Routes deferred from Spec 02 PR 2's adoption sweep. Tracked in
 // docs/specs/_blockers.md. Allowlist runs at HIGH severity for the
 // migrated routes; deferred routes are scoped out until the follow-up
-// sweep migrates them. Once a route here adopts PageHeader, REMOVE it
-// from this list — that's how the rule progressively widens.
+// sweep migrates them.
+//
+// PAGE_HEADER_DEFERRED_ROUTES: routes pending migration. Remove entries
+// as each route adopts PageHeader. This list should reach [] when
+// migration completes (Spec 04). New routes added here = regression —
+// don't.
 const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
   // /admin/* deferred routes (29 of 37)
   "app/admin/page.tsx",
@@ -1193,8 +1197,26 @@ const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
   "app/account/security/page.tsx",
 ];
 
+// PAGE_HEADER_EXEMPT_ROUTES: routes that intentionally don't use
+// PageHeader because they have a different chrome contract (e.g.
+// full-bleed editor, modal-style page). Each entry must include a
+// comment explaining why. Audit rules headings-use-page-header,
+// breadcrumb-required-when-page-header, and no-raw-h1-in-pages skip
+// every entry here.
+//
+// Exempt = permanent. Deferred = temporary (drains to [] as each
+// route migrates). Don't conflate them.
+const PAGE_HEADER_EXEMPT_ROUTES: readonly string[] = [
+  // (empty — populated by Spec 04 migration PRs only when a route
+  // genuinely can't fit PageHeader chrome)
+];
+
 function isPageHeaderDeferred(rel: string): boolean {
   return PAGE_HEADER_DEFERRED_ROUTES.includes(rel.replace(/\\/g, "/"));
+}
+
+function isPageHeaderExempt(rel: string): boolean {
+  return PAGE_HEADER_EXEMPT_ROUTES.includes(rel.replace(/\\/g, "/"));
 }
 
 function isPageHeaderEnforcedRoute(rel: string): boolean {
@@ -1205,7 +1227,9 @@ function isPageHeaderEnforcedRoute(rel: string): boolean {
     return false;
   }
   if (!norm.endsWith("/page.tsx")) return false;
-  return !PAGE_HEADER_DEFERRED_ROUTES.includes(norm);
+  if (PAGE_HEADER_DEFERRED_ROUTES.includes(norm)) return false;
+  if (PAGE_HEADER_EXEMPT_ROUTES.includes(norm)) return false;
+  return true;
 }
 
 function check11_headingsUsePageHeader(): Issue[] {
@@ -1248,6 +1272,9 @@ function check12_breadcrumbRequiredWithPageHeader(): Issue[] {
     for (const file of walkFiles(dir, [".tsx"])) {
       const rel = relPath(file);
       if (!rel.replace(/\\/g, "/").endsWith("/page.tsx")) continue;
+      // Exempt routes have a different chrome contract — skip the
+      // breadcrumb check here too (mirrors check11 behaviour).
+      if (isPageHeaderExempt(rel)) continue;
       const src = readSafe(file);
       const importsPageHeader =
         /import\s*(?:type\s+)?\{[^}]*\bPageHeader\b[^}]*\}\s*from\s*["']@\/components\/ui\/page-header["']/.test(
@@ -1293,6 +1320,9 @@ function check13_noRawH1InPages(): Issue[] {
       // adopts PageHeader, remove it from that list and this check
       // starts firing on it.
       if (isPageHeaderDeferred(rel)) continue;
+      // Spec 04 — exempt routes have permanent custom chrome that
+      // doesn't fit PageHeader; raw <h1> is fine on those.
+      if (isPageHeaderExempt(rel)) continue;
       const lines = readSafe(file).split(/\r?\n/);
       lines.forEach((ln, i) => {
         if (h1OpenRe.test(ln)) {
