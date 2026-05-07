@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
 
 import { MenuProvider } from "@/components/SiteActionsMenu";
 import { SitesFilterChips } from "@/components/SitesFilterChips";
 import { SitesTable } from "@/components/SitesTable";
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { H1, Lead } from "@/components/ui/typography";
 import type { SiteSortColumn, SiteSortDir, ListSitesOptions } from "@/lib/sites";
 import type { SiteListItem } from "@/lib/tool-schemas";
@@ -44,7 +44,7 @@ export function SitesListClient({
         </div>
         <Button asChild data-testid="add-site-button">
           <Link href="/admin/sites/new">
-            <Plus aria-hidden className="h-4 w-4" />
+            <NavIcon name="plus" size={16} />
             New site
           </Link>
         </Button>

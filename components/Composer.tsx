@@ -12,9 +12,8 @@ import {
   type ReactNode,
 } from "react";
 
-import { Paperclip, X } from "lucide-react";
-
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
 // RS-1 — Unified Composer.
@@ -216,7 +215,7 @@ export function Composer({
                 "disabled:pointer-events-none",
               )}
             >
-              <X aria-hidden className="h-4 w-4" />
+              <NavIcon name="cross" size={16} />
             </button>
           </span>
         </div>
@@ -236,7 +235,7 @@ export function Composer({
             "transition-smooth disabled:pointer-events-none",
           )}
         >
-          <Paperclip aria-hidden className="h-5 w-5" />
+          <NavIcon name="paperclip" size={20} />
         </button>
         <input
           ref={fileInputRef}

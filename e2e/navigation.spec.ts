@@ -51,7 +51,11 @@ test.describe("Primary nav", () => {
 
   test("all primary nav icons have consistent size", async ({ page }) => {
     await page.goto("/admin/sites");
-    const icons = await page.locator('[data-testid="primary-nav"] svg').all();
+    // Linearicons web font: each glyph is an <i class="icon-{name}"> element
+    // sized via inline font-size. (Was `svg` selector pre-Linearicons.)
+    const icons = await page
+      .locator('[data-testid="primary-nav"] i[class^="icon-"]')
+      .all();
     expect(icons.length).toBeGreaterThan(0);
     const sizes = await Promise.all(
       icons.map(async (icon) => {
@@ -61,7 +65,8 @@ test.describe("Primary nav", () => {
     );
     const validSizes = sizes.filter(Boolean);
     if (validSizes.length > 1) {
-      // Allow for bottom-rail icons being slightly smaller (18px vs 22px)
+      // Primary rail items + bottom rail items are all 20px now. Allow
+      // ≤2 distinct sizes for headroom (rail vs. mobile drawer variants).
       const widths = new Set(validSizes.map((s) => s!.w));
       expect(widths.size).toBeLessThanOrEqual(2);
     }

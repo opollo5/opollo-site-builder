@@ -2,18 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Building2,
-  CalendarDays,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsUpDown,
-  Clock,
-  List,
-  Plus,
-} from "lucide-react";
-
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   Popover,
   PopoverContent,
@@ -194,7 +183,7 @@ function ProfilesFilter({
           className="flex items-center gap-2 rounded-md border border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
         >
           {label}
-          <ChevronsUpDown className="h-3.5 w-3.5 opacity-50" aria-hidden />
+          <NavIcon name="chevrons-expand-vertical" size={14} className="opacity-50" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2" align="end">
@@ -210,7 +199,7 @@ function ProfilesFilter({
               )}
             >
               {allVisible && (
-                <Check className="h-3 w-3 text-white" aria-hidden />
+                <NavIcon name="check" size={12} className="text-white" />
               )}
             </div>
             <span>All profiles</span>
@@ -235,7 +224,7 @@ function ProfilesFilter({
                   )}
                 >
                   {visible && (
-                    <Check className="h-3 w-3 text-white" aria-hidden />
+                    <NavIcon name="check" size={12} className="text-white" />
                   )}
                 </div>
                 <span className="shrink-0 font-mono text-xs opacity-60">
@@ -342,7 +331,7 @@ export function SocialCalendarClient({
           className="flex items-center gap-1.5 rounded-md border border-white/[0.1] px-3 py-1.5 text-sm text-m2"
           title={companyName}
         >
-          <Building2 className="h-3.5 w-3.5 shrink-0 opacity-60" aria-hidden />
+          <NavIcon name="apartment" size={14} className="shrink-0 opacity-60" />
           <span className="max-w-[10rem] truncate">{companyName}</span>
         </div>
 
@@ -354,7 +343,7 @@ export function SocialCalendarClient({
             data-testid="calendar-prev"
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.1] text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
           >
-            <ChevronLeft aria-hidden className="h-4 w-4" />
+            <NavIcon name="chevron-left" size={16} />
           </a>
           <span
             className="min-w-[10rem] text-center text-sm font-semibold"
@@ -368,7 +357,7 @@ export function SocialCalendarClient({
             data-testid="calendar-next"
             className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.1] text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
           >
-            <ChevronRight aria-hidden className="h-4 w-4" />
+            <NavIcon name="chevron-right" size={16} />
           </a>
           {!isCurrentMonth && (
             <a
@@ -393,14 +382,14 @@ export function SocialCalendarClient({
               aria-current="page"
               className="flex items-center gap-1.5 border-r border-white/[0.1] bg-pk px-3 py-1.5 text-sm text-white"
             >
-              <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+              <NavIcon name="calendar-full" size={14} />
               Calendar
             </span>
             <Link
               href="/company/social/posts"
               className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
             >
-              <List className="h-3.5 w-3.5" aria-hidden />
+              <NavIcon name="list" size={14} />
               Posts
             </Link>
             <button
@@ -409,7 +398,7 @@ export function SocialCalendarClient({
               title="Coming soon"
               className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-m3 opacity-40"
             >
-              <Clock className="h-3.5 w-3.5" aria-hidden />
+              <NavIcon name="clock" size={14} />
               Timeline
             </button>
           </div>
@@ -428,7 +417,7 @@ export function SocialCalendarClient({
             className="inline-flex items-center gap-1.5 rounded-md bg-pk px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-pk/80"
             data-testid="calendar-new-post"
           >
-            <Plus className="h-3.5 w-3.5" aria-hidden />
+            <NavIcon name="plus" size={14} />
             New post
           </Link>
         </div>
@@ -489,7 +478,7 @@ export function SocialCalendarClient({
                     aria-label={`Create post for ${dayKey}`}
                     className="invisible flex h-5 w-5 items-center justify-center rounded-full text-m3 transition-colors hover:bg-white/10 hover:text-white group-hover:visible"
                   >
-                    <Plus className="h-3 w-3" aria-hidden />
+                    <NavIcon name="plus" size={12} />
                   </Link>
                   <span
                     className={cn(

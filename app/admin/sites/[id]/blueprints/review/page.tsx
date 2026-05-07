@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { LayoutTemplate } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -155,7 +154,7 @@ export default function BlueprintReviewPage({
     return (
       <main className="mx-auto max-w-4xl p-6">
         <EmptyState
-          icon={LayoutTemplate}
+          icon={<NavIcon name="grid" size={20} />}
           iconLabel="No site plan"
           title="No site plan yet"
           body="Run the site planner from the brief run page to generate a plan before approving page generation."

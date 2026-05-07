@@ -2,9 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import { FileText } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -161,7 +160,7 @@ export default function SharedContentPage({
         </div>
       ) : rows.length === 0 ? (
         <EmptyState
-          icon={FileText}
+          icon={<NavIcon name="file-empty" size={20} />}
           iconLabel="No shared content"
           title="No shared content yet"
           body="Run the site planner to generate reusable content objects like CTAs, testimonials, and FAQ items."

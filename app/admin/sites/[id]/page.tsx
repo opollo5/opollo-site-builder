@@ -16,7 +16,7 @@ import {
   siteStatusKind,
 } from "@/components/ui/status-pill";
 import { H1, H3 } from "@/components/ui/typography";
-import { FileText, LayoutTemplate, Layers, Sparkles, Workflow } from "lucide-react";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -242,7 +242,7 @@ export default async function SiteDetailPage({
               <div className="p-3">
                 <EmptyState
                   density="compact"
-                  icon={Workflow}
+                  icon={<NavIcon name="tree" size={20} />}
                   iconLabel="No batches"
                   title="No batches yet"
                   body={
@@ -323,7 +323,7 @@ export default async function SiteDetailPage({
               <div className="p-3">
                 <EmptyState
                   density="compact"
-                  icon={FileText}
+                  icon={<NavIcon name="file-empty" size={20} />}
                   iconLabel="No briefs"
                   title="No briefs yet"
                   body={
@@ -529,7 +529,7 @@ export default async function SiteDetailPage({
           {/* M13-5d — Appearance panel link. */}
           <div className="rounded-lg border p-3">
             <div className="flex items-start gap-2">
-              <Layers aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <NavIcon name="layers" size={16} className="mt-0.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Appearance</H3>
                 <p className="mt-1 text-base text-muted-foreground">
@@ -549,7 +549,7 @@ export default async function SiteDetailPage({
           {/* M16 — Site Plan Review (blueprint pages). */}
           <div className="rounded-lg border p-3">
             <div className="flex items-start gap-2">
-              <LayoutTemplate aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <NavIcon name="grid" size={16} className="mt-0.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Site Plan</H3>
                 <p className="mt-1 text-base text-muted-foreground">
@@ -569,7 +569,7 @@ export default async function SiteDetailPage({
           {/* M16 — Shared Content Manager. */}
           <div className="rounded-lg border p-3">
             <div className="flex items-start gap-2">
-              <FileText aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <NavIcon name="file-empty" size={16} className="mt-0.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <H3>Shared Content</H3>
                 <p className="mt-1 text-base text-muted-foreground">
@@ -589,7 +589,7 @@ export default async function SiteDetailPage({
           {/* RS-2 — Settings (brand voice + design direction defaults). */}
           <div className="rounded-lg border p-3">
             <div className="flex items-start gap-2">
-              <Sparkles aria-hidden className="mt-0.5 h-4 w-4 text-muted-foreground" />
+              <NavIcon name="magic-wand" size={16} className="mt-0.5 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <H3>Settings</H3>

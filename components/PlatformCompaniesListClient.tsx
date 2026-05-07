@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { H1, Lead } from "@/components/ui/typography";
 import type { PlatformCompanyListItem } from "@/lib/platform/companies";
 
@@ -29,7 +29,7 @@ export function PlatformCompaniesListClient({
         </div>
         <Button asChild data-testid="add-company-button">
           <Link href="/admin/companies/new">
-            <Plus aria-hidden className="h-4 w-4" />
+            <NavIcon name="plus" size={16} />
             New company
           </Link>
         </Button>

@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+
+import { NavIcon } from "@/components/ui/nav-icon";
 
 import { ConceptRefinementView } from "@/components/ConceptRefinementView";
 import { ConceptReviewCards } from "@/components/ConceptReviewCards";
@@ -473,7 +474,7 @@ export function DesignDirectionInputs({
           >
             {extracting ? (
               <>
-                <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                <NavIcon name="sync" size={14} className="animate-spin" />
                 Extracting…
               </>
             ) : (
@@ -552,12 +553,12 @@ export function DesignDirectionInputs({
         >
           {generating ? (
             <>
-              <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+              <NavIcon name="sync" size={16} className="animate-spin" />
               Generating…
             </>
           ) : (
             <>
-              <Sparkles aria-hidden className="h-4 w-4" />
+              <NavIcon name="magic-wand" size={16} />
               {concepts && concepts.length > 0 ? "Regenerate concepts" : "Generate concepts"}
             </>
           )}

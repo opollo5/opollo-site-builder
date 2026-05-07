@@ -1,32 +1,11 @@
-import {
-  Activity,
-  BarChart2,
-  BookOpen,
-  Building2,
-  CalendarDays,
-  Globe,
-  Image as ImageIcon,
-  KeyRound,
-  Laptop,
-  Link2,
-  List,
-  LogOut,
-  Mail,
-  PenSquare,
-  Settings,
-  Share2,
-  ShieldCheck,
-  TrendingUp,
-  Users,
-  Workflow,
-  type LucideIcon,
-} from "lucide-react";
-
 // ---------------------------------------------------------------------------
 // Single source of truth for ALL navigation items.
 //
 // DO NOT render nav items anywhere else — add them here and let
 // PrimaryNav + SectionNav read this config.
+//
+// Icons are Linearicons class names (without the `icon-` prefix). Browse
+// `assets/Linearicons/demo.html` for the full list of 1097 available icons.
 // ---------------------------------------------------------------------------
 
 export type NavUserContext = {
@@ -43,6 +22,7 @@ export type SectionNavItem = {
   href: string;
   testId?: string;
   requiresCompanyAdmin?: boolean;
+  requiresSuperAdmin?: boolean;
 };
 
 export type SectionNavGroup = {
@@ -59,7 +39,7 @@ export type SectionNavConfig = {
 export type PrimaryNavItem = {
   key: string;
   label: string;
-  icon: LucideIcon;
+  icon: string;
   href: string;
   pathPrefixes: string[];
   testId?: string;
@@ -72,7 +52,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "sites",
     label: "Sites",
-    icon: Globe,
+    icon: "earth",
     href: "/admin/sites",
     pathPrefixes: ["/admin/sites"],
     testId: "nav-sites",
@@ -80,8 +60,8 @@ export const primaryNavItems: PrimaryNavItem[] = [
   },
   {
     key: "posts",
-    label: "Post a blog",
-    icon: PenSquare,
+    label: "Blog",
+    icon: "blog",
     href: "/admin/posts/new",
     pathPrefixes: ["/admin/posts"],
     testId: "nav-post-blog",
@@ -90,7 +70,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "batches",
     label: "Batches",
-    icon: Workflow,
+    icon: "layers",
     href: "/admin/batches",
     pathPrefixes: ["/admin/batches"],
     testId: "nav-batches",
@@ -99,7 +79,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "images",
     label: "Images",
-    icon: ImageIcon,
+    icon: "picture",
     href: "/admin/images",
     pathPrefixes: ["/admin/images"],
     testId: "nav-images",
@@ -108,7 +88,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "social",
     label: "Social",
-    icon: Share2,
+    icon: "share2",
     href: "/company/social/calendar",
     pathPrefixes: ["/company/"],
     testId: "nav-social",
@@ -140,7 +120,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "optimiser",
     label: "Optimiser",
-    icon: TrendingUp,
+    icon: "chart-growth",
     href: "/optimiser",
     pathPrefixes: ["/optimiser"],
     testId: "nav-optimiser",
@@ -164,7 +144,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "users",
     label: "Users",
-    icon: Users,
+    icon: "users",
     href: "/admin/users",
     pathPrefixes: ["/admin/users"],
     testId: "nav-users",
@@ -174,7 +154,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "companies",
     label: "Companies",
-    icon: Building2,
+    icon: "apartment",
     href: "/admin/companies",
     pathPrefixes: ["/admin/companies"],
     testId: "nav-companies",
@@ -184,7 +164,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
   {
     key: "admin-tools",
     label: "Admin",
-    icon: ShieldCheck,
+    icon: "shield-check",
     href: "/admin/users/audit",
     pathPrefixes: [
       "/admin/users/audit",
@@ -211,11 +191,13 @@ export const primaryNavItems: PrimaryNavItem[] = [
   },
 ];
 
-// Bottom-rail items (account + sign out)
+// Bottom-rail items — per spec, ONLY ⌘K and Sign out.
+// Account surfaces (Security, Devices) live behind the avatar/dropdown
+// or under the Admin section nav, not in the always-visible footer rail.
 export type BottomNavItem = {
   key: string;
   label: string;
-  icon: LucideIcon;
+  icon: string;
   href?: string;
   pathPrefixes?: string[];
   kind: "link" | "signout" | "cmdpalette";
@@ -226,42 +208,14 @@ export type BottomNavItem = {
 export const bottomNavItems: BottomNavItem[] = [
   {
     key: "cmdpalette",
-    label: "⌘K",
-    icon: Settings,
+    label: "Search",
+    icon: "magnifier",
     kind: "cmdpalette",
-  },
-  {
-    key: "security",
-    label: "Security",
-    icon: KeyRound,
-    href: "/account/security",
-    pathPrefixes: ["/account/security"],
-    kind: "link",
-    testId: "nav-security",
-    requiresUser: true,
-  },
-  {
-    key: "devices",
-    label: "Devices",
-    icon: Laptop,
-    href: "/account/devices",
-    pathPrefixes: ["/account/devices"],
-    kind: "link",
-    testId: "nav-devices",
-    requiresUser: true,
-  },
-  {
-    key: "builder",
-    label: "Builder",
-    icon: Settings,
-    href: "/",
-    kind: "link",
-    testId: "nav-back-to-builder",
   },
   {
     key: "signout",
     label: "Sign out",
-    icon: LogOut,
+    icon: "exit",
     kind: "signout",
     testId: "nav-sign-out",
     requiresUser: true,
@@ -316,8 +270,10 @@ export function filterSectionItems(
   items: SectionNavItem[],
   ctx: NavUserContext,
 ): SectionNavItem[] {
+  const isSuperAdmin = ctx.role === "super_admin";
   return items.filter((item) => {
     if (item.requiresCompanyAdmin && !ctx.isCompanyAdmin) return false;
+    if (item.requiresSuperAdmin && !isSuperAdmin) return false;
     return true;
   });
 }

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Sparkles, X } from "lucide-react";
+
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // SetupReminderBanner — DESIGN-DISCOVERY PR 12.
 //
@@ -47,7 +48,7 @@ export function SetupReminderBanner({ siteId }: { siteId: string }) {
       role="status"
       data-testid="setup-reminder-banner"
     >
-      <Sparkles aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-foreground" />
+      <NavIcon name="magic-wand" size={16} className="mt-0.5 shrink-0 text-foreground" />
       <div className="min-w-0 flex-1">
         <p className="font-medium">
           Set up your design direction and tone of voice to improve
@@ -72,7 +73,7 @@ export function SetupReminderBanner({ siteId }: { siteId: string }) {
         aria-label="Dismiss"
         data-testid="setup-reminder-banner-dismiss"
       >
-        <X aria-hidden className="h-4 w-4" />
+        <NavIcon name="cross" size={16} />
       </button>
     </div>
   );

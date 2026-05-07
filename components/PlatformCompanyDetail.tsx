@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { Users, Globe, CheckCircle, Clock, Send, Share2 } from "lucide-react";
-
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { H1 } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
@@ -159,31 +158,31 @@ function OverviewTab({
       {/* Quick stats cards */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard
-          icon={Users}
+          iconName="users"
           label="Team members"
           value={stats.member_count}
           testId="stat-members"
         />
         <StatCard
-          icon={Share2}
+          iconName="share2"
           label="Social accounts"
           value={stats.social_connection_count}
           testId="stat-connections"
         />
         <StatCard
-          icon={Clock}
+          iconName="clock"
           label="Pending approval"
           value={stats.pending_post_count}
           testId="stat-pending"
         />
         <StatCard
-          icon={CheckCircle}
+          iconName="checkmark-circle"
           label="Approved posts"
           value={stats.approved_post_count}
           testId="stat-approved"
         />
         <StatCard
-          icon={Send}
+          iconName="paper-plane"
           label="Published posts"
           value={stats.published_post_count}
           testId="stat-published"
@@ -246,12 +245,12 @@ function OverviewTab({
 }
 
 function StatCard({
-  icon: Icon,
+  iconName,
   label,
   value,
   testId,
 }: {
-  icon: typeof Users;
+  iconName: string;
   label: string;
   value: number;
   testId?: string;
@@ -262,7 +261,7 @@ function StatCard({
       data-testid={testId}
     >
       <div className="flex items-center gap-2 text-muted-foreground">
-        <Icon aria-hidden className="h-4 w-4" />
+        <NavIcon name={iconName} size={16} />
         <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
       </div>
       <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>

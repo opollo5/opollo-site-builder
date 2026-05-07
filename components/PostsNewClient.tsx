@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, FileText, Layers } from "lucide-react";
-
 import { BlogPostComposer } from "@/components/BlogPostComposer";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { BulkUploadPanel } from "@/components/BulkUploadPanel";
 import {
   Command,
@@ -95,14 +94,14 @@ function ModeTabs({
         id="single"
         active={mode === "single"}
         onClick={() => onModeChange("single")}
-        icon={FileText}
+        iconName="file-empty"
         label="Single post"
       />
       <ModeTab
         id="bulk"
         active={mode === "bulk"}
         onClick={() => onModeChange("bulk")}
-        icon={Layers}
+        iconName="layers"
         label="Bulk upload"
       />
     </div>
@@ -113,13 +112,13 @@ function ModeTab({
   id,
   active,
   onClick,
-  icon: Icon,
+  iconName,
   label,
 }: {
   id: Mode;
   active: boolean;
   onClick: () => void;
-  icon: typeof FileText;
+  iconName: string;
   label: string;
 }) {
   return (
@@ -136,7 +135,7 @@ function ModeTab({
           : "text-muted-foreground hover:text-foreground",
       )}
     >
-      <Icon aria-hidden className="h-3.5 w-3.5" />
+      <NavIcon name={iconName} size={14} />
       {label}
     </button>
   );
@@ -187,9 +186,10 @@ function SitePicker({
             <span className={value ? "" : "text-muted-foreground"}>
               {value ? value.name : "Pick a site…"}
             </span>
-            <ChevronDown
-              aria-hidden
-              className="ml-2 h-4 w-4 text-muted-foreground"
+            <NavIcon
+              name="chevron-down"
+              size={16}
+              className="ml-2 text-muted-foreground"
             />
           </button>
         </PopoverTrigger>

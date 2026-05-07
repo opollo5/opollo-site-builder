@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Loader2, RefreshCw } from "lucide-react";
-
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   PLATFORM_LABEL,
   STATUS_LABEL,
@@ -107,7 +106,7 @@ export function ProfileSelector({ companyId, selected, onChange, error }: Props)
   if (loading) {
     return (
       <div className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        <NavIcon name="sync" size={16} className="animate-spin" />
         Loading profiles…
       </div>
     );
@@ -149,7 +148,7 @@ export function ProfileSelector({ companyId, selected, onChange, error }: Props)
             )}
             aria-hidden
           >
-            {allSelected && <Check className="h-3 w-3 text-white" aria-hidden />}
+            {allSelected && <NavIcon name="check" size={12} className="text-white" />}
           </div>
           <input
             type="checkbox"
@@ -183,7 +182,7 @@ export function ProfileSelector({ companyId, selected, onChange, error }: Props)
                   )}
                   aria-hidden
                 >
-                  {checked && <Check className="h-3 w-3 text-white" aria-hidden />}
+                  {checked && <NavIcon name="check" size={12} className="text-white" />}
                 </div>
                 <input
                   type="checkbox"
@@ -228,7 +227,7 @@ export function ProfileSelector({ companyId, selected, onChange, error }: Props)
                 className="flex items-center gap-1 text-xs text-primary hover:underline"
                 title="Reconnect this account"
               >
-                <RefreshCw className="h-3 w-3" aria-hidden />
+                <NavIcon name="sync" size={12} />
                 Reconnect
               </a>
             </div>

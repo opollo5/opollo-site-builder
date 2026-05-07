@@ -10,7 +10,7 @@ import {
   jobStatusKind,
 } from "@/components/ui/status-pill";
 import { H1, Lead } from "@/components/ui/typography";
-import { Workflow } from "lucide-react";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -208,7 +208,7 @@ export default async function AdminBatchesPage({
       <div className="mt-4">
         {rows.length === 0 ? (
           <EmptyState
-            icon={Workflow}
+            icon={<NavIcon name="tree" size={20} />}
             iconLabel="No batches"
             title="No batches yet"
             body={
