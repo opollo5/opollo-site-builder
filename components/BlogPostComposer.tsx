@@ -705,7 +705,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return extras;
   }
 
-  async function submitToOpollo(forceAsDraft = false): Promise<{ id: string; edit_url: string } | null> {
+  async function submitToOpollo(forceAsDraft = false): Promise<{ id: string; edit_url: string; version_lock: number } | null> {
     const body = await buildCreateBody(forceAsDraft);
     const baseSlug = body.slug as string;
     const MAX_ATTEMPTS = 5;
@@ -718,7 +718,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         body: JSON.stringify({ ...body, slug: attemptSlug }),
       });
       const payload = (await res.json().catch(() => null)) as
-        | { ok: true; data: { id: string; edit_url: string } }
+        | { ok: true; data: { id: string; edit_url: string; version_lock?: number } }
         | { ok: false; error: { code: string; message: string } }
         | null;
 
@@ -726,7 +726,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
         if (attemptSlug !== baseSlug) {
           setSlug({ value: attemptSlug, source: "derived", touched: true });
         }
-        return payload.data;
+        return { ...payload.data, version_lock: payload.data.version_lock ?? 1 };
       }
 
       const code = payload?.ok === false ? payload.error.code : "INTERNAL_ERROR";
@@ -744,11 +744,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     return null;
   }
 
-  async function handlePublishToWp(postId: string): Promise<boolean> {
+  async function handlePublishToWp(postId: string, versionLock: number): Promise<boolean> {
     const res = await fetch(`/api/sites/${siteId}/posts/${postId}/publish`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ expected_version_lock: 0, ...buildWpPublishExtras() }),
+      body: JSON.stringify({ expected_version_lock: versionLock, ...buildWpPublishExtras() }),
     });
     const payload = (await res.json().catch(() => null)) as
       | { ok: true; data: unknown }
@@ -781,7 +781,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       if (!postData) return;
 
       if (publishMode === "publish" || publishMode === "pending") {
-        const wpOk = await handlePublishToWp(postData.id);
+        const wpOk = await handlePublishToWp(postData.id, postData.version_lock);
         if (!wpOk) return; // Error shown in form; post is saved as draft
         if (publishMode === "publish") {
           const liveUrl =
@@ -850,6 +850,11 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     >
       {/* ── LEFT: title + editor + SEO ── */}
       <div className="space-y-4">
+        {formError && (
+          <Alert variant="destructive" data-testid="post-form-error-banner">
+            {formError}
+          </Alert>
+        )}
         {!siteLoading && !siteWpUrl && (
           <Alert variant="destructive" className="flex items-start gap-2">
             <AlertTriangle aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
@@ -1032,8 +1037,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             </div>}
           </section>
         </div>
-
-        {formError && <Alert variant="destructive">{formError}</Alert>}
 
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <SaveStatus

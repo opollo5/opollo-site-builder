@@ -295,6 +295,8 @@ export type SiteListItem = {
   status: string;
   last_successful_operation_at: string | null;
   updated_at: string;
+  company_id?: string | null;
+  company_name?: string | null;
 };
 
 // ---------- create_page ----------

@@ -27,7 +27,7 @@ export default async function PostsNewPage() {
   const result = await listSites();
   if (!result.ok) {
     return (
-      <div className="mx-auto max-w-4xl">
+      <div className="mx-auto max-w-7xl">
         <Alert variant="destructive">
           Failed to load sites: {result.error.message}
         </Alert>
@@ -44,7 +44,7 @@ export default async function PostsNewPage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-7xl">
       <H1>Post a blog</H1>
       <Lead className="mt-1">
         Pick a site, then paste or drop your post. Metadata pre-fills from

@@ -1,13 +1,19 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
+import { Users, Globe, CheckCircle, Clock, Send, Share2 } from "lucide-react";
 
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
-import { H1, Lead } from "@/components/ui/typography";
-import type { CompanyDetail } from "@/lib/platform/companies";
+import { H1 } from "@/components/ui/typography";
+import { cn } from "@/lib/utils";
+import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
 
-// P3-3 — read-only company detail. Renders company metadata, the list
-// of members with their role, and any pending invitations. Action
-// buttons (invite, revoke) land in P3-4.
+// P3-3 — company detail. Tabs: Overview (default), Settings, Members.
+// Overview shows quick stats cards + key sections for staff operators.
+
+type Tab = "overview" | "settings" | "members";
 
 export function PlatformCompanyDetail({
   detail,
@@ -20,10 +26,11 @@ export function PlatformCompanyDetail({
   isCurrentUserMember?: boolean;
   joinAction?: ((formData: FormData) => Promise<void>) | null;
 }) {
-  const { company, members, pending_invitations } = detail;
+  const { company, members, pending_invitations, stats } = detail;
+  const [activeTab, setActiveTab] = useState<Tab>("members");
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <header>
         <Link
           href="/admin/companies"
@@ -43,13 +50,17 @@ export function PlatformCompanyDetail({
             </span>
           ) : null}
         </div>
-        <Lead className="mt-1">
-          {company.domain ? (
-            <span className="font-mono text-sm">{company.domain}</span>
-          ) : (
-            <span className="text-muted-foreground">No domain set</span>
+        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <span
+            className="font-mono"
+            data-testid="company-detail-slug"
+          >
+            {company.slug}
+          </span>
+          {company.domain && (
+            <span className="font-mono">{company.domain}</span>
           )}
-        </Lead>
+        </div>
       </header>
 
       {isOpolloStaff && (
@@ -90,51 +101,231 @@ export function PlatformCompanyDetail({
         </section>
       )}
 
-      <section
-        className="rounded-lg border bg-card"
-        aria-labelledby="company-meta"
+      {/* Tab navigation */}
+      <nav
+        role="tablist"
+        aria-label="Company sections"
+        className="flex gap-1 border-b"
       >
-        <h2
-          id="company-meta"
-          className="border-b px-4 py-3 text-base font-semibold"
-        >
-          Company settings
-        </h2>
-        <dl className="grid grid-cols-1 gap-3 p-4 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="text-muted-foreground">Slug</dt>
-            <dd
-              className="font-mono"
-              data-testid="company-detail-slug"
-            >
-              {company.slug}
-            </dd>
+        {(["overview", "settings", "members"] as Tab[]).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px",
+              activeTab === tab
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
+
+      {activeTab === "overview" && (
+        <OverviewTab company={company} stats={stats} members={members} />
+      )}
+
+      {activeTab === "settings" && (
+        <SettingsTab company={company} />
+      )}
+
+      {activeTab === "members" && (
+        <MembersTab
+          company={company}
+          members={members}
+          pending_invitations={pending_invitations}
+        />
+      )}
+    </div>
+  );
+}
+
+function OverviewTab({
+  company,
+  stats,
+  members,
+}: {
+  company: CompanyDetail["company"];
+  stats: CompanyStats;
+  members: CompanyDetail["members"];
+}) {
+  return (
+    <div className="space-y-6" data-testid="company-overview-tab">
+      {/* Quick stats cards */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        <StatCard
+          icon={Users}
+          label="Team members"
+          value={stats.member_count}
+          testId="stat-members"
+        />
+        <StatCard
+          icon={Share2}
+          label="Social accounts"
+          value={stats.social_connection_count}
+          testId="stat-connections"
+        />
+        <StatCard
+          icon={Clock}
+          label="Pending approval"
+          value={stats.pending_post_count}
+          testId="stat-pending"
+        />
+        <StatCard
+          icon={CheckCircle}
+          label="Approved posts"
+          value={stats.approved_post_count}
+          testId="stat-approved"
+        />
+        <StatCard
+          icon={Send}
+          label="Published posts"
+          value={stats.published_post_count}
+          testId="stat-published"
+        />
+      </div>
+
+      {/* Team members preview */}
+      <section className="rounded-lg border bg-card" aria-labelledby="overview-members">
+        <header className="flex items-center justify-between border-b px-4 py-3">
+          <h2 id="overview-members" className="text-base font-semibold">
+            Team ({members.length})
+          </h2>
+          <PlatformInviteUserModal companyId={company.id} />
+        </header>
+        {members.length === 0 ? (
+          <div className="p-6 text-center text-sm text-muted-foreground">
+            No members yet — invite someone to get started.
           </div>
-          <div>
-            <dt className="text-muted-foreground">Timezone</dt>
-            <dd>{company.timezone}</dd>
+        ) : (
+          <div className="divide-y">
+            {members.slice(0, 5).map((m) => (
+              <div key={m.user_id} className="flex items-center justify-between px-4 py-2.5 text-sm">
+                <div>
+                  <p className="font-medium">{m.full_name ?? m.email}</p>
+                  {m.full_name && (
+                    <p className="text-muted-foreground">{m.email}</p>
+                  )}
+                </div>
+                <span className="capitalize text-muted-foreground">{m.role}</span>
+              </div>
+            ))}
+            {members.length > 5 && (
+              <div className="px-4 py-2.5 text-sm text-muted-foreground">
+                +{members.length - 5} more members
+              </div>
+            )}
           </div>
-          <div>
-            <dt className="text-muted-foreground">Approval required</dt>
-            <dd>{company.approval_default_required ? "Yes" : "No"}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Approval rule</dt>
-            <dd>{company.approval_default_rule}</dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Concurrent publish limit</dt>
-            <dd className="tabular-nums">
-              {company.concurrent_publish_limit}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-muted-foreground">Created</dt>
-            <dd>{formatDate(company.created_at)}</dd>
-          </div>
-        </dl>
+        )}
       </section>
 
+      {/* Social platform link */}
+      <section className="rounded-lg border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Social platform</h2>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Manage posts, connections, and scheduling for this company.
+            </p>
+          </div>
+          <Link
+            href="/company"
+            className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+          >
+            Open platform →
+          </Link>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  testId,
+}: {
+  icon: typeof Users;
+  label: string;
+  value: number;
+  testId?: string;
+}) {
+  return (
+    <div
+      className="rounded-lg border bg-card p-4"
+      data-testid={testId}
+    >
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Icon aria-hidden className="h-4 w-4" />
+        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="mt-2 text-2xl font-semibold tabular-nums">{value}</p>
+    </div>
+  );
+}
+
+function SettingsTab({ company }: { company: CompanyDetail["company"] }) {
+  return (
+    <section
+      className="rounded-lg border bg-card"
+      aria-labelledby="company-meta"
+      data-testid="company-settings-tab"
+    >
+      <h2
+        id="company-meta"
+        className="border-b px-4 py-3 text-base font-semibold"
+      >
+        Company settings
+      </h2>
+      <dl className="grid grid-cols-1 gap-3 p-4 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="text-muted-foreground">Slug</dt>
+          <dd className="font-mono">{company.slug}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Timezone</dt>
+          <dd>{company.timezone}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Approval required</dt>
+          <dd>{company.approval_default_required ? "Yes" : "No"}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Approval rule</dt>
+          <dd>{company.approval_default_rule}</dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Concurrent publish limit</dt>
+          <dd className="tabular-nums">
+            {company.concurrent_publish_limit}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-muted-foreground">Created</dt>
+          <dd>{formatDate(company.created_at)}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function MembersTab({
+  company,
+  members,
+  pending_invitations,
+}: {
+  company: CompanyDetail["company"];
+  members: CompanyDetail["members"];
+  pending_invitations: CompanyDetail["pending_invitations"];
+}) {
+  return (
+    <div className="space-y-6" data-testid="company-members-tab">
       <section
         className="rounded-lg border bg-card"
         aria-labelledby="company-members"

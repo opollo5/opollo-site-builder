@@ -19,7 +19,7 @@ export type SiteWithOptionalCredentials = {
 };
 
 const LIGHT_SITE_FIELDS =
-  "id,name,wp_url,prefix,status,last_successful_operation_at,updated_at";
+  "id,name,wp_url,prefix,status,last_successful_operation_at,updated_at,company_id";
 
 function now(): string {
   return new Date().toISOString();
@@ -213,9 +213,29 @@ async function listSitesImpl(): Promise<ApiResponse<{ sites: SiteListItem[] }>> 
     return internalError("Failed to list sites.", { supabase_error: error });
   }
 
+  const rows = (data ?? []) as (SiteListItem & { company_id?: string | null })[];
+
+  // Resolve company names in a single follow-up query (non-fatal on error).
+  const companyIds = [...new Set(rows.map((r) => r.company_id).filter(Boolean))] as string[];
+  const companyNameById = new Map<string, string>();
+  if (companyIds.length > 0) {
+    const { data: companies } = await supabase
+      .from("platform_companies")
+      .select("id,name")
+      .in("id", companyIds);
+    for (const c of companies ?? []) {
+      companyNameById.set(c.id as string, c.name as string);
+    }
+  }
+
+  const sites: SiteListItem[] = rows.map((r) => ({
+    ...r,
+    company_name: r.company_id ? (companyNameById.get(r.company_id) ?? null) : null,
+  }));
+
   return {
     ok: true,
-    data: { sites: (data ?? []) as SiteListItem[] },
+    data: { sites },
     timestamp: now(),
   };
 }

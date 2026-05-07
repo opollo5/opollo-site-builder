@@ -140,6 +140,7 @@ export async function POST(
         id: result.data.id,
         slug: result.data.slug,
         title: result.data.title,
+        version_lock: result.data.version_lock ?? 1,
         edit_url: `/admin/sites/${params.id}/posts/${result.data.id}`,
       },
       timestamp: new Date().toISOString(),
