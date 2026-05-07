@@ -1,79 +1,94 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
+import { NavIcon } from "@/components/ui/nav-icon";
+import { Pill } from "@/components/ui/pill";
+import { TableCell } from "@/components/ui/table-cell";
 import type { PlatformCompanyListItem } from "@/lib/platform/companies";
 
-// P3-1 — client shell for /admin/companies. Renders the table only;
-// the page header (H1 + subtitle + "New company" CTA) lives in
-// app/admin/companies/page.tsx via PageHeader (Spec 04 migration).
+// ---------------------------------------------------------------------------
+// Spec 18 PR B — Companies table migration.
+//
+// Replaced the bespoke <table> markup with the canonical DataTable
+// primitive. Visual contract:
+//
+//   - Slug    → TableCell.Mono.
+//   - Domain  → TableCell.Mono OR TableCell.Empty (never blank).
+//   - Members → right-aligned tabular-nums, primary cell text.
+//   - Type    → Pill (`accent` for "Opollo internal", `neutral` otherwise).
+//
+// Row actions intentionally omitted: edit / manage-members / delete are
+// not yet exposed via individual API routes for companies, so the
+// canonical pattern (`...` menu) has nothing to call. Action lives on
+// the company detail page reached via row click. Documented in the
+// Spec 18 PR B description.
+// ---------------------------------------------------------------------------
+
+const COLUMNS: ColumnDef<PlatformCompanyListItem>[] = [
+  {
+    key: "name",
+    header: "Name",
+    cell: (c) => <TableCell.Primary>{c.name}</TableCell.Primary>,
+  },
+  {
+    key: "slug",
+    header: "Slug",
+    cell: (c) => <TableCell.Mono>{c.slug}</TableCell.Mono>,
+  },
+  {
+    key: "domain",
+    header: "Domain",
+    cell: (c) =>
+      c.domain ? <TableCell.Mono>{c.domain}</TableCell.Mono> : <TableCell.Empty />,
+  },
+  {
+    key: "members",
+    header: "Members",
+    align: "right",
+    cell: (c) => (
+      <span className="text-sm tabular-nums text-foreground">
+        {c.member_count}
+      </span>
+    ),
+  },
+  {
+    key: "type",
+    header: "Type",
+    cell: (c) => (
+      <Pill variant={c.is_opollo_internal ? "accent" : "neutral"}>
+        {c.is_opollo_internal ? "Opollo internal" : "Customer"}
+      </Pill>
+    ),
+  },
+];
 
 export function PlatformCompaniesListClient({
   companies,
 }: {
   companies: PlatformCompanyListItem[];
 }) {
+  const router = useRouter();
+
   return (
-    <>
-      <div
-        className="overflow-hidden rounded-lg border bg-card"
-        data-testid="platform-companies-table"
-      >
-        {companies.length === 0 ? (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            No companies yet — click <strong>New company</strong> to add one.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-sm uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Slug</th>
-                <th className="px-4 py-2 font-medium">Domain</th>
-                <th className="px-4 py-2 font-medium">Members</th>
-                <th className="px-4 py-2 font-medium">Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((c) => (
-                <tr
-                  key={c.id}
-                  className="border-b last:border-b-0 hover:bg-muted/20"
-                  data-testid={`platform-company-row-${c.slug}`}
-                >
-                  <td className="px-4 py-3 font-medium">
-                    <Link
-                      href={`/admin/companies/${c.id}`}
-                      className="hover:underline"
-                      data-testid={`platform-company-link-${c.slug}`}
-                    >
-                      {c.name}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
-                    {c.slug}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {c.domain ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums">
-                    {c.member_count}
-                  </td>
-                  <td className="px-4 py-3 text-sm">
-                    {c.is_opollo_internal ? (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary">
-                        Opollo internal
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">Customer</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </>
+    <DataTable
+      data={companies}
+      columns={COLUMNS}
+      rowKey={(c) => c.id}
+      onRowClick={(c) => router.push(`/admin/companies/${c.id}`)}
+      testId="platform-companies-table"
+      emptyState={{
+        icon: <NavIcon name="apartment" size={20} />,
+        iconLabel: "No companies",
+        title: "No companies yet",
+        body: (
+          <>
+            Companies group sites and members under a single billing /
+            access tenant. Click <strong>New company</strong> to add one.
+          </>
+        ),
+      }}
+    />
   );
 }
