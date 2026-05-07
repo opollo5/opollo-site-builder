@@ -6,11 +6,10 @@ import { getCurrentPlatformSession } from "@/lib/platform/auth";
 
 // /company/social/* — session + company guard.
 //
-// The sidebar shell and page chrome live in app/company/layout.tsx.
+// The nav shell lives in app/company/layout.tsx (NavShell).
 // This layout enforces that the visitor has a company context. For Opollo
-// staff who haven't yet selected a company via the sidebar selector, we
-// render an inline prompt rather than redirecting (the sidebar remains
-// visible so they can pick a company immediately).
+// staff who haven't yet selected a company via the Social section nav
+// selector, we render an inline prompt rather than redirecting.
 
 export default async function CompanySocialLayout({
   children,
@@ -28,8 +27,8 @@ export default async function CompanySocialLayout({
           <Building2 className="h-9 w-9 text-m3" aria-hidden />
           <p className="text-base font-medium">Select a company to continue</p>
           <p className="max-w-xs text-sm text-m3">
-            Use the company selector in the sidebar to choose a client, then
-            navigate here again.
+            Use the company selector in the Social navigation panel to choose a
+            client, then navigate here again.
           </p>
         </div>
       );
