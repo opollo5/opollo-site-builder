@@ -1157,25 +1157,11 @@ function printResults(issues: Issue[]): boolean {
 // sweep migrates them.
 //
 // PAGE_HEADER_DEFERRED_ROUTES: routes pending migration. Remove entries
-// as each route adopts PageHeader. This list should reach [] when
-// migration completes (Spec 04). New routes added here = regression —
-// don't.
-const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
-  // /admin/* deferred routes — drains as Spec 04 PRs B–E migrate.
-  // PR B (batch 1): admin index, batches/*, companies/*, email-test, images.
-  // PR C (batch 2): images/[id], posts/new, settings/design-system,
-  //                  sites/[id], sites/[id]/appearance, blueprints/review,
-  //                  briefs/[brief_id]/review. /admin/settings → EXEMPT.
-  "app/admin/sites/[id]/posts/new/page.tsx",
-  "app/admin/sites/[id]/posts/[post_id]/page.tsx",
-  "app/admin/system/jobs/page.tsx",
-  "app/admin/users/page.tsx",
-  "app/admin/users/audit/page.tsx",
-  // /account/* deferred (the operator account-management surface; same
-  // mechanical migration as /admin/* but kept out of PR 2's scope).
-  "app/account/devices/page.tsx",
-  "app/account/security/page.tsx",
-];
+// as each route adopts PageHeader. This list reached [] when Spec 04
+// PR E landed — every /admin/* and /account/* route now uses PageHeader
+// (or sits in PAGE_HEADER_EXEMPT_ROUTES below). New routes added here =
+// regression — don't.
+const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [];
 
 // PAGE_HEADER_EXEMPT_ROUTES: routes that intentionally don't use
 // PageHeader because they have a different chrome contract (e.g.

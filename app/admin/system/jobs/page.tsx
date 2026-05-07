@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { H1, H2, Lead } from "@/components/ui/typography";
+import { H2 } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -255,19 +256,21 @@ export default async function SystemJobsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Admin", href: "/admin/sites" },
-          { label: "System", href: "/admin/system/jobs" },
-          { label: "Jobs" },
-        ]}
-      />
-      <H1 className="mt-2">System jobs</H1>
-      <Lead className="mt-1">
-        Cron schedule + queue depth across the worker pipelines. Refresh the
-        page to re-read; counts come straight from the queue tables.
-      </Lead>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "System", href: "/admin/system/jobs" },
+            { label: "Jobs" },
+          ]}
+        />
+        <PageHeader.Title>System jobs</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Cron schedule + queue depth across the worker pipelines. Refresh the
+          page to re-read; counts come straight from the queue tables.
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {stuckQueues.length > 0 && (
         <div
@@ -422,6 +425,6 @@ export default async function SystemJobsPage() {
           </table>
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }

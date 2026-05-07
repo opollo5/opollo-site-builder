@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { InviteUserButton } from "@/components/InviteUserButton";
 import { PendingInvitesTable } from "@/components/PendingInvitesTable";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { UsersTable } from "@/components/UsersTable";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -75,18 +76,24 @@ export default async function AdminUsersPage() {
     },
   );
 
+  const userCount = (usersRes.data ?? []).length;
+  const subtitle =
+    userCount === 0
+      ? "No users yet."
+      : `${userCount} ${userCount === 1 ? "user" : "users"} with access. Change a role inline; the server blocks self-modification, last-admin demotions, and any change to the super_admin row.`;
+
   return (
-    <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <H1>Users</H1>
-          <Lead className="mt-0.5">
-            {(usersRes.data ?? []).length === 0
-              ? "No users yet."
-              : `${(usersRes.data ?? []).length} ${(usersRes.data ?? []).length === 1 ? "user" : "users"} with access. Change a role inline; the server blocks self-modification, last-admin demotions, and any change to the super_admin row.`}
-          </Lead>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Users" },
+          ]}
+        />
+        <PageHeader.Title>Users</PageHeader.Title>
+        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
+        <PageHeader.Actions>
           {isSuperAdmin && (
             <Link
               href="/admin/users/audit"
@@ -97,8 +104,8 @@ export default async function AdminUsersPage() {
             </Link>
           )}
           <InviteUserButton actorRole={actorRole} />
-        </div>
-      </div>
+        </PageHeader.Actions>
+      </PageHeader>
 
       {pendingInvites.length > 0 && (
         <div className="mt-6">
@@ -126,6 +133,6 @@ export default async function AdminUsersPage() {
           </>
         )}
       </div>
-    </>
+    </PageShell>
   );
 }
