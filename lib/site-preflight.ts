@@ -51,17 +51,20 @@ export const REQUIRED_PUBLISH_CAPABILITIES = [
 
 export type PreflightBlocker = {
   // Short identifier for the UI to switch on; mirrors the parent plan's
-  // "three blockers" list.
+  // "three blockers" list, plus Spec 03's BLOG_STYLE_NOT_CALIBRATED.
   code:
     | "AUTH_CAPABILITY_MISSING"
     | "REST_UNREACHABLE"
     | "REST_AUTH_FAILED"
-    | "SITE_CONFIG_MISSING";
+    | "SITE_CONFIG_MISSING"
+    | "BLOG_STYLE_NOT_CALIBRATED";
   title: string;
   detail: string;
   nextAction: string;
   /** Specific capabilities missing when code is AUTH_CAPABILITY_MISSING. */
   missing_capabilities?: string[];
+  /** Optional href the UI's "Action" button should link to. */
+  actionHref?: string;
 };
 
 export type PreflightResult =
@@ -199,6 +202,85 @@ function translateWpErrorToBlocker(
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Spec 03 — blog-styling calibration gate for copy_existing sites.
+//
+// Fires when ALL of:
+//   1. content_type === 'post'
+//   2. site_mode === 'copy_existing'
+//   3. extracted_design.blog_styling is null OR has zero source_blog_urls
+//
+// Does NOT fire for new_design (Kadence sync owns blog styling there),
+// for site_mode=null (the onboarding banner handles unconfigured sites),
+// or for content_type='page' (page generation unaffected by blog styling).
+//
+// Returns null when the blocker doesn't apply, or a typed PreflightBlocker
+// that callers can render alongside other preflight failures (UIs MAY
+// see both BLOG_STYLE_NOT_CALIBRATED and REST_AUTH_FAILED simultaneously
+// per the spec — render both).
+// ---------------------------------------------------------------------------
+
+export async function checkBlogStylingCalibrated(
+  site_id: string,
+  content_type: "post" | "page",
+): Promise<PreflightBlocker | null> {
+  if (content_type !== "post") return null;
+
+  const svc = getServiceRoleClient();
+  const res = await svc
+    .from("sites")
+    .select("site_mode, extracted_design")
+    .eq("id", site_id)
+    .maybeSingle();
+
+  if (res.error) {
+    logger.error("site_preflight.blog_styling_check_failed", {
+      site_id,
+      error: res.error,
+    });
+    // Fail open — don't synthesise a blocker on a DB read error.
+    return null;
+  }
+
+  const row = res.data as {
+    site_mode: string | null;
+    extracted_design: unknown;
+  } | null;
+
+  if (!row || row.site_mode !== "copy_existing") return null;
+
+  const extracted = row.extracted_design;
+  const blogStyling =
+    extracted && typeof extracted === "object" && extracted !== null
+      ? (extracted as { blog_styling?: { source_blog_urls?: unknown } }).blog_styling
+      : null;
+  const sourceUrls =
+    blogStyling && typeof blogStyling === "object"
+      ? (blogStyling as { source_blog_urls?: unknown }).source_blog_urls
+      : undefined;
+  const calibrated =
+    blogStyling !== null &&
+    blogStyling !== undefined &&
+    Array.isArray(sourceUrls) &&
+    sourceUrls.length > 0;
+
+  if (calibrated) return null;
+
+  return {
+    code: "BLOG_STYLE_NOT_CALIBRATED",
+    title: "Blog styling not calibrated",
+    detail:
+      'This site is in "copy existing" mode, but we haven\'t learned how its blog posts are styled yet. Generated blog posts may not match your site\'s design.',
+    nextAction: "Calibrate blog styling →",
+    actionHref: `/admin/sites/${site_id}/setup/extract?focus=blog-styling`,
+  };
+}
+
+// NOTE: bulk-blog-upload surface (if added later) must respect this blocker
+// per Spec 03 §2.5 — call checkBlogStylingCalibrated() at the site-picker
+// step and disable the file-drop / paste interface when it returns
+// non-null.
 
 // ---------------------------------------------------------------------------
 // Path-B publish gate — Kadence sync freshness check.
