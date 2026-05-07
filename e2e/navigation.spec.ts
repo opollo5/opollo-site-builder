@@ -135,7 +135,8 @@ test.describe("Section nav", () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("/admin/sites");
     await page.getByTestId("mobile-nav-button").click();
-    await expect(page.getByTestId("nav-sites")).toBeVisible();
-    await expect(page.getByTestId("nav-social")).toBeVisible();
+    const drawer = page.getByRole("dialog", { name: "Navigation" });
+    await expect(drawer.getByRole("link", { name: "Sites" })).toBeVisible();
+    await expect(drawer.getByRole("button", { name: "Social" })).toBeVisible();
   });
 });

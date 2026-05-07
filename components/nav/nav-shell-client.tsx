@@ -298,7 +298,6 @@ function MobileNavContent({
                             <li key={subItem.href}>
                               <Link
                                 href={subItem.href}
-                                data-testid={subItem.testId}
                                 onClick={onClose}
                                 className={cn(
                                   "block rounded-md px-2 py-1.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
@@ -325,7 +324,6 @@ function MobileNavContent({
           <li key={item.key}>
             <Link
               href={item.href}
-              data-testid={item.testId}
               onClick={onClose}
               className={cn(
                 "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
