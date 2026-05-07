@@ -29,6 +29,11 @@ export function getServiceRoleClient(): SupabaseClient<Database> {
       autoRefreshToken: false,
       persistSession: false,
     },
+    global: {
+      // Opt all service-role fetches out of Next.js's Data Cache so
+      // server components always see live DB state on every request.
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
   return serviceRoleClient;
 }

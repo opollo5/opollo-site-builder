@@ -55,6 +55,10 @@ test.describe("platform admin / companies", () => {
       page.getByRole("heading", { name: `E2E Test Co ${slug}` }),
     ).toBeVisible();
     await expect(page.getByTestId("company-detail-slug")).toHaveText(slug);
+
+    // The detail page defaults to the "overview" tab; switch to "members"
+    // before asserting the members/pending sections.
+    await page.getByRole("tab", { name: /members/i }).click();
     await expect(page.getByTestId("company-members-section")).toBeVisible();
     await expect(page.getByTestId("company-pending-section")).toBeVisible();
     await auditA11y(page, testInfo);

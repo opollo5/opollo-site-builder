@@ -13,6 +13,7 @@ import { listPlatformCompanies } from "@/lib/platform/companies";
 //   - [id]/invitations/  (P3-4: invite-from-detail flow)
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export default async function AdminCompaniesPage() {
   const result = await listPlatformCompanies();
