@@ -1,10 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SiteVoiceSettingsForm } from "@/components/SiteVoiceSettingsForm";
 import { UseImageLibraryToggle } from "@/components/UseImageLibraryToggle";
 import { Alert } from "@/components/ui/alert";
-import { H1, H2, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
+import { H2 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -68,24 +69,27 @@ export default async function SiteSettingsPage({
   const imagesWithMetadata = metadataCountRow.count ?? 0;
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Admin", href: "/admin/sites" },
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Settings" },
-        ]}
-      />
-      <H1 className="mt-2">{site.name} — Settings</H1>
-      <Lead className="mt-1">
-        These values pre-populate every new brief. Each brief can still
-        override at commit time without changing the site default.
-      </Lead>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Settings" },
+          ]}
+        />
+        <PageHeader.Title>{site.name} — Settings</PageHeader.Title>
+        <PageHeader.Subtitle>
+          These values pre-populate every new brief. Each brief can still
+          override at commit time without changing the site default.
+        </PageHeader.Subtitle>
+      </PageHeader>
+      <div className="mx-auto max-w-3xl">
 
       <section
         aria-labelledby="voice-heading"
-        className="mt-6 rounded-lg border p-4"
+        className="rounded-lg border p-4"
       >
         <H2 id="voice-heading">Brand voice &amp; design direction</H2>
         <p className="mt-1 text-base text-muted-foreground">
@@ -120,6 +124,7 @@ export default async function SiteSettingsPage({
           />
         </div>
       </section>
-    </div>
+      </div>
+    </PageShell>
   );
 }

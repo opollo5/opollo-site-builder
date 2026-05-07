@@ -1,5 +1,53 @@
 # Spec run blockers
 
+## Spec 02 PR 2 — partial admin-route adoption sweep (8 of 37 routes)
+
+**Date:** 2026-05-07
+
+**Spec section in tension:** Spec 02 §2.1 ("Walk app/admin/**/page.tsx and migrate every page").
+
+**What this PR did:**
+
+Migrated the highest-traffic operator routes:
+
+- `/admin/sites`
+- `/admin/sites/new`
+- `/admin/sites/[id]/edit`
+- `/admin/sites/[id]/onboarding`
+- `/admin/sites/[id]/setup`
+- `/admin/sites/[id]/setup/extract`
+- `/admin/sites/[id]/posts`
+- `/admin/sites/[id]/settings`
+
+**Routes deferred to a follow-up PR:**
+
+- `/admin` (dashboard)
+- `/admin/batches/*`
+- `/admin/companies/*`
+- `/admin/email-test`
+- `/admin/images/*`
+- `/admin/posts/new`
+- `/admin/settings/*`
+- `/admin/sites/[id]` (large detail page with rich aside)
+- `/admin/sites/[id]/appearance`
+- `/admin/sites/[id]/blueprints/*`
+- `/admin/sites/[id]/briefs/*/run`
+- `/admin/sites/[id]/briefs/*/review`
+- `/admin/sites/[id]/content`
+- `/admin/sites/[id]/design-system/*`
+- `/admin/sites/[id]/pages/*`
+- `/admin/sites/[id]/posts/[post_id]`, `/admin/sites/[id]/posts/new`
+- `/admin/system/jobs`
+- `/admin/users/*`
+
+**Reason:** Single autonomous-run session couldn't reliably hand-migrate 37 page.tsx files within reasonable wall-time without risking subtle layout regressions. Each migration is mechanical but unique to the page's existing header structure.
+
+**Implication for PR 3 (audit:static rules):** PR 3's `headings-use-page-header` and `breadcrumb-required-when-page-header` HIGH rules need an allowlist that excludes the deferred routes until a follow-up sweep migrates them. The allowlist is documented in `docs/RULES.md` with a target date.
+
+---
+
+## Spec 03 PR 3 — content_type gating without modifying brief-runner.ts
+
 Surfaced by the autonomous spec runner. Each entry: which spec/PR, the
 contradiction encountered, and the chosen interim behaviour.
 

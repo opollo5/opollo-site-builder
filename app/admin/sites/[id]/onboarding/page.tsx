@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SiteOnboardingForm } from "@/components/SiteOnboardingForm";
 import { Alert } from "@/components/ui/alert";
-import { H1, H3, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
+import { H3 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -62,24 +63,26 @@ export default async function SiteOnboardingPage({
   }
 
   return (
-    <>
-      <Breadcrumbs
-        crumbs={[
-          { label: "Admin", href: "/admin/sites" },
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Onboarding" },
-        ]}
-      />
-
-      <div className="mt-4 max-w-3xl">
-        <H1>How would you like to use this site?</H1>
-        <Lead className="mt-2">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Onboarding" },
+          ]}
+        />
+        <PageHeader.Title>
+          How would you like to use this site?
+        </PageHeader.Title>
+        <PageHeader.Subtitle>
           Pick one. We&apos;ll tailor the rest of the setup — and how
           generated content is styled — based on your choice. You can
           re-onboard later if you change your mind.
-        </Lead>
-
+        </PageHeader.Subtitle>
+      </PageHeader>
+      <div className="max-w-3xl">
         <SiteOnboardingForm siteId={site.id} />
 
         <section className="mt-10 border-t pt-6">
@@ -106,6 +109,6 @@ export default async function SiteOnboardingPage({
           </Link>
         </section>
       </div>
-    </>
+    </PageShell>
   );
 }

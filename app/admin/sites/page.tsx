@@ -1,4 +1,10 @@
+import Link from "next/link";
+
 import { SitesListClient } from "@/components/SitesListClient";
+import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   SITE_SORTABLE_COLUMNS,
@@ -80,22 +86,57 @@ export default async function ManageSitesPage({
   const result = await listSites({ status, sort, dir });
   if (!result.ok) {
     return (
-      <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        role="alert"
-      >
-        Failed to load sites: {result.error.message}
-      </div>
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Sites" },
+            ]}
+          />
+          <PageHeader.Title>Sites</PageHeader.Title>
+        </PageHeader>
+        <div
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+          role="alert"
+        >
+          Failed to load sites: {result.error.message}
+        </div>
+      </PageShell>
     );
   }
   const sites: SiteListItem[] = result.data.sites;
+  const subtitle =
+    sites.length === 0
+      ? "No WordPress sites connected yet."
+      : `${sites.length} WordPress ${sites.length === 1 ? "site" : "sites"} connected to this builder.`;
   return (
-    <SitesListClient
-      sites={sites}
-      filter={status}
-      sort={sort}
-      dir={dir}
-      isSuperAdmin={isSuperAdmin}
-    />
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites" },
+          ]}
+        />
+        <PageHeader.Title>Sites</PageHeader.Title>
+        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button asChild data-testid="add-site-button">
+            <Link href="/admin/sites/new">
+              <NavIcon name="plus" size={16} />
+              New site
+            </Link>
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
+      <SitesListClient
+        sites={sites}
+        filter={status}
+        sort={sort}
+        dir={dir}
+        isSuperAdmin={isSuperAdmin}
+      />
+    </PageShell>
   );
 }
