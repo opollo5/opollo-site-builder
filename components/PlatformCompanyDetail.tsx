@@ -27,7 +27,7 @@ export function PlatformCompanyDetail({
   joinAction?: ((formData: FormData) => Promise<void>) | null;
 }) {
   const { company, members, pending_invitations, stats } = detail;
-  const [activeTab, setActiveTab] = useState<Tab>("members");
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   return (
     <div className="space-y-6">
