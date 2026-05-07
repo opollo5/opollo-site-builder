@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Minimize2, TriangleAlert } from "lucide-react";
-
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   StatusPill,
   pageStatusKind,
@@ -603,7 +602,7 @@ function QualityFlagBadge({ flag }: { flag: BriefPageQualityFlag }) {
       title={QUALITY_FLAG_HINT[flag]}
       label={
         <>
-          <TriangleAlert aria-hidden className="h-3 w-3" />
+          <NavIcon name="warning" size={12} />
           {flag === "cost_ceiling" ? "Cost ceiling hit" : "Capped with issues"}
         </>
       }
@@ -674,9 +673,9 @@ function PagePreview({
               aria-label={fullscreen ? "Exit fullscreen preview" : "Open fullscreen preview"}
             >
               {fullscreen ? (
-                <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+                <NavIcon name="frame-contract" size={14} />
               ) : (
-                <Maximize2 aria-hidden className="h-3.5 w-3.5" />
+                <NavIcon name="frame-expand" size={14} />
               )}
               {fullscreen ? "Exit" : "Fullscreen"}
             </button>
@@ -719,7 +718,7 @@ function PagePreview({
               onClick={() => setFullscreen(false)}
               className="inline-flex items-center gap-1.5 rounded border bg-background px-3 py-1.5 text-sm hover:bg-muted"
             >
-              <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+              <NavIcon name="frame-contract" size={14} />
               Exit fullscreen
             </button>
           </div>

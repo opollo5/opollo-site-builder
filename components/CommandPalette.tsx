@@ -2,20 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  FileText,
-  Globe,
-  Image as ImageIcon,
-  KeyRound,
-  PenSquare,
-  Plus,
-  Settings,
-  Sparkles,
-  Users,
-  Workflow,
-  type LucideIcon,
-} from "lucide-react";
-
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   Command,
   CommandEmpty,
@@ -69,7 +56,7 @@ interface NavigateItem {
   label: string;
   description?: string;
   href: string;
-  icon: LucideIcon;
+  iconName: string;
   keywords?: string;
 }
 
@@ -78,42 +65,42 @@ const NAVIGATE_ITEMS: readonly NavigateItem[] = [
     label: "Sites",
     description: "Manage WordPress sites",
     href: "/admin/sites",
-    icon: Globe,
+    iconName: "earth",
     keywords: "sites wordpress wp manage",
   },
   {
     label: "Post a blog",
     description: "Start a new post — single or bulk",
     href: "/admin/posts/new",
-    icon: PenSquare,
+    iconName: "blog",
     keywords: "post blog new draft compose write bulk upload",
   },
   {
     label: "Batches",
     description: "Generation runs",
     href: "/admin/batches",
-    icon: Workflow,
+    iconName: "tree",
     keywords: "batches jobs generation runs",
   },
   {
     label: "Images",
     description: "Image library",
     href: "/admin/images",
-    icon: ImageIcon,
+    iconName: "picture",
     keywords: "images library media uploads",
   },
   {
     label: "Users",
     description: "Operator access",
     href: "/admin/users",
-    icon: Users,
+    iconName: "users",
     keywords: "users team operators access roles",
   },
   {
     label: "Account security",
     description: "Change your password",
     href: "/account/security",
-    icon: KeyRound,
+    iconName: "key",
     keywords: "account security password 2fa profile",
   },
 ];
@@ -252,7 +239,7 @@ export function CommandPalette() {
                     value={`recent ${site.name}`}
                     onSelect={() => navigateToSite(site)}
                   >
-                    <Globe aria-hidden className="h-4 w-4 text-muted-foreground" />
+                    <NavIcon name="earth" size={16} className="text-muted-foreground" />
                     <span className="truncate">{site.name}</span>
                   </CommandItem>
                 ))}
@@ -263,14 +250,13 @@ export function CommandPalette() {
 
             <CommandGroup heading="Navigate">
               {NAVIGATE_ITEMS.map((item) => {
-                const Icon = item.icon;
                 return (
                   <CommandItem
                     key={item.href}
                     value={`${item.label} ${item.keywords ?? ""}`}
                     onSelect={() => navigate(item.href)}
                   >
-                    <Icon aria-hidden className="h-4 w-4 text-muted-foreground" />
+                    <NavIcon name={item.iconName} size={16} className="text-muted-foreground" />
                     <span className="flex-1 truncate">{item.label}</span>
                     {item.description && (
                       <span className="ml-2 shrink-0 text-sm text-muted-foreground">
@@ -292,7 +278,7 @@ export function CommandPalette() {
                       value={`site ${site.name} ${site.prefix} ${site.status}`}
                       onSelect={() => navigateToSite(site)}
                     >
-                      <Globe aria-hidden className="h-4 w-4 text-muted-foreground" />
+                      <NavIcon name="earth" size={16} className="text-muted-foreground" />
                       <span className="flex-1 truncate">{site.name}</span>
                       <span className="ml-2 shrink-0 text-sm text-muted-foreground">
                         /{site.prefix}
@@ -309,7 +295,7 @@ export function CommandPalette() {
                   value="add-site"
                   onSelect={() => navigate("/admin/sites")}
                 >
-                  <Plus aria-hidden className="h-4 w-4 text-muted-foreground" />
+                  <NavIcon name="plus" size={16} className="text-muted-foreground" />
                   <span className="flex-1">Add your first site</span>
                 </CommandItem>
               </CommandGroup>
@@ -318,7 +304,7 @@ export function CommandPalette() {
             {sitesError && (
               <CommandGroup heading="Sites">
                 <CommandItem disabled value="sites-error">
-                  <Sparkles aria-hidden className="h-4 w-4 text-destructive" />
+                  <NavIcon name="warning" size={16} className="text-destructive" />
                   <span className="text-destructive">{sitesError}</span>
                 </CommandItem>
               </CommandGroup>
@@ -331,10 +317,7 @@ export function CommandPalette() {
                 value="settings account-security"
                 onSelect={() => navigate("/account/security")}
               >
-                <Settings
-                  aria-hidden
-                  className="h-4 w-4 text-muted-foreground"
-                />
+                <NavIcon name="cog" size={16} className="text-muted-foreground" />
                 <span>Account security</span>
               </CommandItem>
               <CommandItem
@@ -349,9 +332,10 @@ export function CommandPalette() {
                   );
                 }}
               >
-                <FileText
-                  aria-hidden
-                  className="h-4 w-4 text-muted-foreground"
+                <NavIcon
+                  name="file-empty"
+                  size={16}
+                  className="text-muted-foreground"
                 />
                 <span className="flex-1">Open docs (GitHub)</span>
                 <span className="ml-2 shrink-0 text-sm text-muted-foreground">

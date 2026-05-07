@@ -2,9 +2,9 @@
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
 // RS-0 — shadcn-shape Radix Dialog wrapper.
@@ -67,7 +67,7 @@ const DialogContent = React.forwardRef<
         )}
         aria-label="Close"
       >
-        <X aria-hidden className="h-5 w-5" />
+        <NavIcon name="cross" size={20} />
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>

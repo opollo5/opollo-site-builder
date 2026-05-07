@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 // DESIGN-SYSTEM-OVERHAUL PR 14 — uniform "something went wrong"
 // surface. Wherever an admin route has historically dumped a raw
@@ -46,9 +46,10 @@ export function ErrorFallback({
       data-testid={testId ?? "error-fallback"}
     >
       <div className="flex items-start gap-3">
-        <AlertTriangle
-          aria-hidden
-          className="mt-0.5 h-5 w-5 shrink-0 text-destructive"
+        <NavIcon
+          name="warning"
+          size={20}
+          className="mt-0.5 shrink-0 text-destructive"
         />
         <div className="flex-1 space-y-2">
           <p className="text-sm font-semibold">{title}</p>

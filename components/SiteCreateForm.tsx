@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { CheckCircle2, ChevronDown, ChevronRight, Info, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
 
 // AUTH-FOUNDATION P2.2 — Single-page guided form for /admin/sites/new.
@@ -294,7 +294,7 @@ export function SiteCreateForm() {
           >
             {testResult.kind === "testing" ? (
               <>
-                <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                <NavIcon name="sync" size={14} className="animate-spin" />
                 Testing…
               </>
             ) : (
@@ -351,10 +351,11 @@ function TestResultPanel({
         data-matches-current={matchesCurrent ? "true" : "false"}
       >
         <div className="flex items-start gap-2">
-          <CheckCircle2
-            aria-hidden
+          <NavIcon
+            name="checkmark-circle"
+            size={16}
             className={cn(
-              "h-4 w-4 shrink-0",
+              "shrink-0",
               matchesCurrent ? "text-success" : "text-warning",
             )}
           />
@@ -402,11 +403,11 @@ function ApplicationPasswordHelp() {
         data-testid="site-wp-password-help-toggle"
       >
         {open ? (
-          <ChevronDown aria-hidden className="h-3.5 w-3.5" />
+          <NavIcon name="chevron-down" size={14} />
         ) : (
-          <ChevronRight aria-hidden className="h-3.5 w-3.5" />
+          <NavIcon name="chevron-right" size={14} />
         )}
-        <Info aria-hidden className="h-3.5 w-3.5" />
+        <NavIcon name="question-circle" size={14} />
         <span>How do I get this?</span>
       </button>
       {open && (

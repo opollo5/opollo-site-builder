@@ -411,7 +411,7 @@ Two-level persistent navigation: narrow primary rail (70px) + conditional sectio
 | `components/nav/nav-shell-client.tsx` | Mobile state + desktop composition (Client Component) |
 | `components/nav/nav-shell.tsx` | Server wrapper: reads cookies, exports `NavShell` + `NavUserContext` |
 | `components/nav/company-selector.tsx` | Company switcher (shown in Social section nav for Opollo staff) |
-| `components/ui/nav-icon.tsx` | Lucide icon wrapper — use for EVERY nav icon |
+| `components/ui/nav-icon.tsx` | Linearicons wrapper — use for EVERY icon (`<NavIcon name="..." size={N} />`) |
 
 ### Adding a new authenticated section (e.g. Reports)
 
@@ -420,7 +420,7 @@ Two-level persistent navigation: narrow primary rail (70px) + conditional sectio
 {
   key: "reports",
   label: "Reports",
-  icon: BarChart2,       // from lucide-react
+  icon: "chart-bars",    // Linearicons name (no `icon-` prefix). See docs/patterns/icons.md.
   href: "/reports",
   pathPrefixes: ["/reports"],
   testId: "nav-reports",

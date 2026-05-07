@@ -7,9 +7,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { ChevronDown, ChevronRight, FileText, Upload, X } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -276,7 +275,7 @@ export function BulkUploadPanel({ siteId }: { siteId: string }) {
         )}
         data-testid="bulk-dropzone"
       >
-        <Upload aria-hidden className="mx-auto mb-2 h-6 w-6 text-muted-foreground" />
+        <NavIcon name="upload" size={24} className="mx-auto mb-2 text-muted-foreground" />
         <p className="font-medium">Drop markdown, HTML, or text files here</p>
         <p className="mt-1 text-sm text-muted-foreground">
           Each file becomes one post. Max 10 MB per file. Or
@@ -552,10 +551,11 @@ function BulkCandidateCard({
       data-status={candidate.status}
     >
       <div className="flex items-start gap-3 p-3">
-        <FileText
-          aria-hidden
+        <NavIcon
+          name="file-empty"
+          size={16}
           className={cn(
-            "mt-2 h-4 w-4 shrink-0",
+            "mt-2 shrink-0",
             candidate.status === "saved"
               ? "text-success"
               : candidate.status === "failed"
@@ -619,9 +619,9 @@ function BulkCandidateCard({
             data-testid="bulk-candidate-preview-toggle"
           >
             {previewOpen ? (
-              <ChevronDown aria-hidden className="h-3 w-3" />
+              <NavIcon name="chevron-down" size={12} />
             ) : (
-              <ChevronRight aria-hidden className="h-3 w-3" />
+              <NavIcon name="chevron-right" size={12} />
             )}
             Preview body
           </button>
@@ -669,7 +669,7 @@ function BulkCandidateCard({
               aria-label={`Remove ${candidate.origin}`}
               className="rounded-md p-1 text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             >
-              <X aria-hidden className="h-3.5 w-3.5" />
+              <NavIcon name="cross" size={14} />
             </button>
           )}
         </div>

@@ -50,6 +50,16 @@ export default async function RootLayout({
         />
         {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link rel="stylesheet" href="/styles/ds.css" />
+        {/* Linearicons icon font — served as a static asset; CSS class API is `icon-{name}`. */}
+        <link
+          rel="preload"
+          as="font"
+          href="/fonts/linearicons/icomoon.woff?585at6"
+          type="font/woff"
+          crossOrigin=""
+        />
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
+        <link rel="stylesheet" href="/fonts/linearicons/linearicons.css" />
         {cssOverride && (
           // Inject per-instance design token overrides from design_system_settings.
           // eslint-disable-next-line react/no-danger

@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Building2, Check, ChevronsUpDown } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 
 type Company = {
   id: string;
@@ -68,7 +68,7 @@ export function CompanySelector({
   if (!isOpolloStaff) {
     return (
       <div className="flex items-center gap-2 px-3 py-2">
-        <Building2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-icon-dim" />
+        <NavIcon name="apartment" size={14} className="shrink-0 text-icon-dim" />
         <span className="truncate text-sm font-medium text-foreground">
           {companyName ?? "No company"}
         </span>
@@ -87,7 +87,11 @@ export function CompanySelector({
         aria-label={`Company: ${companyName ?? "None selected"}`}
         className="group flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-smooth hover:bg-nav-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
       >
-        <Building2 aria-hidden className="h-3.5 w-3.5 shrink-0 text-icon-dim group-hover:text-gr" />
+        <NavIcon
+          name="apartment"
+          size={14}
+          className="shrink-0 text-icon-dim group-hover:text-gr"
+        />
         <span
           className={cn(
             "flex-1 truncate text-left font-medium",
@@ -96,7 +100,11 @@ export function CompanySelector({
         >
           {switching ? "Switching…" : (companyName ?? "Select company")}
         </span>
-        <ChevronsUpDown aria-hidden className="h-3 w-3 shrink-0 opacity-50" />
+        <NavIcon
+          name="chevrons-expand-vertical"
+          size={12}
+          className="shrink-0 opacity-50"
+        />
       </button>
 
       {selectorOpen && (
@@ -113,7 +121,7 @@ export function CompanySelector({
             className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-m3 transition-colors hover:bg-muted hover:text-foreground"
           >
             {!companyId ? (
-              <Check className="h-3 w-3 shrink-0 text-pk" aria-hidden />
+              <NavIcon name="check" size={12} className="shrink-0 text-pk" />
             ) : (
               <span className="h-3 w-3 shrink-0" aria-hidden />
             )}
@@ -142,7 +150,7 @@ export function CompanySelector({
                       )}
                     >
                       {isSelected ? (
-                        <Check className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                        <NavIcon name="check" size={14} className="shrink-0" />
                       ) : (
                         <span className="h-3.5 w-3.5 shrink-0" aria-hidden />
                       )}

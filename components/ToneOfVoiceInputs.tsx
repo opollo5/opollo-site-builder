@@ -2,10 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Loader2, Sparkles, Check } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -430,12 +430,12 @@ export function ToneOfVoiceInputs({
         >
           {extracting ? (
             <>
-              <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+              <NavIcon name="sync" size={16} className="animate-spin" />
               Extracting…
             </>
           ) : (
             <>
-              <Sparkles aria-hidden className="h-4 w-4" />
+              <NavIcon name="magic-wand" size={16} />
               {tone ? "Re-extract tone" : "Extract tone of voice"}
             </>
           )}
@@ -497,12 +497,12 @@ export function ToneOfVoiceInputs({
           >
             {approving ? (
               <>
-                <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+                <NavIcon name="sync" size={16} className="animate-spin" />
                 Approving…
               </>
             ) : (
               <>
-                <Check aria-hidden className="h-4 w-4" />
+                <NavIcon name="check" size={16} />
                 Approve tone of voice
               </>
             )}

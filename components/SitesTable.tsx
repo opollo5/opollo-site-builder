@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowDown, ArrowUp, Globe, Plus } from "lucide-react";
 
 import { SiteActionsMenu } from "@/components/SiteActionsMenu";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   StatusPill,
   siteStatusKind,
@@ -148,10 +148,10 @@ function SortHeader({
     >
       {label}
       {active && dir === "desc" && (
-        <ArrowDown aria-hidden className="h-5 w-5" />
+        <NavIcon name="arrow-down" size={20} />
       )}
       {active && dir !== "desc" && (
-        <ArrowUp aria-hidden className="h-5 w-5" />
+        <NavIcon name="arrow-up" size={20} />
       )}
     </Link>
   );
@@ -168,7 +168,7 @@ export function SitesTable({
   if (sites.length === 0) {
     return (
       <EmptyState
-        icon={Globe}
+        icon={<NavIcon name="earth" size={20} />}
         iconLabel="No sites"
         title="No sites connected yet"
         body={
@@ -181,7 +181,7 @@ export function SitesTable({
         cta={
           onCreateClick && (
             <Button onClick={onCreateClick}>
-              <Plus aria-hidden className="h-4 w-4" />
+              <NavIcon name="plus" size={16} />
               Add a site
             </Button>
           )

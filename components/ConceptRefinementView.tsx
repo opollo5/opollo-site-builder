@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Check, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   ConceptResult,
@@ -277,7 +277,7 @@ export function ConceptRefinementView({
           >
             {refining ? (
               <>
-                <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                <NavIcon name="sync" size={14} className="animate-spin" />
                 Refining…
               </>
             ) : (
@@ -306,12 +306,12 @@ export function ConceptRefinementView({
         >
           {approving ? (
             <>
-              <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+              <NavIcon name="sync" size={16} className="animate-spin" />
               Approving…
             </>
           ) : (
             <>
-              <Check aria-hidden className="h-4 w-4" />
+              <NavIcon name="check" size={16} />
               Approve this direction
             </>
           )}
@@ -397,12 +397,12 @@ export function ApprovedDesignReadout({
         >
           {resetting ? (
             <>
-              <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+              <NavIcon name="sync" size={14} className="animate-spin" />
               Resetting…
             </>
           ) : (
             <>
-              <RotateCcw aria-hidden className="h-3.5 w-3.5" />
+              <NavIcon name="undo" size={14} />
               Reset and start over
             </>
           )}

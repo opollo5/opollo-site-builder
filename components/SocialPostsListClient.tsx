@@ -3,9 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock, List } from "lucide-react";
-
 import { BulkUploadButton } from "@/components/BulkUploadButton";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
@@ -332,14 +331,14 @@ export function SocialPostsListClient({
             href="/company/social/calendar"
             className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
           >
-            <CalendarDays className={cn("h-3.5 w-3.5")} aria-hidden />
+            <NavIcon name="calendar-full" size={14} />
             Calendar
           </Link>
           <span
             aria-current="page"
             className="flex items-center gap-1.5 border-r border-white/[0.1] bg-pk px-3 py-1.5 text-sm text-white"
           >
-            <List className="h-3.5 w-3.5" aria-hidden />
+            <NavIcon name="list" size={14} />
             Posts
           </span>
           <button
@@ -348,7 +347,7 @@ export function SocialPostsListClient({
             title="Coming soon"
             className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-m3 opacity-40"
           >
-            <Clock className="h-3.5 w-3.5" aria-hidden />
+            <NavIcon name="clock" size={14} />
             Timeline
           </button>
         </div>

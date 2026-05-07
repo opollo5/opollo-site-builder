@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import { RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -204,11 +204,11 @@ export function DesignSystemSettingsClient({ initialSettings }: Props) {
             disabled={isPending}
             data-testid="ds-settings-reset"
           >
-            <RotateCcw aria-hidden className="h-4 w-4" />
+            <NavIcon name="undo" size={16} />
             Reset to defaults
           </Button>
           <Button size="sm" onClick={handleSave} disabled={isPending} data-testid="ds-settings-save">
-            <Save aria-hidden className="h-4 w-4" />
+            <NavIcon name="floppy-disk" size={16} />
             {isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>

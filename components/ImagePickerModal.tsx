@@ -1,9 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Sparkles, Upload as UploadIcon, Search, Link2 } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   Dialog,
   DialogContent,
@@ -251,7 +250,7 @@ export function ImagePickerModal({
             <SegmentedTab
               active={tab === "suggested"}
               onClick={() => setTab("suggested")}
-              icon={Sparkles}
+              iconName="magic-wand"
               testId="picker-tab-suggested"
             >
               Suggested
@@ -260,7 +259,7 @@ export function ImagePickerModal({
           <SegmentedTab
             active={tab === "browse"}
             onClick={() => setTab("browse")}
-            icon={Search}
+            iconName="magnifier"
             testId="picker-tab-browse"
           >
             Browse
@@ -268,7 +267,7 @@ export function ImagePickerModal({
           <SegmentedTab
             active={tab === "upload"}
             onClick={() => setTab("upload")}
-            icon={UploadIcon}
+            iconName="upload"
             testId="picker-tab-upload"
           >
             Upload
@@ -587,7 +586,7 @@ function UrlSubMode({
         data-testid="picker-url-disclosure"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
       >
-        <Link2 aria-hidden className="h-3 w-3" />
+        <NavIcon name="link2" size={12} />
         Or paste a URL instead
       </button>
     );
@@ -654,13 +653,13 @@ function UrlSubMode({
 function SegmentedTab({
   active,
   onClick,
-  icon: Icon,
+  iconName,
   testId,
   children,
 }: {
   active: boolean;
   onClick: () => void;
-  icon: typeof Sparkles;
+  iconName: string;
   testId?: string;
   children: React.ReactNode;
 }) {
@@ -683,7 +682,7 @@ function SegmentedTab({
           : "text-muted-foreground hover:text-foreground",
       )}
     >
-      <Icon aria-hidden className="h-3.5 w-3.5" />
+      <NavIcon name={iconName} size={14} />
       {children}
     </button>
   );

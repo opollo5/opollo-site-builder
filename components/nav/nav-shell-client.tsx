@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Menu, X } from "lucide-react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { PrimaryNav } from "./primary-nav";
 import { SectionNav, SECTION_NAV_COLLAPSED_COOKIE } from "./section-nav";
 import {
@@ -83,13 +83,11 @@ export function NavShellClient({
     if (!item) return;
 
     if (sectionKey !== activeSectionKey) {
-      // Navigate to this section and show its panel
       router.push(item.href);
       setSectionNavCollapsed(false);
       return;
     }
 
-    // Already on this section — toggle panel
     setSectionNavCollapsed((prev) => {
       const next = !prev;
       persistSectionNavCollapsed(next);
@@ -115,10 +113,11 @@ export function NavShellClient({
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logos/opollo-logo-dark.png"
+            src="/images/opollo-icon.png"
             alt="Opollo"
-            width={100}
-            className="h-7 w-auto"
+            width={32}
+            height={32}
+            className="h-8 w-8"
           />
         </Link>
         <button
@@ -129,7 +128,7 @@ export function NavShellClient({
           className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           data-testid="mobile-nav-button"
         >
-          <Menu aria-hidden className="h-5 w-5" />
+          <NavIcon name="menu" size={20} />
         </button>
       </div>
 
@@ -162,10 +161,11 @@ export function NavShellClient({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src="/logos/opollo-logo-dark.png"
+              src="/images/opollo-icon.png"
               alt="Opollo"
-              width={100}
-              className="h-7 w-auto"
+              width={32}
+              height={32}
+              className="h-8 w-8"
             />
           </Link>
           <button
@@ -174,7 +174,7 @@ export function NavShellClient({
             aria-label="Close navigation"
             className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           >
-            <X aria-hidden className="h-5 w-5" />
+            <NavIcon name="cross" size={20} />
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
@@ -187,7 +187,6 @@ export function NavShellClient({
 
       {/* Desktop nav panels (hidden on mobile) */}
       <div className="hidden sm:flex shrink-0 h-full">
-        {/* Primary nav rail */}
         <PrimaryNav
           navContext={navContext}
           activeSectionKey={activeSectionKey}
@@ -195,7 +194,6 @@ export function NavShellClient({
           isSectionNavVisible={hasSectionNav && !sectionNavCollapsed}
         />
 
-        {/* Section nav panel */}
         {hasSectionNav && (
           <SectionNav
             navContext={navContext}
@@ -207,7 +205,6 @@ export function NavShellClient({
 
       {/* Content column — single render for both desktop and mobile */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {/* Spacer clears the fixed mobile top bar */}
         <div aria-hidden className="h-14 shrink-0 sm:hidden" />
         <main
           id={skipToId}
@@ -225,10 +222,6 @@ export function NavShellClient({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Mobile nav — flat accordion list showing all primary + section items
-// ---------------------------------------------------------------------------
 
 function MobileNavContent({
   navContext,
@@ -265,15 +258,16 @@ function MobileNavContent({
                 className={cn(
                   "group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActive
-                    ? "bg-nav-active text-pk font-medium"
+                    ? "bg-nav-active font-medium text-foreground"
                     : "text-m2 hover:bg-nav-hover hover:text-gr",
                 )}
               >
-                <item.icon
-                  aria-hidden
+                <NavIcon
+                  name={item.icon}
+                  size={16}
                   className={cn(
-                    "h-4 w-4 shrink-0",
-                    isActive ? "text-pk" : "text-icon-dim group-hover:text-gr",
+                    "shrink-0",
+                    isActive ? "text-foreground" : "text-icon-dim group-hover:text-gr",
                   )}
                 />
                 <span className="flex-1 text-left">{item.label}</span>
@@ -302,7 +296,7 @@ function MobileNavContent({
                                 className={cn(
                                   "block rounded-md px-2 py-1.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                                   subActive
-                                    ? "text-pk font-medium"
+                                    ? "font-medium text-foreground"
                                     : "text-m2 hover:text-gr",
                                 )}
                               >
@@ -328,15 +322,16 @@ function MobileNavContent({
               className={cn(
                 "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                 isActive
-                  ? "bg-nav-active text-pk font-medium"
+                  ? "bg-nav-active font-medium text-foreground"
                   : "text-m2 hover:bg-nav-hover hover:text-gr",
               )}
             >
-              <item.icon
-                aria-hidden
+              <NavIcon
+                name={item.icon}
+                size={16}
                 className={cn(
-                  "h-4 w-4 shrink-0",
-                  isActive ? "text-pk" : "text-icon-dim group-hover:text-gr",
+                  "shrink-0",
+                  isActive ? "text-foreground" : "text-icon-dim group-hover:text-gr",
                 )}
               />
               {item.label}
@@ -345,7 +340,6 @@ function MobileNavContent({
         );
       })}
 
-      {/* Sign out */}
       {navContext.email && (
         <li className="mt-2 border-t border-border pt-2">
           <form action="/logout" method="POST">

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H1, Lead } from "@/components/ui/typography";
-import { Download, FileText, Plus } from "lucide-react";
+import { NavIcon } from "@/components/ui/nav-icon";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
   listPostsForSite,
@@ -154,7 +154,7 @@ export default async function SitePostsList({
                 download
                 data-testid="download-all-button"
               >
-                <Download aria-hidden className="h-4 w-4" />
+                <NavIcon name="download" size={16} />
                 Download all
               </a>
             </Button>
@@ -164,7 +164,7 @@ export default async function SitePostsList({
               href={`/admin/sites/${site.id}/posts/new`}
               data-testid="new-post-button"
             >
-              <Plus aria-hidden className="h-4 w-4" />
+              <NavIcon name="plus" size={16} />
               New post
             </Link>
           </Button>
@@ -232,7 +232,7 @@ export default async function SitePostsList({
       {items.length === 0 ? (
         <div className="mt-4">
           <EmptyState
-            icon={FileText}
+            icon={<NavIcon name="file-empty" size={20} />}
             iconLabel="No posts"
             title={
               parsed.status || parsed.query
@@ -255,7 +255,7 @@ export default async function SitePostsList({
               !parsed.status && !parsed.query ? (
                 <Button asChild>
                   <Link href={`/admin/sites/${site.id}/posts/new`}>
-                    <Plus aria-hidden className="h-4 w-4" />
+                    <NavIcon name="plus" size={16} />
                     New post
                   </Link>
                 </Button>

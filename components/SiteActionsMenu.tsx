@@ -9,10 +9,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { translateTestConnectionErrorCode } from "@/lib/error-translations";
 
 // AUTH-FOUNDATION P2.3 + Spec 01 — per-row dropdown for /admin/sites.
@@ -151,7 +151,7 @@ export function SiteActionsMenu({
           disabled={testing}
         >
           {testing ? (
-            <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+            <NavIcon name="sync" size={16} className="animate-spin" />
           ) : (
             "⋯"
           )}
