@@ -1161,15 +1161,9 @@ function printResults(issues: Issue[]): boolean {
 // migration completes (Spec 04). New routes added here = regression —
 // don't.
 const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
-  // /admin/* deferred routes (29 of 37)
-  "app/admin/page.tsx",
-  "app/admin/batches/page.tsx",
-  "app/admin/batches/[id]/page.tsx",
-  "app/admin/companies/page.tsx",
-  "app/admin/companies/new/page.tsx",
-  "app/admin/companies/[id]/page.tsx",
-  "app/admin/email-test/page.tsx",
-  "app/admin/images/page.tsx",
+  // /admin/* deferred routes — drains as Spec 04 PRs B–E migrate.
+  // PR B (batch 1): removed admin index, batches/*, companies/*, email-test,
+  //                  images. /admin/page.tsx → moved to EXEMPT below.
   "app/admin/images/[id]/page.tsx",
   "app/admin/posts/new/page.tsx",
   "app/admin/settings/page.tsx",
@@ -1207,8 +1201,10 @@ const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
 // Exempt = permanent. Deferred = temporary (drains to [] as each
 // route migrates). Don't conflate them.
 const PAGE_HEADER_EXEMPT_ROUTES: readonly string[] = [
-  // (empty — populated by Spec 04 migration PRs only when a route
-  // genuinely can't fit PageHeader chrome)
+  // reason: redirect-only page that never renders any UI; importing
+  // PageHeader would be dead code. The file is a single
+  // `redirect("/admin/sites")` call (Spec 04 PR B).
+  "app/admin/page.tsx",
 ];
 
 function isPageHeaderDeferred(rel: string): boolean {

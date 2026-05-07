@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 
 import { EmailTestForm } from "@/components/EmailTestForm";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // AUTH-FOUNDATION P3.4 — /admin/email-test now gated on super_admin.
@@ -22,24 +23,34 @@ export default async function EmailTestPage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <div className="mx-auto max-w-2xl">
-      <H1>SendGrid wrapper test</H1>
-      <Lead className="mt-1">
-        Fire a one-shot test email through{" "}
-        <code className="font-mono text-sm">lib/email/sendgrid.ts</code>.
-        Same code path as the runtime uses — invites, login challenges,
-        every transactional send.
-      </Lead>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Email test" },
+          ]}
+        />
+        <PageHeader.Title>SendGrid wrapper test</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Fire a one-shot test email through{" "}
+          <code className="font-mono text-sm">lib/email/sendgrid.ts</code>.
+          Same code path as the runtime uses — invites, login challenges,
+          every transactional send.
+        </PageHeader.Subtitle>
+      </PageHeader>
 
-      <Alert className="mt-6">
-        Restricted to <strong>super_admin</strong>. Every send is
-        captured in <code className="font-mono text-sm">email_log</code>{" "}
-        for audit.
-      </Alert>
+      <div className="max-w-2xl">
+        <Alert>
+          Restricted to <strong>super_admin</strong>. Every send is
+          captured in <code className="font-mono text-sm">email_log</code>{" "}
+          for audit.
+        </Alert>
 
-      <div className="mt-6">
-        <EmailTestForm />
+        <div className="mt-6">
+          <EmailTestForm />
+        </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
