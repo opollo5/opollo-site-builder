@@ -89,10 +89,10 @@ Spec 04 — PageHeader slot-order flip + polish + complete migration.
 
 | Spec | PR # | Title | Branch | Commit on main | State |
 |---|---|---|---|---|---|
-| 04 | TBD (PR A) | Slot-order flip + polish + rhythm + exempt allowlist | feat/spec04-pr-a-page-header-flip | TBD | TBD |
-| 04 | TBD (PR B) | Migrate batch 1 | feat/spec04-pr-b-migrate-batch-1 | TBD | TBD |
-| 04 | TBD (PR C) | Migrate batch 2 | feat/spec04-pr-c-migrate-batch-2 | TBD | TBD |
-| 04 | TBD (PR D) | Migrate batch 3 | feat/spec04-pr-d-migrate-batch-3 | TBD | TBD |
-| 04 | TBD (PR E) | Final routes + drain `PAGE_HEADER_DEFERRED_ROUTES` to [] | feat/spec04-pr-e-migrate-final | TBD | TBD |
+| 04 | #744 (PR A) | Slot-order flip + polish + rhythm + exempt allowlist | feat/spec04-pr-a-page-header-flip | (auto-closes via squash-dedup) | open, superseded |
+| 04 | #747 (PR B) | Migrate batch 1 | feat/spec04-pr-b-migrate-batch-1 | (auto-closes via squash-dedup) | open, superseded |
+| 04 | #748 (PR C) | Migrate batch 2 | feat/spec04-pr-c-migrate-batch-2 | (auto-closes via squash-dedup) | open, superseded |
+| 04 | #749 (PR D) | Migrate batch 3 + cumulative head | feat/spec04-pr-d-migrate-batch-3 | TBD (squash-merge target) | open |
+| 04 | #750 (PR E) | Final routes + drain `PAGE_HEADER_DEFERRED_ROUTES` to [] | feat/spec04-pr-e-migrate-final | merged into PR D's branch (`99ac09ba`) | merged-stacked |
 
-(Filled in as each PR squash-merges.)
+PR E was stacked on PR D's branch; auto-merge consumed it without going through main, so PR D (#749) is the cumulative head carrying every Spec 04 change. When #749 squash-merges to main, GitHub's squash-dedup auto-closes #744/#747/#748 (their content is identical to D's first three commits).
