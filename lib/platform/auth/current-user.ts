@@ -67,17 +67,11 @@ export async function getCurrentPlatformSession(
       .from("platform_users")
       .upsert({ id: userId, email, is_opollo_staff: true }, { onConflict: "id" });
 
-    // Cookie takes priority; fall back to platform_company_users if no cookie.
-    const staffCompany = await resolveStaffCompany(userId, svc);
-    return { userId, email, isOpolloStaff: true, company: staffCompany };
+    // No company membership yet for auto-provisioned staff.
+    return { userId, email, isOpolloStaff: true, company: null };
   }
 
-  if (profileResult.data.is_opollo_staff === true) {
-    // Cookie takes priority; fall back to platform_company_users if no cookie.
-    const staffCompany = await resolveStaffCompany(userId, svc);
-    return { userId, email, isOpolloStaff: true, company: staffCompany };
-  }
-
+  // Resolve company membership from platform_company_users for all users.
   const membershipResult = await svc
     .from("platform_company_users")
     .select("company_id, role")
@@ -86,19 +80,23 @@ export async function getCurrentPlatformSession(
 
   if (membershipResult.error) return null;
 
-  const company: CompanyMembership | null = membershipResult.data
+  let company: CompanyMembership | null = membershipResult.data
     ? {
         companyId: membershipResult.data.company_id as string,
         role: membershipResult.data.role as CompanyRole,
       }
     : null;
 
-  return {
-    userId,
-    email,
-    isOpolloStaff: false,
-    company,
-  };
+  const isOpolloStaff = profileResult.data.is_opollo_staff === true;
+
+  // Opollo staff can override their company context via a cookie (view-as).
+  // The cookie is set by POST /api/platform/companies/switch.
+  if (isOpolloStaff) {
+    const cookieOverride = await resolveStaffCookieCompany(svc);
+    if (cookieOverride) company = cookieOverride;
+  }
+
+  return { userId, email, isOpolloStaff, company };
 }
 
 export async function getCurrentCompany(
@@ -108,40 +106,17 @@ export async function getCurrentCompany(
   return session?.company ?? null;
 }
 
-// For staff users: cookie-selected company takes priority over their actual
-// platform_company_users row. Falls back to the DB row when no cookie is set
-// so staff who are members of Opollo Internal still get company context.
-async function resolveStaffCompany(
-  userId: string,
-  svc: ReturnType<typeof getServiceRoleClient>,
-): Promise<CompanyMembership | null> {
-  const cookieCompany = await resolveStaffSelectedCompany(svc);
-  if (cookieCompany) return cookieCompany;
-
-  const membershipResult = await svc
-    .from("platform_company_users")
-    .select("company_id, role")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (membershipResult.error || !membershipResult.data) return null;
-  return {
-    companyId: membershipResult.data.company_id as string,
-    role: membershipResult.data.role as CompanyRole,
-  };
-}
-
 // Reads the staff company-selection cookie and validates the company exists.
 // Returns a synthetic admin-role membership so Opollo staff can browse any
-// company's portal without permanently joining it.
-async function resolveStaffSelectedCompany(
+// company's portal without permanently joining it via platform_company_users.
+async function resolveStaffCookieCompany(
   svc: ReturnType<typeof getServiceRoleClient>,
 ): Promise<CompanyMembership | null> {
   let selectedId: string | undefined;
   try {
     selectedId = cookies().get(STAFF_SELECTED_COMPANY_COOKIE)?.value;
   } catch {
-    // cookies() throws outside of a request context (e.g. during tests).
+    // cookies() throws outside of a request context (e.g. Vitest tests).
     return null;
   }
   if (!selectedId || !/^[0-9a-f-]{36}$/i.test(selectedId)) return null;
@@ -154,8 +129,5 @@ async function resolveStaffSelectedCompany(
 
   if (result.error || !result.data) return null;
 
-  return {
-    companyId: selectedId,
-    role: "admin",
-  };
+  return { companyId: selectedId, role: "admin" };
 }
