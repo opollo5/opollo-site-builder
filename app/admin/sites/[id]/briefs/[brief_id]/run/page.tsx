@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBanner";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BriefCommitWaiter } from "@/components/BriefCommitWaiter";
 import { BriefRunClient } from "@/components/BriefRunClient";
@@ -8,6 +9,7 @@ import {
   getBriefWithPages,
   type BriefRunSnapshot,
 } from "@/lib/briefs";
+import { checkBlogStylingCalibrated } from "@/lib/site-preflight";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -138,6 +140,15 @@ export default async function BriefRunPage({
   const usage = Number(budget.data?.monthly_usage_cents ?? 0);
   const remainingBudgetCents = Math.max(0, cap - usage);
 
+  // Spec 03 §2.4 — block Start when content_type='post' on a
+  // copy_existing site without calibrated blog_styling. Banner shows
+  // above the brief; BriefRunClient receives blogStyleBlocked so the
+  // Start button is disabled with the calibrate-first tooltip.
+  const blogStyleBlocker =
+    brief.content_type === "post"
+      ? await checkBlogStylingCalibrated(site.id, "post")
+      : null;
+
   return (
     <main className="mx-auto max-w-5xl p-6">
       <Breadcrumbs
@@ -149,6 +160,7 @@ export default async function BriefRunPage({
           { label: "Run" },
         ]}
       />
+      {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
       <BriefRunClient
         siteId={site.id}
         siteName={site.name}
@@ -159,6 +171,7 @@ export default async function BriefRunPage({
         activeRun={activeRun}
         estimateCents={estimate.ok ? estimate.estimate_cents : 0}
         remainingBudgetCents={remainingBudgetCents}
+        blogStyleBlocked={blogStyleBlocker !== null}
       />
     </main>
   );

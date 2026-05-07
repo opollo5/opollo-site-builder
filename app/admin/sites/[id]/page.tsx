@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBanner";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
@@ -20,6 +21,7 @@ import { NavIcon } from "@/components/ui/nav-icon";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
+import { checkBlogStylingCalibrated } from "@/lib/site-preflight";
 import { getSetupStatus } from "@/lib/site-setup";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -185,10 +187,18 @@ export default async function SiteDetailPage({
     setupStatusResult.data.design_direction_status === "pending" &&
     setupStatusResult.data.tone_of_voice_status === "pending";
 
+  // Spec 03 §2.4 — calibration banner. Suppressed when the site
+  // hasn't yet picked a mode (the onboarding banner above takes
+  // priority for that state).
+  const blogStyleBlocker = !needsOnboarding
+    ? await checkBlogStylingCalibrated(site.id, "post")
+    : null;
+
   return (
     <>
       {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
       {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
+      {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
       <div className="flex items-start justify-between gap-4">
         <div>
           <Breadcrumbs

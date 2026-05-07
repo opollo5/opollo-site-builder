@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBanner";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
   listPostsForSite,
   type PostStatus,
 } from "@/lib/posts";
+import { checkBlogStylingCalibrated } from "@/lib/site-preflight";
 import { getSite } from "@/lib/sites";
 
 // ---------------------------------------------------------------------------
@@ -127,6 +129,12 @@ export default async function SitePostsList({
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + limit, total);
 
+  // Spec 03 §2.4 — block "+ New post" CTA when copy_existing site has
+  // no calibrated blog styling. Banner shows above; CTA renders as
+  // disabled with the spec tooltip.
+  const blogStyleBlocker = await checkBlogStylingCalibrated(site.id, "post");
+  const blogGateBlocked = blogStyleBlocker !== null;
+
   return (
     <main className="mx-auto max-w-5xl p-6">
       <Breadcrumbs
@@ -136,6 +144,8 @@ export default async function SitePostsList({
           { label: "Posts" },
         ]}
       />
+
+      {blogGateBlocked && <BlogStyleCalibrationBanner siteId={site.id} />}
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <div>
@@ -159,15 +169,28 @@ export default async function SitePostsList({
               </a>
             </Button>
           )}
-          <Button asChild>
-            <Link
-              href={`/admin/sites/${site.id}/posts/new`}
-              data-testid="new-post-button"
-            >
-              <NavIcon name="plus" size={16} />
-              New post
-            </Link>
-          </Button>
+          {blogGateBlocked ? (
+            <span title="Calibrate blog styling first">
+              <Button
+                disabled
+                data-testid="new-post-button"
+                aria-disabled="true"
+              >
+                <NavIcon name="plus" size={16} />
+                New post
+              </Button>
+            </span>
+          ) : (
+            <Button asChild>
+              <Link
+                href={`/admin/sites/${site.id}/posts/new`}
+                data-testid="new-post-button"
+              >
+                <NavIcon name="plus" size={16} />
+                New post
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -253,12 +276,21 @@ export default async function SitePostsList({
             }
             cta={
               !parsed.status && !parsed.query ? (
-                <Button asChild>
-                  <Link href={`/admin/sites/${site.id}/posts/new`}>
-                    <NavIcon name="plus" size={16} />
-                    New post
-                  </Link>
-                </Button>
+                blogGateBlocked ? (
+                  <span title="Calibrate blog styling first">
+                    <Button disabled aria-disabled="true">
+                      <NavIcon name="plus" size={16} />
+                      New post
+                    </Button>
+                  </span>
+                ) : (
+                  <Button asChild>
+                    <Link href={`/admin/sites/${site.id}/posts/new`}>
+                      <NavIcon name="plus" size={16} />
+                      New post
+                    </Link>
+                  </Button>
+                )
               ) : (
                 <Button asChild variant="outline">
                   <Link href={`/admin/sites/${site.id}/posts`}>

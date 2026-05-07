@@ -222,6 +222,18 @@ const WP_HTTP_CODE_TABLE: Record<
   },
 };
 
+// Spec 03 §2.2 — operator copy for the BLOG_STYLE_NOT_CALIBRATED preflight
+// blocker. Used by the inline banner on /admin/sites/[id], the posts
+// list, and the run page when content_type='post' and the site is
+// copy_existing without calibrated blog_styling.
+export const BLOG_STYLE_NOT_CALIBRATED_TRANSLATION: OperatorTranslation = {
+  severity: "validation",
+  title: "Blog styling not calibrated",
+  detail:
+    'This site is in "copy existing" mode, but we haven\'t learned how its blog posts are styled yet. Generated blog posts may not match your site\'s design.',
+  nextAction: "Calibrate blog styling →",
+};
+
 // Spec 01 §3.1 — short toast copy for the "Test Connection" dropdown
 // action in /admin/sites. The richer translateWpError() output is
 // shaped for the publish-failure banner (title + detail + nextAction);

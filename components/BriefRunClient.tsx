@@ -106,6 +106,7 @@ export function BriefRunClient({
   activeRun: initialActiveRun,
   estimateCents: initialEstimateCents,
   remainingBudgetCents: initialRemainingBudgetCents,
+  blogStyleBlocked = false,
 }: {
   siteId: string;
   siteName: string;
@@ -116,6 +117,12 @@ export function BriefRunClient({
   activeRun: BriefRunSnapshot | null;
   estimateCents: number;
   remainingBudgetCents: number;
+  /**
+   * Spec 03 §2.4 — when true, Start run is disabled with the
+   * "Calibrate blog styling first" tooltip. Resolved server-side from
+   * checkBlogStylingCalibrated().
+   */
+  blogStyleBlocked?: boolean;
 }) {
   const [controlState, setControlState] = useState<ControlState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -453,13 +460,26 @@ export function BriefRunClient({
 
       {canStartRun && (
         <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            onClick={() => handleStartRun(false)}
-            disabled={controlState !== "idle"}
-          >
-            {controlState === "starting" ? "Starting…" : "Start run"}
-          </Button>
+          {blogStyleBlocked ? (
+            <span title="Calibrate blog styling first">
+              <Button
+                type="button"
+                disabled
+                aria-disabled="true"
+                data-testid="brief-run-start-blocked"
+              >
+                Start run
+              </Button>
+            </span>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => handleStartRun(false)}
+              disabled={controlState !== "idle"}
+            >
+              {controlState === "starting" ? "Starting…" : "Start run"}
+            </Button>
+          )}
         </div>
       )}
 
