@@ -5,9 +5,20 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
+import { NavIcon } from "@/components/ui/nav-icon";
+import { Pill } from "@/components/ui/pill";
+import { TableCell } from "@/components/ui/table-cell";
+import type { RowAction } from "@/components/ui/row-actions";
 import { formatRelativeTime } from "@/lib/utils";
 
-// AUTH-FOUNDATION P3.3 — pending-invites table on /admin/users.
+// ---------------------------------------------------------------------------
+// Spec 18 PR D — PendingInvitesTable migration.
+//
+// Replaced bespoke <table> with the canonical DataTable. Revoke moves
+// from an inline button to the trailing `...` menu (destructive
+// variant). The pre-existing ConfirmDialog gates the actual DELETE.
+// ---------------------------------------------------------------------------
 
 interface PendingInvite {
   id: string;
@@ -25,7 +36,10 @@ export function PendingInvitesTable({
 }) {
   const router = useRouter();
   const [revoking, setRevoking] = useState<string | null>(null);
-  const [pendingRevoke, setPendingRevoke] = useState<{ id: string; email: string } | null>(null);
+  const [pendingRevoke, setPendingRevoke] = useState<{
+    id: string;
+    email: string;
+  } | null>(null);
 
   async function revoke(id: string, email: string) {
     setRevoking(id);
@@ -38,7 +52,8 @@ export function PendingInvitesTable({
       if (!res.ok || !payload?.ok) {
         toast.error("Couldn't revoke invite", {
           description:
-            payload?.error?.message ?? `Revoke failed (HTTP ${res.status}).`,
+            payload?.error?.message ??
+            `Revoke failed (HTTP ${res.status}).`,
         });
         return;
       }
@@ -53,82 +68,98 @@ export function PendingInvitesTable({
     }
   }
 
+  const columns: ColumnDef<PendingInvite>[] = [
+    {
+      key: "email",
+      header: "Email",
+      cell: (i) => <TableCell.Primary>{i.email}</TableCell.Primary>,
+    },
+    {
+      key: "role",
+      header: "Role",
+      cell: (i) => <Pill variant="info">{i.role}</Pill>,
+    },
+    {
+      key: "invited_by",
+      header: "Invited by",
+      cell: (i) =>
+        i.invited_by_email ? (
+          <TableCell.Secondary>{i.invited_by_email}</TableCell.Secondary>
+        ) : (
+          <TableCell.Secondary>(deleted user)</TableCell.Secondary>
+        ),
+    },
+    {
+      key: "sent",
+      header: "Sent",
+      cell: (i) => (
+        <TableCell.Secondary>
+          <span data-screenshot-mask>{formatRelativeTime(i.created_at)}</span>
+        </TableCell.Secondary>
+      ),
+    },
+    {
+      key: "expires",
+      header: "Expires",
+      cell: (i) => {
+        const expiresIn = new Date(i.expires_at).getTime() - Date.now();
+        const expiringSoon = expiresIn < 60 * 60 * 1000;
+        return (
+          <span
+            className={
+              expiringSoon
+                ? "text-sm text-warning"
+                : "text-[13px] text-muted-foreground"
+            }
+            data-screenshot-mask
+          >
+            {formatRelativeTime(i.expires_at)}
+          </span>
+        );
+      },
+    },
+  ];
+
   return (
     <>
       <ConfirmDialog
         open={pendingRevoke !== null}
-        onOpenChange={(o) => !o && setPendingRevoke(null)}
+        onOpenChange={(o) => {
+          if (!o) setPendingRevoke(null);
+        }}
         title="Revoke this invite?"
-        description={pendingRevoke ? `Remove the pending invite for ${pendingRevoke.email}. They will not be able to use the invite link.` : undefined}
+        description={
+          pendingRevoke
+            ? `Remove the pending invite for ${pendingRevoke.email}. They will not be able to use the invite link.`
+            : undefined
+        }
         confirmLabel="Revoke invite"
         confirmVariant="destructive"
-        onConfirm={() => pendingRevoke && void revoke(pendingRevoke.id, pendingRevoke.email)}
+        onConfirm={() =>
+          pendingRevoke && void revoke(pendingRevoke.id, pendingRevoke.email)
+        }
       />
-    <div className="rounded-md border">
-      <table className="w-full text-sm">
-        <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 font-medium">Email</th>
-            <th className="px-3 py-2 font-medium">Role</th>
-            <th className="px-3 py-2 font-medium">Invited by</th>
-            <th className="px-3 py-2 font-medium">Sent</th>
-            <th className="px-3 py-2 font-medium">Expires</th>
-            <th className="w-24 px-2 py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {invites.map((inv) => {
-            const expiresIn = new Date(inv.expires_at).getTime() - Date.now();
-            const expiringSoon = expiresIn < 60 * 60 * 1000; // < 1h
-            return (
-              <tr
-                key={inv.id}
-                className="border-b transition-smooth last:border-b-0 hover:bg-muted/40"
-                data-testid="pending-invite-row"
-              >
-                <td className="px-3 py-2 font-medium">{inv.email}</td>
-                <td className="px-3 py-2">
-                  <span className="inline-flex items-center rounded border border-input px-2 py-0.5 text-sm">
-                    {inv.role}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-sm text-muted-foreground">
-                  {inv.invited_by_email ?? "(deleted user)"}
-                </td>
-                <td className="px-3 py-2 text-sm text-muted-foreground">
-                  <span data-screenshot-mask>
-                    {formatRelativeTime(inv.created_at)}
-                  </span>
-                </td>
-                <td className="px-3 py-2 text-sm">
-                  <span
-                    className={
-                      expiringSoon
-                        ? "text-warning"
-                        : "text-muted-foreground"
-                    }
-                    data-screenshot-mask
-                  >
-                    {formatRelativeTime(inv.expires_at)}
-                  </span>
-                </td>
-                <td className="px-2 py-2 text-right">
-                  <button
-                    type="button"
-                    onClick={() => setPendingRevoke({ id: inv.id, email: inv.email })}
-                    disabled={revoking === inv.id}
-                    className="rounded border px-2 py-0.5 text-sm text-destructive transition-smooth hover:bg-destructive/10 disabled:opacity-60"
-                    data-testid="invite-revoke-button"
-                  >
-                    {revoking === inv.id ? "…" : "Revoke"}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+      <DataTable
+        data={invites}
+        columns={columns}
+        rowKey={(i) => i.id}
+        testId="pending-invites-table"
+        rowActions={(inv): RowAction[] => [
+          {
+            label: "Revoke invite",
+            icon: <NavIcon name="cross-circle" size={14} />,
+            variant: "destructive",
+            disabled: revoking === inv.id,
+            onClick: () => setPendingRevoke({ id: inv.id, email: inv.email }),
+          },
+        ]}
+        emptyState={{
+          icon: <NavIcon name="envelope" size={20} />,
+          iconLabel: "No pending invitations",
+          title: "No pending invitations",
+          body: <>Invites you send will show up here until they&apos;re accepted.</>,
+        }}
+      />
     </>
   );
 }

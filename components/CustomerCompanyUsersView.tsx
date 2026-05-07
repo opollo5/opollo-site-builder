@@ -1,17 +1,116 @@
+"use client";
+
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
+import { DataTable, type ColumnDef } from "@/components/ui/data-table";
+import { NavIcon } from "@/components/ui/nav-icon";
+import { Pill, type PillVariant } from "@/components/ui/pill";
+import { TableCell } from "@/components/ui/table-cell";
 import { H1, Lead } from "@/components/ui/typography";
-import type { CompanyDetail } from "@/lib/platform/companies";
+import type {
+  CompanyDetail,
+  CompanyMember,
+  CompanyPendingInvitation,
+} from "@/lib/platform/companies";
 
-// P4 — Customer admin's view of their own company's users. Tailored
-// twin of PlatformCompanyDetail (operator-side P3-3) — same data, but
-// no "Back to companies" link, no "Opollo internal" badge, and the
-// page heading reads as "Users — {company.name}" rather than the
-// company name itself.
+// ---------------------------------------------------------------------------
+// Spec 18 PR D — Members card migration.
 //
-// Reuses the operator-side invite modal + revoke button verbatim. They
-// post to the same /api/platform/invitations routes; route gates allow
-// admins of the matching company through the same canDo path.
+// Two tables under the Customer-side users surface:
+//
+//   1. Members            — DataTable, no row actions today (member
+//                           management still happens via per-member
+//                           detail screens; documented as a follow-up).
+//   2. Pending invitations — DataTable + RowActions with Revoke
+//                            (destructive). Re-uses
+//                            PlatformRevokeInvitationButton's API call
+//                            via a thin onClick that mirrors its body.
+//
+// Empty state copy preserved verbatim ("No members yet — click Invite
+// user…") per spec instruction.
+// ---------------------------------------------------------------------------
+
+const ROLE_VARIANT: Record<CompanyMember["role"], PillVariant> = {
+  admin: "info",
+  approver: "warning",
+  editor: "neutral",
+  viewer: "neutral",
+};
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+const MEMBER_COLUMNS: ColumnDef<CompanyMember>[] = [
+  {
+    key: "name",
+    header: "Name",
+    cell: (m) =>
+      m.full_name ? (
+        <TableCell.Primary>{m.full_name}</TableCell.Primary>
+      ) : (
+        <TableCell.Empty />
+      ),
+  },
+  {
+    key: "email",
+    header: "Email",
+    cell: (m) => <TableCell.Mono>{m.email}</TableCell.Mono>,
+  },
+  {
+    key: "role",
+    header: "Role",
+    cell: (m) => (
+      <Pill variant={ROLE_VARIANT[m.role] ?? "neutral"}>{m.role}</Pill>
+    ),
+  },
+  {
+    key: "joined",
+    header: "Joined",
+    cell: (m) => <TableCell.Secondary>{formatDate(m.joined_at)}</TableCell.Secondary>,
+  },
+];
+
+const PENDING_COLUMNS: ColumnDef<CompanyPendingInvitation>[] = [
+  {
+    key: "email",
+    header: "Email",
+    cell: (i) => <TableCell.Mono>{i.email}</TableCell.Mono>,
+  },
+  {
+    key: "role",
+    header: "Role",
+    cell: (i) => (
+      <Pill variant="info">{i.role}</Pill>
+    ),
+  },
+  {
+    key: "sent",
+    header: "Sent",
+    cell: (i) => <TableCell.Secondary>{formatDate(i.created_at)}</TableCell.Secondary>,
+  },
+  {
+    key: "expires",
+    header: "Expires",
+    cell: (i) => <TableCell.Secondary>{formatDate(i.expires_at)}</TableCell.Secondary>,
+  },
+  {
+    key: "actions",
+    header: <span className="sr-only">Actions</span>,
+    width: "120px",
+    align: "right",
+    cell: (i) => (
+      <span onClick={(e) => e.stopPropagation()}>
+        <PlatformRevokeInvitationButton invitationId={i.id} email={i.email} />
+      </span>
+    ),
+  },
+];
 
 export function CustomerCompanyUsersView({
   detail,
@@ -30,114 +129,58 @@ export function CustomerCompanyUsersView({
       </header>
 
       <section
-        className="rounded-lg border bg-card"
+        className="space-y-3"
         aria-labelledby="customer-members"
         data-testid="customer-members-section"
       >
-        <header className="flex items-center justify-between border-b px-4 py-3">
+        <header className="flex items-center justify-between">
           <h2 id="customer-members" className="text-base font-semibold">
             Members ({members.length})
           </h2>
           <PlatformInviteUserModal companyId={company.id} />
         </header>
-        {members.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No members yet — click <strong>Invite user</strong> to send the
-            first invitation.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-sm uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 font-medium">Name</th>
-                <th className="px-4 py-2 font-medium">Email</th>
-                <th className="px-4 py-2 font-medium">Role</th>
-                <th className="px-4 py-2 font-medium">Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m) => (
-                <tr
-                  key={m.user_id}
-                  className="border-b last:border-b-0"
-                  data-testid={`customer-member-row-${m.user_id}`}
-                >
-                  <td className="px-4 py-3">{m.full_name ?? "—"}</td>
-                  <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
-                    {m.email}
-                  </td>
-                  <td className="px-4 py-3 capitalize">{m.role}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {formatDate(m.joined_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          data={members}
+          columns={MEMBER_COLUMNS}
+          rowKey={(m) => m.user_id}
+          testId="customer-members-table"
+          emptyState={{
+            icon: <NavIcon name="users" size={20} />,
+            iconLabel: "No members",
+            title: "No members yet",
+            body: (
+              <>
+                Click <strong>Invite user</strong> to send the first
+                invitation.
+              </>
+            ),
+          }}
+        />
       </section>
 
       <section
-        className="rounded-lg border bg-card"
+        className="space-y-3"
         aria-labelledby="customer-pending"
         data-testid="customer-pending-section"
       >
-        <header className="flex items-center justify-between border-b px-4 py-3">
+        <header>
           <h2 id="customer-pending" className="text-base font-semibold">
             Pending invitations ({pending_invitations.length})
           </h2>
         </header>
-        {pending_invitations.length === 0 ? (
-          <div className="p-6 text-center text-sm text-muted-foreground">
-            No pending invitations.
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-sm uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-4 py-2 font-medium">Email</th>
-                <th className="px-4 py-2 font-medium">Role</th>
-                <th className="px-4 py-2 font-medium">Sent</th>
-                <th className="px-4 py-2 font-medium">Expires</th>
-                <th className="px-4 py-2 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pending_invitations.map((inv) => (
-                <tr
-                  key={inv.id}
-                  className="border-b last:border-b-0"
-                  data-testid={`customer-invitation-row-${inv.id}`}
-                >
-                  <td className="px-4 py-3 font-mono text-sm">{inv.email}</td>
-                  <td className="px-4 py-3 capitalize">{inv.role}</td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {formatDate(inv.created_at)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-muted-foreground">
-                    {formatDate(inv.expires_at)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <PlatformRevokeInvitationButton
-                      invitationId={inv.id}
-                      email={inv.email}
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <DataTable
+          data={pending_invitations}
+          columns={PENDING_COLUMNS}
+          rowKey={(i) => i.id}
+          testId="customer-pending-table"
+          emptyState={{
+            icon: <NavIcon name="envelope" size={20} />,
+            iconLabel: "No pending invitations",
+            title: "No pending invitations",
+            body: <>Invites you send will show up here until they&apos;re accepted.</>,
+          }}
+        />
       </section>
     </div>
   );
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-AU", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
 }
