@@ -92,7 +92,7 @@ export function PrimaryNav({
             <span
               className={cn(
                 "w-full truncate text-center leading-none",
-                mobile ? "text-xs" : "text-[11px]",
+                mobile ? "text-xs" : "text-xs",
                 "font-medium",
                 isActive ? "text-pk" : "",
               )}
@@ -129,7 +129,7 @@ export function PrimaryNav({
           <span
             className={cn(
               "w-full truncate text-center leading-none",
-              mobile ? "text-xs" : "text-[11px]",
+              mobile ? "text-xs" : "text-xs",
               "font-medium",
               isActive ? "text-pk" : "",
             )}
@@ -187,8 +187,8 @@ export function PrimaryNav({
                   title="Command palette (⌘K)"
                   className="flex flex-col items-center gap-1 rounded-md px-1 py-2 text-m3"
                 >
-                  <span className="text-[10px] font-mono leading-none">⌘K</span>
-                  <span className="text-[10px] leading-none truncate w-full text-center">
+                  <span className="text-xs font-mono leading-none">⌘K</span>
+                  <span className="text-xs leading-none truncate w-full text-center">
                     {item.label}
                   </span>
                 </div>
@@ -205,7 +205,7 @@ export function PrimaryNav({
                     className="group flex w-full flex-col items-center gap-1 rounded-md px-1 py-2 transition-smooth text-destructive hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
                   >
                     <NavIcon icon={LogOut} size={18} className="shrink-0" />
-                    <span className="text-[10px] font-medium leading-none truncate w-full text-center">
+                    <span className="text-xs font-medium leading-none truncate w-full text-center">
                       {item.label}
                     </span>
                   </button>
@@ -238,7 +238,7 @@ export function PrimaryNav({
                   />
                   <span
                     className={cn(
-                      "text-[10px] font-medium leading-none truncate w-full text-center",
+                      "text-xs font-medium leading-none truncate w-full text-center",
                       active ? "text-pk" : "",
                     )}
                   >
@@ -254,7 +254,7 @@ export function PrimaryNav({
           {/* Email truncated at very bottom */}
           {navContext.email && (
             <p
-              className="mt-1 truncate border-t border-border pt-1.5 px-1 text-[9px] text-m3 text-center"
+              className="mt-1 truncate border-t border-border pt-1.5 px-1 text-xs text-m3 text-center"
               title={navContext.email}
             >
               {navContext.email}

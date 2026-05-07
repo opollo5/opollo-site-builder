@@ -287,7 +287,7 @@ function MobileNavContent({
                   {item.sectionNav.groups.map((group, gi) => (
                     <li key={gi}>
                       {group.label && (
-                        <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-m3">
+                        <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-m3">
                           {group.label}
                         </p>
                       )}
