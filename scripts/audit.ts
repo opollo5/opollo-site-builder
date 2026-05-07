@@ -1087,6 +1087,69 @@ function check10_hardcodedDesignValues(): Issue[] {
 }
 
 // ============================================================================
+// Spec 18 — DataTable usage rule
+// ============================================================================
+//
+// Spec 18 PR D — every list/table view in the admin app must use the
+// canonical DataTable primitive (components/ui/data-table.tsx). Bespoke
+// `<table>` markup in admin / company page files is a regression target.
+//
+// Heuristic: scan app/admin and app/company *.tsx files for `<table` (the
+// opening tag — picks up `<table className=...>` plus the dangling form).
+// Skip the audit log page (legacy server-rendered, owned by a different
+// surface) and the reference / examples page. Skip migration sweeps
+// targeted by the audit (audit/), docs/ snippets, and the test-examples
+// surface itself.
+//
+// LOW severity: this is a code-style nudge, not a build break. Lift to
+// MEDIUM once the legacy holdouts (audit log + jobs + a couple optimiser
+// surfaces) get migrated.
+
+const DATATABLE_AUDIT_EXEMPT: ReadonlySet<string> = new Set([
+  // Reference page renders <table> markup as a counter-example.
+  "app/admin/_internal/table-examples/page.tsx",
+  // Audit log is super_admin-only, structurally tabular but row-content
+  // is JSON metadata; deferred to a follow-up.
+  "app/admin/users/audit/page.tsx",
+  // System jobs view is operator-style read-only; deferred.
+  "app/admin/system/jobs/page.tsx",
+]);
+
+function check_tablesUseDataTable(): Issue[] {
+  const issues: Issue[] = [];
+  const roots = ["app/admin", "app/company"];
+  // <table opening-tag matcher. Avoids matching things like
+  // `<TableCell>` (capitalised T = component, never a raw HTML table).
+  const TABLE_OPEN_RE = /<table\b/;
+
+  for (const root of roots) {
+    const dir = join(REPO_ROOT, root);
+    if (!existsSync(dir)) continue;
+    for (const file of walkFiles(dir, [".tsx"])) {
+      const rel = relPath(file);
+      if (DATATABLE_AUDIT_EXEMPT.has(rel)) continue;
+      if (file.includes("__tests__") || file.includes(".test.")) continue;
+      const text = readSafe(file);
+      if (!TABLE_OPEN_RE.test(text)) continue;
+      const lines = text.split(/\r?\n/);
+      lines.forEach((ln, i) => {
+        if (TABLE_OPEN_RE.test(ln)) {
+          issues.push({
+            category: "tables-use-datatable",
+            severity: "LOW",
+            file: rel,
+            line: i + 1,
+            message:
+              "Bespoke <table> in an admin/company page — Spec 18 says use the canonical DataTable primitive (components/ui/data-table.tsx). See /admin/_internal/table-examples for usage. Add to DATATABLE_AUDIT_EXEMPT in scripts/audit.ts if this is a legacy holdout being deferred.",
+          });
+        }
+      });
+    }
+  }
+  return issues;
+}
+
+// ============================================================================
 // Output
 // ============================================================================
 
@@ -1425,6 +1488,7 @@ function main(): void {
     ...check13_noRawH1InPages(),
     ...check14_milestonesRegistryCurrent(),
     ...check15_docsIndexUpToDate(),
+    ...check_tablesUseDataTable(),
   ];
 
   const failed = printResults(all);

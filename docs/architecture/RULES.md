@@ -107,6 +107,20 @@ There are TWO allowlists in `scripts/audit.ts`:
 
 ---
 
+## 13. Tables in admin / company pages must use the canonical DataTable
+
+**Rule.** Every list / table view in `app/admin/**` or `app/company/**` must render via the canonical `DataTable` primitive (`components/ui/data-table.tsx`), never a bespoke `<table>`. Status / type / role indicators must use `<Pill>`. Row actions must live in the trailing `...` menu (`<RowActions>`) with the documented single-primary-action exception (e.g. the Sites table's `Connect →` link for not-yet-paired rows). Empty states use the `emptyState` prop (which renders `<EmptyState>`); never a blank `<tbody>`. Audit script `tables-use-datatable` (LOW) enforces.
+
+**Why a single primitive.** The platform had at least nine distinct table treatments by mid-2026 — Sites table-with-pills-and-overflow, Users table-with-inline-dropdowns, Companies table-with-rounded-full-chips, Images table-with-checkboxes, etc. Operators reported it "feels like five different tools". Spec 18 (2026-05-08) consolidated to one `DataTable` primitive plus four supporting components (`Pill`, `RowActions`, `EmptyState`, `TableCell.{Primary,Secondary,Mono,Stack,Empty}`). Reference page at `/admin/_internal/table-examples` is the canonical visual spec — when migrating or building a new table, look there first.
+
+**Where the rule applies.**
+- `app/admin/**/*.tsx` and `app/company/**/*.tsx` — bespoke `<table>` triggers a finding.
+- `DATATABLE_AUDIT_EXEMPT` in `scripts/audit.ts` carries the legacy holdouts (audit log, system jobs) that haven't been migrated yet. Don't add to it without documenting the deferral.
+
+**Incident (Spec 18, 2026-05-08).** Operators repeatedly described the admin app as "five different tools". The five tables in the original screenshot review (Sites, Users, Companies, Images, Members) used five different chrome treatments, three different action patterns (overflow menu vs inline dropdown vs button), and two different empty-state shapes. PR A built the DataTable primitive; PRs B/C/D swept the seven highest-traffic tables; the audit rule prevents regression as new admin surfaces land.
+
+---
+
 ## Adding a new rule
 
 - If a recurring shape with scaffolding emerges, that's a pattern — put it in `docs/patterns/`, not here.
