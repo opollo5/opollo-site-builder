@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as suggestPOST } from "@/app/api/images/suggest/route";
 
@@ -54,9 +54,11 @@ vi.mock("@/lib/images/embed", async () => {
 
 import { getServiceRoleClient } from "@/lib/supabase";
 
+// IDs are valid RFC 4122 v4 UUIDs (version=4, variant=8) so they pass
+// strict UUID validation — pattern `xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx`.
 const SEEDED_IMAGES = [
   {
-    id: "11111111-1111-1111-1111-111111111111",
+    id: "11111111-1111-4111-8111-111111111111",
     cloudflare_id: "test/phishing",
     filename: "istock-phishing-attack.jpg",
     title: "Phishing email warning illustration",
@@ -67,7 +69,7 @@ const SEEDED_IMAGES = [
     source_ref: "phishing-1",
   },
   {
-    id: "22222222-2222-2222-2222-222222222222",
+    id: "22222222-2222-4222-8222-222222222222",
     cloudflare_id: "test/office",
     filename: "istock-office-meeting.jpg",
     title: "Two coworkers in modern office",
@@ -78,7 +80,7 @@ const SEEDED_IMAGES = [
     source_ref: "office-1",
   },
   {
-    id: "33333333-3333-3333-3333-333333333333",
+    id: "33333333-3333-4333-8333-333333333333",
     cloudflare_id: "test/hacker",
     filename: "istock-hooded-hacker.jpg",
     title: "Hooded figure at laptop",
@@ -126,14 +128,10 @@ async function setEmbedding(id: string, source: string): Promise<void> {
   if (error) throw new Error(`Embedding write failed: ${error.message}`);
 }
 
-async function cleanup(): Promise<void> {
-  if (createdImageIds.length === 0) return;
-  const svc = getServiceRoleClient();
-  await svc.from("image_library").delete().in("id", createdImageIds);
-  createdImageIds = [];
-}
-
-beforeAll(async () => {
+// _setup.ts truncates image_library between every test, so seed inside
+// beforeEach (post-truncate) rather than beforeAll. Each test starts with
+// a fresh, fully-populated set including embeddings.
+beforeEach(async () => {
   await seedImages();
   // Mirror the embedding-input composition the suggest route uses for
   // queries. For each seeded image, write an embedding derived from the
@@ -144,10 +142,6 @@ beforeAll(async () => {
       `${img.title}. ${img.caption}. Tags: ${img.tags.join(", ")}.`,
     );
   }
-});
-
-afterAll(async () => {
-  await cleanup();
 });
 
 afterEach(() => {
