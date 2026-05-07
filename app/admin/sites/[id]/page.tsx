@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBanner";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditTenantBudgetButton } from "@/components/EditTenantBudgetButton";
 import { OnboardingReminderBanner } from "@/components/OnboardingReminderBanner";
 import { SetupReminderBanner } from "@/components/SetupReminderBanner";
@@ -16,8 +15,10 @@ import {
   jobStatusKind,
   siteStatusKind,
 } from "@/components/ui/status-pill";
-import { H1, H3 } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
 import { NavIcon } from "@/components/ui/nav-icon";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -195,47 +196,47 @@ export default async function SiteDetailPage({
     : null;
 
   return (
-    <>
+    <PageShell>
       {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
       {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
       {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Breadcrumbs
-            crumbs={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Sites", href: "/admin/sites" },
-              { label: site.name },
-            ]}
-          />
-          <H1 className="mt-2">{site.name}</H1>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-muted-foreground">
-            <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
-            <a
-              href={site.wp_url}
-              target="_blank"
-              rel="noreferrer"
-              className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-            >
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name },
+          ]}
+        />
+        <PageHeader.Title>{site.name}</PageHeader.Title>
+        <PageHeader.Meta>
+          <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
+          <a
+            href={site.wp_url}
+            target="_blank"
+            rel="noreferrer"
+            className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          >
               {site.wp_url}
             </a>
-            <Link
-              href={`/admin/sites/${site.id}/pages`}
-              className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-              data-testid="site-pages-link"
-            >
-              Pages →
-            </Link>
-            <span data-screenshot-mask>updated {formatDate(site.updated_at)}</span>
-          </div>
-        </div>
-        <SiteDetailActions
-          site={{ id: site.id, name: site.name, wp_url: site.wp_url }}
-          templates={batchTemplateOptions}
-        />
-      </div>
+          <Link
+            href={`/admin/sites/${site.id}/pages`}
+            className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            data-testid="site-pages-link"
+          >
+            Pages →
+          </Link>
+          <span data-screenshot-mask>updated {formatDate(site.updated_at)}</span>
+        </PageHeader.Meta>
+        <PageHeader.Actions>
+          <SiteDetailActions
+            site={{ id: site.id, name: site.name, wp_url: site.wp_url }}
+            templates={batchTemplateOptions}
+          />
+        </PageHeader.Actions>
+      </PageHeader>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
          <section>
           <div className="flex items-center justify-between">
@@ -624,6 +625,6 @@ export default async function SiteDetailPage({
           </div>
         </aside>
       </div>
-    </>
+    </PageShell>
   );
 }

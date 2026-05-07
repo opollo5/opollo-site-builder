@@ -5,12 +5,15 @@ import { useState } from "react";
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
 import { NavIcon } from "@/components/ui/nav-icon";
-import { H1 } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
 
 // P3-3 — company detail. Tabs: Overview (default), Settings, Members.
 // Overview shows quick stats cards + key sections for staff operators.
+//
+// PageHeader (H1 + slug/domain meta + Opollo-internal pill + breadcrumb
+// nav) lives in app/admin/companies/[id]/page.tsx via Spec 04 migration.
+// This component renders the staff-join section, tabs, and tab body only.
 
 type Tab = "overview" | "settings" | "members";
 
@@ -30,38 +33,6 @@ export function PlatformCompanyDetail({
 
   return (
     <div className="space-y-6">
-      <header>
-        <Link
-          href="/admin/companies"
-          className="text-sm text-muted-foreground hover:underline"
-          data-testid="company-detail-back"
-        >
-          ← Back to companies
-        </Link>
-        <div className="mt-2 flex items-center gap-3">
-          <H1>{company.name}</H1>
-          {company.is_opollo_internal ? (
-            <span
-              className="rounded-full bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary"
-              data-testid="company-internal-badge"
-            >
-              Opollo internal
-            </span>
-          ) : null}
-        </div>
-        <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-          <span
-            className="font-mono"
-            data-testid="company-detail-slug"
-          >
-            {company.slug}
-          </span>
-          {company.domain && (
-            <span className="font-mono">{company.domain}</span>
-          )}
-        </div>
-      </header>
-
       {isOpolloStaff && (
         <section
           className="rounded-lg border border-border bg-muted/30 px-4 py-3"

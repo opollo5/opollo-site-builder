@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { TableSkeleton } from "@/components/ui/skeleton";
-import { H1, Lead } from "@/components/ui/typography";
 import { PreviewGallery } from "@/components/PreviewGallery";
 import {
   resolveSelectedDesignSystem,
@@ -88,14 +88,21 @@ export default function DesignSystemPreviewPage() {
 
   return (
     <>
-      <div>
-        <H1>Preview</H1>
-        <Lead className="mt-0.5">
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Design system" },
+            { label: "Preview" },
+          ]}
+        />
+        <PageHeader.Title>Preview</PageHeader.Title>
+        <PageHeader.Subtitle>
           Read-only metadata view of design system v{selectedDs.version} (
           {selectedDs.status}). Live component rendering lands with M3 — this
           page shows raw templates + CSS + field schemas + composition chains.
-        </Lead>
-      </div>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       <div className="mt-6">
         {state.status === "loading" && <TableSkeleton rows={6} cols={3} />}

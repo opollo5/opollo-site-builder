@@ -1154,47 +1154,40 @@ function printResults(issues: Issue[]): boolean {
 // Routes deferred from Spec 02 PR 2's adoption sweep. Tracked in
 // docs/specs/_blockers.md. Allowlist runs at HIGH severity for the
 // migrated routes; deferred routes are scoped out until the follow-up
-// sweep migrates them. Once a route here adopts PageHeader, REMOVE it
-// from this list — that's how the rule progressively widens.
-const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [
-  // /admin/* deferred routes (29 of 37)
+// sweep migrates them.
+//
+// PAGE_HEADER_DEFERRED_ROUTES: routes pending migration. Remove entries
+// as each route adopts PageHeader. This list reached [] when Spec 04
+// PR E landed — every /admin/* and /account/* route now uses PageHeader
+// (or sits in PAGE_HEADER_EXEMPT_ROUTES below). New routes added here =
+// regression — don't.
+const PAGE_HEADER_DEFERRED_ROUTES: readonly string[] = [];
+
+// PAGE_HEADER_EXEMPT_ROUTES: routes that intentionally don't use
+// PageHeader because they have a different chrome contract (e.g.
+// full-bleed editor, modal-style page). Each entry must include a
+// comment explaining why. Audit rules headings-use-page-header,
+// breadcrumb-required-when-page-header, and no-raw-h1-in-pages skip
+// every entry here.
+//
+// Exempt = permanent. Deferred = temporary (drains to [] as each
+// route migrates). Don't conflate them.
+const PAGE_HEADER_EXEMPT_ROUTES: readonly string[] = [
+  // reason: redirect-only page that never renders any UI; importing
+  // PageHeader would be dead code. The file is a single
+  // `redirect("/admin/sites")` call (Spec 04 PR B).
   "app/admin/page.tsx",
-  "app/admin/batches/page.tsx",
-  "app/admin/batches/[id]/page.tsx",
-  "app/admin/companies/page.tsx",
-  "app/admin/companies/new/page.tsx",
-  "app/admin/companies/[id]/page.tsx",
-  "app/admin/email-test/page.tsx",
-  "app/admin/images/page.tsx",
-  "app/admin/images/[id]/page.tsx",
-  "app/admin/posts/new/page.tsx",
+  // reason: redirect-only — `redirect("/admin/settings/design-system")`.
+  // No chrome to host (Spec 04 PR C).
   "app/admin/settings/page.tsx",
-  "app/admin/settings/design-system/page.tsx",
-  "app/admin/sites/[id]/page.tsx",
-  "app/admin/sites/[id]/appearance/page.tsx",
-  "app/admin/sites/[id]/blueprints/review/page.tsx",
-  "app/admin/sites/[id]/briefs/[brief_id]/review/page.tsx",
-  "app/admin/sites/[id]/briefs/[brief_id]/run/page.tsx",
-  "app/admin/sites/[id]/content/page.tsx",
-  "app/admin/sites/[id]/design-system/page.tsx",
-  "app/admin/sites/[id]/design-system/components/page.tsx",
-  "app/admin/sites/[id]/design-system/preview/page.tsx",
-  "app/admin/sites/[id]/design-system/templates/page.tsx",
-  "app/admin/sites/[id]/pages/page.tsx",
-  "app/admin/sites/[id]/pages/[pageId]/page.tsx",
-  "app/admin/sites/[id]/posts/new/page.tsx",
-  "app/admin/sites/[id]/posts/[post_id]/page.tsx",
-  "app/admin/system/jobs/page.tsx",
-  "app/admin/users/page.tsx",
-  "app/admin/users/audit/page.tsx",
-  // /account/* deferred (the operator account-management surface; same
-  // mechanical migration as /admin/* but kept out of PR 2's scope).
-  "app/account/devices/page.tsx",
-  "app/account/security/page.tsx",
 ];
 
 function isPageHeaderDeferred(rel: string): boolean {
   return PAGE_HEADER_DEFERRED_ROUTES.includes(rel.replace(/\\/g, "/"));
+}
+
+function isPageHeaderExempt(rel: string): boolean {
+  return PAGE_HEADER_EXEMPT_ROUTES.includes(rel.replace(/\\/g, "/"));
 }
 
 function isPageHeaderEnforcedRoute(rel: string): boolean {
@@ -1205,7 +1198,9 @@ function isPageHeaderEnforcedRoute(rel: string): boolean {
     return false;
   }
   if (!norm.endsWith("/page.tsx")) return false;
-  return !PAGE_HEADER_DEFERRED_ROUTES.includes(norm);
+  if (PAGE_HEADER_DEFERRED_ROUTES.includes(norm)) return false;
+  if (PAGE_HEADER_EXEMPT_ROUTES.includes(norm)) return false;
+  return true;
 }
 
 function check11_headingsUsePageHeader(): Issue[] {
@@ -1248,6 +1243,9 @@ function check12_breadcrumbRequiredWithPageHeader(): Issue[] {
     for (const file of walkFiles(dir, [".tsx"])) {
       const rel = relPath(file);
       if (!rel.replace(/\\/g, "/").endsWith("/page.tsx")) continue;
+      // Exempt routes have a different chrome contract — skip the
+      // breadcrumb check here too (mirrors check11 behaviour).
+      if (isPageHeaderExempt(rel)) continue;
       const src = readSafe(file);
       const importsPageHeader =
         /import\s*(?:type\s+)?\{[^}]*\bPageHeader\b[^}]*\}\s*from\s*["']@\/components\/ui\/page-header["']/.test(
@@ -1293,6 +1291,9 @@ function check13_noRawH1InPages(): Issue[] {
       // adopts PageHeader, remove it from that list and this check
       // starts firing on it.
       if (isPageHeaderDeferred(rel)) continue;
+      // Spec 04 — exempt routes have permanent custom chrome that
+      // doesn't fit PageHeader; raw <h1> is fine on those.
+      if (isPageHeaderExempt(rel)) continue;
       const lines = readSafe(file).split(/\r?\n/);
       lines.forEach((ln, i) => {
         if (h1OpenRe.test(ln)) {

@@ -8,8 +8,9 @@ import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { CreateDesignSystemModal } from "@/components/CreateDesignSystemModal";
 import { DesignSystemsTable } from "@/components/DesignSystemsTable";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { H1, H3, Lead } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
 import { useDesignSystemLayout } from "@/components/design-system-context";
 import type { DesignSystem } from "@/lib/design-systems";
 
@@ -70,19 +71,27 @@ export default function DesignSystemIndexPage() {
     };
   }, [site.id]);
 
+  const designSystemBreadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Sites", href: "/admin/sites" },
+    { label: site.name, href: `/admin/sites/${site.id}` },
+    { label: "Design system" },
+  ];
+
   if (advanced) {
     return (
       <>
-        <div className="flex items-center justify-between">
-          <div>
-            <H1>Versions (advanced)</H1>
-            <p className="text-base text-muted-foreground">
-              One version is active at a time. Edit drafts before activating —
-              activation is atomic and archives the previous active version.
-            </p>
-          </div>
-          <Button onClick={() => setCreateOpen(true)}>New draft</Button>
-        </div>
+        <PageHeader>
+          <PageHeader.Breadcrumb segments={designSystemBreadcrumb} />
+          <PageHeader.Title>Versions (advanced)</PageHeader.Title>
+          <PageHeader.Subtitle>
+            One version is active at a time. Edit drafts before activating —
+            activation is atomic and archives the previous active version.
+          </PageHeader.Subtitle>
+          <PageHeader.Actions>
+            <Button onClick={() => setCreateOpen(true)}>New draft</Button>
+          </PageHeader.Actions>
+        </PageHeader>
 
         <div className="mt-6">
           <DesignSystemsTable
@@ -146,10 +155,13 @@ export default function DesignSystemIndexPage() {
 
   return (
     <>
-      <H1>Design system</H1>
-      <Lead className="mt-1">
-        How {site.name} is styled when we generate content.
-      </Lead>
+      <PageHeader>
+        <PageHeader.Breadcrumb segments={designSystemBreadcrumb} />
+        <PageHeader.Title>Design system</PageHeader.Title>
+        <PageHeader.Subtitle>
+          How {site.name} is styled when we generate content.
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {modeRow === null ? (
         <CardSkeleton lines={3} />

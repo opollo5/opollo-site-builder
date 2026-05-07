@@ -8,6 +8,8 @@ import { NavIcon } from "@/components/ui/nav-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // /admin/sites/[id]/blueprints/review — M16-7.
@@ -139,42 +141,58 @@ export default function BlueprintReviewPage({
     }
   }
 
+  const breadcrumbSegments = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Sites", href: "/admin/sites" },
+    { label: "Site", href: `/admin/sites/${siteId}` },
+    { label: "Site plan review" },
+  ];
+
   if (loading) {
     return (
-      <main className="mx-auto max-w-4xl p-6 space-y-4">
-        <Skeleton className="h-8 w-1/3" />
-        <Skeleton className="h-4 w-1/4" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-32 w-full" />
-      </main>
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb segments={breadcrumbSegments} />
+          <PageHeader.Title>Site Plan Review</PageHeader.Title>
+        </PageHeader>
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-1/3" />
+          <Skeleton className="h-4 w-1/4" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-32 w-full" />
+        </div>
+      </PageShell>
     );
   }
 
   if (!blueprint) {
     return (
-      <main className="mx-auto max-w-4xl p-6">
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb segments={breadcrumbSegments} />
+          <PageHeader.Title>Site Plan Review</PageHeader.Title>
+        </PageHeader>
         <EmptyState
           icon={<NavIcon name="grid" size={20} />}
           iconLabel="No site plan"
           title="No site plan yet"
           body="Run the site planner from the brief run page to generate a plan before approving page generation."
         />
-      </main>
+      </PageShell>
     );
   }
 
   const isApproved = blueprint.status === "approved";
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Site Plan Review</h1>
-          <p className="mt-1 text-base text-muted-foreground">
-            Review the plan before approving page generation.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb segments={breadcrumbSegments} />
+        <PageHeader.Title>Site Plan Review</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Review the plan before approving page generation.
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
           <Badge tone={isApproved ? "success" : "neutral"}>
             {isApproved ? "Approved" : "Draft"}
           </Badge>
@@ -187,9 +205,10 @@ export default function BlueprintReviewPage({
               {saving ? "Approving…" : "Approve plan"}
             </Button>
           )}
-        </div>
-      </div>
+        </PageHeader.Actions>
+      </PageHeader>
 
+      <div className="space-y-6">
       {error && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
@@ -271,6 +290,7 @@ export default function BlueprintReviewPage({
           {JSON.stringify({ nav_items: blueprint.nav_items, footer_items: blueprint.footer_items, cta_catalogue: blueprint.cta_catalogue, seo_defaults: blueprint.seo_defaults }, null, 2)}
         </pre>
       </details>
-    </main>
+      </div>
+    </PageShell>
   );
 }

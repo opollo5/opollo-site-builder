@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 
 import { BatchDetailClient } from "@/components/BatchDetailClient";
 import { Alert } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   StatusPill,
   jobStatusKind,
   slotStateKind,
 } from "@/components/ui/status-pill";
-import { H1, H3 } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -64,9 +66,21 @@ export default async function BatchDetailPage({
 
   if (jobErr) {
     return (
-      <Alert variant="destructive" title="Failed to load batch">
-        {jobErr.message}
-      </Alert>
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Batches", href: "/admin/batches" },
+              { label: "Error" },
+            ]}
+          />
+          <PageHeader.Title>Failed to load batch</PageHeader.Title>
+        </PageHeader>
+        <Alert variant="destructive">
+          {jobErr.message}
+        </Alert>
+      </PageShell>
     );
   }
   if (!job) {
@@ -120,42 +134,40 @@ export default async function BatchDetailPage({
   };
 
   return (
-    <>
-      <div className="flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/admin/batches"
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              ← Batches
-            </Link>
-          </div>
-          <H1 className="mt-1">
-            {site.name} · {tmpl.name}
-          </H1>
-          <div className="mt-1 flex items-center gap-3 text-sm text-muted-foreground">
-            <StatusPill kind={jobStatusKind(job.status as Parameters<typeof jobStatusKind>[0])} />
-            <span>
-              {job.succeeded_count} ok · {job.failed_count} fail ·{" "}
-              {job.requested_count} total
-            </span>
-            <span>{formatCostCents(Number(job.total_cost_usd_cents ?? 0))}</span>
-            <span>
-              {Number(job.total_input_tokens ?? 0).toLocaleString()} in ·{" "}
-              {Number(job.total_output_tokens ?? 0).toLocaleString()} out
-              tokens
-            </span>
-            <span>created {formatDate(job.created_at as string)}</span>
-            {job.finished_at && (
-              <span>finished {formatDate(job.finished_at as string)}</span>
-            )}
-          </div>
-        </div>
-        <BatchDetailClient jobId={params.id} status={job.status as string} />
-      </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Batches", href: "/admin/batches" },
+            { label: `${site.name} · ${tmpl.name}` },
+          ]}
+        />
+        <PageHeader.Title>
+          {site.name} · {tmpl.name}
+        </PageHeader.Title>
+        <PageHeader.Meta>
+          <StatusPill kind={jobStatusKind(job.status as Parameters<typeof jobStatusKind>[0])} />
+          <span>
+            {job.succeeded_count} ok · {job.failed_count} fail ·{" "}
+            {job.requested_count} total
+          </span>
+          <span>{formatCostCents(Number(job.total_cost_usd_cents ?? 0))}</span>
+          <span>
+            {Number(job.total_input_tokens ?? 0).toLocaleString()} in ·{" "}
+            {Number(job.total_output_tokens ?? 0).toLocaleString()} out tokens
+          </span>
+          <span>created {formatDate(job.created_at as string)}</span>
+          {job.finished_at && (
+            <span>finished {formatDate(job.finished_at as string)}</span>
+          )}
+        </PageHeader.Meta>
+        <PageHeader.Actions>
+          <BatchDetailClient jobId={params.id} status={job.status as string} />
+        </PageHeader.Actions>
+      </PageHeader>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>
           <H3>Slots</H3>
           <div className="mt-2 overflow-x-auto rounded-md border">
@@ -243,6 +255,6 @@ export default async function BatchDetailPage({
           </div>
         </div>
       </div>
-    </>
+    </PageShell>
   );
 }

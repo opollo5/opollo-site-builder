@@ -2,14 +2,15 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Fragment } from "react";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { DownloadImageButton } from "@/components/DownloadImageButton";
 import { ImageDeleteButton } from "@/components/ImageDeleteButton";
 import { ImageDetailLightbox } from "@/components/ImageDetailLightbox";
 import { ReextractMetadataButton } from "@/components/ReextractMetadataButton";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { H1, H3 } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { ImageArchiveButton } from "@/components/ImageArchiveButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -131,33 +132,28 @@ export default async function AdminImageDetailPage({
   // burden.
   const thumbUrl = publicUrl;
 
+  const titleLabel = image.title ?? image.filename ?? "Untitled image";
   return (
-    <>
-      <Breadcrumbs
-        crumbs={[
-          { label: "Images", href: backHref },
-          { label: image.title ?? image.caption?.slice(0, 60) ?? image.filename ?? image.id },
-        ]}
-      />
-
-      <div className="mt-4 flex items-start justify-between gap-4">
-        <div>
-          <H1>
-            {image.title ?? image.filename ?? "Untitled image"}
-          </H1>
-          <p className="text-sm text-muted-foreground">
-            Imported {formatDate(image.created_at)}
-            {image.deleted_at && (
-              <>
-                {" · "}
-                <span className="text-destructive">
-                  archived {formatRelativeTime(image.deleted_at)}
-                </span>
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Images", href: backHref },
+            { label: image.title ?? image.caption?.slice(0, 60) ?? image.filename ?? image.id },
+          ]}
+        />
+        <PageHeader.Title>{titleLabel}</PageHeader.Title>
+        <PageHeader.Meta>
+          <span>Imported {formatDate(image.created_at)}</span>
+          {image.deleted_at && (
+            <span className="text-destructive">
+              archived {formatRelativeTime(image.deleted_at)}
+            </span>
+          )}
+        </PageHeader.Meta>
+        <PageHeader.Actions>
+          <div className="flex flex-wrap items-center gap-3">
           {!image.deleted_at && (
             <EditImageMetadataButton
               image={{
@@ -184,16 +180,11 @@ export default async function AdminImageDetailPage({
           {image.deleted_at && (
             <ImageDeleteButton imageId={image.id} />
           )}
-          <Link
-            href={backHref}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            ← Back to library
-          </Link>
-        </div>
-      </div>
+          </div>
+        </PageHeader.Actions>
+      </PageHeader>
 
-      <section className="mt-6 grid gap-6 md:grid-cols-[1fr_2fr]">
+      <section className="grid gap-6 md:grid-cols-[1fr_2fr]">
         <div className="flex flex-col gap-3">
           <div className="overflow-hidden rounded-md border bg-muted/30">
             {publicUrl ? (
@@ -402,6 +393,6 @@ export default async function AdminImageDetailPage({
           )}
         </div>
       </section>
-    </>
+    </PageShell>
   );
 }

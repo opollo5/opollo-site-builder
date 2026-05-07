@@ -5,7 +5,8 @@ import { BulkImageUpload } from "@/components/BulkImageUpload";
 import { ImagesTable } from "@/components/ImagesTable";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
@@ -129,9 +130,20 @@ export default async function AdminImagesPage({
 
   if (!result.ok) {
     return (
-      <Alert variant="destructive" title="Failed to load images">
-        {result.error.message}
-      </Alert>
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Images" },
+            ]}
+          />
+          <PageHeader.Title>Image library</PageHeader.Title>
+        </PageHeader>
+        <Alert variant="destructive" title="Failed to load images">
+          {result.error.message}
+        </Alert>
+      </PageShell>
     );
   }
 
@@ -142,23 +154,29 @@ export default async function AdminImagesPage({
   const rangeEnd = Math.min(offset + limit, total);
 
   return (
-    <>
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <H1>Image library</H1>
-          <Lead className="mt-0.5">
-            {parsed.deleted
-              ? `${total} archived ${total === 1 ? "image" : "images"} (soft-deleted). Restore from the detail view.`
-              : `${total} ${total === 1 ? "image" : "images"} available to the chat builder. Filter by caption, tag, or source.`}
-          </Lead>
-        </div>
-        <Link
-          href={buildHref(parsed, { deleted: !parsed.deleted, page: 1 })}
-          className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-        >
-          {parsed.deleted ? "← Active images" : "View archived →"}
-        </Link>
-      </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Images" },
+          ]}
+        />
+        <PageHeader.Title>Image library</PageHeader.Title>
+        <PageHeader.Subtitle>
+          {parsed.deleted
+            ? `${total} archived ${total === 1 ? "image" : "images"} (soft-deleted). Restore from the detail view.`
+            : `${total} ${total === 1 ? "image" : "images"} available to the chat builder. Filter by caption, tag, or source.`}
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Link
+            href={buildHref(parsed, { deleted: !parsed.deleted, page: 1 })}
+            className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+          >
+            {parsed.deleted ? "← Active images" : "View archived →"}
+          </Link>
+        </PageHeader.Actions>
+      </PageHeader>
 
       {!parsed.deleted && <BulkImageUpload />}
 
@@ -278,6 +296,6 @@ export default async function AdminImagesPage({
       <div className="mt-3">
         <ImagesTable items={items} backHref={buildHref(parsed, {})} />
       </div>
-    </>
+    </PageShell>
   );
 }

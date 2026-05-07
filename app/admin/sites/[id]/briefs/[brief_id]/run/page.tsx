@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBanner";
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { BriefCommitWaiter } from "@/components/BriefCommitWaiter";
 import { BriefRunClient } from "@/components/BriefRunClient";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   estimateBriefRunCost,
   getBriefWithPages,
@@ -100,20 +101,24 @@ export default async function BriefRunPage({
     // commit" message + back-to-review link, replacing the prior
     // panel's role.
     return (
-      <main className="mx-auto max-w-5xl p-6">
-        <Breadcrumbs
-          crumbs={[
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Briefs", href: `/admin/sites/${site.id}` },
-            { label: brief.title },
-          ]}
-        />
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Sites", href: "/admin/sites" },
+              { label: site.name, href: `/admin/sites/${site.id}` },
+              { label: "Briefs", href: `/admin/sites/${site.id}` },
+              { label: brief.title },
+            ]}
+          />
+          <PageHeader.Title>{brief.title}</PageHeader.Title>
+        </PageHeader>
         <BriefCommitWaiter
           briefId={brief.id}
           reviewUrl={`/admin/sites/${site.id}/briefs/${brief.id}/review`}
         />
-      </main>
+      </PageShell>
     );
   }
 
@@ -150,16 +155,23 @@ export default async function BriefRunPage({
       : null;
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: site.name, href: `/admin/sites/${site.id}` },
-          { label: "Briefs", href: `/admin/sites/${site.id}` },
-          { label: brief.title, href: `/admin/sites/${site.id}/briefs/${brief.id}/review` },
-          { label: "Run" },
-        ]}
-      />
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: site.name, href: `/admin/sites/${site.id}` },
+            { label: "Briefs", href: `/admin/sites/${site.id}` },
+            { label: brief.title, href: `/admin/sites/${site.id}/briefs/${brief.id}/review` },
+            { label: "Run" },
+          ]}
+        />
+        <PageHeader.Title>{brief.title}</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Brief run for {site.name}.
+        </PageHeader.Subtitle>
+      </PageHeader>
       {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
       <BriefRunClient
         siteId={site.id}
@@ -173,6 +185,6 @@ export default async function BriefRunPage({
         remainingBudgetCents={remainingBudgetCents}
         blogStyleBlocked={blogStyleBlocker !== null}
       />
-    </main>
+    </PageShell>
   );
 }

@@ -2,14 +2,11 @@
 
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
-import { NavIcon } from "@/components/ui/nav-icon";
-import { H1, Lead } from "@/components/ui/typography";
 import type { PlatformCompanyListItem } from "@/lib/platform/companies";
 
-// P3-1 — client shell for /admin/companies. Renders the table; the
-// "New company" button is a placeholder until P3-2 lands the create
-// flow. Server component supplies the initial list.
+// P3-1 — client shell for /admin/companies. Renders the table only;
+// the page header (H1 + subtitle + "New company" CTA) lives in
+// app/admin/companies/page.tsx via PageHeader (Spec 04 migration).
 
 export function PlatformCompaniesListClient({
   companies,
@@ -18,25 +15,8 @@ export function PlatformCompaniesListClient({
 }) {
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <H1>Companies</H1>
-          <Lead className="mt-0.5">
-            {companies.length === 0
-              ? "No customer companies yet."
-              : `${companies.length} ${companies.length === 1 ? "company" : "companies"} on the platform.`}
-          </Lead>
-        </div>
-        <Button asChild data-testid="add-company-button">
-          <Link href="/admin/companies/new">
-            <NavIcon name="plus" size={16} />
-            New company
-          </Link>
-        </Button>
-      </div>
-
       <div
-        className="mt-4 overflow-hidden rounded-lg border bg-card"
+        className="overflow-hidden rounded-lg border bg-card"
         data-testid="platform-companies-table"
       >
         {companies.length === 0 ? (

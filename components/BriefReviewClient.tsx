@@ -296,17 +296,14 @@ export function BriefReviewClient({
     }
   }
 
+  // PageHeader (title + breadcrumb + "Brief for {siteName}" subtitle)
+  // lives in app/admin/sites/[id]/briefs/[brief_id]/review/page.tsx via
+  // Spec 04 migration. Status pill stays here as a sub-header row.
   return (
-    <div className="mt-6 space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{brief.title}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Brief for <span className="font-medium">{siteName}</span> —{" "}
-            <StatusPill status={brief.status} />
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        <StatusPill status={brief.status} />
+      </p>
 
       {isParsing && (
         <div className="rounded-md border border-primary/40 bg-primary/5 p-4 text-sm" role="status">

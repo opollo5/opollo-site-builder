@@ -404,7 +404,11 @@
 .text-page-title {
   font-size: 28px;
   line-height: 1.15;
-  font-weight: 600;
+  /* Spec 04 — bumped from 600 → 700 for the polish pass. The 600 drift
+     was the visual weight gap Steven called "lacking polish" on the
+     migrated routes; 700 lands the page title at the same visual mass
+     as a Linear / Vercel admin heading. */
+  font-weight: 700;
   letter-spacing: -0.01em;
 }
 

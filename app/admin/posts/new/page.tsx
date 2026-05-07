@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { PostsNewClient } from "@/components/PostsNewClient";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSites } from "@/lib/sites";
@@ -27,11 +28,20 @@ export default async function PostsNewPage() {
   const result = await listSites();
   if (!result.ok) {
     return (
-      <div className="mx-auto max-w-7xl">
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Post a blog" },
+            ]}
+          />
+          <PageHeader.Title>Post a blog</PageHeader.Title>
+        </PageHeader>
         <Alert variant="destructive">
           Failed to load sites: {result.error.message}
         </Alert>
-      </div>
+      </PageShell>
     );
   }
 
@@ -44,17 +54,22 @@ export default async function PostsNewPage() {
   );
 
   return (
-    <div className="mx-auto max-w-7xl">
-      <H1>Post a blog</H1>
-      <Lead className="mt-1">
-        Pick a site, then paste or drop your post. Metadata pre-fills from
-        front-matter, inline labels, or the first heading — every value is
-        editable before save.
-      </Lead>
-
-      <div className="mt-6">
-        <PostsNewClient sites={sites} />
-      </div>
-    </div>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Post a blog" },
+          ]}
+        />
+        <PageHeader.Title>Post a blog</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Pick a site, then paste or drop your post. Metadata pre-fills from
+          front-matter, inline labels, or the first heading — every value is
+          editable before save.
+        </PageHeader.Subtitle>
+      </PageHeader>
+      <PostsNewClient sites={sites} />
+    </PageShell>
   );
 }

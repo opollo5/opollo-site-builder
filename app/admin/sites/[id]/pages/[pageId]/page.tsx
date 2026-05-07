@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
-import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
 import { Alert } from "@/components/ui/alert";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
-import { H1, H3 } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
 import { RegenerateButton } from "@/components/RegenerateButton";
@@ -112,29 +113,28 @@ export default async function PageDetail({
   );
 
   return (
-    <>
-      <Breadcrumbs
-        crumbs={[
-          { label: "Sites", href: "/admin/sites" },
-          { label: page.site_name, href: `/admin/sites/${params.id}` },
-          { label: "Pages", href: backHref },
-          { label: page.title.slice(0, 60) },
-        ]}
-      />
-
-      <div className="mt-4 flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <H1 className="truncate">{page.title}</H1>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            {statusBadge(page.status)}
-            <span className="rounded bg-muted px-2 py-0.5">
-              {page.page_type.replace(/_/g, " ")}
-            </span>
-            <span>/{page.slug}</span>
-            <span>· updated {formatRelativeTime(page.updated_at)}</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: page.site_name, href: `/admin/sites/${params.id}` },
+            { label: "Pages", href: backHref },
+            { label: page.title.slice(0, 60) },
+          ]}
+        />
+        <PageHeader.Title>{page.title}</PageHeader.Title>
+        <PageHeader.Meta>
+          {statusBadge(page.status)}
+          <span className="rounded bg-muted px-2 py-0.5">
+            {page.page_type.replace(/_/g, " ")}
+          </span>
+          <span>/{page.slug}</span>
+          <span>· updated {formatRelativeTime(page.updated_at)}</span>
+        </PageHeader.Meta>
+        <PageHeader.Actions>
+          <div className="flex items-center gap-3">
           <RegenerateButton
             siteId={params.id}
             pageId={page.id}
@@ -177,17 +177,11 @@ export default async function PageDetail({
               )}
             </>
           )}
-          <Link
-            href={backHref}
-            className="text-sm text-muted-foreground hover:text-foreground"
-            data-testid="page-back-to-list"
-          >
-            ← Back to pages
-          </Link>
-        </div>
-      </div>
+          </div>
+        </PageHeader.Actions>
+      </PageHeader>
 
-      <section className="mt-6 grid gap-6 md:grid-cols-[2fr_1fr]">
+      <section className="grid gap-6 md:grid-cols-[2fr_1fr]">
         <PageHtmlPreview html={page.generated_html} />
 
         <dl
@@ -238,6 +232,6 @@ export default async function PageDetail({
           <RegenHistoryPanel jobs={regenJobs} />
         </div>
       </section>
-    </>
+    </PageShell>
   );
 }

@@ -5,11 +5,12 @@ import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   StatusPill,
   jobStatusKind,
 } from "@/components/ui/status-pill";
-import { H1, Lead } from "@/components/ui/typography";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -98,9 +99,20 @@ export default async function AdminBatchesPage({
 
   if (error) {
     return (
-      <Alert variant="destructive" title="Failed to load batches">
-        {error.message}
-      </Alert>
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Batches" },
+            ]}
+          />
+          <PageHeader.Title>Batches</PageHeader.Title>
+        </PageHeader>
+        <Alert variant="destructive" title="Failed to load batches">
+          {error.message}
+        </Alert>
+      </PageShell>
     );
   }
 
@@ -179,33 +191,46 @@ export default async function AdminBatchesPage({
     }
   }
 
-  return (
-    <>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <H1>Batches</H1>
-          <Lead className="mt-0.5">
-            {siteForButton
-              ? `${rows.length} ${rows.length === 1 ? "batch" : "batches"} for ${siteForButton.name}.`
-              : `${rows.length} ${rows.length === 1 ? "batch" : "batches"} across every site. Click a row for slot-level detail.`}
-          </Lead>
-          {siteForButton && (
-            <Link
-              href="/admin/batches"
-              className="mt-1 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-            >
-              ← All batches
-            </Link>
-          )}
-        </div>
-        <NewBatchButton
-          site={siteForButton}
-          templates={templateOptions}
-          label="New batch"
-        />
-      </div>
+  const subtitle = siteForButton
+    ? `${rows.length} ${rows.length === 1 ? "batch" : "batches"} for ${siteForButton.name}.`
+    : `${rows.length} ${rows.length === 1 ? "batch" : "batches"} across every site. Click a row for slot-level detail.`;
 
-      <div className="mt-4">
+  const breadcrumbs = siteForButton
+    ? [
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Batches", href: "/admin/batches" },
+        { label: siteForButton.name },
+      ]
+    : [
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Batches" },
+      ];
+
+  return (
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb segments={breadcrumbs} />
+        <PageHeader.Title>Batches</PageHeader.Title>
+        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <NewBatchButton
+            site={siteForButton}
+            templates={templateOptions}
+            label="New batch"
+          />
+        </PageHeader.Actions>
+      </PageHeader>
+
+      {siteForButton && (
+        <Link
+          href="/admin/batches"
+          className="mb-4 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        >
+          ← All batches
+        </Link>
+      )}
+
+      <div>
         {rows.length === 0 ? (
           <EmptyState
             icon={<NavIcon name="tree" size={20} />}
@@ -268,6 +293,6 @@ export default async function AdminBatchesPage({
           </div>
         )}
       </div>
-    </>
+    </PageShell>
   );
 }

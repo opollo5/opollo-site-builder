@@ -7,6 +7,8 @@ import { NavIcon } from "@/components/ui/nav-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -139,14 +141,23 @@ export default function SharedContentPage({
   }, {});
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Shared Content</h1>
-        <p className="mt-1 text-base text-muted-foreground">
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Sites", href: "/admin/sites" },
+            { label: "Site", href: `/admin/sites/${siteId}` },
+            { label: "Shared Content" },
+          ]}
+        />
+        <PageHeader.Title>Shared Content</PageHeader.Title>
+        <PageHeader.Subtitle>
           Reusable content objects referenced from generated pages.
-        </p>
-      </div>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
+      <div className="space-y-6">
       {error && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
@@ -256,6 +267,7 @@ export default function SharedContentPage({
           </DialogContent>
         </Dialog>
       )}
-    </main>
+      </div>
+    </PageShell>
   );
 }

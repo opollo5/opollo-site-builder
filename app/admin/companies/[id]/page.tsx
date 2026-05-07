@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { PlatformCompanyDetail } from "@/components/PlatformCompanyDetail";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getPlatformCompany } from "@/lib/platform/companies";
 import { joinCompanyAsAdmin } from "../_actions";
@@ -25,12 +27,24 @@ export default async function CompanyDetailPage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        role="alert"
-      >
-        Failed to load company: {result.error.message}
-      </div>
+      <PageShell>
+        <PageHeader>
+          <PageHeader.Breadcrumb
+            segments={[
+              { label: "Admin", href: "/admin/sites" },
+              { label: "Companies", href: "/admin/companies" },
+              { label: "Error" },
+            ]}
+          />
+          <PageHeader.Title>Failed to load company</PageHeader.Title>
+        </PageHeader>
+        <div
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+          role="alert"
+        >
+          {result.error.message}
+        </div>
+      </PageShell>
     );
   }
 
@@ -42,12 +56,42 @@ export default async function CompanyDetailPage({
     ? joinCompanyAsAdmin.bind(null, params.id)
     : null;
 
+  const { company } = result.data;
+
   return (
-    <PlatformCompanyDetail
-      detail={result.data}
-      isOpolloStaff={session?.isOpolloStaff ?? false}
-      isCurrentUserMember={isCurrentUserMember}
-      joinAction={boundJoinAction}
-    />
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Companies", href: "/admin/companies" },
+            { label: company.name },
+          ]}
+        />
+        <PageHeader.Title>{company.name}</PageHeader.Title>
+        <PageHeader.Meta>
+          {company.is_opollo_internal && (
+            <span
+              className="rounded-full bg-primary/10 px-2 py-0.5 text-sm font-medium text-primary"
+              data-testid="company-internal-badge"
+            >
+              Opollo internal
+            </span>
+          )}
+          <span className="font-mono" data-testid="company-detail-slug">
+            {company.slug}
+          </span>
+          {company.domain && (
+            <span className="font-mono">{company.domain}</span>
+          )}
+        </PageHeader.Meta>
+      </PageHeader>
+      <PlatformCompanyDetail
+        detail={result.data}
+        isOpolloStaff={session?.isOpolloStaff ?? false}
+        isCurrentUserMember={isCurrentUserMember}
+        joinAction={boundJoinAction}
+      />
+    </PageShell>
   );
 }

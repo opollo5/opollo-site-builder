@@ -5,7 +5,6 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { H1, Lead } from "@/components/ui/typography";
 
 function Label({
   htmlFor,
@@ -79,16 +78,10 @@ export function PlatformCompanyCreateForm() {
     router.refresh();
   }
 
+  // PageHeader (title + subtitle) lives in /admin/companies/new/page.tsx
+  // via Spec 04 migration; this component renders the form only.
   return (
     <div className="max-w-xl">
-      <div className="mb-6">
-        <H1>New company</H1>
-        <Lead className="mt-0.5">
-          Create a customer company. The first admin will be invited
-          separately from the company detail page (P3-4).
-        </Lead>
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="company-name">Name</Label>

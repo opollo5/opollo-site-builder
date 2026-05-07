@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 
 import { TrustedDevicesList } from "@/components/TrustedDevicesList";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   DEVICE_ID_COOKIE,
   decodeDeviceCookie,
@@ -48,16 +49,24 @@ export default async function AccountDevicesPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-3xl">
-      <H1>Trusted devices</H1>
-      <Lead className="mt-1">
-        Devices that skip the email-approval step on sign-in. Trust
-        lasts 30 days from last sign-in; sign out any device you
-        don&apos;t recognise.
-      </Lead>
+    <PageShell>
+      <PageHeader>
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Account", href: "/account/security" },
+            { label: "Trusted devices" },
+          ]}
+        />
+        <PageHeader.Title>Trusted devices</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Devices that skip the email-approval step on sign-in. Trust
+          lasts 30 days from last sign-in; sign out any device you
+          don&apos;t recognise.
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {!flagOn && (
-        <Alert className="mt-6">
+        <Alert>
           Email-2FA is not currently enabled on this environment.
           Trusted-device tracking starts when{" "}
           <code className="font-mono text-sm">AUTH_2FA_ENABLED</code>{" "}
@@ -66,7 +75,7 @@ export default async function AccountDevicesPage() {
       )}
 
       {flagOn && devices.length === 0 && (
-        <Alert className="mt-6">
+        <Alert>
           No trusted devices yet. The next time you sign in and tick
           &quot;Trust this device for 30 days&quot;, it will appear
           here.
@@ -74,13 +83,11 @@ export default async function AccountDevicesPage() {
       )}
 
       {flagOn && devices.length > 0 && (
-        <div className="mt-6">
-          <TrustedDevicesList
-            devices={devices}
-            hasCurrentDevice={currentDeviceId !== null}
-          />
-        </div>
+        <TrustedDevicesList
+          devices={devices}
+          hasCurrentDevice={currentDeviceId !== null}
+        />
       )}
-    </div>
+    </PageShell>
   );
 }
