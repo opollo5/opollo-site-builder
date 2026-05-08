@@ -68,9 +68,9 @@ export interface DataTableProps<T> {
 }
 
 const HEADER_CLASS = cn(
-  // Spec 18 canonical: all-caps, 12px, +0.05em tracking, weight 600,
+  // Spec 18 canonical: all-caps, text-sm, +0.05em tracking, weight 600,
   // muted color. Background: bg-muted/30. Bottom border 1px.
-  "px-3 py-3 text-left text-[12px] font-semibold uppercase tracking-wider text-muted-foreground",
+  "px-3 py-3 text-left text-sm font-semibold uppercase tracking-wider text-muted-foreground",
 );
 
 const CELL_CLASS = cn(

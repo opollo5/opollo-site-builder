@@ -109,7 +109,7 @@ export function PendingInvitesTable({
             className={
               expiringSoon
                 ? "text-sm text-warning"
-                : "text-[13px] text-muted-foreground"
+                : "text-sm text-muted-foreground"
             }
             data-screenshot-mask
           >
