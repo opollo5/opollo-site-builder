@@ -1,5 +1,29 @@
 # Spec run blockers
 
+## Spec 14 PR B — auto-save surface adoption (deferred to a follow-up slice)
+
+**Date:** 2026-05-08
+
+PR B ships the load-bearing infrastructure (`useActivity`, `useSessionGrace`, `useTabLeader`, `useAutoSave`) plus the grace banner and hard-logout enforcement. The auto-save **surface adoption sweep** is deferred — each long-form surface needs case-by-case review before adopting `useAutoSave`, and the parallel-session friction during the 2026-05-08 master-brief run makes large multi-file edits risky.
+
+**Surfaces audited:**
+
+- **`components/BlogPostComposer.tsx`** (post composer) — already has aggressive client-side autosave to `localStorage` (BL-2 pattern, debounced 800ms per keystroke, keyed by siteId). Local autosave survives logout, but a fresh login on a different browser does not. Adding a server-side `useAutoSave` flush here is a small change in principle but the composer is a 1700-line file with active parallel-session work; the slice deserves its own PR with thorough E2E coverage.
+
+- **Site builder / Brief PDF parser surfaces** — no autosave exists. These are larger changes (multi-step wizards with file upload + parse pipelines). Adopting `useAutoSave` requires defining what "save" means at each step (snapshot the wizard state? PATCH the row?). Defer.
+
+- **`components/SiteEditForm.tsx`, `components/SiteCreateForm.tsx`, `components/DesignDirectionInputs.tsx`, `components/SetupWizard.tsx`** — multi-field forms with explicit Save buttons. Adding autosave is mostly mechanical but each needs a server-side endpoint that accepts partial state. Defer.
+
+**Recommendation for the follow-up slice:**
+
+1. Start with the post composer: extend the existing localStorage autosave with a server-side flush keyed off `useAutoSave`, gated on `enabled === true` only when the post has an id. Verify the existing 800ms-debounced local save isn't double-firing the server save.
+2. Then sweep one wizard surface (e.g. `SetupWizard.tsx`) as a proof point.
+3. Each surface's PR should include an E2E test that simulates the grace banner appearing while the form is dirty.
+
+Until adoption ships, the PR B infrastructure is **inert** — no surface uses `useAutoSave` yet — but the user-visible session-policy changes (grace banner, non-renewable timer, hard-logout enforcement) are live and protective on their own.
+
+---
+
 ## Spec 11 / 12 / 05-conditional / 14 PR B+C / 08 sweep — deferred from 2026-05-08 master-brief run
 
 **Date:** 2026-05-08
