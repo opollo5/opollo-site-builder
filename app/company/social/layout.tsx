@@ -28,9 +28,9 @@ export default async function CompanySocialLayout({
     if (session.isOpolloStaff) {
       return (
         <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-center">
-          <NavIcon name="apartment" size={36} className="text-m3" />
+          <NavIcon name="apartment" size={36} className="text-tx-muted" />
           <p className="text-base font-medium">Select a company to continue</p>
-          <p className="max-w-xs text-sm text-m3">
+          <p className="max-w-xs text-sm text-tx-muted">
             Use the company selector in the Social navigation panel to choose a
             client, then navigate here again.
           </p>

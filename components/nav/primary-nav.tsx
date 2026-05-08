@@ -58,7 +58,7 @@ export function PrimaryNav({
         : "flex-col gap-1 px-1 py-3",
       isActive
         ? "bg-nav-active text-foreground"
-        : "text-m2 hover:bg-nav-hover hover:text-gr",
+        : "text-tx-secondary hover:bg-nav-hover hover:text-gr",
     );
 
     const iconClass = cn(
@@ -159,7 +159,7 @@ export function PrimaryNav({
             aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
             title={collapsed ? "Expand navigation" : "Collapse navigation"}
             data-testid="nav-collapse-toggle"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-m3 transition-smooth hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-tx-muted transition-smooth hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           >
             <NavIcon name={collapsed ? "chevron-right" : "chevron-left"} size={14} />
           </button>
@@ -190,7 +190,7 @@ export function PrimaryNav({
                   key={item.key}
                   title="Command palette"
                   className={cn(
-                    "flex items-center rounded-md px-1 py-2 text-m3",
+                    "flex items-center rounded-md px-1 py-2 text-tx-muted",
                     collapsed
                       ? "justify-center"
                       : "flex-col gap-1",
@@ -235,7 +235,7 @@ export function PrimaryNav({
           {/* Email truncated at very bottom — hidden when collapsed (no room) */}
           {!collapsed && navContext.email && (
             <p
-              className="mt-1 truncate border-t border-border pt-1.5 px-1 text-xs text-m3 text-center"
+              className="mt-1 truncate border-t border-border pt-1.5 px-1 text-xs text-tx-muted text-center"
               title={navContext.email}
             >
               {navContext.email}

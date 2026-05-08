@@ -151,7 +151,7 @@ export function NavShellClient({
           onClick={() => setMobileOpen(true)}
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-md text-tx-secondary transition-smooth hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           data-testid="mobile-nav-button"
         >
           <NavIcon name="menu" size={20} />
@@ -198,7 +198,7 @@ export function NavShellClient({
             type="button"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-m2 hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-tx-secondary hover:bg-b1 hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
           >
             <NavIcon name="cross" size={20} />
           </button>
@@ -287,7 +287,7 @@ function MobileNavContent({
                   "group flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                   isActive
                     ? "bg-nav-active font-medium text-foreground"
-                    : "text-m2 hover:bg-nav-hover hover:text-gr",
+                    : "text-tx-secondary hover:bg-nav-hover hover:text-gr",
                 )}
               >
                 <NavIcon
@@ -309,7 +309,7 @@ function MobileNavContent({
                   {item.sectionNav.groups.map((group, gi) => (
                     <li key={gi}>
                       {group.label && (
-                        <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-m3">
+                        <p className="px-2 py-1 text-xs font-semibold uppercase tracking-wider text-tx-muted">
                           {group.label}
                         </p>
                       )}
@@ -325,7 +325,7 @@ function MobileNavContent({
                                   "block rounded-md px-2 py-1.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                                   subActive
                                     ? "font-medium text-foreground"
-                                    : "text-m2 hover:text-gr",
+                                    : "text-tx-secondary hover:text-gr",
                                 )}
                               >
                                 {subItem.label}
@@ -351,7 +351,7 @@ function MobileNavContent({
                 "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                 isActive
                   ? "bg-nav-active font-medium text-foreground"
-                  : "text-m2 hover:bg-nav-hover hover:text-gr",
+                  : "text-tx-secondary hover:bg-nav-hover hover:text-gr",
               )}
             >
               <NavIcon

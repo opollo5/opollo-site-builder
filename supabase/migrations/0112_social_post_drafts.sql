@@ -14,8 +14,12 @@
 --   4. RLS gates on platform_company_users so only editors/approvers/admins
 --      of the owning company can read or write their own drafts.
 --   5. service_role bypasses RLS for the create/save API routes.
+--
+-- Idempotency note: IF NOT EXISTS guards and DROP POLICY IF EXISTS make this
+-- safe to re-run after a partial failure (e.g. the policy creation failed on
+-- first attempt but the table+indexes were already created).
 
-CREATE TABLE social_post_drafts (
+CREATE TABLE IF NOT EXISTS social_post_drafts (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   company_id        UUID        NOT NULL REFERENCES platform_companies(id) ON DELETE CASCADE,
   created_by        UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -28,36 +32,37 @@ CREATE TABLE social_post_drafts (
 );
 
 -- Fast lookup of active drafts for a company (list + conflict-check on open).
-CREATE INDEX idx_social_post_drafts_company
+CREATE INDEX IF NOT EXISTS idx_social_post_drafts_company
   ON social_post_drafts (company_id, archived_at)
   WHERE archived_at IS NULL;
 
 -- Feed for "my drafts" view scoped by author.
-CREATE INDEX idx_social_post_drafts_created_by
+CREATE INDEX IF NOT EXISTS idx_social_post_drafts_created_by
   ON social_post_drafts (created_by, updated_at DESC)
   WHERE archived_at IS NULL;
 
 -- General-purpose recency ordering used by admin list + draft-recovery.
-CREATE INDEX idx_social_post_drafts_updated
+CREATE INDEX IF NOT EXISTS idx_social_post_drafts_updated
   ON social_post_drafts (updated_at DESC);
 
 -- RLS: allow all platform company editors/approvers/admins to read and
 -- write their own company's drafts. Service-role callers bypass this.
 ALTER TABLE social_post_drafts ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS social_post_drafts_company_editors ON social_post_drafts;
 CREATE POLICY social_post_drafts_company_editors
   ON social_post_drafts FOR ALL
   USING (
     company_id IN (
       SELECT company_id FROM platform_company_users
       WHERE user_id = auth.uid()
-        AND role IN ('editor', 'approver', 'admin', 'super_admin')
+        AND role IN ('editor', 'approver', 'admin')
     )
   )
   WITH CHECK (
     company_id IN (
       SELECT company_id FROM platform_company_users
       WHERE user_id = auth.uid()
-        AND role IN ('editor', 'approver', 'admin', 'super_admin')
+        AND role IN ('editor', 'approver', 'admin')
     )
   );

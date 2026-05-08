@@ -27,7 +27,7 @@ export function SocialViewToggle({ activeView }: Props) {
       ) : (
         <Link
           href="/company/social/calendar"
-          className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
+          className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-tx-secondary transition-colors hover:bg-white/[0.05] hover:text-white"
         >
           <NavIcon name="calendar-full" size={14} />
           Calendar
@@ -45,7 +45,7 @@ export function SocialViewToggle({ activeView }: Props) {
       ) : (
         <Link
           href="/company/social/posts"
-          className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
+          className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-tx-secondary transition-colors hover:bg-white/[0.05] hover:text-white"
         >
           <NavIcon name="list" size={14} />
           Posts
@@ -56,7 +56,7 @@ export function SocialViewToggle({ activeView }: Props) {
         disabled
         aria-disabled="true"
         title="Coming soon"
-        className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-m3 opacity-40"
+        className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-tx-muted opacity-40"
       >
         <NavIcon name="clock" size={14} />
         Timeline

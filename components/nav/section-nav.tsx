@@ -60,7 +60,7 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
           type="button"
           onClick={onToggle}
           aria-label={`Expand ${title} navigation`}
-          className="mx-auto mt-3 flex h-6 w-5 items-center justify-center rounded-sm text-m2 hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          className="mx-auto mt-3 flex h-6 w-5 items-center justify-center rounded-sm text-tx-secondary hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
         >
           <NavIcon name="chevron-right" size={12} />
         </button>
@@ -85,7 +85,7 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
           type="button"
           onClick={onToggle}
           aria-label={`Collapse ${title} navigation`}
-          className="flex h-6 w-6 items-center justify-center rounded-sm text-m2 hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
+          className="flex h-6 w-6 items-center justify-center rounded-sm text-tx-secondary hover:bg-nav-hover hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
         >
           <NavIcon name="chevron-left" size={12} />
         </button>
@@ -109,7 +109,7 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
           return (
             <div key={gi} className={cn(gi > 0 && "mt-4")}>
               {group.label && (
-                <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-m3">
+                <p className="mb-1 px-3 text-xs font-semibold uppercase tracking-wider text-tx-muted">
                   {group.label}
                 </p>
               )}
@@ -126,7 +126,7 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
                           "block rounded-md px-3 py-1.5 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-gr",
                           active
                             ? "bg-nav-active font-medium text-foreground"
-                            : "text-m2 hover:bg-nav-hover hover:text-gr",
+                            : "text-tx-secondary hover:bg-nav-hover hover:text-gr",
                         )}
                       >
                         {item.label}
