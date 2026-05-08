@@ -17,6 +17,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Editors+ in a company may read/write their own company folder.
 -- Path convention: {company_id}/{uuid}.{ext}
+DROP POLICY IF EXISTS social_media_company_editor ON storage.objects;
 CREATE POLICY social_media_company_editor
   ON storage.objects FOR ALL
   TO authenticated
@@ -27,7 +28,7 @@ CREATE POLICY social_media_company_editor
       FROM platform_company_users pcu
       WHERE pcu.user_id = auth.uid()
         AND pcu.company_id = (storage.foldername(name))[1]::uuid
-        AND pcu.role IN ('editor', 'approver', 'admin', 'super_admin')
+        AND pcu.role IN ('editor', 'approver', 'admin')
     )
   )
   WITH CHECK (
@@ -37,6 +38,6 @@ CREATE POLICY social_media_company_editor
       FROM platform_company_users pcu
       WHERE pcu.user_id = auth.uid()
         AND pcu.company_id = (storage.foldername(name))[1]::uuid
-        AND pcu.role IN ('editor', 'approver', 'admin', 'super_admin')
+        AND pcu.role IN ('editor', 'approver', 'admin')
     )
   );
