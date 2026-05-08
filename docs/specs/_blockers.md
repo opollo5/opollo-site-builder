@@ -1,5 +1,19 @@
 # Spec run blockers
 
+## Spec 08 Tier-2 — toast.success → toastSuccess sweep (deferred)
+
+**Date:** 2026-05-08
+
+`lib/toast-success.ts` is extended with `duration` + `id` passthrough so the helper covers every option the existing call sites use. The codebase sweep itself (~30 `toast.success(...)` call sites across `components/`) is the cosmetic remainder — pure rename + import swap, no behaviour change.
+
+**Affected files (audited via `grep "toast.success" components/ app/`):**
+
+`BlogPostComposer.tsx`, `BulkUploadButton.tsx`, `CAPGenerateModal.tsx`, `ConceptRefinementView.tsx`, `DesignSystemSettingsClient.tsx`, `MoodBoardClient.tsx`, `PendingInvitesTable.tsx`, `SiteActionsMenu.tsx`, `SiteCreateForm.tsx`, `SiteEditForm.tsx`, `SiteVoiceSettingsForm.tsx`, `SocialConnectionsList.tsx`, `SocialPostDetailClient.tsx`, `ToneOfVoiceInputs.tsx`, `TrustedDevicesList.tsx`, `UserActionsMenu.tsx`, `admin/internal/ExampleTablesClient.tsx`. Files with no other `toast.X` usage: drop the sonner import. Files with mixed usage: keep sonner, add `toastSuccess` next to it. `PostDetailClient.tsx` already migrated.
+
+**Why deferred:** the 2026-05-08 run hit heavy parallel-session contention on these exact files — incremental edits were repeatedly reset between commit windows. Deferring to a quiet single-session window keeps the sweep risk-free. Pure consistency change; nothing functional depends on it.
+
+---
+
 ## Spec 14 PR B — auto-save surface adoption (deferred to a follow-up slice)
 
 **Date:** 2026-05-08
