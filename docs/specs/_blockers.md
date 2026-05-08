@@ -140,9 +140,9 @@ Migrated the highest-traffic operator routes:
 Surfaced by the autonomous spec runner. Each entry: which spec/PR, the
 contradiction encountered, and the chosen interim behaviour.
 
-## Spec 03 PR 3 — content_type gating without modifying brief-runner.ts
+## ~~Spec 03 PR 3 — content_type gating without modifying brief-runner.ts~~ (resolved 2026-05-08, PR #785)
 
-**Date:** 2026-05-07
+**Date:** 2026-05-07 — **Resolved:** 2026-05-08
 
 **Spec section in tension:** Spec 03 §3.1 + §3.2.
 
@@ -176,6 +176,8 @@ const designContextPrefix = await buildDesignContextPrefix(
 ```
 
 That single-line change is gated on Steven's explicit approval per ARCH §18.
+
+**Resolution (2026-05-08):** Steven approved on 2026-05-08. PR #785 made the change and merged. `<blog_content_classes>` now emits for `copy_existing` sites with calibrated blog styling when running `content_type='post'` briefs.
 
 **Why this is acceptable interim state:**
 
