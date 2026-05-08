@@ -2,11 +2,10 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
-import { createRouteAuthClient } from "@/lib/auth";
 import { NavShell, type NavUserContext } from "@/components/nav/nav-shell";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DebugFooter } from "@/components/DebugFooter";
-import { SessionExpiryWarning } from "@/components/SessionExpiryWarning";
+import { SessionExpiryWatcher } from "@/components/session/session-expiry-watcher";
 import { Toaster } from "@/components/ui/toaster";
 
 export default async function AdminLayout({
@@ -22,11 +21,6 @@ export default async function AdminLayout({
   const isAdminTier =
     !user || user.role === "admin" || user.role === "super_admin";
   const isSuperAdmin = !user || user.role === "super_admin";
-
-  const {
-    data: { session },
-  } = await createRouteAuthClient().auth.getSession();
-  const sessionExpiresAt = session?.expires_at ?? null;
 
   const navContext: NavUserContext = {
     email: user?.email ?? null,
@@ -48,7 +42,7 @@ export default async function AdminLayout({
       </NavShell>
       <Toaster />
       <CommandPalette />
-      <SessionExpiryWarning expiresAt={sessionExpiresAt} />
+      <SessionExpiryWatcher />
       {isSuperAdmin && (
         <DebugFooter
           buildSha={process.env.VERCEL_GIT_COMMIT_SHA ?? null}
