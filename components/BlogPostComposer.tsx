@@ -9,7 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 import { NavIcon } from "@/components/ui/nav-icon";
 
 import { Alert } from "@/components/ui/alert";
@@ -865,7 +865,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             siteWpUrl && slug.value && visibility !== "private"
               ? `${siteWpUrl.replace(/\/+$/, "")}/${slug.value}/`
               : null;
-          toast.success("Published to WordPress!", {
+          toastSuccess("Published to WordPress!", {
             description: liveUrl ? "Your post is now live." : undefined,
             duration: 5000,
             action: liveUrl
@@ -873,7 +873,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
               : undefined,
           });
         } else {
-          toast.success("Submitted for review in WordPress.", { duration: 5000 });
+          toastSuccess("Submitted for review in WordPress.", { duration: 5000 });
         }
       }
 
