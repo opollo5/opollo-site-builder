@@ -1,23 +1,24 @@
 name: Screenshots
 
-# Polish workstream visual-regression harness. Captures every admin
-# surface at desktop 1440×900 + mobile 380×844 against an ephemeral
-# local Supabase, uploads the playwright-screenshots/ folder as a
-# downloadable artifact.
+# Visual-regression harness — baseline capture + diff gating.
 #
-# Per the world-class polish brief (PR #229) the per-screen Phase B
-# PRs and the R-0 operator-review report each need before/after PNGs.
-# This workflow makes them downloadable from every PR's CI run.
+# Two modes:
+#   compare  — PR branches. Compares against committed baselines in
+#              e2e/__screenshots__/. Fails the job if any baseline
+#              diverges beyond the maxDiffPixelRatio threshold, blocking
+#              merge of unintended visual regressions.
+#   baseline — First run (no committed baselines) OR manual trigger with
+#              UPDATE_SNAPSHOTS=true. Generates fresh baselines and
+#              uploads them as a downloadable artifact. Commit the
+#              artifact contents to e2e/__screenshots__/ to activate
+#              the comparison gate on future PRs.
 #
 # Triggered:
-#   • pull_request — every Phase B / Phase C PR gets fresh screenshots
-#     for visual review.
-#   • workflow_dispatch — Steven can fire it manually against any
-#     branch (e.g. for the R-0 report PR).
-#   • push to main — captures the post-merge baseline; the artifact on
-#     the latest main run is the reference state.
+#   • pull_request — comparison mode on every PR.
+#   • push to main — baseline mode; refreshes post-merge reference.
+#   • workflow_dispatch — set UPDATE_SNAPSHOTS=true for manual regen.
 #
-# Skipped on forked-repo PRs (same as e2e.yml — secrets would leak).
+# Skipped on forked-repo PRs (secrets would leak).
 
 on:
   pull_request:
@@ -25,6 +26,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: "Regenerate baselines (UPDATE_SNAPSHOTS=true)"
+        required: false
+        default: "false"
 
 concurrency:
   group: screenshots-${{ github.ref }}
@@ -34,10 +40,8 @@ jobs:
   screenshots:
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     env:
-      # Same setup as e2e.yml — admin gate ON exercises the real auth
-      # flow; deterministic master key for ephemeral encryption.
       FEATURE_SUPABASE_AUTH: "true"
       OPOLLO_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
     steps:
@@ -84,20 +88,63 @@ jobs:
           echo "SUPABASE_ANON_KEY=$ANON" >> "$GITHUB_ENV"
           echo "SUPABASE_DB_URL=$DB" >> "$GITHUB_ENV"
 
-      - name: Capture screenshots
-        run: npm run screenshots
+      # Detect run mode:
+      #   baseline — no committed snapshots OR explicit override.
+      #   compare  — committed snapshots present; gate on regressions.
+      - name: Detect run mode
+        id: mode
+        run: |
+          SNAP_DIR="e2e/__screenshots__"
+          FORCE_UPDATE="${{ github.event_name == 'push' && 'true' || github.event.inputs.update_snapshots || 'false' }}"
+          if [ "$FORCE_UPDATE" = "true" ] || [ ! -d "$SNAP_DIR" ] || [ -z "$(ls -A "$SNAP_DIR" 2>/dev/null)" ]; then
+            echo "mode=baseline" >> "$GITHUB_OUTPUT"
+          else
+            echo "mode=compare" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Detected mode: $(cat $GITHUB_OUTPUT | grep mode | cut -d= -f2)"
 
-      - name: Upload screenshot artifact
+      # Comparison mode — gates on visual regressions.
+      - name: Capture + compare screenshots
+        if: steps.mode.outputs.mode == 'compare'
+        run: npm run screenshots
+        env:
+          RUN_SCREENSHOTS: "1"
+
+      # Baseline mode — generates fresh snapshots for commit.
+      - name: Generate baseline screenshots
+        if: steps.mode.outputs.mode == 'baseline'
+        run: npm run screenshots:baseline
+        env:
+          RUN_SCREENSHOTS: "1"
+
+      - name: Upload screenshot artifacts (PR review)
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: playwright-screenshots-${{ github.event.pull_request.number || github.sha }}
           path: playwright-screenshots
           retention-days: 30
-          # if-no-files-found: warn rather than error — a partially
-          # broken capture run still gives reviewers something to look
-          # at while we triage the failure.
           if-no-files-found: warn
+
+      # Upload new baselines when generated — download, commit to
+      # e2e/__screenshots__/ to activate the comparison gate on PRs.
+      - name: Upload baseline snapshots
+        if: steps.mode.outputs.mode == 'baseline'
+        uses: actions/upload-artifact@v7
+        with:
+          name: visual-regression-baselines-${{ github.sha }}
+          path: e2e/__screenshots__
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-screenshots-${{ github.event.pull_request.number || github.sha }}
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Stop Supabase
         if: always()

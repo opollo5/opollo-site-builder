@@ -1,41 +1,43 @@
+import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 
+import type { Browser, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { auditA11y, signInAsAdmin } from "./helpers";
+import { auditA11y, signInAsAdmin, signInAsCompanyAdmin } from "./helpers";
 import { E2E_TEST_SITE_PREFIX } from "./fixtures";
 import { createClient } from "@supabase/supabase-js";
 
 // ---------------------------------------------------------------------------
-// A-0 — Visual regression screenshot harness for the polish workstream.
+// A-0 — Visual regression screenshot harness.
 //
-// Captures every admin surface at two viewports:
+// Captures every admin + social surface at two viewports:
 //   - Desktop  1440×900 (Linear / Vercel reference)
 //   - Mobile    380×844 (iPhone-class width floor)
 //
-// Output: `playwright-screenshots/<viewport>/<route-slug>.png`
+// Two outputs per route:
+//   1. playwright-screenshots/<viewport>/<route-slug>.png
+//      → uploaded as a CI artifact; reviewers download for visual diff.
+//   2. expect(page).toHaveScreenshot() baseline in e2e/__screenshots__/
+//      → automated regression gate. CI fails on mismatch once baselines
+//      are committed. Baselines are skipped on first run (no file present)
+//      to avoid bootstrap failures; generate them with:
 //
-// Each Phase B per-screen PR overwrites the screenshots for the surfaces
-// it touches. GitHub renders the PNG diff in the PR's Files Changed view
-// — that's the canonical "before / after" for review (no manual paste).
-// PR description references the affected files by path.
+//        npm run screenshots:baseline
 //
-// Determinism notes:
-//   - Time-rendered surfaces ("updated 2 minutes ago") are masked at
-//     screenshot time so a clock tick doesn't churn the diff.
-//   - Per-route, we wait for `networkidle` so SSR + client-side
-//     hydration both settle before the snapshot.
-//   - Animations are disabled via `reducedMotion: "reduce"` page
-//     context option — every PR's screenshots represent the
-//     reduced-motion "static" view of the surface, which is the
-//     stable-by-design end state.
+//      then commit e2e/__screenshots__/ to lock the baseline.
 //
-// Skip semantics:
-//   - Routes that require seeded data we don't have (specific brief in
-//     `awaiting_review`, specific WP post id) capture the empty/redirect
-//     state instead. That's still useful — empty states are part of
-//     the polish surface area.
+// Viewport taxonomy:
+//   ADMIN_ROUTES   — signed in as Opollo super_admin (all /admin/* routes)
+//   COMPANY_ROUTES — signed in as company admin (all /company/social/* routes)
+//
+// Determinism:
+//   - reducedMotion: "reduce" disables CSS animations.
+//   - Locale en-US + timezone UTC stabilise date-formatted strings.
+//   - networkidle wait ensures SSR + hydration settle.
+//   - [data-screenshot-mask] elements are masked (muted gray) so
+//     relative timestamps ("updated 2 min ago") don't churn the diff.
 // ---------------------------------------------------------------------------
 
 const DESKTOP = { width: 1440, height: 900 } as const;
@@ -43,22 +45,25 @@ const MOBILE = { width: 380, height: 844 } as const;
 
 const SCREENSHOTS_DIR = path.join(process.cwd(), "playwright-screenshots");
 
+// Snapshots are stored at:
+// e2e/__screenshots__/screenshots.spec.ts/<slug>-<viewport>-linux.png
+// Matches snapshotPathTemplate in playwright.config.ts.
+const SNAPSHOT_DIR = path.join(
+  process.cwd(),
+  "e2e/__screenshots__/screenshots.spec.ts",
+);
+
 interface RouteEntry {
-  /** Slug used for the filename (alphanumerics + hyphens only). */
   slug: string;
-  /** Route to navigate to. `{siteId}` is replaced with the seeded test site's id. */
   url: string;
-  /** Optional wait condition: a selector to wait for before the snapshot. */
   waitForSelector?: string;
-  /** Optional ms wait after navigation for any client-side hydration. */
   hydrationDelayMs?: number;
 }
 
-const ROUTES: readonly RouteEntry[] = [
-  // Auth surfaces (no sign-in required — the harness signs out for these).
+// Admin routes — sign in as Opollo super_admin.
+const ADMIN_ROUTES: readonly RouteEntry[] = [
   { slug: "login", url: "/login" },
   { slug: "auth-forgot-password", url: "/auth/forgot-password" },
-  // Admin surfaces (sign-in required).
   { slug: "admin-sites-list", url: "/admin/sites" },
   { slug: "admin-site-detail", url: "/admin/sites/{siteId}" },
   { slug: "admin-site-settings", url: "/admin/sites/{siteId}/settings" },
@@ -84,6 +89,31 @@ const ROUTES: readonly RouteEntry[] = [
   { slug: "admin-batches-list", url: "/admin/batches" },
   { slug: "admin-images-list", url: "/admin/images" },
   { slug: "admin-users-list", url: "/admin/users" },
+  { slug: "admin-companies-list", url: "/admin/companies" },
+];
+
+// Company routes — sign in as the seeded company admin (e2e-customer-co).
+// These render the actual social UI (calendar grid, posts list, etc.).
+const COMPANY_ROUTES: readonly RouteEntry[] = [
+  // Social module — primary targets of the UI consistency pass.
+  {
+    slug: "social-calendar",
+    url: "/company/social/calendar",
+    hydrationDelayMs: 300,
+  },
+  {
+    slug: "social-posts",
+    url: "/company/social/posts",
+    hydrationDelayMs: 300,
+  },
+  { slug: "social-connections", url: "/company/social/connections" },
+  { slug: "social-media", url: "/company/social/media" },
+  { slug: "social-analytics", url: "/company/social/analytics" },
+  { slug: "social-sharing", url: "/company/social/sharing" },
+  // Company account surfaces (also get button + nav migrations).
+  { slug: "company-users", url: "/company/users" },
+  { slug: "company-settings", url: "/company/settings" },
+  { slug: "company-brand", url: "/company/brand" },
 ];
 
 async function getSeededSiteId(): Promise<string> {
@@ -91,7 +121,7 @@ async function getSeededSiteId(): Promise<string> {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
     throw new Error(
-      "SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required for the screenshot harness — run via `npm run screenshots`.",
+      "SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required — run via `npm run screenshots`.",
     );
   }
   const supabase = createClient(url, key, {
@@ -111,106 +141,148 @@ async function getSeededSiteId(): Promise<string> {
   return data.id as string;
 }
 
-// Skipped by default so the regular `npm run test:e2e` pipeline doesn't
-// pay the ~2-minute screenshot pass on every CI run. `npm run screenshots`
-// flips RUN_SCREENSHOTS=1 to enable.
+/** True when the committed baseline file exists for this slug + viewport. */
+function baselineExists(slug: string, viewportName: string): boolean {
+  return existsSync(
+    path.join(SNAPSHOT_DIR, `${slug}-${viewportName}-linux.png`),
+  );
+}
+
+type ViewportSpec = { name: "desktop" | "mobile"; size: typeof DESKTOP | typeof MOBILE };
+
+/**
+ * Capture screenshots for a route list using the given sign-in helper.
+ * Per route:
+ *   1. Save full-page PNG to playwright-screenshots/ (artifact upload).
+ *   2. If a baseline exists, assert via toHaveScreenshot() (CI gate).
+ *
+ * Navigation failures are logged and skipped — a broken single route
+ * doesn't abort the rest of the run.
+ */
+async function captureRoutes(
+  browser: Browser,
+  viewport: ViewportSpec,
+  routes: readonly RouteEntry[],
+  signIn: (page: Page) => Promise<void>,
+  siteId: string,
+  testInfo: import("@playwright/test").TestInfo,
+): Promise<void> {
+  const context = await browser.newContext({
+    viewport: viewport.size,
+    reducedMotion: "reduce",
+    locale: "en-US",
+    timezoneId: "UTC",
+  });
+  const page = await context.newPage();
+  await signIn(page);
+
+  for (const route of routes) {
+    const targetUrl = route.url.replace("{siteId}", siteId);
+    const filePath = path.join(
+      SCREENSHOTS_DIR,
+      viewport.name,
+      `${route.slug}.png`,
+    );
+
+    let screenshotTaken = false;
+    try {
+      await page.goto(targetUrl, { waitUntil: "networkidle" });
+      if (route.waitForSelector) {
+        await page
+          .locator(route.waitForSelector)
+          .first()
+          .waitFor({ timeout: 5_000 });
+      }
+      if (route.hydrationDelayMs) {
+        await page.waitForTimeout(route.hydrationDelayMs);
+      }
+      const masks = await page.locator("[data-screenshot-mask]").all();
+      await page.screenshot({
+        path: filePath,
+        fullPage: true,
+        mask: masks,
+        maskColor: "#e5e7eb",
+        animations: "disabled",
+      });
+      screenshotTaken = true;
+
+      if (viewport.name === "desktop") {
+        await auditA11y(page, testInfo);
+      }
+      // eslint-disable-next-line no-console
+      console.log(
+        `  [${viewport.name}] ${route.slug} → ${path.relative(process.cwd(), filePath)}`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      await testInfo.attach(
+        `screenshot-failed-${route.slug}-${viewport.name}`,
+        { body: `${targetUrl}\n${msg}`, contentType: "text/plain" },
+      );
+      // eslint-disable-next-line no-console
+      console.warn(`  [${viewport.name}] ${route.slug} FAILED: ${msg}`);
+    }
+
+    // Visual regression gate — only runs when a committed baseline exists.
+    // First-time baseline capture: run `npm run screenshots:baseline`.
+    if (screenshotTaken && baselineExists(route.slug, viewport.name)) {
+      const masks = await page.locator("[data-screenshot-mask]").all();
+      await expect(page).toHaveScreenshot(
+        `${route.slug}-${viewport.name}.png`,
+        {
+          fullPage: true,
+          mask: masks,
+          animations: "disabled",
+        },
+      );
+    }
+  }
+
+  await context.close();
+}
+
+// Skipped by default so `npm run test:e2e` doesn't pay the screenshot pass.
+// Enable with: RUN_SCREENSHOTS=1 (set by `npm run screenshots`).
 const SHOULD_RUN = process.env.RUN_SCREENSHOTS === "1";
 
 test.describe("A-0 visual regression screenshot harness", () => {
   test.skip(!SHOULD_RUN, "RUN_SCREENSHOTS=1 not set");
 
-  test("captures every admin surface at desktop + mobile", async ({
-    browser,
-  }, testInfo) => {
-    test.setTimeout(180_000);
+  test("captures every admin + social surface at desktop + mobile", async (
+    { browser },
+    testInfo,
+  ) => {
+    test.setTimeout(300_000);
+
     await mkdir(path.join(SCREENSHOTS_DIR, "desktop"), { recursive: true });
     await mkdir(path.join(SCREENSHOTS_DIR, "mobile"), { recursive: true });
 
     const siteId = await getSeededSiteId();
 
     for (const viewport of [
-      { name: "desktop", size: DESKTOP },
-      { name: "mobile", size: MOBILE },
-    ] as const) {
-      // Fresh context per viewport — reduced-motion + viewport are
-      // browser-context level, can't be flipped per-page.
-      const context = await browser.newContext({
-        viewport: viewport.size,
-        reducedMotion: "reduce",
-        // Pin the locale + timezone so any date-formatted text is stable.
-        locale: "en-US",
-        timezoneId: "UTC",
-      });
-      const page = await context.newPage();
-
-      // Sign in once per viewport (cookie sticks for subsequent
-      // navigations within this context).
-      await signInAsAdmin(page);
-
-      for (const route of ROUTES) {
-        const targetUrl = route.url.replace("{siteId}", siteId);
-        const filePath = path.join(
-          SCREENSHOTS_DIR,
-          viewport.name,
-          `${route.slug}.png`,
-        );
-
-        try {
-          await page.goto(targetUrl, { waitUntil: "networkidle" });
-          if (route.waitForSelector) {
-            await page
-              .locator(route.waitForSelector)
-              .first()
-              .waitFor({ timeout: 5_000 });
-          }
-          if (route.hydrationDelayMs) {
-            await page.waitForTimeout(route.hydrationDelayMs);
-          }
-          // Mask "updated N minutes ago" style relative timestamps so a
-          // clock tick between PRs doesn't reorder the diff.
-          // R1-9 — override Playwright's default magenta maskColor (which
-          // appeared on the Sites list UPDATED column as bright pink
-          // blocks in operator review). Use a subtle muted gray that
-          // blends with the canvas tint so the screenshot reads as
-          // "this column has dynamic text" rather than "broken styling."
-          const masks = await page.locator("[data-screenshot-mask]").all();
-          await page.screenshot({
-            path: filePath,
-            fullPage: true,
-            mask: masks,
-            maskColor: "#e5e7eb",
-            animations: "disabled",
-          });
-          // C-3 — run axe-core on every captured route. Findings
-          // attach to the test result; non-blocking by design (the
-          // harness still produces screenshots even if axe surfaces
-          // violations) but visible in the CI run output for triage.
-          // Desktop-viewport pass only — running on both viewports
-          // doubles audit time and rarely finds viewport-specific
-          // a11y issues.
-          if (viewport.name === "desktop") {
-            await auditA11y(page, testInfo);
-          }
-          // eslint-disable-next-line no-console
-          console.log(
-            `  [${viewport.name}] ${route.slug} → ${path.relative(process.cwd(), filePath)}`,
-          );
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          await testInfo.attach(`screenshot-failed-${route.slug}-${viewport.name}`, {
-            body: `${targetUrl}\n${msg}`,
-            contentType: "text/plain",
-          });
-          // eslint-disable-next-line no-console
-          console.warn(
-            `  [${viewport.name}] ${route.slug} FAILED: ${msg}`,
-          );
-        }
-      }
-
-      await context.close();
+      { name: "desktop" as const, size: DESKTOP },
+      { name: "mobile" as const, size: MOBILE },
+    ]) {
+      await captureRoutes(
+        browser,
+        viewport,
+        ADMIN_ROUTES,
+        signInAsAdmin,
+        siteId,
+        testInfo,
+      );
+      await captureRoutes(
+        browser,
+        viewport,
+        COMPANY_ROUTES,
+        signInAsCompanyAdmin,
+        siteId,
+        testInfo,
+      );
     }
 
+    // Sentinel — always passes; individual toHaveScreenshot assertions
+    // above are the real gate.
     expect(true).toBe(true);
   });
 });

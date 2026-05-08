@@ -41,7 +41,17 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report", open: "never" }],
   ],
   timeout: 30_000,
-  expect: { timeout: 10_000 },
+  expect: {
+    timeout: 10_000,
+    toHaveScreenshot: {
+      // 2% pixel ratio tolerance — accommodates sub-pixel antialiasing
+      // differences between CI Linux and local macOS/Windows renders.
+      // Tighten to 0.01 once baselines stabilise across a few green runs.
+      maxDiffPixelRatio: 0.02,
+      // Per-pixel colour threshold (0 = exact, 1 = ignore all colour diffs).
+      threshold: 0.2,
+    },
+  },
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",
