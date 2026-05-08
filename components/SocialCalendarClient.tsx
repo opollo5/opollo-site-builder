@@ -13,6 +13,7 @@ import {
   PLATFORM_LABEL,
   type SocialPlatform,
 } from "@/lib/platform/social/variants/types";
+import { SocialModuleShell } from "@/components/social/social-module-shell";
 
 // ---------------------------------------------------------------------------
 // Monthly calendar grid for /company/social/calendar.
@@ -21,6 +22,10 @@ import {
 // connections for the profiles filter. This client component handles
 // platform filtering (local state) and prev/next month navigation
 // (href → full page reload with ?month=YYYY-MM).
+//
+// Shell chrome (breadcrumb, workspace selector, tab group, New post CTA)
+// is owned by SocialModuleShell; this component provides the period
+// navigator and ProfilesFilter as toolbar slots.
 // ---------------------------------------------------------------------------
 
 type Entry = {
@@ -182,10 +187,16 @@ function ProfilesFilter({
       <PopoverTrigger asChild>
         <button
           aria-label="Filter by profiles"
-          className="flex items-center gap-2 rounded-md border border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="inline-flex items-center gap-1.5 rounded-full border border-[#1F2937] bg-white px-[14px] py-[6px] text-[13px] font-medium text-[#1F2937] transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           {label}
-          <NavIcon name="chevrons-expand-vertical" size={14} className="opacity-50" />
+          <NavIcon
+            name="chevrons-expand-vertical"
+            size={14}
+            className={cn("shrink-0 transition-transform", open && "rotate-180")}
+          />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2" align="end">
@@ -197,7 +208,7 @@ function ProfilesFilter({
             <div
               className={cn(
                 "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                allVisible ? "border-pk bg-pk" : "border-white/20",
+                allVisible ? "border-pk bg-pk" : "border-gray-300",
               )}
             >
               {allVisible && (
@@ -208,7 +219,7 @@ function ProfilesFilter({
           </button>
 
           {connections.length > 0 && (
-            <div className="my-1 border-t border-white/[0.06]" />
+            <div className="my-1 border-t border-gray-100" />
           )}
 
           {connections.map((conn) => {
@@ -222,7 +233,7 @@ function ProfilesFilter({
                 <div
                   className={cn(
                     "flex h-4 w-4 shrink-0 items-center justify-center rounded border",
-                    visible ? "border-pk bg-pk" : "border-white/20",
+                    visible ? "border-pk bg-pk" : "border-gray-300",
                   )}
                 >
                   {visible && (
@@ -240,7 +251,7 @@ function ProfilesFilter({
           })}
 
           {connections.length === 0 && (
-            <p className="px-2 py-1.5 text-xs text-m3">
+            <p className="px-2 py-1.5 text-xs text-tx-muted">
               No connected accounts yet.
             </p>
           )}
@@ -309,238 +320,178 @@ export function SocialCalendarClient({
     return map;
   }, [entries, hiddenPlatforms]);
 
-  return (
-    <div data-testid="social-calendar">
-      {/* Breadcrumbs */}
-      <nav aria-label="Breadcrumb" className="mb-4">
-        <ol className="flex items-center gap-1.5 text-sm text-m3">
-          <li>
-            <Link
-              href="/company/social"
-              className="transition-colors hover:text-white"
-            >
-              Social
-            </Link>
-          </li>
-          <li aria-hidden>/</li>
-          <li className="font-medium text-white">Calendar</li>
-        </ol>
-      </nav>
-
-      {/* Header bar */}
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        {/* Company indicator (V1: single-company, read-only) */}
-        <div
-          className="flex items-center gap-1.5 rounded-md border border-white/[0.1] px-3 py-1.5 text-sm text-m2"
-          title={companyName}
-        >
-          <NavIcon name="apartment" size={14} className="shrink-0 opacity-60" />
-          <span className="max-w-[10rem] truncate">{companyName}</span>
-        </div>
-
-        {/* Month navigation */}
-        <div className="flex items-center gap-1">
-          <a
-            href={`?month=${prevMonth}`}
-            aria-label="Previous month"
-            data-testid="calendar-prev"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.1] text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
-          >
-            <NavIcon name="chevron-left" size={16} />
-          </a>
-          <span
-            className="min-w-[10rem] text-center text-sm font-semibold"
-            data-testid="calendar-month-label"
-          >
-            {monthLabel}
-          </span>
-          <a
-            href={`?month=${nextMonth}`}
-            aria-label="Next month"
-            data-testid="calendar-next"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-white/[0.1] text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
-          >
-            <NavIcon name="chevron-right" size={16} />
-          </a>
-          {!isCurrentMonth && (
-            <a
-              href="/company/social/calendar"
-              className="ml-1 rounded-md border border-white/[0.1] px-3 py-1 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
-              data-testid="calendar-today"
-            >
-              Today
-            </a>
-          )}
-        </div>
-
-        {/* Right-side controls */}
-        <div className="ml-auto flex flex-wrap items-center gap-2">
-          {/* View toggle */}
-          <div
-            className="flex items-center overflow-hidden rounded-lg border border-white/[0.1]"
-            role="group"
-            aria-label="View mode"
-          >
-            <span
-              aria-current="page"
-              className="flex items-center gap-1.5 border-r border-white/[0.1] bg-pk px-3 py-1.5 text-sm text-white"
-            >
-              <NavIcon name="calendar-full" size={14} />
-              Calendar
-            </span>
-            <Link
-              href="/company/social/posts"
-              className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
-            >
-              <NavIcon name="list" size={14} />
-              Posts
-            </Link>
-            <button
-              disabled
-              aria-disabled="true"
-              title="Coming soon"
-              className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-m3 opacity-40"
-            >
-              <NavIcon name="clock" size={14} />
-              Timeline
-            </button>
-          </div>
-
-          {/* Profiles filter */}
-          <ProfilesFilter
-            connections={connections}
-            hiddenPlatforms={hiddenPlatforms}
-            onToggle={togglePlatform}
-            onShowAll={showAllPlatforms}
-          />
-
-          {/* New post */}
-          <Link
-            href={composerEnabled ? "?compose=new" : "/company/social/posts"}
-            className="inline-flex items-center gap-1.5 rounded-md bg-pk px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-pk/80"
-            data-testid="calendar-new-post"
-          >
-            <NavIcon name="plus" size={14} />
-            New post
-          </Link>
-        </div>
-      </div>
-
-      {/* Grid */}
-      <div
-        className="overflow-hidden rounded-lg border border-white/[0.06]"
-        role="grid"
-        aria-label={`Calendar for ${monthLabel}`}
+  const periodNavigator = (
+    <div className="flex items-center gap-1">
+      <a
+        href={`?month=${prevMonth}`}
+        aria-label="Previous month"
+        data-testid="calendar-prev"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-[#374151] transition-colors hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
-        {/* Day-of-week header */}
-        <div
-          className="grid grid-cols-7 border-b border-white/[0.06] bg-white/[0.04]"
-          role="row"
+        <NavIcon name="chevron-left" size={16} />
+      </a>
+      <span
+        className="min-w-[10rem] text-center text-sm font-semibold text-tx-primary"
+        data-testid="calendar-month-label"
+      >
+        {monthLabel}
+      </span>
+      <a
+        href={`?month=${nextMonth}`}
+        aria-label="Next month"
+        data-testid="calendar-next"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-[#374151] transition-colors hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        <NavIcon name="chevron-right" size={16} />
+      </a>
+      {!isCurrentMonth && (
+        <a
+          href="/company/social/calendar"
+          className="ml-1 rounded-full border border-[#1F2937] bg-white px-3 py-1 text-[13px] font-medium text-[#1F2937] transition-colors hover:bg-gray-50"
+          data-testid="calendar-today"
         >
-          {DAY_HEADERS.map((d) => (
-            <div
-              key={d}
-              role="columnheader"
-              className="px-2 py-1.5 text-center text-xs font-medium uppercase tracking-wide text-m3"
-            >
-              {d}
-            </div>
-          ))}
-        </div>
-
-        {/* Day cells — 6 rows */}
-        <div className="grid grid-cols-7">
-          {grid.map((day, idx) => {
-            const dayKey = localDayKey(day);
-            const inMonth = day.getMonth() === month - 1;
-            const isToday = dayKey === todayKey;
-            const dayEntries = entryMap.get(dayKey) ?? [];
-            const visibleChips = dayEntries.slice(0, MAX_CHIPS);
-            const hasOverflow = dayEntries.length > MAX_CHIPS;
-            const isLastRow = idx >= 35;
-            const isLastCol = idx % 7 === 6;
-
-            return (
-              <div
-                key={dayKey}
-                role="gridcell"
-                data-testid={`calendar-day-${dayKey}`}
-                className={cn(
-                  "group min-h-[6rem] p-1.5",
-                  !isLastRow && "border-b border-white/[0.06]",
-                  !isLastCol && "border-r border-white/[0.06]",
-                  !inMonth && "opacity-30",
-                )}
-              >
-                {/* Date number row */}
-                <div className="flex items-center justify-between">
-                  {/* + create post hint — visible on hover */}
-                  <Link
-                    href="/company/social/posts"
-                    tabIndex={-1}
-                    aria-label={`Create post for ${dayKey}`}
-                    className="invisible flex h-5 w-5 items-center justify-center rounded-full text-m3 transition-colors hover:bg-white/10 hover:text-white group-hover:visible"
-                  >
-                    <NavIcon name="plus" size={12} />
-                  </Link>
-                  <span
-                    className={cn(
-                      "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                      isToday ? "bg-pk text-white" : "text-m2",
-                    )}
-                  >
-                    {day.getDate()}
-                  </span>
-                </div>
-
-                {/* Post chips */}
-                <ul className="mt-1 space-y-0.5">
-                  {visibleChips.map((e) => (
-                    <li key={e.id}>
-                      <a
-                        href={`/company/social/posts/${e.post_master_id}`}
-                        data-testid={`calendar-entry-${e.id}`}
-                        className={cn(
-                          "flex items-center gap-1 truncate rounded px-1 py-0.5 text-xs leading-tight transition-opacity hover:opacity-80",
-                          CHIP_CLASS[e.platform],
-                        )}
-                        title={e.preview ?? "(no copy)"}
-                      >
-                        <span className="shrink-0 font-semibold">
-                          {PLATFORM_ABBR[e.platform]}
-                        </span>
-                        <span className="shrink-0 opacity-70">
-                          {timeLabel(e.scheduled_at)}
-                        </span>
-                        {e.preview && (
-                          <span className="truncate opacity-80">
-                            {e.preview}
-                          </span>
-                        )}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* Overflow popover */}
-                {hasOverflow && (
-                  <DayOverflowPopover dayKey={dayKey} dayEntries={dayEntries} />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Total count */}
-      {entries.length > 0 && (
-        <p
-          className="mt-3 text-right text-xs text-m3"
-          data-testid="calendar-count"
-        >
-          {entries.length} {entries.length === 1 ? "post" : "posts"} this month
-        </p>
+          Today
+        </a>
       )}
     </div>
+  );
+
+  return (
+    <SocialModuleShell
+      activeView="calendar"
+      companyName={companyName}
+      composerEnabled={composerEnabled}
+      periodNavigator={periodNavigator}
+      toolbarActions={
+        <ProfilesFilter
+          connections={connections}
+          hiddenPlatforms={hiddenPlatforms}
+          onToggle={togglePlatform}
+          onShowAll={showAllPlatforms}
+        />
+      }
+    >
+      <div data-testid="social-calendar">
+        {/* Grid */}
+        <div
+          className="overflow-hidden rounded-lg border border-white/[0.06]"
+          role="grid"
+          aria-label={`Calendar for ${monthLabel}`}
+        >
+          {/* Day-of-week header */}
+          <div
+            className="grid grid-cols-7 border-b border-white/[0.06] bg-white/[0.04]"
+            role="row"
+          >
+            {DAY_HEADERS.map((d) => (
+              <div
+                key={d}
+                role="columnheader"
+                className="px-2 py-1.5 text-center text-xs font-medium uppercase tracking-wide text-m3"
+              >
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Day cells — 6 rows */}
+          <div className="grid grid-cols-7">
+            {grid.map((day, idx) => {
+              const dayKey = localDayKey(day);
+              const inMonth = day.getMonth() === month - 1;
+              const isToday = dayKey === todayKey;
+              const dayEntries = entryMap.get(dayKey) ?? [];
+              const visibleChips = dayEntries.slice(0, MAX_CHIPS);
+              const hasOverflow = dayEntries.length > MAX_CHIPS;
+              const isLastRow = idx >= 35;
+              const isLastCol = idx % 7 === 6;
+
+              return (
+                <div
+                  key={dayKey}
+                  role="gridcell"
+                  data-testid={`calendar-day-${dayKey}`}
+                  className={cn(
+                    "group min-h-[6rem] p-1.5",
+                    !isLastRow && "border-b border-white/[0.06]",
+                    !isLastCol && "border-r border-white/[0.06]",
+                    !inMonth && "opacity-30",
+                  )}
+                >
+                  {/* Date number row */}
+                  <div className="flex items-center justify-between">
+                    {/* + create post hint — visible on hover */}
+                    <Link
+                      href="/company/social/posts"
+                      tabIndex={-1}
+                      aria-label={`Create post for ${dayKey}`}
+                      className="invisible flex h-5 w-5 items-center justify-center rounded-full text-m3 transition-colors hover:bg-white/10 hover:text-white group-hover:visible"
+                    >
+                      <NavIcon name="plus" size={12} />
+                    </Link>
+                    <span
+                      className={cn(
+                        "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
+                        isToday ? "bg-pk text-white" : "text-m2",
+                      )}
+                    >
+                      {day.getDate()}
+                    </span>
+                  </div>
+
+                  {/* Post chips */}
+                  <ul className="mt-1 space-y-0.5">
+                    {visibleChips.map((e) => (
+                      <li key={e.id}>
+                        <a
+                          href={`/company/social/posts/${e.post_master_id}`}
+                          data-testid={`calendar-entry-${e.id}`}
+                          className={cn(
+                            "flex items-center gap-1 truncate rounded px-1 py-0.5 text-xs leading-tight transition-opacity hover:opacity-80",
+                            CHIP_CLASS[e.platform],
+                          )}
+                          title={e.preview ?? "(no copy)"}
+                        >
+                          <span className="shrink-0 font-semibold">
+                            {PLATFORM_ABBR[e.platform]}
+                          </span>
+                          <span className="shrink-0 opacity-70">
+                            {timeLabel(e.scheduled_at)}
+                          </span>
+                          {e.preview && (
+                            <span className="truncate opacity-80">
+                              {e.preview}
+                            </span>
+                          )}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Overflow popover */}
+                  {hasOverflow && (
+                    <DayOverflowPopover
+                      dayKey={dayKey}
+                      dayEntries={dayEntries}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Total count */}
+        {entries.length > 0 && (
+          <p
+            className="mt-3 text-right text-xs text-m3"
+            data-testid="calendar-count"
+          >
+            {entries.length} {entries.length === 1 ? "post" : "posts"} this
+            month
+          </p>
+        )}
+      </div>
+    </SocialModuleShell>
   );
 }
