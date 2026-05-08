@@ -46,8 +46,12 @@ describe("purgeSite recursive cascade", () => {
         site_id: siteId,
         title: "Purge test brief",
         status: "parsed",
-        original_text: "Some content",
         text_model: "claude-sonnet-4-6",
+        source_storage_path: "purge-test/brief.txt",
+        source_mime_type: "text/plain",
+        source_size_bytes: 12,
+        source_sha256: "aabbccdd",
+        upload_idempotency_key: "purge-test-idem-key",
       })
       .select("id")
       .single();
