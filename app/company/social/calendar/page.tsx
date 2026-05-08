@@ -89,7 +89,7 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
   const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <>
       {entriesResult.ok ? (
         <SocialCalendarClient
           entries={entriesResult.data.entries.map((e) => ({
@@ -112,6 +112,6 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
           Failed to load calendar: {entriesResult.error.message}
         </div>
       )}
-    </main>
+    </>
   );
 }

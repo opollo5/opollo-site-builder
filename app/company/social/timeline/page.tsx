@@ -41,24 +41,22 @@ export default async function CompanySocialTimelinePage() {
   const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <SocialModuleShell
-        activeView="timeline"
-        companyName={companyName}
-        composerEnabled={composerEnabled}
+    <SocialModuleShell
+      activeView="timeline"
+      companyName={companyName}
+      composerEnabled={composerEnabled}
+    >
+      <div
+        className="flex min-h-[24rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-200 text-center"
+        data-testid="timeline-coming-soon"
       >
-        <div
-          className="flex min-h-[24rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-200 text-center"
-          data-testid="timeline-coming-soon"
-        >
-          <p className="text-sm font-medium text-tx-primary">
-            Timeline coming soon
-          </p>
-          <p className="max-w-xs text-sm text-tx-muted">
-            A chronological view of your social post history will appear here.
-          </p>
-        </div>
-      </SocialModuleShell>
-    </main>
+        <p className="text-sm font-medium text-tx-primary">
+          Timeline coming soon
+        </p>
+        <p className="max-w-xs text-sm text-tx-muted">
+          A chronological view of your social post history will appear here.
+        </p>
+      </div>
+    </SocialModuleShell>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { NavIcon } from "@/components/ui/nav-icon";
 import {
   StatusPill,
@@ -357,36 +358,21 @@ export function BriefRunClient({
 
   return (
     <div className="mt-6 space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">{brief.title}</h1>
-          {/* UAT (2026-05-03 round-3): converted the run-status line from
-              a <p> with inline pills to a flex row so the status pill +
-              Live badge baseline-align cleanly with the prose. The pills
-              have padding-y of their own; baseline alignment inside a
-              text-sm <p> dropped them ~1px below the text and read as
-              broken to operators. */}
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>{brief.title}</PageHeader.Title>
+        {/* UAT (2026-05-03 round-3): status row uses a flex div so pills
+            baseline-align with prose without the ~1px drop that <p> caused. */}
+        <PageHeader.Subtitle className="text-sm">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>
               Run surface for <span className="font-medium">{siteName}</span>
             </span>
             {activeRun && (
               <>
                 <span aria-hidden className="text-muted-foreground/60">—</span>
-                {/* RS-5 — when a specific page is awaiting review, the
-                    run-level pill becomes a clickable shortcut showing
-                    the ordinal so the operator knows exactly which page
-                    is blocking. Falls back to the static pill when no
-                    page is awaiting (defensive). */}
                 {activeRun.status === "paused" &&
                 firstAwaitingReview &&
                 sortedPages.length > 1 ? (
-                  // UAT (2026-05-03 round-3): only show the "Page N
-                  // awaiting your review →" clickable shortcut on
-                  // multi-page briefs. With a single page the operator
-                  // is already looking at the only card; the shortcut
-                  // is a no-op that adds visual noise. Single-page
-                  // briefs fall through to the static run pill.
                   <StatusPill
                     kind="run_paused"
                     role="button"
@@ -412,10 +398,6 @@ export function BriefRunClient({
                 )}
               </>
             )}
-            {/* RS-4 — live-update indicator. Stale (>8s without a fresh
-                fetch) shows amber; healthy shows a faint pulsing green
-                so the operator sees the surface is wired up and doesn't
-                feel the urge to refresh. */}
             {polled.isStale ? (
               <span
                 role="status"
@@ -439,19 +421,21 @@ export function BriefRunClient({
               </span>
             )}
           </div>
-        </div>
+        </PageHeader.Subtitle>
         {isRunActive && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleCancel}
-            disabled={controlState !== "idle"}
-          >
-            {controlState === "cancelling" ? "Cancelling…" : "Cancel run"}
-          </Button>
+          <PageHeader.Actions>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCancel}
+              disabled={controlState !== "idle"}
+            >
+              {controlState === "cancelling" ? "Cancelling…" : "Cancel run"}
+            </Button>
+          </PageHeader.Actions>
         )}
-      </div>
+      </PageHeader>
 
       {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
 

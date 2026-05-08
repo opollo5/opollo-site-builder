@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { listClients } from "@/lib/optimiser/clients";
 import { listChangeLog } from "@/lib/optimiser/change-log";
 
@@ -21,14 +22,12 @@ export default async function OptimiserChangeLogPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Change log</h1>
-          <p className="text-sm text-muted-foreground">
-            Append-only audit trail of every page change applied through the engine.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader>
+        <PageHeader.Title>Change log</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Append-only audit trail of every page change applied through the engine.
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
           {onboarded.length > 1 && (
             <form method="get" action="/optimiser/change-log" className="flex items-center gap-1">
               <select
@@ -50,8 +49,8 @@ export default async function OptimiserChangeLogPage({
           <Button asChild variant="outline">
             <Link href="/optimiser">Page browser</Link>
           </Button>
-        </div>
-      </header>
+        </PageHeader.Actions>
+      </PageHeader>
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left">

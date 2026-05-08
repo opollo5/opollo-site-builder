@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { AssistedApprovalToggle } from "@/components/optimiser/AssistedApprovalToggle";
 import { CrossClientConsentToggle } from "@/components/optimiser/CrossClientConsentToggle";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -63,27 +64,20 @@ export default async function ClientSettingsPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            <Link href="/optimiser" className="text-primary underline-offset-4 hover:underline">
-              ← Page browser
+      <PageHeader>
+        <PageHeader.Title>{client.name} — score settings</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Phase 1 surface is read-only. Phase 2 wires the manual override
+          via this page.
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button asChild variant="outline">
+            <Link href={`/optimiser/onboarding/${client.id}`}>
+              Connector settings
             </Link>
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {client.name} — score settings
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Phase 1 surface is read-only. Phase 2 wires the manual override
-            via this page.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href={`/optimiser/onboarding/${client.id}`}>
-            Connector settings
-          </Link>
-        </Button>
-      </header>
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
 
       <section className="space-y-4 rounded-lg border border-border bg-card p-6">
         <h2 className="text-lg font-medium">Composite score weights</h2>

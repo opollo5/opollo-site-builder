@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { ConnectorBannerView } from "@/components/optimiser/ConnectorBanner";
 import { PageBrowser } from "@/components/optimiser/PageBrowser";
 import { listClients } from "@/lib/optimiser/clients";
@@ -66,22 +67,20 @@ export default async function OptimiserHomePage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Page browser</h1>
-          <p className="text-base text-muted-foreground">
-            All managed landing pages, with state, data reliability, and key metrics.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader>
+        <PageHeader.Title>Page browser</PageHeader.Title>
+        <PageHeader.Subtitle>
+          All managed landing pages, with state, data reliability, and key metrics.
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
           {onboarded.length > 1 && (
             <ClientSwitcher clients={onboarded} selectedId={selected.id} />
           )}
           <Button asChild variant="outline">
             <Link href="/optimiser/onboarding">Onboarding</Link>
           </Button>
-        </div>
-      </header>
+        </PageHeader.Actions>
+      </PageHeader>
 
       {banners.length > 0 && (
         <div className="space-y-2">
@@ -99,12 +98,12 @@ export default async function OptimiserHomePage({
 function EmptyState({ clientsExist }: { clientsExist: boolean }) {
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Optimiser</h1>
-        <p className="text-base text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>Optimiser</PageHeader.Title>
+        <PageHeader.Subtitle>
           Autonomous Landing Page Optimisation Engine — Phase 1.
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
       <section className="rounded-lg border border-dashed border-border bg-card p-8 text-center">
         <h2 className="text-lg font-medium">No onboarded clients yet</h2>
         <p className="mt-2 text-base text-muted-foreground">

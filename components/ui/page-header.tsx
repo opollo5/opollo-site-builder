@@ -198,9 +198,9 @@ function PageHeaderSubtitle({
   className?: string;
 }) {
   return (
-    <p className={cn("text-base text-muted-foreground", className)}>
+    <div className={cn("text-base text-muted-foreground", className)}>
       {children}
-    </p>
+    </div>
   );
 }
 PageHeaderSubtitle.displayName = SLOT_NAMES.Subtitle;

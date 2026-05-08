@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { listClients } from "@/lib/optimiser/clients";
 import { listPendingProposals } from "@/lib/optimiser/proposals";
 
@@ -28,14 +29,12 @@ export default async function OptimiserProposalsList({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Proposals</h1>
-          <p className="text-sm text-muted-foreground">
-            Pending optimisation proposals, sorted by priority.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader>
+        <PageHeader.Title>Proposals</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Pending optimisation proposals, sorted by priority.
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
           {onboarded.length > 1 && (
             <form method="get" action="/optimiser/proposals" className="flex items-center gap-1">
               <select
@@ -57,8 +56,8 @@ export default async function OptimiserProposalsList({
           <Button asChild variant="outline">
             <Link href="/optimiser">Page browser</Link>
           </Button>
-        </div>
-      </header>
+        </PageHeader.Actions>
+      </PageHeader>
 
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-sm">

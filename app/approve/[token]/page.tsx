@@ -1,4 +1,5 @@
 import { ApprovalDecisionForm } from "@/components/ApprovalDecisionForm";
+import { PageHeader } from "@/components/ui/page-header";
 import { resolveRecipientByToken } from "@/lib/platform/social/approvals";
 import {
   PLATFORM_LABEL,
@@ -75,18 +76,16 @@ export default async function ApproveViewerPage({
 
   return (
     <main className="mx-auto max-w-2xl p-6">
-      <header>
-        <h1 className="text-2xl font-semibold">
-          {company.name} — approval request
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>{company.name} — approval request</PageHeader.Title>
+        <PageHeader.Subtitle>
           {recipient.name?.trim() ? `Hi ${recipient.name},` : "Hi,"}{" "}
           {company.name} would like your decision on the social post
           below. {snapshot.submitted_at
             ? `Submitted ${formatTime(snapshot.submitted_at)}.`
             : null}
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       <SnapshotReadOnly snapshot={snapshot} />
 
@@ -165,7 +164,7 @@ function SnapshotReadOnly({ snapshot }: { snapshot: Snapshot }) {
 function InvalidLink() {
   return (
     <main className="mx-auto max-w-xl p-6 text-sm">
-      <h1 className="text-xl font-semibold">Approval link not valid</h1>
+      <h1 className="text-page-title text-foreground">Approval link not valid</h1>
       <p className="mt-3 text-muted-foreground">
         This link is invalid or has expired. If you were expecting to
         review a post, ask the team for a fresh link.
@@ -177,7 +176,7 @@ function InvalidLink() {
 function RevokedPanel() {
   return (
     <main className="mx-auto max-w-xl p-6 text-sm">
-      <h1 className="text-xl font-semibold">Approval link revoked</h1>
+      <h1 className="text-page-title text-foreground">Approval link revoked</h1>
       <p className="mt-3 text-muted-foreground">
         This invitation has been revoked. If you still need to review
         the post, ask the team for a fresh link.
@@ -189,7 +188,7 @@ function RevokedPanel() {
 function ExpiredPanel({ companyName }: { companyName: string }) {
   return (
     <main className="mx-auto max-w-xl p-6 text-sm">
-      <h1 className="text-xl font-semibold">Approval window closed</h1>
+      <h1 className="text-page-title text-foreground">Approval window closed</h1>
       <p className="mt-3 text-muted-foreground">
         The approval window for this {companyName} post has expired.
         If you still need to review it, ask the team for a fresh link.

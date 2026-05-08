@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 
 import { SocialPostsDashboardCard } from "@/components/SocialPostsDashboardCard";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
@@ -76,13 +77,13 @@ export default async function CompanyLandingPage() {
     process.env.IMAGE_FEATURE_MOOD_BOARD === "true" && canCreate;
 
   return (
-    <main className="mx-auto max-w-5xl p-6 space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Welcome back</h1>
-        <p className="mt-1 text-base text-muted-foreground">
+    <div className="space-y-6">
+      <PageHeader>
+        <PageHeader.Title>Welcome back</PageHeader.Title>
+        <PageHeader.Subtitle>
           Here&apos;s where your social content sits today.
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {showCompletionBanner && isAdmin ? (
         <BrandCompletionBanner tier={brandTier} />
@@ -191,7 +192,7 @@ export default async function CompanyLandingPage() {
           </Link>
         ) : null}
       </nav>
-    </main>
+    </div>
   );
 }
 
@@ -228,14 +229,16 @@ function BrandCompletionBanner({ tier }: { tier: "none" | "minimal" }) {
 
 function MinimalLanding({ role }: { role: string }) {
   return (
-    <main className="mx-auto max-w-3xl p-6 text-sm">
-      <h1 className="text-2xl font-semibold">Welcome back</h1>
-      <p className="mt-2 text-muted-foreground">
-        Your role ({role}) doesn&apos;t have access to the calendar.
-        Ask an admin to elevate your permissions if you need to see
-        post stats.
-      </p>
-      <nav className="mt-6 grid gap-3 sm:grid-cols-2">
+    <div className="max-w-3xl">
+      <PageHeader>
+        <PageHeader.Title>Welcome back</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Your role ({role}) doesn&apos;t have access to the calendar.
+          Ask an admin to elevate your permissions if you need to see
+          post stats.
+        </PageHeader.Subtitle>
+      </PageHeader>
+      <nav className="grid gap-3 sm:grid-cols-2">
         <Link
           href="/company/users"
           className="block rounded-md border bg-card p-4 hover:border-primary/40"
@@ -246,6 +249,6 @@ function MinimalLanding({ role }: { role: string }) {
           </div>
         </Link>
       </nav>
-    </main>
+    </div>
   );
 }

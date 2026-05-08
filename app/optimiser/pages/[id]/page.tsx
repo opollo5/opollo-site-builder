@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { AbTestStatusBanner } from "@/components/optimiser/AbTestStatusBanner";
 import { ScoreBreakdownPanel } from "@/components/optimiser/ScoreBreakdownPanel";
 import { StagedRolloutBanner } from "@/components/optimiser/StagedRolloutBanner";
@@ -127,27 +128,19 @@ export default async function OptimiserPageDetail({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">
-            <Link href="/optimiser" className="text-primary underline-offset-4 hover:underline">
-              ← Page browser
-            </Link>{" "}
-            · {client.name}
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {page.display_name ?? page.url}
-          </h1>
-          <p className="font-mono text-sm text-muted-foreground">{page.url}</p>
-        </div>
-        <Button asChild variant="outline">
-          <Link
-            href={`/optimiser/clients/${client.id}/settings`}
-          >
-            Score weights
-          </Link>
-        </Button>
-      </header>
+      <PageHeader>
+        <PageHeader.Title>{page.display_name ?? page.url}</PageHeader.Title>
+        <PageHeader.Subtitle>
+          <span className="font-mono">{page.url}</span>
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button asChild variant="outline">
+            <Link href={`/optimiser/clients/${client.id}/settings`}>
+              Score weights
+            </Link>
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
 
       <AbTestStatusBanner test={latestTest as never} />
       <StagedRolloutBanner rollout={latestRollout} />

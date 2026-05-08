@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 // PillTabs — pill-shaped tab group.
 //
 // Spec:
-//   Active:   bg-[#00e5a0], white text, rounded-full
-//   Inactive: transparent bg, text-[#4B5563], rounded-full, hover bg-[#F3F4F6]
+//   Active:   bg-[var(--tab-active-bg)], white text, rounded-full
+//   Inactive: transparent bg, text-[var(--tab-inactive-text)], rounded-full, hover bg-[var(--icon-control-hover)]
 //   No borders on individual tabs.
 //
 // Each tab renders as a <Link> when `href` is supplied (navigation tabs)

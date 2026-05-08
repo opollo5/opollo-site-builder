@@ -42,7 +42,7 @@ export default async function CompanySocialMediaPage() {
   ]);
 
   return (
-    <main className="mx-auto max-w-6xl p-6">
+    <>
       <header>
         <H1>Media library</H1>
         <Lead className="mt-0.5">
@@ -67,6 +67,6 @@ export default async function CompanySocialMediaPage() {
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 }

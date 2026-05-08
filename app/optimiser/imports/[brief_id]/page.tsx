@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { ImportSideBySide } from "@/components/optimiser/ImportSideBySide";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getImportDetails } from "@/lib/optimiser/page-import/read-import";
@@ -28,40 +29,32 @@ export default async function OptimiserImportReviewPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">
-            <Link
-              href="/optimiser"
-              className="text-primary underline-offset-4 hover:underline"
-            >
-              ← Page browser
-            </Link>
-          </p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Import review — {details.brief_page.title}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Brief status:{" "}
-            <code className="font-mono text-sm">{details.brief.status}</code>
-            {" · "}
-            {details.brief_page.word_count.toLocaleString()} words captured
-            {details.brief_page.import_source_url && (
-              <>
-                {" · "}
-                <span className="font-mono text-sm">
-                  {details.brief_page.import_source_url}
-                </span>
-              </>
-            )}
-          </p>
-        </div>
+      <PageHeader>
+        <PageHeader.Title>
+          Import review — {details.brief_page.title}
+        </PageHeader.Title>
+        <PageHeader.Subtitle>
+          Brief status:{" "}
+          <code className="font-mono text-sm">{details.brief.status}</code>
+          {" · "}
+          {details.brief_page.word_count.toLocaleString()} words captured
+          {details.brief_page.import_source_url && (
+            <>
+              {" · "}
+              <span className="font-mono text-sm">
+                {details.brief_page.import_source_url}
+              </span>
+            </>
+          )}
+        </PageHeader.Subtitle>
         {briefRunHref && (
-          <Button asChild variant="outline">
-            <Link href={briefRunHref}>Brief run progress</Link>
-          </Button>
+          <PageHeader.Actions>
+            <Button asChild variant="outline">
+              <Link href={briefRunHref}>Brief run progress</Link>
+            </Button>
+          </PageHeader.Actions>
         )}
-      </header>
+      </PageHeader>
 
       <ImportSideBySide
         cachedHtml={details.brief_page.source_text}
