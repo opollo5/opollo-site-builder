@@ -143,14 +143,28 @@ describe("initiateBundlesocialConnect", () => {
 
     const callArg =
       mockClient.socialAccount.socialAccountCreatePortalLink.mock.calls[0]?.[0];
-    expect(callArg?.requestBody?.socialAccountTypes).toEqual(
-      expect.arrayContaining([
-        "LINKEDIN",
-        "FACEBOOK",
-        "TWITTER",
-        "GOOGLE_BUSINESS",
-      ]),
+    const types: string[] = callArg?.requestBody?.socialAccountTypes ?? [];
+    expect(types).toHaveLength(4);
+    expect(types).toEqual(
+      expect.arrayContaining(["LINKEDIN", "FACEBOOK", "TWITTER", "GOOGLE_BUSINESS"]),
     );
+  });
+
+  it("de-dupes LINKEDIN when only linkedin variants are supplied (non-empty path)", async () => {
+    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
+      url: "https://bundle.social/portal/li-only",
+    });
+
+    const result = await initiateBundlesocialConnect({
+      companyId: COMPANY_A_ID,
+      platforms: ["linkedin_personal", "linkedin_company"],
+      redirectUrl: "https://opollo.test/cb",
+    });
+
+    expect(result.ok).toBe(true);
+    const callArg =
+      mockClient.socialAccount.socialAccountCreatePortalLink.mock.calls[0]?.[0];
+    expect(callArg?.requestBody?.socialAccountTypes).toStrictEqual(["LINKEDIN"]);
   });
 
   it("returns INTERNAL_ERROR when SDK throws", async () => {
