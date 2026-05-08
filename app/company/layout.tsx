@@ -45,7 +45,6 @@ export default async function CompanyLayout({
       <NavShell
         navContext={navContext}
         skipToId="company-main"
-        contentMaxWidth="5xl"
       >
         {children}
       </NavShell>

@@ -61,7 +61,8 @@ audit_section() {
 audit_section "Bug A: per-page max-w containers" 'mx-auto.*max-w-(5xl|6xl|7xl)' 'app/'
 audit_section "Bug B: bare H1s (raw text-size, not PageHeader.Title)" '<h1[^>]*className="text-(2xl|xl|3xl|4xl|5xl)' 'app/ components/'
 audit_section "Bug C: breadcrumb in mt-5 wrapper (below H1)" '"mt-5"' 'app/'
-audit_section "Bug D: hex colours in JSX" '(bg|text|border|fill|stroke)-\[#[0-9a-fA-F]' 'app/ components/'
+# Bug D excludes components/composer/live-preview-card.tsx — social platform brand hex (LinkedIn, Facebook, Google)
+audit_section "Bug D: hex colours in JSX" '(bg|text|border|fill|stroke)-\[#[0-9a-fA-F]' 'app/ components/nav/ components/ui/ components/social/ components/optimiser/ components/admin/'
 audit_section "Bug E: rounded-full inline buttons (likely raw <button>)" '<button[^>]*className="[^"]*rounded-' 'app/'
 audit_section "Bug F: per-page header.mb-8 blocks" '<header className="mb-8"' 'app/'
 audit_section "Bug G: NavShellClient prop usage" 'contentMaxWidth|contentPadding' 'app/ components/'

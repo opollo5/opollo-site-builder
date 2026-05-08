@@ -18,16 +18,12 @@ interface NavShellProps {
   children: ReactNode;
   navContext: NavUserContext;
   skipToId?: string;
-  contentMaxWidth?: string;
-  contentPadding?: string;
 }
 
 export async function NavShell({
   children,
   navContext,
   skipToId = "main",
-  contentMaxWidth = "7xl",
-  contentPadding = "px-4 py-6 sm:px-8 sm:py-8",
 }: NavShellProps) {
   const cookieJar = cookies();
   const initialSectionNavCollapsed =
@@ -48,8 +44,6 @@ export async function NavShell({
         initialSectionNavCollapsed={initialSectionNavCollapsed}
         initialPrimaryNavCollapsed={initialPrimaryNavCollapsed}
         skipToId={skipToId}
-        contentMaxWidth={contentMaxWidth}
-        contentPadding={contentPadding}
       >
         {children}
       </NavShellClient>

@@ -31,7 +31,6 @@ export default async function OptimiserLayout({
       <NavShell
         navContext={navContext}
         skipToId="optimiser-main"
-        contentMaxWidth="6xl"
       >
         {children}
       </NavShell>

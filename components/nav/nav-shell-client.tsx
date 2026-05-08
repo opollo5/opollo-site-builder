@@ -52,8 +52,6 @@ interface NavShellClientProps {
   initialSectionNavCollapsed: boolean;
   initialPrimaryNavCollapsed: boolean;
   skipToId: string;
-  contentMaxWidth: string;
-  contentPadding: string;
 }
 
 export function NavShellClient({
@@ -62,8 +60,6 @@ export function NavShellClient({
   initialSectionNavCollapsed,
   initialPrimaryNavCollapsed,
   skipToId,
-  contentMaxWidth,
-  contentPadding,
 }: NavShellClientProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -237,12 +233,9 @@ export function NavShellClient({
         <main
           id={skipToId}
           tabIndex={-1}
-          className={cn(
-            "flex-1 overflow-auto scroll-mt-4 focus:outline-none",
-            contentPadding,
-          )}
+          className="flex-1 overflow-auto scroll-mt-4 focus:outline-none px-4 py-6 sm:px-8 sm:py-8"
         >
-          <div className={cn("mx-auto", `max-w-${contentMaxWidth}`)}>
+          <div className="mx-auto max-w-7xl">
             {children}
           </div>
         </main>

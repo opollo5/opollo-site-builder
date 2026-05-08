@@ -415,8 +415,8 @@ export function SocialCalendarClient({
                   data-testid={`calendar-day-${dayKey}`}
                   className={cn(
                     "group min-h-[6rem] p-1.5",
-                    !isLastRow && "border-b border-[#E5E7EB]",
-                    !isLastCol && "border-r border-[#E5E7EB]",
+                    !isLastRow && "border-b border-[var(--search-input-border)]",
+                    !isLastCol && "border-r border-[var(--search-input-border)]",
                     !inMonth && "opacity-30",
                   )}
                 >
@@ -435,7 +435,7 @@ export function SocialCalendarClient({
                       className={cn(
                         "inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium",
                         isToday
-                          ? "bg-[#00e5a0] text-white"
+                          ? "bg-[var(--tab-active-bg)] text-[var(--tab-active-text)]"
                           : isPast
                             ? "text-tx-muted"
                             : "text-tx-secondary",
