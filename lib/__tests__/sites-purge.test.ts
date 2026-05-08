@@ -62,9 +62,11 @@ describe("purgeSite recursive cascade", () => {
 
     const { error: pageErr } = await svc.from("brief_pages").insert({
       brief_id: briefId,
-      page_number: 1,
+      ordinal: 0,
       title: "Purge test page",
-      page_status: "pending",
+      mode: "short_brief",
+      source_text: "Purge test page content.",
+      word_count: 4,
     });
     if (pageErr) {
       throw new Error(`brief_pages seed failed: ${pageErr.message}`);

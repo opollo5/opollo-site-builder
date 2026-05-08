@@ -35,7 +35,7 @@ function Secondary({ className, children }: TextCellProps) {
   return (
     <span
       className={cn(
-        "text-[13px] leading-tight text-muted-foreground",
+        "text-sm leading-tight text-muted-foreground",
         className,
       )}
     >
@@ -48,7 +48,7 @@ function Mono({ className, children }: TextCellProps) {
   return (
     <code
       className={cn(
-        "font-mono text-[13px] text-foreground",
+        "font-mono text-sm text-foreground",
         // Reset code's default browser background so it sits flush in a
         // cell. Consumers who want a chip-shaped mono cell apply
         // bg-muted themselves.
