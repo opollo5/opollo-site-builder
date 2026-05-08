@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -194,7 +194,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setSubmitting(false);
         return;
       }
-      toast.success("Submitted for approval.");
+      toastSuccess("Submitted for approval.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -239,7 +239,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setCancelling(false);
         return;
       }
-      toast.success("Approval cancelled — post returned to draft.");
+      toastSuccess("Approval cancelled — post returned to draft.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -279,7 +279,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setReopening(false);
         return;
       }
-      toast.success("Post reopened for editing.");
+      toastSuccess("Post reopened for editing.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -314,7 +314,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setApproving(false);
         return;
       }
-      toast.success("Post approved.");
+      toastSuccess("Post approved.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -351,7 +351,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setRejecting(false);
         return;
       }
-      toast.success("Post rejected.");
+      toastSuccess("Post rejected.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -387,7 +387,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setRequestingChanges(false);
         return;
       }
-      toast.success("Changes requested.");
+      toastSuccess("Changes requested.");
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -415,7 +415,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
         setDuplicating(false);
         return;
       }
-      toast.success("Post duplicated.");
+      toastSuccess("Post duplicated.");
       router.push(`/company/social/posts/${json.data.newPostId}`);
       router.refresh();
     } catch (err) {
