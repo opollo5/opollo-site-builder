@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ApiError } from "bundlesocial";
+
 import {
   getBundlesocialClient,
   getBundlesocialTeamId,
@@ -95,29 +97,82 @@ export async function initiateBundlesocialConnect(
   // duplicate before Set collapses it).
   const bundlePlatforms = Array.from(new Set(rawPlatforms));
 
+  const requestPayload = {
+    teamId,
+    redirectUrl: input.redirectUrl,
+    socialAccountTypes: bundlePlatforms,
+    userName: input.userName ?? undefined,
+    userLogoUrl: input.userLogoUrl ?? undefined,
+  };
+
+  logger.info("bundlesocial.initiate_connect.request", {
+    company_id: input.companyId,
+    team_id_prefix: teamId.slice(0, 8),
+    redirect_url: input.redirectUrl,
+    social_account_types: bundlePlatforms,
+  });
+
   try {
     const response = await client.socialAccount.socialAccountCreatePortalLink({
-      requestBody: {
-        teamId,
-        redirectUrl: input.redirectUrl,
-        socialAccountTypes: bundlePlatforms,
-        userName: input.userName ?? undefined,
-        userLogoUrl: input.userLogoUrl ?? undefined,
-      },
+      requestBody: requestPayload,
     });
+
+    logger.info("bundlesocial.initiate_connect.response", {
+      company_id: input.companyId,
+      response_url: response?.url ?? null,
+      response_keys: response ? Object.keys(response) : [],
+      has_url: Boolean(response?.url),
+    });
+
     if (!response?.url) {
       return internal("bundle.social returned no portal URL.");
     }
+
+    // Warn if the URL looks like a bare portal page with no token — visiting
+    // https://bundle.social/connect without query params shows an error page.
+    let parsedUrl: URL | null = null;
+    try { parsedUrl = new URL(response.url); } catch { /* invalid URL logged below */ }
+    if (!parsedUrl || parsedUrl.protocol !== "https:") {
+      logger.error("bundlesocial.initiate_connect.invalid_url", {
+        company_id: input.companyId,
+        url: response.url,
+        reason: "not a valid https URL",
+      });
+      return internal(`bundle.social returned an invalid portal URL: ${response.url}`);
+    }
+    if (!parsedUrl.search) {
+      logger.warn("bundlesocial.initiate_connect.url_no_params", {
+        company_id: input.companyId,
+        url: response.url,
+        reason: "URL has no query params — likely missing token; portal will show error",
+      });
+    }
+
     return {
       ok: true,
       data: { url: response.url },
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
+    if (err instanceof ApiError) {
+      logger.error("bundlesocial.initiate_connect.api_error", {
+        company_id: input.companyId,
+        status: err.status,
+        status_text: err.statusText,
+        body: err.body,
+        request_url: err.request?.url,
+        message: err.message,
+      });
+      return internal(
+        `bundle.social create-portal-link failed: HTTP ${err.status} ${err.statusText} — ${JSON.stringify(err.body)}`,
+      );
+    }
     const message = err instanceof Error ? err.message : String(err);
+    const cause = err instanceof Error && err.cause ? String(err.cause) : undefined;
     logger.error("bundlesocial.initiate_connect.failed", {
-      err: message,
       company_id: input.companyId,
+      err: message,
+      cause,
     });
     return internal(`bundle.social create-portal-link failed: ${message}`);
   }
