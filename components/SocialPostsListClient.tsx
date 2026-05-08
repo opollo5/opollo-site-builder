@@ -55,6 +55,8 @@ type Props = {
   totalCount?: number;
   sortBy?: SortCol;
   sortDir?: SortDir;
+  /** Spec 22: when true, "New post" opens ?compose=new instead of inline form */
+  composerEnabled?: boolean;
 };
 
 const STATE_PILL: Record<SocialPostState, string> = {
@@ -140,6 +142,7 @@ export function SocialPostsListClient({
   totalCount,
   sortBy: initialSortBy = "state_changed_at",
   sortDir: initialSortDir = "desc",
+  composerEnabled = false,
 }: Props) {
   const router = useRouter();
   const [posts, setPosts] = useState(initialPosts);
@@ -373,12 +376,21 @@ export function SocialPostsListClient({
             >
               Generate with AI
             </Button>
-            <Button
-              data-testid="new-post-button"
-              onClick={() => setShowCreate((v) => !v)}
-            >
-              {showCreate ? "Cancel" : "New post"}
-            </Button>
+            {composerEnabled ? (
+              <Button
+                data-testid="new-post-button"
+                onClick={() => router.push("?compose=new")}
+              >
+                New post
+              </Button>
+            ) : (
+              <Button
+                data-testid="new-post-button"
+                onClick={() => setShowCreate((v) => !v)}
+              >
+                {showCreate ? "Cancel" : "New post"}
+              </Button>
+            )}
           </div>
         ) : null}
       </div>

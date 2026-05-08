@@ -42,6 +42,8 @@ type Props = {
   monthIso: string; // "YYYY-MM"
   connections: Connection[];
   companyName: string;
+  /** Spec 22: when true, "New post" opens ?compose=new instead of navigating to /posts */
+  composerEnabled?: boolean;
 };
 
 const MAX_CHIPS = 3;
@@ -255,6 +257,7 @@ export function SocialCalendarClient({
   monthIso,
   connections,
   companyName,
+  composerEnabled = false,
 }: Props) {
   const [hiddenPlatforms, setHiddenPlatforms] = useState<Set<SocialPlatform>>(
     new Set(),
@@ -413,7 +416,7 @@ export function SocialCalendarClient({
 
           {/* New post */}
           <Link
-            href="/company/social/posts"
+            href={composerEnabled ? "?compose=new" : "/company/social/posts"}
             className="inline-flex items-center gap-1.5 rounded-md bg-pk px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-pk/80"
             data-testid="calendar-new-post"
           >

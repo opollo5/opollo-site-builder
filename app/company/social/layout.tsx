@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { NavIcon } from "@/components/ui/nav-icon";
+import { ComposerMount } from "@/components/composer/composer-mount";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 
 // /company/social/* — session + company guard.
@@ -10,6 +11,9 @@ import { getCurrentPlatformSession } from "@/lib/platform/auth";
 // This layout enforces that the visitor has a company context. For Opollo
 // staff who haven't yet selected a company via the Social section nav
 // selector, we render an inline prompt rather than redirecting.
+//
+// FEATURE_COMPOSER_V2: when enabled, mounts PostComposerModal here so it
+// is available on every social sub-route via ?compose=new or ?compose=<id>.
 
 export default async function CompanySocialLayout({
   children,
@@ -36,5 +40,17 @@ export default async function CompanySocialLayout({
     redirect("/company");
   }
 
-  return <>{children}</>;
+  const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
+
+  return (
+    <>
+      {children}
+      {composerEnabled && (
+        <ComposerMount
+          companyId={session.company.companyId}
+          userId={session.userId}
+        />
+      )}
+    </>
+  );
 }
