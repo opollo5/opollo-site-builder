@@ -4,35 +4,35 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-// Opollo button hierarchy — all variants are full-pill (rounded-full).
-// default  → pink gradient CTA (uppercase 13px 700)
-// outline  → hairline border, goes green on hover
-// ghost    → transparent, green on hover (nav / table actions)
-// secondary → subtle elevated surface
-// destructive → red, for irreversible actions
-// link    → pink underline
+// Opollo button hierarchy — all variants are full-pill (rounded-full), sentence case.
+// default     → solid #00e5a0 primary CTA, white text
+// secondary   → white surface with #1F2937 hairline border (outlined)
+// ghost       → transparent tertiary, dark text
+// destructive → solid red, white text, for irreversible actions
+// outline     → hairline border (legacy, backwards compat)
+// link        → pink underline (legacy, backwards compat)
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium ring-offset-background transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
         default:
-          "bg-gradient-to-r from-pk to-pk2 text-white text-base font-bold uppercase tracking-[0.05em] hover:brightness-110 hover:-translate-y-px hover:shadow-pk-glow active:translate-y-0 active:shadow-none",
+          "bg-[#00e5a0] text-white font-semibold hover:brightness-110 hover:-translate-y-px hover:shadow-pk-glow active:translate-y-0 active:shadow-none",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90 active:translate-y-px",
+          "bg-[var(--btn-destructive-bg)] text-[var(--btn-destructive-text)] hover:bg-[#b91c1c] hover:-translate-y-px active:translate-y-0",
         outline:
           "border border-white/20 bg-transparent text-foreground hover:border-gr hover:text-gr active:translate-y-px",
         secondary:
-          "bg-white/[0.08] text-foreground hover:bg-white/[0.12] active:translate-y-px",
+          "bg-white border border-[#1F2937] text-[#1F2937] hover:bg-gray-50 hover:-translate-y-px active:translate-y-0",
         ghost:
-          "bg-transparent text-muted-foreground hover:bg-[var(--gr-soft)] hover:text-gr",
+          "bg-transparent text-[#1F2937] hover:bg-[#F3F4F6] active:translate-y-px",
         link: "text-pk underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-6 py-2",
-        sm: "h-8 px-4 text-sm",
-        lg: "h-11 px-8",
-        icon: "h-10 w-10",
+        default: "py-[10px] px-5 text-[14px]",
+        sm: "py-[6px] px-[14px] text-[13px]",
+        lg: "py-[14px] px-7 text-base",
+        icon: "h-8 w-8",
       },
     },
     defaultVariants: {
