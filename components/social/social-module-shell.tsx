@@ -28,7 +28,7 @@ export interface SocialModuleShellProps {
 const TABS: readonly PillTab[] = [
   { value: "calendar", label: "Calendar", href: "/company/social/calendar" },
   { value: "posts", label: "Posts", href: "/company/social/posts" },
-  { value: "timeline", label: "Timeline", disabled: true },
+  { value: "timeline", label: "Timeline", href: "/company/social/timeline" },
 ];
 
 const VIEW_LABEL: Record<SocialView, string> = {
