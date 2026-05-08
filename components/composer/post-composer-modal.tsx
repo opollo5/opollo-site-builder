@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { cn } from "@/lib/utils";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { toastSuccess } from "@/lib/toast-success";
 import { useAutoSave } from "@/lib/hooks/use-auto-save";
@@ -487,10 +488,19 @@ export function PostComposerModal({
 
         {/* Body — split panes */}
         <div className="flex min-h-0 flex-1">
-          {/* Left pane — editor (60%) */}
-          <div className="flex w-[60%] flex-col border-r border-white/10">
+          {/* Left pane — editor (60%).
+              Centering applied directly on the pane (which has a well-defined
+              height from the flex-row body) so items-center/justify-center
+              works reliably in the loading/error states without a flex-1 inner
+              wrapper that can collapse inside overflow-y-auto. */}
+          <div
+            className={cn(
+              "flex w-[60%] flex-col border-r border-white/10",
+              (isLoading || isLoadFailed) && "items-center justify-center",
+            )}
+          >
             {isLoadFailed && state.status === "load_failed" ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+              <div className="flex flex-col items-center gap-3 p-6 text-center">
                 <p className="text-sm text-destructive">
                   {state.error.message}
                 </p>
@@ -503,11 +513,9 @@ export function PostComposerModal({
                 </button>
               </div>
             ) : isLoading ? (
-              <div className="flex flex-1 items-center justify-center">
-                <span className="inline-flex animate-spin text-muted-foreground">
-                  <NavIcon name="sync" size={24} />
-                </span>
-              </div>
+              <span className="inline-flex animate-spin text-muted-foreground">
+                <NavIcon name="sync" size={24} />
+              </span>
             ) : (
               <div className="flex flex-col gap-4 overflow-y-auto p-6">
                 {/* Profile selector */}
@@ -560,7 +568,7 @@ export function PostComposerModal({
               <button
                 type="button"
                 role="tab"
-                className="pb-2 text-sm font-medium text-foreground border-b-2 border-pk"
+                className="border-b-2 border-pk pb-2 text-sm font-medium text-foreground"
                 aria-selected="true"
               >
                 Post preview
