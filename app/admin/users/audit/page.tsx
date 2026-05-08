@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { formatRelativeTime } from "@/lib/utils";
@@ -46,7 +45,7 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
   const totalPages = count ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : 1;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -152,6 +151,6 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
           )}
         </>
       )}
-    </PageShell>
+    </>
   );
 }

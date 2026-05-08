@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { BlogPostComposer } from "@/components/BlogPostComposer";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -39,7 +38,7 @@ export default async function BlogPostEntryPage({
   const site = result.data.site;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -58,6 +57,6 @@ export default async function BlogPostEntryPage({
         </PageHeader.Subtitle>
       </PageHeader>
       <BlogPostComposer siteId={site.id} />
-    </PageShell>
+    </>
   );
 }

@@ -6,7 +6,6 @@ import { checkAdminAccess } from "@/lib/admin-gate";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { NavIcon } from "@/components/ui/nav-icon";
 import {
@@ -141,7 +140,7 @@ export default async function SitePostsList({
       : `${total} ${total === 1 ? "post" : "posts"}${total > 0 && items.length < total ? ` · showing ${rangeStart}–${rangeEnd}` : ""}`;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -382,6 +381,6 @@ export default async function SitePostsList({
         </nav>
       )}
       </>
-    </PageShell>
+    </>
   );
 }

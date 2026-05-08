@@ -10,7 +10,6 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { H3 } from "@/components/ui/typography";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { ImageArchiveButton } from "@/components/ImageArchiveButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -134,7 +133,7 @@ export default async function AdminImageDetailPage({
 
   const titleLabel = image.title ?? image.filename ?? "Untitled image";
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -393,6 +392,6 @@ export default async function AdminImageDetailPage({
           )}
         </div>
       </section>
-    </PageShell>
+    </>
   );
 }

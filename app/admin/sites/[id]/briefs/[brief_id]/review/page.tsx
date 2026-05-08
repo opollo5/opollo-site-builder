@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { BriefReviewClient } from "@/components/BriefReviewClient";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { getBriefWithPages } from "@/lib/briefs";
 import { getSite } from "@/lib/sites";
 
@@ -58,7 +57,7 @@ export default async function BriefReviewPage({
   const { brief, pages } = briefResult.data;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -82,6 +81,6 @@ export default async function BriefReviewPage({
         brief={brief}
         initialPages={pages}
       />
-    </PageShell>
+    </>
   );
 }
