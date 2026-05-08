@@ -4,7 +4,6 @@ import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBan
 import { BriefCommitWaiter } from "@/components/BriefCommitWaiter";
 import { BriefRunClient } from "@/components/BriefRunClient";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import {
   estimateBriefRunCost,
   getBriefWithPages,
@@ -101,7 +100,7 @@ export default async function BriefRunPage({
     // commit" message + back-to-review link, replacing the prior
     // panel's role.
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -118,7 +117,7 @@ export default async function BriefRunPage({
           briefId={brief.id}
           reviewUrl={`/admin/sites/${site.id}/briefs/${brief.id}/review`}
         />
-      </PageShell>
+      </>
     );
   }
 
@@ -155,7 +154,7 @@ export default async function BriefRunPage({
       : null;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -185,6 +184,6 @@ export default async function BriefRunPage({
         remainingBudgetCents={remainingBudgetCents}
         blogStyleBlocked={blogStyleBlocker !== null}
       />
-    </PageShell>
+    </>
   );
 }

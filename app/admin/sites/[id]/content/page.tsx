@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -141,7 +140,7 @@ export default function SharedContentPage({
   }, {});
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -268,6 +267,6 @@ export default function SharedContentPage({
         </Dialog>
       )}
       </div>
-    </PageShell>
+    </>
   );
 }

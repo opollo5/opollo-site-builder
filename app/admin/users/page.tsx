@@ -5,7 +5,6 @@ import { InviteUserButton } from "@/components/InviteUserButton";
 import { PendingInvitesTable } from "@/components/PendingInvitesTable";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { UsersTable } from "@/components/UsersTable";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -83,7 +82,7 @@ export default async function AdminUsersPage() {
       : `${userCount} ${userCount === 1 ? "user" : "users"} with access. Change a role inline; the server blocks self-modification, last-admin demotions, and any change to the super_admin row.`;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -133,6 +132,6 @@ export default async function AdminUsersPage() {
           </>
         )}
       </div>
-    </PageShell>
+    </>
   );
 }
