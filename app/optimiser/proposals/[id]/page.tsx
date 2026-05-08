@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { CreateVariantButton } from "@/components/optimiser/CreateVariantButton";
 import { PastCausalDeltasPanel } from "@/components/optimiser/PastCausalDeltasPanel";
 import { PatternPriorsPanel } from "@/components/optimiser/PatternPriorsPanel";
+import { ProposalAppliedMoment } from "@/components/optimiser/ProposalAppliedMoment";
 import { ProposalReview } from "@/components/optimiser/ProposalReview";
 import { ProposalRolloutLink } from "@/components/optimiser/ProposalRolloutLink";
 import { getClient } from "@/lib/optimiser/clients";
@@ -76,6 +77,16 @@ export default async function OptimiserProposalReviewPage({
           Status: <code>{proposal.status}</code>
         </span>
       </div>
+      {proposal.status === "applied" && (
+        <ProposalAppliedMoment
+          proposalId={proposal.id}
+          rolloutHref={
+            rollout
+              ? `/optimiser/pages/${proposal.landing_page_id}`
+              : null
+          }
+        />
+      )}
       <ProposalRolloutLink
         rollout={rollout}
         landingPageId={proposal.landing_page_id}

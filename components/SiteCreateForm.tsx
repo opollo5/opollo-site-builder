@@ -165,7 +165,9 @@ export function SiteCreateForm() {
         // mode-selection screen first; the existing copy / new-design
         // branches diverge from there. The post-onboarding redirect
         // sends the operator to the right wizard or extraction flow.
-        router.push(`/admin/sites/${payload.data.id}/onboarding`);
+        // Spec 08 — pass ?fresh=1 so the onboarding page can render
+        // the first-site-connected SuccessMoment when applicable.
+        router.push(`/admin/sites/${payload.data.id}/onboarding?fresh=1`);
         return;
       }
       const message =

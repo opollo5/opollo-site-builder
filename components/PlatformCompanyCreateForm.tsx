@@ -62,6 +62,7 @@ export function PlatformCompanyCreateForm() {
     });
     const json = (await response.json().catch(() => null)) as {
       ok: boolean;
+      data?: { company: { id: string; name: string } };
       error?: { code: string; message: string };
     } | null;
 
@@ -74,7 +75,13 @@ export function PlatformCompanyCreateForm() {
       return;
     }
 
-    router.push("/admin/companies");
+    // Spec 08 — pass the new company id + name through so the list
+    // page can render the FirstCustomerOnboardedMoment celebration once.
+    const created = json.data?.company;
+    const query = created
+      ? `?created=${encodeURIComponent(created.id)}&name=${encodeURIComponent(created.name)}`
+      : "";
+    router.push(`/admin/companies${query}`);
     router.refresh();
   }
 
