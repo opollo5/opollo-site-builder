@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { BulkUploadButton } from "@/components/BulkUploadButton";
-import { NavIcon } from "@/components/ui/nav-icon";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ import type {
   SocialPostSource,
   SocialPostState,
 } from "@/lib/platform/social/posts";
+import { SocialModuleShell } from "@/components/social/social-module-shell";
 
 // ---------------------------------------------------------------------------
 // S1-2 — client shell for /company/social/posts.
@@ -45,6 +45,7 @@ type RowActionKind = "approving" | "rejecting" | "requesting";
 
 type Props = {
   companyId: string;
+  companyName: string;
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
   canApprove?: boolean;
@@ -132,6 +133,7 @@ function buildUrl({
 
 export function SocialPostsListClient({
   companyId,
+  companyName,
   initialPosts,
   canCreate,
   canApprove = false,
@@ -309,53 +311,11 @@ export function SocialPostsListClient({
         : `${total} ${total === 1 ? "post" : "posts"}`;
 
   return (
-    <>
-      {/* Breadcrumbs */}
-      <nav aria-label="Breadcrumb" className="mb-4">
-        <ol className="flex items-center gap-1.5 text-sm text-m3">
-          <li>
-            <Link href="/company/social" className="transition-colors hover:text-white">
-              Social
-            </Link>
-          </li>
-          <li aria-hidden>/</li>
-          <li className="font-medium text-white">Posts</li>
-        </ol>
-      </nav>
-
-      {/* View toggle */}
-      <div className="mb-5 flex items-center gap-2">
-        <div
-          className="flex items-center overflow-hidden rounded-lg border border-white/[0.1]"
-          role="group"
-          aria-label="View mode"
-        >
-          <Link
-            href="/company/social/calendar"
-            className="flex items-center gap-1.5 border-r border-white/[0.1] px-3 py-1.5 text-sm text-m2 transition-colors hover:bg-white/[0.05] hover:text-white"
-          >
-            <NavIcon name="calendar-full" size={14} />
-            Calendar
-          </Link>
-          <span
-            aria-current="page"
-            className="flex items-center gap-1.5 border-r border-white/[0.1] bg-pk px-3 py-1.5 text-sm text-white"
-          >
-            <NavIcon name="list" size={14} />
-            Posts
-          </span>
-          <button
-            disabled
-            aria-disabled="true"
-            title="Coming soon"
-            className="flex cursor-not-allowed items-center gap-1.5 px-3 py-1.5 text-sm text-m3 opacity-40"
-          >
-            <NavIcon name="clock" size={14} />
-            Timeline
-          </button>
-        </div>
-      </div>
-
+    <SocialModuleShell
+      activeView="posts"
+      companyName={companyName}
+      composerEnabled={composerEnabled}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <H1>Social posts</H1>
@@ -708,6 +668,6 @@ export function SocialPostsListClient({
         onClose={() => setShowCAPGenerate(false)}
         onSuccess={(newPosts) => setPosts((prev) => [...newPosts, ...prev])}
       />
-    </>
+    </SocialModuleShell>
   );
 }
