@@ -24,15 +24,15 @@ export const SearchInput = React.forwardRef<HTMLInputElement, SearchInputProps>(
         <NavIcon
           name="magnifier"
           size={16}
-          className="pointer-events-none absolute left-3 text-[#9CA3AF]"
+          className="pointer-events-none absolute left-3 text-gray-400"
         />
         <input
           ref={ref}
           type="search"
           aria-label={props["aria-label"] ?? label}
           className={cn(
-            "h-9 w-full rounded-full border border-[#E5E7EB] bg-white pl-9 pr-3",
-            "text-[14px] text-[#111827] placeholder:text-[#9CA3AF]",
+            "h-9 w-full rounded-full border border-gray-200 bg-white pl-9 pr-3",
+            "text-sm text-gray-900 placeholder:text-gray-400",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
             "disabled:pointer-events-none disabled:opacity-50",
             className,

@@ -85,7 +85,6 @@ describe("migration 0111 -- platform_events", () => {
   it("dedup query: finds rows within window, misses rows outside window", async () => {
     const svc = getServiceRoleClient();
     const entityId = "22222222-0000-0000-0000-000000000001";
-    const recipientId = "33333333-0000-0000-0000-000000000001";
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
     const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
@@ -95,14 +94,12 @@ describe("migration 0111 -- platform_events", () => {
         company_id: COMPANY_ID,
         event_type: "connection_broken",
         entity_id: entityId,
-        recipient_id: recipientId,
         notification_sent_at: oneHourAgo,
       },
       {
         company_id: COMPANY_ID,
         event_type: "publish_failed",
         entity_id: entityId,
-        recipient_id: recipientId,
         notification_sent_at: twoHoursAgo,
       },
     ]);
@@ -113,7 +110,6 @@ describe("migration 0111 -- platform_events", () => {
       .select("id")
       .eq("event_type", "connection_broken")
       .eq("entity_id", entityId)
-      .eq("recipient_id", recipientId)
       .gt("notification_sent_at", twentyFourHoursAgo)
       .limit(1);
     expect(inWindow).toHaveLength(1);
@@ -124,7 +120,6 @@ describe("migration 0111 -- platform_events", () => {
       .select("id")
       .eq("event_type", "publish_failed")
       .eq("entity_id", entityId)
-      .eq("recipient_id", recipientId)
       .gt("notification_sent_at", oneHourAgoTs)
       .limit(1);
     expect(outsideWindow).toHaveLength(0);
