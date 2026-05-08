@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { FirstSiteConnectedMoment } from "@/components/onboarding/first-site-connected-moment";
 import { SiteOnboardingForm } from "@/components/SiteOnboardingForm";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -26,8 +27,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 export default async function SiteOnboardingPage({
   params,
+  searchParams,
 }: {
   params: { id: string };
+  searchParams?: { fresh?: string };
 }) {
   const access = await checkAdminAccess({
     requiredRoles: ["super_admin", "admin"],
@@ -83,6 +86,11 @@ export default async function SiteOnboardingPage({
         </PageHeader.Subtitle>
       </PageHeader>
       <div className="max-w-3xl">
+        {searchParams?.fresh === "1" && (
+          <div className="mb-6">
+            <FirstSiteConnectedMoment siteName={site.name} />
+          </div>
+        )}
         <SiteOnboardingForm siteId={site.id} />
 
         <section className="mt-10 border-t pt-6">

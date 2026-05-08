@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { FirstCustomerOnboardedMoment } from "@/components/onboarding/first-customer-onboarded-moment";
 import { PlatformCompaniesListClient } from "@/components/PlatformCompaniesListClient";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
@@ -16,7 +17,11 @@ import { listPlatformCompanies } from "@/lib/platform/companies";
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-export default async function AdminCompaniesPage() {
+export default async function AdminCompaniesPage({
+  searchParams,
+}: {
+  searchParams?: { created?: string; name?: string };
+}) {
   const result = await listPlatformCompanies();
   if (!result.ok) {
     return (
@@ -66,6 +71,14 @@ export default async function AdminCompaniesPage() {
           </Button>
         </PageHeader.Actions>
       </PageHeader>
+      {searchParams?.created && (
+        <div className="mb-6">
+          <FirstCustomerOnboardedMoment
+            companyId={searchParams.created}
+            companyName={searchParams.name ?? "New customer"}
+          />
+        </div>
+      )}
       <PlatformCompaniesListClient companies={companies} />
     </PageShell>
   );
