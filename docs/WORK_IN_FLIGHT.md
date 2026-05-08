@@ -8,25 +8,14 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 ---
 ## Session A
-- Started: 2026-05-08 07:30 UTC
-- Branch: feat/spec22-pr2-core-editor
-- Slice: Spec 22 PR 2 — core editor (ProfileSelector, ComposerTextarea, ImageUploadZone, ToolsRow, SchedulingTabs, submit wiring)
+- Started: 2026-05-08 UTC
+- Branch: feat/ui-consistency-s1-visual-regression
+- Slice: UI Consistency S1 — Playwright visual regression infrastructure (screenshots.spec.ts, playwright.config.ts, screenshots.yml, package.json)
 - Files claimed:
-  - components/composer/profile-selector.tsx
-  - components/composer/composer-textarea.tsx
-  - components/composer/image-upload-zone.tsx
-  - components/composer/tools-row.tsx
-  - components/composer/scheduling-tabs.tsx
-  - components/composer/approval-toggle.tsx
-  - components/composer/composer-actions.tsx
-  - components/composer/post-composer-modal.tsx (left-pane wiring only)
-  - app/api/platform/social/drafts/[id]/publish/route.ts
-  - app/api/platform/social/media/upload/route.ts
-  - app/api/platform/social/cap/generate-image/route.ts
-  - supabase/migrations/0113_social_media_uploads_bucket.sql
-- Migration number reserved: 0113
-- Expected completion: same session
-- Migration number reserved: 0112
+  - e2e/screenshots.spec.ts
+  - playwright.config.ts
+  - .github/workflows/screenshots.yml
+  - package.json
 - Expected completion: same session
 ---
 
@@ -68,7 +57,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0072 — S1-7 record_approval_decision transactional function.~~ Shipped in #415.
 - ~~0073 — S1-10 cancel_post_approval transactional function.~~ Shipped (0073_cancel_post_approval_fn.sql in main).
 - ~~0112 — Session A — Spec 22 PR 1 social_post_drafts table (branch: feat/spec22-pr1-composer-shell).~~ Shipped in #789.
-- 0113 — Session A — Spec 22 PR 2 social-media-uploads storage bucket (branch: feat/spec22-pr2-core-editor)
+- ~~0113 — Session A — Spec 22 PR 2 social-media-uploads storage bucket (branch: feat/spec22-pr2-core-editor).~~ Shipped.
 
 ## Claim block template
 
