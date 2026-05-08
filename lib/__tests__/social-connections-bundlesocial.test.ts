@@ -99,7 +99,7 @@ describe("initiateBundlesocialConnect", () => {
 
   it("forwards mapped platforms + de-dupes LINKEDIN", async () => {
     mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/portal/abc",
+      url: "https://bundle.social/portal/abc?token=test-session-token",
     });
 
     const result = await initiateBundlesocialConnect({
@@ -110,7 +110,7 @@ describe("initiateBundlesocialConnect", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.url).toBe("https://bundle.social/portal/abc");
+    expect(result.data.url).toBe("https://bundle.social/portal/abc?token=test-session-token");
 
     expect(
       mockClient.socialAccount.socialAccountCreatePortalLink,
@@ -131,7 +131,7 @@ describe("initiateBundlesocialConnect", () => {
 
   it("falls back to all configured types when platforms[] empty", async () => {
     mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/portal/all",
+      url: "https://bundle.social/portal/all?token=test-session-token",
     });
 
     const result = await initiateBundlesocialConnect({
@@ -152,7 +152,7 @@ describe("initiateBundlesocialConnect", () => {
 
   it("de-dupes LINKEDIN when only linkedin variants are supplied (non-empty path)", async () => {
     mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/portal/li-only",
+      url: "https://bundle.social/portal/li-only?token=test-session-token",
     });
 
     const result = await initiateBundlesocialConnect({
@@ -180,6 +180,21 @@ describe("initiateBundlesocialConnect", () => {
     if (result.ok) return;
     expect(result.error.code).toBe("INTERNAL_ERROR");
     expect(result.error.message).toContain("HTTP 502");
+  });
+
+  it("returns INTERNAL_ERROR when SDK returns a tokenless URL (no query params)", async () => {
+    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
+      url: "https://bundle.social/connect",
+    });
+    const result = await initiateBundlesocialConnect({
+      companyId: COMPANY_A_ID,
+      platforms: ["x"],
+      redirectUrl: "https://opollo.test/cb",
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.error.code).toBe("INTERNAL_ERROR");
+    expect(result.error.message).toContain("session token");
   });
 
   it("returns INTERNAL_ERROR when SDK returns no url", async () => {
