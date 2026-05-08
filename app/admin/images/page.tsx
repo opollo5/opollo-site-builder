@@ -6,7 +6,6 @@ import { ImagesTable } from "@/components/ImagesTable";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
@@ -130,7 +129,7 @@ export default async function AdminImagesPage({
 
   if (!result.ok) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -143,7 +142,7 @@ export default async function AdminImagesPage({
         <Alert variant="destructive" title="Failed to load images">
           {result.error.message}
         </Alert>
-      </PageShell>
+      </>
     );
   }
 
@@ -154,7 +153,7 @@ export default async function AdminImagesPage({
   const rangeEnd = Math.min(offset + limit, total);
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -296,6 +295,6 @@ export default async function AdminImagesPage({
       <div className="mt-3">
         <ImagesTable items={items} backHref={buildHref(parsed, {})} />
       </div>
-    </PageShell>
+    </>
   );
 }
