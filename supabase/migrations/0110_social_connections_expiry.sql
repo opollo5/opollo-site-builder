@@ -1,4 +1,4 @@
-﻿-- 0110 -- Add expires_at + last_validated_at to social_connections.
+-- 0110 -- Add expires_at + last_validated_at to social_connections.
 -- Reference: ADR 0003, Build Proposal v2 Week 0 item 0.3.
 --
 -- Design decisions encoded here:

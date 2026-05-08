@@ -1,4 +1,4 @@
-﻿-- 0111 -- platform_events table.
+-- 0111 -- platform_events table.
 -- Reference: ADR 0004, Build Proposal v2 Week 0 item 0.4.
 --
 -- Dual purpose:
