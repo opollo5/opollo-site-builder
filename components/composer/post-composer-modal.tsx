@@ -13,6 +13,7 @@ import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
 import { ApprovalToggle } from "./approval-toggle";
 import { ComposerActions } from "./composer-actions";
+import { ComposerPreview } from "./composer-preview";
 import { ComposerTextarea } from "./composer-textarea";
 import { ImageUploadZone } from "./image-upload-zone";
 import { ProfileSelector } from "./profile-selector";
@@ -26,20 +27,11 @@ import {
 import type { ComposerError, Draft } from "./use-composer-reducer";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 2 — PostComposerModal with real editor components.
+// Spec 22 PR 3 — PostComposerModal with live preview pane.
 //
-// PR 1 shipped the modal chrome + state machine + autosave.
-// PR 2 replaces all placeholder blocks with:
-//   - ProfileSelector (left pane top)
-//   - ComposerTextarea (main text input)
-//   - ImageUploadZone (three-source picker)
-//   - ToolsRow (emoji / GIF stub / UTM stub / AI stub)
-//   - SchedulingTabs + date/time pickers (footer left)
-//   - ApprovalToggle
-//   - ComposerActions (primary submit button)
-//
-// Submit flow: POST /api/platform/social/drafts/[id]/publish which handles
-// create-post → submit → auto-approve → schedule in one server-side call.
+// PR 2 shipped all editor components. PR 3 replaces the right-pane
+// placeholder with ComposerPreview (LivePreviewCard per platform +
+// MiniCalendarPreview on the Calendar tab).
 // ---------------------------------------------------------------------------
 
 interface PostComposerModalProps {
@@ -562,32 +554,15 @@ export function PostComposerModal({
           </div>
 
           {/* Right pane — preview (40%) */}
-          <div className="flex w-[40%] flex-col overflow-y-auto p-6">
-            {/* Preview tab strip */}
-            <div role="tablist" className="mb-4 flex gap-3 border-b border-white/10 pb-3">
-              <button
-                type="button"
-                role="tab"
-                className="border-b-2 border-pk pb-2 text-sm font-medium text-foreground"
-                aria-selected="true"
-              >
-                Post preview
-              </button>
-              <button
-                type="button"
-                role="tab"
-                className="pb-2 text-sm text-muted-foreground hover:text-foreground"
-                aria-selected="false"
-              >
-                Calendar
-              </button>
-            </div>
-
-            {/* Preview empty state — PR 3 replaces this */}
-            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-center text-sm text-muted-foreground">
-              <NavIcon name="picture" size={32} className="opacity-30" />
-              <p>Select at least one profile and start typing to see preview</p>
-            </div>
+          <div className="flex w-[40%] flex-col overflow-y-auto">
+            <ComposerPreview
+              draftData={draftData}
+              selectedPlatforms={selectedPlatforms}
+              connections={connections}
+              mode={mode}
+              scheduleDate={scheduleDate}
+              scheduleTime={scheduleTime}
+            />
           </div>
         </div>
 
