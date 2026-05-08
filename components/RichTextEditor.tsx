@@ -80,8 +80,12 @@ export function RichTextEditor({
           .replace(/<o:[^/]+\/>/gi, "");
       },
       attributes: {
+        // Spec 12 — composer-editor-content is the hook for the
+        // typography overrides in app/globals.css (18px body, 32px h1,
+        // etc.). Keep `prose` for baseline tag resets but drop
+        // `prose-sm` so our explicit sizes win without specificity wars.
         class:
-          "prose prose-sm max-w-none min-h-[400px] px-3 py-2 focus:outline-none",
+          "composer-editor-content prose max-w-none min-h-[400px] px-3 py-2 focus:outline-none",
       },
     },
   });

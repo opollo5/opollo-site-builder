@@ -923,7 +923,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
     <form
       id={`blog-post-composer-form-${siteId}`}
       onSubmit={handlePrimarySubmit}
-      className="lg:grid lg:grid-cols-[minmax(0,1fr)_260px] lg:items-start lg:gap-6"
+      className="lg:grid lg:grid-cols-[minmax(0,800px)_300px] lg:items-start lg:gap-10"
     >
       {/* ── LEFT: title + editor + SEO ── */}
       <div className="space-y-4">
@@ -963,7 +963,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             </label>
             <Input
               id="post-title"
-              className="rounded-none border-0 border-b px-0 text-2xl font-bold shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
+              className="composer-title-input rounded-none border-0 border-b-0 bg-transparent px-0 shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50 h-auto"
               placeholder="Post title"
               value={title.value}
               onChange={(e) =>
