@@ -116,6 +116,23 @@ const config: Config = {
           url: "#006621",
           desc: "#545454",
         },
+        /* UI consistency semantic text tokens (2026-05-08).
+         * Use as: text-tx-primary, text-tx-secondary, text-tx-muted, text-tx-inverse.
+         * bg-tx-* and border-tx-* also available via Tailwind's utilities. */
+        "tx-primary":   "var(--tx-primary)",    /* #111827 gray-900 */
+        "tx-secondary": "var(--tx-secondary)",  /* #374151 gray-700 */
+        "tx-muted":     "var(--tx-muted)",      /* #6B7280 gray-500 */
+        "tx-inverse":   "var(--tx-inverse)",    /* #FFFFFF */
+        /* Button token passthrough — consumed by components/ui/button.tsx */
+        "btn-primary":          "var(--btn-primary-bg)",
+        "btn-secondary-border": "var(--btn-secondary-border)",
+        "btn-tertiary-hover":   "var(--btn-tertiary-hover)",
+        "btn-destructive":      "var(--btn-destructive-bg)",
+        /* Tab + control tokens */
+        "tab-active":           "var(--tab-active-bg)",
+        "tab-inactive-text":    "var(--tab-inactive-text)",
+        "icon-hover":           "var(--icon-control-hover)",
+        "search-border":        "var(--search-input-border)",
       },
       boxShadow: {
         'pk-glow': '0 4px 24px var(--pk-glow)',

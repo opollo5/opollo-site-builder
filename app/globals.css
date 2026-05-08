@@ -17,9 +17,9 @@
   :root {
     /* ---- Opollo raw hex tokens — ds.css v5 palette -------------------- */
     /* Brand accent: green replaces pink as the primary action color */
-    --pk: #00E89A;                          /* brand green — Opollo accent */
+    --pk: #00e5a0;                          /* brand green — Opollo accent (spec: #00e5a0) */
     --pk2: #00A86B;                         /* green-deep — hover, gradient end */
-    --pk-soft: rgba(0, 232, 154, 0.10);
+    --pk-soft: rgba(0, 229, 160, 0.10);
     --gr: #00B07C;                          /* mint — secondary green accent */
     --gr2: #00875a;
     --gr-soft: rgba(0, 176, 124, 0.12);
@@ -27,9 +27,9 @@
     --bl-soft: rgba(30, 111, 255, 0.10);
     --am: #FFB547;                          /* warning */
     --rd: #FF5F5A;                          /* danger */
-    --bg: #F4F5F7;                          /* page canvas */
+    --bg: #F9FAFB;                          /* page canvas — soft-light theme */
     --d1: #FFFFFF;                          /* card / sidebar surface */
-    --d2: #F4F5F7;                          /* off-white */
+    --d2: #F9FAFB;                          /* off-white */
     --d3: #EEF0F3;                          /* deeper inset */
     --d4: #E6E8EC;                          /* dividers */
     --white: #FFFFFF;
@@ -43,10 +43,39 @@
     /* Dim alpha for inactive icons */
     --icon-dim: rgba(75, 83, 96, 0.80);
     /* Nav chrome — semantic aliases so components don't hard-code rgba */
-    --nav-active: rgba(0, 232, 154, 0.10);  /* green at 10%: active nav item bg */
-    --nav-hover:  rgba(0, 232, 154, 0.06);  /* green at 6%: nav item hover bg   */
+    --nav-active: rgba(0, 229, 160, 0.10);  /* green at 10%: active nav item bg */
+    --nav-hover:  rgba(0, 229, 160, 0.06);  /* green at 6%: nav item hover bg   */
     --topbar-bg:  rgba(255, 255, 255, 0.92);/* white at 92%: mobile topbar      */
-    --pk-glow:    rgba(0, 232, 154, 0.20);  /* green glow — button hover shadow */
+    --pk-glow:    rgba(0, 229, 160, 0.20);  /* green glow — button hover shadow */
+
+    /* ---- UI consistency token layer (2026-05-08) ----------------------- */
+    /* Button system — used by components/ui/button.tsx */
+    --btn-primary-bg:       #00e5a0;        /* = var(--pk); explicit for clarity */
+    --btn-primary-text:     #FFFFFF;
+    --btn-secondary-bg:     #FFFFFF;
+    --btn-secondary-border: #1F2937;        /* gray-800 */
+    --btn-secondary-text:   #1F2937;
+    --btn-tertiary-text:    #1F2937;
+    --btn-tertiary-hover:   #F3F4F6;        /* gray-100 */
+    --btn-destructive-bg:   #DC2626;        /* red-600 — WCAG AA on white */
+    --btn-destructive-text: #FFFFFF;
+
+    /* Icon-only controls — 32×32 circular hit area */
+    --icon-control-hover:   #F3F4F6;        /* gray-100 */
+
+    /* Tab states */
+    --tab-active-bg:        #00e5a0;        /* = var(--pk) */
+    --tab-active-text:      #FFFFFF;
+    --tab-inactive-text:    #4B5563;        /* gray-600 */
+
+    /* Search inputs */
+    --search-input-border:  #E5E7EB;        /* gray-200 */
+
+    /* Text semantic tokens — WCAG AA on #F9FAFB / white canvas */
+    --tx-primary:   #111827;                /* gray-900 — headings, active labels */
+    --tx-secondary: #374151;                /* gray-700 — body, inactive tabs */
+    --tx-muted:     #6B7280;                /* gray-500 — dates, disabled, helpers */
+    --tx-inverse:   #FFFFFF;                /* white on dark backgrounds only */
 
     /* ---- Font stack — defined here so Tailwind fontFamily vars resolve ---- */
     --font-display: "Sora", "Helvetica Neue", "Arial", sans-serif;
@@ -59,7 +88,7 @@
     --card-foreground: 218 27% 6%;
     --popover: 0 0% 100%;
     --popover-foreground: 218 27% 6%;
-    --primary: 156 100% 46%;               /* --pk  #00E89A brand green       */
+    --primary: 162 100% 45%;               /* --pk  #00e5a0 brand green       */
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 93%;              /* --d3  #EEF0F3                   */
     --secondary-foreground: 218 27% 6%;
@@ -75,10 +104,10 @@
     --radius: 0.375rem;                    /* op-r-md                         */
 
     /* canvas = page base */
-    --canvas: 220 16% 96%;                 /* --bg  #F4F5F7                   */
+    --canvas: 210 20% 98%;                 /* --bg  #F9FAFB soft-light        */
 
     /* status tokens — ds.css v5 */
-    --success: 156 100% 46%;               /* --pk  #00E89A                   */
+    --success: 162 100% 45%;               /* --pk  #00e5a0                   */
     --success-foreground: 0 0% 100%;
     --warning: 36 100% 64%;                /* --am  #FFB547                   */
     --warning-foreground: 0 0% 100%;
