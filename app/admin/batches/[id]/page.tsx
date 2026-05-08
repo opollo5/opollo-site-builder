@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BatchDetailClient } from "@/components/BatchDetailClient";
+import { BatchSuccessMoment } from "@/components/BatchSuccessMoment";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/ui/page-shell";
@@ -166,6 +167,14 @@ export default async function BatchDetailPage({
           <BatchDetailClient jobId={params.id} status={job.status as string} />
         </PageHeader.Actions>
       </PageHeader>
+
+      {job.status === "succeeded" && (
+        <BatchSuccessMoment
+          jobId={params.id}
+          succeededCount={Number(job.succeeded_count ?? 0)}
+          siteName={site.name}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div>

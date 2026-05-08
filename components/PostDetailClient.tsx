@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
+import { SuccessMoment } from "@/components/ui/success-moment";
 import { H1 } from "@/components/ui/typography";
 import type { PostDetail } from "@/lib/posts";
 import type { PreflightResult } from "@/lib/site-preflight";
@@ -126,10 +128,10 @@ export function PostDetailClient({
         };
       };
       if (res.ok && payload.ok) {
-        toast.success("Published to WordPress!", {
+        toastSuccess("Published to WordPress!", {
           description: wpFrontendUrl ? "Your post is now live." : undefined,
           action: wpFrontendUrl
-            ? { label: "View live", onClick: () => window.open(wpFrontendUrl, "_blank") }
+            ? { label: "View live →", onClick: () => window.open(wpFrontendUrl, "_blank") }
             : undefined,
         });
         router.refresh();
@@ -168,7 +170,7 @@ export function PostDetailClient({
       };
       if (res.ok && payload.ok) {
         setUnpublishOpen(false);
-        toast.success("Post moved to WordPress trash. You can re-publish any time.");
+        toastSuccess("Post moved to WordPress trash. You can re-publish any time.");
         router.refresh();
         return;
       }
@@ -238,6 +240,24 @@ export function PostDetailClient({
           )}
         </div>
       </div>
+
+      {post.status === "published" && (
+        <SuccessMoment
+          firstTimeKey={`post-published:${post.id}`}
+          title="Post published to WordPress"
+          firstTimeTitle="Your post is live!"
+          subtitle={
+            wpFrontendUrl
+              ? "The post is visible on your site. Use the link above to view it."
+              : "Published successfully to WordPress."
+          }
+          primaryAction={
+            wpFrontendUrl
+              ? { label: "View live post", href: wpFrontendUrl, external: true }
+              : undefined
+          }
+        />
+      )}
 
       {preflightBlocked && (
         <Alert

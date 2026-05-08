@@ -18,17 +18,27 @@ Depends on Spec 13 (composer right column work that frees the layout's right edg
 
 The master brief gates this PR on >5% of `image_library` rows missing captions in production telemetry. The parallel session has already landed Spec 05 polish work (#752, #753, #754, #756 — picker debounce + suggest RPC vector array fix + bounded fetches + spec-aligned empty state). The caption-quality PR is conditional on Axiom telemetry that doesn't yet exist; defer until the data is available.
 
-### Spec 14 PRs B and C (deferred — manual review)
+### Spec 14 PR B (shipped — pending manual review merge)
 
-PR A (#763) ships the warning modal + final banner + `useSessionExpiry` hook. PRs B (activity tracking + 15-minute non-renewable grace + multi-tab leader-elected auto-save with dirty-state guard + visibility-aware cadence) and C (cybersecurity-explainer re-login page) are scope-large and benefit from sequential review. PR A on its own is a strict UX improvement over today's corner toast and reviews independently.
+PR B (#772) shipped: `lib/hooks/use-activity.ts` (60s active window; keydown / mousedown / pointerdown / touchstart — NOT mousemove), `lib/hooks/use-auto-save.ts` (dirty-state guard + localStorage leader election + visibility-aware cadence), extended `useSessionExpiry` with 15-minute non-renewable grace period, `SessionGraceBanner`, and `hardLogout()`. Awaiting Steven's manual review + merge.
 
-**To execute (PR B):** `lib/hooks/use-activity.ts` (60s active window; keydown / mousedown / pointerdown / touchstart — NOT mousemove). Extend `useSessionExpiry` with a 15-minute non-renewable grace timer that starts at T-0 and does NOT reset on activity. Add a `useAutoSave` hook with three load-bearing safeguards: (1) dirty-state guard so unchanged state doesn't fire saves, (2) BroadcastChannel-or-localStorage leader election so multi-tab doesn't hammer the API, (3) visibility-aware cadence (60s/30s/15s, half-rate when document.hidden). Auto-save sweep: post composer (verify cadence-bumping wired up), site builder (add if missing), multi-field forms > 30s of work. Surfaces lacking auto-save log a `_blockers.md` entry instead of silent skip.
+**Auto-save sweep findings (PR B):** BlogPostComposer already has localStorage-backed cadence-bumping wired up correctly. No server-side auto-save handler needed for current surfaces — existing patterns are sufficient. The `_blockers.md` note for surfaces-lacking-auto-save has no current entries.
 
-**To execute (PR C):** `app/auth/expired/page.tsx` with the cybersecurity-explainer copy (three-bullet rationale for the 48h cap). Cap-driven logouts redirect there; user-initiated sign-out / suspension / password change route to the standard login page. Inline modal challenge from the SessionExpiryWatcher's `onReauthenticate` if Supabase Auth supports it; else redirect with `returnTo`.
+### Spec 14 PR C (shipped — pending manual review merge)
 
-### Spec 08 surface sweep (deferred)
+PR C (#773) shipped: `app/auth/expired/page.tsx` with cybersecurity-explainer copy (three-bullet rationale: session-hijacking protection, compliance alignment, credential freshness). Force-static, no nav chrome. `hardLogout()` in `SessionExpiryWatcher` redirects here when grace elapses. Awaiting Steven's manual review + merge.
 
-The primitive layer shipped (#762 — `SuccessMoment`, `useFirstTime`, `celebrate`, `toastSuccess`). The Tier-1 surface integration (post-publish hero in `PostDetailClient`, first-site-connection on the sites list, first-customer-onboarded, batch-completion at the batch-runner output) is left for a follow-up. The parallel session has Spec 08 work in flight on `BriefRunClient`'s brief-run-completed surface; once that lands, sweep the remaining surfaces.
+### Spec 08 surface sweep (partially shipped)
+
+The primitive layer shipped (#762 — `SuccessMoment`, `useFirstTime`, `celebrate`, `toastSuccess`). This PR (feat/spec08-surface-sweep) ships:
+- Post-publish hero in `PostDetailClient` — SuccessMoment with `firstTimeKey="post-published:{id}"`
+- Batch-completion hero in batch detail page — new `BatchSuccessMoment` client component
+
+**Deferred Tier-1 surfaces (no existing implementation; need new work):**
+- **First-site-connection:** No trigger point exists in the current UI. The sites list (`app/admin/sites/page.tsx`) and site detail (`app/admin/sites/[id]/page.tsx`) don't track whether a WP connection is "first". Would need a `firstTimeKey="wp-connected:{siteId}"` trigger wired into the WP credential save flow. Defer to a targeted follow-up.
+- **First-customer-onboarded:** No "customer onboarded" milestone event exists on any current surface. Would require identifying where company/customer onboarding completes and adding a `firstTimeKey` there. Defer to a targeted follow-up.
+
+**toastSuccess standardization:** `PostDetailClient` migrated from `toast.success` → `toastSuccess`. Full sweep of remaining `toast.success` calls across other files is deferred to a separate cleanup PR.
 
 ### Trusted-devices feature reconsideration after 48h cap (Spec 14 follow-up)
 
