@@ -183,7 +183,7 @@ function PageHeaderTitle({
   className?: string;
 }) {
   return (
-    <h1 className={cn("text-page-title text-foreground", className)}>
+    <h1 className={cn("text-xl text-page-title text-foreground", className)}>
       {children}
     </h1>
   );
