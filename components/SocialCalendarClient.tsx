@@ -121,7 +121,7 @@ function DayOverflowPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="mt-0.5 w-full rounded px-1 py-0.5 text-left text-xs text-tx-muted transition-colors hover:bg-[#F3F4F6] hover:text-tx-primary"
+          className="mt-0.5 w-full rounded px-1 py-0.5 text-left text-xs text-tx-muted transition-colors hover:bg-gray-100 hover:text-tx-primary"
           data-testid={`calendar-overflow-${dayKey}`}
         >
           +{overflowCount} more
@@ -189,7 +189,7 @@ function ProfilesFilter({
           aria-label="Filter by profiles"
           aria-haspopup="listbox"
           aria-expanded={open}
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#1F2937] bg-white px-[14px] py-[6px] text-[13px] font-medium text-[#1F2937] transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="inline-flex items-center gap-1.5 rounded-full border border-gray-800 bg-white px-[14px] py-[6px] text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           {label}
           <NavIcon
@@ -326,7 +326,7 @@ export function SocialCalendarClient({
         href={`?month=${prevMonth}`}
         aria-label="Previous month"
         data-testid="calendar-prev"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-[#374151] transition-colors hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <NavIcon name="chevron-left" size={16} />
       </a>
@@ -340,14 +340,14 @@ export function SocialCalendarClient({
         href={`?month=${nextMonth}`}
         aria-label="Next month"
         data-testid="calendar-next"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-[#374151] transition-colors hover:bg-[#F3F4F6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-transparent text-gray-700 transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         <NavIcon name="chevron-right" size={16} />
       </a>
       {!isCurrentMonth && (
         <a
           href="/company/social/calendar"
-          className="ml-1 rounded-full border border-[#1F2937] bg-white px-3 py-1 text-[13px] font-medium text-[#1F2937] transition-colors hover:bg-gray-50"
+          className="ml-1 rounded-full border border-gray-800 bg-white px-3 py-1 text-xs font-medium text-gray-800 transition-colors hover:bg-gray-50"
           data-testid="calendar-today"
         >
           Today
@@ -374,13 +374,13 @@ export function SocialCalendarClient({
       <div data-testid="social-calendar">
         {/* Grid */}
         <div
-          className="overflow-hidden rounded-lg border border-[#E5E7EB]"
+          className="overflow-hidden rounded-lg border border-gray-200"
           role="grid"
           aria-label={`Calendar for ${monthLabel}`}
         >
           {/* Day-of-week header */}
           <div
-            className="grid grid-cols-7 border-b border-[#E5E7EB] bg-gray-50"
+            className="grid grid-cols-7 border-b border-gray-200 bg-gray-50"
             role="row"
           >
             {DAY_HEADERS.map((d) => (
@@ -427,7 +427,7 @@ export function SocialCalendarClient({
                       href="/company/social/posts"
                       tabIndex={-1}
                       aria-label={`Create post for ${dayKey}`}
-                      className="invisible flex h-5 w-5 items-center justify-center rounded-full text-tx-muted transition-colors hover:bg-[#F3F4F6] hover:text-tx-primary group-hover:visible"
+                      className="invisible flex h-5 w-5 items-center justify-center rounded-full text-tx-muted transition-colors hover:bg-gray-100 hover:text-tx-primary group-hover:visible"
                     >
                       <NavIcon name="plus" size={12} />
                     </Link>

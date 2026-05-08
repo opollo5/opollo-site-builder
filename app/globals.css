@@ -24,6 +24,7 @@
     --gr2: #00875a;
     --gr-soft: rgba(0, 176, 124, 0.12);
     --bl: #1E6FFF;                          /* action blue */
+    --serp-blue: #1a0dab;                   /* Google SERP link blue — blog post preview only */
     --bl-soft: rgba(30, 111, 255, 0.10);
     --am: #FFB547;                          /* warning */
     --rd: #FF5F5A;                          /* danger */

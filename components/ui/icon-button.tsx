@@ -28,8 +28,8 @@ export const IconButton = React.forwardRef<
       aria-label={label}
       className={cn(
         "inline-flex h-8 w-8 items-center justify-center rounded-full",
-        "bg-transparent text-[#374151] transition-colors",
-        "hover:bg-[#F3F4F6]",
+        "bg-transparent text-gray-700 transition-colors",
+        "hover:bg-gray-100",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         "disabled:pointer-events-none disabled:opacity-50",
         className,

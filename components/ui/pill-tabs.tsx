@@ -35,7 +35,7 @@ export interface PillTabsProps {
 }
 
 const TAB_BASE =
-  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[14px] font-medium transition-colors whitespace-nowrap";
+  "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap";
 
 const TAB_ACTIVE = "bg-[#00e5a0] text-white";
 
