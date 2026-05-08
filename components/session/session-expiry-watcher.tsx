@@ -60,8 +60,11 @@ export function SessionExpiryWatcher() {
       }
       const returnTo = pathname ?? "/admin";
       // Use replace() so back-button doesn't return to the expired session.
+      // PR C — cap-driven logouts land on /auth/expired (the cybersecurity
+      // explainer). User-initiated sign-out continues to land on /login
+      // directly; the explainer is only for "we kicked you out" flows.
       window.location.replace(
-        `/login?returnTo=${encodeURIComponent(returnTo)}&reason=session_expired`,
+        `/auth/expired?returnTo=${encodeURIComponent(returnTo)}`,
       );
     })();
   }, [grace.mustLogout, pathname]);
