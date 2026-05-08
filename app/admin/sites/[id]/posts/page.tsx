@@ -237,12 +237,9 @@ export default async function SitePostsList({
             className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm"
           />
         </div>
-        <button
-          type="submit"
-          className="inline-flex items-center rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-        >
+        <Button type="submit" size="sm">
           Apply
-        </button>
+        </Button>
         {(parsed.status || parsed.query) && (
           <Link
             href={`/admin/sites/${site.id}/posts`}

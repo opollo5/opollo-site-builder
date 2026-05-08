@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { toastSuccess } from "@/lib/toast-success";
 import type { AspectRatio, CompositionType, StyleId } from "@/lib/image/types";
 
@@ -147,18 +148,16 @@ export function MoodBoardClient({
           <p className="mb-1.5 text-sm font-medium">Style</p>
           <div className="flex flex-wrap gap-1.5">
             {allowedStyles.map((s) => (
-              <button
+              <Button
                 key={s}
                 type="button"
+                variant={style === s ? "default" : "secondary"}
+                size="sm"
+                className="h-auto px-3 py-1 text-xs"
                 onClick={() => setStyle(s)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  style === s
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/50"
-                }`}
               >
                 {STYLE_LABELS[s]}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -168,18 +167,16 @@ export function MoodBoardClient({
           <p className="mb-1.5 text-sm font-medium">Composition</p>
           <div className="flex flex-wrap gap-1.5">
             {ALL_COMPOSITIONS.map((c) => (
-              <button
+              <Button
                 key={c}
                 type="button"
+                variant={composition === c ? "default" : "secondary"}
+                size="sm"
+                className="h-auto px-3 py-1 text-xs"
                 onClick={() => setComposition(c)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  composition === c
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/50"
-                }`}
               >
                 {COMPOSITION_LABELS[c]}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -189,18 +186,16 @@ export function MoodBoardClient({
           <p className="mb-1.5 text-sm font-medium">Aspect ratio</p>
           <div className="flex flex-wrap gap-1.5">
             {ALL_ASPECT_RATIOS.map((ar) => (
-              <button
+              <Button
                 key={ar}
                 type="button"
+                variant={aspectRatio === ar ? "default" : "secondary"}
+                size="sm"
+                className="h-auto px-3 py-1 text-xs"
                 onClick={() => setAspectRatio(ar)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  aspectRatio === ar
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/50"
-                }`}
               >
                 {ASPECT_RATIO_LABELS[ar]}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -210,18 +205,16 @@ export function MoodBoardClient({
           <p className="mb-1.5 text-sm font-medium">Count</p>
           <div className="flex gap-1.5">
             {COUNT_OPTIONS.map((n) => (
-              <button
+              <Button
                 key={n}
                 type="button"
+                variant={count === n ? "default" : "secondary"}
+                size="sm"
+                className="h-auto px-3 py-1 text-xs"
                 onClick={() => setCount(n)}
-                className={`rounded-full border px-3 py-1 text-xs transition-colors ${
-                  count === n
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background hover:border-primary/50"
-                }`}
               >
                 {n}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -229,14 +222,14 @@ export function MoodBoardClient({
 
       {/* Generate button */}
       <div>
-        <button
+        <Button
           type="button"
+          className="min-w-[160px]"
           onClick={generate}
           disabled={isLoading || allowedStyles.length === 0}
-          className="inline-flex min-w-[160px] items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-50"
         >
           {isLoading ? "Generating…" : "Generate images"}
-        </button>
+        </Button>
         {isLoading ? (
           <p className="mt-2 text-xs text-muted-foreground">
             This can take up to 60 seconds for {count} images — please wait.

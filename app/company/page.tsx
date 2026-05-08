@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
+
 import { SocialPostsDashboardCard } from "@/components/SocialPostsDashboardCard";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getActiveBrandProfile, getBrandTier } from "@/lib/platform/brand";
@@ -214,13 +216,11 @@ function BrandCompletionBanner({ tier }: { tier: "none" | "minimal" }) {
           <p className="text-base font-semibold">{heading}</p>
           <p className="mt-1 text-base text-muted-foreground">{body}</p>
         </div>
-        <Link
-          href="/company/settings/brand"
-          className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          data-testid="brand-completion-cta"
-        >
-          {tier === "none" ? "Get started" : "Continue setup"}
-        </Link>
+        <Button asChild data-testid="brand-completion-cta">
+          <Link href="/company/settings/brand">
+            {tier === "none" ? "Get started" : "Continue setup"}
+          </Link>
+        </Button>
       </div>
     </div>
   );
