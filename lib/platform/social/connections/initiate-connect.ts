@@ -82,24 +82,25 @@ export async function initiateBundlesocialConnect(
   const teamId = getBundlesocialTeamId();
   if (!teamId) return notConfigured("BUNDLE_SOCIAL_TEAMID");
 
-  // De-dupe the bundle.social platform set; LINKEDIN appears once
-  // even if the operator picked both linkedin_personal and
-  // linkedin_company (bundle.social's "channel selection" step
-  // covers the per-account choice).
-  const bundlePlatforms = Array.from(
-    new Set(input.platforms.map((p) => PLATFORM_TO_BUNDLE[p])),
-  );
+  const rawPlatforms: Array<
+    "LINKEDIN" | "FACEBOOK" | "TWITTER" | "GOOGLE_BUSINESS"
+  > =
+    input.platforms.length > 0
+      ? input.platforms.map((p) => PLATFORM_TO_BUNDLE[p])
+      : (Object.values(PLATFORM_TO_BUNDLE) as Array<
+          "LINKEDIN" | "FACEBOOK" | "TWITTER" | "GOOGLE_BUSINESS"
+        >);
+  // De-dupe once; covers both paths (linkedin_personal + linkedin_company
+  // both map to LINKEDIN; the fallback Object.values produces the same
+  // duplicate before Set collapses it).
+  const bundlePlatforms = Array.from(new Set(rawPlatforms));
 
   try {
     const response = await client.socialAccount.socialAccountCreatePortalLink({
       requestBody: {
         teamId,
         redirectUrl: input.redirectUrl,
-        socialAccountTypes: bundlePlatforms.length > 0
-          ? bundlePlatforms
-          : (Object.values(PLATFORM_TO_BUNDLE) as Array<
-              "LINKEDIN" | "FACEBOOK" | "TWITTER" | "GOOGLE_BUSINESS"
-            >),
+        socialAccountTypes: bundlePlatforms,
         userName: input.userName ?? undefined,
         userLogoUrl: input.userLogoUrl ?? undefined,
       },
