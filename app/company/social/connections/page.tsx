@@ -122,7 +122,7 @@ export default async function CompanySocialConnectionsPage({
   ]);
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <>
       <header>
         <H1>Social connections</H1>
         <Lead className="mt-0.5">
@@ -150,6 +150,6 @@ export default async function CompanySocialConnectionsPage({
           </div>
         )}
       </div>
-    </main>
+    </>
   );
 }

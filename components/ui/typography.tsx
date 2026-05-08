@@ -33,7 +33,7 @@ import { cn } from "@/lib/utils";
 //
 // Sweep notes for follow-up Phase B PRs:
 //
-//   • <h1 className="text-xl font-semibold"> → <H1>
+//   • raw h1 heading → <PageHeader.Title> (or <H1> for non-page contexts)
 //   • <h2 className="text-sm font-semibold"> → <H3>   (semantic mismatch
 //     but visual match — section headings in the sidebar are a sub-
 //     section role despite the h2 element)

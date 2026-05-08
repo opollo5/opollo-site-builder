@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ViewerLinksManager } from "@/components/ViewerLinksManager";
+import { PageHeader } from "@/components/ui/page-header";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listViewerLinks } from "@/lib/platform/social/viewer-links";
 
@@ -60,14 +61,14 @@ export default async function CompanySocialSharingPage() {
 
   return (
     <main className="mx-auto max-w-4xl p-6 space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">Calendar sharing</h1>
-        <p className="mt-1 text-base text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>Calendar sharing</PageHeader.Title>
+        <PageHeader.Subtitle>
           Mint 90-day read-only links to share the content calendar
           with clients or stakeholders. They don&apos;t need an Opollo
           account.
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {linksResult.ok ? (
         <ViewerLinksManager

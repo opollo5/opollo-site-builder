@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { Textarea } from "@/components/ui/textarea";
 import { RepromptForm } from "@/components/optimiser/RepromptForm";
 
@@ -134,18 +135,20 @@ export function ProposalReview({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <div className="space-y-6">
-        <header className="space-y-2">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-semibold">{proposal.headline}</h1>
-              {pageUrl && (
-                <p className="font-mono text-sm text-muted-foreground">{pageUrl}</p>
-              )}
-            </div>
+        <PageHeader>
+          <PageHeader.Title>{proposal.headline}</PageHeader.Title>
+          {proposal.problem_summary && (
+            <PageHeader.Subtitle className="text-sm">
+              {proposal.problem_summary}
+            </PageHeader.Subtitle>
+          )}
+          <PageHeader.Actions>
+            {pageUrl && (
+              <span className="font-mono text-sm text-muted-foreground">{pageUrl}</span>
+            )}
             <RiskPill risk={proposal.risk_level} />
-          </div>
-          <p className="text-sm text-muted-foreground">{proposal.problem_summary}</p>
-        </header>
+          </PageHeader.Actions>
+        </PageHeader>
 
         <Section title="Suggested change">
           <div className="rounded-md border border-border bg-card p-4 text-sm whitespace-pre-wrap">

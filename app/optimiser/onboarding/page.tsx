@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { listClients } from "@/lib/optimiser/clients";
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { NewClientForm } from "@/components/optimiser/NewClientForm";
 
 export const metadata = { title: "Optimiser · Onboarding" };
@@ -14,17 +15,17 @@ export default async function OptimiserOnboardingHome() {
 
   return (
     <div className="space-y-8">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Onboarding</h1>
-          <p className="text-sm text-muted-foreground">
-            Five-step gated checklist per spec §7.1. Steps unlock as each verification passes.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/optimiser">Back to optimiser</Link>
-        </Button>
-      </header>
+      <PageHeader>
+        <PageHeader.Title>Onboarding</PageHeader.Title>
+        <PageHeader.Subtitle>
+          Five-step gated checklist per spec §7.1. Steps unlock as each verification passes.
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button asChild variant="outline">
+            <Link href="/optimiser">Back to optimiser</Link>
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
 
       <section className="space-y-3 rounded-lg border border-border bg-card p-6">
         <h2 className="text-lg font-medium">Add a client</h2>

@@ -193,7 +193,7 @@ export default async function SitePostsList({
 
       {blogGateBlocked && <BlogStyleCalibrationBanner siteId={site.id} />}
 
-      <main className="mx-auto max-w-5xl">
+      <>
 
       <form
         method="get"
@@ -381,7 +381,7 @@ export default async function SitePostsList({
           )}
         </nav>
       )}
-      </main>
+      </>
     </PageShell>
   );
 }

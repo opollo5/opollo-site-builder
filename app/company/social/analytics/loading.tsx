@@ -1,7 +1,7 @@
 // Streaming skeleton shown while the server fetches analytics data.
 export default function AnalyticsLoading() {
   return (
-    <main className="mx-auto max-w-6xl space-y-10 p-6 animate-pulse">
+    <div className="space-y-10 animate-pulse">
       {/* Header */}
       <div className="space-y-2">
         <div className="h-8 w-40 rounded bg-muted" />
@@ -56,6 +56,6 @@ export default function AnalyticsLoading() {
           ))}
         </div>
       </div>
-    </main>
+    </div>
   );
 }

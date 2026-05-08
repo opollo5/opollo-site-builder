@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { PostsNewClient } from "@/components/PostsNewClient";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSites } from "@/lib/sites";
@@ -28,7 +27,7 @@ export default async function PostsNewPage() {
   const result = await listSites();
   if (!result.ok) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -41,7 +40,7 @@ export default async function PostsNewPage() {
         <Alert variant="destructive">
           Failed to load sites: {result.error.message}
         </Alert>
-      </PageShell>
+      </>
     );
   }
 
@@ -54,7 +53,7 @@ export default async function PostsNewPage() {
   );
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -70,6 +69,6 @@ export default async function PostsNewPage() {
         </PageHeader.Subtitle>
       </PageHeader>
       <PostsNewClient sites={sites} />
-    </PageShell>
+    </>
   );
 }

@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import {
   PLATFORM_LABEL,
   type SocialPlatform,
@@ -129,16 +130,14 @@ export default async function ViewerLinkPage({
 
   return (
     <main className="mx-auto max-w-3xl p-6">
-      <header>
-        <h1 className="text-2xl font-semibold">
-          {company.name} — content calendar
-        </h1>
-        <p className="mt-2 text-base text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>{company.name} — content calendar</PageHeader.Title>
+        <PageHeader.Subtitle>
           {grouped.length === 0
             ? "Nothing scheduled in the visible window. Check back soon."
             : `Showing posts from the last ${BACK_DAYS} days through the next ${FORWARD_DAYS}.`}
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {grouped.length === 0 ? null : (
         <ol className="mt-6 space-y-6" data-testid="viewer-calendar">
@@ -220,7 +219,7 @@ function groupByLocalDate(
 function InvalidLink() {
   return (
     <main className="mx-auto max-w-xl p-6 text-sm">
-      <h1 className="text-xl font-semibold">Calendar link not valid</h1>
+      <h1 className="text-page-title text-foreground">Calendar link not valid</h1>
       <p className="mt-3 text-muted-foreground">
         This link is invalid, has expired, or has been revoked. Ask the
         team that sent it for a fresh one.

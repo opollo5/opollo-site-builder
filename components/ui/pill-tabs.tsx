@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 // PillTabs — pill-shaped tab group.
 //
 // Spec:
-//   Active:   bg-[#00e5a0], white text, rounded-full
-//   Inactive: transparent bg, text-[#4B5563], rounded-full, hover bg-[#F3F4F6]
+//   Active:   bg-[var(--tab-active-bg)], white text, rounded-full
+//   Inactive: transparent bg, text-[var(--tab-inactive-text)], rounded-full, hover bg-[var(--icon-control-hover)]
 //   No borders on individual tabs.
 //
 // Each tab renders as a <Link> when `href` is supplied (navigation tabs)
@@ -37,12 +37,12 @@ export interface PillTabsProps {
 const TAB_BASE =
   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap";
 
-const TAB_ACTIVE = "bg-[#00e5a0] text-white";
+const TAB_ACTIVE = "bg-[var(--tab-active-bg)] text-[var(--tab-active-text)]";
 
 const TAB_INACTIVE =
-  "bg-transparent text-[#4B5563] hover:bg-[#F3F4F6] hover:text-[#111827]";
+  "bg-transparent text-[var(--tab-inactive-text)] hover:bg-[var(--icon-control-hover)] hover:text-[var(--tx-primary)]";
 
-const TAB_DISABLED = "bg-transparent text-[#9CA3AF] cursor-not-allowed";
+const TAB_DISABLED = "bg-transparent text-[var(--tx-muted)] cursor-not-allowed";
 
 export function PillTabs({ tabs, activeValue, onSelect, className }: PillTabsProps) {
   return (

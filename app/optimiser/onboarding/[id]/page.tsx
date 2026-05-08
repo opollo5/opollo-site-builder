@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/ui/page-header";
 import { ConnectorBannerView } from "@/components/optimiser/ConnectorBanner";
 import { OnboardingWizard } from "@/components/optimiser/OnboardingWizard";
 import { getClient } from "@/lib/optimiser/clients";
@@ -26,19 +27,19 @@ export default async function OptimiserOnboardingClientPage({
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{client.name}</h1>
-          <p className="text-sm text-muted-foreground">
-            <code className="font-mono">{client.client_slug}</code> ·{" "}
-            {client.hosting_mode.replace("_", " ")} ·{" "}
-            {client.onboarded_at ? "onboarded" : "in progress"}
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/optimiser/onboarding">All clients</Link>
-        </Button>
-      </header>
+      <PageHeader>
+        <PageHeader.Title>{client.name}</PageHeader.Title>
+        <PageHeader.Subtitle>
+          <code className="font-mono">{client.client_slug}</code> ·{" "}
+          {client.hosting_mode.replace("_", " ")} ·{" "}
+          {client.onboarded_at ? "onboarded" : "in progress"}
+        </PageHeader.Subtitle>
+        <PageHeader.Actions>
+          <Button asChild variant="outline">
+            <Link href="/optimiser/onboarding">All clients</Link>
+          </Button>
+        </PageHeader.Actions>
+      </PageHeader>
 
       {banners.length > 0 && (
         <div className="space-y-2">

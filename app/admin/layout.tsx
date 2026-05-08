@@ -36,7 +36,6 @@ export default async function AdminLayout({
       <NavShell
         navContext={navContext}
         skipToId="admin-main"
-        contentMaxWidth="7xl"
       >
         {children}
       </NavShell>

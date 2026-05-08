@@ -1,6 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 import { AutosaveLabClient } from "./AutosaveLabClient";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata: Metadata = {
   title: "Autosave Validation Lab -- Opollo Internal",
@@ -20,13 +21,13 @@ export const metadata: Metadata = {
 export default function AutosaveLabPage() {
   return (
     <main className="mx-auto max-w-4xl p-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold">Autosave Validation Lab</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Spec 14 PR B -- Week 0 item 0.5. Run all 12 scenarios before enabling{" "}
+      <PageHeader>
+        <PageHeader.Title>Autosave Validation Lab</PageHeader.Title>
+        <PageHeader.Subtitle className="text-sm">
+          Spec 14 PR B — Week 0 item 0.5. Run all 12 scenarios before enabling{" "}
           <code className="rounded bg-muted px-1 py-0.5 text-xs">FEATURE_AUTOSAVE_ADOPTED</code>.
-        </p>
-      </div>
+        </PageHeader.Subtitle>
+      </PageHeader>
       <AutosaveLabClient />
     </main>
   );

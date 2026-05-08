@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MoodBoardClient } from "@/components/MoodBoardClient";
+import { PageHeader } from "@/components/ui/page-header";
 import { getAllowedStyles } from "@/lib/image";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getActiveBrandProfile } from "@/lib/platform/brand";
@@ -68,7 +69,7 @@ export default async function MoodBoardPage() {
   const allowedStyles = getAllowedStyles(brand);
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <>
       <div className="mb-4 text-sm">
         <Link
           href="/company"
@@ -77,18 +78,18 @@ export default async function MoodBoardPage() {
           ← Dashboard
         </Link>
       </div>
-      <header className="mb-6">
-        <h1 className="text-2xl font-semibold">Mood board generator</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>Mood board generator</PageHeader.Title>
+        <PageHeader.Subtitle>
           Generate background images for your social posts. Click an image to
           select it and copy its URL.
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
       <MoodBoardClient
         companyId={companyId}
         allowedStyles={allowedStyles}
         primaryColour={brand?.primary_colour ?? null}
       />
-    </main>
+    </>
   );
 }

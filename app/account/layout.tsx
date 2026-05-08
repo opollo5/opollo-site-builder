@@ -40,7 +40,6 @@ export default async function AccountLayout({
       <NavShell
         navContext={navContext}
         skipToId="account-main"
-        contentMaxWidth="6xl"
       >
         {children}
       </NavShell>

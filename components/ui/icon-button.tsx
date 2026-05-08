@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 // IconButton — 32×32 circular icon-only control.
 //
 // Spec: fully rounded pill (9999px), transparent background, hover
-// bg-[#F3F4F6]. Must always carry an accessible label (aria-label or
+// bg-[var(--icon-control-hover)]. Must always carry an accessible label (aria-label or
 // aria-labelledby). Always pair with a visible text label where space
 // allows; this component is for space-constrained controls only (‹ ›,
 // close, overflow).

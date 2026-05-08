@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { runDiagnostics } from "@/lib/optimiser/diagnostics";
 
@@ -13,15 +14,13 @@ export default async function OptimiserDiagnosticsPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Optimiser diagnostics
-        </h1>
-        <p className="text-sm text-muted-foreground">
+      <PageHeader>
+        <PageHeader.Title>Optimiser diagnostics</PageHeader.Title>
+        <PageHeader.Subtitle>
           Operator wiring check. Generated{" "}
           {new Date(report.generated_at).toLocaleString()}.
-        </p>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       <section className="space-y-3 rounded-lg border border-border bg-card p-6">
         <h2 className="text-lg font-medium">Module</h2>

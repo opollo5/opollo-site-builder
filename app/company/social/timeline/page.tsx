@@ -72,19 +72,17 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
   }
 
   return (
-    <main className="mx-auto max-w-5xl p-6">
-      <SocialModuleShell
-        activeView="timeline"
-        companyName={companyName}
-        composerEnabled={composerEnabled && canCreate}
-      >
-        <TimelineFeed
-          posts={postsResult.data.posts}
-          totalCount={postsResult.data.totalCount}
-          page={page}
-          pageSize={PAGE_SIZE}
-        />
-      </SocialModuleShell>
-    </main>
+    <SocialModuleShell
+      activeView="timeline"
+      companyName={companyName}
+      composerEnabled={composerEnabled && canCreate}
+    >
+      <TimelineFeed
+        posts={postsResult.data.posts}
+        totalCount={postsResult.data.totalCount}
+        page={page}
+        pageSize={PAGE_SIZE}
+      />
+    </SocialModuleShell>
   );
 }
