@@ -86,6 +86,7 @@ export async function truncateAll(): Promise<void> {
         'social_approval_events',
         'social_approval_recipients',
         'social_approval_requests',
+        'social_post_drafts',
         'social_media_assets',
         'social_post_variant',
         'social_post_master',
