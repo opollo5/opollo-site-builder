@@ -7,7 +7,7 @@ import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 import type {
   PostMasterListItem,
@@ -316,13 +316,11 @@ export function SocialPostsListClient({
       companyName={companyName}
       composerEnabled={composerEnabled}
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <H1>Social posts</H1>
-          <Lead className="mt-0.5">{countLabel}</Lead>
-        </div>
+      <PageHeader>
+        <PageHeader.Title>Social posts</PageHeader.Title>
+        <PageHeader.Subtitle>{countLabel}</PageHeader.Subtitle>
         {canCreate ? (
-          <div className="flex items-center gap-2">
+          <PageHeader.Actions>
             <BulkUploadButton
               companyId={companyId}
               onSuccess={(newPosts) =>
@@ -351,9 +349,9 @@ export function SocialPostsListClient({
                 {showCreate ? "Cancel" : "New post"}
               </Button>
             )}
-          </div>
+          </PageHeader.Actions>
         ) : null}
-      </div>
+      </PageHeader>
 
       {/* Search bar */}
       <form

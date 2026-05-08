@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { H1, H3, Lead } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
 
 // DESIGN-SYSTEM-OVERHAUL PR 8 — Appearance panel for copy_existing
 // sites. Pure read-only summary of sites.extracted_design +
@@ -58,9 +59,9 @@ export function ExtractedProfilePanel({
 
   return (
     <div data-testid="extracted-profile-panel" className="mt-6 space-y-6">
-      <header>
-        <H1>{siteName}</H1>
-        <Lead className="mt-1">
+      <PageHeader>
+        <PageHeader.Title>{siteName}</PageHeader.Title>
+        <PageHeader.Subtitle>
           Appearance — design extracted from{" "}
           <a
             href={siteUrl}
@@ -70,8 +71,8 @@ export function ExtractedProfilePanel({
           >
             {siteUrl}
           </a>
-        </Lead>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {!hasProfile ? (
         <section

@@ -5,7 +5,8 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Eyebrow, H1, Lead } from "@/components/ui/typography";
+import { Eyebrow } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
 // Value imports come directly from the sub-path. Importing them from
 // the `@/lib/platform/brand` barrel would pull `./get` and `./update`
 // (both `import "server-only"`) into the client bundle via the
@@ -119,13 +120,13 @@ export function CustomerBrandProfileEditor({ company, brand }: Props) {
 
   return (
     <div className="space-y-8">
-      <header>
-        <H1>Brand profile</H1>
-        <Lead className="mt-1">
+      <PageHeader>
+        <PageHeader.Title>Brand profile</PageHeader.Title>
+        <PageHeader.Subtitle>
           How <strong>{company.name}</strong> looks, sounds, and behaves
           across every Opollo product.
-        </Lead>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       <section
         className="rounded-lg border bg-card p-4"

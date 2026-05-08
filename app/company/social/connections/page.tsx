@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SocialConnectionsList } from "@/components/SocialConnectionsList";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
 
@@ -123,13 +123,13 @@ export default async function CompanySocialConnectionsPage({
 
   return (
     <>
-      <header>
-        <H1>Social connections</H1>
-        <Lead className="mt-0.5">
+      <PageHeader>
+        <PageHeader.Title>Social connections</PageHeader.Title>
+        <PageHeader.Subtitle>
           Each platform you publish to has one connection. Reconnect
           flows when a credential expires.
-        </Lead>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       <div className="mt-6">
         <ConnectBanner params={searchParams ?? {}} />
