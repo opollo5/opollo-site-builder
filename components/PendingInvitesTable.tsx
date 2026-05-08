@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { NavIcon } from "@/components/ui/nav-icon";
@@ -57,7 +58,7 @@ export function PendingInvitesTable({
         });
         return;
       }
-      toast.success(`Invite for ${email} revoked.`);
+      toastSuccess(`Invite for ${email} revoked.`);
       router.refresh();
     } catch (err) {
       toast.error("Network error revoking invite", {

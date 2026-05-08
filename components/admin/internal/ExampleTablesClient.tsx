@@ -8,6 +8,8 @@ import { Pill, type PillVariant } from "@/components/ui/pill";
 import { TableCell } from "@/components/ui/table-cell";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
+
 // ---------------------------------------------------------------------------
 // Spec 18 — DataTable + Pill visual reference page (client island).
 //
@@ -133,7 +135,7 @@ export function ExampleTablesClient() {
               label: "Test connection",
               icon: <NavIcon name="cloud-lightning" size={14} />,
               onClick: () => {
-                toast.success(`Tested: ${r.name}`);
+                toastSuccess(`Tested: ${r.name}`);
               },
             },
             {
