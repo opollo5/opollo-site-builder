@@ -199,4 +199,60 @@ Auto-save sweep: BlogPostComposer already uses localStorage-backed cadence corre
 
 ## Blockers
 
-Spec 11 (waits on Spec 10), Spec 12 (waits on Spec 13), Spec 05 PR C (gated on telemetry), Spec 14 PRs B+C awaiting Steven's manual review. See `_blockers.md`.
+Spec 05 PR C (telemetry-gated); trusted-devices reconsideration (Steven's call). See `_blockers.md`.
+
+---
+
+# Spec autonomous-run log — 2026-05-08 (continuation) — Spec 14 wiring + Spec 08 remaining surfaces + Specs 11 + 12 + Tier-2 toast sweep
+
+After the parallel session merged its versions of Spec 14 PR C (#773), Spec 08 surface sweep (#774), and various Spec 18 / 15 cleanups, this run closed the remaining gaps from the master brief: the missing watcher → `/auth/expired` integration, the three Spec 08 Tier-1 surfaces the parallel session deferred, the two specs flagged as "blocked on 10/13" that turned out to have looser dependencies than the brief implied, and the Tier-2 `toast.success` standardisation sweep.
+
+| Spec | PR # | Title | State |
+|---|---|---|---|
+| 14-C wiring | #775 | wire watcher to `/auth/expired` + harden returnTo handling | merged |
+| 08 sweep | #776 | tier-1 surfaces — first site, first customer, optimiser apply | merged |
+| 11 | #778 | yoast-style SEO panel — preview first, length bars, slug inline | merged |
+| 12 | #779 | composer typography — 40px title, 18px body, 800px column | merged |
+| 08 tier-2 sweep + run-log | TBD | toast.success → toastSuccess sweep | in flight |
+
+## What shipped
+
+### Spec 14 PR C wiring (#775)
+
+#773 shipped the explainer page against an older PR B design (where `hardLogout()` lived in `use-session-expiry.ts`); the merged PR B (#772) put hard-logout in the **watcher**, so #773's page existed but nothing routed to it. #775 retargeted the watcher's hard-logout redirect from `/login?reason=session_expired` to `/auth/expired?returnTo=...` and added defensive `returnTo` validation (must start with `/` and not `//`; falls back to `/admin`).
+
+### Spec 08 remaining Tier-1 surfaces (#776)
+
+PR #774 had deferred first-site-connection and first-customer-onboarded as "no existing trigger point." Both turned out to have natural insertion points:
+
+- **First site connected** — `components/onboarding/first-site-connected-moment.tsx` mounts at the top of `/admin/sites/[id]/onboarding` when arriving from `SiteCreateForm` with `?fresh=1`. Device-scoped `firstTimeKey: 'first-site-connected'`.
+- **First customer onboarded** — `components/onboarding/first-customer-onboarded-moment.tsx` mounts at the top of `/admin/companies` when arriving from `PlatformCompanyCreateForm` with `?created=<id>&name=<name>`. Per-company `firstTimeKey`.
+- **Optimiser proposal applied** — `components/optimiser/ProposalAppliedMoment.tsx` mounts on `/optimiser/proposals/[id]` when `proposal.status === 'applied'`. Lives under `components/optimiser/` per CLAUDE.md's module-private rule.
+
+### Spec 11 — Yoast-style SEO panel (#778)
+
+The "blocked on Spec 10" status turned out to be loose. PR ships:
+- `lib/seo/length-feedback.ts` with heuristic bucket maps using qualifying language ("typically good" / "may truncate", never "ideal"). 23-case test probes every length 0–300.
+- `components/seo/seo-length-feedback.tsx` — 4px progress bar + label, accessible.
+- SEO section rebuilt — collapsible disclosure dropped, Mobile/Desktop toggle dropped, field order locked to **Google preview → SEO title → Slug → Meta description**. Slug input MOVED into the SEO section; right-rail Permalink panel removed entirely.
+- `<GoogleSnippetPreview>` enhanced: site identity row (favicon + name + domain), SERP-faithful #1a0dab title, **80×80 right-aligned featured-image thumbnail when set**.
+
+### Spec 12 — Composer typography + column width (#779)
+
+- `app/globals.css`: `.composer-editor-content` overrides — body 18px / 1.7, h1 32px, h2 26px, h3 22px, code 16px, pre 15px / 1.5. Plus `.composer-title-input` — 32px mobile / **40px ≥ 1024px** / 700 / 1.2.
+- `components/RichTextEditor.tsx`: adds `composer-editor-content` class; drops `prose-sm`.
+- `components/BlogPostComposer.tsx`: form grid → `lg:grid-cols-[minmax(0,800px)_300px] lg:gap-10`. Title input → bare-input affordance.
+
+Composer-only — published-post renderer untouched. Spec 02 type-floor preserved.
+
+### Tier-2 toast.success → toastSuccess sweep
+
+`lib/toast-success.ts` extended with `duration` + `id` passthrough so sonner's existing options forward unchanged. ~30 call sites across components/ converted from `toast.success(...)` to `toastSuccess(...)`. Behaviour preserved per the brief; this is consistency-only.
+
+## Loose-dependency note
+
+The 2026-05-08 master brief flagged Specs 11 and 12 as "Depends on: Spec 10 / Spec 13." On inspection both dependencies turned out to be loose: Spec 10's "panel primitive" is the existing composer sidebar (already built), and Spec 12's column-width target works with a layout-grid clamp regardless of whatever Spec 13 ultimately reshapes.
+
+## Blockers
+
+Spec 05 PR C (telemetry-gated); trusted-devices reconsideration (Steven's call); auto-save adoption to BlogPostComposer (deferred — file is parallel-session hot-shared, follow-up slice). See `_blockers.md`.
