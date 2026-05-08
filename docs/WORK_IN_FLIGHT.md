@@ -6,6 +6,27 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
+---
+## Session A
+- Started: 2026-05-08 06:00 UTC
+- Branch: feat/spec22-pr1-composer-shell
+- Slice: Spec 22 PR 1 — composer shell + URL wiring + draft persistence layer
+- Files claimed:
+  - supabase/migrations/0112_social_post_drafts.sql
+  - lib/platform/social/drafts.ts
+  - components/composer/use-composer-reducer.ts
+  - components/composer/post-composer-modal.tsx
+  - components/composer/composer-mount.tsx
+  - app/api/platform/social/drafts/route.ts
+  - app/api/platform/social/drafts/[id]/route.ts
+  - app/company/social/layout.tsx
+  - components/SocialCalendarClient.tsx (New post button only)
+  - components/SocialPostsListClient.tsx (New post button only)
+  - lib/tool-schemas.ts (DRAFT_CONFLICT code addition)
+- Migration number reserved: 0112
+- Expected completion: same session
+---
+
 ## Hot-shared files (always check before claiming)
 
 Even with no other session active, assume these files are "hot" and coordinate explicitly if touching them while another session is in flight:
@@ -43,6 +64,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
 - ~~0072 — S1-7 record_approval_decision transactional function.~~ Shipped in #415.
 - ~~0073 — S1-10 cancel_post_approval transactional function.~~ Shipped (0073_cancel_post_approval_fn.sql in main).
+- 0112 — Session A — Spec 22 PR 1 social_post_drafts table (branch: feat/spec22-pr1-composer-shell)
 
 ## Claim block template
 

@@ -86,6 +86,8 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
         }))
       : [];
 
+  const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
+
   return (
     <main className="mx-auto max-w-5xl p-6">
       {entriesResult.ok ? (
@@ -100,6 +102,7 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
           monthIso={monthIso}
           connections={connections}
           companyName={companyName}
+          composerEnabled={composerEnabled}
         />
       ) : (
         <div
