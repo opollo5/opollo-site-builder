@@ -25,6 +25,7 @@ export type ComposerError = {
 export type ComposerState =
   | { status: "idle" }
   | { status: "loading" }
+  | { status: "load_failed"; error: ComposerError }
   | { status: "editing"; draft: Draft; dirty: boolean }
   | { status: "saving"; draft: Draft }
   | { status: "saved"; draft: Draft; savedAt: Date }
@@ -40,6 +41,7 @@ export type ComposerState =
 export type ComposerAction =
   | { type: "LOAD_START" }
   | { type: "LOAD_SUCCESS"; draft: Draft }
+  | { type: "LOAD_FAIL"; error: ComposerError }
   | { type: "UPDATE_DRAFT"; patch: Partial<DraftData> }
   | { type: "SAVE_START" }
   | { type: "SAVE_SUCCESS"; draft: Draft; savedAt: Date }
@@ -67,6 +69,10 @@ export function composerReducer(
 
     case "LOAD_SUCCESS":
       return { status: "editing", draft: action.draft, dirty: false };
+
+    case "LOAD_FAIL":
+      if (state.status !== "loading") return state;
+      return { status: "load_failed", error: action.error };
 
     case "UPDATE_DRAFT": {
       if (state.status !== "editing" && state.status !== "saved") return state;

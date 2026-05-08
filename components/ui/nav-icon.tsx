@@ -23,7 +23,7 @@ export function NavIcon({ name, size = 20, className }: NavIconProps) {
   return (
     <i
       className={cn(`icon-${name}`, className)}
-      style={{ fontSize: `${size}px` }}
+      style={{ fontSize: `${size}px`, display: "inline-block", lineHeight: 1 }}
       aria-hidden="true"
     />
   );
