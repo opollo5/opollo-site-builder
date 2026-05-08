@@ -35,7 +35,7 @@ describe("migration 0110 -- social_connections expiry columns", () => {
     const svc = getServiceRoleClient();
     const { error } = await svc.from("social_connections").insert({
       company_id: COMPANY_ID,
-      platform: "instagram",
+      platform: "x",
       bundle_social_account_id: "m0110-acc-001",
       display_name: "Test Account",
       status: "healthy",
@@ -52,7 +52,7 @@ describe("migration 0110 -- social_connections expiry columns", () => {
       .from("social_connections")
       .insert({
         company_id: COMPANY_ID,
-        platform: "facebook",
+        platform: "facebook_page",
         bundle_social_account_id: "m0110-acc-002",
         display_name: "Test Facebook",
         status: "healthy",
@@ -77,7 +77,7 @@ describe("migration 0110 -- social_connections expiry columns", () => {
     await svc.from("social_connections").insert([
       {
         company_id: COMPANY_ID,
-        platform: "linkedin",
+        platform: "linkedin_personal",
         bundle_social_account_id: "m0110-acc-soon",
         display_name: "Soon Expires",
         status: "healthy",
@@ -86,7 +86,7 @@ describe("migration 0110 -- social_connections expiry columns", () => {
       },
       {
         company_id: COMPANY_ID,
-        platform: "instagram",
+        platform: "gbp",
         bundle_social_account_id: "m0110-acc-far",
         display_name: "Far Expiry",
         status: "healthy",
@@ -95,7 +95,7 @@ describe("migration 0110 -- social_connections expiry columns", () => {
       },
       {
         company_id: COMPANY_ID,
-        platform: "facebook",
+        platform: "linkedin_company",
         bundle_social_account_id: "m0110-acc-null",
         display_name: "No Expiry",
         status: "healthy",

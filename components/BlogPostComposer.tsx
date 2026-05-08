@@ -186,8 +186,7 @@ function GoogleSnippetPreview({
           </div>
           {/* Title in faithful SERP blue */}
           <div
-            className="mt-2 truncate text-lg font-medium leading-snug"
-            style={{ color: "#1a0dab" }}
+            className="mt-2 truncate text-lg font-medium leading-snug [color:var(--serp-blue)]"
             title={displayTitle}
           >
             {displayTitle.length > 60 ? displayTitle.slice(0, 60) + "…" : displayTitle}

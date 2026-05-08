@@ -48,7 +48,7 @@ export default async function CompanySocialTimelinePage() {
         composerEnabled={composerEnabled}
       >
         <div
-          className="flex min-h-[24rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-[#E5E7EB] text-center"
+          className="flex min-h-[24rem] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-200 text-center"
           data-testid="timeline-coming-soon"
         >
           <p className="text-sm font-medium text-tx-primary">
