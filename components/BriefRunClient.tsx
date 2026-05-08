@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { NavIcon } from "@/components/ui/nav-icon";
 import {
   StatusPill,
@@ -358,84 +357,77 @@ export function BriefRunClient({
 
   return (
     <div className="mt-6 space-y-6">
-      <PageHeader>
-        <PageHeader.Title>{brief.title}</PageHeader.Title>
-        {/* UAT (2026-05-03 round-3): status row uses a flex div so pills
-            baseline-align with prose without the ~1px drop that <p> caused. */}
-        <PageHeader.Subtitle className="text-sm">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span>
-              Run surface for <span className="font-medium">{siteName}</span>
-            </span>
-            {activeRun && (
-              <>
-                <span aria-hidden className="text-muted-foreground/60">—</span>
-                {activeRun.status === "paused" &&
-                firstAwaitingReview &&
-                sortedPages.length > 1 ? (
-                  <StatusPill
-                    kind="run_paused"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => scrollToPageCard(firstAwaitingReview.id)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        scrollToPageCard(firstAwaitingReview.id);
-                      }
-                    }}
-                    className="cursor-pointer hover:bg-warning/20 focus:outline-none focus:ring-2 focus:ring-ring"
-                    aria-label={`Page ${firstAwaitingReview.ordinal + 1} (${firstAwaitingReview.title}) awaiting your review — jump to card`}
-                    label={
-                      <>
-                        Page {firstAwaitingReview.ordinal + 1} awaiting your
-                        review →
-                      </>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+          <span>
+            Run surface for <span className="font-medium">{siteName}</span>
+          </span>
+          {activeRun && (
+            <>
+              <span aria-hidden className="text-muted-foreground/60">—</span>
+              {activeRun.status === "paused" &&
+              firstAwaitingReview &&
+              sortedPages.length > 1 ? (
+                <StatusPill
+                  kind="run_paused"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => scrollToPageCard(firstAwaitingReview.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      scrollToPageCard(firstAwaitingReview.id);
                     }
-                  />
-                ) : (
-                  <RunStatusPill status={activeRun.status} />
-                )}
-              </>
-            )}
-            {polled.isStale ? (
-              <span
-                role="status"
-                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-muted px-2 py-0.5 font-medium text-sm text-muted-foreground"
-                title="Live updates paused — retrying"
-              >
-                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                Reconnecting…
-              </span>
-            ) : (
-              <span
-                role="status"
-                className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700"
-                title="This page auto-updates as the runner makes progress"
-              >
-                <span
-                  aria-hidden
-                  className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
+                  }}
+                  className="cursor-pointer hover:bg-warning/20 focus:outline-none focus:ring-2 focus:ring-ring"
+                  aria-label={`Page ${firstAwaitingReview.ordinal + 1} (${firstAwaitingReview.title}) awaiting your review — jump to card`}
+                  label={
+                    <>
+                      Page {firstAwaitingReview.ordinal + 1} awaiting your
+                      review →
+                    </>
+                  }
                 />
-                Live
-              </span>
-            )}
-          </div>
-        </PageHeader.Subtitle>
-        {isRunActive && (
-          <PageHeader.Actions>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleCancel}
-              disabled={controlState !== "idle"}
+              ) : (
+                <RunStatusPill status={activeRun.status} />
+              )}
+            </>
+          )}
+          {polled.isStale ? (
+            <span
+              role="status"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-muted px-2 py-0.5 font-medium text-sm text-muted-foreground"
+              title="Live updates paused — retrying"
             >
-              {controlState === "cancelling" ? "Cancelling…" : "Cancel run"}
-            </Button>
-          </PageHeader.Actions>
+              <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+              Reconnecting…
+            </span>
+          ) : (
+            <span
+              role="status"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700"
+              title="This page auto-updates as the runner makes progress"
+            >
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500"
+              />
+              Live
+            </span>
+          )}
+        </div>
+        {isRunActive && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleCancel}
+            disabled={controlState !== "idle"}
+          >
+            {controlState === "cancelling" ? "Cancelling…" : "Cancel run"}
+          </Button>
         )}
-      </PageHeader>
+      </div>
 
       {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
 
