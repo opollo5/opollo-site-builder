@@ -39,6 +39,11 @@ import {
   type BlogPostMetadata,
   type ParseSource,
 } from "@/lib/blog-post-parser";
+import { SeoLengthFeedback } from "@/components/seo/seo-length-feedback";
+import {
+  getMetaDescriptionFeedback,
+  getSeoTitleFeedback,
+} from "@/lib/seo/length-feedback";
 import { generateSlug } from "@/lib/slug";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
@@ -71,9 +76,9 @@ const AUTOSAVE_STATUS_FRESH_MS = 1500;
 // BL-3 — SEO recommendation envelopes. Advisory only; neither field is
 // hard-capped. Matches Google / Bing SERPs as of mid-2025.
 const TITLE_SEO_CAP = 60;
-const META_TITLE_SEO_CAP = 60;
-const META_DESCRIPTION_SEO_MIN = 120;
-const META_DESCRIPTION_SEO_MAX = 160;
+// Spec 11 — META_TITLE_SEO_CAP / META_DESCRIPTION_SEO_MIN / META_DESCRIPTION_SEO_MAX
+// removed; thresholds now live in lib/seo/length-feedback.ts via the
+// getSeoTitleFeedback / getMetaDescriptionFeedback bucket maps.
 
 const SOURCE_HINTS: Record<ParseSource, string> = {
   yaml: "Auto-filled from YAML front-matter",
@@ -115,28 +120,100 @@ function extractFirstParagraph(html: string): string {
 }
 
 // Google SERP snippet preview — purely visual, no interaction.
+// Spec 11 — extract domain for the favicon. Returns null on parse error;
+// caller falls back to a globe glyph.
+function extractDomain(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.hostname || null;
+  } catch {
+    return null;
+  }
+}
+
 function GoogleSnippetPreview({
   title,
   url,
   description,
+  siteName,
+  featuredImageUrl,
 }: {
   title: string;
   url: string;
   description: string;
+  siteName?: string | null;
+  featuredImageUrl?: string | null;
 }) {
   const displayTitle = title || "Post title";
   const displayDesc = description || "Meta description will appear here.";
+  const domain = extractDomain(url);
+  const faviconUrl = domain
+    ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`
+    : null;
+  // SERP shows today's date alongside the description in many layouts.
+  const today = new Date().toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
   return (
-    <div className="rounded border border-border bg-background p-3 font-sans text-sm">
-      <div
-        className="truncate text-base font-medium leading-snug text-serp-title"
-        title={displayTitle}
-      >
-        {displayTitle.length > 60 ? displayTitle.slice(0, 60) + "…" : displayTitle}
-      </div>
-      <div className="mt-0.5 truncate text-xs text-serp-url">{url}</div>
-      <div className="mt-1 line-clamp-2 text-xs text-serp-desc">
-        {displayDesc.length > 160 ? displayDesc.slice(0, 160) + "…" : displayDesc}
+    <div className="rounded-lg border border-border bg-background p-3 font-sans text-sm shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          {/* Site identity row */}
+          <div className="flex items-center gap-2">
+            {faviconUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={faviconUrl}
+                alt=""
+                width={24}
+                height={24}
+                className="h-6 w-6 rounded-full bg-muted"
+              />
+            ) : (
+              <div className="h-6 w-6 rounded-full bg-muted" aria-hidden />
+            )}
+            <div className="min-w-0">
+              <div className="truncate text-sm font-medium text-foreground">
+                {siteName ?? domain ?? "Your site"}
+              </div>
+              <div className="truncate text-xs text-muted-foreground">
+                {domain ?? url}
+              </div>
+            </div>
+          </div>
+          {/* Title in faithful SERP blue */}
+          <div
+            className="mt-2 truncate text-lg font-medium leading-snug"
+            style={{ color: "#1a0dab" }}
+            title={displayTitle}
+          >
+            {displayTitle.length > 60 ? displayTitle.slice(0, 60) + "…" : displayTitle}
+          </div>
+          {/* Date · description (muted grey) */}
+          <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+            <span>{today}</span>
+            <span> — </span>
+            <span>
+              {displayDesc.length > 160
+                ? displayDesc.slice(0, 160) + "…"
+                : displayDesc}
+            </span>
+          </div>
+        </div>
+        {/* Featured image thumbnail — 80×80 right-aligned, when set */}
+        {featuredImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={featuredImageUrl}
+            alt=""
+            width={80}
+            height={80}
+            className="h-20 w-20 shrink-0 rounded-md object-cover"
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -262,7 +339,6 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
   const [lastParse, setLastParse] = useState<BlogPostMetadata | null>(null);
   const [featuredImage, setFeaturedImage] = useState<ImagePickerEntry | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [seoPanelOpen, setSeoPanelOpen] = useState(true);
   const [autosave, setAutosave] = useState<AutosaveState>({ kind: "idle" });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [pendingDraft, setPendingDraft] = useState<DraftSnapshot | null>(null);
@@ -947,96 +1023,154 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
             )}
           </div>
 
-          {/* SEO section — inside left column below editor */}
+          {/* SEO section — Spec 11: no collapsible header, Google preview
+              at top, then SEO title → Slug → Meta description with live
+              progress bars below each input. */}
           <section
             className="mt-8 border-t pt-6"
             data-testid="seo-section"
             aria-label="SEO settings"
           >
-            <button
-              type="button"
-              onClick={() => setSeoPanelOpen((v) => !v)}
-              aria-expanded={seoPanelOpen}
-              className="flex w-full items-center justify-between text-left text-sm font-semibold transition-colors hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              SEO
-              <NavIcon
-                name="chevron-down"
-                size={16}
-                className={cn(
-                  "text-muted-foreground transition-transform",
-                  seoPanelOpen && "rotate-180",
-                )}
+            <h2 className="text-sm font-semibold">SEO</h2>
+            <div className="mt-4 space-y-4">
+              {/* 1. Google search preview */}
+              <GoogleSnippetPreview
+                title={metaTitle.value || title.value}
+                url={
+                  siteWpUrl && slug.value
+                    ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
+                    : siteWpUrl ?? "https://example.com/"
+                }
+                description={metaDescription.value}
+                siteName={siteName}
+                featuredImageUrl={featuredImage?.delivery_url ?? null}
               />
-            </button>
-            {seoPanelOpen && <div className="mt-4 space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <label htmlFor="post-meta-title" className="block text-sm font-medium">
-                    SEO title
-                  </label>
-                  <Input
-                    id="post-meta-title"
-                    className="mt-1"
-                    value={metaTitle.value}
-                    onChange={(e) =>
-                      setFieldValue(
-                        setMetaTitle,
-                        e.target.value,
-                        lastParse?.meta_title ?? null,
-                        lastParse?.source_map.meta_title ?? "derived",
-                      )
-                    }
-                    disabled={submitting}
-                    maxLength={200}
-                  />
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <SourceHint source={metaTitle.source} />
-                    <MetaTitleLengthHint length={metaTitle.value.length} />
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="post-meta-description" className="block text-sm font-medium">
-                    Meta description
-                  </label>
-                  <Textarea
-                    id="post-meta-description"
-                    className="mt-1"
-                    rows={3}
-                    value={metaDescription.value}
-                    onChange={(e) =>
-                      setFieldValue(
-                        setMetaDescription,
-                        e.target.value,
-                        lastParse?.meta_description ?? null,
-                        lastParse?.source_map.meta_description ?? "derived",
-                      )
-                    }
-                    disabled={submitting}
-                    maxLength={400}
-                    aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
-                  />
-                  <div className="mt-1 flex items-center justify-between gap-2 text-sm">
-                    <SourceHint source={metaDescription.source} />
-                    <MetaDescriptionLengthHint length={metaDescription.value.length} />
-                  </div>
-                </div>
-              </div>
+
+              {/* 2. SEO title */}
               <div>
-                <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Search preview
-                </p>
-                <GoogleSnippetPreview
-                  title={metaTitle.value || title.value}
-                  url={
-                    siteWpUrl && slug.value
-                      ? `${siteWpUrl.replace(/\/$/, "")}/${slug.value}/`
-                      : siteWpUrl ?? "https://example.com/"
+                <label htmlFor="post-meta-title" className="block text-sm font-medium">
+                  SEO title
+                </label>
+                <Input
+                  id="post-meta-title"
+                  className="mt-1"
+                  value={metaTitle.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setMetaTitle,
+                      e.target.value,
+                      lastParse?.meta_title ?? null,
+                      lastParse?.source_map.meta_title ?? "derived",
+                    )
                   }
-                  description={metaDescription.value}
+                  disabled={submitting}
+                  maxLength={200}
                 />
+                <SeoLengthFeedback
+                  feedback={getSeoTitleFeedback(metaTitle.value.length)}
+                  length={metaTitle.value.length}
+                />
+                <div className="mt-1">
+                  <SourceHint source={metaTitle.source} />
+                </div>
               </div>
-            </div>}
+
+              {/* 3. Slug — moved into the SEO panel per Spec 11 field order */}
+              <div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <label htmlFor="post-slug" className="block text-sm font-medium">
+                    URL slug
+                  </label>
+                  {title.value.trim().length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSlug({
+                          value: generateSlug(title.value),
+                          source: "derived",
+                          touched: true,
+                        })
+                      }
+                      disabled={submitting}
+                      className="rounded-sm text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      Regenerate
+                    </button>
+                  )}
+                </div>
+                <Input
+                  id="post-slug"
+                  className="mt-1"
+                  value={slug.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setSlug,
+                      e.target.value.toLowerCase(),
+                      lastParse?.slug ?? null,
+                      lastParse?.source_map.slug ?? "derived",
+                    )
+                  }
+                  onBlur={() => {
+                    if (slug.value && !slugIsValid) {
+                      setSlug({
+                        value: generateSlug(slug.value),
+                        source: "derived",
+                        touched: true,
+                      });
+                    }
+                  }}
+                  disabled={submitting}
+                  maxLength={100}
+                  aria-invalid={!slugIsValid}
+                />
+                <div className="mt-1 space-y-0.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <SourceHint source={slug.source} />
+                    {!slugIsValid && slug.value.length > 0 && (
+                      <span className="text-xs text-destructive">
+                        Lowercase, numbers, dashes only.
+                      </span>
+                    )}
+                  </div>
+                  <PermalinkPreview
+                    structure={permalinkStructure}
+                    wpUrl={siteWpUrl}
+                    slug={slug.value}
+                  />
+                </div>
+              </div>
+
+              {/* 4. Meta description */}
+              <div>
+                <label htmlFor="post-meta-description" className="block text-sm font-medium">
+                  Meta description
+                </label>
+                <Textarea
+                  id="post-meta-description"
+                  className="mt-1"
+                  rows={3}
+                  value={metaDescription.value}
+                  onChange={(e) =>
+                    setFieldValue(
+                      setMetaDescription,
+                      e.target.value,
+                      lastParse?.meta_description ?? null,
+                      lastParse?.source_map.meta_description ?? "derived",
+                    )
+                  }
+                  disabled={submitting}
+                  maxLength={400}
+                  aria-invalid={metaDescription.value.length > 0 && !metaDescriptionIsValid}
+                />
+                <SeoLengthFeedback
+                  feedback={getMetaDescriptionFeedback(metaDescription.value.length)}
+                  length={metaDescription.value.length}
+                />
+                <div className="mt-1">
+                  <SourceHint source={metaDescription.source} />
+                </div>
+              </div>
+            </div>
           </section>
         </div>
 
@@ -1176,65 +1310,9 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
           </p>
         </SidebarPanel>
 
-        {/* Permalink panel */}
-        <SidebarPanel title="Permalink" defaultOpen testId="sidebar-permalink">
-          <div className="flex items-baseline justify-between gap-2">
-            <label htmlFor="post-slug" className="block text-sm font-medium">
-              URL slug
-            </label>
-            {title.value.trim().length > 0 && (
-              <button
-                type="button"
-                onClick={() =>
-                  setSlug({
-                    value: generateSlug(title.value),
-                    source: "derived",
-                    touched: true,
-                  })
-                }
-                disabled={submitting}
-                className="rounded-sm text-sm text-muted-foreground underline-offset-2 hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Regenerate
-              </button>
-            )}
-          </div>
-          <Input
-            id="post-slug"
-            value={slug.value}
-            onChange={(e) =>
-              setFieldValue(
-                setSlug,
-                e.target.value.toLowerCase(),
-                lastParse?.slug ?? null,
-                lastParse?.source_map.slug ?? "derived",
-              )
-            }
-            onBlur={() => {
-              if (slug.value && !slugIsValid) {
-                setSlug({ value: generateSlug(slug.value), source: "derived", touched: true });
-              }
-            }}
-            disabled={submitting}
-            maxLength={100}
-            aria-invalid={!slugIsValid}
-          />
-          <div className="space-y-0.5">
-            <div className="flex items-center justify-between gap-2">
-              <SourceHint source={slug.source} />
-              {!slugIsValid && slug.value.length > 0 && (
-                <span className="text-sm text-destructive">
-                  Lowercase, numbers, dashes only.
-                </span>
-              )}
-            </div>
-            <PermalinkPreview
-              structure={permalinkStructure}
-              wpUrl={siteWpUrl}
-              slug={slug.value}
-            />
-          </div>
-        </SidebarPanel>
+        {/* Spec 11 — Permalink sidebar panel removed; URL slug now lives
+            inside the SEO section in the main column (Google preview →
+            SEO title → Slug → Meta description). */}
 
         {/* Categories panel */}
         <SidebarPanel title="Categories" defaultOpen testId="sidebar-categories">
@@ -1492,51 +1570,10 @@ function TitleLengthHint({
   );
 }
 
-function MetaTitleLengthHint({ length }: { length: number }) {
-  if (length === 0) return null;
-  const overSeoCap = length > META_TITLE_SEO_CAP;
-  return (
-    <span
-      data-testid="post-meta-title-length-hint"
-      className={cn(
-        "text-sm",
-        overSeoCap ? "text-warning" : "text-muted-foreground",
-      )}
-    >
-      {length}/{META_TITLE_SEO_CAP}
-      {overSeoCap && " · search will truncate"}
-    </span>
-  );
-}
-
-function MetaDescriptionLengthHint({ length }: { length: number }) {
-  if (length === 0) {
-    return (
-      <span className="text-muted-foreground">
-        Aim for {META_DESCRIPTION_SEO_MIN}–{META_DESCRIPTION_SEO_MAX} chars.
-      </span>
-    );
-  }
-  if (length > META_DESCRIPTION_SEO_MAX) {
-    return (
-      <span data-testid="post-meta-description-length-hint" className="text-destructive">
-        {length}/{META_DESCRIPTION_SEO_MAX} · search will truncate
-      </span>
-    );
-  }
-  if (length < META_DESCRIPTION_SEO_MIN) {
-    return (
-      <span data-testid="post-meta-description-length-hint" className="text-muted-foreground">
-        {length}/{META_DESCRIPTION_SEO_MAX} · aim for {META_DESCRIPTION_SEO_MIN}+
-      </span>
-    );
-  }
-  return (
-    <span data-testid="post-meta-description-length-hint" className="text-success">
-      {length}/{META_DESCRIPTION_SEO_MAX} · good length
-    </span>
-  );
-}
+// Spec 11 — MetaTitleLengthHint / MetaDescriptionLengthHint replaced by
+// <SeoLengthFeedback> in components/seo/seo-length-feedback.tsx, which
+// renders the live progress bar + heuristic label per the brief's
+// qualifying-language requirement ("typically good", not "ideal").
 
 // ---------------------------------------------------------------------------
 // WordPress-style collapsible sidebar panel.
