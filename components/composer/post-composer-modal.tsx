@@ -1,11 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { NavIcon } from "@/components/ui/nav-icon";
+import { toastSuccess } from "@/lib/toast-success";
 import { useAutoSave } from "@/lib/hooks/use-auto-save";
 import type { DraftData } from "@/lib/platform/social/drafts";
+import type { SocialConnection } from "@/lib/platform/social/connections/types";
+import type { SocialPlatform } from "@/lib/platform/social/variants/types";
+
+import { ApprovalToggle } from "./approval-toggle";
+import { ComposerActions } from "./composer-actions";
+import { ComposerTextarea } from "./composer-textarea";
+import { ImageUploadZone } from "./image-upload-zone";
+import { ProfileSelector } from "./profile-selector";
+import type { ComposerMode } from "./scheduling-tabs";
+import { SchedulingTabs } from "./scheduling-tabs";
+import { ToolsRow } from "./tools-row";
 import {
   composerReducer,
   INITIAL_STATE,
@@ -13,14 +25,20 @@ import {
 import type { ComposerError, Draft } from "./use-composer-reducer";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 1 — PostComposerModal shell.
+// Spec 22 PR 2 — PostComposerModal with real editor components.
 //
-// Full-screen modal overlay. Opens when ?compose=new (creates draft) or
-// ?compose=<uuid> (loads existing draft). Closing removes the search param.
+// PR 1 shipped the modal chrome + state machine + autosave.
+// PR 2 replaces all placeholder blocks with:
+//   - ProfileSelector (left pane top)
+//   - ComposerTextarea (main text input)
+//   - ImageUploadZone (three-source picker)
+//   - ToolsRow (emoji / GIF stub / UTM stub / AI stub)
+//   - SchedulingTabs + date/time pickers (footer left)
+//   - ApprovalToggle
+//   - ComposerActions (primary submit button)
 //
-// PR 1 ships: modal chrome, state machine wiring, autosave. The editor
-// content pane is a placeholder; PR 2 replaces it with real editor
-// components (ProfileSelector, ComposerTextarea, ImageUploadZone, etc.).
+// Submit flow: POST /api/platform/social/drafts/[id]/publish which handles
+// create-post → submit → auto-approve → schedule in one server-side call.
 // ---------------------------------------------------------------------------
 
 interface PostComposerModalProps {
@@ -43,11 +61,20 @@ export function PostComposerModal({
   const [state, dispatch] = useReducer(composerReducer, INITIAL_STATE);
   const modalRef = useRef<HTMLDivElement>(null);
   const firstFocusRef = useRef<HTMLButtonElement>(null);
-
-  // Derive current draft for autosave getValue; stable ref so the callback
-  // doesn't trigger hook re-subscriptions on every render.
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  // Transient UI state — not persisted in draft_data per D13.
+  const [mode, setMode] = useState<ComposerMode>("post_now");
+  const [scheduleDate, setScheduleDate] = useState(
+    () => new Date().toISOString().slice(0, 10),
+  );
+  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Connections list — loaded by ProfileSelector, also needed for publish call.
+  const [connections, setConnections] = useState<SocialConnection[]>([]);
 
   // ---------------------------------------------------------------------------
   // Initialise: create or load draft on mount
@@ -105,18 +132,64 @@ export function PostComposerModal({
 
     void init();
     return () => { cancelled = true; };
-    // Intentionally only run on mount — initialDraftId is stable per modal open.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Autosave — wired through Spec 14 useAutoSave hook
+  // Helpers to update draft_data fields
+  // ---------------------------------------------------------------------------
+
+  const updateText = useCallback((text: string) => {
+    dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text } });
+  }, []);
+
+  const updateLinkUrl = useCallback((url: string | null) => {
+    dispatch({ type: "UPDATE_DRAFT", patch: { link_url: url } });
+  }, []);
+
+  const updateConnections = useCallback((ids: string[]) => {
+    dispatch({ type: "UPDATE_DRAFT", patch: { target_connection_ids: ids } });
+  }, []);
+
+  const updateMediaRef = useCallback((ref: import("@/lib/platform/social/drafts").MediaRef | null) => {
+    dispatch({ type: "UPDATE_DRAFT", patch: { media_refs: ref ? [ref] : [] } });
+  }, []);
+
+  const updateApproval = useCallback((v: boolean) => {
+    dispatch({ type: "UPDATE_DRAFT", patch: { approval_required: v } });
+  }, []);
+
+  const insertEmoji = useCallback((emoji: string) => {
+    const s = stateRef.current;
+    if (s.status !== "editing" && s.status !== "saved") return;
+    const text = s.draft.draft_data.master_text ?? "";
+    dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text + emoji } });
+  }, []);
+
+  // Keep schedule in draft_data for autosave.
+  const updateScheduleDate = useCallback((date: string) => {
+    setScheduleDate(date);
+    const s = stateRef.current;
+    if (s.status !== "editing" && s.status !== "saved") return;
+    const times = s.draft.draft_data.schedule?.times ?? [scheduleTime];
+    dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date, times } } });
+  }, [scheduleTime]);
+
+  const updateScheduleTime = useCallback((time: string) => {
+    setScheduleTime(time);
+    const s = stateRef.current;
+    if (s.status !== "editing" && s.status !== "saved") return;
+    const date = s.draft.draft_data.schedule?.date ?? scheduleDate;
+    dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date, times: [time] } } });
+  }, [scheduleDate]);
+
+  // ---------------------------------------------------------------------------
+  // Autosave
   // ---------------------------------------------------------------------------
 
   const getDraftId = (): string | null => {
     const s = stateRef.current;
-    if (s.status === "editing" || s.status === "saved") return s.draft.id;
-    if (s.status === "saving") return s.draft.id;
+    if (s.status === "editing" || s.status === "saved" || s.status === "saving") return s.draft.id;
     return null;
   };
 
@@ -184,19 +257,91 @@ export function PostComposerModal({
   });
 
   // ---------------------------------------------------------------------------
-  // Close handler — flush pending save, remove search param
+  // Submit
+  // ---------------------------------------------------------------------------
+
+  const handleSubmit = useCallback(async () => {
+    const s = stateRef.current;
+    if (s.status !== "editing" && s.status !== "saved") return;
+
+    const dd = s.draft.draft_data;
+    if (!dd.master_text?.trim() && !dd.link_url?.trim()) {
+      setSubmitError("Add some content before posting.");
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      // Flush pending autosave first.
+      try { await flush(); } catch { /* non-fatal */ }
+
+      const res = await fetch(`/api/platform/social/drafts/${s.draft.id}/publish`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-correlation-id": correlationId,
+        },
+        body: JSON.stringify({ company_id: companyId, mode }),
+      });
+
+      const result = await res.json();
+      if (!result.ok) {
+        setSubmitError(result.error?.message ?? "Submit failed.");
+        return;
+      }
+
+      const postId: string = result.data.post.id;
+      dispatch({ type: "PUBLISH_SUCCESS", postId });
+
+      const scheduled: boolean = result.data.scheduled;
+      const postState: string = result.data.state;
+
+      if (mode === "draft") {
+        toastSuccess("Saved as draft", { description: "Your post has been saved." });
+      } else if (scheduled) {
+        toastSuccess("Post scheduled", {
+          description: `Scheduled for ${result.data.scheduledAt ? new Date(result.data.scheduledAt as string).toLocaleString() : "the selected time"}.`,
+          action: { label: "View posts →", onClick: () => router.push("/company/social/posts") },
+        });
+      } else if (postState === "pending_client_approval") {
+        toastSuccess("Post submitted for approval", {
+          description: "An approver will review it before publishing.",
+          action: { label: "View posts →", onClick: () => router.push("/company/social/posts") },
+        });
+      } else {
+        toastSuccess("Post queued for publishing");
+      }
+
+      // Close modal.
+      const url = new URL(window.location.href);
+      url.searchParams.delete("compose");
+      url.searchParams.delete("date");
+      router.replace(url.pathname + (url.search || ""), { scroll: false });
+      dispatch({ type: "RESET" });
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Submit failed.");
+      dispatch({
+        type: "PUBLISH_FAIL",
+        error: { message: err instanceof Error ? err.message : "Submit failed.", code: "SUBMIT_FAILED", correlationId },
+        retryable: true,
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [mode, companyId, correlationId, flush, router]);
+
+  // ---------------------------------------------------------------------------
+  // Close
   // ---------------------------------------------------------------------------
 
   const handleClose = useCallback(async () => {
     const s = stateRef.current;
-    const dirty = s.status === "editing" && s.draft !== undefined;
-
-    // Best-effort final flush before closing.
+    const dirty = s.status === "editing" && s.dirty;
     if (dirty) {
-      try { await flush(); } catch { /* ignore — user chose to close */ }
+      try { await flush(); } catch { /* ignore */ }
     }
-
-    // Remove compose search param without pushing a new history entry.
     const url = new URL(window.location.href);
     url.searchParams.delete("compose");
     url.searchParams.delete("date");
@@ -210,10 +355,7 @@ export function PostComposerModal({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        void handleClose();
-      }
-      // Focus trap: Tab / Shift+Tab cycles within the modal.
+      if (e.key === "Escape") void handleClose();
       if (e.key === "Tab" && modalRef.current) {
         const focusable = Array.from(
           modalRef.current.querySelectorAll<HTMLElement>(
@@ -224,38 +366,48 @@ export function PostComposerModal({
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
         if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          }
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
         } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
         }
       }
     }
-
     document.addEventListener("keydown", onKeyDown);
-    // Auto-focus the close button on open so screen readers announce the dialog.
     firstFocusRef.current?.focus();
-
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [handleClose]);
+
+  // ---------------------------------------------------------------------------
+  // Derive editor state
+  // ---------------------------------------------------------------------------
+
+  const isLoading = state.status === "idle" || state.status === "loading";
+  const isConflict = state.status === "recovering";
+  const draftData: DraftData | null =
+    state.status === "editing" || state.status === "saved" || state.status === "saving"
+      ? state.draft.draft_data
+      : null;
+
+  const selectedPlatforms: SocialPlatform[] = (() => {
+    if (!draftData || !connections.length) return [];
+    const ids = new Set(draftData.target_connection_ids);
+    return [...new Set(
+      connections.filter((c) => ids.has(c.id)).map((c) => c.platform),
+    )];
+  })();
+
+  const canSubmit = !isLoading && !submitting && !!draftData &&
+    (!!draftData.master_text?.trim() || !!draftData.link_url?.trim());
 
   // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
 
-  const isLoading = state.status === "idle" || state.status === "loading";
-  const isConflict = state.status === "recovering";
-
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="New post"
+      aria-label={initialDraftId ? "Edit post" : "New post"}
       className="fixed inset-0 z-50 flex items-stretch"
     >
       {/* Backdrop */}
@@ -318,42 +470,70 @@ export function PostComposerModal({
           </div>
         )}
 
+        {/* Submit error banner */}
+        {submitError && (
+          <div className="border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
+            {submitError}
+            <button
+              type="button"
+              onClick={() => setSubmitError(null)}
+              className="ml-2 underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         {/* Body — split panes */}
         <div className="flex min-h-0 flex-1">
           {/* Left pane — editor (60%) */}
-          <div className="flex w-[60%] flex-col overflow-y-auto border-r border-white/10 p-6">
+          <div className="flex w-[60%] flex-col gap-4 overflow-y-auto border-r border-white/10 p-6">
             {isLoading ? (
               <div className="flex flex-1 items-center justify-center">
                 <NavIcon name="sync" size={24} className="animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="space-y-4">
-                {/* Profile selector placeholder — PR 2 replaces this */}
-                <div
-                  className="flex min-h-[40px] items-center gap-2 rounded-md border border-dashed border-white/20 px-3 py-2 text-sm text-muted-foreground"
-                  aria-label="Profile selector (coming in PR 2)"
-                >
-                  <NavIcon name="users" size={16} />
-                  Select accounts…
-                </div>
+              <>
+                {/* Profile selector */}
+                <ProfileSelector
+                  companyId={companyId}
+                  selectedIds={draftData?.target_connection_ids ?? []}
+                  onChange={updateConnections}
+                  onConnectionsLoaded={setConnections}
+                  disabled={submitting}
+                />
 
-                {/* Composer textarea placeholder — PR 2 replaces this */}
-                <div
-                  className="min-h-[120px] rounded-md border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground"
-                  aria-label="Post content (coming in PR 2)"
-                >
-                  Paste a link or type something…
-                </div>
+                {/* Composer textarea */}
+                <ComposerTextarea
+                  value={draftData?.master_text ?? ""}
+                  linkUrl={draftData?.link_url}
+                  selectedPlatforms={selectedPlatforms}
+                  onChange={updateText}
+                  onLinkUrl={updateLinkUrl}
+                  disabled={submitting}
+                />
 
-                {/* Image upload zone placeholder */}
-                <div
-                  className="flex items-center justify-center gap-2 rounded-md border border-dashed border-white/20 py-8 text-sm text-muted-foreground"
-                  aria-label="Image upload (coming in PR 2)"
-                >
-                  <NavIcon name="picture" size={20} />
-                  Add an image
-                </div>
-              </div>
+                {/* Image upload zone */}
+                <ImageUploadZone
+                  companyId={companyId}
+                  mediaRef={draftData?.media_refs[0] ?? null}
+                  onSelect={updateMediaRef}
+                  disabled={submitting}
+                />
+
+                {/* Tools row */}
+                <ToolsRow
+                  onEmojiInsert={insertEmoji}
+                  disabled={submitting}
+                />
+
+                {/* Approval toggle */}
+                <ApprovalToggle
+                  value={draftData?.approval_required ?? false}
+                  onChange={updateApproval}
+                  disabled={submitting}
+                />
+              </>
             )}
           </div>
 
@@ -389,36 +569,24 @@ export function PostComposerModal({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
-          {/* Mode tabs */}
-          <div className="flex gap-1 rounded-md border border-white/10 p-0.5 text-xs">
-            {(["Post now", "Schedule", "Save as draft"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className="rounded px-3 py-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground first:bg-white/10 first:text-foreground"
-                disabled={isLoading}
-              >
-                {mode}
-              </button>
-            ))}
-            <button
-              type="button"
-              className="rounded px-3 py-1.5 text-muted-foreground/40"
-              disabled
-              title="Coming soon"
-            >
-              Publish regularly
-            </button>
-          </div>
+          {/* Scheduling tabs */}
+          <SchedulingTabs
+            mode={mode}
+            scheduleDate={scheduleDate}
+            scheduleTime={scheduleTime}
+            onModeChange={setMode}
+            onScheduleDate={updateScheduleDate}
+            onScheduleTime={updateScheduleTime}
+            disabled={isLoading || submitting}
+          />
 
           {/* Primary action */}
-          <button
-            type="button"
-            disabled={isLoading || state.status === "saving"}
-            className="rounded-md bg-pk px-4 py-2 text-sm font-medium text-white hover:bg-pk/80 disabled:opacity-50"
-          >
-            Save
-          </button>
+          <ComposerActions
+            mode={mode}
+            submitting={submitting}
+            disabled={!canSubmit}
+            onSubmit={() => void handleSubmit()}
+          />
         </div>
       </div>
     </div>
