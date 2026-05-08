@@ -145,3 +145,58 @@ Run-time observation, not a new finding: per memory's "Parallel sessions, single
 ## Blockers
 
 See `_blockers.md` — Spec 11 (waits on Spec 10), Spec 12 (waits on Spec 13), Spec 05 PR C (gated on telemetry), Spec 14 PRs B+C (manual review, deferred), Spec 08 surface sweep, trusted-devices reconsideration, image-search latency baseline.
+
+---
+
+# Spec autonomous-run log — 2026-05-08 (cont.) — dispatch brief: Spec 14 PRs B+C, Spec 08 surface sweep, test debt
+
+Continuation of the 2026-05-08 master brief. Five PRs total; two require manual review.
+
+| Work item | PR # | Title | Branch | State |
+|---|---|---|---|---|
+| Test debt | #771 | fix 5 failing unit test groups | feat/fix-unit-tests | merged |
+| 14-B | #772 | activity tracking + grace period + auto-save | feat/spec14-pr-b-activity-grace-autosave | open — manual review |
+| 14-C | #773 | cybersecurity re-login page `/auth/expired` | feat/spec14-pr-c-auth-expired | open — manual review |
+| 08 (sweep) | #774 | surface sweep — post-publish + batch-completion success moments | feat/spec08-surface-sweep | CI running → auto-merge when green |
+
+## What shipped
+
+### Test debt (#771, merged)
+
+Five vitest test groups fixed in one PR:
+
+- **`breadcrumb.test.ts` / `page-header.test.ts` / `spec08-success-moment.test.ts`**: `vite:import-analysis` could not parse TSX because `tsconfig.json` sets `jsx: "preserve"` for Next.js. Fix: added `esbuild: { jsx: "automatic" }` to `vitest.config.ts`.
+- **`alt-text.test.ts`**: `deriveAltText` trimmed `seoTitle` before separator matching, stripping the leading space from `" - Acme"`. Fix: match against `raw` (untrimmed), return `raw` when stripped result is empty.
+- **`sites-purge.test.ts`**: brief insert referenced non-existent column `original_text` and omitted required NOT NULL fields. Fix: aligned insert to real schema.
+- **`sites-purge-permissions.test.ts`**: `revalidatePath` from `next/cache` throws `Invariant: static generation store missing` outside App Router context. Fix: `vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))`.
+- **`images-suggest.test.ts`**: `plainto_tsquery` ANDs all stemmed terms; `"basics"` stems to `"basic"`, absent from all seeded images → 0 rows. Fix: changed test query to `"Phishing fraud"` whose stems match the seeded phishing image.
+
+### Spec 14 PR B (#772, manual review)
+
+`lib/hooks/use-activity.ts`: tracks keydown / mousedown / pointerdown / touchstart (NOT mousemove); 60-second active window; returns `isActive: boolean`.
+
+`lib/hooks/use-auto-save.ts`: generic `useAutoSave({key, getData, onSave, intervalMs})` hook with three safeguards: (1) dirty-state guard via JSON snapshot comparison, (2) localStorage leader election (`autosave:leader:{key}`, 5s heartbeat, 12s TTL), (3) visibility-aware cadence (normal interval when visible, 2× when `document.hidden`).
+
+`lib/hooks/use-session-expiry.ts` extended: `GRACE_PERIOD_MS = 15 * 60 * 1000` starts at T-0, non-renewable. `hardLogout()` exported: Supabase sign-out + `window.location.replace("/auth/expired")`. `SessionExpiry` extended with `graceElapsed` + `graceSecondsRemaining`.
+
+`components/session/session-grace-banner.tsx`: amber undismissable countdown banner during grace period with `formatCountdown()` and "Re-authenticate now" CTA.
+
+`components/session/session-expiry-watcher.tsx` updated: imports `SessionGraceBanner`, calls `hardLogout()` via `useEffect` when `graceElapsed` becomes true.
+
+Auto-save sweep: BlogPostComposer already uses localStorage-backed cadence correctly; no additional server-side auto-save needed for current surfaces.
+
+### Spec 14 PR C (#773, manual review)
+
+`app/auth/expired/page.tsx`: `force-static` page (user already signed out), three-bullet cybersecurity rationale (session-hijacking protection / compliance alignment / credential freshness), "Sign in again" → `/login` CTA, NavIcon `lock` in amber circle header, footer note "Your work was auto-saved before sign-out."
+
+### Spec 08 surface sweep (#774, CI running)
+
+`PostDetailClient`: `SuccessMoment` block wired when `post.status === 'published'` — first-time shows "Your post is live!" confetti hero, subsequent visits show quiet "Post published to WordPress" banner. Both `toast.success()` calls migrated to `toastSuccess()`.
+
+`BatchSuccessMoment` (new client component): wraps `SuccessMoment` for `job.status === 'succeeded'` on the batch detail page, keyed `batch-completed:{jobId}`.
+
+**Deferred Tier-1 surfaces:** first-site-connection (no existing trigger point in credential-save flow) and first-company-onboarded (no onboarding milestone event) — logged in `_blockers.md` for targeted follow-up.
+
+## Blockers
+
+Spec 11 (waits on Spec 10), Spec 12 (waits on Spec 13), Spec 05 PR C (gated on telemetry), Spec 14 PRs B+C awaiting Steven's manual review. See `_blockers.md`.
