@@ -488,9 +488,9 @@ export function PostComposerModal({
         {/* Body — split panes */}
         <div className="flex min-h-0 flex-1">
           {/* Left pane — editor (60%) */}
-          <div className="flex w-[60%] flex-col gap-4 overflow-y-auto border-r border-white/10 p-6">
+          <div className="flex w-[60%] flex-col border-r border-white/10">
             {isLoadFailed && state.status === "load_failed" ? (
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
                 <p className="text-sm text-destructive">
                   {state.error.message}
                 </p>
@@ -509,7 +509,7 @@ export function PostComposerModal({
                 </span>
               </div>
             ) : (
-              <>
+              <div className="flex flex-col gap-4 overflow-y-auto p-6">
                 {/* Profile selector */}
                 <ProfileSelector
                   companyId={companyId}
@@ -549,7 +549,7 @@ export function PostComposerModal({
                   onChange={updateApproval}
                   disabled={submitting}
                 />
-              </>
+              </div>
             )}
           </div>
 
