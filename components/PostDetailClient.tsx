@@ -9,6 +9,7 @@ import { toastSuccess } from "@/lib/toast-success";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { PostDraftEditor } from "@/components/PostDraftEditor";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { SuccessMoment } from "@/components/ui/success-moment";
 import { H1 } from "@/components/ui/typography";
@@ -281,6 +282,15 @@ export function PostDetailClient({
       )}
 
       {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
+
+      {post.status === "draft" && (
+        <PostDraftEditor
+          siteId={siteId}
+          postId={post.id}
+          initialTitle={post.title}
+          initialHtml={post.generated_html ?? ""}
+        />
+      )}
 
       <section
         aria-labelledby="preview-heading"
