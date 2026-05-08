@@ -105,9 +105,8 @@ export function PostComposerModal({
         const result = await response.json();
         if (!result.ok) {
           dispatch({
-            type: "SAVE_FAIL",
+            type: "LOAD_FAIL",
             error: { message: result.error?.message ?? "Failed to initialise draft.", code: result.error?.code ?? "INTERNAL_ERROR", correlationId },
-            retryable: result.error?.retryable ?? true,
           });
           return;
         }
@@ -123,9 +122,8 @@ export function PostComposerModal({
       } catch (err) {
         if (cancelled) return;
         dispatch({
-          type: "SAVE_FAIL",
+          type: "LOAD_FAIL",
           error: { message: err instanceof Error ? err.message : "Network error.", code: "NETWORK_ERROR", correlationId },
-          retryable: true,
         });
       }
     }
@@ -382,6 +380,7 @@ export function PostComposerModal({
   // ---------------------------------------------------------------------------
 
   const isLoading = state.status === "idle" || state.status === "loading";
+  const isLoadFailed = state.status === "load_failed";
   const isConflict = state.status === "recovering";
   const draftData: DraftData | null =
     state.status === "editing" || state.status === "saved" || state.status === "saving"
@@ -430,7 +429,9 @@ export function PostComposerModal({
           <div className="flex items-center gap-3">
             {saveStatus === "saving" && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <NavIcon name="sync" size={12} className="animate-spin" />
+                <span className="inline-flex animate-spin">
+                  <NavIcon name="sync" size={12} />
+                </span>
                 Saving…
               </span>
             )}
@@ -488,9 +489,24 @@ export function PostComposerModal({
         <div className="flex min-h-0 flex-1">
           {/* Left pane — editor (60%) */}
           <div className="flex w-[60%] flex-col gap-4 overflow-y-auto border-r border-white/10 p-6">
-            {isLoading ? (
+            {isLoadFailed && state.status === "load_failed" ? (
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+                <p className="text-sm text-destructive">
+                  {state.error.message}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void handleClose()}
+                  className="text-xs text-muted-foreground underline hover:text-foreground"
+                >
+                  Close
+                </button>
+              </div>
+            ) : isLoading ? (
               <div className="flex flex-1 items-center justify-center">
-                <NavIcon name="sync" size={24} className="animate-spin text-muted-foreground" />
+                <span className="inline-flex animate-spin text-muted-foreground">
+                  <NavIcon name="sync" size={24} />
+                </span>
               </div>
             ) : (
               <>
