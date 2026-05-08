@@ -3,10 +3,10 @@
 import type { ComposerMode } from "./scheduling-tabs";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 2 — ComposerActions.
+// Spec 22 PR 5 — ComposerActions.
 //
 // Primary action button (label changes per mode) + "Schedule & create another"
-// stub (PR 5 wires the "create another" behaviour).
+// (wired in PR 5: submits current draft then resets composer for a new draft).
 // ---------------------------------------------------------------------------
 
 const MODE_LABEL: Record<ComposerMode, string> = {
@@ -20,6 +20,7 @@ interface ComposerActionsProps {
   submitting: boolean;
   disabled: boolean;
   onSubmit: () => void;
+  onSubmitAndCreateAnother?: () => void;
 }
 
 export function ComposerActions({
@@ -27,16 +28,17 @@ export function ComposerActions({
   submitting,
   disabled,
   onSubmit,
+  onSubmitAndCreateAnother,
 }: ComposerActionsProps) {
   return (
     <div className="flex items-center gap-3">
-      {/* "Schedule & create another" — stub, PR 5 */}
-      {mode === "schedule" && (
+      {/* "Schedule & create another" — only in schedule mode */}
+      {mode === "schedule" && onSubmitAndCreateAnother && (
         <button
           type="button"
-          disabled
-          title="Coming in a future update"
-          className="rounded-md border border-white/10 px-4 py-2 text-sm text-muted-foreground/40"
+          onClick={onSubmitAndCreateAnother}
+          disabled={disabled || submitting}
+          className="rounded-md border border-white/10 px-4 py-2 text-sm text-muted-foreground hover:bg-white/5 hover:text-foreground disabled:opacity-40"
         >
           Schedule &amp; create another
         </button>

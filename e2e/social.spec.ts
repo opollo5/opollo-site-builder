@@ -96,4 +96,28 @@ test.describe("social platform", () => {
 
     await auditA11y(page, testInfo);
   });
+
+  test("timeline page loads with feed or empty state", async ({ page }, testInfo) => {
+    await page.goto("/company/social/timeline");
+    await expect(page).toHaveURL(/\/company\/social\/timeline/);
+
+    // Either a feed or an empty state must render.
+    const feed = page.getByTestId("timeline-feed");
+    const empty = page.getByTestId("timeline-empty");
+    await expect(feed.or(empty)).toBeVisible({ timeout: 15_000 });
+
+    // Shell toolbar must be present.
+    await expect(page.getByTestId("social-module-shell")).toBeVisible();
+
+    await auditA11y(page, testInfo);
+  });
+
+  test("timeline tab in shell navigation links to timeline", async ({ page }) => {
+    await page.goto("/company/social/posts");
+    await expect(page).toHaveURL(/\/company\/social\/posts/);
+
+    // Click the Timeline pill tab.
+    await page.getByRole("link", { name: /timeline/i }).click();
+    await expect(page).toHaveURL(/\/company\/social\/timeline/, { timeout: 10_000 });
+  });
 });

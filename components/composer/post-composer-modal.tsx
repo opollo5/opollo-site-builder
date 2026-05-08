@@ -272,10 +272,10 @@ export function PostComposerModal({
   });
 
   // ---------------------------------------------------------------------------
-  // Submit
+  // Submit (shared logic; createAnother = true resets for next draft)
   // ---------------------------------------------------------------------------
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (createAnother = false) => {
     const s = stateRef.current;
     if (s.status !== "editing" && s.status !== "saved") return;
 
@@ -329,12 +329,21 @@ export function PostComposerModal({
         toastSuccess("Post queued for publishing");
       }
 
-      // Close modal.
-      const url = new URL(window.location.href);
-      url.searchParams.delete("compose");
-      url.searchParams.delete("date");
-      router.replace(url.pathname + (url.search || ""), { scroll: false });
-      dispatch({ type: "RESET" });
+      if (createAnother) {
+        // Keep modal open with a fresh composer (triggers new draft creation).
+        const url = new URL(window.location.href);
+        url.searchParams.set("compose", "new");
+        url.searchParams.delete("date");
+        router.replace(url.pathname + url.search, { scroll: false });
+        dispatch({ type: "RESET" });
+      } else {
+        // Close modal.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("compose");
+        url.searchParams.delete("date");
+        router.replace(url.pathname + (url.search || ""), { scroll: false });
+        dispatch({ type: "RESET" });
+      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Submit failed.");
       dispatch({
@@ -621,6 +630,7 @@ export function PostComposerModal({
             submitting={submitting}
             disabled={!canSubmit}
             onSubmit={() => void handleSubmit()}
+            onSubmitAndCreateAnother={() => void handleSubmit(true)}
           />
         </div>
       </div>
