@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { Input } from "@/components/ui/input";
@@ -241,7 +242,7 @@ export function ToneOfVoiceInputs({
       void fetch(`/api/admin/sites/${siteId}/setup/apply-tone`, {
         method: "POST",
       }).catch(() => {});
-      toast.success("Tone of voice approved.");
+      toastSuccess("Tone of voice approved.");
       router.push(`/admin/sites/${siteId}/setup?step=3`);
       router.refresh();
     } catch (err) {

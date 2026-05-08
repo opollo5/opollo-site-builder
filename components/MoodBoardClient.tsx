@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import type { AspectRatio, CompositionType, StyleId } from "@/lib/image/types";
 
 // ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ export function MoodBoardClient({
     setSelectedIdx(idx);
     try {
       await navigator.clipboard.writeText(img.signedUrl);
-      toast.success("Image URL copied to clipboard.");
+      toastSuccess("Image URL copied to clipboard.");
     } catch {
       toast.error(
         "Could not copy to clipboard — check browser permissions.",

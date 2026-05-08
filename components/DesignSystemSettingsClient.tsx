@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
@@ -164,7 +165,7 @@ export function DesignSystemSettingsClient({ initialSettings }: Props) {
         const json: { ok: boolean; error?: { message: string } } = await res.json();
         if (!json.ok) throw new Error(json.error?.message ?? "Save failed");
         isDirty.current = false;
-        toast.success("Design system settings saved.");
+        toastSuccess("Design system settings saved.");
       } catch (err) {
         toast.error("Save failed", {
           description: err instanceof Error ? err.message : "Unknown error",

@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -66,7 +66,7 @@ export function SiteVoiceSettingsForm({
         | { ok: true; data: { brand_voice: string | null } }
         | { ok: false; error: { code: string; message: string } };
       if (payload.ok) {
-        toast.success("Voice settings saved", {
+        toastSuccess("Voice settings saved", {
           description:
             "New briefs on this site will inherit the updated defaults.",
         });

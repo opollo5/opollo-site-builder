@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -127,7 +127,7 @@ export function SocialConnectionsList({
         setError(msg);
         return;
       }
-      toast.success("Connections refreshed.");
+      toastSuccess("Connections refreshed.");
       router.refresh();
     } finally {
       setBusyTop(null);

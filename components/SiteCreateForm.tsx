@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -158,7 +158,7 @@ export function SiteCreateForm() {
         | { ok: false; error: { code: string; message: string } }
         | null;
       if (payload?.ok) {
-        toast.success("Site connected", {
+        toastSuccess("Site connected", {
           description: `${form.name} — choose how you want to use this site next.`,
         });
         // DESIGN-SYSTEM-OVERHAUL (PR 6) — fresh sites land on the

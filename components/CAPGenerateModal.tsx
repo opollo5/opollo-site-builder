@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -93,7 +93,7 @@ export function CAPGenerateModal({ open, companyId, onClose, onSuccess }: Props)
         setError(msg);
         return;
       }
-      toast.success(`${json.data.count} draft ${json.data.count === 1 ? "post" : "posts"} generated.`);
+      toastSuccess(`${json.data.count} draft ${json.data.count === 1 ? "post" : "posts"} generated.`);
       onSuccess(json.data.posts);
       reset();
       onClose();

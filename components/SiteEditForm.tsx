@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { toast } from "sonner";
+import { toastSuccess } from "@/lib/toast-success";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -234,7 +234,7 @@ export function SiteEditForm({
         | { ok: false; error: { code: string; message: string } }
         | null;
       if (payload?.ok) {
-        toast.success("Site updated", {
+        toastSuccess("Site updated", {
           description: form.passwordTouched
             ? "Credentials rotated."
             : "Changes saved.",

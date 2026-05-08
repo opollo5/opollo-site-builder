@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { Textarea } from "@/components/ui/textarea";
@@ -160,7 +161,7 @@ export function ConceptRefinementView({
         setApproving(false);
         return;
       }
-      toast.success("Design direction approved.");
+      toastSuccess("Design direction approved.");
       router.refresh();
       onApproved();
     } catch (err) {
@@ -364,7 +365,7 @@ export function ApprovedDesignReadout({
         setResetting(false);
         return;
       }
-      toast.success("Approved concept cleared. Generate or refine again.");
+      toastSuccess("Approved concept cleared. Generate or refine again.");
       router.refresh();
       onReset?.();
     } catch (err) {

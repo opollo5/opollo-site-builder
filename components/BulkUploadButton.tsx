@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import type { PostMasterListItem } from "@/lib/platform/social/posts";
 
 // ---------------------------------------------------------------------------
@@ -73,7 +74,7 @@ export function BulkUploadButton({ companyId, onSuccess }: Props) {
       setResult(data);
 
       if (data.created > 0) {
-        toast.success(
+        toastSuccess(
           `${data.created} post${data.created !== 1 ? "s" : ""} imported.`,
         );
         onSuccess(data.posts);
