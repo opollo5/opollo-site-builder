@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+
 type Progress = {
   total: number;
   done: number;
@@ -156,28 +158,27 @@ export function ImageMetadataJobTrigger() {
 
         <div className="flex shrink-0 gap-2">
           {autoRunning ? (
-            <button
-              onClick={stopAll}
-              className="rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10"
-            >
+            <Button variant="destructive" size="sm" onClick={stopAll}>
               Stop
-            </button>
+            </Button>
           ) : (
             <>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
                 onClick={() => void runBatch()}
                 disabled={running || isDone || !!noCreds || autoRunning}
-                className="rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50 hover:bg-muted"
               >
                 {running ? "Running…" : "Run one batch"}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
                 onClick={() => void runAll()}
                 disabled={running || isDone || !!noCreds || autoRunning}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50 hover:bg-primary/90"
               >
                 {isDone ? "All done ✓" : "Extract all"}
-              </button>
+              </Button>
             </>
           )}
         </div>

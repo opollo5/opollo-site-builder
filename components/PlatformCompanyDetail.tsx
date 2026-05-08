@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
+import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
 import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
@@ -49,22 +50,14 @@ export function PlatformCompanyDetail({
               </p>
             </div>
             {isCurrentUserMember ? (
-              <Link
-                href="/company"
-                className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                data-testid="staff-go-to-platform-link"
-              >
-                Go to platform →
-              </Link>
+              <Button asChild data-testid="staff-go-to-platform-link">
+                <Link href="/company">Go to platform →</Link>
+              </Button>
             ) : joinAction ? (
               <form action={joinAction}>
-                <button
-                  type="submit"
-                  className="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                  data-testid="staff-join-button"
-                >
+                <Button type="submit" data-testid="staff-join-button">
                   Join as admin
-                </button>
+                </Button>
               </form>
             ) : null}
           </div>
@@ -203,12 +196,9 @@ function OverviewTab({
               Manage posts, connections, and scheduling for this company.
             </p>
           </div>
-          <Link
-            href="/company"
-            className="inline-flex items-center rounded-md border px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
-          >
-            Open platform →
-          </Link>
+          <Button asChild variant="secondary">
+            <Link href="/company">Open platform →</Link>
+          </Button>
         </div>
       </section>
     </div>

@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { Button } from "@/components/ui/button";
 import { H1, H3, Lead } from "@/components/ui/typography";
 import type { SocialAnalytics } from "@/lib/platform/social/analytics";
 
@@ -149,12 +150,9 @@ export function SocialAnalyticsClient({
           <p className="mt-1 text-sm text-muted-foreground">
             Create your first post to see analytics here.
           </p>
-          <Link
-            href="/company/social/posts"
-            className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Go to Posts
-          </Link>
+          <Button asChild className="mt-4">
+            <Link href="/company/social/posts">Go to Posts</Link>
+          </Button>
         </div>
       )}
 

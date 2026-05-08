@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { useAutoSave } from "@/lib/hooks/use-auto-save";
 import { useTabLeader } from "@/lib/hooks/use-tab-leader";
 
@@ -336,14 +337,13 @@ export function AutosaveLabClient() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <button
+        <Button
           type="button"
           onClick={runAll}
           disabled={isRunningAll && !allDone}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
           Run all 12 scenarios
-        </button>
+        </Button>
         {allDone && (
           <span className={`text-sm font-medium ${failCount === 0 ? "text-green-600" : "text-destructive"}`}>
             {passCount}/{scenarios.length} passed{failCount > 0 && ` -- ${failCount} failed`}
@@ -380,14 +380,16 @@ export function AutosaveLabClient() {
                 </p>
               )}
             </div>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => runScenario(s.id)}
               disabled={s.status === "running"}
-              className="shrink-0 rounded px-2 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"
+              className="shrink-0"
             >
               Run
-            </button>
+            </Button>
           </div>
         ))}
       </div>

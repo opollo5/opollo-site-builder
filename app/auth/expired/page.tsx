@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { H1, Lead } from "@/components/ui/typography";
 
@@ -105,12 +106,9 @@ export default function SessionExpiredPage({
 
         {/* CTA */}
         <div className="flex flex-col items-center gap-3">
-          <Link
-            href={loginHref}
-            className="inline-flex w-full items-center justify-center rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-smooth hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            Sign in again
-          </Link>
+          <Button asChild className="w-full">
+            <Link href={loginHref}>Sign in again</Link>
+          </Button>
           <p className="text-xs text-muted-foreground">
             Your work was auto-saved before sign-out.
           </p>

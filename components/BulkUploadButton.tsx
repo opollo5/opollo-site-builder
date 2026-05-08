@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { toastSuccess } from "@/lib/toast-success";
 import type { PostMasterListItem } from "@/lib/platform/social/posts";
 
@@ -119,23 +120,26 @@ export function BulkUploadButton({ companyId, onSuccess }: Props) {
         onChange={handleFile}
       />
       <div className="flex items-center gap-2">
-        <button
+        <Button
           type="button"
+          variant="secondary"
+          size="sm"
           onClick={openPicker}
           disabled={uploading}
           data-testid="bulk-upload-button"
-          className="inline-flex items-center rounded-md border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-50"
         >
           {uploading ? "Uploading…" : "Upload CSV"}
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          variant="link"
+          size="sm"
           onClick={downloadTemplate}
-          className="text-sm text-muted-foreground underline-offset-2 hover:underline"
+          className="text-muted-foreground"
           data-testid="bulk-template-download"
         >
           Download template
-        </button>
+        </Button>
       </div>
 
       {/* Upload error */}
