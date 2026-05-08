@@ -74,7 +74,7 @@ export function SitesFilterChips({
             className={cn(
               "inline-flex items-center rounded-full px-3 py-1 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
               isActive
-                ? "bg-[var(--brand-pink,#FF03A5)] text-white shadow-sm"
+                ? "bg-[var(--brand-pink)] text-white shadow-sm"
                 : "border border-border text-muted-foreground hover:bg-muted",
             )}
           >

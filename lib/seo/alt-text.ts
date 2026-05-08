@@ -17,19 +17,21 @@ export interface DeriveAltTextInput {
 }
 
 export function deriveAltText(input: DeriveAltTextInput): string {
-  const seo = (input.seoTitle ?? "").trim();
+  const raw = input.seoTitle ?? "";
+  const seo = raw.trim();
   if (!seo) return input.postTitleFallback;
 
   const site = (input.siteName ?? "").trim();
   if (!site) return seo;
 
   // Strip trailing " {sep}{siteName}" — first matching separator wins,
-  // mirroring the order in the spec.
+  // mirroring the order in the spec. Match against the raw (untrimmed)
+  // value so leading whitespace in the title is preserved as-is.
   for (const sep of SEPARATORS) {
     const pattern = `${sep}${site}`;
-    if (seo.endsWith(pattern)) {
-      const stripped = seo.slice(0, seo.length - pattern.length).trim();
-      return stripped || seo;
+    if (raw.endsWith(pattern)) {
+      const stripped = raw.slice(0, raw.length - pattern.length).trim();
+      return stripped || raw;
     }
   }
   return seo;

@@ -8,6 +8,9 @@ import {
 } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+// revalidatePath throws outside Next.js App Router — suppress in tests.
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+
 import { __resetAuthKillSwitchCacheForTests } from "@/lib/auth-kill-switch";
 import { getServiceRoleClient } from "@/lib/supabase";
 

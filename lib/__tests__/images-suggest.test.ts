@@ -207,10 +207,12 @@ describe("POST /api/images/suggest", () => {
     const spy = vi
       .spyOn(embedMod, "embedText")
       .mockRejectedValueOnce(new embedMod.EmbeddingNotConfiguredError());
+    // Use terms that exist in the seeded phishing image ("phishing", "fraud")
+    // so plainto_tsquery returns at least one row on the keyword side.
     const res = await suggestPOST(
       makePost({
-        postTitle: "Phishing email basics",
-        postBody: "fraud",
+        postTitle: "Phishing fraud",
+        postBody: "phishing email fraud cybersecurity",
         limit: 3,
       }) as never,
     );

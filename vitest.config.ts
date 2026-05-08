@@ -2,6 +2,9 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
+  // tsconfig.json uses jsx: "preserve" for Next.js, but vitest's Vite
+  // bundler needs JSX transformed so .tsx imports work in server tests.
+  esbuild: { jsx: "automatic" },
   resolve: {
     // Array form so `server-only` can match a regex pattern. Next.js's
     // bundler resolves `server-only` via its `react-server` export
