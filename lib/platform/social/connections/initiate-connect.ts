@@ -95,15 +95,19 @@ export async function initiateBundlesocialConnect(
   // duplicate before Set collapses it).
   const bundlePlatforms = Array.from(new Set(rawPlatforms));
 
-  // PROBE: force single-platform to isolate whether socialAccountTypes is
-  // causing the tokenless-URL response. Remove after diagnosis.
+  // PROBE: isolate whether redirectUrl with a query string (?company_id=...)
+  // causes bundle.social to return a tokenless URL. Using a clean URL with
+  // no path and no query string — matches the direct curl test that worked.
+  // Also isolating socialAccountTypes to LINKEDIN only.
+  // Remove both hardcodes after diagnosis.
   const probePlatforms: ["LINKEDIN"] = ["LINKEDIN"];
+  const probeRedirectUrl = "https://example.com";
 
   try {
     const response = await client.socialAccount.socialAccountCreatePortalLink({
       requestBody: {
         teamId,
-        redirectUrl: input.redirectUrl,
+        redirectUrl: probeRedirectUrl,
         socialAccountTypes: probePlatforms,
         userName: input.userName ?? undefined,
         userLogoUrl: input.userLogoUrl ?? undefined,
