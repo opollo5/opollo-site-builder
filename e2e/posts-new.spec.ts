@@ -112,9 +112,12 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await firstOption.click();
 
     // Sidebar document panels are visible from the start.
+    // Spec 11: slug + permalink moved into the SEO section in the main
+    // column; the right-rail Permalink panel was removed.
     await expect(page.getByTestId("post-sidebar")).toBeVisible();
     await expect(page.getByTestId("sidebar-publish")).toBeVisible();
-    await expect(page.getByTestId("sidebar-permalink")).toBeVisible();
+    await expect(page.getByTestId("seo-section")).toBeVisible();
+    await expect(page.locator("#post-slug")).toBeVisible();
 
     // Type into the composer (TipTap ProseMirror). Use pressSequentially so
     // TipTap's key-event handlers fire and update the React state that the
@@ -213,14 +216,17 @@ test.describe("/admin/posts/new — top-level entry", () => {
       .click();
 
     // All default-open panels are visible.
+    // Spec 11: Permalink panel removed from the sidebar — slug now lives
+    // inside the SEO section in the main column.
     const publishPanel = page.getByTestId("sidebar-publish");
-    const permalinkPanel = page.getByTestId("sidebar-permalink");
+    const seoSection = page.getByTestId("seo-section");
     const categoriesPanel = page.getByTestId("sidebar-categories");
     const tagsPanel = page.getByTestId("sidebar-tags");
     const featuredImagePanel = page.getByTestId("sidebar-featured-image");
 
     await expect(publishPanel).toBeVisible();
-    await expect(permalinkPanel).toBeVisible();
+    await expect(seoSection).toBeVisible();
+    await expect(seoSection.locator("#post-slug")).toBeVisible();
     await expect(categoriesPanel).toBeVisible();
     await expect(tagsPanel).toBeVisible();
     await expect(featuredImagePanel).toBeVisible();
@@ -246,8 +252,6 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
 
     // SEO section is now full-width below the editor grid (not a collapsible sidebar panel).
-    const seoSection = page.getByTestId("seo-section");
-    await expect(seoSection).toBeVisible();
     await expect(seoSection.locator("#post-meta-title")).toBeVisible();
     await expect(seoSection.locator("#post-meta-description")).toBeVisible();
 
