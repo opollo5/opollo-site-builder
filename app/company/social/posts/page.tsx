@@ -110,7 +110,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
     );
   }
 
-  const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
+  const composerEnabled = process.env.FEATURE_COMPOSER_V2 !== "false";
 
   return (
     <SocialPostsListClient

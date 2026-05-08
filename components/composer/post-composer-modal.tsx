@@ -11,6 +11,8 @@ import type { DraftData } from "@/lib/platform/social/drafts";
 import type { SocialConnection } from "@/lib/platform/social/connections/types";
 import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
+import { AiAssistantPanel } from "./ai-assistant-panel";
+import type { AiMeta } from "./ai-assistant-panel";
 import { ApprovalToggle } from "./approval-toggle";
 import { ComposerActions } from "./composer-actions";
 import { ComposerPreview } from "./composer-preview";
@@ -68,6 +70,9 @@ export function PostComposerModal({
 
   // Connections list — loaded by ProfileSelector, also needed for publish call.
   const [connections, setConnections] = useState<SocialConnection[]>([]);
+
+  // AI assistant panel open/close.
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Initialise: create or load draft on mount
@@ -155,6 +160,25 @@ export function PostComposerModal({
     if (s.status !== "editing" && s.status !== "saved") return;
     const text = s.draft.draft_data.master_text ?? "";
     dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text + emoji } });
+  }, []);
+
+  const aiReplace = useCallback((text: string, meta: AiMeta) => {
+    dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text, ai_metadata: { prompt: meta.prompt, tone: meta.tone, generated_at: meta.generated_at } } });
+    setAiPanelOpen(false);
+  }, []);
+
+  const aiAppend = useCallback((text: string, meta: AiMeta) => {
+    const s = stateRef.current;
+    if (s.status !== "editing" && s.status !== "saved") return;
+    const current = s.draft.draft_data.master_text ?? "";
+    dispatch({
+      type: "UPDATE_DRAFT",
+      patch: {
+        master_text: current ? `${current}\n\n${text}` : text,
+        ai_metadata: { prompt: meta.prompt, tone: meta.tone, generated_at: meta.generated_at },
+      },
+    });
+    setAiPanelOpen(false);
   }, []);
 
   // Keep schedule in draft_data for autosave.
@@ -248,10 +272,10 @@ export function PostComposerModal({
   });
 
   // ---------------------------------------------------------------------------
-  // Submit
+  // Submit (shared logic; createAnother = true resets for next draft)
   // ---------------------------------------------------------------------------
 
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (createAnother = false) => {
     const s = stateRef.current;
     if (s.status !== "editing" && s.status !== "saved") return;
 
@@ -305,12 +329,21 @@ export function PostComposerModal({
         toastSuccess("Post queued for publishing");
       }
 
-      // Close modal.
-      const url = new URL(window.location.href);
-      url.searchParams.delete("compose");
-      url.searchParams.delete("date");
-      router.replace(url.pathname + (url.search || ""), { scroll: false });
-      dispatch({ type: "RESET" });
+      if (createAnother) {
+        // Keep modal open with a fresh composer (triggers new draft creation).
+        const url = new URL(window.location.href);
+        url.searchParams.set("compose", "new");
+        url.searchParams.delete("date");
+        router.replace(url.pathname + url.search, { scroll: false });
+        dispatch({ type: "RESET" });
+      } else {
+        // Close modal.
+        const url = new URL(window.location.href);
+        url.searchParams.delete("compose");
+        url.searchParams.delete("date");
+        router.replace(url.pathname + (url.search || ""), { scroll: false });
+        dispatch({ type: "RESET" });
+      }
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Submit failed.");
       dispatch({
@@ -540,8 +573,20 @@ export function PostComposerModal({
                 {/* Tools row */}
                 <ToolsRow
                   onEmojiInsert={insertEmoji}
+                  onAIAssistant={() => setAiPanelOpen((v) => !v)}
                   disabled={submitting}
                 />
+
+                {/* AI assistant inline panel */}
+                {aiPanelOpen && (
+                  <AiAssistantPanel
+                    companyId={companyId}
+                    correlationId={correlationId}
+                    onReplace={aiReplace}
+                    onAppend={aiAppend}
+                    onClose={() => setAiPanelOpen(false)}
+                  />
+                )}
 
                 {/* Approval toggle */}
                 <ApprovalToggle
@@ -585,6 +630,7 @@ export function PostComposerModal({
             submitting={submitting}
             disabled={!canSubmit}
             onSubmit={() => void handleSubmit()}
+            onSubmitAndCreateAnother={() => void handleSubmit(true)}
           />
         </div>
       </div>
