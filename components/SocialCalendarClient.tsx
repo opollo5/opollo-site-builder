@@ -56,11 +56,11 @@ const MAX_CHIPS = 3;
 const DAY_HEADERS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const CHIP_CLASS: Record<SocialPlatform, string> = {
-  linkedin_personal: "bg-blue-500/20 text-blue-300",
-  linkedin_company: "bg-blue-500/20 text-blue-300",
-  facebook_page: "bg-indigo-500/20 text-indigo-300",
-  x: "bg-white/10 text-white/70",
-  gbp: "bg-emerald-500/20 text-emerald-300",
+  linkedin_personal: "bg-blue-100 text-blue-700",
+  linkedin_company: "bg-blue-100 text-blue-700",
+  facebook_page: "bg-indigo-100 text-indigo-700",
+  x: "bg-gray-100 text-gray-700",
+  gbp: "bg-emerald-100 text-emerald-700",
 };
 
 const PLATFORM_ABBR: Record<SocialPlatform, string> = {
@@ -121,14 +121,14 @@ function DayOverflowPopover({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="mt-0.5 w-full rounded px-1 py-0.5 text-left text-xs text-m3 transition-colors hover:bg-white/[0.05] hover:text-white"
+          className="mt-0.5 w-full rounded px-1 py-0.5 text-left text-xs text-tx-muted transition-colors hover:bg-[#F3F4F6] hover:text-tx-primary"
           data-testid={`calendar-overflow-${dayKey}`}
         >
           +{overflowCount} more
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-72 p-2" side="right" align="start">
-        <p className="mb-2 px-1 text-xs font-medium text-m3">
+        <p className="mb-2 px-1 text-xs font-medium text-tx-muted">
           All posts — {dayKey}
         </p>
         <ul className="space-y-1">
@@ -374,20 +374,20 @@ export function SocialCalendarClient({
       <div data-testid="social-calendar">
         {/* Grid */}
         <div
-          className="overflow-hidden rounded-lg border border-white/[0.06]"
+          className="overflow-hidden rounded-lg border border-[#E5E7EB]"
           role="grid"
           aria-label={`Calendar for ${monthLabel}`}
         >
           {/* Day-of-week header */}
           <div
-            className="grid grid-cols-7 border-b border-white/[0.06] bg-white/[0.04]"
+            className="grid grid-cols-7 border-b border-[#E5E7EB] bg-gray-50"
             role="row"
           >
             {DAY_HEADERS.map((d) => (
               <div
                 key={d}
                 role="columnheader"
-                className="px-2 py-1.5 text-center text-xs font-medium uppercase tracking-wide text-m3"
+                className="px-2 py-1.5 text-center text-xs font-medium tracking-wide text-tx-muted"
               >
                 {d}
               </div>
@@ -406,6 +406,8 @@ export function SocialCalendarClient({
               const isLastRow = idx >= 35;
               const isLastCol = idx % 7 === 6;
 
+              const isPast = dayKey < todayKey;
+
               return (
                 <div
                   key={dayKey}
@@ -413,8 +415,8 @@ export function SocialCalendarClient({
                   data-testid={`calendar-day-${dayKey}`}
                   className={cn(
                     "group min-h-[6rem] p-1.5",
-                    !isLastRow && "border-b border-white/[0.06]",
-                    !isLastCol && "border-r border-white/[0.06]",
+                    !isLastRow && "border-b border-[#E5E7EB]",
+                    !isLastCol && "border-r border-[#E5E7EB]",
                     !inMonth && "opacity-30",
                   )}
                 >
@@ -425,14 +427,18 @@ export function SocialCalendarClient({
                       href="/company/social/posts"
                       tabIndex={-1}
                       aria-label={`Create post for ${dayKey}`}
-                      className="invisible flex h-5 w-5 items-center justify-center rounded-full text-m3 transition-colors hover:bg-white/10 hover:text-white group-hover:visible"
+                      className="invisible flex h-5 w-5 items-center justify-center rounded-full text-tx-muted transition-colors hover:bg-[#F3F4F6] hover:text-tx-primary group-hover:visible"
                     >
                       <NavIcon name="plus" size={12} />
                     </Link>
                     <span
                       className={cn(
-                        "inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium",
-                        isToday ? "bg-pk text-white" : "text-m2",
+                        "inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium",
+                        isToday
+                          ? "bg-[#00e5a0] text-white"
+                          : isPast
+                            ? "text-tx-muted"
+                            : "text-tx-secondary",
                       )}
                     >
                       {day.getDate()}
@@ -484,7 +490,7 @@ export function SocialCalendarClient({
         {/* Total count */}
         {entries.length > 0 && (
           <p
-            className="mt-3 text-right text-xs text-m3"
+            className="mt-3 text-right text-xs text-tx-muted"
             data-testid="calendar-count"
           >
             {entries.length} {entries.length === 1 ? "post" : "posts"} this
