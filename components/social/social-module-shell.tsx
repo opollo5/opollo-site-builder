@@ -47,7 +47,7 @@ export function SocialModuleShell({
 }: SocialModuleShellProps) {
   const newPostHref = composerEnabled
     ? "?compose=new"
-    : "/company/social/posts/new";
+    : "/company/social/posts";
 
   return (
     <div data-testid="social-module-shell">
