@@ -7,6 +7,19 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
 ---
+## Session B
+- Started: 2026-05-08 UTC
+- Branch: feat/spec22-pr3-preview-pane
+- Slice: Spec 22 PR 3 — preview pane (ComposerPreview, LivePreviewCard, MiniCalendarPreview)
+- Files claimed:
+  - components/composer/composer-preview.tsx
+  - components/composer/live-preview-card.tsx
+  - components/composer/mini-calendar-preview.tsx
+  - components/composer/post-composer-modal.tsx
+- Expected completion: same session
+---
+
+---
 ## Session A
 - Started: 2026-05-08 UTC
 - Branch: feat/ui-consistency-s1-visual-regression
