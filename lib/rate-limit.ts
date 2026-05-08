@@ -44,6 +44,7 @@ export type LimiterName =
   | "admin_write"
   | "briefs_upload"
   | "cap_generate"
+  | "cap_assist"
   | "approval_decision";
 
 type LimiterConfig = {
@@ -103,6 +104,9 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // 5 posts; 10/company/24 h caps runaway spend while leaving headroom
   // for daily editorial use. Keyed on "company:<uuid>".
   cap_generate: { requests: 10, window: "24 h" },
+  // Spec 22 PR 4: inline AI assist in composer. 30 calls/company/hour —
+  // lighter than CAP generate (no DB rows); covers rapid "regenerate" use.
+  cap_assist: { requests: 30, window: "1 h" },
   // B-8: public approval decision endpoint. 256-bit token keyspace makes
   // brute-force infeasible; this per-IP cap is defence-in-depth against
   // credential-stuffing / automated replay. 20/hour matches invite_accept.
