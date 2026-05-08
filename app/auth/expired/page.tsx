@@ -7,16 +7,24 @@ import { H1, Lead } from "@/components/ui/typography";
 // /auth/expired — Spec 14 PR C.
 //
 // Cybersecurity-explainer page for cap-driven logouts. Shown when:
-//   • The 15-minute grace period after session expiry elapses (hardLogout
-//     in use-session-expiry.ts redirects here).
+//   • The 15-minute non-renewable activity grace elapses, OR
+//   • The operator was inactive at T-0 and was hard-logged-out immediately.
+//
+// Both code paths route through SessionExpiryWatcher's hard-logout effect
+// (PR B, components/session/session-expiry-watcher.tsx), which calls
+// supabase.auth.signOut() and redirects here with returnTo preserved.
 //
 // NOT shown for:
-//   • User-initiated sign-out → /login
-//   • Suspension / password change → /login (admin-forced revocation)
+//   • User-initiated sign-out → /login (no policy explainer needed)
+//   • Suspension / password change → /login (admin-forced revocation;
+//     different copy, separate UX)
 //
 // The three-bullet rationale is required copy per the Spec 14 brief.
 // It explains WHY the 48-hour cap exists so operators understand this is
-// a deliberate security policy, not a bug or server error.
+// a deliberate security policy, not a bug or server error. Force-static
+// because the page has no per-user content — it can be cached at the
+// edge and served without hitting the auth layer (which the operator
+// has just been kicked out of).
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-static";
@@ -39,7 +47,27 @@ const WHY_BULLETS = [
   },
 ] as const;
 
-export default function SessionExpiredPage() {
+interface SearchParams {
+  returnTo?: string;
+}
+
+export default function SessionExpiredPage({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) {
+  // returnTo is preserved through the cap-driven logout flow so the
+  // operator lands back on the same page after re-auth. Defensive
+  // validation: only accept paths that start with "/" and not "//"
+  // (which would resolve as a protocol-relative external URL). Anything
+  // else falls back to /admin.
+  const returnToRaw = searchParams?.returnTo ?? "/admin";
+  const returnToSafe =
+    returnToRaw.startsWith("/") && !returnToRaw.startsWith("//")
+      ? returnToRaw
+      : "/admin";
+  const loginHref = `/login?returnTo=${encodeURIComponent(returnToSafe)}`;
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-lg space-y-8">
@@ -78,7 +106,7 @@ export default function SessionExpiredPage() {
         {/* CTA */}
         <div className="flex flex-col items-center gap-3">
           <Link
-            href="/login"
+            href={loginHref}
             className="inline-flex w-full items-center justify-center rounded-md bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground shadow-sm transition-smooth hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             Sign in again
