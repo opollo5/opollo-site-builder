@@ -95,7 +95,7 @@ export function CompanySelector({
         <span
           className={cn(
             "flex-1 truncate text-left font-medium",
-            companyName ? "text-foreground" : "text-m2",
+            companyName ? "text-foreground" : "text-tx-secondary",
           )}
         >
           {switching ? "Switching…" : (companyName ?? "Select company")}
@@ -118,7 +118,7 @@ export function CompanySelector({
             aria-selected={!companyId}
             type="button"
             onClick={() => selectCompany(null)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-m3 transition-colors hover:bg-muted hover:text-foreground"
+            className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-tx-muted transition-colors hover:bg-muted hover:text-foreground"
           >
             {!companyId ? (
               <NavIcon name="check" size={12} className="shrink-0 text-pk" />
@@ -130,9 +130,9 @@ export function CompanySelector({
           <div className="border-t border-border" />
 
           {companiesLoading ? (
-            <p className="px-3 py-2 text-xs text-m3">Loading…</p>
+            <p className="px-3 py-2 text-xs text-tx-muted">Loading…</p>
           ) : companies.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-m3">No companies found.</p>
+            <p className="px-3 py-2 text-xs text-tx-muted">No companies found.</p>
           ) : (
             <ul className="max-h-64 overflow-y-auto">
               {companies.map((c) => {
@@ -146,7 +146,7 @@ export function CompanySelector({
                       onClick={() => selectCompany(c.id)}
                       className={cn(
                         "flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                        isSelected ? "text-pk" : "text-m2 hover:text-foreground",
+                        isSelected ? "text-pk" : "text-tx-secondary hover:text-foreground",
                       )}
                     >
                       {isSelected ? (
