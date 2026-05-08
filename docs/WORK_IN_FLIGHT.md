@@ -8,21 +8,24 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 ---
 ## Session A
-- Started: 2026-05-08 06:00 UTC
-- Branch: feat/spec22-pr1-composer-shell
-- Slice: Spec 22 PR 1 — composer shell + URL wiring + draft persistence layer
+- Started: 2026-05-08 07:30 UTC
+- Branch: feat/spec22-pr2-core-editor
+- Slice: Spec 22 PR 2 — core editor (ProfileSelector, ComposerTextarea, ImageUploadZone, ToolsRow, SchedulingTabs, submit wiring)
 - Files claimed:
-  - supabase/migrations/0112_social_post_drafts.sql
-  - lib/platform/social/drafts.ts
-  - components/composer/use-composer-reducer.ts
-  - components/composer/post-composer-modal.tsx
-  - components/composer/composer-mount.tsx
-  - app/api/platform/social/drafts/route.ts
-  - app/api/platform/social/drafts/[id]/route.ts
-  - app/company/social/layout.tsx
-  - components/SocialCalendarClient.tsx (New post button only)
-  - components/SocialPostsListClient.tsx (New post button only)
-  - lib/tool-schemas.ts (DRAFT_CONFLICT code addition)
+  - components/composer/profile-selector.tsx
+  - components/composer/composer-textarea.tsx
+  - components/composer/image-upload-zone.tsx
+  - components/composer/tools-row.tsx
+  - components/composer/scheduling-tabs.tsx
+  - components/composer/approval-toggle.tsx
+  - components/composer/composer-actions.tsx
+  - components/composer/post-composer-modal.tsx (left-pane wiring only)
+  - app/api/platform/social/drafts/[id]/publish/route.ts
+  - app/api/platform/social/media/upload/route.ts
+  - app/api/platform/social/cap/generate-image/route.ts
+  - supabase/migrations/0113_social_media_uploads_bucket.sql
+- Migration number reserved: 0113
+- Expected completion: same session
 - Migration number reserved: 0112
 - Expected completion: same session
 ---
@@ -64,7 +67,8 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0071 — S1-5 submit_post_for_approval transactional function.~~ Shipped in #412.
 - ~~0072 — S1-7 record_approval_decision transactional function.~~ Shipped in #415.
 - ~~0073 — S1-10 cancel_post_approval transactional function.~~ Shipped (0073_cancel_post_approval_fn.sql in main).
-- 0112 — Session A — Spec 22 PR 1 social_post_drafts table (branch: feat/spec22-pr1-composer-shell)
+- ~~0112 — Session A — Spec 22 PR 1 social_post_drafts table (branch: feat/spec22-pr1-composer-shell).~~ Shipped in #789.
+- 0113 — Session A — Spec 22 PR 2 social-media-uploads storage bucket (branch: feat/spec22-pr2-core-editor)
 
 ## Claim block template
 
