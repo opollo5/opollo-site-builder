@@ -253,6 +253,16 @@ Composer-only — published-post renderer untouched. Spec 02 type-floor preserve
 
 The 2026-05-08 master brief flagged Specs 11 and 12 as "Depends on: Spec 10 / Spec 13." On inspection both dependencies turned out to be loose: Spec 10's "panel primitive" is the existing composer sidebar (already built), and Spec 12's column-width target works with a layout-grid clamp regardless of whatever Spec 13 ultimately reshapes.
 
-## Blockers
+## Tier-2 toast sweep + auto-save adoption (closed 2026-05-08)
 
-Spec 05 PR C (telemetry-gated); trusted-devices reconsideration (Steven's call); auto-save adoption to BlogPostComposer (deferred — file is parallel-session hot-shared, follow-up slice). See `_blockers.md`.
+Both items the previous "Blockers" line listed as deferred have now shipped:
+
+| Item | PR | Notes |
+|---|---|---|
+| Tier-2 `toast.success` → `toastSuccess` sweep | #782 | 18 files. `lib/toast-success.ts` extended with `duration` + `id` passthrough so the helper covers every option the existing call sites passed. Behaviour-only change. |
+| Server-side autosave endpoint | #783 (also #784, duplicate) | `POST /api/sites/[id]/posts/[post_id]/autosave`. Last-write-wins partial PATCH; rejects already-published posts so the publish/unpublish CAS routes are never bypassed. 11-case mock test. |
+| Auto-save consumer surface | #787 (manual review) | `components/PostDraftEditor.tsx` — first real consumer of `useAutoSave` (#772) + the autosave endpoint. Mounts on `PostDetailClient` when `post.status === 'draft'`. Title + RichTextEditor with cadence-escalating server flushes. |
+
+## Blockers (genuinely external)
+
+Spec 05 PR C (telemetry-gated); trusted-devices reconsideration (Steven's call). See `_blockers.md`.

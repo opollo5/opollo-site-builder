@@ -1,6 +1,12 @@
 # Spec run blockers
 
-## Spec 14 PR B — auto-save surface adoption (deferred to a follow-up slice)
+## ~~Spec 14 PR B — auto-save surface adoption~~ (RESOLVED 2026-05-08, PRs #783 + #787)
+
+PR #783 shipped the autosave endpoint (`POST /api/sites/[id]/posts/[post_id]/autosave`) — last-write-wins partial PATCH; rejects already-published posts so the publish/unpublish CAS routes are never bypassed. PR #787 ships the first consumer surface — `PostDraftEditor` mounted on `PostDetailClient` when `post.status === 'draft'`. Title + RichTextEditor with cadence-escalating server flushes via `useAutoSave` (#772). Other long-form surfaces (wizards, multi-field forms) remain deferred — see entries below.
+
+Original deferral note kept for context:
+
+## ~~Spec 14 PR B — auto-save surface adoption (deferred to a follow-up slice)~~ (resolved per above)
 
 **Date:** 2026-05-08
 
@@ -30,39 +36,37 @@ Until adoption ships, the PR B infrastructure is **inert** — no surface uses `
 
 The 2026-05-08 master brief covered eight specs (06, 07, 09, 08, 11, 12, 14, plus a conditional Spec 05 PR C). This session shipped six PRs against the truly-independent specs; the rest are deferred for the reasons below.
 
-### Spec 11 — Yoast-style SEO panel (deferred)
+### ~~Spec 11 — Yoast-style SEO panel~~ (RESOLVED 2026-05-08, PR #778)
 
-Depends on Spec 10 (composer right-sidebar panel primitive). Spec 10 is being executed by a parallel session and is not yet in main. Once Spec 10 lands, Spec 11 can ship per its plan in the master brief: Google search preview at top, live length progress bars under SEO title + meta description (heuristic thresholds with qualifying language — "typically good" not "ideal"), no collapsible header, field order Google preview → SEO title → Slug → Meta description, Mobile/Desktop toggle dropped.
+The "blocked on Spec 10" status turned out to be loose: the existing composer sidebar already provides the panel surface. Shipped: `lib/seo/length-feedback.ts` with heuristic bucket maps (qualifying language, "typically good" not "ideal"), `<SeoLengthFeedback>` progress-bar component, rebuilt SEO section with field order locked to **Google preview → SEO title → Slug → Meta description**, slug input MOVED into the SEO section (Permalink panel removed), `<GoogleSnippetPreview>` enhanced with site-identity row + 80×80 right-aligned featured-image thumbnail. 23-case unit test on length-feedback heuristics.
 
-### Spec 12 — Composer typography + column width (deferred)
+### ~~Spec 12 — Composer typography + column width~~ (RESOLVED 2026-05-08, PR #779)
 
-Depends on Spec 13 (composer right column work that frees the layout's right edge). Spec 13 is also in flight on a parallel session. Once Spec 13 lands: title input 40px desktop / 32px mobile (700 weight), body editor 18px / 1.7, prose-style overrides scoped to `.composer-editor-content` in `app/globals.css`, main column 760–800px desktop with 300px sidebar + 32–40px gap. **Composer-only — do NOT change the published post renderer.**
+Same loose-dependency story for Spec 13. Shipped: `app/globals.css` `.composer-editor-content` overrides + `.composer-title-input` (32px mobile / 40px ≥1024px / 700 / 1.2). `RichTextEditor.tsx` adds the class; `BlogPostComposer.tsx` form grid → `lg:grid-cols-[minmax(0,800px)_300px] lg:gap-10`. Composer-only — published post renderer untouched.
 
 ### Spec 05 PR C (conditional) — caption-quality follow-up (deferred)
 
 The master brief gates this PR on >5% of `image_library` rows missing captions in production telemetry. The parallel session has already landed Spec 05 polish work (#752, #753, #754, #756 — picker debounce + suggest RPC vector array fix + bounded fetches + spec-aligned empty state). The caption-quality PR is conditional on Axiom telemetry that doesn't yet exist; defer until the data is available.
 
-### Spec 14 PR B (shipped — pending manual review merge)
+### ~~Spec 14 PR B~~ (RESOLVED 2026-05-08, MERGED #772)
 
-PR B (#772) shipped: `lib/hooks/use-activity.ts` (60s active window; keydown / mousedown / pointerdown / touchstart — NOT mousemove), `lib/hooks/use-auto-save.ts` (dirty-state guard + localStorage leader election + visibility-aware cadence), extended `useSessionExpiry` with 15-minute non-renewable grace period, `SessionGraceBanner`, and `hardLogout()`. Awaiting Steven's manual review + merge.
+`lib/hooks/use-activity.ts`, `lib/hooks/use-session-grace.ts`, `lib/hooks/use-tab-leader.ts`, `lib/hooks/use-auto-save.ts`, `SessionGraceBanner`, hard-logout enforcement in `SessionExpiryWatcher`. All shipped + merged.
 
-**Auto-save sweep findings (PR B):** BlogPostComposer already has localStorage-backed cadence-bumping wired up correctly. No server-side auto-save handler needed for current surfaces — existing patterns are sufficient. The `_blockers.md` note for surfaces-lacking-auto-save has no current entries.
+### ~~Spec 14 PR C~~ (RESOLVED 2026-05-08, MERGED #773 + #775)
 
-### Spec 14 PR C (shipped — pending manual review merge)
+`app/auth/expired/page.tsx` with cybersecurity-explainer copy (three-bullet rationale). `SessionExpiryWatcher` retargeted to redirect cap-driven logouts to `/auth/expired?returnTo=...` (#775); `returnTo` defended against absolute / protocol-relative URLs.
 
-PR C (#773) shipped: `app/auth/expired/page.tsx` with cybersecurity-explainer copy (three-bullet rationale: session-hijacking protection, compliance alignment, credential freshness). Force-static, no nav chrome. `hardLogout()` in `SessionExpiryWatcher` redirects here when grace elapses. Awaiting Steven's manual review + merge.
+### ~~Spec 08 surface sweep~~ (RESOLVED 2026-05-08, PRs #774 + #776 + #782)
 
-### Spec 08 surface sweep (partially shipped)
+All five Tier-1 surfaces wired with `<SuccessMoment>`:
+- Post-publish hero (PostDetailClient) — #774
+- Batch-completion hero (BatchSuccessMoment) — #774
+- First site connected (`/admin/sites/[id]/onboarding?fresh=1`) — #776
+- First customer onboarded (`/admin/companies?created=...`) — #776
+- Optimiser proposal applied (`/optimiser/proposals/[id]`) — #776
+- Brief-run completed — parallel session (#764)
 
-The primitive layer shipped (#762 — `SuccessMoment`, `useFirstTime`, `celebrate`, `toastSuccess`). This PR (feat/spec08-surface-sweep) ships:
-- Post-publish hero in `PostDetailClient` — SuccessMoment with `firstTimeKey="post-published:{id}"`
-- Batch-completion hero in batch detail page — new `BatchSuccessMoment` client component
-
-**Deferred Tier-1 surfaces (no existing implementation; need new work):**
-- **First-site-connection:** No trigger point exists in the current UI. The sites list (`app/admin/sites/page.tsx`) and site detail (`app/admin/sites/[id]/page.tsx`) don't track whether a WP connection is "first". Would need a `firstTimeKey="wp-connected:{siteId}"` trigger wired into the WP credential save flow. Defer to a targeted follow-up.
-- **First-customer-onboarded:** No "customer onboarded" milestone event exists on any current surface. Would require identifying where company/customer onboarding completes and adding a `firstTimeKey` there. Defer to a targeted follow-up.
-
-**toastSuccess standardization:** `PostDetailClient` migrated from `toast.success` → `toastSuccess`. Full sweep of remaining `toast.success` calls across other files is deferred to a separate cleanup PR.
+**Tier-2 toast.success → toastSuccess sweep:** RESOLVED via #782 (18 files swept; `lib/toast-success.ts` extended with `duration` + `id` passthrough so the helper covers every option the existing call sites passed; behaviour-only change).
 
 ### Trusted-devices feature reconsideration after 48h cap (Spec 14 follow-up)
 
