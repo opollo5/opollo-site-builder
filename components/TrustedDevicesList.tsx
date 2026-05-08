@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatRelativeTime } from "@/lib/utils";
@@ -52,7 +53,7 @@ export function TrustedDevicesList({
         });
         return;
       }
-      toast.success(`${label} signed out.`);
+      toastSuccess(`${label} signed out.`);
       router.refresh();
     } finally {
       setRevokingId(null);
@@ -75,7 +76,7 @@ export function TrustedDevicesList({
         });
         return;
       }
-      toast.success(
+      toastSuccess(
         `${payload.data.revoked_count} other ${payload.data.revoked_count === 1 ? "device" : "devices"} signed out.`,
       );
       router.refresh();

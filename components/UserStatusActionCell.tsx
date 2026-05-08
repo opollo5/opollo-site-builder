@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 
 // ---------------------------------------------------------------------------
@@ -48,7 +49,7 @@ export function UserStatusActionCell({
         });
         return;
       }
-      toast.success("User reinstated");
+      toastSuccess("User reinstated");
       router.refresh();
     } catch (err) {
       setOptimisticRevoked(true);
@@ -103,7 +104,7 @@ export function UserStatusActionCell({
           onSuccess={() => {
             setRevokeOpen(false);
             setOptimisticRevoked(true);
-            toast.success("User revoked");
+            toastSuccess("User revoked");
             router.refresh();
           }}
         />

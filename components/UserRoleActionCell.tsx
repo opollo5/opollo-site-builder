@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
+
 // AUTH-FOUNDATION P3 — role enum migrated from
 // (admin, operator, viewer) to (super_admin, admin, user).
 // super_admin is the locked top tier; this dropdown only offers
@@ -73,7 +75,7 @@ export function UserRoleActionCell({
         });
         return;
       }
-      toast.success(`Role updated to ${newRole}`);
+      toastSuccess(`Role updated to ${newRole}`);
       // Server-rendered list still reflects the old role until refresh;
       // re-fetch so the rest of the table catches up.
       router.refresh();

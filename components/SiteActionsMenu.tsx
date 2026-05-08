@@ -11,6 +11,7 @@ import {
 } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { translateTestConnectionErrorCode } from "@/lib/error-translations";
@@ -116,7 +117,7 @@ export function SiteActionsMenu({
         | { ok: false; errorCode?: string }
         | null;
       if (payload && payload.ok === true) {
-        toast.success("Connection healthy");
+        toastSuccess("Connection healthy");
         // Refresh the row so the "Last tested" cell updates from the
         // freshly written timestamp.
         router.refresh();
@@ -250,7 +251,7 @@ export function SiteActionsMenu({
           onClose={() => setDeleteOpen(false)}
           onSuccess={() => {
             setDeleteOpen(false);
-            toast.success("Site deleted permanently");
+            toastSuccess("Site deleted permanently");
             router.refresh();
           }}
         />

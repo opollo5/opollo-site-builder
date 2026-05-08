@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { ChangeUserRoleModal } from "@/components/ChangeUserRoleModal";
 import { NavIcon } from "@/components/ui/nav-icon";
@@ -68,7 +69,7 @@ export function UserActionsMenu({
         });
         return;
       }
-      toast.success("User reinstated");
+      toastSuccess("User reinstated");
       router.refresh();
     } catch (err) {
       toast.error("Network error reinstating user", {
@@ -120,7 +121,7 @@ export function UserActionsMenu({
           onClose={() => setRoleModalOpen(false)}
           onSuccess={() => {
             setRoleModalOpen(false);
-            toast.success(`Role updated for ${email}`);
+            toastSuccess(`Role updated for ${email}`);
             router.refresh();
           }}
         />
@@ -137,7 +138,7 @@ export function UserActionsMenu({
           onClose={() => setRevokeOpen(false)}
           onSuccess={() => {
             setRevokeOpen(false);
-            toast.success("User revoked");
+            toastSuccess("User revoked");
             router.refresh();
           }}
         />
