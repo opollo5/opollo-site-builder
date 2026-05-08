@@ -2001,7 +2001,10 @@ async function processPagePassLoop(
   // DESIGN-DISCOVERY (PR 10) — load the design + voice context once
   // per page-tick. Empty string when DESIGN_CONTEXT_ENABLED is off
   // or neither step is approved; existing behaviour preserved.
-  const designContextPrefix = await buildDesignContextPrefix(brief.site_id);
+  const designContextPrefix = await buildDesignContextPrefix(
+    brief.site_id,
+    brief.content_type,
+  );
 
   // DESIGN-SYSTEM-OVERHAUL PR 13 — load sites.site_mode so the
   // systemPromptFor branch for content_type='post' can drop the
