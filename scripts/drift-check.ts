@@ -88,7 +88,11 @@ function renderReport(checks: Check[]): string {
   lines.push("|---|---|---|");
   for (const c of checks) {
     const status = c.ok ? "✅ OK" : "❌ FAIL";
-    const detail = (c.detail ?? "").replace(/\|/g, "\\|");
+    // Markdown table cell: escape both backslashes and pipes so
+    // operator-supplied error strings don't break the table.
+    const detail = (c.detail ?? "")
+      .replace(/\\/g, "\\\\")
+      .replace(/\|/g, "\\|");
     lines.push(`| ${c.name} | ${status} | ${detail} |`);
   }
   lines.push("");

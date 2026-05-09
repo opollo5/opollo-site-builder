@@ -59,6 +59,33 @@ describe.each(XSS_PAYLOADS)(
   },
 );
 
+describe("sanitizeHtmlFragment — fixed-point stabilisation", () => {
+  // Pinned by CodeQL "incomplete multi-character sanitization" finding.
+  // Single-pass strips would leave residue tags after one round of
+  // sanitisation. The loop runs to stabilisation; if a future refactor
+  // removes the loop, these tests fire red.
+
+  it("collapses nested <scr<script>ipt> into a single safe pass", () => {
+    const malicious = "<scr<script>ipt>alert(1)</scr</script>ipt>";
+    const out = sanitizeHtmlFragment(malicious);
+    expect(out).not.toMatch(/<script/i);
+    expect(out).not.toContain("alert(1)");
+  });
+
+  it("collapses doubly-nested <<script>script> patterns", () => {
+    const malicious = "<<script>script>alert(1)<</script>/script>";
+    const out = sanitizeHtmlFragment(malicious);
+    expect(out).not.toMatch(/<script/i);
+  });
+
+  it("collapses nested iframe inside a script wrapper", () => {
+    const malicious = "<script><iframe src=x></iframe></script>";
+    const out = sanitizeHtmlFragment(malicious);
+    expect(out).not.toMatch(/<script/i);
+    expect(out).not.toMatch(/<iframe/i);
+  });
+});
+
 describe("sanitizeHtmlFragment — defensive cases", () => {
   it("strips event handler from an otherwise allowed tag", () => {
     const malicious = '<button onclick="alert(1)">Click</button>';

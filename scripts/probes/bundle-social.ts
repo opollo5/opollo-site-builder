@@ -109,7 +109,13 @@ function renderMarkdown(outcomes: Outcome[]): string {
       ? o.hasToken
         ? "URL contains query string"
         : "URL has no query string — likely whitelist mismatch"
-      : (o.errorMessage ?? "").replace(/\|/g, "\\|").replace(/\n/g, " ");
+      : (o.errorMessage ?? "")
+          // Markdown table cell: escape backslashes BEFORE pipes so
+          // an error message containing a literal `\|` doesn't break
+          // the table.
+          .replace(/\\/g, "\\\\")
+          .replace(/\|/g, "\\|")
+          .replace(/\n/g, " ");
     lines.push(
       `| ${i + 1} | ${o.case} | ${types} | ${redirect} | ${ok} | ${tok} | ${status} | ${notes} |`,
     );

@@ -72,27 +72,42 @@ const DANGEROUS_HREF_OR_SRC =
 export function sanitizeHtmlFragment(input: string): string {
   if (typeof input !== "string" || input.length === 0) return "";
 
+  // Loop the regex passes until the input stabilises. Single-pass
+  // regexing misses nested injection patterns like
+  // `<scr<script>ipt>` — after one pass the inner `<script>` is
+  // gone but the outer `<scr...ipt>` remains as a syntactically
+  // suspect fragment. Looping until fixed-point ensures every
+  // round of stripping is followed by another round that can act
+  // on the residue, defeating CodeQL's "incomplete multi-character
+  // sanitization" class.
+  //
+  // Bounded iteration count guards against pathological input
+  // (would be a DoS otherwise). 20 is well above any plausible
+  // legitimate nesting depth.
   let out = input;
+  for (let i = 0; i < 20; i++) {
+    const before = out;
 
-  // 1. Drop dangerous block tags + their content.
-  out = out.replace(DROP_WITH_CONTENT, "");
-  // 2. Drop dangerous self-closing variants.
-  out = out.replace(DROP_SELF_CLOSING, "");
-  // 3. Drop every event-handler attribute (onclick, onerror, ontoggle, ...).
-  out = out.replace(EVENT_HANDLER_ATTR, "");
-  // 4. Drop href / src with javascript:/data:/vbscript: schemes.
-  out = out.replace(DANGEROUS_HREF_OR_SRC, "");
+    // 1. Drop dangerous block tags + their content.
+    out = out.replace(DROP_WITH_CONTENT, "");
+    // 2. Drop dangerous self-closing variants.
+    out = out.replace(DROP_SELF_CLOSING, "");
+    // 3. Drop every event-handler attribute (onclick, onerror, ontoggle, ...).
+    out = out.replace(EVENT_HANDLER_ATTR, "");
+    // 4. Drop href / src with javascript:/data:/vbscript: schemes.
+    out = out.replace(DANGEROUS_HREF_OR_SRC, "");
 
-  // 5. Strip any tag whose name is not allow-listed. We do this by
-  //    matching tags and replacing disallowed ones with their textContent
-  //    equivalent (empty for opening, drop the closing).
-  out = out.replace(
-    /<\/?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/g,
-    (match, name: string) => {
-      if (ALLOWED_TAGS.has(name.toLowerCase())) return match;
-      return "";
-    },
-  );
+    // 5. Strip any tag whose name is not allow-listed.
+    out = out.replace(
+      /<\/?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/g,
+      (match, name: string) => {
+        if (ALLOWED_TAGS.has(name.toLowerCase())) return match;
+        return "";
+      },
+    );
+
+    if (out === before) break;
+  }
 
   return out;
 }
