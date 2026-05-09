@@ -4,7 +4,6 @@ import { SocialCalendarClient } from "@/components/SocialCalendarClient";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
 import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
-import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // /company/social/calendar — monthly grid view (default social landing).
@@ -61,21 +60,14 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
 
   const companyId = session.company.companyId;
 
-  const [entriesResult, connectionsResult, companyRow] = await Promise.all([
+  const [entriesResult, connectionsResult] = await Promise.all([
     listCompanyScheduleEntries({
       companyId,
       fromIso: gridStart.toISOString(),
       toIso: gridEnd.toISOString(),
     }),
     listConnections({ companyId }),
-    getServiceRoleClient()
-      .from("platform_companies")
-      .select("name")
-      .eq("id", companyId)
-      .maybeSingle(),
   ]);
-
-  const companyName: string = (companyRow.data as { name: string } | null)?.name ?? "My company";
 
   const connections =
     connectionsResult.ok
@@ -101,7 +93,6 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
           }))}
           monthIso={monthIso}
           connections={connections}
-          companyName={companyName}
           composerEnabled={composerEnabled}
         />
       ) : (

@@ -4,7 +4,6 @@ import { SocialPostsListClient } from "@/components/SocialPostsListClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listPostMasters } from "@/lib/platform/social/posts";
 import type { SocialPostState } from "@/lib/platform/social/posts";
-import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // S1-2 — customer-facing social posts list at /company/social/posts.
@@ -77,7 +76,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       ? (dirParam as "asc" | "desc")
       : "desc";
 
-  const [postsResult, canCreate, canApprove, companyRow] = await Promise.all([
+  const [postsResult, canCreate, canApprove] = await Promise.all([
     listPostMasters({
       companyId,
       q: searchTerm || undefined,
@@ -90,14 +89,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
     }),
     canDo(companyId, "create_post"),
     canDo(companyId, "approve_post"),
-    getServiceRoleClient()
-      .from("platform_companies")
-      .select("name")
-      .eq("id", companyId)
-      .maybeSingle(),
   ]);
-
-  const companyName: string = (companyRow.data as { name: string } | null)?.name ?? "My company";
 
   if (!postsResult.ok) {
     return (
@@ -115,7 +107,6 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
   return (
     <SocialPostsListClient
       companyId={companyId}
-      companyName={companyName}
       initialPosts={postsResult.data.posts}
       canCreate={canCreate}
       canApprove={canApprove}

@@ -46,7 +46,6 @@ type Props = {
   entries: Entry[];
   monthIso: string; // "YYYY-MM"
   connections: Connection[];
-  companyName: string;
   /** Spec 22: when true, "New post" opens ?compose=new instead of navigating to /posts */
   composerEnabled?: boolean;
 };
@@ -267,7 +266,6 @@ export function SocialCalendarClient({
   entries,
   monthIso,
   connections,
-  companyName,
   composerEnabled = false,
 }: Props) {
   const [hiddenPlatforms, setHiddenPlatforms] = useState<Set<SocialPlatform>>(
@@ -359,7 +357,6 @@ export function SocialCalendarClient({
   return (
     <SocialModuleShell
       activeView="calendar"
-      companyName={companyName}
       composerEnabled={composerEnabled}
       periodNavigator={periodNavigator}
       toolbarActions={
