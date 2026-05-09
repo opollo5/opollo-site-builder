@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { Toaster } from "@/components/ui/toaster";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 
 export default async function CompanyLayout({
@@ -14,10 +13,5 @@ export default async function CompanyLayout({
     redirect(`/login?next=${encodeURIComponent("/company")}`);
   }
 
-  return (
-    <>
-      {children}
-      <Toaster />
-    </>
-  );
+  return <>{children}</>;
 }

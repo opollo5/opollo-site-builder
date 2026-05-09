@@ -341,6 +341,19 @@ export async function middleware(req: NextRequest): Promise<NextResponse> {
       : await supabaseAuthGate(req);
   }
 
+  // Forward the request pathname as a request header so server components
+  // can read it via headers().get('x-pathname'). Only applies to pass-through
+  // (200) responses — redirects and error responses don't need it.
+  if (response.status === 200) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-pathname", req.nextUrl.pathname);
+    const withPathname = NextResponse.next({ request: { headers: requestHeaders } });
+    response.cookies.getAll().forEach(({ name, value, ...opts }) =>
+      withPathname.cookies.set(name, value, opts)
+    );
+    response = withPathname;
+  }
+
   return applySecurityHeaders(response, requestId);
 }
 

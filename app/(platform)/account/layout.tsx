@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DebugFooter } from "@/components/DebugFooter";
-import { Toaster } from "@/components/ui/toaster";
 
 // /account/* is reachable by any signed-in user. Mirrors admin chrome.
 
@@ -25,7 +24,6 @@ export default async function AccountLayout({
   return (
     <>
       {children}
-      <Toaster />
       <CommandPalette />
       {isSuperAdmin && (
         <DebugFooter
