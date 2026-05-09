@@ -36,6 +36,8 @@ vi.mock("@/lib/bundlesocial", () => ({
 import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";
 
 const COMPANY_ID = "abcdef00-0000-0000-0000-aaaaaaaa1616";
+// The popup=1 param is appended by the API route layer, not by
+// initiateBundlesocialConnect itself. Use the base callback URL here.
 const REDIRECT_URL =
   "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616";
 
@@ -86,6 +88,21 @@ describe("CONTRACT: bundle.social socialAccountCreatePortalLink", () => {
       companyId: COMPANY_ID,
       platforms: ["linkedin_personal", "linkedin_company"],
       redirectUrl: REDIRECT_URL,
+    });
+
+    const arg =
+      mockClient.socialAccount.socialAccountCreatePortalLink.mock.calls[0]?.[0];
+    expect(arg).toMatchSnapshot();
+  });
+
+  it("[snapshot] with branding: logoUrl, userName, language", async () => {
+    await initiateBundlesocialConnect({
+      companyId: COMPANY_ID,
+      platforms: ["x"],
+      redirectUrl: REDIRECT_URL,
+      logoUrl: "https://cdn.example.com/logo.png",
+      userName: "Acme Corp",
+      language: "en",
     });
 
     const arg =
