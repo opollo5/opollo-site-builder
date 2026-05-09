@@ -122,4 +122,120 @@ test.describe("social platform", () => {
     await page.getByRole("link", { name: /timeline/i }).click();
     await expect(page).toHaveURL(/\/company\/social\/timeline/, { timeout: 10_000 });
   });
+
+  test.describe("connect popup flow", () => {
+    // Tests the window.open popup mechanics without hitting external
+    // bundle.social. The connect API is mocked to return a URL on our
+    // own origin that we also intercept to serve postMessage HTML.
+
+    test("(a) postMessage: popup sends bundle-connect-complete and parent recovers", async ({
+      page,
+      context,
+    }, testInfo) => {
+      await page.goto("/company/social/connections");
+
+      // Mock connect API — return a URL on our own origin so same-origin
+      // postMessage passes the parent's origin check.
+      await context.route(
+        "**/api/platform/social/connections/connect",
+        (route) => {
+          const origin = new URL(page.url()).origin;
+          void route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ok: true,
+              data: { url: `${origin}/_test-popup-stub` },
+            }),
+          });
+        },
+      );
+
+      // Intercept popup navigation — serve HTML that fires postMessage then closes.
+      await context.route("**/_test-popup-stub*", (route) => {
+        void route.fulfill({
+          status: 200,
+          contentType: "text/html; charset=utf-8",
+          body: `<!DOCTYPE html><html><body><script>
+(function () {
+  try {
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage(
+        { type: "bundle-connect-complete", connect: "noop" },
+        window.location.origin
+      );
+    }
+  } catch (e) {}
+  window.close();
+})();
+</script></body></html>`,
+        });
+      });
+
+      const connectBtn = page.getByTestId("connections-connect-button");
+      await expect(connectBtn).toBeVisible({ timeout: 10_000 });
+
+      const popupPromise = page.waitForEvent("popup");
+      await connectBtn.click();
+      const popup = await popupPromise;
+
+      // Popup loads stub, fires postMessage, then calls window.close().
+      await popup.waitForEvent("close", { timeout: 10_000 });
+
+      // Parent must not show error or popup-blocked banners.
+      await expect(page.getByTestId("connections-error")).not.toBeVisible();
+      await expect(
+        page.getByTestId("connections-popup-blocked"),
+      ).not.toBeVisible();
+
+      await auditA11y(page, testInfo);
+    });
+
+    test("(b) user-closes-popup: parent handles abandonment gracefully", async ({
+      page,
+      context,
+    }) => {
+      await page.goto("/company/social/connections");
+
+      await context.route(
+        "**/api/platform/social/connections/connect",
+        (route) => {
+          const origin = new URL(page.url()).origin;
+          void route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ok: true,
+              data: { url: `${origin}/_test-popup-stub-abandon` },
+            }),
+          });
+        },
+      );
+
+      // Stub stays open — simulating user who hasn't completed OAuth yet.
+      await context.route("**/_test-popup-stub-abandon*", (route) => {
+        void route.fulfill({
+          status: 200,
+          contentType: "text/html; charset=utf-8",
+          body: "<!DOCTYPE html><html><body>Loading…</body></html>",
+        });
+      });
+
+      const connectBtn = page.getByTestId("connections-connect-button");
+      await expect(connectBtn).toBeVisible({ timeout: 10_000 });
+
+      const popupPromise = page.waitForEvent("popup");
+      await connectBtn.click();
+      const popup = await popupPromise;
+
+      // User closes popup without completing OAuth.
+      await popup.close();
+
+      // Parent must recover: no crash, no error banner, wrapper still present.
+      await expect(page.getByTestId("connections-error")).not.toBeVisible();
+      await expect(
+        page.getByTestId("connections-list-wrapper"),
+      ).toBeVisible({ timeout: 10_000 });
+    });
+  });
 });

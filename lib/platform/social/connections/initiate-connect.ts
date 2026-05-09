@@ -56,12 +56,16 @@ export type InitiateConnectInput = {
   platforms: SocialPlatform[];
   // Absolute URL the admin's browser should be sent to AFTER bundle.
   // social finishes the OAuth dance. Typically:
-  //   `${origin}/api/platform/social/connections/callback?company_id=<id>`
+  //   `${origin}/api/platform/social/connections/callback?company_id=<id>&popup=1`
   redirectUrl: string;
-  // Branding overrides that surface in the bundle.social portal UI.
-  // Optional; defaults shown in their dashboard otherwise.
+  // Branding fields that surface in the bundle.social portal UI.
+  // All optional; bundle.social applies its own defaults when omitted.
+  // Note: userLogoUrl is intentionally excluded — the portal shows a
+  // placeholder avatar when omitted; wire user avatars as a follow-up.
+  logoUrl?: string | null;
   userName?: string | null;
-  userLogoUrl?: string | null;
+  hidePoweredBy?: boolean;
+  language?: string | null;
 };
 
 export type InitiateConnectResult = {
@@ -101,8 +105,13 @@ export async function initiateBundlesocialConnect(
     teamId,
     redirectUrl: input.redirectUrl,
     socialAccountTypes: bundlePlatforms,
+    logoUrl: input.logoUrl ?? undefined,
     userName: input.userName ?? undefined,
-    userLogoUrl: input.userLogoUrl ?? undefined,
+    hidePoweredBy: input.hidePoweredBy ?? undefined,
+    language: (input.language ?? undefined) as
+      | "en" | "pl" | "fr" | "hi" | "sv" | "de" | "es"
+      | "it" | "nl" | "pt" | "ru" | "tr" | "zh"
+      | undefined,
   };
 
   logger.info("bundlesocial.initiate_connect.request", {
