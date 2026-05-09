@@ -1,5 +1,7 @@
 import "server-only";
 
+import { ApiError } from "bundlesocial";
+
 import {
   getBundlesocialClient,
   getBundlesocialTeamId,
@@ -95,29 +97,97 @@ export async function initiateBundlesocialConnect(
   // duplicate before Set collapses it).
   const bundlePlatforms = Array.from(new Set(rawPlatforms));
 
+  const requestPayload = {
+    teamId,
+    redirectUrl: input.redirectUrl,
+    socialAccountTypes: bundlePlatforms,
+    userName: input.userName ?? undefined,
+    userLogoUrl: input.userLogoUrl ?? undefined,
+  };
+
+  logger.info("bundlesocial.initiate_connect.request", {
+    company_id: input.companyId,
+    team_id_prefix: teamId.slice(0, 8),
+    redirect_url: input.redirectUrl,
+    social_account_types: bundlePlatforms,
+  });
+
   try {
     const response = await client.socialAccount.socialAccountCreatePortalLink({
-      requestBody: {
-        teamId,
-        redirectUrl: input.redirectUrl,
-        socialAccountTypes: bundlePlatforms,
-        userName: input.userName ?? undefined,
-        userLogoUrl: input.userLogoUrl ?? undefined,
-      },
+      requestBody: requestPayload,
     });
+
+    logger.info("bundlesocial.initiate_connect.response", {
+      company_id: input.companyId,
+      response_url: response?.url ?? null,
+      response_keys: response ? Object.keys(response) : [],
+      has_url: Boolean(response?.url),
+    });
+
     if (!response?.url) {
       return internal("bundle.social returned no portal URL.");
     }
+
+    // Validate the returned URL. A bare https://bundle.social/connect with no
+    // query params means bundle.social did not embed a session token — the user
+    // would see "There was an error" on that page. Hard-fail here rather than
+    // redirecting to a broken page, and log the full URL so we can diagnose.
+    let parsedUrl: URL | null = null;
+    try { parsedUrl = new URL(response.url); } catch { /* logged below */ }
+
+    if (!parsedUrl || parsedUrl.protocol !== "https:") {
+      logger.error("bundlesocial.initiate_connect.invalid_url", {
+        company_id: input.companyId,
+        url: response.url,
+        reason: "not a valid https URL",
+      });
+      return internal(`bundle.social returned an invalid portal URL: ${response.url}`);
+    }
+
+    if (!parsedUrl.search) {
+      // No query params means no token. Most likely causes:
+      //   1. redirectUrl domain is not whitelisted in bundle.social's team settings.
+      //   2. teamId does not match the API key's team.
+      // Check: bundle.social dashboard → Team → Settings → Allowed redirect domains.
+      logger.error("bundlesocial.initiate_connect.url_missing_token", {
+        company_id: input.companyId,
+        url: response.url,
+        redirect_url_sent: input.redirectUrl,
+        team_id_prefix: teamId.slice(0, 8),
+        reason: "portal URL has no query params — token not embedded by bundle.social",
+      });
+      return internal(
+        "bundle.social returned a portal URL without a session token. " +
+        "The redirect URL is probably not whitelisted in the bundle.social team settings. " +
+        `Redirect URL sent: ${input.redirectUrl}`,
+      );
+    }
+
     return {
       ok: true,
       data: { url: response.url },
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
+    if (err instanceof ApiError) {
+      logger.error("bundlesocial.initiate_connect.api_error", {
+        company_id: input.companyId,
+        status: err.status,
+        status_text: err.statusText,
+        body: err.body,
+        request_url: err.request?.url,
+        message: err.message,
+      });
+      return internal(
+        `bundle.social create-portal-link failed: HTTP ${err.status} ${err.statusText} — ${JSON.stringify(err.body)}`,
+      );
+    }
     const message = err instanceof Error ? err.message : String(err);
+    const cause = err instanceof Error && err.cause ? String(err.cause) : undefined;
     logger.error("bundlesocial.initiate_connect.failed", {
-      err: message,
       company_id: input.companyId,
+      err: message,
+      cause,
     });
     return internal(`bundle.social create-portal-link failed: ${message}`);
   }

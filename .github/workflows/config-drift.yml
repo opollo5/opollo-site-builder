@@ -1,0 +1,62 @@
+name: Config drift detector
+
+# Daily check that production third-party configuration matches what
+# the code expects. Encoding the expected values in
+# lib/config/production-urls.ts means a Vercel project rename or a
+# bundle.social dashboard mistake surfaces here as a GitHub issue
+# rather than as a silent outage.
+#
+# Canary case (May 2026): bundle.social's webhook URL was set to
+# `opollo.vercel.app` (stale) while the active deploy was at
+# `opollo-site-builder.vercel.app`. Webhook events never reached us.
+# The drift detector pinned in lib/config/production-urls.ts is the
+# fix for that class.
+
+on:
+  schedule:
+    - cron: "0 9 * * *" # 09:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Run drift detector
+        id: drift
+        env:
+          BUNDLE_SOCIAL_API: ${{ secrets.BUNDLE_SOCIAL_API }}
+          BUNDLE_SOCIAL_TEAMID: ${{ secrets.BUNDLE_SOCIAL_TEAMID }}
+        run: |
+          set -euo pipefail
+          # The drift script is wired in scripts/drift-check.ts; today
+          # it short-circuits to noop until BUNDLE_SOCIAL_API is set in
+          # CI secrets (per docs/test-coverage-target.md §7). The exit
+          # code is the gate.
+          npx tsx scripts/drift-check.ts > /tmp/drift.out 2>&1 || {
+            echo "drift_status=fail" >> "$GITHUB_OUTPUT"
+            cat /tmp/drift.out
+            exit 1
+          }
+          cat /tmp/drift.out
+
+      - name: Open drift issue on failure
+        if: failure() && steps.drift.outputs.drift_status == 'fail'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ts=$(date -u +%Y-%m-%d)
+          body=$(cat /tmp/drift.out 2>/dev/null || echo '(no drift output captured)')
+          gh issue create \
+            --title "Config drift detected on ${ts}" \
+            --label "config-drift,p1" \
+            --body "$body"

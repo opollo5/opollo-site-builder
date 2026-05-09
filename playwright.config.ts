@@ -32,6 +32,11 @@ const BASE_URL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
 
 export default defineConfig({
   testDir: "./e2e",
+  // Smoke specs live under e2e/smoke/ and target a live production
+  // URL via playwright.smoke.config.ts. They MUST NOT run in the
+  // default config — they assert against env-provisioned production
+  // credentials that aren't set during regular CI.
+  testIgnore: ["**/smoke/**"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,

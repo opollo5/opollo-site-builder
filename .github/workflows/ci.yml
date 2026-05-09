@@ -181,6 +181,30 @@ jobs:
       - name: Run component/hook tests (no Supabase required)
         run: npm run test:components -- --reporter=verbose
 
+  # Layer 1 (unit) + Layer 2 (contract) — no Supabase, no I/O.
+  # Independent status check so a Layer 2 contract-snapshot diff is
+  # immediately visible in PR checks without waiting for the 50-min
+  # integration job.
+  test-unit:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: Run unit + contract + regression + no-DB security tests
+        run: npm run test:unit -- --reporter=verbose
+
   test:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest

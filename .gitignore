@@ -7,6 +7,15 @@ dist
 .env
 .env.local
 .env.*.local
+# Catch every .env.* variant so a stray Vercel env dump
+# (e.g. `vercel env pull .env.bundlesocial-test`) cannot be
+# accidentally committed via `git add -A`. The two specific
+# patterns above remain for clarity. Allow .env.example +
+# .env.local.example explicitly with !-prefixed exceptions if
+# new template names are added.
+.env.*
+!.env.example
+!.env.local.example
 
 .DS_Store
 *.log
