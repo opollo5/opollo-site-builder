@@ -18,6 +18,7 @@ import {
 import { H3 } from "@/components/ui/typography";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
@@ -195,7 +196,7 @@ export default async function SiteDetailPage({
     : null;
 
   return (
-    <>
+    <PageShell>
       {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
       {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
       {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
@@ -624,6 +625,6 @@ export default async function SiteDetailPage({
           </div>
         </aside>
       </div>
-    </>
+    </PageShell>
   );
 }

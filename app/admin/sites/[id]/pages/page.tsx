@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { PagesTable } from "@/components/PagesTable";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   LIST_PAGES_DEFAULT_LIMIT,
@@ -129,7 +130,7 @@ export default async function SitePagesList({
   const rangeEnd = Math.min(offset + limit, total);
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -261,6 +262,6 @@ export default async function SitePagesList({
           backHref={buildHref(params.id, parsed, {})}
         />
       </div>
-    </>
+    </PageShell>
   );
 }

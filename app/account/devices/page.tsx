@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { TrustedDevicesList } from "@/components/TrustedDevicesList";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   DEVICE_ID_COOKIE,
   decodeDeviceCookie,
@@ -48,7 +49,7 @@ export default async function AccountDevicesPage() {
     : [];
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -87,6 +88,6 @@ export default async function AccountDevicesPage() {
           hasCurrentDevice={currentDeviceId !== null}
         />
       )}
-    </>
+    </PageShell>
   );
 }

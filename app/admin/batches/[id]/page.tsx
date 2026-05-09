@@ -5,6 +5,7 @@ import { BatchDetailClient } from "@/components/BatchDetailClient";
 import { BatchSuccessMoment } from "@/components/BatchSuccessMoment";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import {
   StatusPill,
   jobStatusKind,
@@ -66,7 +67,7 @@ export default async function BatchDetailPage({
 
   if (jobErr) {
     return (
-      <>
+      <PageShell>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -80,7 +81,7 @@ export default async function BatchDetailPage({
         <Alert variant="destructive">
           {jobErr.message}
         </Alert>
-      </>
+      </PageShell>
     );
   }
   if (!job) {
@@ -134,7 +135,7 @@ export default async function BatchDetailPage({
   };
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -263,6 +264,6 @@ export default async function BatchDetailPage({
           </div>
         </div>
       </div>
-    </>
+    </PageShell>
   );
 }

@@ -6,6 +6,7 @@ import { ExtractedProfilePanel } from "@/components/ExtractedProfilePanel";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listAppearanceEventsForSite } from "@/lib/appearance-events";
 import { getSite } from "@/lib/sites";
@@ -88,7 +89,7 @@ export default async function SiteAppearancePage({
 
   if (modeRow.site_mode === null) {
     return (
-      <>
+      <PageShell>
         <PageHeader>
           <PageHeader.Breadcrumb segments={headerSegments} />
           <PageHeader.Title>{site.name}</PageHeader.Title>
@@ -106,13 +107,13 @@ export default async function SiteAppearancePage({
             </Link>
           </Button>
         </div>
-      </>
+      </PageShell>
     );
   }
 
   if (modeRow.site_mode === "copy_existing") {
     return (
-      <>
+      <PageShell>
         <PageHeader>
           <PageHeader.Breadcrumb segments={headerSegments} />
           <PageHeader.Title>Appearance · {site.name}</PageHeader.Title>
@@ -124,7 +125,7 @@ export default async function SiteAppearancePage({
           extractedDesign={modeRow.extracted_design}
           extractedClasses={modeRow.extracted_css_classes}
         />
-      </>
+      </PageShell>
     );
   }
 
@@ -135,7 +136,7 @@ export default async function SiteAppearancePage({
     process.env.FEATURE_PATH_B_PUBLISH_GATE === "1";
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb segments={headerSegments} />
         <PageHeader.Title>Appearance · {site.name}</PageHeader.Title>
@@ -150,6 +151,6 @@ export default async function SiteAppearancePage({
         initialEvents={events}
         publishGateEnabled={publishGateEnabled}
       />
-    </>
+    </PageShell>
   );
 }

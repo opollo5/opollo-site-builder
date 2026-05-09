@@ -6,6 +6,7 @@ import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -64,7 +65,7 @@ export default async function AdminBatchesPage({
 
   if (error) {
     return (
-      <>
+      <PageShell>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -77,7 +78,7 @@ export default async function AdminBatchesPage({
         <Alert variant="destructive" title="Failed to load batches">
           {error.message}
         </Alert>
-      </>
+      </PageShell>
     );
   }
 
@@ -172,7 +173,7 @@ export default async function AdminBatchesPage({
       ];
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb segments={breadcrumbs} />
         <PageHeader.Title>Batches</PageHeader.Title>
@@ -198,6 +199,7 @@ export default async function AdminBatchesPage({
       <div>
         <BatchesTable rows={rows} />
       </div>
-    </>
+    </PageShell>
   );
 }
+

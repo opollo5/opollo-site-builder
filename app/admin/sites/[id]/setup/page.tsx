@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { SetupWizard } from "@/components/SetupWizard";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   computeResumeStep,
@@ -88,7 +89,7 @@ export default async function SiteSetupPage({
   const step: SetupStep = requested;
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -113,6 +114,6 @@ export default async function SiteSetupPage({
           status={status}
         />
       </div>
-    </>
+    </PageShell>
   );
 }

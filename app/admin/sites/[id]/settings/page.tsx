@@ -4,6 +4,7 @@ import { SiteVoiceSettingsForm } from "@/components/SiteVoiceSettingsForm";
 import { UseImageLibraryToggle } from "@/components/UseImageLibraryToggle";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { H2 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
@@ -68,7 +69,7 @@ export default async function SiteSettingsPage({
   const imagesWithMetadata = metadataCountRow.count ?? 0;
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -124,6 +125,6 @@ export default async function SiteSettingsPage({
         </div>
       </section>
       </div>
-    </>
+    </PageShell>
   );
 }

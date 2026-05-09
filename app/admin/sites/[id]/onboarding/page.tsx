@@ -5,6 +5,7 @@ import { FirstSiteConnectedMoment } from "@/components/onboarding/first-site-con
 import { SiteOnboardingForm } from "@/components/SiteOnboardingForm";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { H3 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -65,7 +66,7 @@ export default async function SiteOnboardingPage({
   }
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -116,6 +117,6 @@ export default async function SiteOnboardingPage({
           </Link>
         </section>
       </div>
-    </>
+    </PageShell>
   );
 }

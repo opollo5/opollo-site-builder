@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PlatformCompanyDetail } from "@/components/PlatformCompanyDetail";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getPlatformCompany } from "@/lib/platform/companies";
 import { joinCompanyAsAdmin } from "../_actions";
@@ -26,7 +27,7 @@ export default async function CompanyDetailPage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <>
+      <PageShell>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -43,7 +44,7 @@ export default async function CompanyDetailPage({
         >
           {result.error.message}
         </div>
-      </>
+      </PageShell>
     );
   }
 
@@ -58,7 +59,7 @@ export default async function CompanyDetailPage({
   const { company } = result.data;
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -91,6 +92,6 @@ export default async function CompanyDetailPage({
         isCurrentUserMember={isCurrentUserMember}
         joinAction={boundJoinAction}
       />
-    </>
+    </PageShell>
   );
 }

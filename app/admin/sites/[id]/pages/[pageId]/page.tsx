@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
+import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H3 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
@@ -112,7 +113,7 @@ export default async function PageDetail({
   );
 
   return (
-    <>
+    <PageShell>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -231,6 +232,6 @@ export default async function PageDetail({
           <RegenHistoryPanel jobs={regenJobs} />
         </div>
       </section>
-    </>
+    </PageShell>
   );
 }
