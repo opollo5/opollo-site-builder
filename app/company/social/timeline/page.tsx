@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { SocialModuleShell } from "@/components/social/social-module-shell";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listPostMasters } from "@/lib/platform/social/posts";
-import { getServiceRoleClient } from "@/lib/supabase";
 
 import { TimelineFeed } from "./timeline-feed";
 
@@ -38,7 +37,7 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
   const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [postsResult, canCreate, companyRow] = await Promise.all([
+  const [postsResult, canCreate] = await Promise.all([
     listPostMasters({
       companyId,
       limit: PAGE_SIZE,
@@ -48,15 +47,7 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
       sortDir: "desc",
     }),
     canDo(companyId, "create_post"),
-    getServiceRoleClient()
-      .from("platform_companies")
-      .select("name")
-      .eq("id", companyId)
-      .maybeSingle(),
   ]);
-
-  const companyName: string =
-    (companyRow.data as { name: string } | null)?.name ?? "My company";
 
   const composerEnabled = process.env.FEATURE_COMPOSER_V2 !== "false";
 
@@ -74,7 +65,6 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
   return (
     <SocialModuleShell
       activeView="timeline"
-      companyName={companyName}
       composerEnabled={composerEnabled && canCreate}
     >
       <TimelineFeed
