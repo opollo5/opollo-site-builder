@@ -71,9 +71,11 @@ Walk top to bottom.
    ├─ Yes → STOP. Wait for review.
    └─ No  → continue.
 
-7. Auto-merge: poll `gh pr checks` until all green, then `gh pr merge --squash`.
-   Do NOT use `--auto` — branch protection has no required checks here, so
-   `--auto` fires immediately without CI. Project memory documents this.
+7. Merge gate: poll `gh pr checks <PR> --watch` until terminal. Verify
+   every required check shows `pass`. Only then `gh pr merge <PR> --squash`.
+   Auto-merge flags (`--auto`, `enable_pr_auto_merge`, UI button) are
+   forbidden until issue #822 closes — they bypass CI on permissive branch
+   protection. See §"Merge gate — no merge without CI-verified green".
 ```
 
 Full background and edge cases: `docs/governance/MERGE_RULES.md`.
@@ -274,13 +276,42 @@ Still on <slice>; current state: <X>; next: <Y>.
 Heartbeat is the only allowed deviation from §"Communication". It
 exists so Steven knows whether to interrupt without him having to ask.
 
-## Auto-merge — operational notes
+## Merge gate — no merge without CI-verified green
 
-The §"Merge decision tree" is the truth. These are operational mechanics:
+The §"Merge decision tree" is the truth. This section is the **gate
+that prevents premature merges** — the failure mode where a PR
+auto-merges before CI runs.
 
-- Every PR must arm GitHub auto-merge at creation time via `mcp__github__enable_pr_auto_merge` (`mergeMethod: "SQUASH"`) immediately after `create_pull_request`. Without this, the PR sits mergeable and the loop breaks.
-- Never call `gh pr merge --auto`: branch protection is permissive here so `--auto` fires before CI. Poll `gh pr checks` until green, then `--squash`.
-- "Out-of-date with base" handling: if a polled PR shows OPEN + BEHIND, run `gh pr update-branch <PR>` automatically. Update-branch failure due to merge conflict → stop and report; do not force.
+**No merge — CLI, MCP, or UI button — fires until CI is verified green
+by polling.** The mechanism that prevents premature merge is
+required-status-checks at the branch protection level. Until those are
+configured (tracked in #822), all merges are gated by an explicit
+polling loop:
+
+1. `gh pr checks <PR> --watch` — wait until every check is terminal.
+2. Read the conclusion of each check. Every required check must show `pass`.
+3. Only then: `gh pr merge <PR> --squash`.
+
+**Auto-merge flags are forbidden on this repo** until #822 closes:
+
+- ❌ `gh pr merge --auto` — fires immediately on permissive branch protection.
+- ❌ `mcp__github__enable_pr_auto_merge` — same failure mode at the API layer.
+- ❌ Clicking the green merge button in the UI before checks are green.
+
+The "arm auto-merge at creation time" pattern from earlier docs is
+revoked by this rule. It only worked when branch protection required
+checks; here it does not, so arming = merging-without-CI.
+
+**"Out-of-date with base" handling**: if a polled PR shows OPEN +
+BEHIND, run `gh pr update-branch <PR>` automatically. Update-branch
+failure due to merge conflict → stop and report; do not force. After
+update-branch, CI re-runs — wait for terminal green again before
+`--squash`.
+
+Once #822 closes (branch protection requires the eight CI status
+checks), the polling loop becomes a **backup** rather than the primary
+gate, and arming auto-merge via `gh pr merge --auto` becomes safe again.
+At that point this section gets revised.
 
 ## Sub-slice autonomy
 
