@@ -31,6 +31,14 @@ export default defineConfig({
     globalSetup: ["./lib/__tests__/_globalSetup.ts"],
     setupFiles: ["./lib/__tests__/_setup.ts"],
     include: ["lib/__tests__/**/*.test.ts"],
+    // Contract + pure-unit tests have their own no-Supabase config
+    // (vitest.unit.config.ts). Excluded here so they don't run twice.
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "lib/__tests__/**/*.contract.test.ts",
+      "lib/__tests__/**/*.unit.test.ts",
+    ],
     testTimeout: 15_000,
     hookTimeout: 60_000,
     // Tests share one Supabase stack. fileParallelism: false forces files to

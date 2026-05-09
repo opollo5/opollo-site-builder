@@ -1,5 +1,26 @@
 #!/usr/bin/env sh
-# Runs lint-staged on staged files. ESLint auto-fixes, then fails the
-# commit if anything is still broken. Scoped via .lintstagedrc so we
-# don't re-lint the whole repo on every commit.
+# Pre-commit gate. Runs:
+#
+#   1. lint-staged — ESLint auto-fix + stylelint on staged files only.
+#      Always runs.
+#   2. test-unit — Vitest unit + contract + regression + no-DB
+#      security suite (~10s). Catches contract-snapshot drift,
+#      regression-test breakage, and basic logic bugs at commit time
+#      rather than waiting for CI.
+#
+# To skip (e.g. during a WIP rebase), set SKIP_PRECOMMIT_TESTS=1.
+#   SKIP_PRECOMMIT_TESTS=1 git commit -m "..."
+#
+# Per CLAUDE.md, do not bypass with --no-verify unless explicitly
+# directed — the hook exists because past commits shipped contract
+# regressions that the test suite would have caught at commit time.
 npx lint-staged
+
+if [ -z "$SKIP_PRECOMMIT_TESTS" ]; then
+  npm run test:unit -- --reporter=dot --bail=1 || {
+    echo ""
+    echo "✖ Pre-commit unit tests failed."
+    echo "  Fix the failure or set SKIP_PRECOMMIT_TESTS=1 for an explicit bypass."
+    exit 1
+  }
+fi

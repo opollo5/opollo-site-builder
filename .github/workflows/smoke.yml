@@ -1,0 +1,127 @@
+name: Smoke (post-deploy)
+
+# Triggers:
+#   - Vercel deploy hook → repository_dispatch (event_type:
+#     vercel-deploy-success) — wired manually in Vercel dashboard:
+#     Settings → Git → Deploy Hooks. Hook URL is in 1Password.
+#   - workflow_dispatch — manual trigger for ad-hoc smoke runs.
+#
+# Required secrets (provisioned by Steven; see
+# docs/test-coverage-target.md §7):
+#   - PROD_SMOKE_USER_EMAIL
+#   - PROD_SMOKE_USER_PASSWORD
+#   - VERCEL_TOKEN (read + rollback scope) — used by the auto-hotfix
+#     job below to mark a failed deploy unhealthy.
+#   - SLACK_WEBHOOK_URL or NOTIFY_EMAIL — channel for failure alerts.
+
+on:
+  repository_dispatch:
+    types: [vercel-deploy-success]
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: "Override the production URL"
+        required: false
+        type: string
+        default: "https://opollo-site-builder.vercel.app"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run production smoke
+        id: smoke
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ github.event.inputs.base_url || github.event.client_payload.deploy_url || 'https://opollo-site-builder.vercel.app' }}
+          PROD_SMOKE_USER_EMAIL: ${{ secrets.PROD_SMOKE_USER_EMAIL }}
+          PROD_SMOKE_USER_PASSWORD: ${{ secrets.PROD_SMOKE_USER_PASSWORD }}
+        run: npm run test:smoke
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-smoke-report
+          path: |
+            playwright-report-smoke
+            playwright-smoke-results.json
+          retention-days: 14
+
+      - name: Notify on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DEPLOY_URL: ${{ github.event.client_payload.deploy_url }}
+          DEPLOY_SHA: ${{ github.event.client_payload.deploy_sha }}
+        run: |
+          if [ -z "$SLACK_WEBHOOK_URL" ]; then
+            echo "::warning::SLACK_WEBHOOK_URL not configured — failure visible only in workflow logs."
+            exit 0
+          fi
+          jq -n \
+            --arg sha "${DEPLOY_SHA:-unknown}" \
+            --arg url "${DEPLOY_URL:-unknown}" \
+            --arg run "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            '{ text: ("⚠️ Production smoke FAILED on " + $sha + " (" + $url + "). Run: " + $run) }' \
+            | curl -sS -H "content-type: application/json" -d @- "$SLACK_WEBHOOK_URL"
+
+  auto-hotfix:
+    needs: smoke
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create hotfix branch + incident doc
+        env:
+          DEPLOY_URL: ${{ github.event.client_payload.deploy_url }}
+          DEPLOY_SHA: ${{ github.event.client_payload.deploy_sha }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          ts=$(date -u +%Y%m%dT%H%M)
+          branch="hotfix/smoke-failure-${ts}"
+          incident="docs/incidents/${ts}-smoke-failure.md"
+
+          git config user.email "claude-code@opollo.com"
+          git config user.name "Claude Code (auto-hotfix)"
+          git checkout -b "$branch"
+
+          mkdir -p docs/incidents
+          # Render TEMPLATE.md with the known fields filled in.
+          sed \
+            -e "s|<integration>|smoke|g" \
+            -e "s|<YYYY-MM-DDThhmm>|${ts}|g" \
+            -e "s|<branch name>|${branch}|g" \
+            -e "s|<sha>|${DEPLOY_SHA:-unknown}|g" \
+            docs/incidents/TEMPLATE.md > "$incident"
+
+          git add "$incident"
+          git commit -m "incident: smoke failed on deploy ${DEPLOY_SHA:-unknown} at ${ts}"
+          git push origin "$branch"
+
+          gh issue create \
+            --title "Smoke failure on deploy ${DEPLOY_SHA:-unknown} (${ts})" \
+            --label "smoke-failure,p0" \
+            --body "Smoke ran red on commit ${DEPLOY_SHA:-unknown}. Incident doc: \`${incident}\`. Branch: \`${branch}\`. Workflow: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}.
+
+          Paste this into Claude Code on the hotfix branch:
+
+          \`\`\`
+          You are working on ${branch}. The full incident evidence is at ${incident}. Read that file first, then propose a fix in the smallest possible diff. Open a PR back into main and follow the standard auto-merge rules in CLAUDE.md.
+          \`\`\`"

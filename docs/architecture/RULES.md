@@ -4,6 +4,14 @@ Codified one-paragraph rules born from specific incidents. Each entry states the
 
 Sort: strongest "if you skip this, production breaks" signal at the top.
 
+> **Cross-reference (added 2026-05-09):** `CLAUDE.md` carries top-level
+> engineering rules that aren't incident-derived (Verification over
+> assumption, Loop detection, Incident stabilisation priority,
+> Risk-weighted execution, Security escalation, Heartbeat, PR size
+> limit, Communication discipline). Read both: this file is the
+> historical incident registry, `CLAUDE.md` is the daily operating
+> manual.
+
 ---
 
 ## 1. Service-role client pollution in test helpers

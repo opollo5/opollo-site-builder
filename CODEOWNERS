@@ -1,0 +1,46 @@
+# Code owners — security-sensitive paths.
+#
+# GitHub uses this file to assign reviewers automatically when a PR
+# touches the matching paths. Until @opollo/security exists as a real
+# team, all entries route to @hi (Steven). Add team handles here as
+# the company grows.
+#
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default — Steven approves everything.
+*                                                  @hi
+
+# Auth + session + admin gate — anything that mediates request → user.
+/lib/auth*.ts                                      @hi
+/lib/admin-api-gate.ts                             @hi
+/lib/platform/auth/                                @hi
+/middleware.ts                                     @hi
+/app/api/auth/                                     @hi
+
+# Webhooks — signature verification surface.
+/lib/bundlesocial.ts                               @hi
+/lib/qstash.ts                                     @hi
+/app/api/webhooks/                                 @hi
+
+# Multi-tenant boundaries — RLS-relevant code.
+/lib/platform/social/connections/                  @hi
+/lib/platform/social/posts/                        @hi
+/lib/platform/social/approvals/                    @hi
+/supabase/migrations/                              @hi
+/supabase/rollbacks/                               @hi
+
+# Encryption + secrets handling.
+/lib/encryption.ts                                 @hi
+/lib/security-headers.ts                           @hi
+/lib/ssrf-guard.ts                                 @hi
+/lib/sanitize-html-fragment.ts                     @hi
+
+# Test harness — changes here affect every future merge.
+/CLAUDE.md                                         @hi
+/.github/workflows/                                @hi
+/vitest.config.ts                                  @hi
+/vitest.unit.config.ts                             @hi
+/vitest.components.config.ts                       @hi
+/playwright.config.ts                              @hi
+/lib/__tests__/_security-helpers.ts                @hi
+/tests/                                            @hi

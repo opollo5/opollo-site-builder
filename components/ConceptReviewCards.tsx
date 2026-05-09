@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
+import { sanitizeHtmlFragment } from "@/lib/sanitize-html-fragment";
 import type { ConceptError, ConceptResult } from "@/components/DesignDirectionInputs";
 
 // ---------------------------------------------------------------------------
@@ -265,15 +266,21 @@ function MicroUiPreview({ micro }: { micro: ConceptResult["micro_ui"] }) {
         data-testid="concept-micro-ui"
       >
         <div
-          dangerouslySetInnerHTML={{ __html: micro.button }}
+          dangerouslySetInnerHTML={{
+            __html: sanitizeHtmlFragment(micro.button),
+          }}
           className="overflow-hidden"
         />
         <div
-          dangerouslySetInnerHTML={{ __html: micro.card }}
+          dangerouslySetInnerHTML={{
+            __html: sanitizeHtmlFragment(micro.card),
+          }}
           className="overflow-hidden"
         />
         <div
-          dangerouslySetInnerHTML={{ __html: micro.input }}
+          dangerouslySetInnerHTML={{
+            __html: sanitizeHtmlFragment(micro.input),
+          }}
           className="overflow-hidden"
         />
       </div>
