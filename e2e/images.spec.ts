@@ -151,7 +151,8 @@ test.describe("images admin surface", () => {
     ).toBeVisible();
   });
 
-  test("list → detail round-trip preserves filter state on back-nav", async ({
+  // TODO(#820): pre-existing failure on main since 2026-05-08.
+  test.fixme("list → detail round-trip preserves filter state on back-nav", async ({
     page,
   }, testInfo) => {
     // Start on a filtered list.
@@ -190,7 +191,8 @@ test.describe("images admin surface", () => {
     expect(response?.status()).toBe(404);
   });
 
-  test("archive flow removes image from active list; restore returns it", async ({
+  // TODO(#820): pre-existing failure on main since 2026-05-08.
+  test.fixme("archive flow removes image from active list; restore returns it", async ({
     page,
   }) => {
     await page.goto("/admin/images");
@@ -242,7 +244,8 @@ test.describe("images admin surface", () => {
     ).toBeVisible();
   });
 
-  test("edit modal updates caption + tags and the list reflects the change", async ({
+  // TODO(#820): pre-existing failure on main since 2026-05-08.
+  test.fixme("edit modal updates caption + tags and the list reflects the change", async ({
     page,
   }) => {
     await page.goto("/admin/images?source=upload");

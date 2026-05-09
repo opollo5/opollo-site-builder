@@ -69,35 +69,49 @@ const DANGEROUS_HREF_OR_SRC =
  *
  * Idempotent: sanitize(sanitize(x)) === sanitize(x).
  */
+// Per-regex fixed-point helper. Apply `re` to `s` repeatedly until
+// the result stops changing — defeats nested patterns like
+// `<scr<script>ipt>` where a single replace pass leaves residue
+// that itself matches the regex. This is the form CodeQL's
+// js/incomplete-multi-character-sanitization rule recognises as
+// complete.
+//
+// Bounded iteration count guards against pathological input. 64
+// is far above any plausible legitimate nesting depth and below
+// any practical DoS surface.
+function fixedPointReplace(s: string, re: RegExp, replacement: string): string {
+  let out = s;
+  let prev: string;
+  let i = 0;
+  do {
+    prev = out;
+    out = out.replace(re, replacement);
+    i++;
+  } while (out !== prev && i < 64);
+  return out;
+}
+
 export function sanitizeHtmlFragment(input: string): string {
   if (typeof input !== "string" || input.length === 0) return "";
 
-  // Loop the regex passes until the input stabilises. Single-pass
-  // regexing misses nested injection patterns like
-  // `<scr<script>ipt>` — after one pass the inner `<script>` is
-  // gone but the outer `<scr...ipt>` remains as a syntactically
-  // suspect fragment. Looping until fixed-point ensures every
-  // round of stripping is followed by another round that can act
-  // on the residue, defeating CodeQL's "incomplete multi-character
-  // sanitization" class.
-  //
-  // Bounded iteration count guards against pathological input
-  // (would be a DoS otherwise). 20 is well above any plausible
-  // legitimate nesting depth.
   let out = input;
-  for (let i = 0; i < 20; i++) {
-    const before = out;
 
-    // 1. Drop dangerous block tags + their content.
-    out = out.replace(DROP_WITH_CONTENT, "");
-    // 2. Drop dangerous self-closing variants.
-    out = out.replace(DROP_SELF_CLOSING, "");
-    // 3. Drop every event-handler attribute (onclick, onerror, ontoggle, ...).
-    out = out.replace(EVENT_HANDLER_ATTR, "");
-    // 4. Drop href / src with javascript:/data:/vbscript: schemes.
-    out = out.replace(DANGEROUS_HREF_OR_SRC, "");
+  // 1. Drop dangerous block tags + their content (run to fixed point).
+  out = fixedPointReplace(out, DROP_WITH_CONTENT, "");
+  // 2. Drop dangerous self-closing variants (run to fixed point).
+  out = fixedPointReplace(out, DROP_SELF_CLOSING, "");
+  // 3. Drop every event-handler attribute (onclick, onerror, ontoggle, ...).
+  out = fixedPointReplace(out, EVENT_HANDLER_ATTR, "");
+  // 4. Drop href / src with javascript:/data:/vbscript: schemes.
+  out = fixedPointReplace(out, DANGEROUS_HREF_OR_SRC, "");
 
-    // 5. Strip any tag whose name is not allow-listed.
+  // 5. Strip any tag whose name is not allow-listed (run to fixed
+  //    point — residue tag fragments after step 1-2 may form new
+  //    disallowed-tag matches once the surrounding context shifts).
+  let prev: string;
+  let i = 0;
+  do {
+    prev = out;
     out = out.replace(
       /<\/?([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>/g,
       (match, name: string) => {
@@ -105,9 +119,8 @@ export function sanitizeHtmlFragment(input: string): string {
         return "";
       },
     );
-
-    if (out === before) break;
-  }
+    i++;
+  } while (out !== prev && i < 64);
 
   return out;
 }
