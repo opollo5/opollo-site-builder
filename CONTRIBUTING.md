@@ -1,5 +1,35 @@
 # Contributing
 
+> **Read [CLAUDE.md](./CLAUDE.md) before opening a PR.** It's the
+> source of truth for the seven-layer test harness, the live
+> diagnostic protocol, and the security realism rule. The PR template
+> at `.github/pull_request_template.md` references CLAUDE.md by
+> section.
+
+## Test commands at a glance
+
+| Command | Layer | Needs Supabase? | Roughly how long |
+|---|---|---|---|
+| `npm run test:unit` | 1 + 2 + regression + no-DB security | no | < 10 s |
+| `npm run test:components` | 4 | no | < 10 s |
+| `npm run test:integration` | 3 + DB-backed security | **yes** (`supabase start`) | 10–40 min |
+| `npm run test:e2e` | 5 | **yes** + Playwright deps | 5–15 min |
+| `npm run test:precommit` | lint + typecheck + Layer 1 | no | < 30 s |
+| `npm run test:regressions` | tests/regressions only | no | < 5 s |
+| `npm run test:smoke` | 7 (live, post-deploy) | live URL + smoke creds | 1–3 min |
+
+## Reusable test helpers
+
+| Helper | Where | Use for |
+|---|---|---|
+| `seedSite()`, `randomPrefix()` | `lib/__tests__/_helpers.ts` | DB seed |
+| `seedAuthUser()`, `signInAs()` | `lib/__tests__/_auth-helpers.ts` | Auth user + session token |
+| `seedTwoCompanies()` | `lib/__tests__/_security-helpers.ts` | Cross-tenant pair |
+| `XSS_PAYLOADS` | `tests/helpers/xss-payloads.ts` | Component-layer XSS coverage |
+| `SQL_INJECTION_PAYLOADS` | `tests/helpers/sql-injection-payloads.ts` | Route-layer injection coverage |
+| `SSRF_PAYLOADS` | `tests/helpers/ssrf-payloads.ts` | URL-fetching route coverage |
+| `PROMPT_INJECTION_PAYLOADS` | `tests/helpers/prompt-injection-payloads.ts` | LLM-input coverage |
+
 ## Running tests locally
 
 The test suite is integration-level: tests exercise the real data layer

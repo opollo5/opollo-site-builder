@@ -313,6 +313,83 @@ Every PR that adds or substantially changes an admin-facing route, form, or acti
 
 If a change is tested only at the unit layer and not in E2E, state why in the PR description ("purely a lib/ change", "admin-facing but flagged off for this slice", etc.). Silent omissions are a review-blocker.
 
+## Seven-layer test harness — coverage rules
+
+The test harness is split into seven layers, each with its own CI status check. **A PR cannot merge unless the layers covering its change shape are green.** No exceptions for "small" or "trivial" changes — small surfaces are the ones that drift.
+
+| # | Layer | File convention | npm script | CI status check |
+|---|---|---|---|---|
+| 1 | Unit | `*.unit.test.ts`, mocked deps | `test:unit` | `test-unit` |
+| 2 | Contract | `*.contract.test.ts` + `__snapshots__/` | `test:contract` | `test-unit` (subset) |
+| 3 | Integration | `lib/__tests__/*.test.ts` (real Supabase) | `test:integration` | `test` |
+| 4 | Component | `components/__tests__/**/*.test.{ts,tsx}` | `test:components` | `test-components` |
+| 5 | E2E | `e2e/*.spec.ts` | `test:e2e` | `e2e` |
+| 6 | Security | `lib/__tests__/*.security.test.ts`, `tests/security/**` | `test:security` | included in `test-unit` / `test` |
+| 7 | Live probes + smoke | `scripts/probes/*.ts`, `e2e/smoke/*.spec.ts` | `test:smoke` | `smoke` (post-deploy) |
+
+### Hard floors — every PR
+
+- **New API route** → integration test (happy + auth-failure + validation) + security tests for the threat classes the route exposes (cross-tenant if tenant-scoped, injection if any user input flows to DB or LLM).
+- **New external SDK call** → contract snapshot under `lib/__tests__/*.contract.test.ts` + a probe script under `scripts/probes/<integration>.ts`.
+- **New user-facing journey** → e2e spec + `auditA11y` call.
+- **User-input rendering surface** (anything calling `dangerouslySetInnerHTML` or rendering operator/tenant content) → component-layer XSS test driving every `XSS_PAYLOADS` entry through the real renderer.
+- **New webhook receiver** → signature-verification security test that drives a real wrong-signed payload through the route handler and asserts 401.
+- **Any change to RLS policy** → cross-tenant isolation test using `seedTwoCompanies()` from `lib/__tests__/_security-helpers.ts`.
+- **Any change to a critical path** (auth, social, webhooks, billing) → production smoke must pass post-deploy.
+- **Any production bug fix that took >1 PR** → permanent regression test under `tests/regressions/<bug-slug>.test.ts` BEFORE the final fix merges.
+
+### Pre-PR checklist (paste this into the PR description)
+
+```
+- [ ] Lint, typecheck, build all green
+- [ ] Layer scripts run: which of test:unit / test:integration / test:components / test:e2e / test:security
+- [ ] Contract snapshots reviewed (if SDK calls touched)
+- [ ] Cross-tenant test added (if tenant-scoped resource added)
+- [ ] XSS payload coverage added (if user-content rendering touched)
+- [ ] Probe script updated (if SDK boundary changed)
+- [ ] Regression test added (if this fix is for a >1-PR production bug)
+```
+
+### Flaky tests
+
+Fixed within 24 hours of identification. **Never silent skip.** A test marked `test.skip()` or `it.skip()` without an inline comment linking the open issue + an owner is itself a CI break — the static-audit script flags it. `test.fixme()` (declarative) is the only acceptable skip variant; `test.skip()` runtime branches that bail-out on missing seed are forbidden — fix the seed.
+
+## Live diagnostic protocol — required before any "third-party bug" claim
+
+**No agent in this codebase may claim "third-party bug" for any external integration without completing this protocol first.** Six steps, all required, all attached to the incident doc:
+
+1. **Run the relevant probe script** in `scripts/probes/`. Capture full markdown output. Empty output = a missing probe = step-1-failed.
+2. **Verify the deployed bundle matches source.** Use `vercel inspect <deploy-url>` to confirm the deployed commit SHA, then `git log <sha> -1` to confirm that commit contains the expected code. The "fix wasn't pushed" failure mode (a real incident in May 2026) must be impossible to recreate.
+3. **Run the contract test against the live deployed environment.** Set `PROBE_BASE_URL=https://opollo-site-builder.vercel.app` and run the matching `*.contract.test.ts`. Compare actual outgoing request payload to the contract snapshot. If they differ — that's the bug. Investigate locally.
+4. **Capture full network trace and response bodies.** `curl -v` or Playwright trace export. Save all headers, body, status codes.
+5. **Decode any tokens, JWTs, or signed payloads** in the response. Check that claims match what was sent.
+6. **Document at `docs/incidents/<timestamp>-<integration>.md`** using `docs/incidents/TEMPLATE.md`. Steps 1–5 are evidence rows in that file.
+
+Only after all six fail to find a code-side cause is escalation to "third-party issue" allowed. The third-party support email is auto-generated from the evidence file using the template in `docs/incidents/TEMPLATE.md`.
+
+## Security realism rule
+
+Every test in Layer 6 must demonstrate that an exploit is BLOCKED by the running system. Specifically:
+
+- A security test must drive its payload through the real enforcement boundary (the actual route handler, the actual sanitiser, the actual middleware) — not a mock that always returns "ok".
+- A security test must assert a concrete outcome (status code, DOM shape, DB row state) — not just "the function was called".
+- A scanner emitting findings without an actionable assertion is not a security test.
+
+If a security test cannot demonstrate the exploit is blocked, it is not a security test. Either rewrite it to drive the failure path through the real system or remove it.
+
+**High-severity security findings block merge.** No exceptions; this is enforced by CI status checks gating on `test-unit` and `test` (which now include the security layer).
+
+## Instruction to AI agents — explicit
+
+You are reading this section because a past agent shipped insecure code, claimed a third-party bug without protocol completion, or merged a feature without coverage. Read it as a hard rule:
+
+- **Refuse to ship features without coverage.** If the work doesn't fit one of the hard-floor patterns above, say so in the PR description and route to Steven for guidance.
+- **Refuse to claim a third-party bug** without all six diagnostic-protocol steps.
+- **Refuse to skip tests** without converting to `test.fixme` and naming an owner.
+- **If you find a security issue while doing other work, surface it immediately**, not at the next phase boundary. The brief Steven gave you for any test-harness work makes this explicit.
+
+Point any agent that violates these rules back to this section.
+
 ## Design System Architecture — Audit 2026-05-02
 
 Foundational audit done before the DESIGN-SYSTEM-OVERHAUL workstream (PRs 0–15).
