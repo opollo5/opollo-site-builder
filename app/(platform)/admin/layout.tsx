@@ -5,7 +5,6 @@ import { checkAdminAccess } from "@/lib/admin-gate";
 import { CommandPalette } from "@/components/CommandPalette";
 import { DebugFooter } from "@/components/DebugFooter";
 import { SessionExpiryWatcher } from "@/components/session/session-expiry-watcher";
-import { Toaster } from "@/components/ui/toaster";
 
 export default async function AdminLayout({
   children,
@@ -21,7 +20,6 @@ export default async function AdminLayout({
   return (
     <>
       {children}
-      <Toaster />
       <CommandPalette />
       <SessionExpiryWatcher />
       {isSuperAdmin && (

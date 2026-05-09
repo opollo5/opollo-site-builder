@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { headers } from "next/headers";
 
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { NavShell, type NavUserContext } from "@/components/nav/nav-shell";
+import { Toaster } from "@/components/ui/toaster";
 
 // ---------------------------------------------------------------------------
 // PlatformLayout — single shared authenticated layout that renders NavShell
@@ -30,23 +32,33 @@ export default async function PlatformLayout({
 }) {
   const supabase = createRouteAuthClient();
 
+  // TODO(tech-debt): platform session + admin user are both fetched here AND
+  // in each section layout's checkAdminAccess(). Unify once all sections share
+  // a single auth boundary.
   const [platformSession, adminUser] = await Promise.all([
     getCurrentPlatformSession(supabase),
     getCurrentUser(supabase),
   ]);
 
+  const isOpolloStaff = platformSession?.isOpolloStaff ?? false;
+
+  // Only expose company context to /company/* routes — admin/account/optimiser
+  // routes had explicit companyId: null in their pre-refactor layouts.
+  const pathname = (await headers()).get("x-pathname") ?? "";
+  const isCompanyRoute = pathname.startsWith("/company");
+
+  let companyId: string | null = null;
   let companyName: string | null = null;
-  if (platformSession?.company?.companyId) {
+  if (isCompanyRoute && platformSession?.company?.companyId) {
+    companyId = platformSession.company.companyId;
     const svc = getServiceRoleClient();
     const { data } = await svc
       .from("platform_companies")
       .select("name")
-      .eq("id", platformSession.company.companyId)
+      .eq("id", companyId)
       .maybeSingle();
     companyName = (data as { name: string } | null)?.name ?? null;
   }
-
-  const isOpolloStaff = platformSession?.isOpolloStaff ?? false;
 
   const navContext: NavUserContext = {
     email: platformSession?.email ?? adminUser?.email ?? null,
@@ -59,13 +71,14 @@ export default async function PlatformLayout({
     isOpolloStaff,
     isCompanyAdmin:
       isOpolloStaff || platformSession?.company?.role === "admin" || false,
-    companyId: platformSession?.company?.companyId ?? null,
+    companyId,
     companyName,
   };
 
   return (
     <NavShell navContext={navContext}>
       {children}
+      <Toaster />
     </NavShell>
   );
 }

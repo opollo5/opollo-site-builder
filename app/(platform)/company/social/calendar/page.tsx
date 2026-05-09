@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SocialCalendarClient } from "@/components/SocialCalendarClient";
-import { getCurrentPlatformSession } from "@/lib/platform/auth";
+import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
 import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
 
@@ -60,13 +60,14 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
 
   const companyId = session.company.companyId;
 
-  const [entriesResult, connectionsResult] = await Promise.all([
+  const [entriesResult, connectionsResult, canCreate] = await Promise.all([
     listCompanyScheduleEntries({
       companyId,
       fromIso: gridStart.toISOString(),
       toIso: gridEnd.toISOString(),
     }),
     listConnections({ companyId }),
+    canDo(companyId, "create_post"),
   ]);
 
   const connections =
@@ -94,6 +95,7 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
           monthIso={monthIso}
           connections={connections}
           composerEnabled={composerEnabled}
+          canCreate={canCreate}
         />
       ) : (
         <div
