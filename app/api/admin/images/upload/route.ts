@@ -14,6 +14,7 @@ import { extractExifFields } from "@/lib/exif-extract";
 import { internalError, routeError, validationError } from "@/lib/http";
 import { readImageDimensions } from "@/lib/image-dimensions";
 import { embedAndStoreImage, refreshImageEmbedding } from "@/lib/images/embed";
+import { detectImageSource } from "@/lib/images/source-detection";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -247,12 +248,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const supabase = getServiceRoleClient();
+  const { source, sourceRef } = detectImageSource(filename);
   const insertRow = {
     cloudflare_id: cfRecord.id,
     filename,
     title: deriveTitle(exifRaw, filename),
-    source: "upload" as const,
-    source_ref: filename,
+    source,
+    source_ref: sourceRef,
     bytes: file.size,
     width_px: dims?.width ?? null,
     height_px: dims?.height ?? null,
