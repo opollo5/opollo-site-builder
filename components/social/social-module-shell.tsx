@@ -18,8 +18,9 @@ type SocialView = "calendar" | "posts" | "timeline";
 
 export interface SocialModuleShellProps {
   activeView: SocialView;
-  companyName: string;
   composerEnabled?: boolean;
+  /** When false, hides the New post CTA from the toolbar. Default: true. */
+  showNewPostCta?: boolean;
   periodNavigator?: React.ReactNode;
   toolbarActions?: React.ReactNode;
   children: React.ReactNode;
@@ -39,8 +40,8 @@ const VIEW_LABEL: Record<SocialView, string> = {
 
 export function SocialModuleShell({
   activeView,
-  companyName,
   composerEnabled = false,
+  showNewPostCta = true,
   periodNavigator,
   toolbarActions,
   children,
@@ -76,20 +77,6 @@ export function SocialModuleShell({
         data-testid="social-module-toolbar"
         className="mb-4 flex flex-wrap items-center gap-3"
       >
-        {/* Workspace selector — read-only pill (V1) */}
-        <Button
-          variant="secondary"
-          size="sm"
-          type="button"
-          aria-disabled="true"
-          tabIndex={-1}
-          title={companyName}
-          className="cursor-default pointer-events-none"
-        >
-          <span className="max-w-[10rem] truncate">{companyName}</span>
-          <NavIcon name="chevron-down" size={14} />
-        </Button>
-
         {/* Period navigator slot (calendar passes ‹ Month YYYY ›) */}
         {periodNavigator ? <div>{periodNavigator}</div> : null}
 
@@ -100,14 +87,16 @@ export function SocialModuleShell({
         {toolbarActions ? <div>{toolbarActions}</div> : null}
 
         {/* Primary CTA — pushed right; wraps to its own row on narrow viewports */}
-        <div className="ml-auto">
-          <Button asChild size="sm" data-testid="social-new-post-cta">
-            <Link href={newPostHref}>
-              <NavIcon name="plus" size={16} />
-              New post
-            </Link>
-          </Button>
-        </div>
+        {showNewPostCta && (
+          <div className="ml-auto">
+            <Button asChild size="sm" data-testid="social-new-post-cta">
+              <Link href={newPostHref}>
+                <NavIcon name="plus" size={16} />
+                New post
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
 
       {children}

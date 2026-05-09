@@ -45,7 +45,6 @@ type RowActionKind = "approving" | "rejecting" | "requesting";
 
 type Props = {
   companyId: string;
-  companyName: string;
   initialPosts: PostMasterListItem[];
   canCreate: boolean;
   canApprove?: boolean;
@@ -133,7 +132,6 @@ function buildUrl({
 
 export function SocialPostsListClient({
   companyId,
-  companyName,
   initialPosts,
   canCreate,
   canApprove = false,
@@ -313,8 +311,8 @@ export function SocialPostsListClient({
   return (
     <SocialModuleShell
       activeView="posts"
-      companyName={companyName}
       composerEnabled={composerEnabled}
+      showNewPostCta={false}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
