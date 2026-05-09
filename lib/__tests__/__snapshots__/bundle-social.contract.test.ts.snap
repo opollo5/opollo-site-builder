@@ -1,0 +1,49 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: bundle.social socialAccountCreatePortalLink > [snapshot] LinkedIn-only (personal+company → single LINKEDIN) 1`] = `
+{
+  "requestBody": {
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616",
+    "socialAccountTypes": [
+      "LINKEDIN",
+    ],
+    "teamId": "team-contract-snapshot",
+    "userLogoUrl": undefined,
+    "userName": undefined,
+  },
+}
+`;
+
+exports[`CONTRACT: bundle.social socialAccountCreatePortalLink > [snapshot] all platforms — order, dedup, shape are stable 1`] = `
+{
+  "requestBody": {
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616",
+    "socialAccountTypes": [
+      "LINKEDIN",
+      "FACEBOOK",
+      "TWITTER",
+      "GOOGLE_BUSINESS",
+    ],
+    "teamId": "team-contract-snapshot",
+    "userLogoUrl": undefined,
+    "userName": undefined,
+  },
+}
+`;
+
+exports[`CONTRACT: bundle.social socialAccountCreatePortalLink > [snapshot] empty platforms[] fallback 1`] = `
+{
+  "requestBody": {
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616",
+    "socialAccountTypes": [
+      "LINKEDIN",
+      "FACEBOOK",
+      "TWITTER",
+      "GOOGLE_BUSINESS",
+    ],
+    "teamId": "team-contract-snapshot",
+    "userLogoUrl": undefined,
+    "userName": undefined,
+  },
+}
+`;
