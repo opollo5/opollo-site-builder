@@ -1,321 +1,194 @@
 # Opollo Site Builder — Working Brief
 
 ## What this is
+
 Next.js 14 (App Router) + TypeScript + Tailwind + shadcn/ui + Vercel AI SDK.
-A chat interface that generates WordPress pages for Opollo's clients.
+A chat interface that generates WordPress pages for Opollo's clients, plus a
+multi-tenant social posting platform (bundle.social), plus the Optimiser
+module for landing-page optimisation.
 
-## How to work
-- Work autonomously. Don't ask for permission for normal coding tasks.
-- **Docs index:** `docs/README.md` is the navigable map of the docs/ tree — consult it first when you need to find a document.
-- **Before starting a task that matches a pattern, read `docs/patterns/<pattern-name>.md` first.** The patterns folder is the playbook for recurring shapes — files, tests, PR structure, known pitfalls. If no pattern matches, proceed from first principles and note whether the task is a candidate for a new pattern.
-- **For operations tasks** (deploy rollback, key rotation, stuck incident, missing migration, env-var provisioning) — consult `docs/runbooks/RUNBOOK.md` before acting. Do not freelance on destructive or irreversible operations.
-- **For one-off rules that aren't patterns** (test-helper discipline, fresh-stack config, CI-stuck recovery, write-safety audit requirement, UX-debt capture discipline, secret-handling discipline) — see `docs/architecture/RULES.md`. Each rule has the incident that taught it.
-- **Spec brief preservation:** when Steven pastes a spec into a new session, save it immediately to `docs/specs/<NN>-<slug>.md` before starting work. A spec living only in the conversation context is lost when context rolls. If no spec file yet exists, write it from the pasted text before opening the first PR.
-- After any change: run lint, typecheck, and build. Fix failures yourself before reporting back.
-- When reporting back, give me a one-paragraph summary, not a blow-by-blow.
-- After opening a PR, monitor CI until it passes. If CI fails, read the failure, fix it, push again. Repeat until green.
-- "Done" means: PR merged (or handed to Steven for merge, where required) and summary posted. Not: PR open, CI running, waiting for input.
+This file is the operating manual every session reads first. Architecture
+detail, audits, and operational deep-dives live under `docs/`. The
+"Pointers" section at the bottom is the canonical index.
 
-## Merging
-- Auto-merge your own PRs when ALL of these are true:
-  - CI is fully green (all required checks pass)
-  - No review requested and no pending review comments
-  - The PR was opened by Claude Code (not by Steven)
-  - The PR is not write-safety-critical (see below)
-- Human merge still required for:
-  - Any PR Claude Code escalates to Steven for a decision
-  - M3, M4, M7 milestone PRs (concurrency / transactional / circuit breaker code)
-  - Any PR Steven explicitly flags for review
+## Instruction to AI agents — explicit
 
-## Self-test loop
-- Retry ceiling is 10 attempts per PR, not 3. Retry count alone is no longer the escalation trigger — "not converging" is.
-- Escalate to Steven only when: (a) you see the same failure twice in a row (the fix isn't landing), or (b) you hit a genuine architectural question requiring his input — spec deviation, security tradeoff, schema decision.
-- CI failure logs are auto-posted as PR comments by `.github/workflows/ci.yml` (added in PR #18). Read those comments directly instead of asking Steven to paste logs.
+You are reading this section because a past agent shipped insecure code,
+claimed a third-party bug without protocol completion, or merged a feature
+without coverage. Read it as a hard rule:
 
-## Sub-slice autonomy
-For sub-slices of a parent milestone whose plan Steven has already approved (M2a/b/c/d under M2, etc.), execute end-to-end without per-slice plan review:
+- **Refuse to ship features without coverage.** If the work doesn't fit one of the hard-floor patterns in §"Seven-layer test harness", say so and route the question to Steven.
+- **Refuse to claim a third-party bug** without all seven steps of §"Live diagnostic protocol".
+- **Refuse to skip tests** silently. Convert to `test.fixme` with an open issue link or remove with reasoning.
+- **Surface security findings the moment you see them.** Do not defer them into a roadmap doc. See §"Security escalation".
+- **Verify, don't assume.** See §"Verification over assumption".
+- **Stop loops early.** See §"Loop detection".
 
-- Propose the sub-slice plan in the PR description itself, not as a message to Steven beforehand.
-- Write code immediately against the approved parent plan.
-- Open the PR with plan-as-description + code + tests in one go.
-- Self-correct CI failures within the 10-retry ceiling above.
-- Auto-merge when green.
-- Status update to Steven once merged: one-liner, e.g. "M2c-2 merged, proceeding to M2c-3."
+Point any agent that violates these rules back to this section.
 
-Escalate only for: architectural decisions not in the parent plan, spec deviations, security tradeoffs, or same-failure-twice CI loops. Do NOT escalate for: sub-slice planning, operational/infra issues, routine tradeoffs already covered in the parent plan.
+## Engineering principles
 
-## Auto-continue — across sub-slices AND across milestones
-After an auto-merged PR, automatically proceed to the next PR per the roadmap. No stop-gates at sub-slice boundaries, no stop-gates at parent-milestone boundaries. Silence = keep going.
+These are the tradeoff defaults. When in conflict with a specific rule
+below, the specific rule wins; otherwise apply these.
 
-Rule chain:
+1. **Prefer reversible decisions over irreversible.** A revert window matters more than a clever shortcut.
+2. **Prefer correctness over cleverness.** Boring code that obviously matches the spec ships faster than smart code that needs explanation.
+3. **Prefer narrow tested fixes over broad untested refactors.** A bug fix is not a license to clean up. Ship the fix; open a separate slice for the cleanup if it's warranted.
+4. **Prefer rollback over forward-patch during incidents.** Cross-references §"Incident stabilisation priority". Forward-patches under pressure are how the original bug compounded.
+5. **Prefer verification over inference.** See §"Verification over assumption".
 
-- `M2c-1 merged → start M2c-2`
-- `M2c-2 merged → start M2c-3`
-- `M2c-3 merged → start M2d-1` (next slice of parent M2)
-- `M2d-N (last) merged → start M3-1` (next milestone per the roadmap)
-- `M3-N (last) merged → start M4-1`
-- etc. through the roadmap in the technical design doc.
+## Merge decision tree
 
-Write-safety-critical milestones (M3 batch generator, M4 image library, M7 anything that spends money or mutates client WP sites) still require per-slice plans with the **"Risks identified and mitigated"** audit. That audit + the concurrency / E2E / migration / RLS test patterns are the safety net — not a wait for Steven at a milestone boundary.
+The single source of truth on whether Claude Code can auto-merge a PR.
+Walk top to bottom.
 
-Stop and wait for Steven only when:
-- An architectural escalation surfaces (cost tradeoff, spec ambiguity, security decision — things the plan can't resolve).
-- The same CI failure lands twice in a row (same-failure-twice rule).
-- A required env var is missing (note what's needed, skip the affected sub-slice, continue with slices that don't depend on it).
-- Steven explicitly tells you to pause — e.g. "I want to test M4 before starting M5." Silence is NOT a pause signal; it's a proceed signal.
+```
+1. Is the PR write-safety-critical?
+   (M3 batch generator | M4 image library | M7 anything that spends money
+    or mutates client WP sites | any code path that gates a billed external
+    call without idempotency | any encryption / decryption code path)
+   ├─ Yes → STOP. Steven merges.
+   └─ No  → continue.
 
-Post a one-line status ping per merge: `"<slice> merged, starting <next>"`. That's the visibility channel — Steven reads the pings in his GitHub inbox.
+2. Is the PR on the milestone human-merge list?
+   (M3, M4, M7. Plus any milestone Steven explicitly flagged as human-merge.)
+   ├─ Yes → STOP. Steven merges.
+   └─ No  → continue.
 
-## Parallelism (multi-session coordination)
-Serial-single-session is the default. When Steven runs two browser tabs of Claude Code in parallel, coordinate via `docs/WORK_IN_FLIGHT.md` and follow `docs/PARALLELISM_PLAN.md`:
+3. Was the PR opened by Steven?
+   ├─ Yes → STOP. Steven merges.
+   └─ No  → continue.
 
-- Read `docs/WORK_IN_FLIGHT.md` before editing any file. Respect the other session's claims + the "Hot-shared" list.
-- Append a claim block with your branch, slice, files claimed, and (if applicable) reserved migration number.
-- Prefix every status message to Steven with `[Session A]` / `[Session B]` so cross-session output stays legible.
-- On merge, remove your claim block in the next PR's first commit (or a one-line cleanup PR if nothing's queued).
-- Conflict with the other session's claims → stop and ask Steven; do NOT coordinate with the other session directly.
+4. Has Steven flagged this PR for review (comment, label, or message)?
+   ├─ Yes → STOP. Wait for review.
+   └─ No  → continue.
 
-The bootstrap prompt Steven pastes into a second tab lives in `docs/PARALLELISM_PLAN.md` → *The bootstrap prompt*.
+5. Is CI fully green on every required status check?
+   ├─ No  → see §"Self-test loop" + §"Auto-merge — operational notes".
+   └─ Yes → continue.
 
-## Enabling auto-merge on every PR
-Every PR must have GitHub auto-merge armed at creation time. Call `mcp__github__enable_pr_auto_merge` (with `mergeMethod: "SQUASH"`) immediately after `create_pull_request` — it is not enabled implicitly. Without that call, the PR sits in the mergeable state until someone clicks the button in the UI, breaking the self-driving loop.
+6. Are there pending review requests or unresolved review comments?
+   ├─ Yes → STOP. Wait for review.
+   └─ No  → continue.
 
-## PR auto-merge monitoring
-
-When monitoring a PR with auto-merge armed, handle the "out-of-date with base branch" state, not just merged/failed. Specifically:
-
-1. If a polled PR shows state OPEN with mergeable=BEHIND (or equivalent signal that the branch is behind main), run `gh pr update-branch <PR>` automatically.
-2. If update-branch fails due to merge conflict, stop and report — do not force it.
-3. If update-branch succeeds, continue polling; CI will re-run and auto-merge fires when green.
-4. Apply this to every PR being monitored, including ones stacked behind other PRs that just merged.
-
-This prevents the failure mode where PR A merges, PR B becomes behind main, and the monitor waits forever because auto-merge can't fire on a behind-main branch.
-
-## Self-audit is the review; proceed without external gate
-Self-audit is the first AND the final layer for planning. Once a plan has a populated **"Risks identified and mitigated"** section (see below for what that must contain), proceed directly to implementation. Do NOT post plans to Steven or Claude.ai as a review gate — not for parent milestones, not for sub-slices.
-
-Where plans live:
-- Parent milestone plans go in the first sub-slice's PR description.
-- Sub-slice plans go in their own PR description.
-- Status updates ("M3-1 merged, starting M3-2") happen once per merge — that's the visibility channel.
-
-Escalate to Steven only when:
-- You cannot self-resolve a tradeoff (cost, deadline, spec ambiguity).
-- A decision needs information you don't have (legal, security review, infrastructure cost ceiling).
-- The same CI failure lands twice in a row.
-
-Every plan MUST include a **"Risks identified and mitigated"** section listing:
-
-- Each write-safety hotspot in the proposed design (billed external calls, concurrent writers, multi-row state transitions, triggers, race windows, schema-level uniqueness assumptions).
-- How the plan mitigates it (idempotency key, DB unique constraint, advisory lock, dedicated test case, etc.).
-- Any gaps you are deliberately deferring, with a reason and a follow-up slice / milestone pointer.
-
-If an obvious write-safety gap exists (missing idempotency key on a billed external call, missing constraint on a high-churn table, missing test assertion on a concurrency invariant, trigger that can deadlock with a worker), fix it in the plan *before* coding. Write-safety-critical milestones (M3 batch generator, anything that spends money or mutates client WP sites) get this audit applied to every sub-slice plan, not just the parent milestone plan.
-
-A plan without a populated "Risks identified and mitigated" section is not ready to execute.
-
-## Commands
-- `npm run dev` — local dev
-- `npm run lint` — ESLint
-- `npm run typecheck` — tsc --noEmit
-- `npm run build` — production build
-- `npm run test` — Vitest
-- `npm run test:coverage` — Vitest with V8 coverage (60% line / 55% branch baseline)
-- `npm run test:e2e` — Playwright (requires `supabase start`)
-- `npm run audit:static` — static-analysis script (`scripts/audit.ts`) catching middleware/auth/db/migration/typography/env-var/error-handling/dead-route class errors before runtime. **HIGH severity gates CI.** Per `docs/architecture/RULES.md` rule #8 — see also the PLATFORM-AUDIT workstream PRs (#386, #389, #392, #394, #396, #398, #400, #402).
-- `npm run analyze` — production build with @next/bundle-analyzer reports
-
-## DX hygiene
-Pre-commit and commit-message hygiene is enforced via Husky. Hooks install on
-`npm install` via the `prepare` script.
-
-- **pre-commit:** `lint-staged` runs ESLint (auto-fix) on staged JS/TS and
-  stylelint on CSS. Any remaining warning fails the commit — `--max-warnings=0`.
-- **commit-msg:** `commitlint` enforces Conventional Commits
-  (feat / fix / chore / refactor / docs / test / perf / build / ci / revert).
-  Milestone scopes like `feat(m3-6):` or `feat(infra):` pass the default rule
-  set; header length cap is 100 chars.
-
-Supply-chain scanning runs server-side:
-- **CodeQL** (`.github/workflows/codeql.yml`) — SAST on every PR + weekly cron.
-- **Dependabot** (`.github/dependabot.yml`) — weekly npm + actions refresh,
-  Radix grouped, minors/patches grouped, majors separate.
-- **gitleaks** (`.github/workflows/gitleaks.yml`) — secret scan with
-  `.gitleaks.toml` allow-list for the deterministic test master key + local
-  Supabase JWTs.
-- **npm audit** (`.github/workflows/audit.yml`) — blocks on critical CVEs in
-  prod deps, informational at high. Threshold will tighten to `high` once the
-  pending Next.js framework upgrade lands.
-
-## Standards
-- Server Components by default; Client Components only when required
-- shadcn/ui components over custom; Tailwind utility classes only
-- Strict TypeScript — no `any`, no `@ts-ignore`
-- One logical change per commit; conventional commit messages
-
-## Navigation architecture (two-level rail + section panel)
-
-Two-level persistent navigation, Semrush-shaped:
-
-- **Primary rail (`components/nav/primary-nav.tsx`, 70px wide):** always
-  visible. Round Opollo icon at top, icon + short label per item, ⌘K +
-  Sign out pinned at the bottom rail. Active item uses `bg-nav-active`
-  only — no border, no green text, no accent bar.
-- **Section panel (`components/nav/section-nav.tsx`, 220px wide):**
-  conditionally visible — only when the active primary item carries a
-  `sectionNav` config in `nav-config.ts`. Title at top, optional
-  `CompanySelector` below the title (Social section, Opollo staff only),
-  group headers in muted uppercase, items in `text-sm`. Active item uses
-  `bg-nav-active` + `font-medium` only.
-- **Mobile:** hamburger top-bar opens an off-canvas drawer that lists
-  primary items as an accordion (section nav items expand inline).
-
-### Rules — never violate
-
-- All nav config lives in `components/nav/nav-config.ts` — single
-  source of truth for primary items + section nav structure + filter
-  predicates (`requiresAdminTier`, `requiresSuperAdmin`,
-  `requiresCompanyAdmin`).
-- Don't render nav chrome from `page.tsx` files or child layouts. The
-  shell wraps everything; pages render content only.
-- Don't truncate primary-rail labels. If a label doesn't fit, shorten
-  the word (e.g. "Companies" → "Clients" if needed).
-- Don't add bottom-rail items beyond ⌘K and Sign out. Account surfaces
-  go behind the avatar/dropdown or under the Admin section nav.
-- Don't use the wordmark logo in the rail. The round
-  `/images/opollo-icon.png` icon is the only logo here.
-
-### Icon system — Linearicons web font
-
-All icons across the entire app use the Linearicons icon font wrapped
-by `<NavIcon>`. See `docs/patterns/icons.md` for the full intent map +
-sizing convention. Never import from `lucide-react` (the package was
-removed in the two-level-nav workstream).
-
-```tsx
-import { NavIcon } from "@/components/ui/nav-icon";
-
-<NavIcon name="calendar-full" size={16} />
+7. Auto-merge: poll `gh pr checks` until all green, then `gh pr merge --squash`.
+   Do NOT use `--auto` — branch protection has no required checks here, so
+   `--auto` fires immediately without CI. Project memory documents this.
 ```
 
-Font files live at `public/fonts/linearicons/` (copied from
-`assets/Linearicons/fonts/`); the CSS class definitions are at
-`public/fonts/linearicons/linearicons.css` and loaded via a `<link>`
-tag in `app/layout.tsx`. The woff is preloaded so icon glyphs don't
-flash blank on first paint.
+Full background and edge cases: `docs/governance/MERGE_RULES.md`.
 
-### Adding a new top-level section
+## Communication
 
-1. Add an entry to `primaryNavItems` in `components/nav/nav-config.ts`.
-2. If the section has sub-items, populate `sectionNav` with one or more
-   groups; each group has an optional uppercase `label` and an array
-   of `SectionNavItem`s.
-3. Pages under the section render content only — no nav chrome.
+Do not send conversational progress narration. Communicate only on:
 
-## Git workflow
-- Branch per task: `feat/`, `fix/`, `chore/`, `refactor/`
-- Always open a PR, never push direct to main
-- PR description should reference the issue it closes
+- Completed milestones (slice merged, phase finished)
+- Verified findings (test red-on-break confirmed, exploit reproduced + blocked)
+- Real blockers (missing env var, external signup needed, architectural ambiguity)
+- Security findings (immediate, regardless of current task — see §"Security escalation")
+- Architectural escalations (cost tradeoff, spec ambiguity, security decision)
+- Final outcomes (PR merged, CI green, incident resolved)
 
-## What I care about
-- Don't loop me in on routine errors — fix and retry
-- Do loop me in on design decisions or scope questions
-- Keep PRs small enough to review in 5 minutes
-- **RUNBOOK is load-bearing for incident response. Code that changes a blocker code, audit event name, or error envelope MUST update the matching `docs/runbooks/RUNBOOK.md` entry in the same PR.**
-- **Never print env-var values or connection strings to tool output.** Any command that reads from `.env.local`, env, or another secret source runs with `2>$null` (PowerShell) / `2>/dev/null` (bash). Pass values via variables — never inline them into the visible command, never `Write-Output`/`Write-Host`/`echo` them, never paste a connection string into a chat update. If you need to confirm a value is set, print only its length or a hash prefix. Tool output that surfaces a secret (CLI parse errors, `--debug` flags, verbose logs) gets piped through a redactor before it reaches the conversation. Full rule + incident: `docs/architecture/RULES.md` #9.
+The heartbeat rule (§"Heartbeat") is the only exception during long
+autonomous runs.
 
-## Performance standards
-- **Lighthouse CI:** every PR runs `.github/workflows/lighthouse.yml`
-  against a production build of `/login` (session-gated admin surfaces
-  are out of scope — they'd need the full Supabase-in-CI flow to render).
-  Thresholds are `warn` for now; baseline ratchets to `error` once we
-  have a few runs of stable history.
-- **EXPLAIN ANALYZE for hot-path queries:** any new DB query in a code
-  path that runs per-request or per-slot (chat route, batch worker,
-  middleware, admin list pages) MUST be EXPLAIN ANALYZE'd against a
-  realistic-volume seed before merge. Paste the plan in the PR
-  description so the index decision is visible in history. Pointed-read
-  queries keyed by PK/UUID skip this; new JOINs, LIKE / ILIKE, ORDER BY,
-  and anything without an obvious index path do not.
+## Verification over assumption
 
-## Data + AI conventions
-Lives in dedicated docs so this file doesn't sprawl:
+Never claim any of the following without direct verification by command
+output, CI status, API response, or observable system state. Inference is
+not verification.
 
-- `docs/architecture/DATA_CONVENTIONS.md` — soft-delete (`deleted_at` + `deleted_by`),
-  audit columns (`created_at` / `updated_at` / `created_by` / `updated_by`),
-  `version_lock` for optimistic concurrency, `supabase/data-migrations/`
-  contract. Forward-facing; existing tables fold in on the next natural
-  migration.
-- `docs/architecture/PROMPT_VERSIONING.md` — `lib/prompts/vN/` layout, per-version
-  immutability, eval harness under `__evals__/`, prompt injection
-  defense via tagged inputs, per-tenant cost budgets spec, Langfuse
-  integration. Cutover is its own sub-slice (blocked on
-  `LANGFUSE_*` env provisioning for the shipping path).
-- `docs/runbooks/RUNBOOK.md` — on-call playbook: deploy rollback, auth
-  break-glass, batch cancellation, WP publish failures, Supabase
-  quota, security incident response.
+- A deploy succeeded
+- A migration applied
+- A test passed
+- A webhook fired
+- A queue drained
+- A smoke suite passed
+- A branch merged
+- A rollback completed
+- A third-party integration works
 
-## Release hygiene
-- `.github/workflows/release-please.yml` watches main; every merge
-  aggregates conventional commits into a Release PR that bumps
-  `package.json` + generates `CHANGELOG.md`. Merging that PR cuts
-  a GitHub Release + git tag.
-- No external secrets — default `GITHUB_TOKEN` is enough.
-- Commit discipline matters for the changelog: `feat:` → Features,
-  `fix:` → Bug Fixes, `perf:` → Performance, etc. `chore:` / `test:`
-  / `ci:` / `build:` are hidden from the user-facing changelog.
+If you cannot verify, say "I have not verified <X>; the evidence I have
+is <Y>" and pause until you can verify or until Steven directs otherwise.
 
-## Observability + security contract
-Every change has to honour the following invariants. They landed with the
-security-observability-baseline sub-PR and fail-fast CI is how they stay true.
+## Loop detection
 
-- **Request IDs:** every HTTP response carries `x-request-id`. Middleware
-  propagates a well-formed incoming UUID; otherwise it mints a fresh UUIDv4.
-  Don't log, print, or return "unknown" — the logger reads it from
-  AsyncLocalStorage (`lib/request-context.ts`) automatically.
-- **Structured logging:** use `import { logger } from "@/lib/logger"`.
-  Never `console.log` in production paths. `logger.{debug,info,warn,error}`
-  emits one JSON line per call, pulls context fields from
-  AsyncLocalStorage, and sanitises Error / bigint / deep objects. When
-  Axiom provisioning lands, the transport swap is one-file.
-- **Health endpoint:** `/api/health` is the liveness/readiness contract.
-  Add checks for any new hard dependency (e.g. Redis when rate limiting
-  is wired). 200 = all green, 503 = degraded.
-- **Security headers:** `lib/security-headers.ts` is the single source
-  of truth. X-Frame-Options, X-Content-Type-Options, Referrer-Policy,
-  Permissions-Policy, HSTS, and CSP (report-only) are applied to every
-  response. If you need to relax a header for a single route, document
-  *why* in a comment next to the override.
-- **Supply-chain scans:** CodeQL, Dependabot, and gitleaks run on every
-  push + PR. New dependencies must clear CodeQL; leaked-secret matches
-  block merge. If a fixture legitimately matches a gitleaks rule, add
-  it to `.gitleaks.toml` with a justification comment.
-- **Env provisioning:** anything that reaches an external service must
-  degrade gracefully when its secret is unset (Sentry no-op without DSN,
-  in-memory logger without Axiom token, etc.). Hard-requiring an env
-  var at cold-start is reserved for secrets that are operationally
-  guaranteed (Supabase URL, service role key).
-- **Transactional email** ships through `lib/email/sendgrid.ts` and
-  `lib/email/templates/base.ts` only. Direct `@sendgrid/mail` imports
-  outside those two files are a code-review block. Every send writes
-  a row to `email_log` (success or failure). Required env vars:
-  `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME`.
-  Smoke-test the wrapper from prod with
-  `npx tsx scripts/send-test-email.ts <to-email>`.
+If the same class of failure persists across two materially different fix
+attempts, **stop retrying**. Narrow the problem, isolate the subsystem,
+document current evidence, and reassess assumptions before the next
+attempt. Repeated retries without new evidence are failure amplification.
 
-## E2E coverage is a hard requirement for admin UI changes
-Every PR that adds or substantially changes an admin-facing route, form, or action MUST include a Playwright spec for its happy path. Specs live in `e2e/*.spec.ts`; run locally with `npm run test:e2e` (requires `supabase start`).
+"Same class" means: same workflow, same job, same first error line. A
+different first error line is a new failure (and resets the per-class count).
 
-- A new page → a new spec OR a new test in the closest topical file (sites / users / batches / auth).
-- A new form or modal → at least one test that opens it, submits it, and verifies the after-state.
-- A new API mutation that has a UI surface → covered by the UI spec that drives it (the API itself is covered at the unit layer).
-- Every spec navigates to every page it touches and runs `auditA11y(page, testInfo)` — axe findings are non-blocking today but the history is building for the Level-3 upgrade.
+Hard ceiling: ten retry pushes total per PR, regardless of class. After
+ten, escalate to Steven with the full evidence chain.
 
-If a change is tested only at the unit layer and not in E2E, state why in the PR description ("purely a lib/ change", "admin-facing but flagged off for this slice", etc.). Silent omissions are a review-blocker.
+## Incident stabilisation priority
+
+During production incidents, in this order:
+
+1. **Restore stability.** Get users back to a working surface.
+2. **Contain blast radius.** Disable the broken path, isolate the failed deploy, lock the credential.
+3. **Preserve evidence.** Capture network traces, logs, decoded tokens, deployed bundle SHA, env-var state. The §"Live diagnostic protocol" is the canonical evidence template.
+4. **Investigate root cause** only after the above.
+
+Rollback to last known-good is preferred over speculative forward-fixes
+when users are actively impacted.
+
+## Risk-weighted execution
+
+For changes involving any of: auth, billing, webhooks, multi-tenant
+boundaries, concurrency, external side effects, destructive mutations,
+production infrastructure, data migrations, or security enforcement —
+**prioritise verification depth over implementation speed**. A slower
+correct fix is preferred over a fast uncertain fix.
+
+This complements §"Auto-continue": auto-continue applies to low-risk
+paths. The list above is the high-risk set; pause and verify on each
+sub-step rather than chaining.
+
+## Security escalation
+
+If a suspected vulnerability could expose any of the following, surface
+**immediately** — even if unrelated to the current task. Do not defer
+exploitable findings into roadmap docs.
+
+- Tenant data
+- Credentials (production secrets, API keys, master keys, OAuth tokens)
+- Authentication state (session bypass, role elevation, MFA bypass)
+- Billing operations (any future billing surface)
+- Webhook authenticity (signature verification gap)
+- Arbitrary code execution (XSS, deserialisation, prompt-injection-to-RCE)
+
+Surfacing means: stop the current task, post a finding to Steven with
+severity + exploit path + evidence, then wait for direction. Material
+findings landed during a PR get the immediate-surface treatment, not a
+phase-boundary summary.
+
+## Critical paths
+
+A "critical path" is any route or surface where a regression directly
+impacts user trust, billing, security, or data integrity. Production
+smoke (Layer 7) MUST pass for changes touching these.
+
+| Class | Routes / surfaces |
+|---|---|
+| **Auth** | `/api/auth/*` (login, callback, logout, accept-invite, reset-password, forgot-password, change-password, devices), middleware session enforcement |
+| **Social — connect / publish** | `/api/platform/social/connections/*`, `/api/platform/social/posts/[id]/{schedule,submit,approve,publish-attempts,recipients}`, `/api/webhooks/bundlesocial`, `/api/webhooks/qstash/social-publish` |
+| **Multi-tenant boundaries** | Any RLS-protected route under `/api/platform/*`, `/api/admin/sites/[id]/*`, `/api/admin/companies/*` |
+| **Billing** | (none today — slot reserved for future) |
+| **Encryption** | Anything that touches `lib/encryption.ts` (`site_credentials.encrypted_value`, `opt_client_credentials`) |
+| **Data migrations** | Any change to `supabase/migrations/`, `supabase/rollbacks/` |
+| **Brief generation hot path** | `/api/cron/process-brief-runner`, `/api/cron/process-batch`, `/api/briefs/[brief_id]/{run,commit,cancel}` (cost + correctness) |
+
+Full enumeration with file paths and last-modified history:
+`docs/architecture/CRITICAL_PATHS.md`.
 
 ## Seven-layer test harness — coverage rules
 
-The test harness is split into seven layers, each with its own CI status check. **A PR cannot merge unless the layers covering its change shape are green.** No exceptions for "small" or "trivial" changes — small surfaces are the ones that drift.
+Every PR must satisfy the layer rules for its change-shape. CI status
+checks gate on the layers covered.
 
 | # | Layer | File convention | npm script | CI status check |
 |---|---|---|---|---|
@@ -327,18 +200,161 @@ The test harness is split into seven layers, each with its own CI status check. 
 | 6 | Security | `lib/__tests__/*.security.test.ts`, `tests/security/**` | `test:security` | included in `test-unit` / `test` |
 | 7 | Live probes + smoke | `scripts/probes/*.ts`, `e2e/smoke/*.spec.ts` | `test:smoke` | `smoke` (post-deploy) |
 
-### Hard floors — every PR
+### Hard floors per change-shape
 
-- **New API route** → integration test (happy + auth-failure + validation) + security tests for the threat classes the route exposes (cross-tenant if tenant-scoped, injection if any user input flows to DB or LLM).
-- **New external SDK call** → contract snapshot under `lib/__tests__/*.contract.test.ts` + a probe script under `scripts/probes/<integration>.ts`.
-- **New user-facing journey** → e2e spec + `auditA11y` call.
-- **User-input rendering surface** (anything calling `dangerouslySetInnerHTML` or rendering operator/tenant content) → component-layer XSS test driving every `XSS_PAYLOADS` entry through the real renderer.
-- **New webhook receiver** → signature-verification security test that drives a real wrong-signed payload through the route handler and asserts 401.
-- **Any change to RLS policy** → cross-tenant isolation test using `seedTwoCompanies()` from `lib/__tests__/_security-helpers.ts`.
-- **Any change to a critical path** (auth, social, webhooks, billing) → production smoke must pass post-deploy.
+- **New API route** → integration (happy + auth + validation) + cross-tenant if tenant-scoped + injection if user input flows to DB or LLM.
+- **New external SDK call** → contract snapshot + probe script.
+- **New user-facing journey** → e2e + `auditA11y`.
+- **User-input rendering surface** (`dangerouslySetInnerHTML` or operator/tenant content) → component-layer test driving every `XSS_PAYLOADS` entry through the real renderer.
+- **New webhook receiver** → signature-verification security test driving real wrong-signed payload through the route handler, asserting 401.
+- **Any change to RLS policy** → cross-tenant isolation test using `seedTwoCompanies()`.
+- **Any change to a critical path** (§"Critical paths") → production smoke must pass post-deploy.
 - **Any production bug fix that took >1 PR** → permanent regression test under `tests/regressions/<bug-slug>.test.ts` BEFORE the final fix merges.
 
-### Pre-PR checklist (paste this into the PR description)
+### Flaky / fixme tests
+
+`test.skip()` runtime branches that bail on missing seed are forbidden —
+fix the seed. `test.fixme()` is the only acceptable skip variant, and
+**every fixme MUST link an open issue within seven days** (provisional —
+adjust on real-world data). CI fails the build if any fixme has been
+open longer with no linked issue. The static-audit script flags
+violators.
+
+## Live diagnostic protocol — required before any "third-party bug" claim
+
+**No agent in this codebase may claim "third-party bug" for any external
+integration without completing this protocol first.** Seven steps, all
+required, all attached to the incident doc using
+`docs/incidents/TEMPLATE.md`.
+
+0. **Confirm env vars the failing path depends on are SET in the target deployment.** Use `vercel env ls` (production scope). Missing env is a config issue, not a third-party bug.
+1. **Run the relevant probe script** in `scripts/probes/`. Capture full markdown output. Empty output = a missing probe = step-1-failed.
+2. **Verify the deployed bundle matches source.** Use `vercel inspect <deploy-url>` to confirm the deployed commit SHA, then `git log <sha> -1` to confirm the commit content. The "fix wasn't pushed" failure mode (May 2026 incident) must be impossible to recreate.
+3. **Run the contract test against the live deployed environment.** Set `PROBE_BASE_URL=https://opollo-site-builder.vercel.app`. If the actual outgoing request payload differs from the contract snapshot — that's the bug. Investigate locally.
+4. **Capture full network trace and response bodies.** `curl -v` or Playwright trace export. All headers, body, status codes.
+5. **Decode any tokens, JWTs, or signed payloads** in the response. Check that claims match what was sent.
+6. **Document at `docs/incidents/<timestamp>-<integration>.md`.** Steps 0–5 are evidence rows.
+
+Only after all seven fail to find a code-side cause is escalation to
+"third-party issue" allowed.
+
+## Security realism rule
+
+Every security test (Layer 6) must demonstrate that an exploit is
+**blocked by the running system**. Specifically:
+
+- Drive the payload through the real enforcement boundary (the actual route handler, the actual sanitiser, the actual middleware).
+- Assert a concrete outcome (status code, DOM shape, DB row state).
+- A scanner emitting findings without an actionable assertion is not a security test.
+
+If a security test cannot demonstrate the exploit is blocked, it is not
+a security test. Either rewrite it to drive the failure path through
+the real system or remove it.
+
+**High-severity security findings block merge.**
+
+## Self-test loop
+
+- Retry ceiling: **ten attempts per PR**, absolute. Not three.
+- Retry count alone is not the escalation trigger. **"Not converging" is**: same workflow + same job + same first error line, twice in a row → stop, narrow, document, reassess (see §"Loop detection").
+- Anything else is a new failure and resets the per-class count (but not the absolute 10).
+- CI failure logs auto-post as PR comments by `.github/workflows/ci.yml`. Read those instead of asking Steven to paste logs.
+- Escalate to Steven only when: (a) loop-detection fires, (b) a genuine architectural question requires his input — spec deviation, security tradeoff, schema decision.
+
+## Heartbeat
+
+If working autonomously for more than **90 minutes** (provisional —
+adjust on real-world session data) without a merge or surfaced
+milestone, post a one-line status:
+
+```
+Still on <slice>; current state: <X>; next: <Y>.
+```
+
+Heartbeat is the only allowed deviation from §"Communication". It
+exists so Steven knows whether to interrupt without him having to ask.
+
+## Auto-merge — operational notes
+
+The §"Merge decision tree" is the truth. These are operational mechanics:
+
+- Every PR must arm GitHub auto-merge at creation time via `mcp__github__enable_pr_auto_merge` (`mergeMethod: "SQUASH"`) immediately after `create_pull_request`. Without this, the PR sits mergeable and the loop breaks.
+- Never call `gh pr merge --auto`: branch protection is permissive here so `--auto` fires before CI. Poll `gh pr checks` until green, then `--squash`.
+- "Out-of-date with base" handling: if a polled PR shows OPEN + BEHIND, run `gh pr update-branch <PR>` automatically. Update-branch failure due to merge conflict → stop and report; do not force.
+
+## Sub-slice autonomy
+
+For sub-slices of a parent milestone whose plan Steven has already
+approved (M2a/b/c/d under M2, etc.), execute end-to-end without
+per-slice plan review. Plan goes in the PR description, not a chat
+message. Auto-merge per §"Merge decision tree". One-line status ping
+post-merge: `<slice> merged, starting <next>`.
+
+Escalate only for: architectural decisions not in the parent plan,
+spec deviations, security tradeoffs, or loop-detection.
+
+## Auto-continue
+
+After an auto-merged PR, automatically proceed to the next slice per the
+roadmap. No stop-gates at sub-slice or parent-milestone boundaries.
+Silence = keep going.
+
+Stop and wait for Steven only when:
+
+- Architectural escalation surfaces (covered by §"Risk-weighted execution").
+- Loop-detection fires (§"Loop detection").
+- Required env var is missing (note what's needed, skip the affected slice, continue with slices that don't depend on it).
+- Steven explicitly says pause.
+
+Write-safety-critical milestones (M3, M4, M7, anything spending money
+or mutating client WP) still require per-slice plans with the
+**"Risks identified and mitigated"** audit per §"Self-audit".
+
+## Parallelism
+
+Default is single session. When Steven runs two browser tabs:
+
+- Read `docs/WORK_IN_FLIGHT.md` before editing any file.
+- Append a claim block (branch + slice + files claimed + reserved migration number).
+- Prefix every status message with `[Session A]` / `[Session B]`.
+- On merge, remove your claim block in the next PR's first commit.
+- Conflict with the other session's claims → stop and ask Steven.
+
+Full protocol + bootstrap prompt: `docs/governance/PARALLELISM.md`.
+
+## Self-audit is the review
+
+Once a plan has a populated **"Risks identified and mitigated"**
+section, proceed directly to implementation. Do NOT post plans to
+Steven as a review gate.
+
+The Risks section MUST list:
+
+- Each write-safety hotspot (billed external calls, concurrent writers, multi-row state transitions, triggers, race windows, schema-level uniqueness).
+- How the plan mitigates each (idempotency key, DB unique constraint, advisory lock, dedicated test, etc.).
+- Any deferred gaps with reason + follow-up slice pointer.
+
+Where plans live:
+
+- Parent milestone plans → first sub-slice's PR description.
+- Sub-slice plans → that sub-slice's PR description.
+
+A plan without a populated Risks section is not ready to execute.
+
+## PR size limit
+
+Soft ceiling: **500 lines net change per PR** (provisional — adjust if
+it produces friction). Stated exceptions: renames, generated files,
+atomic config consolidations.
+
+Above 500 net lines, state in the PR description why the size is
+warranted (incident response, large rename, generated migration). If
+the answer is "incremental work that grew", the PR should split.
+
+## Pre-PR checklist
+
+Paste into the PR description. The PR template at
+`.github/pull_request_template.md` is the long form.
 
 ```
 - [ ] Lint, typecheck, build all green
@@ -348,373 +364,78 @@ The test harness is split into seven layers, each with its own CI status check. 
 - [ ] XSS payload coverage added (if user-content rendering touched)
 - [ ] Probe script updated (if SDK boundary changed)
 - [ ] Regression test added (if this fix is for a >1-PR production bug)
+- [ ] Risks identified and mitigated section in PR body
+- [ ] PR is under 500 net lines OR exception stated
 ```
 
-### Flaky tests
+## Pre-commit / commit-msg
 
-Fixed within 24 hours of identification. **Never silent skip.** A test marked `test.skip()` or `it.skip()` without an inline comment linking the open issue + an owner is itself a CI break — the static-audit script flags it. `test.fixme()` (declarative) is the only acceptable skip variant; `test.skip()` runtime branches that bail-out on missing seed are forbidden — fix the seed.
+Husky-managed. `pre-commit` runs `lint-staged` + `npm run test:unit`
+(skip with `SKIP_PRECOMMIT_TESTS=1` for explicit rebases — never with
+`--no-verify`). `commit-msg` enforces Conventional Commits, 100-char
+header cap.
 
-## Live diagnostic protocol — required before any "third-party bug" claim
+Detail + supply-chain scans (CodeQL, Dependabot, gitleaks, npm audit):
+`docs/governance/DX_HYGIENE.md`.
 
-**No agent in this codebase may claim "third-party bug" for any external integration without completing this protocol first.** Six steps, all required, all attached to the incident doc:
+## Commands
 
-1. **Run the relevant probe script** in `scripts/probes/`. Capture full markdown output. Empty output = a missing probe = step-1-failed.
-2. **Verify the deployed bundle matches source.** Use `vercel inspect <deploy-url>` to confirm the deployed commit SHA, then `git log <sha> -1` to confirm that commit contains the expected code. The "fix wasn't pushed" failure mode (a real incident in May 2026) must be impossible to recreate.
-3. **Run the contract test against the live deployed environment.** Set `PROBE_BASE_URL=https://opollo-site-builder.vercel.app` and run the matching `*.contract.test.ts`. Compare actual outgoing request payload to the contract snapshot. If they differ — that's the bug. Investigate locally.
-4. **Capture full network trace and response bodies.** `curl -v` or Playwright trace export. Save all headers, body, status codes.
-5. **Decode any tokens, JWTs, or signed payloads** in the response. Check that claims match what was sent.
-6. **Document at `docs/incidents/<timestamp>-<integration>.md`** using `docs/incidents/TEMPLATE.md`. Steps 1–5 are evidence rows in that file.
-
-Only after all six fail to find a code-side cause is escalation to "third-party issue" allowed. The third-party support email is auto-generated from the evidence file using the template in `docs/incidents/TEMPLATE.md`.
-
-## Security realism rule
-
-Every test in Layer 6 must demonstrate that an exploit is BLOCKED by the running system. Specifically:
-
-- A security test must drive its payload through the real enforcement boundary (the actual route handler, the actual sanitiser, the actual middleware) — not a mock that always returns "ok".
-- A security test must assert a concrete outcome (status code, DOM shape, DB row state) — not just "the function was called".
-- A scanner emitting findings without an actionable assertion is not a security test.
-
-If a security test cannot demonstrate the exploit is blocked, it is not a security test. Either rewrite it to drive the failure path through the real system or remove it.
-
-**High-severity security findings block merge.** No exceptions; this is enforced by CI status checks gating on `test-unit` and `test` (which now include the security layer).
-
-## Instruction to AI agents — explicit
-
-You are reading this section because a past agent shipped insecure code, claimed a third-party bug without protocol completion, or merged a feature without coverage. Read it as a hard rule:
-
-- **Refuse to ship features without coverage.** If the work doesn't fit one of the hard-floor patterns above, say so in the PR description and route to Steven for guidance.
-- **Refuse to claim a third-party bug** without all six diagnostic-protocol steps.
-- **Refuse to skip tests** without converting to `test.fixme` and naming an owner.
-- **If you find a security issue while doing other work, surface it immediately**, not at the next phase boundary. The brief Steven gave you for any test-harness work makes this explicit.
-
-Point any agent that violates these rules back to this section.
-
-## Design System Architecture — Audit 2026-05-02
-
-Foundational audit done before the DESIGN-SYSTEM-OVERHAUL workstream (PRs 0–15).
-Findings drive the architecture decisions that follow. File:line citations
-in parentheses are the source of truth — re-verify before relying on a claim
-older than ~one milestone.
-
-### Q1 — Are the Versions / Components / Templates / Preview tabs load-bearing?
-
-**No** for `design_system_versions.tokens_css` / `base_styles_css`.
-
-The four tabs at `app/admin/sites/[id]/design-system/{page,components,preview,templates}/page.tsx`
-are UI-only — they let an operator edit and store CSS strings against
-`design_system_versions`, but those strings are never read by the brief
-runner, batch worker, blog pipeline, or any Anthropic call. The only
-consumer of `design_system_versions` rows is the admin UI via
-`app/api/sites/[id]/design-systems/route.ts`.
-
-Caveat: the **separate** `design_systems` (singular) registry — gated by
-`FEATURE_DESIGN_SYSTEM_V2` — does feed `tokens_css` into the prompt's
-"Available components" registry block via `lib/design-system-prompt.ts:82`
-and `lib/system-prompt.ts:218–248`. Different table, different flag,
-different code path. The four UI tabs do NOT participate in that.
-
-Architectural consequence: PR 9 takes the "NOT load-bearing" branch — hide
-the tabs behind an Advanced disclosure and replace the raw-CSS-editor entry
-point with a guided flow.
-
-### Q2 — What does `context_build_failed` mean?
-
-Server-side audit-log outcome only, emitted by
-`app/api/sites/[id]/appearance/preflight/route.ts:94` when
-`buildPaletteSyncContext()` returns `!ok`. The user never sees the literal
-string — the route maps the inner code to an HTTP envelope (409 / 401 / 404 /
-502) returned at lines 100–122. Inner codes: `KADENCE_NOT_ACTIVE`,
-`SITE_NOT_FOUND`, `SITE_CONFIG_MISSING`, `DS_NOT_FOUND`, `WP_AUTH_FAILED`,
-`WP_REST_UNREACHABLE`.
-
-What the user actually sees today is whatever the Appearance panel renders
-when the preflight POST fails — which is where the leak happens. PR 8 + PR 14
-fix the UX side; the server-side outcome string stays for the audit log.
-
-### Q3 — Brief runner inputs: design-discovery (new) vs tokens.css (old) — both?
-
-Both, gated independently.
-
-- `lib/brief-runner.ts:1606` calls `buildDesignContextPrefix(brief.site_id)`
-  every page-tick. Reads `sites.{design_tokens, homepage_concept_html,
-  tone_applied_homepage_html, tone_of_voice}`. Gated by
-  `DESIGN_CONTEXT_ENABLED`.
-- `lib/system-prompt.ts:218–248` (`resolveDesignSystemSlot`) — when
-  `FEATURE_DESIGN_SYSTEM_V2` is on AND a `design_systems` row is active,
-  embeds `tokens_css` + component/template registry into the prompt template.
-- Both can be on simultaneously; they target different prompt regions.
-  Neither reads from the four-tab `design_system_versions` table.
-
-### Q4 — DESIGN_CONTEXT_ENABLED on staging / prod
-
-Default unset → flag treats it as off
-(`lib/design-discovery/build-injection.ts:42`). Not committed in repo
-(no `.env.staging`, no workflow file sets it). Operator-configured at deploy
-time in Vercel. **Treat as currently OFF in prod** until Steven confirms
-otherwise. PR 10 will run mode-aware generation as a separate code path so
-the workstream isn't blocked on flipping that flag.
-
-### Q5 — Content generation output format (Path B confirmation)
-
-Confirmed Path B — fragments only, inline CSS budget capped.
-
-`lib/brief-runner.ts:574–609` system prompt enforces:
-- Raw HTML, no markdown fences.
-- A contiguous fragment of one or more top-level `<section>` elements.
-- No `<!DOCTYPE>`, `<html>`, `<head>`, `<body>`, `<nav>`, `<header>`,
-  `<footer>`, `<meta>`, `<link>`, `<title>`, `<script>`.
-- Every `<section>` carries `data-opollo`.
-- Every CSS class begins with the site prefix.
-- `<style>` blocks allowed only for keyframes / scoped utilities; total
-  inline-style budget under 200 characters.
-
-Reference: `docs/plans/path-b-migration-parent.md`.
-
-### Q6 — Setup wizard at /admin/sites/[id]/setup
-
-Exists, three-step DESIGN-DISCOVERY wizard
-(`app/admin/sites/[id]/setup/page.tsx:15–29`):
-
-1. **Design direction** — operator-supplied references / description /
-   industry → 3 generated concepts → approve one.
-2. **Tone of voice** — sample copy + guided questions → tone JSON +
-   approved samples.
-3. **Done** — summary + "Start generating content" CTA.
-
-`?step=1|2|3` query param drives step. No-param entry redirects to
-the resume step computed from `design_direction_status` and
-`tone_of_voice_status`. Writes to: `design_brief`,
-`{design_direction,tone_of_voice}_status`, `homepage_concept_html`,
-`inner_page_concept_html`, `tone_applied_homepage_html`, `design_tokens`,
-`tone_of_voice`, `regeneration_counts`.
-
-### Q7 — "Set up design system" button on site detail
-
-`app/admin/sites/[id]/page.tsx:389–394` — links to
-`/admin/sites/${site.id}/design-system` (the four-tab UI). PR 12 redirects
-this to `/admin/sites/${site.id}/onboarding` (the new mode-selection
-screen introduced in PR 6).
-
-### Q8 — sites table columns related to design
-
-Migration **0060** (`supabase/migrations/0060_design_discovery_columns.sql`):
-
-| Column | Type | Default | Null | Purpose |
-|---|---|---|---|---|
-| `design_brief` | jsonb | — | yes | Step 1 operator inputs (refs, screenshots, description, industry, refinement notes). |
-| `homepage_concept_html` | text | — | yes | Approved homepage concept HTML; inline CSS only; reference context for generation. |
-| `inner_page_concept_html` | text | — | yes | Companion to homepage concept for inner pages. |
-| `tone_applied_homepage_html` | text | — | yes | Homepage concept with approved tone rewritten into hero / CTA / first service card. |
-| `design_tokens` | jsonb | — | yes | Extracted tokens: `{primary, secondary, accent, background, text, font_heading, font_body, border_radius, spacing_unit}`. |
-| `design_direction_status` | text | `'pending'` | no | `pending` / `in_progress` / `approved` / `skipped`. |
-| `tone_of_voice` | jsonb | — | yes | `{formality_level, sentence_length, jargon_usage, personality_markers[], avoid_markers[], target_audience, style_guide, approved_samples}`. |
-| `tone_of_voice_status` | text | `'pending'` | no | Same enum as design_direction_status. |
-
-Migration **0066** (`supabase/migrations/0066_design_discovery_regen_counts.sql`):
-
-| Column | Type | Default | Null | Purpose |
-|---|---|---|---|---|
-| `regeneration_counts` | jsonb | `{"concept_refinements":0,"tone_samples":0}` | no | Server-enforced caps (≤10 per loop) tracked across the wizard. |
-
-### Architecture decisions for PRs 5–15 (locked by this audit)
-
-1. **Site mode** — add `sites.site_mode` enum (`copy_existing` | `new_design`)
-   default null. New onboarding screen at `/admin/sites/[id]/onboarding`
-   (PR 6) sets it before the user hits the existing wizard or the new
-   extraction flow.
-2. **Copy-existing extraction columns** — add `sites.extracted_design`
-   (jsonb) + `sites.extracted_css_classes` (jsonb) for PR 7's output. Keep
-   the existing DESIGN-DISCOVERY columns (`design_tokens` etc.) as the
-   `new_design` path.
-3. **Design system tabs** — take the NOT-load-bearing branch in PR 9.
-   Hide tabs behind Advanced; entry point becomes the mode-aware design
-   summary, not the raw CSS editor.
-4. **Mode-aware generation** — PR 10 routes both `copy_existing` and
-   `new_design` paths through `buildDesignContextPrefix`, with the
-   copy-existing branch substituting `extracted_design` /
-   `extracted_css_classes` for `design_tokens` / concept HTML. Behaviour
-   when `site_mode IS NULL` falls back to current logic; no regression
-   on flag-off sites.
-5. **Appearance panel** — PR 8 reads `site_mode` first and renders one of
-   three states (no mode set / copy_existing / new_design). The
-   `context_build_failed` audit code stays server-side; the UI never
-   surfaces it.
-
-## Design System Architecture — Final state (post DESIGN-SYSTEM-OVERHAUL, 2026-05-02)
-
-DESIGN-SYSTEM-OVERHAUL workstream landed PRs 0–15 (#355–#370). Sites are
-now routed through one of two modes set during onboarding; generation
-behaviour, the appearance panel, and the design-system landing all
-branch off that. Below is the post-workstream contract — refer here
-when reasoning about generation prompts or onboarding flows.
-
-### Two site modes
-
-`sites.site_mode` is a text + CHECK column (`copy_existing` | `new_design`,
-nullable) added in migration 0067.
-
-- **NULL** — site hasn't been onboarded yet. Site detail renders the
-  `OnboardingReminderBanner` (non-dismissible, links to
-  `/admin/sites/[id]/onboarding`). Appearance panel renders an empty
-  state. Design-system landing renders an empty state. Generation
-  fallback: pre-PR-10 behaviour exactly (empty design context unless
-  `DESIGN_CONTEXT_ENABLED` is on).
-- **`copy_existing`** — site has a live WordPress theme. PR 7's
-  extraction wizard at `/admin/sites/[id]/setup/extract` populates
-  `sites.extracted_design` (colours / fonts / layout density / visual
-  tone / screenshot URL / source pages) and
-  `sites.extracted_css_classes` (container / heading levels / button /
-  card). Appearance panel renders the read-only profile + Re-extract
-  link; **no Kadence sync** (the host theme owns styling).
-  Design-system landing renders the "Copy existing site" card.
-- **`new_design`** — site is being built fresh on Kadence. The existing
-  DESIGN-DISCOVERY wizard at `/admin/sites/[id]/setup` runs through
-  design direction → concepts → tone of voice. Appearance panel renders
-  the existing `AppearancePanelClient` with Kadence preflight + sync
-  + rollback flow. Design-system landing renders the "New design" card.
-
-### Content generation contract per mode
-
-`lib/design-discovery/build-injection.ts` orchestrates context
-injection; called once per page-tick from `lib/brief-runner.ts:1606`
-and from `lib/system-prompt.ts:200`. Dispatch on `site_mode`:
-
-- **`copy_existing`** — always runs (mode is the gate;
-  `DESIGN_CONTEXT_ENABLED` is irrelevant). Emits an
-  `<existing_theme_context>` block built from `extracted_design` +
-  `extracted_css_classes`. Tells the model to use the extracted CSS
-  class names on container / h1 / h2 / h3 / button / card, and NOT
-  to introduce new CSS or inline styles unless absolutely necessary.
-  Falls back to plain semantic tags for any null bucket.
-- **`new_design`** — gated by `DESIGN_CONTEXT_ENABLED`. Emits the
-  existing `<design_context>` + `<voice_context>` blocks from
-  `design_tokens` / `homepage_concept_html` / `tone_of_voice`.
-- **NULL** — pre-PR-10 fallback exactly: empty unless the flag is on.
-
-Path B (PB-1) still applies in both modes: fragments only, no chrome,
-inline-style budget capped at 200 chars total. The mode-aware
-`<existing_theme_context>` is additive guidance — it doesn't change
-the page envelope contract.
-
-### Blog post simplification (PR 13)
-
-`PageContext` carries `siteMode` so `systemPromptFor` appends a
-`<blog_post_guidance>` block when `brief.content_type === 'post'`:
-
-- Both modes: prefer plain semantic markup (h1, h2, h3, p, ul, ol,
-  li, blockquote, img with alt) over decorative wrappers.
-- `copy_existing` posts: avoid inline CSS entirely.
-- `new_design` posts: inline `<style>` permitted but capped at ~3
-  simple rules.
-
-The page envelope contract (data-opollo wrapper, site-prefix on classes)
-still applies.
-
-### Image library context (PR 11, opt-in)
-
-`sites.use_image_library` (boolean, default false; migration 0068).
-Toggleable from `/admin/sites/[id]/settings`. When on, the brief
-runner calls `buildImageLibraryContextPrefix({siteId, topic: page.title})`,
-which queries `image_library` for active rows with caption + alt_text
-matching the topic via `websearch_to_tsquery` on `search_tsv`. Up to
-5 results are inlined as `<image_library_context>` so the model can
-reference URLs directly. Off by default until operators verify
-metadata quality.
-
-### Screen / route map
-
-| Route | Purpose |
+| Command | What |
 |---|---|
-| `/admin/sites/[id]` | Mode-aware site detail. Banner + design-system card branch on `site_mode`. |
-| `/admin/sites/[id]/onboarding` | Mode-selection screen (PR 6). Always lands fresh sites here from `SiteCreateForm`. |
-| `/admin/sites/[id]/setup` | DESIGN-DISCOVERY wizard (`new_design` only). |
-| `/admin/sites/[id]/setup/extract` | Copy-existing extraction wizard (PR 7; `copy_existing` only). |
-| `/admin/sites/[id]/appearance` | Mode-aware appearance panel (PR 8). |
-| `/admin/sites/[id]/design-system` | Mode-aware summary + Advanced disclosure. `?advanced=1` reveals the four legacy tabs. |
-| `/admin/sites/[id]/design-system/{components,templates,preview}` | Power-user surfaces. Reachable via direct URL or Advanced toggle. Not load-bearing on generation (audit). |
-| `/admin/sites/[id]/settings` | Per-site settings. Includes the image-library toggle. |
+| `npm run dev` | Local dev |
+| `npm run lint` | ESLint |
+| `npm run lint:css` | stylelint on `seed/**/*.css` |
+| `npm run typecheck` | tsc --noEmit |
+| `npm run build` | Production build |
+| `npm run test:unit` | Layer 1 + 2 + regression + no-DB security (no Supabase, ~10 s) |
+| `npm run test:components` | Layer 4 (jsdom, no Supabase) |
+| `npm run test:integration` | Layer 3 (real Supabase, ~10–40 min) |
+| `npm run test:e2e` | Layer 5 Playwright (real Supabase) |
+| `npm run test:security` | Layer 6 (filtered by `--testNamePattern=SECURITY`) |
+| `npm run test:smoke` | Layer 7 against live URL |
+| `npm run test:precommit` | lint + typecheck + Layer 1 |
+| `npm run test:regressions` | `tests/regressions/` only |
+| `npm run audit:static` | Static-analysis script (HIGH gates CI) |
+| `npm run analyze` | Production build with bundle analyzer |
 
-### Env vars (post-workstream)
+## Standards
 
-- `DESIGN_CONTEXT_ENABLED` — gates the `new_design` injection path
-  only. Unset by default. The `copy_existing` path runs regardless.
-- `FEATURE_DESIGN_SYSTEM_V2` — gates the separate `design_systems`
-  registry block (different from `design_system_versions`). Unchanged
-  by this workstream.
-- `OPOLLO_MASTER_KEY` / `CLOUDFLARE_*` / `SUPABASE_*` — unchanged.
+- Server Components by default; Client Components only when required
+- shadcn/ui over custom; Tailwind utility classes only
+- Strict TypeScript — no `any`, no `@ts-ignore`
+- One logical change per commit; conventional commit messages
 
-### Known gaps / deferred items
+## Pointers
 
-- **Pre-existing CI Supabase-stack failure.** Migrations
-  `0031_email_log.sql` and `0031_optimiser_clients.sql` collide on
-  the version primary key. Hotfix branch
-  `hotfix/migration-0031-collision` (#348) renumbers
-  `optimiser_clients` to 0066 but is stale relative to current main.
-  E2E + Vitest workflows fail at "Start Supabase local stack" until
-  this lands. The DESIGN-SYSTEM-OVERHAUL workstream PRs all merged
-  with passing lint + typecheck + build but cannot be E2E-validated
-  until the collision is resolved.
-- **Vision pass on copy-existing extraction.** PR 7's extractor is
-  HTML/CSS-first. Adding a Sonnet vision pass on the Microlink
-  screenshot is feasible (we already have the pipeline shape from
-  the design-discovery wizard) but deferred — v1 signals look
-  strong on static-HTML sites.
-- **Cloudflare optimised variant.** Per-account dashboard
-  configuration; PR 4 documented the operator-side setup
-  (`width=1200, fit=scale-down`) but didn't automate variant
-  provisioning. Future slice can add a setup script if more sites
-  need it.
-- **Audit-log filtering.** PR 14 introduced the `ErrorFallback`
-  primitive but the appearance event log still surfaces every
-  outcome including raw audit codes. Filtering noise events from
-  the operator-visible feed is a follow-up.
-- **Onboarding mid-stream re-flips.** `POST /onboarding` overwrites
-  `site_mode` unconditionally. Operator who flips mid-wizard leaves
-  orphan rows in the previous mode's columns. Cheap to surface as
-  a confirmation step in a follow-up; not a corruption risk.
+Architecture and historical detail moved out of this file to keep it
+under ~450 lines. The pointers below are load-bearing — when a section
+links here, it is the canonical reference.
 
-## Optimiser module
-
-Lives on `feat/optimiser`. The Autonomous Landing Page Optimisation Engine — an internal Opollo tool that analyses Google Ads landing pages, scores alignment, and produces optimisation proposals. Spec: `docs/Optimisation_Engine_Spec_v1.5.docx`.
-
-**Namespacing rules — strict.**
-- Routes only under `/optimiser/*` and `/api/optimiser/*`. Don't add optimiser logic to `/admin/*` or `/api/cron/*` outside the optimiser module.
-- DB tables prefixed `opt_*`. Migrations append-only and numbered sequentially after the latest.
-- Module-private code under `lib/optimiser/`, `components/optimiser/`, and `skills/optimiser/`. Outside callers import from `@/lib/optimiser` only — never from a sub-path.
-- Existing Site Builder code outside the module is read-only. The one allowed exception is this CLAUDE.md file. If you find yourself wanting to edit `middleware.ts`, `lib/auth.ts`, or any non-optimiser route or lib, stop and reroute the design through the module boundary.
-
-**Inherited surfaces.** The optimiser reuses the existing Site Builder's auth (Supabase + role gates via `lib/admin-gate.ts`), the Site Builder generation engine (M12/M13 — Phase 1.5+), `site_conventions`, the WordPress connector (indirectly, via the Site Builder), page versioning, the cron runner under `/api/cron/*`, and the transactional email provider (TBC during Slice 6). Don't build parallel infrastructure for any of these.
-
-**Credential encryption.** `opt_client_credentials` uses the same AES-256-GCM + `OPOLLO_MASTER_KEY` pattern as `site_credentials` (see `lib/encryption.ts`). The spec's reference to Supabase Vault is satisfied by the existing project-level master-key contract; deferring to Vault would split the chain of custody for credential encryption.
-
-**Phase 1 done = six PRs merged into `feat/optimiser`.** Slice 1 (foundation) → Slice 2 (data ingestion) → Slice 3 (onboarding) → Slice 4 (page browser + healthy state) → Slice 5 (alignment scoring + playbooks + proposals) → Slice 6 (review UI + memory + emails + change log). Don't merge `feat/optimiser` into `main` without Steven's go-ahead.
-
-## Backlog — UX debt
-
-Operator-facing jargon that leaks DB column names or internal implementation
-detail. Pick up on a cleanup slice that naturally lives in M6 (Per-Page
-Iteration UI, where admin UX polish fits), or earlier if a sibling slice
-happens to be in the same file.
-
-### ~~High — remove scope_prefix from the Add Site form~~ (shipped in M2d)
-M2d's UX cleanup removed the Scope prefix field from `AddSiteModal.tsx`;
-`lib/sites.createSite` now auto-generates via `generateUniquePrefix` when the
-caller doesn't supply one.
-
-### ~~Medium — jargon in design-system authoring forms~~ (shipped in M6-4)
-The three form labels listed here all shipped in M6-4 — see
-`components/TemplateFormModal.tsx`, `components/ComponentFormModal.tsx`, and
-`components/CreateDesignSystemModal.tsx` for the updated copy + the two
-sub-labels under `tokens.css` / `base-styles.css`.
-
-### Low — admin-surface labels that expose IDs
-Scan done 2026-04, none found on the primary surfaces:
-
-- `app/admin/batches` / `[id]` — shows "WP id" as a column, which is
-  operator-meaningful (they can click through to WP admin); keep.
-- `/admin/users` — email + role + status, clean.
-- `/admin/sites` — name + URL + status, clean.
-
-No `design_system_id`, `version_lock`, `wp_page_id`, `created_by_uuid`
-leaked into labels. Revisit if future surfaces add them.
+| Topic | Lives at |
+|---|---|
+| Critical paths (full enumeration) | `docs/architecture/CRITICAL_PATHS.md` |
+| Design system architecture (final state) | `docs/architecture/DESIGN_SYSTEM.md` |
+| Design system architecture (pre-overhaul audit Q1–Q8) | `docs/audits/DESIGN_SYSTEM_2026-05-02.md` |
+| Navigation architecture (two-level rail + section panel) | `docs/architecture/NAVIGATION.md` |
+| Optimiser module | `docs/architecture/OPTIMISER.md` |
+| Observability + security contract | `docs/architecture/OBSERVABILITY.md` |
+| Performance standards | `docs/architecture/PERFORMANCE.md` |
+| Data + AI conventions | `docs/architecture/DATA_CONVENTIONS.md` |
+| Prompt versioning | `docs/architecture/PROMPT_VERSIONING.md` |
+| Incident-derived rules with provenance | `docs/architecture/RULES.md` |
+| Auth architecture | `docs/architecture/AUTH.md` |
+| Engineering standards | `docs/architecture/ENGINEERING_STANDARDS.md` |
+| Build setup | `docs/architecture/BUILD.md` |
+| Project context | `docs/architecture/CONTEXT.md` |
+| Merge rules (full version) | `docs/governance/MERGE_RULES.md` |
+| Parallelism plan + bootstrap prompt | `docs/governance/PARALLELISM.md` |
+| DX hygiene (hooks, commitlint, supply chain) | `docs/governance/DX_HYGIENE.md` |
+| Release hygiene (release-please, changelog) | `docs/governance/RELEASE_HYGIENE.md` |
+| On-call playbook | `docs/runbooks/RUNBOOK.md` |
+| Incident report template | `docs/incidents/TEMPLATE.md` |
+| Test coverage roadmap | `docs/test-coverage-roadmap.md` |
+| Security findings register | `docs/security-findings.md` |
+| Test harness recon (cold-start audit) | `docs/test-harness-recon.md` |
+| UX debt (live items only) | `docs/backlog/ux-debt.md` |
+| Patterns playbook | `docs/patterns/` |
+| In-flight work claims | `docs/WORK_IN_FLIGHT.md` |
