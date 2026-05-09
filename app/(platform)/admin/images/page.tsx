@@ -146,6 +146,8 @@ export default async function AdminImagesPage({
     );
   }
 
+  const cfHash = process.env.CLOUDFLARE_IMAGES_HASH ?? null;
+
   const { items, total } = result.data;
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.min(parsed.page, totalPages);
@@ -293,7 +295,7 @@ export default async function AdminImagesPage({
       </div>
 
       <div className="mt-3">
-        <ImagesTable items={items} backHref={buildHref(parsed, {})} />
+        <ImagesTable items={items} backHref={buildHref(parsed, {})} cfHash={cfHash} />
       </div>
     </>
   );
