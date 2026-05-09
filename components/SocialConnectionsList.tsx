@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toastSuccess } from "@/lib/toast-success";
 
 import { Button } from "@/components/ui/button";
@@ -16,17 +16,34 @@ import {
 // ---------------------------------------------------------------------------
 // S1-12 / S1-16 — connections roster for /company/social/connections.
 //
-// V1 (S1-12) was read-only with a stubbed Reconnect button. S1-16 wires
-// the real bundle.social hosted-portal flow:
-//   - Top: "Connect new account" button (admin-only) → POST /connect →
-//     redirect browser to bundle.social portal → bundle.social redirects
-//     back to /callback → callback syncs new accounts → admin lands
-//     back here with ?connect=success|error|noop.
-//   - Top: "Refresh" button (admin-only) → POST /sync → re-reads bundle.
-//     social's account list, refreshes display_name + status.
-//   - Per-row: Reconnect button (admin-only, when status='auth_required'
-//     or 'disconnected') → POST /connect with the row's platform.
+// Connect flow (popup):
+//   1. "Connect new account" → POST /connect → receives bundle.social URL
+//   2. window.open() opens the URL in a 600×700 popup
+//   3. bundle.social OAuth runs inside the popup
+//   4. bundle.social redirects to /callback?popup=1 → callback syncs accounts
+//      and returns HTML that posts { type:"bundle-connect-complete" } to
+//      window.opener, then closes itself
+//   5. Parent receives postMessage → router.refresh() shows new connections
+//   6. Fallback: setInterval polling popup.closed covers user-abandons-popup
+//      and popup-blocked-then-manually-opened cases
 // ---------------------------------------------------------------------------
+
+const POPUP_FEATURES =
+  "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
+
+type ConnectMessage = {
+  type: "bundle-connect-complete";
+  connect: "success" | "noop" | "error" | "sync-failed";
+  reason?: string;
+};
+
+function isConnectMessage(v: unknown): v is ConnectMessage {
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    (v as Record<string, unknown>)["type"] === "bundle-connect-complete"
+  );
+}
 
 type Props = {
   companyId: string;
@@ -49,6 +66,71 @@ export function SocialConnectionsList({
   const [busyRow, setBusyRow] = useState<string | null>(null);
   const [busyTop, setBusyTop] = useState<"connect" | "sync" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Set when the browser blocks window.open(); shows a fallback link.
+  const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
+
+  // Active popup reference — used by polling and to avoid stacking popups.
+  const popupRef = useRef<Window | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  function clearPopupState(activeRowId?: string) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = null;
+    popupRef.current = null;
+    setBusyTop(null);
+    if (activeRowId) setBusyRow(null);
+  }
+
+  function openConnectPopup(url: string, rowId?: string) {
+    // Reuse existing popup if still open, otherwise open a new one.
+    if (popupRef.current && !popupRef.current.closed) {
+      popupRef.current.focus();
+      return;
+    }
+
+    const popup = window.open(url, "bundle-connect", POPUP_FEATURES);
+
+    if (!popup || popup.closed) {
+      // Browser blocked the popup. Show a fallback link so the admin can
+      // still complete the flow.
+      setPopupBlockedUrl(url);
+      clearPopupState(rowId);
+      return;
+    }
+
+    setPopupBlockedUrl(null);
+    popupRef.current = popup;
+
+    // Polling fallback: detects user closing the popup before completing
+    // OAuth and cases where postMessage does not fire (e.g. network error).
+    pollRef.current = setInterval(() => {
+      if (popup.closed) {
+        clearPopupState(rowId);
+        router.refresh();
+      }
+    }, 500);
+  }
+
+  // postMessage listener — primary success path.
+  useEffect(() => {
+    const expectedOrigin = window.location.origin;
+
+    function handleMessage(evt: MessageEvent) {
+      if (evt.origin !== expectedOrigin) return;
+      if (!isConnectMessage(evt.data)) return;
+
+      clearPopupState();
+      // The popup closes itself after sending; no need to close it here.
+      router.refresh();
+    }
+
+    window.addEventListener("message", handleMessage);
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function initiateConnect(platforms?: SocialPlatform[]) {
     setError(null);
@@ -66,41 +148,36 @@ export function SocialConnectionsList({
     if (!res.ok || !json.ok) {
       const msg = !json.ok ? json.error.message : "Failed to start connect.";
       setError(msg);
+      setBusyTop(null);
       return;
     }
-    window.location.href = json.data.url;
+    openConnectPopup(json.data.url);
   }
 
   async function handleConnectAll() {
     setBusyTop("connect");
-    try {
-      await initiateConnect();
-    } finally {
-      setBusyTop(null);
-    }
+    await initiateConnect();
+    // busyTop cleared by popup close (poll or postMessage).
   }
 
   async function handleReconnect(rowId: string) {
     setBusyRow(rowId);
     setError(null);
-    try {
-      const res = await fetch("/api/platform/social/connections/reconnect", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId, connection_id: rowId }),
-      });
-      const json = (await res.json()) as
-        | { ok: true; data: { url: string } }
-        | { ok: false; error: { message: string } };
-      if (!res.ok || !json.ok) {
-        setError(!json.ok ? json.error.message : "Failed to start reconnect.");
-        return;
-      }
-      window.location.href = json.data.url;
-    } finally {
-      // busyRow stays set until the redirect fires; clear on error path.
+    const res = await fetch("/api/platform/social/connections/reconnect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ company_id: companyId, connection_id: rowId }),
+    });
+    const json = (await res.json()) as
+      | { ok: true; data: { url: string } }
+      | { ok: false; error: { message: string } };
+    if (!res.ok || !json.ok) {
+      setError(!json.ok ? json.error.message : "Failed to start reconnect.");
       setBusyRow(null);
+      return;
     }
+    openConnectPopup(json.data.url, rowId);
+    // busyRow cleared by popup close (poll or postMessage) via rowId arg.
   }
 
   async function handleSync() {
@@ -164,6 +241,25 @@ export function SocialConnectionsList({
           data-testid="connections-error"
         >
           {error}
+        </p>
+      ) : null}
+
+      {popupBlockedUrl ? (
+        <p
+          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="alert"
+          data-testid="connections-popup-blocked"
+        >
+          Your browser blocked the popup.{" "}
+          <a
+            href={popupBlockedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline"
+            data-testid="connections-popup-fallback-link"
+          >
+            Open portal →
+          </a>
         </p>
       ) : null}
 
