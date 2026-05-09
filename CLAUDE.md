@@ -11,15 +11,98 @@ This file is the operating manual every session reads first. Architecture
 detail, audits, and operational deep-dives live under `docs/`. The
 "Pointers" section at the bottom is the canonical index.
 
+## Default execution contract
+
+Every task in this codebase ends the same way: **a working solution
+deployed to production and ready for Steven to test.** That is the
+only terminal state. Nothing else qualifies — not "PR opened", not
+"CI green", not "plan ready for review", not "merged to main". Until
+Steven can open a browser, hit an endpoint, or run a command and
+observe the change working live, the task is not done.
+
+This contract applies to every request regardless of how it was
+phrased. "Fix X", "build Y", "investigate Z then fix it", "ship the
+popup flow", "plan the work as two PRs" — all mean the same thing:
+**drive it to production, verify it works, then surface to Steven.**
+The user starting a task is the user authorising every step between
+"task started" and "deployed and verified". No mid-task approval
+gate exists. Approval was given when the task was given.
+
+For multi-PR plans approved as a single task, the task is the plan.
+Opening each PR is a step; merging each PR is a step; deploying each
+PR is a step. The task is done when **every** PR in the plan has
+reached the deployed-and-verified terminal state — not when the last
+PR is opened.
+
+### Intermediate states are not stopping points
+
+When work reaches a state in the left column, the next action is in
+the right column. Do not surface to Steven. Do not ask "should I
+continue?" or "want me to proceed?" or "let me know if you want me
+to apply this." Do not stop. The user has already said yes by
+giving you the task.
+
+| Current state | Next action |
+|---|---|
+| Plan drafted | Implement it. The plan does not need approval before code is written. |
+| Code written | Run lint, typecheck, unit tests; fix locally; commit and push. |
+| Branch pushed | Open a PR with the §"Pre-PR checklist" populated. |
+| PR open, CI in flight | Arm `gh pr merge <PR> --squash --auto` if not already armed; GitHub fires the merge when all required checks pass. If auto-merge cannot be armed (draft, stacked PR, write-safety gate), fall back to `gh pr checks <PR> --watch` until terminal, then merge manually. |
+| PR open, CI failed | Read the failure logs (auto-posted as PR comments), fix, push, repeat. Per §"Self-test loop". |
+| PR open, CI green, merge gate clear | `gh pr merge <PR> --squash` per §"Merge gate". |
+| PR open, branch behind main | `gh pr update-branch <PR>` automatically; wait for CI to re-run. |
+| PR merged | Watch the production deploy via `gh api repos/.../deployments/.../statuses`; verify the deployed SHA matches the merge commit. |
+| Deploy complete | Hit the live surface (curl, probe script, Playwright, browser fetch — whatever the change requires) and confirm the user-visible behaviour matches the original acceptance criteria. |
+| Live behaviour verified | Surface to Steven: one line — "`<task>`: deployed to production, verified working at `<URL or evidence>`." Then move to the next task per §"Auto-continue". |
+| Live behaviour fails to match | Diagnose per §"Diagnose by working analog"; design the fix; restart from "code written". Do not surface unless §"Hard stops" applies. |
+
+The only deviation from this chain is a §"Hard stop". If a state
+not in this table arises, the next action is whichever row of this
+table the state most closely resembles. **In every case where the
+default could be either "stop and ask" or "continue", continue.**
+
+## Hard stops
+
+The only reasons to surface to Steven before a task is
+deployed-and-verified. Closed list. Anything not on this list is the
+agent's job to resolve without asking.
+
+1. **Missing env var or secret.** Note the exact var name, the target environment (production / preview / development), and the scope. Skip the affected slice if possible and continue with slices that don't depend on it.
+2. **External dashboard config the agent cannot access.** Bundle.social allowed-redirect-domains, Cloudflare account-level variant config, Vercel team-level settings, third-party webhook secret registration, OAuth app callback URLs. Name the exact dashboard path Steven needs to navigate.
+3. **Required external account or signup.** A new third-party service that needs Steven's credit card, email verification, or sign-up flow.
+4. **Architectural decision the spec genuinely does not resolve.** Material cost-vs-correctness tradeoff with money on the line; security tradeoff that changes the threat model; schema choice that constrains future migrations. **NOT** on this list: "popup vs modal", "which folder should this live in", "should I name it X or Y", "should I dedupe blindly or confirm intent first" — those are implementation choices; pick one with reasoning in the PR description and proceed.
+5. **Loop-detection fired.** Same workflow + same job + same first error line, twice in a row, AND the working-analog search (§"Diagnose by working analog") came back empty or didn't change the diagnosis.
+6. **Write-safety-critical milestone gate.** M3, M4, M7 boundaries that explicitly require Steven's merge per the §"Merge decision tree".
+7. **Branch protection literally blocks the merge AND no approved bypass path exists.** "Literally blocks" means `gh pr merge` returns an error citing branch protection, with no admin override available to the agent. NOT on this list: optional review requests, stale CODEOWNERS suggestions, auto-assigned reviewers, social review etiquette. If the merge command would actually succeed, the answer is to run it; do not pre-emptively defer to a reviewer who hasn't blocked it. If the merge command actually fails, surface with the PR link and the verbatim error message.
+8. **Steven explicitly said pause.** The literal word "pause" or "stop" or equivalent in his last message — not inferred, not implied.
+
+That's the complete list. Specifically NOT on it:
+
+- "CI is running" → watch it. Not a stop.
+- "CI failed" → fix it. Not a stop.
+- "PR is behind main" → update-branch. Not a stop.
+- "Production deploy in progress" → wait for it. Not a stop.
+- "Tests need updating to match the new behaviour" → update them. Not a stop.
+- "Plan looks good, want to apply it?" → apply it. Not a question to ask.
+- "Both PRs are open" → merge them, deploy them, verify them. Not a finish line.
+- "I've stopped here to let you review" → don't. Continue.
+
+If a possible stopping point is not in the numbered list above, it is
+not a stopping point.
+
 ## Instruction to AI agents — explicit
 
 You are reading this section because a past agent shipped insecure code,
-claimed a third-party bug without protocol completion, or merged a feature
-without coverage. Read it as a hard rule:
+claimed a third-party bug without protocol completion, merged a feature
+without coverage, designed a fix without checking whether the codebase
+already had a working pattern, or stopped at "PR opened" instead of
+driving the task to deployed-and-verified. Read it as a hard rule:
 
+- **The user starting a task means the user wants it deployed and testable.** That is the contract — see §"Default execution contract". Drive every task end-to-end from "task started" to "Steven can test it live." Do not surface mid-task except for a §"Hard stop". Do not ask "should I continue?" or "want me to apply this?" — the answer is always yes; the task is the authorisation.
 - **Refuse to ship features without coverage.** If the work doesn't fit one of the hard-floor patterns in §"Seven-layer test harness", say so and route the question to Steven.
 - **Refuse to claim a third-party bug** without all seven steps of §"Live diagnostic protocol".
 - **Refuse to skip tests** silently. Convert to `test.fixme` with an open issue link or remove with reasoning.
+- **Refuse to design a fix without first searching for a working analog** in the codebase. See §"Diagnose by working analog". Either the analog exists and the fix is the diff, or you state explicitly that no analog exists and justify the new pattern. There is no third option.
 - **Surface security findings the moment you see them.** Do not defer them into a roadmap doc. See §"Security escalation".
 - **Verify, don't assume.** See §"Verification over assumption".
 - **Stop loops early.** See §"Loop detection".
@@ -36,6 +119,7 @@ below, the specific rule wins; otherwise apply these.
 3. **Prefer narrow tested fixes over broad untested refactors.** A bug fix is not a license to clean up. Ship the fix; open a separate slice for the cleanup if it's warranted.
 4. **Prefer rollback over forward-patch during incidents.** Cross-references §"Incident stabilisation priority". Forward-patches under pressure are how the original bug compounded.
 5. **Prefer verification over inference.** See §"Verification over assumption".
+6. **Prefer matching existing patterns over inventing new ones.** If the same shape already works elsewhere in the codebase, the fix is to copy it — not redesign it. See §"Diagnose by working analog".
 
 ## Merge decision tree
 
@@ -71,11 +155,13 @@ Walk top to bottom.
    ├─ Yes → STOP. Wait for review.
    └─ No  → continue.
 
-7. Merge gate: poll `gh pr checks <PR> --watch` until terminal. Verify
-   every required check shows `pass`. Only then `gh pr merge <PR> --squash`.
-   Auto-merge flags (`--auto`, `enable_pr_auto_merge`, UI button) are
-   forbidden until issue #822 closes — they bypass CI on permissive branch
-   protection. See §"Merge gate — no merge without CI-verified green".
+7. Merge gate: arm `gh pr merge <PR> --squash --auto`; branch protection
+   now requires all CI status checks (#822 closed), so GitHub fires the
+   merge only when every required check passes. If auto-merge cannot be
+   armed (draft, stacked PR, write-safety gate), fall back to polling
+   `gh pr checks <PR> --watch` until terminal green, then
+   `gh pr merge <PR> --squash`.
+   See §"Merge gate — no merge without CI-verified green".
 ```
 
 Full background and edge cases: `docs/governance/MERGE_RULES.md`.
@@ -84,12 +170,11 @@ Full background and edge cases: `docs/governance/MERGE_RULES.md`.
 
 Do not send conversational progress narration. Communicate only on:
 
-- Completed milestones (slice merged, phase finished)
+- Completed milestones (slice merged, phase finished, **task verified live in production** — see §"Default execution contract")
 - Verified findings (test red-on-break confirmed, exploit reproduced + blocked)
-- Real blockers (missing env var, external signup needed, architectural ambiguity)
+- Real blockers (one of the items in §"Hard stops" — nothing else)
 - Security findings (immediate, regardless of current task — see §"Security escalation")
-- Architectural escalations (cost tradeoff, spec ambiguity, security decision)
-- Final outcomes (PR merged, CI green, incident resolved)
+- Final outcomes (PR merged, CI green, incident resolved, **production behaviour verified**)
 
 The heartbeat rule (§"Heartbeat") is the only exception during long
 autonomous runs.
@@ -112,6 +197,59 @@ not verification.
 
 If you cannot verify, say "I have not verified <X>; the evidence I have
 is <Y>" and pause until you can verify or until Steven directs otherwise.
+
+## Diagnose by working analog
+
+**Before designing a fix for any bug, find where the same shape already
+works correctly in the codebase.** If a working analog exists, the fix
+is to make the broken surface match the working one — not to invent a
+new code path. This rule prevents the failure mode where a surface
+diagnosis ("env var unavailable in browser", "field not populated",
+"helper returns null") is treated as a complete diagnosis and drives a
+fix design that ignores existing convention.
+
+The diagnostic question that completes a surface symptom is always:
+**"where else in this codebase does this already work, and what does
+that code do differently?"** Skipping that question is the bug.
+
+### Required steps before writing any fix code
+
+For any bug fix beyond a single-line patch:
+
+1. **Identify the failing call site.** Read the actual file. Quote the lines that produce the broken output. State whether it's a server component, client component, route handler, worker, etc.
+2. **Search for working analogs.** Grep the codebase for: the same helper, the same external resource (Cloudflare ID, DB column, SDK call, env var), the same data shape, the same render target. Expand to sibling routes (`[id]/page.tsx` next to a list `page.tsx`), parent layouts, shared components, and modules in the same domain. The `Explore` agents do not surface analogs by default — you must ask explicitly.
+3. **Diff working vs broken.** Read both. Identify what differs: server-component vs client-component, helper used, env-var access pattern, prop pass-through, render position, ordering of effects, type of the field read.
+4. **The fix is the diff.** Make the broken site match the working one, mechanically. Do NOT invent a new prop, helper, env-var-naming convention, or layering pattern if the working analog handles the case.
+
+### When a new pattern is justified
+
+Only when:
+
+- No working analog exists in the codebase, AND
+- The working analog (if any) is itself flagged for replacement (look for a `docs/patterns/`-tracked deprecation note or an open refactor issue).
+
+Otherwise, "this is the first place we've done X" is a flag to slow
+down, not a license to invent. If a new pattern is genuinely warranted,
+state the reason explicitly in the PR description so the next agent
+finds it as an analog.
+
+### Report-back template — required in every bug-fix PR description
+
+```
+**Working analog**: <file>:<line-range> — <one-sentence description of how it works>
+**Diff**: <what the broken site does differently>
+**Fix**: <how the broken site is being made to match>
+```
+
+If no analog exists, replace with:
+
+```
+**Working analog**: none found. Searched: <list of greps and files inspected>
+**New pattern justification**: <reason this is the first / why existing patterns don't apply>
+```
+
+A bug-fix PR without one of these two blocks is not ready to merge.
+The §"Pre-PR checklist" enforces this as a checkbox.
 
 ## Loop detection
 
@@ -261,7 +399,7 @@ the real system or remove it.
 - Retry count alone is not the escalation trigger. **"Not converging" is**: same workflow + same job + same first error line, twice in a row → stop, narrow, document, reassess (see §"Loop detection").
 - Anything else is a new failure and resets the per-class count (but not the absolute 10).
 - CI failure logs auto-post as PR comments by `.github/workflows/ci.yml`. Read those instead of asking Steven to paste logs.
-- Escalate to Steven only when: (a) loop-detection fires, (b) a genuine architectural question requires his input — spec deviation, security tradeoff, schema decision.
+- Escalate only for the reasons in §"Hard stops". CI failures, flaky tests, branch-update conflicts, and slow-but-progressing CI runs are NOT escalation triggers — fix them and continue.
 
 ## Heartbeat
 
@@ -282,36 +420,51 @@ The §"Merge decision tree" is the truth. This section is the **gate
 that prevents premature merges** — the failure mode where a PR
 auto-merges before CI runs.
 
-**No merge — CLI, MCP, or UI button — fires until CI is verified green
-by polling.** The mechanism that prevents premature merge is
-required-status-checks at the branch protection level. Until those are
-configured (tracked in #822), all merges are gated by an explicit
-polling loop:
+Branch protection on main now requires all eight CI status checks
+(#822 closed). **Auto-merge is the preferred path**: arm it immediately
+after opening a PR and GitHub will fire the merge automatically once
+every required check passes.
+
+**Primary path** (use by default):
+```
+gh pr merge <PR> --squash --auto
+```
+GitHub holds the merge until all required status checks are green;
+no polling needed.
+
+**Fallback** (draft PRs, stacked PRs, write-safety-gated PRs, or any
+case where `--auto` cannot be armed):
 
 1. `gh pr checks <PR> --watch` — wait until every check is terminal.
 2. Read the conclusion of each check. Every required check must show `pass`.
 3. Only then: `gh pr merge <PR> --squash`.
 
-**Auto-merge flags are forbidden on this repo** until #822 closes:
+**"Out-of-date with base" handling**: if a PR shows OPEN + BEHIND,
+run `gh pr update-branch <PR>` automatically. Update-branch failure
+due to merge conflict → stop and report; do not force. After
+update-branch, CI re-runs — auto-merge fires when checks pass again.
 
-- ❌ `gh pr merge --auto` — fires immediately on permissive branch protection.
-- ❌ `mcp__github__enable_pr_auto_merge` — same failure mode at the API layer.
-- ❌ Clicking the green merge button in the UI before checks are green.
+## Delivery ownership
 
-The "arm auto-merge at creation time" pattern from earlier docs is
-revoked by this rule. It only worked when branch protection required
-checks; here it does not, so arming = merging-without-CI.
+The agent owns **outcome completion**, not process completion.
 
-**"Out-of-date with base" handling**: if a polled PR shows OPEN +
-BEHIND, run `gh pr update-branch <PR>` automatically. Update-branch
-failure due to merge conflict → stop and report; do not force. After
-update-branch, CI re-runs — wait for terminal green again before
-`--squash`.
+PR creation, planning, CI success, and merge readiness are intermediary
+states. They are not the deliverable. Responsibility for the task
+remains active until:
 
-Once #822 closes (branch protection requires the eight CI status
-checks), the polling loop becomes a **backup** rather than the primary
-gate, and arming auto-merge via `gh pr merge --auto` becomes safe again.
-At that point this section gets revised.
+- the change is **deployed** to the target environment,
+- **runtime behaviour is verified** against the original acceptance criteria via direct observation, and
+- **Steven can exercise the feature live**.
+
+This is restated here, near the merge logic, because the merge is the
+intermediate state most likely to be mistaken for the finish line. It
+isn't. The merge is one row in the §"Default execution contract"
+table; rows below it remain.
+
+If the agent has just merged a PR, the next action is to watch the
+deploy and verify production behaviour — not to surface to Steven and
+not to start the next task. Surface only when the post-deploy
+verification has succeeded, or when a §"Hard stop" applies.
 
 ## Sub-slice autonomy
 
@@ -319,10 +472,12 @@ For sub-slices of a parent milestone whose plan Steven has already
 approved (M2a/b/c/d under M2, etc.), execute end-to-end without
 per-slice plan review. Plan goes in the PR description, not a chat
 message. Auto-merge per §"Merge decision tree". One-line status ping
-post-merge: `<slice> merged, starting <next>`.
+post-merge **after the slice is verified live in production** per
+§"Default execution contract": `<slice> deployed and verified, starting <next>`.
 
-Escalate only for: architectural decisions not in the parent plan,
-spec deviations, security tradeoffs, or loop-detection.
+Escalate only for the reasons in §"Hard stops". Sub-slice planning,
+operational hiccups, CI flakes, and routine tradeoffs already covered
+in the parent plan are NOT escalation triggers — proceed.
 
 ## Auto-continue
 
@@ -330,12 +485,8 @@ After an auto-merged PR, automatically proceed to the next slice per the
 roadmap. No stop-gates at sub-slice or parent-milestone boundaries.
 Silence = keep going.
 
-Stop and wait for Steven only when:
-
-- Architectural escalation surfaces (covered by §"Risk-weighted execution").
-- Loop-detection fires (§"Loop detection").
-- Required env var is missing (note what's needed, skip the affected slice, continue with slices that don't depend on it).
-- Steven explicitly says pause.
+The only reasons to pause are listed in §"Hard stops". That section is
+the canonical list — do not invent additional reasons.
 
 Write-safety-critical milestones (M3, M4, M7, anything spending money
 or mutating client WP) still require per-slice plans with the
@@ -395,6 +546,7 @@ Paste into the PR description. The PR template at
 - [ ] XSS payload coverage added (if user-content rendering touched)
 - [ ] Probe script updated (if SDK boundary changed)
 - [ ] Regression test added (if this fix is for a >1-PR production bug)
+- [ ] For bug fixes: working-analog block in PR body (file:lines + diff + fix) OR explicit "no analog exists" + new-pattern justification — see §"Diagnose by working analog"
 - [ ] Risks identified and mitigated section in PR body
 - [ ] PR is under 500 net lines OR exception stated
 ```
