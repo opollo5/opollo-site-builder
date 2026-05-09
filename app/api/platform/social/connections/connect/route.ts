@@ -58,8 +58,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
   if (gate.kind === "deny") return gate.response;
 
+  // Use || (not ??) so an empty-string NEXT_PUBLIC_SITE_URL also falls back
+  // to the request origin; nullish coalescing would return "" in that case,
+  // making redirectUrl a relative path that bundle.social rejects with 400.
   const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     new URL(req.url).origin;
   const redirectUrl = `${origin}/api/platform/social/connections/callback?company_id=${encodeURIComponent(parsed.data.company_id)}`;
 
