@@ -199,6 +199,37 @@ This is low-risk and makes the runtime behaviour match the intent.
 
 ---
 
+## Platform-type matrix (2026-05-10)
+
+Run `scripts/probes/_platform-matrix-probe.ts` with `redirectUrl: "https://google.com"`.
+All 6 configurations generated a valid token AND loaded the picker successfully.
+
+| # | Label | socialAccountTypes | API token | Browser result | Page title |
+|---|---|---|---|---|---|
+| 1 | founder | TIKTOK, FACEBOOK, INSTAGRAM | ✅ | ✅ picker_loaded | Connect \| bundle.social |
+| 2 | ours (full set) | LINKEDIN, FACEBOOK, TWITTER, GOOGLE_BUSINESS | ✅ | ✅ picker_loaded | Connect \| bundle.social |
+| 3 | LINKEDIN only | LINKEDIN | ✅ | ✅ picker_loaded | Connect \| bundle.social |
+| 4 | FACEBOOK only | FACEBOOK | ✅ | ✅ picker_loaded | Connect \| bundle.social |
+| 5 | TWITTER only | TWITTER | ✅ | ✅ picker_loaded | Connect \| bundle.social |
+| 6 | GOOGLE_BUSINESS only | GOOGLE_BUSINESS | ✅ | ✅ picker_loaded | Connect \| bundle.social |
+
+**Conclusion: no platform type is poisoning the request.** All values accepted, picker renders
+correctly for all. Screenshots in `scripts/probes/_screenshots/`.
+
+Additional finding from screenshot inspection:
+- LinkedIn is **already connected** for the team (shows "Opollo MSP Marketing / opollo-marketing"
+  with a "Disconnect" button in the picker). Facebook, X, and Google Business still need connecting.
+- TIKTOK and INSTAGRAM are valid bundle.social account types (not just our four) — the founder's
+  payload works if those types are enabled in the team's bundle.social plan.
+
+**Confirmed conclusion: the "There was an error" occurs at the OAuth callback redirect step,**
+**not at portal load time.** bundle.social shows the platform picker correctly, then after
+the user authenticates, it redirects to the `redirectUrl` in the JWT. If that domain is not
+in the team's allowed-redirect-domains list, bundle.social displays "There was an error" at
+that point — which is consistent with the reported symptom.
+
+---
+
 ## PRs merged as part of this investigation
 
 | PR | Title | What it fixed |
@@ -206,11 +237,13 @@ This is low-risk and makes the runtime behaviour match the intent.
 | #814 | feat(S1-16): initiate-connect + sync Bundlesocial connections | Duplicate LINKEDIN in socialAccountTypes |
 | #816 | fix(S1-16): bundle.social diagnostics + tokenless-URL guard | Structured logging, tokenless URL guard, ApiError catch |
 | #818 | test(bundlesocial): fix tokenless-URL guard breaking unit tests | Updated mock URLs to include `?token=` query param |
+| #827 | fix(bundlesocial): `??` → `||` fallback for empty NEXT_PUBLIC_SITE_URL | Prevents relative redirectUrl when env var is empty string |
 
 ---
 
 ## Open action items
 
-- [ ] **Steven to add `opollo-site-builder.vercel.app` to bundle.social allowed redirect domains** (Fix 1 above)
-- [ ] Open PR for `??` → `||` fix in `connect/route.ts` (Fix 2 — defensive, low-risk)
-- [ ] Clean up temp probe files: `scripts/probes/_redirect-url-probe.ts`, `scripts/probes/_jwt-decode.ts`
+- [ ] **Steven to add `opollo-site-builder.vercel.app` to bundle.social allowed redirect domains**
+      → bundle.social dashboard → Team → Settings → Allowed redirect domains
+      → This is the primary blocker; "There was an error" shows after OAuth because the domain is not whitelisted
+- [x] `??` → `||` fix in `connect/route.ts` — merged as PR #827

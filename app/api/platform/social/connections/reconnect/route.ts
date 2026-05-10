@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { logger } from "@/lib/logger";
+import { getActiveBrandProfile } from "@/lib/platform/brand/get";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -77,9 +78,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     new URL(req.url).origin;
-  const redirectUrl = `${origin}/api/platform/social/connections/callback?company_id=${encodeURIComponent(companyId)}`;
+  const redirectUrl =
+    `${origin}/api/platform/social/connections/callback` +
+    `?company_id=${encodeURIComponent(companyId)}&popup=1`;
 
   logger.info("social.connections.reconnect.start", {
     companyId,
@@ -88,10 +91,24 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     userId: gate.userId,
   });
 
+  const [brand, companyRow] = await Promise.all([
+    getActiveBrandProfile(companyId),
+    svc
+      .from("platform_companies")
+      .select("name")
+      .eq("id", companyId)
+      .maybeSingle()
+      .then((r) => r.data),
+  ]);
+
   const result = await initiateBundlesocialConnect({
     companyId,
     platforms: [conn.platform],
     redirectUrl,
+    logoUrl: brand?.logo_primary_url ?? brand?.logo_icon_url ?? undefined,
+    userName: companyRow?.name ?? undefined,
+    // TODO: set hidePoweredBy: true once companies have a paid-plan flag.
+    language: "en",
   });
 
   if (!result.ok) {
