@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, respond, validationError } from "@/lib/http";
+import { dbUuid, readJsonBody, respond, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import {
   deletePostMaster,
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 const PatchSchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   master_text: z.string().max(10_000).nullable().optional(),
   link_url: z.string().max(2048).nullable().optional(),
 });

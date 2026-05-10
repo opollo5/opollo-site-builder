@@ -1,7 +1,7 @@
 ﻿import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
 
@@ -27,7 +27,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PostBodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

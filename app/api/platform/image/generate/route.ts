@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { dbUuid } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getActiveBrandProfile } from "@/lib/platform/brand";
@@ -33,7 +34,7 @@ const IMAGE_GEN_BUCKET =
 const SIGNED_URL_TTL = 3600; // 1 hour — sufficient for a UI session
 
 const GenerateSchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   style_id: z.enum([
     "clean_corporate",
     "bold_promo",

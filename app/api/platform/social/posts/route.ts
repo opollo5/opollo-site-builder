@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, internalError, notFound } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, internalError, notFound } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import {
   createPostMaster,
@@ -43,7 +43,7 @@ const VALID_STATES: readonly SocialPostState[] = [
 ];
 
 const CreateSchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   master_text: z.string().max(10_000).optional(),
   link_url: z.string().url().max(2048).optional(),
   source_type: z.enum(["manual", "csv", "cap", "api"]).optional(),

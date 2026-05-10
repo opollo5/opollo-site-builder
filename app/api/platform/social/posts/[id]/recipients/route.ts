@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { conflict, readJsonBody, respond, routeError, validationError } from "@/lib/http";
+import { dbUuid, conflict, readJsonBody, respond, routeError, validationError } from "@/lib/http";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderSocialApprovalRequestEmail } from "@/lib/email/templates/social-approval-request";
 import { logger } from "@/lib/logger";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 const PostBodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   email: z.string().email().max(254),
   name: z.string().max(200).nullable().optional(),
   requires_otp: z.boolean().optional(),

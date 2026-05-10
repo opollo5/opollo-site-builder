@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { ZodError, ZodType } from "zod";
+import { z, type ZodError, type ZodType } from "zod";
 import { logger } from "@/lib/logger";
 import {
   errorCodeToStatus,
@@ -15,9 +15,33 @@ import {
 // routes so a reader can skim 13 handlers and see the shape immediately.
 // ---------------------------------------------------------------------------
 
-// Known Next.js App Router UUID param shape. Matches validateUuidParam.
-const UUID_RE =
+// DB-compatible UUID shape — format-only, does NOT enforce RFC 4122
+// version/variant bits.
+//
+// Why format-only: we seed `00000000-0000-0000-0000-000000000001` as the
+// Opollo internal-company sentinel in migration 0070. Zod v4's
+// z.string().uuid() rejects that value (version byte is 0, not in 1-8).
+// PR #845 surfaced the bug for /api/platform/companies/switch — every
+// other company_id-bearing route had the same latent bug (rejecting
+// the sentinel with "Body must be { company_id: uuid, ... }"). BSP-0
+// closes the gap across the customer-facing surface via the dbUuid()
+// helper below.
+//
+// Do NOT use this for client-generated UUIDs that must be v4
+// (idempotency keys, request IDs) — those should keep z.string().uuid()
+// so a typo / non-v4 value is caught at the boundary.
+export const DB_UUID_RE =
   /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+// Back-compat alias — UUID_RE is referenced from validateUuidParam below.
+const UUID_RE = DB_UUID_RE;
+
+// Zod schema for a DB-compatible UUID (format-only, accepts sentinels).
+// Use this in route schemas for company_id (and any other UUID field
+// whose value comes from a DB row that may carry a sentinel).
+export function dbUuid(): z.ZodString {
+  return z.string().regex(DB_UUID_RE);
+}
 
 function now(): string {
   return new Date().toISOString();

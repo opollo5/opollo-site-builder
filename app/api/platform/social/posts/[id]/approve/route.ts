@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import { readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { dispatch } from "@/lib/platform/notifications";
 import { approvePost } from "@/lib/platform/social/posts";
 
@@ -15,7 +15,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const Schema = z.object({ company_id: z.string().uuid() });
+const Schema = z.object({ company_id: dbUuid() });
 
 function errorForCode(code: string, message: string): NextResponse {
   switch (code) {

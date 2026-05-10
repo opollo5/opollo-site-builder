@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { internalError, notFound, readJsonBody, validationError } from "@/lib/http";
+import { dbUuid, internalError, notFound, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { retryPublishAttempt } from "@/lib/platform/social/publishing";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
-const PostBodySchema = z.object({ company_id: z.string().uuid() });
+const PostBodySchema = z.object({ company_id: dbUuid() });
 
 export async function POST(
   req: NextRequest,

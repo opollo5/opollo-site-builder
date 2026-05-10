@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { getActiveBrandProfile } from "@/lib/platform/brand/get";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
@@ -32,7 +32,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const BodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   connection_id: z.string().uuid(),
 });
 

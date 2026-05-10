@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, internalError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const BodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   prompt: z.string().min(1).max(500),
   tone: z.enum(["professional", "casual", "playful"]),
   length: z.enum(["short", "medium", "long"]),

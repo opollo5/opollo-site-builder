@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
+import { dbUuid } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getNotifications, markAllRead } from "@/lib/platform/notifications";
@@ -20,7 +21,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const QuerySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
 });
 
 function error(code: string, message: string, status: number) {
