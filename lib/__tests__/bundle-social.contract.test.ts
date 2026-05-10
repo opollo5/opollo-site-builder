@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // LAYER 2 — Contract.
@@ -31,6 +31,10 @@ const mockClient = {
 vi.mock("@/lib/bundlesocial", () => ({
   getBundlesocialClient: () => mockClient,
   getBundlesocialTeamId: () => "team-contract-snapshot",
+}));
+
+vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
+  getOrCreateBundleSocialTeam: vi.fn().mockResolvedValue("team-contract-snapshot"),
 }));
 
 import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // REGRESSION R2 — tokenless portal URL must be rejected
@@ -24,6 +24,10 @@ const mockClient = {
 vi.mock("@/lib/bundlesocial", () => ({
   getBundlesocialClient: () => mockClient,
   getBundlesocialTeamId: () => "team-r2",
+}));
+
+vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
+  getOrCreateBundleSocialTeam: vi.fn().mockResolvedValue("team-r2"),
 }));
 
 import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";

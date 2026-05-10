@@ -1,4 +1,4 @@
-import {
+﻿import {
   afterEach,
   beforeEach,
   describe,
@@ -36,6 +36,10 @@ const mockClient = {
 vi.mock("@/lib/bundlesocial", () => ({
   getBundlesocialClient: () => mockClient,
   getBundlesocialTeamId: () => "team-test-1",
+}));
+
+vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
+  getOrCreateBundleSocialTeam: vi.fn().mockResolvedValue("team-test-1"),
 }));
 
 import {
@@ -238,6 +242,7 @@ describe("syncBundlesocialConnections", () => {
     });
 
     const result = await syncBundlesocialConnections({
+      companyId: COMPANY_A_ID,
       attributeNewToCompanyId: COMPANY_A_ID,
     });
     expect(result.ok).toBe(true);
@@ -290,7 +295,7 @@ describe("syncBundlesocialConnections", () => {
       ],
     });
 
-    const result = await syncBundlesocialConnections({});
+    const result = await syncBundlesocialConnections({ companyId: COMPANY_A_ID });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.updated).toBe(1);
@@ -327,7 +332,7 @@ describe("syncBundlesocialConnections", () => {
       socialAccounts: [],
     });
 
-    const result = await syncBundlesocialConnections({});
+    const result = await syncBundlesocialConnections({ companyId: COMPANY_A_ID });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.marked_disconnected).toBe(1);
@@ -353,7 +358,7 @@ describe("syncBundlesocialConnections", () => {
       ],
     });
 
-    const result = await syncBundlesocialConnections({});
+    const result = await syncBundlesocialConnections({ companyId: COMPANY_A_ID });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.inserted).toBe(0);
@@ -380,7 +385,7 @@ describe("syncBundlesocialConnections", () => {
       socialAccounts: [],
     });
 
-    const result = await syncBundlesocialConnections({});
+    const result = await syncBundlesocialConnections({ companyId: COMPANY_B_ID });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.marked_disconnected).toBe(0);
@@ -388,7 +393,7 @@ describe("syncBundlesocialConnections", () => {
 
   it("returns INTERNAL_ERROR when teamGetTeam throws", async () => {
     mockClient.team.teamGetTeam.mockRejectedValueOnce(new Error("HTTP 500"));
-    const result = await syncBundlesocialConnections({});
+    const result = await syncBundlesocialConnections({ companyId: COMPANY_A_ID });
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(result.error.code).toBe("INTERNAL_ERROR");

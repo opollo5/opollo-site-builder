@@ -1,11 +1,11 @@
-import "server-only";
+﻿import "server-only";
 
 import {
   getBundlesocialClient,
-  getBundlesocialTeamId,
 } from "@/lib/bundlesocial";
 import { logger } from "@/lib/logger";
 import { resolveBundleUploadIds } from "@/lib/platform/social/media";
+import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -109,14 +109,27 @@ export async function retryPublishAttempt(
 
   // bundle.social call — same shape as fire.ts.
   const client = getBundlesocialClient();
-  const teamId = getBundlesocialTeamId();
-  if (!client || !teamId) {
+  if (!client) {
     await markAttemptFailed(svc, row.publish_attempt_id!, {
       error_class: "platform_error",
       error_payload: { code: "RECEIVER_NOT_CONFIGURED" },
     });
     await markMasterFailed(svc, row.post_master_id!);
     return internal("bundle.social client not configured.");
+  }
+
+  // Resolve the per-company bundle.social team id.
+  let teamId: string;
+  try {
+    teamId = await getOrCreateBundleSocialTeam(row.company_id!);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await markAttemptFailed(svc, row.publish_attempt_id!, {
+      error_class: "platform_error",
+      error_payload: { code: "TEAM_PROVISION_FAILED", message },
+    });
+    await markMasterFailed(svc, row.post_master_id!);
+    return internal(`Failed to provision bundle.social team: ${message}`);
   }
 
   const bundlePlatform = PLATFORM_TO_BUNDLE[row.platform!];

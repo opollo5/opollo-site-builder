@@ -1,4 +1,4 @@
-import {
+﻿import {
   afterEach,
   beforeEach,
   describe,
@@ -30,6 +30,10 @@ const mockClient = {
 vi.mock("@/lib/bundlesocial", () => ({
   getBundlesocialClient: () => mockClient,
   getBundlesocialTeamId: () => "team-test-1",
+}));
+
+vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
+  getOrCreateBundleSocialTeam: vi.fn().mockResolvedValue("team-test-1"),
 }));
 
 import { fireScheduledPublish } from "@/lib/platform/social/publishing";

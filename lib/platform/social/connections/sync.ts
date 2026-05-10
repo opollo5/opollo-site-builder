@@ -1,9 +1,7 @@
-import "server-only";
+﻿import "server-only";
 
-import {
-  getBundlesocialClient,
-  getBundlesocialTeamId,
-} from "@/lib/bundlesocial";
+import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
+import { getBundlesocialClient } from "@/lib/bundlesocial";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
@@ -19,8 +17,9 @@ import type { SocialPlatform } from "./types";
 //      social_connections and INSERT a row for the company that
 //      initiated the connect (passed via the redirectUrl callback).
 //   2. Periodic / manual health refresh: walk every existing
-//      social_connections row and update display_name / status /
-//      last_health_check_at based on bundle.social's latest view.
+//      social_connections row for the given company and update
+//      display_name / status / last_health_check_at based on
+//      bundle.social's latest view of that company's team.
 //
 // This lib doesn't decide which company a new account belongs to —
 // the callback handler does (via the redirectUrl param). For health
@@ -47,6 +46,8 @@ const BUNDLE_TO_PLATFORM: Record<string, SocialPlatform> = {
 };
 
 export type SyncConnectionsInput = {
+  // The company whose bundle.social team to sync.
+  companyId: string;
   // When set, NEW (unmapped) bundle.social accounts get attributed to
   // this company on insert. Leave undefined for pure health-refresh
   // (no inserts, just updates to existing rows).
@@ -61,12 +62,24 @@ export type SyncConnectionsResult = {
 };
 
 export async function syncBundlesocialConnections(
-  input: SyncConnectionsInput = {},
+  input: SyncConnectionsInput,
 ): Promise<ApiResponse<SyncConnectionsResult>> {
+  if (!input.companyId) return notConfigured("companyId");
+
   const client = getBundlesocialClient();
   if (!client) return notConfigured("BUNDLE_SOCIAL_API");
-  const teamId = getBundlesocialTeamId();
-  if (!teamId) return notConfigured("BUNDLE_SOCIAL_TEAMID");
+
+  let teamId: string;
+  try {
+    teamId = await getOrCreateBundleSocialTeam(input.companyId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error("bundlesocial.sync.team_provision_failed", {
+      err: message,
+      company_id: input.companyId,
+    });
+    return internal(`Failed to provision bundle.social team: ${message}`);
+  }
 
   let team: {
     socialAccounts?: Array<{
@@ -84,6 +97,7 @@ export async function syncBundlesocialConnections(
     logger.error("bundlesocial.sync.team_get_failed", {
       err: message,
       team_id: teamId,
+      company_id: input.companyId,
     });
     return internal(`bundle.social team.get failed: ${message}`);
   }
@@ -93,16 +107,17 @@ export async function syncBundlesocialConnections(
 
   const svc = getServiceRoleClient();
 
-  // Read every existing social_connections row keyed by
-  // bundle_social_account_id so we can decide insert/update/disconnect.
+  // Read existing social_connections rows for this company only.
   const existing = await svc
     .from("social_connections")
     .select(
       "id, company_id, platform, bundle_social_account_id, display_name, avatar_url, status",
-    );
+    )
+    .eq("company_id", input.companyId);
   if (existing.error) {
     logger.error("bundlesocial.sync.local_read_failed", {
       err: existing.error.message,
+      company_id: input.companyId,
     });
     return internal(`Local read failed: ${existing.error.message}`);
   }

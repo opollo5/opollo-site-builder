@@ -1,11 +1,9 @@
-import "server-only";
+﻿import "server-only";
 
 import { ApiError } from "bundlesocial";
 
-import {
-  getBundlesocialClient,
-  getBundlesocialTeamId,
-} from "@/lib/bundlesocial";
+import { getBundlesocialClient } from "@/lib/bundlesocial";
+import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
 import { logger } from "@/lib/logger";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -14,8 +12,8 @@ import type { SocialPlatform } from "./types";
 // ---------------------------------------------------------------------------
 // S1-16 — initiate a bundle.social hosted connect-portal flow.
 //
-// We call bundle.social's create-portal-link endpoint with our team
-// id, the platforms the operator wants to connect, and a redirect URL
+// We call bundle.social's create-portal-link endpoint with the company's
+// team id, the platforms the operator wants to connect, and a redirect URL
 // pointing back at our callback handler. Bundle.social returns a URL;
 // we hand that back to the admin's browser, which navigates to it for
 // OAuth. After the user finishes the flow, bundle.social redirects to
@@ -85,8 +83,18 @@ export async function initiateBundlesocialConnect(
 
   const client = getBundlesocialClient();
   if (!client) return notConfigured("BUNDLE_SOCIAL_API");
-  const teamId = getBundlesocialTeamId();
-  if (!teamId) return notConfigured("BUNDLE_SOCIAL_TEAMID");
+
+  let teamId: string;
+  try {
+    teamId = await getOrCreateBundleSocialTeam(input.companyId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error("bundlesocial.initiate_connect.team_provision_failed", {
+      company_id: input.companyId,
+      err: message,
+    });
+    return internal(`Failed to provision bundle.social team: ${message}`);
+  }
 
   const rawPlatforms: Array<
     "LINKEDIN" | "FACEBOOK" | "TWITTER" | "GOOGLE_BUSINESS"
