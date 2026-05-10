@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, respond, validationError } from "@/lib/http";
+import { dbUuid, readJsonBody, respond, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { createViewerLink, listViewerLinks } from "@/lib/platform/social/viewer-links";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 const PostBodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   recipient_email: z.string().email().max(254).nullable().optional(),
   recipient_name: z.string().max(200).nullable().optional(),
   expires_at: z.string().datetime().optional(),

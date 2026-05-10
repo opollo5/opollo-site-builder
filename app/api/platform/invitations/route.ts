@@ -4,6 +4,7 @@ import { z } from "zod";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderPlatformInviteEmail } from "@/lib/email/templates/platform-invite";
 import {
+  dbUuid,
   conflict,
   internalError,
   notFound,
@@ -55,7 +56,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const SendInviteSchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   email: z.string().email().max(254),
   role: z.enum(["admin", "approver", "editor", "viewer"]),
 });

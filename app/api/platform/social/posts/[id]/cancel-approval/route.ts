@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { cancelApprovalRequest } from "@/lib/platform/social/posts";
 
@@ -25,7 +25,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 const Schema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   reason: z.string().max(2000).nullable().optional(),
 });
 

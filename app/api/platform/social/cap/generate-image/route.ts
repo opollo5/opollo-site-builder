@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { internalError, readJsonBody, validationError } from "@/lib/http";
+import { dbUuid, internalError, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { createMediaAsset } from "@/lib/platform/social/media";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -37,7 +37,7 @@ const SIGNED_URL_TTL = 365 * 24 * 3600;
 const TIMEOUT_MS = parseInt(process.env.IMAGE_GENERATION_TIMEOUT_MS ?? "30000");
 
 const BodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   prompt: z.string().min(3).max(500),
   aspect_ratio: z.enum(["ASPECT_1_1", "ASPECT_4_5", "ASPECT_16_9"]).optional(),
 });

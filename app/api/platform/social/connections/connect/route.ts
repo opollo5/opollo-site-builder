@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, internalError } from "@/lib/http";
 import { getActiveBrandProfile } from "@/lib/platform/brand/get";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -29,7 +29,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const PostBodySchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   platforms: z
     .array(
       z.enum([

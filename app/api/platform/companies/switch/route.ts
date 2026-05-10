@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { createRouteAuthClient } from "@/lib/auth";
-import { validationError } from "@/lib/http";
+import { dbUuid, validationError } from "@/lib/http";
 import { STAFF_SELECTED_COMPANY_COOKIE } from "@/lib/platform/auth";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -21,15 +21,12 @@ import { getServiceRoleClient } from "@/lib/supabase";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Zod v4's z.string().uuid() enforces RFC 4122 version/variant bits, which
-// rejects the well-known internal-company sentinel 00000000-0000-0000-0000-000000000001
-// (version byte 0, not in [1-8]). Use a format-only regex that matches what
-// Postgres accepts — any 8-4-4-4-12 hex string — mirroring the loose check
-// already used by resolveStaffCookieCompany.
-const DB_UUID_RE =
-  /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+// Uses dbUuid() (lib/http) — format-only UUID that accepts the Opollo
+// internal-company sentinel 00000000-0000-0000-0000-000000000001. PR #845
+// established this pattern after Zod v4's z.string().uuid() rejected the
+// sentinel; BSP-0 consolidated it into the shared helper.
 const SwitchSchema = z.object({
-  company_id: z.string().regex(DB_UUID_RE).nullable(),
+  company_id: dbUuid().nullable(),
 });
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 1 week

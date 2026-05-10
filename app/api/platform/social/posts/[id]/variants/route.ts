@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, respond, validationError } from "@/lib/http";
+import { dbUuid, readJsonBody, respond, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { listVariants, SUPPORTED_PLATFORMS, upsertVariant } from "@/lib/platform/social/variants";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 const PutSchema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
   platform: z.enum(["linkedin_personal", "linkedin_company", "facebook_page", "x", "gbp"]),
   variant_text: z.string().max(10_000).nullable().optional(),
   media_asset_ids: z.array(z.string().uuid()).max(20).optional(),

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { readJsonBody, validationError, notFound, internalError, routeError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, notFound, internalError, routeError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { duplicatePost } from "@/lib/platform/social/posts";
@@ -22,7 +22,7 @@ export const dynamic = "force-dynamic";
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
 const Schema = z.object({
-  company_id: z.string().uuid(),
+  company_id: dbUuid(),
 });
 
 export async function POST(
