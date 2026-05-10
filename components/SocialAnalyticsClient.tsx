@@ -17,7 +17,8 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
-import { H1, H3, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
+import { H3 } from "@/components/ui/typography";
 import type { SocialAnalytics } from "@/lib/platform/social/analytics";
 
 // ---------------------------------------------------------------------------
@@ -134,12 +135,12 @@ export function SocialAnalyticsClient({
 
   return (
     <main className="mx-auto max-w-6xl space-y-10 p-6">
-      <header>
-        <H1>Analytics</H1>
-        <Lead className="mt-0.5">
+      <PageHeader>
+        <PageHeader.Title>Analytics</PageHeader.Title>
+        <PageHeader.Subtitle>
           Your social media performance at a glance.
-        </Lead>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {!hasAnyPosts && (
         <div
