@@ -1,30 +1,21 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
+import { redirect, permanentRedirect } from "next/navigation";
 
-import { BatchesTable, type BatchRow } from "@/components/BatchesTable";
-import { NewBatchButton } from "@/components/NewBatchButton";
-import type { BatchTemplateOption } from "@/components/NewBatchModal";
-import { Alert } from "@/components/ui/alert";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
-import { getServiceRoleClient } from "@/lib/supabase";
 
-// ---------------------------------------------------------------------------
-// /admin/batches — M3-8.
+// Batches section entry point.
 //
-// Admin + operator visible. Shows every generation_jobs row the caller
-// is entitled to see (admins see all; operators see jobs they
-// created — matches the RLS policy from M3-1). Server-rendered per
-// request; no auto-refresh here — the detail page owns live updates.
-// ---------------------------------------------------------------------------
+// Old URL /admin/batches?site_id=X is 308-redirected to /admin/batches/[siteId]
+// so existing bookmarks still land in the right place.
+//
+// Without a site filter: show "Select a site" empty state; the SiteSelector
+// in the rail drives navigation to /admin/batches/[siteId].
 
 export const dynamic = "force-dynamic";
 
-// BatchRow + status mapping live in components/BatchesTable.tsx — the
-// presentation moved client-side as part of Spec 18 PR C.
-
-export default async function AdminBatchesPage({
+export default async function BatchesEntryPage({
   searchParams,
 }: {
   searchParams: { site_id?: string };
@@ -35,171 +26,33 @@ export default async function AdminBatchesPage({
   });
   if (access.kind === "redirect") redirect(access.to);
 
-  const svc = getServiceRoleClient();
-  const siteFilter =
+  // 308 redirect: ?site_id=X → /admin/batches/X (preserves old bookmarks)
+  if (
     typeof searchParams.site_id === "string" &&
     /^[0-9a-f-]{36}$/i.test(searchParams.site_id)
-      ? searchParams.site_id
-      : null;
-
-  // Join jobs with their site + template names + creator email. The
-  // RLS policy scopes the rows for operators via EXISTS on
-  // created_by; admins see everything.
-  const callerFilter =
-    access.user && access.user.role !== "admin" ? access.user.id : null;
-
-  let query = svc
-    .from("generation_jobs")
-    .select(
-      "id, status, requested_count, succeeded_count, failed_count, created_at, total_cost_usd_cents, created_by, site:sites!inner(name), template:design_templates!inner(name)",
-    )
-    .order("created_at", { ascending: false })
-    .limit(100);
-  if (callerFilter) {
-    query = query.eq("created_by", callerFilter);
+  ) {
+    permanentRedirect(`/admin/batches/${searchParams.site_id}`);
   }
-  if (siteFilter) {
-    query = query.eq("site_id", siteFilter);
-  }
-  const { data: jobs, error } = await query;
-
-  if (error) {
-    return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb
-            segments={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Batches" },
-            ]}
-          />
-          <PageHeader.Title>Batches</PageHeader.Title>
-        </PageHeader>
-        <Alert variant="destructive" title="Failed to load batches">
-          {error.message}
-        </Alert>
-      </PageShell>
-    );
-  }
-
-  // Second pass for creator emails — cheap lookup.
-  const creatorIds = Array.from(
-    new Set((jobs ?? []).map((r) => r.created_by).filter(Boolean)),
-  ) as string[];
-  const emailMap = new Map<string, string>();
-  if (creatorIds.length > 0) {
-    const { data: users } = await svc
-      .from("opollo_users")
-      .select("id, email")
-      .in("id", creatorIds);
-    for (const u of users ?? []) {
-      emailMap.set(u.id as string, u.email as string);
-    }
-  }
-
-  const rows: BatchRow[] = (jobs ?? []).map((j) => {
-    const site = j.site as unknown as { name: string } | null;
-    const tmpl = j.template as unknown as { name: string } | null;
-    return {
-      id: j.id as string,
-      site_name: site?.name ?? "—",
-      template_name: tmpl?.name ?? "—",
-      status: j.status as string,
-      requested_count: j.requested_count as number,
-      succeeded_count: j.succeeded_count as number,
-      failed_count: j.failed_count as number,
-      created_at: j.created_at as string,
-      created_by_email:
-        typeof j.created_by === "string"
-          ? emailMap.get(j.created_by) ?? null
-          : null,
-      total_cost_usd_cents: Number(j.total_cost_usd_cents ?? 0),
-    };
-  });
-
-  // Resolve "Run batch" context: only when a site_id filter is
-  // active do we have a target to point the modal at. On the
-  // unfiltered view the button is disabled with a tooltip; the
-  // per-site detail page is the primary entry-point for running
-  // batches.
-  let siteForButton: { id: string; name: string } | null = null;
-  let templateOptions: BatchTemplateOption[] = [];
-  if (siteFilter) {
-    const siteRes = await svc
-      .from("sites")
-      .select("id, name")
-      .eq("id", siteFilter)
-      .neq("status", "removed")
-      .maybeSingle();
-    if (siteRes.data) {
-      siteForButton = {
-        id: siteRes.data.id as string,
-        name: siteRes.data.name as string,
-      };
-      const { data: dsRow } = await svc
-        .from("design_systems")
-        .select("id")
-        .eq("site_id", siteForButton.id)
-        .eq("status", "active")
-        .maybeSingle();
-      if (dsRow) {
-        const { data: tmpls } = await svc
-          .from("design_templates")
-          .select("id, name, page_type")
-          .eq("design_system_id", dsRow.id as string)
-          .order("page_type", { ascending: true });
-        templateOptions = (tmpls ?? []).map((t) => ({
-          id: t.id as string,
-          name: t.name as string,
-          page_type: t.page_type as string,
-        }));
-      }
-    }
-  }
-
-  const subtitle = siteForButton
-    ? `${rows.length} ${rows.length === 1 ? "batch" : "batches"} for ${siteForButton.name}.`
-    : `${rows.length} ${rows.length === 1 ? "batch" : "batches"} across every site. Click a row for slot-level detail.`;
-
-  const breadcrumbs = siteForButton
-    ? [
-        { label: "Admin", href: "/admin/sites" },
-        { label: "Batches", href: "/admin/batches" },
-        { label: siteForButton.name },
-      ]
-    : [
-        { label: "Admin", href: "/admin/sites" },
-        { label: "Batches" },
-      ];
 
   return (
     <PageShell>
       <PageHeader>
-        <PageHeader.Breadcrumb segments={breadcrumbs} />
+        <PageHeader.Breadcrumb
+          segments={[
+            { label: "Admin", href: "/admin/sites" },
+            { label: "Batches" },
+          ]}
+        />
         <PageHeader.Title>Batches</PageHeader.Title>
-        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <NewBatchButton
-            site={siteForButton}
-            templates={templateOptions}
-            label="New batch"
-          />
-        </PageHeader.Actions>
       </PageHeader>
-
-      {siteForButton && (
-        <Link
-          href="/admin/batches"
-          className="mb-4 inline-block text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-        >
-          ← All batches
-        </Link>
-      )}
-
-      <div>
-        <BatchesTable rows={rows} />
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-center">
+        <NavIcon name="tree" size={36} className="text-tx-muted" />
+        <p className="text-base font-medium">Select a site to continue</p>
+        <p className="max-w-xs text-sm text-tx-muted">
+          Use the site selector in the Batches navigation panel to choose a
+          site, then navigate here again.
+        </p>
       </div>
     </PageShell>
   );
 }
-

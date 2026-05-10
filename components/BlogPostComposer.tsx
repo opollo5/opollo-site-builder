@@ -1340,7 +1340,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
                 })()}
               </span>
               <a
-                href="/admin/posts/new"
+                href="/admin/posts"
                 className="shrink-0 text-xs underline underline-offset-2 hover:text-foreground"
                 title={`Change WordPress site (currently ${siteName ?? siteWpUrl})`}
               >

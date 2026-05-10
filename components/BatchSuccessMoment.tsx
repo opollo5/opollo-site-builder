@@ -11,16 +11,17 @@ interface Props {
   jobId: string;
   succeededCount: number;
   siteName: string;
+  siteId: string;
 }
 
-export function BatchSuccessMoment({ jobId, succeededCount, siteName }: Props) {
+export function BatchSuccessMoment({ jobId, succeededCount, siteName, siteId }: Props) {
   return (
     <SuccessMoment
       firstTimeKey={`batch-completed:${jobId}`}
       title="Batch complete"
       firstTimeTitle="Batch completed!"
       subtitle={`${succeededCount} page${succeededCount === 1 ? "" : "s"} generated for ${siteName}.`}
-      primaryAction={{ label: "View batches", href: "/admin/batches" }}
+      primaryAction={{ label: "View batches", href: `/admin/batches/${siteId}` }}
     />
   );
 }

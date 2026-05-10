@@ -2,96 +2,86 @@ import { expect, test } from "@playwright/test";
 
 import { auditA11y, signInAsAdmin } from "./helpers";
 
-// BL-1 — Top-level /admin/posts/new entry point.
+// BL-1 — /admin/posts/[siteId]/new entry point (rail-based site selection).
 //
 // Scope:
-//   1. Sidebar nav has a "Post a blog" entry.
-//   2. /admin/posts/new renders with the site picker + tab row.
-//   3. The composer is gated until a site is picked; picking a site
-//      reveals it.
-//   4. The Bulk-upload tab shows its placeholder shell (BL-5 fills it).
+//   1. Sidebar nav links to /admin/posts.
+//   2. /admin/posts redirects or shows empty state.
+//   3. /admin/posts/[siteId]/new renders the composer + mode tabs directly.
+//   4. Autosave persists across reload at the same URL.
 
-test.describe("/admin/posts/new — top-level entry", () => {
-  test("sidebar nav links to the route and the page renders", async ({
-    page,
-  }, testInfo) => {
+// Helper: navigate to /admin/sites, click E2E Test Site, return its UUID.
+async function getE2eSiteId(page: Parameters<typeof signInAsAdmin>[0]): Promise<string> {
+  await page.goto("/admin/sites");
+  await page.getByRole("link", { name: "E2E Test Site" }).first().click();
+  await page.waitForURL(/\/admin\/sites\/[0-9a-f-]{36}$/);
+  const match = /\/admin\/sites\/([0-9a-f-]{36})$/.exec(page.url());
+  if (!match?.[1]) throw new Error("Could not extract E2E site ID from URL");
+  return match[1];
+}
+
+test.describe("/admin/posts — Blog section entry point", () => {
+  test("sidebar nav links to the blog section", async ({ page }, testInfo) => {
     await signInAsAdmin(page);
 
-    // Nav entry exists and is reachable.
     const navLink = page.getByTestId("nav-post-blog").first();
     await expect(navLink).toBeVisible();
     await navLink.click();
-    await page.waitForURL(/\/admin\/posts\/new$/);
 
-    // Tabs row + site picker present before any composer is rendered.
-    await expect(
-      page.getByRole("tab", { name: /single post/i }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("tab", { name: /bulk upload/i }),
-    ).toBeVisible();
-    await expect(page.getByTestId("posts-new-site-picker")).toBeVisible();
+    // Either lands on the empty state (/admin/posts) or auto-redirects to
+    // /admin/posts/[siteId]/new if exactly one site exists in the seed.
+    await page.waitForURL(/\/admin\/posts/);
 
-    // Composer is gated — the empty-state copy fronts the surface.
-    await expect(
-      page.getByText(/pick a site to start drafting/i),
-    ).toBeVisible();
+    // In either case the Blog section nav appears.
+    await expect(page.getByTestId("section-nav-title")).toHaveText("Blog");
 
     await auditA11y(page, testInfo);
   });
 
-  test("picking a site reveals the composer", async ({ page }, testInfo) => {
+  test("/admin/posts/new 308-redirects to /admin/posts", async ({ page }) => {
     await signInAsAdmin(page);
     await page.goto("/admin/posts/new");
-
-    await page.getByTestId("posts-new-site-picker").click();
-    // The seed contains at least one site (the E2E test site).
-    const firstOption = page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first();
-    await expect(firstOption).toBeVisible();
-    await firstOption.click();
-
-    // Composer (TipTap ProseMirror) appears once a site is bound.
-    await expect(page.locator(".ProseMirror")).toBeVisible();
-
-    await auditA11y(page, testInfo);
+    await page.waitForURL(/\/admin\/posts/);
+    // Must not have landed back at /admin/posts/new.
+    expect(page.url()).not.toMatch(/\/admin\/posts\/new$/);
   });
+});
 
-  test("bulk-upload tab renders the dropzone after a site is picked", async ({
+test.describe("/admin/posts/[siteId]/new — site-scoped composer", () => {
+  test("renders tabs + composer immediately (no page-level site picker)", async ({
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
-    await page.goto("/admin/posts/new");
+    const siteId = await getE2eSiteId(page);
+    await page.goto(`/admin/posts/${siteId}/new`);
 
-    // Pre-pick is required — bulk panel needs a siteId.
-    await page.getByTestId("posts-new-site-picker").click();
-    await page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first()
-      .click();
+    // Mode tabs present immediately — no gating behind a page picker.
+    await expect(page.getByRole("tab", { name: /single post/i })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /bulk upload/i })).toBeVisible();
+
+    // Composer (TipTap ProseMirror) visible without any further action.
+    await expect(page.locator(".ProseMirror")).toBeVisible();
+
+    // Old page-level site picker must NOT exist.
+    await expect(page.getByTestId("posts-new-site-picker")).toHaveCount(0);
+
+    await auditA11y(page, testInfo);
+  });
+
+  test("bulk-upload tab renders the dropzone", async ({ page }, testInfo) => {
+    await signInAsAdmin(page);
+    const siteId = await getE2eSiteId(page);
+    await page.goto(`/admin/posts/${siteId}/new`);
 
     await page.getByTestId("posts-new-tab-bulk").click();
 
     await expect(page.getByTestId("bulk-dropzone")).toBeVisible();
     await expect(page.getByTestId("bulk-paste-textarea")).toBeVisible();
 
-    // Paste a stacked-YAML blob and confirm the count surfaces.
     await page.getByTestId("bulk-paste-textarea").fill(
-      [
-        "---",
-        "title: First",
-        "---",
-        "Body of first.",
-        "---",
-        "title: Second",
-        "---",
-        "Body of second.",
-      ].join("\n"),
+      ["---", "title: First", "---", "Body of first.", "---", "title: Second", "---", "Body of second."].join("\n"),
     );
-    await expect(page.getByTestId("bulk-summary")).toContainText(
-      /2 posts? ready/i,
-    );
+    await expect(page.getByTestId("bulk-summary")).toContainText(/2 posts? ready/i);
 
     await auditA11y(page, testInfo);
   });
@@ -101,64 +91,33 @@ test.describe("/admin/posts/new — top-level entry", () => {
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
-    await page.goto("/admin/posts/new");
+    const siteId = await getE2eSiteId(page);
+    await page.goto(`/admin/posts/${siteId}/new`);
 
-    // Pick the seeded site so the composer mounts with a stable
-    // localStorage key.
-    await page.getByTestId("posts-new-site-picker").click();
-    const firstOption = page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first();
-    await firstOption.click();
-
-    // Sidebar document panels are visible from the start.
-    // Spec 11: slug + permalink moved into the SEO section in the main
-    // column; the right-rail Permalink panel was removed.
     await expect(page.getByTestId("post-sidebar")).toBeVisible();
     await expect(page.getByTestId("sidebar-publish")).toBeVisible();
     await expect(page.getByTestId("seo-section")).toBeVisible();
     await expect(page.locator("#post-slug")).toBeVisible();
 
-    // Type into the composer (TipTap ProseMirror). Use pressSequentially so
-    // TipTap's key-event handlers fire and update the React state that the
-    // autosave debounce watches.
     const composer = page.locator(".ProseMirror");
     await composer.click();
     await composer.pressSequentially("Hello world body for autosave probe.");
     await page.locator("#post-title").fill("Autosave probe");
 
-    // Wait for the autosave to COMPLETE (localStorage written), not just
-    // started. "Saving…" fires immediately; "Saved ·" fires after the 800ms
-    // debounce callback runs.
-    await expect(page.getByTestId("post-save-status")).toContainText(
-      /saved/i,
-      { timeout: 8000 },
-    );
+    await expect(page.getByTestId("post-save-status")).toContainText(/saved/i, { timeout: 8000 });
 
-    // Reload — the draft should NOT be silently pre-filled; the banner appears.
+    // Reload at the same URL — composer remounts for the same siteId.
     await page.reload();
+    await page.waitForURL(/\/admin\/posts\/[0-9a-f-]{36}\/new$/);
 
-    // The site picker resets to "Pick a site…" because the page
-    // tracks selection client-side, but the composer's localStorage
-    // is keyed by siteId. Re-pick the site to remount the composer.
-    await page.getByTestId("posts-new-site-picker").click();
-    await page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first()
-      .click();
-
-    // The banner surfaces before content is restored.
+    // The draft-restore banner (from BlogPostComposer) surfaces.
     await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
-    // Title + editor are still blank while the banner is showing.
     await expect(page.locator("#post-title")).toHaveValue("");
 
-    // Click Restore — content should populate.
     await page.getByTestId("draft-restore-button").click();
     await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
     await expect(page.locator("#post-title")).toHaveValue(/autosave probe/i);
-    await expect(page.locator(".ProseMirror")).toContainText(
-      /hello world body for autosave probe/i,
-    );
+    await expect(page.locator(".ProseMirror")).toContainText(/hello world body for autosave probe/i);
 
     await auditA11y(page, testInfo);
   });
@@ -167,34 +126,19 @@ test.describe("/admin/posts/new — top-level entry", () => {
     page,
   }, testInfo) => {
     await signInAsAdmin(page);
-    await page.goto("/admin/posts/new");
-
-    await page.getByTestId("posts-new-site-picker").click();
-    await page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first()
-      .click();
+    const siteId = await getE2eSiteId(page);
+    await page.goto(`/admin/posts/${siteId}/new`);
 
     const composer = page.locator(".ProseMirror");
     await composer.click();
     await composer.pressSequentially("Draft to be discarded.");
     await page.locator("#post-title").fill("Discard me");
 
-    await expect(page.getByTestId("post-save-status")).toContainText(
-      /saved/i,
-      { timeout: 8000 },
-    );
+    await expect(page.getByTestId("post-save-status")).toContainText(/saved/i, { timeout: 8000 });
 
     await page.reload();
-    await page.getByTestId("posts-new-site-picker").click();
-    await page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first()
-      .click();
-
     await expect(page.getByTestId("draft-restore-banner")).toBeVisible();
 
-    // Discard — banner disappears, editor remains blank.
     await page.getByTestId("draft-discard-button").click();
     await expect(page.getByTestId("draft-restore-banner")).toHaveCount(0);
     await expect(page.locator("#post-title")).toHaveValue("");
@@ -202,22 +146,11 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await auditA11y(page, testInfo);
   });
 
-  // Issue 3 — WordPress sidebar layout.
-  test("sidebar panels are visible and collapsible", async ({
-    page,
-  }, testInfo) => {
+  test("sidebar panels are visible and collapsible", async ({ page }, testInfo) => {
     await signInAsAdmin(page);
-    await page.goto("/admin/posts/new");
+    const siteId = await getE2eSiteId(page);
+    await page.goto(`/admin/posts/${siteId}/new`);
 
-    await page.getByTestId("posts-new-site-picker").click();
-    await page
-      .locator('[data-testid^="posts-new-site-option-"]')
-      .first()
-      .click();
-
-    // All default-open panels are visible.
-    // Spec 11: Permalink panel removed from the sidebar — slug now lives
-    // inside the SEO section in the main column.
     const publishPanel = page.getByTestId("sidebar-publish");
     const seoSection = page.getByTestId("seo-section");
     const categoriesPanel = page.getByTestId("sidebar-categories");
@@ -231,31 +164,23 @@ test.describe("/admin/posts/new — top-level entry", () => {
     await expect(tagsPanel).toBeVisible();
     await expect(featuredImagePanel).toBeVisible();
 
-    // Publish panel contains action buttons.
-    // Default mode is "draft" — primary button reads "Save as Draft", secondary hidden.
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
     await expect(publishPanel.getByRole("button", { name: /^save draft$/i })).toHaveCount(0);
 
-    // Switch to publish mode → secondary "Save draft" button appears.
     await publishPanel.getByRole("radio", { name: /publish immediately/i }).click();
     await expect(publishPanel.getByRole("button", { name: /^save draft$/i })).toBeVisible();
-    // Restore draft mode.
     await publishPanel.getByRole("radio", { name: /save as draft/i }).click();
     await expect(publishPanel.getByRole("button", { name: /^save draft$/i })).toHaveCount(0);
 
-    // Clicking the Publish panel header collapses it.
     await publishPanel.getByRole("button", { name: /^publish$/i }).click();
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toHaveCount(0);
 
-    // Clicking again expands it.
     await publishPanel.getByRole("button", { name: /^publish$/i }).click();
     await expect(publishPanel.getByRole("button", { name: /save as draft/i })).toBeVisible();
 
-    // SEO section is now full-width below the editor grid (not a collapsible sidebar panel).
     await expect(seoSection.locator("#post-meta-title")).toBeVisible();
     await expect(seoSection.locator("#post-meta-description")).toBeVisible();
 
-    // Visibility panel (new in WP parity) is open by default.
     const visibilityPanel = page.getByTestId("sidebar-visibility");
     await expect(visibilityPanel).toBeVisible();
 

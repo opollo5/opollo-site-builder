@@ -13,6 +13,7 @@ import {
   type NavUserContext,
 } from "./nav-config";
 import { CompanySelector } from "./company-selector";
+import { SiteSelector } from "./site-selector";
 
 // ---------------------------------------------------------------------------
 // Section Nav — secondary panel, ~220px wide, conditionally visible.
@@ -43,10 +44,25 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
     return null;
   }
 
-  const { title, showCompanySelector, groups } = activeItem.sectionNav;
+  const { title, showCompanySelector, showSiteSelector, siteIdSegment, siteSelectPath, groups } =
+    activeItem.sectionNav;
+
+  // Extract the active siteId from the URL when this section is site-scoped.
+  const siteId: string | null =
+    showSiteSelector && siteIdSegment !== undefined
+      ? (pathname.split("/")[siteIdSegment] ?? null) || null
+      : null;
+
+  // Replace the {siteId} token in item hrefs with the extracted siteId.
+  // If no siteId yet, the href is left as-is (will resolve to the entry-point
+  // empty state when clicked, which prompts the user to pick a site first).
+  function resolveHref(href: string): string {
+    return siteId ? href.replace("{siteId}", siteId) : href.replace("/{siteId}", "").replace("{siteId}", "");
+  }
 
   function isItemActive(href: string): boolean {
-    return pathname === href || pathname.startsWith(href + "/");
+    const resolved = resolveHref(href);
+    return pathname === resolved || pathname.startsWith(resolved + "/");
   }
 
   if (collapsed) {
@@ -101,6 +117,16 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
         </div>
       )}
 
+      {showSiteSelector && siteSelectPath && (
+        <div className="border-b border-border py-1">
+          <SiteSelector
+            currentSiteId={siteId}
+            currentSiteName={null}
+            siteSelectPath={siteSelectPath}
+          />
+        </div>
+      )}
+
       <nav className="flex-1 p-3">
         {groups.map((group, gi) => {
           const visibleItems = filterSectionItems(group.items, navContext);
@@ -115,11 +141,12 @@ export function SectionNav({ navContext, collapsed, onToggle }: SectionNavProps)
               )}
               <ul className="space-y-0.5">
                 {visibleItems.map((item) => {
+                  const resolved = resolveHref(item.href);
                   const active = isItemActive(item.href);
                   return (
                     <li key={item.href}>
                       <Link
-                        href={item.href}
+                        href={resolved}
                         data-testid={item.testId}
                         aria-current={active ? "page" : undefined}
                         className={cn(

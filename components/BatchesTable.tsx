@@ -27,6 +27,7 @@ import { TableCell } from "@/components/ui/table-cell";
 
 export type BatchRow = {
   id: string;
+  site_id: string;
   site_name: string;
   template_name: string;
   status: string;
@@ -66,9 +67,10 @@ function formatCost(cents: number): string {
 
 interface BatchesTableProps {
   rows: BatchRow[];
+  siteId: string;
 }
 
-export function BatchesTable({ rows }: BatchesTableProps) {
+export function BatchesTable({ rows, siteId }: BatchesTableProps) {
   const router = useRouter();
 
   const columns: ColumnDef<BatchRow>[] = [
@@ -126,7 +128,7 @@ export function BatchesTable({ rows }: BatchesTableProps) {
       data={rows}
       columns={columns}
       rowKey={(r) => r.id}
-      onRowClick={(r) => router.push(`/admin/batches/${r.id}`)}
+      onRowClick={(r) => router.push(`/admin/batches/${siteId}/${r.id}`)}
       testId="batches-table"
       emptyState={{
         icon: <NavIcon name="tree" size={20} />,

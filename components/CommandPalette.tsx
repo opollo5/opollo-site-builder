@@ -71,7 +71,7 @@ const NAVIGATE_ITEMS: readonly NavigateItem[] = [
   {
     label: "Post a blog",
     description: "Start a new post — single or bulk",
-    href: "/admin/posts/new",
+    href: "/admin/posts",
     iconName: "blog",
     keywords: "post blog new draft compose write bulk upload",
   },

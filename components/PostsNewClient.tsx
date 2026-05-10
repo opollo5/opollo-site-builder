@@ -1,77 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { BlogPostComposer } from "@/components/BlogPostComposer";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { BulkUploadPanel } from "@/components/BulkUploadPanel";
-import {
-  Command,
-  CommandEmpty,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import type { SiteListItem } from "@/lib/tool-schemas";
 import { cn, formatRelativeTime } from "@/lib/utils";
 
-// BL-1 — Client shell for /admin/posts/new.
+// BL-1 — Client shell for /admin/posts/[siteId]/new.
 //
-// Two responsibilities:
-//   1. A site picker that gates the composer. The composer needs a
-//      siteId; until the operator picks one we render a quiet shell.
-//   2. A tabs row with "Single post" + "Bulk upload". Bulk is a
-//      parked stub today (BL-5 fills it). Tabs ride above the picker
-//      so the operator sees the available modes before committing to
-//      a site.
+// Site selection is handled by the SiteSelector in the section rail; this
+// component only manages the mode tabs (Single post / Bulk upload) and the
+// pending-drafts banner. The siteId is guaranteed by the server component.
 
 type Mode = "single" | "bulk";
 
 interface PostsNewClientProps {
-  sites: SiteListItem[];
+  siteId: string;
+  siteName: string;
 }
 
-export function PostsNewClient({ sites }: PostsNewClientProps) {
+export function PostsNewClient({ siteId, siteName: _siteName }: PostsNewClientProps) {
   const [mode, setMode] = useState<Mode>("single");
-  const [siteId, setSiteId] = useState<string | null>(null);
-
-  const selectedSite = sites.find((s) => s.id === siteId) ?? null;
 
   return (
     <div className="space-y-6">
       <ModeTabs mode={mode} onModeChange={setMode} />
 
-      <PendingDraftsNotice
-        onResume={(id) => {
-          setSiteId(id);
-          setMode("single");
-        }}
-      />
-
-      <SitePicker
-        sites={sites}
-        value={selectedSite}
-        onChange={(s) => setSiteId(s?.id ?? null)}
-      />
+      <PendingDraftsNotice currentSiteId={siteId} />
 
       {mode === "single" ? (
-        selectedSite ? (
-          <div className="rounded-md border bg-background p-6">
-            <BlogPostComposer siteId={selectedSite.id} />
-          </div>
-        ) : (
-          <EmptyShell label="Pick a site to start drafting your post." />
-        )
-      ) : selectedSite ? (
         <div className="rounded-md border bg-background p-6">
-          <BulkUploadPanel siteId={selectedSite.id} />
+          <BlogPostComposer siteId={siteId} />
         </div>
       ) : (
-        <EmptyShell label="Pick a site to start a bulk upload." />
+        <div className="rounded-md border bg-background p-6">
+          <BulkUploadPanel siteId={siteId} />
+        </div>
       )}
     </div>
   );
@@ -141,128 +107,10 @@ function ModeTab({
   );
 }
 
-function SitePicker({
-  sites,
-  value,
-  onChange,
-}: {
-  sites: SiteListItem[];
-  value: SiteListItem | null;
-  onChange: (next: SiteListItem | null) => void;
-}) {
-  const [open, setOpen] = useState(false);
-
-  if (sites.length === 0) {
-    return (
-      <div
-        role="status"
-        className="rounded-md border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
-      >
-        No sites available. Pair a WordPress install in
-        <code className="mx-1 font-mono text-sm">/admin/sites</code>
-        before posting.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-1">
-      <label
-        htmlFor="posts-new-site-picker"
-        className="block text-sm font-medium"
-      >
-        Site
-      </label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <button
-            id="posts-new-site-picker"
-            type="button"
-            data-testid="posts-new-site-picker"
-            className="flex h-10 w-full max-w-md items-center justify-between rounded-md border bg-background px-3 text-sm transition-smooth focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            aria-haspopup="listbox"
-            aria-expanded={open}
-          >
-            <span className={value ? "" : "text-muted-foreground"}>
-              {value ? value.name : "Pick a site…"}
-            </span>
-            <NavIcon
-              name="chevron-down"
-              size={16}
-              className="ml-2 text-muted-foreground"
-            />
-          </button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          sideOffset={4}
-          className="w-[var(--radix-popover-trigger-width)] p-0"
-        >
-          <Command>
-            <CommandInput placeholder="Search sites by name or URL" />
-            <CommandList>
-              <CommandEmpty>No sites match.</CommandEmpty>
-              {sites.map((s) => (
-                <CommandItem
-                  key={s.id}
-                  value={`${s.name} ${s.wp_url}`}
-                  onSelect={() => {
-                    onChange(s);
-                    setOpen(false);
-                  }}
-                  data-testid={`posts-new-site-option-${s.id}`}
-                >
-                  <span className="flex-1 truncate">{s.name}</span>
-                  <span className="ml-2 shrink-0 truncate text-sm text-muted-foreground">
-                    {hostnameOf(s.wp_url)}
-                  </span>
-                </CommandItem>
-              ))}
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      {value && (
-        <p className="text-sm text-muted-foreground">
-          Posting to <span className="font-medium text-foreground">{value.name}</span>{" "}
-          ({hostnameOf(value.wp_url)}).
-        </p>
-      )}
-    </div>
-  );
-}
-
-function EmptyShell({
-  label,
-  description,
-}: {
-  label: string;
-  description?: string;
-}) {
-  return (
-    <div className="rounded-md border border-dashed bg-muted/20 px-6 py-12 text-center text-sm">
-      <p className="font-medium">{label}</p>
-      {description && (
-        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-      )}
-    </div>
-  );
-}
-
-function hostnameOf(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return url;
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Issue 17 — PendingDraftsNotice.
-//
-// Scans localStorage for opollo:post-draft:* keys on mount and shows a
-// banner for any draft that has content. The operator can resume (which
-// selects that site + opens the composer) or discard the saved state.
+// PendingDraftsNotice — shows banners for drafts belonging to OTHER sites.
+// The current site's draft is restored silently by BlogPostComposer on mount.
+// Resume navigates to the other site's composer page via the URL.
 // ---------------------------------------------------------------------------
 
 interface PendingDraft {
@@ -271,7 +119,8 @@ interface PendingDraft {
   savedAt: number;
 }
 
-function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void }) {
+function PendingDraftsNotice({ currentSiteId }: { currentSiteId: string }) {
+  const router = useRouter();
   const [drafts, setDrafts] = useState<PendingDraft[]>([]);
 
   useEffect(() => {
@@ -295,21 +144,22 @@ function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void 
             title?: { value?: string };
           };
           if (snap?.v !== 1) continue;
-          // Only surface drafts that have actual content.
           const hasContent =
             (snap.title?.value?.trim().length ?? 0) > 0 ||
             (snap.composerText?.replace(/<[^>]+>/g, "").trim().length ?? 0) > 0;
           if (!hasContent) continue;
+          // Skip current site — its draft is restored silently by BlogPostComposer.
+          if (id === currentSiteId) continue;
           found.push({ siteId: id, siteName: snap.siteName, savedAt: snap.savedAt ?? 0 });
         } catch {
           // Corrupt entry — skip.
         }
       }
     } catch {
-      // localStorage inaccessible in some contexts.
+      // localStorage inaccessible.
     }
     setDrafts(found);
-  }, []);
+  }, [currentSiteId]);
 
   function discard(siteId: string) {
     try {
@@ -344,7 +194,7 @@ function PendingDraftsNotice({ onResume }: { onResume: (siteId: string) => void 
           <div className="flex shrink-0 items-center gap-3">
             <button
               type="button"
-              onClick={() => onResume(draft.siteId)}
+              onClick={() => router.push(`/admin/posts/${draft.siteId}/new`)}
               className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
             >
               Resume
