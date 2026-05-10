@@ -56,10 +56,11 @@ type LightboxState = {
   height_px: number | null;
 };
 
+type ImageListItemWithUrl = ImageListItem & { previewUrl: string | null };
+
 type ImagesTableProps = {
-  items: ImageListItem[];
+  items: ImageListItemWithUrl[];
   backHref?: string;
-  cfHash: string | null;
 };
 
 function buildDetailHref(id: string, backHref: string | undefined): string {
@@ -71,16 +72,11 @@ function buildDetailHref(id: string, backHref: string | undefined): string {
 function Thumbnail({
   item,
   onClick,
-  cfHash,
 }: {
-  item: ImageListItem;
+  item: ImageListItemWithUrl;
   onClick?: () => void;
-  cfHash: string | null;
 }) {
-  const url =
-    item.cloudflare_id && cfHash
-      ? `https://imagedelivery.net/${cfHash}/${item.cloudflare_id}/public`
-      : null;
+  const url = item.previewUrl;
   const alt = item.alt_text ?? item.filename ?? "Library image";
   if (!url) {
     return (
@@ -128,7 +124,7 @@ function TagsCell({ tags }: { tags: string[] }) {
   );
 }
 
-export function ImagesTable({ items, backHref, cfHash }: ImagesTableProps) {
+export function ImagesTable({ items, backHref }: ImagesTableProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [lightbox, setLightbox] = useState<LightboxState | null>(null);
@@ -136,11 +132,8 @@ export function ImagesTable({ items, backHref, cfHash }: ImagesTableProps) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
 
-  function openLightbox(item: ImageListItem) {
-    const url =
-      item.cloudflare_id && cfHash
-        ? `https://imagedelivery.net/${cfHash}/${item.cloudflare_id}/public`
-        : null;
+  function openLightbox(item: ImageListItemWithUrl) {
+    const url = item.previewUrl;
     if (!url) return;
     setLightbox({
       src: url,
@@ -153,7 +146,7 @@ export function ImagesTable({ items, backHref, cfHash }: ImagesTableProps) {
     });
   }
 
-  const columns: ColumnDef<ImageListItem>[] = [
+  const columns: ColumnDef<ImageListItemWithUrl>[] = [
     {
       key: "preview",
       header: "Preview",
@@ -162,9 +155,8 @@ export function ImagesTable({ items, backHref, cfHash }: ImagesTableProps) {
         <Thumbnail
           item={item}
           onClick={
-            item.cloudflare_id ? () => openLightbox(item) : undefined
+            item.previewUrl ? () => openLightbox(item) : undefined
           }
-          cfHash={cfHash}
         />
       ),
     },
@@ -258,7 +250,7 @@ export function ImagesTable({ items, backHref, cfHash }: ImagesTableProps) {
         selectable
         selectedKeys={selectedKeys}
         onSelectionChange={setSelectedKeys}
-        onRowClick={(item) => router.push(buildDetailHref(item.id, backHref))}
+        onRowClick={(item: ImageListItemWithUrl) => router.push(buildDetailHref(item.id, backHref))}
         testId="images-table"
         emptyState={{
           icon: <NavIcon name="picture" size={20} />,
