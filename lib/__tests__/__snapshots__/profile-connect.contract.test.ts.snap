@@ -1,0 +1,32 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] Facebook with disableAutoLogin: true 1`] = `
+{
+  "requestBody": {
+    "disableAutoLogin": true,
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1",
+    "teamId": "team-contract-bsp6",
+    "type": "FACEBOOK",
+  },
+}
+`;
+
+exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] LinkedIn — minimal request body 1`] = `
+{
+  "requestBody": {
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1",
+    "teamId": "team-contract-bsp6",
+    "type": "LINKEDIN",
+  },
+}
+`;
+
+exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] disableAutoLogin: false omits the key entirely 1`] = `
+{
+  "requestBody": {
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1",
+    "teamId": "team-contract-bsp6",
+    "type": "TWITTER",
+  },
+}
+`;
