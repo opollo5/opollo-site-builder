@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: bundle.social socialAccountDisconnect (BSP-7) > [snapshot] Facebook 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-contract-bsp7",
+    "type": "FACEBOOK",
+  },
+}
+`;
+
+exports[`CONTRACT: bundle.social socialAccountDisconnect (BSP-7) > [snapshot] LinkedIn — minimal request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-contract-bsp7",
+    "type": "LINKEDIN",
+  },
+}
+`;

@@ -143,6 +143,93 @@ export async function initiateProfileConnect(
   return { ok: true, data: { url, teamId } };
 }
 
+// BSP-7 — disconnect a per-profile social account.
+//
+// bundle.social's socialAccountDisconnect endpoint identifies the
+// account by (teamId, platform type) — not by account id. There can
+// only be one account of a given platform per team, so this is well-
+// defined. Returns ok:true regardless of whether an account existed
+// before — disconnecting an already-disconnected (team, type) is a no-op.
+
+export type DisconnectProfileAccountInput = {
+  profileId: string;
+  platform: ProfileSocialPlatform;
+};
+
+export type DisconnectProfileAccountResult =
+  | { ok: true; data: { teamId: string; platform: ProfileSocialPlatform } }
+  | {
+      ok: false;
+      error: { code: string; message: string };
+    };
+
+export async function disconnectProfileAccount(
+  input: DisconnectProfileAccountInput,
+): Promise<DisconnectProfileAccountResult> {
+  if (!input.profileId) {
+    return {
+      ok: false,
+      error: { code: "VALIDATION_FAILED", message: "profileId is required." },
+    };
+  }
+  const client = getBundlesocialClient();
+  if (!client) {
+    return {
+      ok: false,
+      error: {
+        code: "RECEIVER_NOT_CONFIGURED",
+        message: "BUNDLE_SOCIAL_API is not configured.",
+      },
+    };
+  }
+
+  // Resolve the profile's team id. Disconnect against an unprovisioned
+  // profile is a no-op error — we never created a team there, so there's
+  // nothing to disconnect from.
+  let teamId: string;
+  try {
+    teamId = await getOrCreateBundleSocialTeamForProfile(input.profileId);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      error: { code: "INTERNAL_ERROR", message: msg },
+    };
+  }
+
+  logger.info("bundlesocial.profile.disconnect.request", {
+    profile_id: input.profileId,
+    team_id: teamId,
+    platform: input.platform,
+  });
+
+  try {
+    await client.socialAccount.socialAccountDisconnect({
+      requestBody: { type: input.platform, teamId },
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("bundlesocial.profile.disconnect.sdk_failed", {
+      profile_id: input.profileId,
+      team_id: teamId,
+      platform: input.platform,
+      err: msg,
+    });
+    return {
+      ok: false,
+      error: { code: "INTERNAL_ERROR", message: msg },
+    };
+  }
+
+  logger.info("bundlesocial.profile.disconnect.response", {
+    profile_id: input.profileId,
+    team_id: teamId,
+    platform: input.platform,
+  });
+
+  return { ok: true, data: { teamId, platform: input.platform } };
+}
+
 // Read a profile's bundle.social team detail (including the list of
 // connected social accounts). Returns null if the profile has not yet
 // been provisioned a team. Caller is responsible for auth gating.
