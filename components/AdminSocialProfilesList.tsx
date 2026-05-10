@@ -321,6 +321,18 @@ export function AdminSocialProfilesList({ companyId, initialProfiles }: Props) {
                         <Button
                           size="sm"
                           variant="ghost"
+                          asChild
+                          data-testid={`profile-view-analytics-${p.id}`}
+                        >
+                          <Link
+                            href={`/admin/companies/${companyId}/social-profiles/${p.id}/analytics`}
+                          >
+                            Analytics
+                          </Link>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={() => {
                             setEditingId(p.id);
                             setEditName(p.name);
