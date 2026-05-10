@@ -167,7 +167,7 @@ export function PlatformAcceptInviteForm({
       </div>
 
       {error && (
-        <Alert variant="destructive" data-testid="platform-accept-invite-error">
+        <Alert variant="destructive" data-testid="platform-accept-invite-error" reportContext={{ message: error }}>
           {error}
         </Alert>
       )}

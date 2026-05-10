@@ -281,7 +281,7 @@ export function PostDetailClient({
         </Alert>
       )}
 
-      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
+      {errorMessage && <Alert variant="destructive" reportContext={{ message: errorMessage }}>{errorMessage}</Alert>}
 
       {post.status === "draft" && (
         <PostDraftEditor

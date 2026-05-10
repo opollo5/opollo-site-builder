@@ -402,7 +402,7 @@ export function SiteEditForm({
       </div>
 
       {submitError && (
-        <Alert variant="destructive" data-testid="site-edit-error">
+        <Alert variant="destructive" data-testid="site-edit-error" reportContext={{ message: submitError }}>
           {submitError}
         </Alert>
       )}

@@ -67,7 +67,7 @@ export function ApproveCompleteHere({ challengeId }: { challengeId: string }) {
         challenged again next time.
       </p>
       {error && (
-        <Alert variant="destructive" data-testid="approve-here-error">
+        <Alert variant="destructive" data-testid="approve-here-error" reportContext={{ message: error }}>
           {error}
         </Alert>
       )}

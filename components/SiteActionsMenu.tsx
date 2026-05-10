@@ -9,8 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { NavIcon } from "@/components/ui/nav-icon";
@@ -127,14 +126,14 @@ export function SiteActionsMenu({
         payload && payload.ok === false
           ? (payload.errorCode ?? "WP_ERROR")
           : "WP_ERROR";
-      toast.error(translateTestConnectionErrorCode(code));
+      const codeMsg = translateTestConnectionErrorCode(code);
+      reportableToast.error(codeMsg, { message: codeMsg, type: code });
     } catch (err) {
-      toast.error(
+      const errMsg = err instanceof Error ? err.message : String(err);
+      reportableToast.error(
         translateTestConnectionErrorCode("REST_UNREACHABLE"),
-        {
-          description:
-            err instanceof Error ? err.message : String(err),
-        },
+        { message: errMsg, type: "REST_UNREACHABLE" },
+        { description: errMsg },
       );
     } finally {
       setTesting(false);

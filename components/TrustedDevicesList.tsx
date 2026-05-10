@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -48,9 +47,8 @@ export function TrustedDevicesList({
       );
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.ok) {
-        toast.error("Couldn't sign out device", {
-          description: payload?.error?.message ?? `Failed (HTTP ${res.status}).`,
-        });
+        const desc = payload?.error?.message ?? `Failed (HTTP ${res.status}).`;
+        reportableToast.error("Couldn't sign out device", { message: desc }, { description: desc });
         return;
       }
       toastSuccess(`${label} signed out.`);
@@ -71,9 +69,8 @@ export function TrustedDevicesList({
         | { ok: false; error: { code: string; message: string } }
         | null;
       if (!res.ok || !payload?.ok) {
-        toast.error("Couldn't sign out other devices", {
-          description: payload?.ok === false ? payload.error.message : `Failed (HTTP ${res.status}).`,
-        });
+        const desc = payload?.ok === false ? payload.error.message : `Failed (HTTP ${res.status}).`;
+        reportableToast.error("Couldn't sign out other devices", { message: desc }, { description: desc });
         return;
       }
       toastSuccess(

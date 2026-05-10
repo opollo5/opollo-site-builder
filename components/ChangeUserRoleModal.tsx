@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -87,18 +86,16 @@ export function ChangeUserRoleModal({
       );
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.ok) {
-        toast.error("Couldn't change role", {
-          description:
-            payload?.error?.message ??
-            `Role change failed (HTTP ${res.status}).`,
-        });
+        const desc =
+          payload?.error?.message ??
+          `Role change failed (HTTP ${res.status}).`;
+        reportableToast.error("Couldn't change role", { message: desc }, { description: desc });
         return;
       }
       onSuccess();
     } catch (err) {
-      toast.error("Network error changing role", {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      reportableToast.error("Network error changing role", { message: errMsg }, { description: errMsg });
     } finally {
       setSubmitting(false);
     }

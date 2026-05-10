@@ -3,7 +3,7 @@
 import { Fragment, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 
 import { NavIcon } from "@/components/ui/nav-icon";
 
@@ -242,9 +242,8 @@ function SkipButton({
         | { ok: false; error: { message: string } }
         | null;
       if (!payload?.ok) {
-        toast.error(
-          payload?.ok === false ? payload.error.message : "Skip failed.",
-        );
+        const desc = payload?.ok === false ? payload.error.message : "Skip failed.";
+        reportableToast.error(desc, { message: desc });
         setBusy(false);
         return;
       }
@@ -252,7 +251,8 @@ function SkipButton({
       router.push(`/admin/sites/${siteId}/setup?step=${nextStep}`);
       router.refresh();
     } catch (err) {
-      toast.error(`Skip failed: ${err instanceof Error ? err.message : "unknown"}`);
+      const errMsg = `Skip failed: ${err instanceof Error ? err.message : "unknown"}`;
+      reportableToast.error(errMsg, { message: errMsg });
       setBusy(false);
     }
   }

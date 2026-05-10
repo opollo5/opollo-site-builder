@@ -554,7 +554,7 @@ export function CopyExistingExtractionWizard({
       />
 
       {error && (
-        <Alert variant="destructive" title="Couldn't complete that step">
+        <Alert variant="destructive" title="Couldn't complete that step" reportContext={{ message: error }}>
           {error}
         </Alert>
       )}

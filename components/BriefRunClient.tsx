@@ -429,7 +429,7 @@ export function BriefRunClient({
         )}
       </div>
 
-      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
+      {errorMessage && <Alert variant="destructive" reportContext={{ message: errorMessage }}>{errorMessage}</Alert>}
 
       {/* RS-6 — inline cost section dropped; the floating RunCostTicker
           (rendered at the page root, fixed bottom-right / bottom-bar)
@@ -469,6 +469,7 @@ export function BriefRunClient({
               <code className="text-sm">{activeRun.failure_code}</code>
             </>
           }
+          reportContext={{ message: activeRun.failure_detail ?? activeRun.failure_code, type: activeRun.failure_code }}
         >
           {activeRun.failure_detail && <p>{activeRun.failure_detail}</p>}
         </Alert>
@@ -695,6 +696,7 @@ function PagePreview({
               variant="destructive"
               className="mt-2"
               title="This page's HTML appears truncated."
+              reportContext={{ message: "This page's HTML appears truncated — missing closing </body> or </html> tag." }}
             >
               The doc is missing a closing{" "}
               <code className="font-mono">&lt;/body&gt;</code> or{" "}

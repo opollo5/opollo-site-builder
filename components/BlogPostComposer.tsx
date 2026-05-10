@@ -1022,7 +1022,7 @@ export function BlogPostComposer({ siteId }: { siteId: string }) {
       {/* ── LEFT: title + editor + SEO ── */}
       <div className="space-y-4">
         {formError && (
-          <Alert variant="destructive" data-testid="post-form-error-banner">
+          <Alert variant="destructive" data-testid="post-form-error-banner" reportContext={{ message: formError }}>
             {formError}
           </Alert>
         )}

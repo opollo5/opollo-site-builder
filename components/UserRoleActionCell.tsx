@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 
 // AUTH-FOUNDATION P3 — role enum migrated from
@@ -68,11 +67,10 @@ export function UserRoleActionCell({
         // Roll back the visual state immediately and surface the
         // server's reason via toast.
         setOptimisticRole(previous);
-        toast.error("Couldn't change role", {
-          description:
-            payload?.error?.message ??
-            `Role change failed (HTTP ${res.status}). The previous role has been restored.`,
-        });
+        const desc =
+          payload?.error?.message ??
+          `Role change failed (HTTP ${res.status}). The previous role has been restored.`;
+        reportableToast.error("Couldn't change role", { message: desc }, { description: desc });
         return;
       }
       toastSuccess(`Role updated to ${newRole}`);
@@ -81,9 +79,8 @@ export function UserRoleActionCell({
       router.refresh();
     } catch (err) {
       setOptimisticRole(previous);
-      toast.error("Network error changing role", {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      reportableToast.error("Network error changing role", { message: errMsg }, { description: errMsg });
     } finally {
       setSubmitting(false);
     }

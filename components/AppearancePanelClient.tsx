@@ -337,7 +337,7 @@ export function AppearancePanelClient({
       </div>
 
       {/* Top-level error banner — covers network errors + post-action errors. */}
-      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
+      {errorMessage && <Alert variant="destructive" reportContext={{ message: errorMessage }}>{errorMessage}</Alert>}
 
       {/* Status banner — varies by phase. */}
       {phase === "loading" && (
@@ -387,6 +387,7 @@ export function AppearancePanelClient({
             label: actionState === "rechecking" ? "Re-checking…" : "Re-check",
             onClick: runPreflight,
           }}
+          reportContext={errorMessage ? { message: errorMessage } : undefined}
         />
       )}
 

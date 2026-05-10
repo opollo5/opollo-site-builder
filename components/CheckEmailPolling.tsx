@@ -214,7 +214,7 @@ export function CheckEmailPolling({
   if (status === "expired") {
     return (
       <div className="space-y-4">
-        <Alert variant="destructive">
+        <Alert variant="destructive" reportContext={{ message: "This sign-in attempt expired (15-minute window). The approval email is no longer valid." }}>
           This sign-in attempt expired (15-minute window). The approval
           email is no longer valid.
         </Alert>
@@ -232,7 +232,7 @@ export function CheckEmailPolling({
   if (completion.kind === "failed") {
     return (
       <div className="space-y-4">
-        <Alert variant="destructive" data-testid="check-email-error">
+        <Alert variant="destructive" data-testid="check-email-error" reportContext={{ message: completion.message }}>
           {completion.message}
         </Alert>
         <div className="flex flex-wrap items-center gap-3">
@@ -326,7 +326,7 @@ export function CheckEmailPolling({
       </p>
 
       {pollErrorMsg && (
-        <Alert variant="destructive" data-testid="check-email-error">
+        <Alert variant="destructive" data-testid="check-email-error" reportContext={{ message: pollErrorMsg }}>
           {pollErrorMsg}
         </Alert>
       )}
