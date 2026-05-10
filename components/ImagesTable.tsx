@@ -214,18 +214,18 @@ function GridCard({
 
       {/* Tag count badge — top-right, only when tags exist */}
       {item.tags.length > 0 && (
-        <div className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/60 px-1.5 py-0.5 text-[10px] font-medium leading-none text-white">
+        <div className="absolute right-1.5 top-1.5 z-10 rounded-full bg-black/60 px-1.5 py-0.5 text-xs font-medium leading-none text-white">
           {item.tags.length}
         </div>
       )}
 
       {/* Gradient overlay — filename + dimensions */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 py-1.5">
-        <p className="truncate text-[10px] font-medium leading-tight text-white">
+        <p className="truncate text-xs font-medium leading-tight text-white">
           {item.filename ?? item.title ?? "—"}
         </p>
         {item.width_px && item.height_px && (
-          <p className="text-[9px] leading-tight text-white/70">
+          <p className="text-xs leading-tight text-white/70">
             {item.width_px}×{item.height_px}
           </p>
         )}
@@ -369,7 +369,7 @@ function ImagesToolbar({
           name="source"
           defaultValue={filterState?.source ?? ""}
           className="h-8 rounded border bg-background px-2 text-sm"
-          aria-label="Source filter"
+          aria-label="Source"
         >
           <option value="">All sources</option>
           <option value="istock">iStock</option>
@@ -388,14 +388,14 @@ function ImagesToolbar({
         </select>
 
         {/* Search — pushed to far right */}
-        <div className="ml-auto flex items-center">
+        <div className="ml-auto flex items-center gap-2">
           <input
             type="search"
             name="q"
             defaultValue={filterState?.query ?? ""}
             placeholder="Search images…"
             className="h-8 min-w-44 rounded-l border border-r-0 bg-background px-2 text-sm"
-            aria-label="Search images"
+            aria-label="Search"
           />
           <button
             type="submit"
@@ -404,6 +404,20 @@ function ImagesToolbar({
           >
             <NavIcon name="magnifier" size={14} />
           </button>
+          {(filterState?.query ||
+            (filterState?.tags?.length ?? 0) > 0 ||
+            filterState?.source) && (
+            <a
+              href={
+                filterState?.deleted
+                  ? "/admin/images?deleted=1"
+                  : "/admin/images"
+              }
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </a>
+          )}
         </div>
       </form>
     </div>
