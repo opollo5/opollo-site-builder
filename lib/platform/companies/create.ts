@@ -1,6 +1,7 @@
-import "server-only";
+﻿import "server-only";
 
 import { logger } from "@/lib/logger";
+import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 

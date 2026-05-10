@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
 // REGRESSION R6 — initiate-connect logs request + response payload
@@ -23,6 +23,10 @@ const mockClient = {
 vi.mock("@/lib/bundlesocial", () => ({
   getBundlesocialClient: () => mockClient,
   getBundlesocialTeamId: () => "team-r6",
+}));
+
+vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
+  getOrCreateBundleSocialTeam: vi.fn().mockResolvedValue("team-r6"),
 }));
 
 import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";

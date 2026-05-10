@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,6 +29,7 @@ export function CompanySelector({
   const [companies, setCompanies] = useState<Company[]>([]);
   const [companiesLoading, setCompaniesLoading] = useState(false);
   const [switching, setSwitching] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
 
   async function openSelector() {
@@ -52,13 +53,19 @@ export function CompanySelector({
   async function selectCompany(id: string | null) {
     if (switching) return;
     setSwitching(true);
+    setSwitchError(null);
     setSelectorOpen(false);
     try {
-      await fetch("/api/platform/companies/switch", {
+      const res = await fetch("/api/platform/companies/switch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ company_id: id }),
       });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+        setSwitchError(json?.error?.message ?? "Failed to switch company. Try again.");
+        return;
+      }
       router.refresh();
     } finally {
       setSwitching(false);
@@ -106,6 +113,15 @@ export function CompanySelector({
           className="shrink-0 opacity-50"
         />
       </button>
+
+      {switchError && (
+        <p
+          data-testid="company-switch-error"
+          className="px-3 py-1.5 text-xs text-destructive bg-destructive/10 rounded-md mt-1"
+        >
+          {switchError}
+        </p>
+      )}
 
       {selectorOpen && (
         <div

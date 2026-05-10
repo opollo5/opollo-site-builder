@@ -1,9 +1,9 @@
-import "server-only";
+﻿import "server-only";
 
 import {
   getBundlesocialClient,
-  getBundlesocialTeamId,
 } from "@/lib/bundlesocial";
+import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
@@ -78,9 +78,21 @@ export async function resolveBundleUploadId(
   }
 
   const client = getBundlesocialClient();
-  const teamId = getBundlesocialTeamId();
-  if (!client || !teamId) {
-    return notConfigured(client ? "BUNDLE_SOCIAL_TEAMID" : "BUNDLE_SOCIAL_API");
+  if (!client) {
+    return notConfigured("BUNDLE_SOCIAL_API");
+  }
+
+  // Resolve the per-company bundle.social team id.
+  let teamId: string;
+  try {
+    teamId = await getOrCreateBundleSocialTeam(input.companyId);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error("social.media.resolve.team_provision_failed", {
+      err: message,
+      company_id: input.companyId,
+    });
+    return internal(`Failed to provision bundle.social team: ${message}`);
   }
 
   const sourceUrl = asset.data.source_url as string | null;

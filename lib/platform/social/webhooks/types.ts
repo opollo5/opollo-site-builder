@@ -1,4 +1,4 @@
-import { z } from "zod";
+﻿import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // S1-17 — bundle.social webhook event shapes.
@@ -26,6 +26,9 @@ import { z } from "zod";
 export const WebhookEnvelopeSchema = z.object({
   id: z.string().min(1),
   type: z.string().min(1),
+  // bundle.social sends teamId on all events; used to route events to the
+  // correct platform_companies row (BSP-1 per-company isolation).
+  teamId: z.string().optional(),
   data: z.record(z.string(), z.unknown()).optional(),
 });
 

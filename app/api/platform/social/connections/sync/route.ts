@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+﻿import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { readJsonBody, validationError, internalError } from "@/lib/http";
@@ -17,8 +17,7 @@ import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
 //     periodic cron (when that lands).
 //
 // Body: { company_id } (required for the canDo gate; the underlying
-// lib touches every row, but we still scope the auth to the company
-// the admin is currently in).
+// lib scopes the sync to this company's bundle.social team).
 //
 // No new-account attribution on this path — that's only for the
 // callback route after a connect flow completes.
@@ -45,7 +44,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
   if (gate.kind === "deny") return gate.response;
 
-  const result = await syncBundlesocialConnections({});
+  const result = await syncBundlesocialConnections({
+    companyId: parsed.data.company_id,
+  });
   if (!result.ok) {
     return internalError(result.error.message);
   }
