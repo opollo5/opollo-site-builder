@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import type { AspectRatio, CompositionType, StyleId } from "@/lib/image/types";
 
@@ -126,7 +127,7 @@ export function MoodBoardClient({
   async function selectImage(idx: number) {
     const img = images[idx];
     if (!img?.signedUrl) {
-      toast.error("No URL available for this image.");
+      reportableToast.error("No URL available for this image.", { message: "No URL available for this image." });
       return;
     }
     setSelectedIdx(idx);

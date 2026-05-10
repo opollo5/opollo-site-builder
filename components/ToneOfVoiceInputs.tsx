@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
@@ -186,9 +187,8 @@ export function ToneOfVoiceInputs({
         | { ok: false; error: { code?: string; message: string } }
         | null;
       if (!payload?.ok) {
-        toast.error(
-          payload?.ok === false ? payload.error.message : "Regeneration failed.",
-        );
+        const regenDesc = payload?.ok === false ? payload.error.message : "Regeneration failed.";
+        reportableToast.error(regenDesc, { message: regenDesc });
         // Server-side cap (DESIGN-DISCOVERY-FOLLOWUP PR 3): a 429
         // means the cap is exhausted on the server even if local
         // state hasn't caught up. Lock the button.
@@ -206,7 +206,8 @@ export function ToneOfVoiceInputs({
       setRegenFeedback("");
       setRegenerating(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Network error.");
+      const regenErrMsg = err instanceof Error ? err.message : "Network error.";
+      reportableToast.error(regenErrMsg, { message: regenErrMsg });
       setRegenerating(false);
     }
   }
@@ -264,16 +265,16 @@ export function ToneOfVoiceInputs({
         | { ok: false; error: { message: string } }
         | null;
       if (!payload?.ok) {
-        toast.error(
-          payload?.ok === false ? payload.error.message : "Skip failed.",
-        );
+        const skipDesc = payload?.ok === false ? payload.error.message : "Skip failed.";
+        reportableToast.error(skipDesc, { message: skipDesc });
         setSkipping(false);
         return;
       }
       router.push(`/admin/sites/${siteId}/setup?step=3`);
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Network error.");
+      const skipErrMsg = err instanceof Error ? err.message : "Network error.";
+      reportableToast.error(skipErrMsg, { message: skipErrMsg });
       setSkipping(false);
     }
   }

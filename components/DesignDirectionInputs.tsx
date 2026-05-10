@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { NavIcon } from "@/components/ui/nav-icon";
 
 import { ConceptRefinementView } from "@/components/ConceptRefinementView";
@@ -336,16 +337,14 @@ export function DesignDirectionInputs({
         | { ok: false; error: { message: string } }
         | null;
       if (!savePayload?.ok) {
-        toast.error(
-          savePayload?.ok === false ? savePayload.error.message : "Save failed.",
-        );
+        const saveDesc = savePayload?.ok === false ? savePayload.error.message : "Save failed.";
+        reportableToast.error(saveDesc, { message: saveDesc });
         setGenerating(false);
         return;
       }
     } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Network error during save.",
-      );
+      const saveErrMsg = err instanceof Error ? err.message : "Network error during save.";
+      reportableToast.error(saveErrMsg, { message: saveErrMsg });
       setGenerating(false);
       return;
     }
