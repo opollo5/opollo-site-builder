@@ -33,7 +33,7 @@ CREATE POLICY "error_reports_select_super_admin"
   USING (
     EXISTS (
       SELECT 1 FROM opollo_users u
-      WHERE u.user_id = auth.uid()
+      WHERE u.id = auth.uid()
         AND u.role = 'super_admin'
     )
   );
