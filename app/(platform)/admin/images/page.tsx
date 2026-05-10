@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BulkImageUpload } from "@/components/BulkImageUpload";
-import { ImagesTable } from "@/components/ImagesTable";
+import { ImagesTable, type ImagesFilterState } from "@/components/ImagesTable";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
@@ -190,85 +190,22 @@ export default async function AdminImagesPage({
         </div>
       )}
 
-      <form
-        method="GET"
-        action="/admin/images"
-        className="mt-6 flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3"
-      >
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="images-q"
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Search
-          </label>
-          <input
-            id="images-q"
-            type="search"
-            name="q"
-            defaultValue={parsed.query ?? ""}
-            placeholder="cat in a windowsill"
-            className="h-8 min-w-56 rounded border bg-background px-2 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="images-tag"
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Tags (comma-separated, all must match)
-          </label>
-          <input
-            id="images-tag"
-            type="text"
-            name="tag"
-            defaultValue={parsed.tags.join(", ")}
-            placeholder="indoor, cat"
-            className="h-8 min-w-48 rounded border bg-background px-2 text-sm"
-            data-testid="images-tag-input"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="images-source"
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Source
-          </label>
-          <select
-            id="images-source"
-            name="source"
-            defaultValue={parsed.source ?? ""}
-            className="h-8 rounded border bg-background px-2 text-sm"
-          >
-            <option value="">Any</option>
-            <option value="istock">iStock</option>
-            <option value="upload">Upload</option>
-            <option value="generated">Generated</option>
-          </select>
-        </div>
-        {parsed.deleted && (
-          <input type="hidden" name="deleted" value="1" />
-        )}
-        <button
-          type="submit"
-          className="h-8 rounded bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Apply
-        </button>
-        {(parsed.query || parsed.tags.length > 0 || parsed.source) && (
-          <Link
-            href={buildHref(
-              { ...parsed, query: null, tags: [], source: null },
-              { page: 1 },
-            )}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </Link>
-        )}
-      </form>
+      <div className="mt-6">
+        <ImagesTable
+          items={items}
+          backHref={buildHref(parsed, {})}
+          filterState={
+            {
+              query: parsed.query,
+              tags: parsed.tags,
+              source: parsed.source,
+              deleted: parsed.deleted,
+            } satisfies ImagesFilterState
+          }
+        />
+      </div>
 
+      {/* Pagination — bottom of container */}
       <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
         <div data-testid="images-range">
           {total === 0
@@ -295,10 +232,6 @@ export default async function AdminImagesPage({
             </Link>
           )}
         </div>
-      </div>
-
-      <div className="mt-3">
-        <ImagesTable items={items} backHref={buildHref(parsed, {})} />
       </div>
     </>
   );
