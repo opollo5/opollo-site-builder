@@ -91,7 +91,12 @@ test.describe("images admin surface", () => {
   test("/admin/images renders the library + filter form + a11y pass", async ({
     page,
   }, testInfo) => {
+    // Force list view so captions are rendered as text rows (not hidden in grid overlay).
+    await page.addInitScript(() =>
+      localStorage.setItem("images-view", "list"),
+    );
     await page.goto("/admin/images");
+    await page.waitForSelector('[data-testid="images-table"]');
     await expect(
       page.getByRole("heading", { name: /image library/i }),
     ).toBeVisible();
@@ -103,17 +108,20 @@ test.describe("images admin surface", () => {
     }
 
     // The filter bar exposes a search box + source selector + apply button.
-    await expect(page.getByLabel("Search")).toBeVisible();
-    await expect(page.getByLabel("Source")).toBeVisible();
+    // exact: true avoids matching "Apply search" button whose aria-label contains "search".
+    await expect(page.getByLabel("Search", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Source", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /apply/i })).toBeVisible();
   });
 
   test("tag filter narrows results + clear link restores", async ({ page }) => {
-    await page.goto("/admin/images");
-
-    // Apply tag filter "indoor" — only the cat fixture should remain.
-    await page.getByTestId("images-tag-input").fill("indoor");
-    await page.getByRole("button", { name: /apply/i }).click();
+    // Force list view so captions are rendered as visible text rows.
+    await page.addInitScript(() =>
+      localStorage.setItem("images-view", "list"),
+    );
+    // Navigate directly with the tag param — the tag dropdown is scaffolded (disabled UI).
+    await page.goto("/admin/images?tag=indoor");
+    await page.waitForSelector('[data-testid="images-table"]');
 
     await expect(
       page.getByText(/tabby cat seated by a bright window/i),
@@ -124,15 +132,22 @@ test.describe("images admin surface", () => {
 
     // Clear link restores the unfiltered view.
     await page.getByRole("link", { name: /clear/i }).click();
+    await page.waitForSelector('[data-testid="images-table"]');
     await expect(
       page.getByText(/wide river cutting a forest valley/i),
     ).toBeVisible();
   });
 
   test("source filter narrows to the selected source", async ({ page }) => {
+    // Force list view so captions render as visible text rows.
+    await page.addInitScript(() =>
+      localStorage.setItem("images-view", "list"),
+    );
     await page.goto("/admin/images");
-    await page.getByLabel("Source").selectOption("upload");
+    await page.waitForSelector('[data-testid="images-table"]');
+    await page.getByLabel("Source", { exact: true }).selectOption("upload");
     await page.getByRole("button", { name: /apply/i }).click();
+    await page.waitForSelector('[data-testid="images-table"]');
 
     await expect(
       page.getByText(/operator-uploaded product hero shot/i),
