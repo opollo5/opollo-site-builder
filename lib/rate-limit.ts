@@ -46,7 +46,8 @@ export type LimiterName =
   | "cap_generate"
   | "cap_assist"
   | "approval_decision"
-  | "ai_prefill";
+  | "ai_prefill"
+  | "error_report";
 
 type LimiterConfig = {
   requests: number;
@@ -117,6 +118,10 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // normal editorial use (operators rarely generate more than a few posts
   // per minute).
   ai_prefill: { requests: 10, window: "60 s" },
+  // Error reporting. 5 per 5 minutes per user — low ceiling because
+  // reports trigger email sends; protects the SendGrid quota and prevents
+  // a single user from spamming the admin inbox.
+  error_report: { requests: 5, window: "5 m" },
 };
 
 export type RateLimitResult =

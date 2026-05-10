@@ -6,6 +6,7 @@ import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { NavShell, type NavUserContext } from "@/components/nav/nav-shell";
 import { Toaster } from "@/components/ui/toaster";
+import { BreadcrumbProvider } from "@/components/error-reporting/BreadcrumbProvider";
 
 // ---------------------------------------------------------------------------
 // PlatformLayout — single shared authenticated layout that renders NavShell
@@ -77,6 +78,7 @@ export default async function PlatformLayout({
 
   return (
     <NavShell navContext={navContext}>
+      <BreadcrumbProvider />
       {children}
       <Toaster />
     </NavShell>

@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
+
+const ErrorReportButton = lazy(() =>
+  import("@/components/error-reporting/ErrorReportButton").then((m) => ({
+    default: m.ErrorReportButton,
+  })),
+);
 
 export default function GlobalError({
   error,
@@ -28,6 +34,15 @@ export default function GlobalError({
       >
         Try again
       </button>
+      <Suspense fallback={null}>
+        <ErrorReportButton
+          context={{
+            message: error.message,
+            type: error.name,
+            stack: error.stack,
+          }}
+        />
+      </Suspense>
     </main>
   );
 }
