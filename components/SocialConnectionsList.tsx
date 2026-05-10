@@ -47,6 +47,11 @@ function isConnectMessage(v: unknown): v is ConnectMessage {
 
 type Props = {
   companyId: string;
+  // BSP-9: when set, connect/reconnect calls scope to this profile so
+  // new accounts land on the profile's bundle.social team. When
+  // omitted (legacy callers + admin operator view), the connect flow
+  // targets the company-level team.
+  profileId?: string;
   connections: SocialConnection[];
   // Admin-or-Opollo-staff. Drives create-new / sync visibility.
   canManage: boolean;
@@ -58,6 +63,7 @@ type Props = {
 
 export function SocialConnectionsList({
   companyId,
+  profileId,
   connections,
   canManage,
   canReconnect,
@@ -139,6 +145,7 @@ export function SocialConnectionsList({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         company_id: companyId,
+        ...(profileId ? { profile_id: profileId } : {}),
         ...(platforms ? { platforms } : {}),
       }),
     });

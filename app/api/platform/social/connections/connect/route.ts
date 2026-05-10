@@ -30,6 +30,12 @@ export const dynamic = "force-dynamic";
 
 const PostBodySchema = z.object({
   company_id: dbUuid(),
+  // BSP-9: when set, the connect flow targets the profile's
+  // bundle.social team. Sync (BSP-8) attributes new social_connections
+  // rows to this profile. When omitted, the legacy company-level flow
+  // is used (which BSP-9's customer page also uses for the default
+  // profile's section).
+  profile_id: dbUuid().optional(),
   platforms: z
     .array(
       z.enum([
@@ -85,6 +91,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const result = await initiateBundlesocialConnect({
     companyId: parsed.data.company_id,
+    profileId: parsed.data.profile_id,
     platforms: (parsed.data.platforms ?? []) as SocialPlatform[],
     redirectUrl,
     logoUrl: brand?.logo_primary_url ?? brand?.logo_icon_url ?? undefined,

@@ -4,6 +4,7 @@ import { SocialConnectionsList } from "@/components/SocialConnectionsList";
 import { H1, Lead } from "@/components/ui/typography";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
+import { listProfilesForCompany } from "@/lib/platform/social/profiles";
 
 // ---------------------------------------------------------------------------
 // S1-12 / S1-16 — customer connections roster at /company/social/connections.
@@ -115,11 +116,35 @@ export default async function CompanySocialConnectionsPage({
 
   const companyId = session.company.companyId;
 
-  const [listResult, canManage, canReconnect] = await Promise.all([
+  const [listResult, canManage, canReconnect, profiles] = await Promise.all([
     listConnections({ companyId }),
     canDo(companyId, "manage_connections"),
     canDo(companyId, "reconnect_connection"),
+    listProfilesForCompany(companyId),
   ]);
+
+  // BSP-9: render one section per profile. Migration 0119's trigger
+  // guarantees at least one (default) profile per company, so this is
+  // never empty for an active company. Single-default-profile
+  // companies see one section that's visually equivalent to the
+  // pre-BSP-9 page (no per-profile chrome shown when there's only one).
+  const hasMultipleProfiles = profiles.length > 1;
+  // Bucket connections by profile_id. Unattributed connections
+  // (profile_id NULL) fall into the default profile so they remain
+  // visible while the next sync re-attributes.
+  const buckets: Record<
+    string,
+    import("@/lib/platform/social/connections/types").SocialConnection[]
+  > = {};
+  if (listResult.ok) {
+    for (const p of profiles) buckets[p.id] = [];
+    const defaultProfileId =
+      profiles.find((p) => p.is_default)?.id ?? profiles[0]?.id;
+    for (const c of listResult.data.connections) {
+      const targetId = c.profile_id ?? defaultProfileId;
+      if (targetId && buckets[targetId]) buckets[targetId].push(c);
+    }
+  }
 
   return (
     <>
@@ -131,16 +156,9 @@ export default async function CompanySocialConnectionsPage({
         </Lead>
       </header>
 
-      <div className="mt-6">
+      <div className="mt-6 space-y-8">
         <ConnectBanner params={searchParams ?? {}} />
-        {listResult.ok ? (
-          <SocialConnectionsList
-            companyId={companyId}
-            connections={listResult.data.connections}
-            canManage={canManage}
-            canReconnect={canReconnect}
-          />
-        ) : (
+        {!listResult.ok ? (
           <div
             className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
             role="alert"
@@ -148,6 +166,35 @@ export default async function CompanySocialConnectionsPage({
           >
             Failed to load connections: {listResult.error.message}
           </div>
+        ) : (
+          profiles.map((p) => (
+            <section
+              key={p.id}
+              data-testid={`profile-section-${p.id}`}
+              className={hasMultipleProfiles ? "rounded-md border bg-card p-4" : ""}
+            >
+              {hasMultipleProfiles ? (
+                <header className="mb-3 flex items-center justify-between">
+                  <h2 className="text-base font-semibold">{p.name}</h2>
+                  {p.is_default ? (
+                    <span
+                      className="rounded-full bg-emerald-100 px-2 py-0.5 text-sm font-medium text-emerald-900"
+                      data-testid={`profile-default-pill-${p.id}`}
+                    >
+                      Default
+                    </span>
+                  ) : null}
+                </header>
+              ) : null}
+              <SocialConnectionsList
+                companyId={companyId}
+                profileId={p.id}
+                connections={buckets[p.id] ?? []}
+                canManage={canManage}
+                canReconnect={canReconnect}
+              />
+            </section>
+          ))
         )}
       </div>
     </>

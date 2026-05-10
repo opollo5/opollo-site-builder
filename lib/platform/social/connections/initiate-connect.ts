@@ -4,6 +4,7 @@ import { ApiError } from "bundlesocial";
 
 import { getBundlesocialClient } from "@/lib/bundlesocial";
 import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
+import { getOrCreateBundleSocialTeamForProfile } from "@/lib/platform/social/profiles/provision-team";
 import { logger } from "@/lib/logger";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -48,6 +49,12 @@ const PLATFORM_TO_BUNDLE: Record<
 
 export type InitiateConnectInput = {
   companyId: string;
+  // BSP-9: optional per-profile scope. When set, the portal flow
+  // targets the profile's bundle.social team instead of the company-
+  // level team. New accounts therefore land on the profile's team,
+  // and the sync flow (BSP-8) attributes the resulting
+  // social_connections row to this profile.
+  profileId?: string;
   // Platforms the admin wants to connect. Empty array = "let the
   // operator pick on the portal page" (bundle.social shows all
   // configured types).
@@ -86,11 +93,14 @@ export async function initiateBundlesocialConnect(
 
   let teamId: string;
   try {
-    teamId = await getOrCreateBundleSocialTeam(input.companyId);
+    teamId = input.profileId
+      ? await getOrCreateBundleSocialTeamForProfile(input.profileId)
+      : await getOrCreateBundleSocialTeam(input.companyId);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error("bundlesocial.initiate_connect.team_provision_failed", {
       company_id: input.companyId,
+      profile_id: input.profileId ?? null,
       err: message,
     });
     return internal(`Failed to provision bundle.social team: ${message}`);
