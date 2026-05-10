@@ -45,7 +45,8 @@ export type LimiterName =
   | "briefs_upload"
   | "cap_generate"
   | "cap_assist"
-  | "approval_decision";
+  | "approval_decision"
+  | "ai_prefill";
 
 type LimiterConfig = {
   requests: number;
@@ -111,6 +112,11 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // brute-force infeasible; this per-IP cap is defence-in-depth against
   // credential-stuffing / automated replay. 20/hour matches invite_accept.
   approval_decision: { requests: 20, window: "1 h" },
+  // AI prefill for blog post composer. 10 per 60s per user — each call
+  // may hit Anthropic Haiku; this caps runaway spend without blocking
+  // normal editorial use (operators rarely generate more than a few posts
+  // per minute).
+  ai_prefill: { requests: 10, window: "60 s" },
 };
 
 export type RateLimitResult =

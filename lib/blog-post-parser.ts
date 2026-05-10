@@ -27,6 +27,7 @@ export type ParseSource =
   | "first_paragraph"
   | "derived"
   | "file"
+  | "ai"
   | "none";
 
 export interface BlogPostMetadata {
