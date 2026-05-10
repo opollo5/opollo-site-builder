@@ -108,8 +108,9 @@ test.describe("images admin surface", () => {
     }
 
     // The filter bar exposes a search box + source selector + apply button.
-    await expect(page.getByLabel("Search")).toBeVisible();
-    await expect(page.getByLabel("Source")).toBeVisible();
+    // exact: true avoids matching "Apply search" button whose aria-label contains "search".
+    await expect(page.getByLabel("Search", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("Source", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /apply/i })).toBeVisible();
   });
 
@@ -144,7 +145,7 @@ test.describe("images admin surface", () => {
     );
     await page.goto("/admin/images");
     await page.waitForSelector('[data-testid="images-table"]');
-    await page.getByLabel("Source").selectOption("upload");
+    await page.getByLabel("Source", { exact: true }).selectOption("upload");
     await page.getByRole("button", { name: /apply/i }).click();
     await page.waitForSelector('[data-testid="images-table"]');
 
