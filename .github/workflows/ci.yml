@@ -208,7 +208,11 @@ jobs:
   test:
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # pull-requests: write is required by the "Post vitest output on
     # failure" step below. It lets the step upsert a comment on the PR
     # with the tail of /tmp/vitest.out so the failing assertion is
@@ -234,7 +238,13 @@ jobs:
         with:
           version: latest
       - name: Show Supabase CLI version
-        run: supabase --version
+        id: supabase-cli
+        run: echo "version=$(supabase --version)" >> $GITHUB_OUTPUT
+      - name: Cache Supabase local data
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/supabase
+          key: ${{ runner.os }}-supabase-${{ steps.supabase-cli.outputs.version }}
       - name: Start Supabase local stack (with debug output)
         run: supabase start --debug
       - name: Show Supabase stack status (for CI debugging)
@@ -266,7 +276,7 @@ jobs:
         id: vitest
         run: |
           set -o pipefail
-          npm test -- --reporter=verbose 2>&1 | tee /tmp/vitest.out
+          npm test -- --reporter=verbose --shard=${{ matrix.shard }}/4 2>&1 | tee /tmp/vitest.out
       - name: Publish test diagnostics to job summary
         if: always()
         run: |
@@ -313,10 +323,10 @@ jobs:
             const vitest = tail(stripAnsi(vitestRaw)) || '(vitest output file empty or missing)';
             const supabase = stripAnsi(safeRead(process.env.SUPABASE_LOG_PATH)) || '(supabase status not captured)';
             const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const marker = '<!-- ci-vitest-failure-comment -->';
+            const marker = '<!-- ci-vitest-failure-shard-${{ matrix.shard }}-comment -->';
             const body = [
               marker,
-              `## CI test job failed on \`${context.sha.slice(0, 7)}\``,
+              `## CI test job shard ${{ matrix.shard }}/4 failed on \`${context.sha.slice(0, 7)}\``,
               '',
               `[Full job log](${runUrl}) — below is the tail of vitest output.`,
               '',
