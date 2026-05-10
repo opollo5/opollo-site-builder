@@ -140,7 +140,7 @@ export function SiteVoiceSettingsForm({
         </p>
       </div>
 
-      {formError && <Alert variant="destructive">{formError}</Alert>}
+      {formError && <Alert variant="destructive" reportContext={{ message: formError }}>{formError}</Alert>}
 
       <div className="flex items-center justify-end">
         <Button type="submit" disabled={submitting}>

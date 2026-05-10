@@ -122,7 +122,7 @@ export function EmailTestForm() {
         </Alert>
       )}
       {result.kind === "err" && (
-        <Alert variant="destructive" data-testid="email-test-error">
+        <Alert variant="destructive" data-testid="email-test-error" reportContext={{ message: result.message, type: result.code }}>
           <strong>{result.code}</strong> — {result.message}
         </Alert>
       )}

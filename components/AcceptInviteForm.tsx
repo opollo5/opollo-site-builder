@@ -144,7 +144,7 @@ export function AcceptInviteForm({
       </div>
 
       {error && (
-        <Alert variant="destructive" data-testid="accept-invite-error">
+        <Alert variant="destructive" data-testid="accept-invite-error" reportContext={{ message: error }}>
           {error}
         </Alert>
       )}

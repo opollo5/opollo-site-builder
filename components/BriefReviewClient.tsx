@@ -315,7 +315,7 @@ export function BriefReviewClient({
       )}
 
       {isFailed && failureMessage && (
-        <Alert variant="destructive" title="We couldn't parse this brief.">
+        <Alert variant="destructive" title="We couldn't parse this brief." reportContext={{ message: failureMessage }}>
           <p>{failureMessage}</p>
           <p className="mt-2">
             <a
@@ -342,7 +342,7 @@ export function BriefReviewClient({
         </Alert>
       )}
 
-      {errorMessage && <Alert variant="destructive">{errorMessage}</Alert>}
+      {errorMessage && <Alert variant="destructive" reportContext={{ message: errorMessage }}>{errorMessage}</Alert>}
 
       {(brief.status === "parsed" || brief.status === "committed") && (
         <section aria-labelledby="voice-direction-heading" className="rounded-lg border p-4">

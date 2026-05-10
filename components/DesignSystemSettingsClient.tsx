@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, useTransition } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
@@ -167,9 +166,8 @@ export function DesignSystemSettingsClient({ initialSettings }: Props) {
         isDirty.current = false;
         toastSuccess("Design system settings saved.");
       } catch (err) {
-        toast.error("Save failed", {
-          description: err instanceof Error ? err.message : "Unknown error",
-        });
+        const errMsg = err instanceof Error ? err.message : "Unknown error";
+        reportableToast.error("Save failed", { message: errMsg }, { description: errMsg });
       }
     });
   }

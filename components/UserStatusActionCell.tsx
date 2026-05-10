@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 
@@ -42,20 +41,18 @@ export function UserStatusActionCell({
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.ok) {
         setOptimisticRevoked(true);
-        toast.error("Couldn't reinstate user", {
-          description:
-            payload?.error?.message ??
-            `Reinstate failed (HTTP ${res.status}). Status restored to revoked.`,
-        });
+        const desc =
+          payload?.error?.message ??
+          `Reinstate failed (HTTP ${res.status}). Status restored to revoked.`;
+        reportableToast.error("Couldn't reinstate user", { message: desc }, { description: desc });
         return;
       }
       toastSuccess("User reinstated");
       router.refresh();
     } catch (err) {
       setOptimisticRevoked(true);
-      toast.error("Network error reinstating user", {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      reportableToast.error("Network error reinstating user", { message: errMsg }, { description: errMsg });
     } finally {
       setSubmitting(false);
     }

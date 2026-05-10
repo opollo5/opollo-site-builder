@@ -308,7 +308,7 @@ export function SiteCreateForm() {
       </div>
 
       {submitError && (
-        <Alert variant="destructive" data-testid="site-create-error">
+        <Alert variant="destructive" data-testid="site-create-error" reportContext={{ message: submitError }}>
           {submitError}
         </Alert>
       )}

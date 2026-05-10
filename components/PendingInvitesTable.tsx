@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
-
+import { reportableToast } from "@/lib/error-reporting/reportable-toast";
 import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DataTable, type ColumnDef } from "@/components/ui/data-table";
@@ -51,19 +50,17 @@ export function PendingInvitesTable({
       );
       const payload = await res.json().catch(() => null);
       if (!res.ok || !payload?.ok) {
-        toast.error("Couldn't revoke invite", {
-          description:
-            payload?.error?.message ??
-            `Revoke failed (HTTP ${res.status}).`,
-        });
+        const desc =
+          payload?.error?.message ??
+          `Revoke failed (HTTP ${res.status}).`;
+        reportableToast.error("Couldn't revoke invite", { message: desc }, { description: desc });
         return;
       }
       toastSuccess(`Invite for ${email} revoked.`);
       router.refresh();
     } catch (err) {
-      toast.error("Network error revoking invite", {
-        description: err instanceof Error ? err.message : String(err),
-      });
+      const errMsg = err instanceof Error ? err.message : String(err);
+      reportableToast.error("Network error revoking invite", { message: errMsg }, { description: errMsg });
     } finally {
       setRevoking(null);
     }

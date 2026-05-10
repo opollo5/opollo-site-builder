@@ -98,7 +98,7 @@ export function SiteOnboardingForm({ siteId }: { siteId: string }) {
       </div>
 
       {error && (
-        <Alert variant="destructive" title="Couldn't save your choice">
+        <Alert variant="destructive" title="Couldn't save your choice" reportContext={{ message: error }}>
           {error}
         </Alert>
       )}
