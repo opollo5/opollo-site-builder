@@ -154,3 +154,81 @@ describe("CompanySelector: error banner on failed switch", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Request-body shape — regression for the sentinel-UUID bug.
+//
+// The Opollo internal company has id "00000000-0000-0000-0000-000000000001".
+// Zod v4's .uuid() validator enforces RFC 4122 version/variant bits, which
+// rejects that sentinel. The switch endpoint must receive exactly:
+//   • { company_id: "<uuid>" }   for tenant companies
+//   • { company_id: "<sentinel>" } for the internal/Opollo company
+//   • { company_id: null }       when "No company selected" is clicked
+// ---------------------------------------------------------------------------
+
+const INTERNAL_ID = "00000000-0000-0000-0000-000000000001";
+const COMPANIES_WITH_INTERNAL = [
+  { id: "aaa00000-0000-4000-8000-000000000001", name: "Acme", domain: "acme.test", is_opollo_internal: false },
+  { id: INTERNAL_ID, name: "Opollo", domain: null, is_opollo_internal: true },
+];
+
+describe("CompanySelector: request body shape", () => {
+  let capturedBodies: string[] = [];
+
+  beforeEach(() => {
+    capturedBodies = [];
+    vi.clearAllMocks();
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url === "/api/platform/companies/list") {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ ok: true, data: { companies: COMPANIES_WITH_INTERNAL } }),
+        });
+      }
+      if (typeof init?.body === "string") capturedBodies.push(init.body);
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) });
+    }) as typeof fetch;
+  });
+
+  it("sends { company_id: '<uuid>' } for a tenant company", async () => {
+    render(
+      <CompanySelector isOpolloStaff={true} companyId={null} companyName={null} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Company:/i }));
+    await waitFor(() => expect(screen.getByText("Acme")).toBeDefined());
+
+    fireEvent.click(screen.getByText("Acme").closest("button")!);
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+
+    expect(capturedBodies).toHaveLength(1);
+    expect(JSON.parse(capturedBodies[0])).toEqual({ company_id: "aaa00000-0000-4000-8000-000000000001" });
+  });
+
+  it("sends { company_id: sentinel } for the internal Opollo company", async () => {
+    render(
+      <CompanySelector isOpolloStaff={true} companyId={null} companyName={null} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Company:/i }));
+    await waitFor(() => expect(screen.getByText("Opollo")).toBeDefined());
+
+    fireEvent.click(screen.getByText("Opollo").closest("button")!);
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+
+    expect(capturedBodies).toHaveLength(1);
+    expect(JSON.parse(capturedBodies[0])).toEqual({ company_id: INTERNAL_ID });
+  });
+
+  it("sends { company_id: null } when 'No company selected' is clicked", async () => {
+    render(
+      <CompanySelector isOpolloStaff={true} companyId="aaa00000-0000-4000-8000-000000000001" companyName="Acme" />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Company:/i }));
+    await waitFor(() => expect(screen.getByText(/No company selected/i)).toBeDefined());
+
+    fireEvent.click(screen.getByText(/No company selected/i).closest("button")!);
+    await waitFor(() => expect(mockRefresh).toHaveBeenCalledTimes(1));
+
+    expect(capturedBodies).toHaveLength(1);
+    expect(JSON.parse(capturedBodies[0])).toEqual({ company_id: null });
+  });
+});
