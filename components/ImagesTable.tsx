@@ -10,7 +10,6 @@ import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { Pill, type PillVariant } from "@/components/ui/pill";
 import { TableCell } from "@/components/ui/table-cell";
-import { deliveryUrl } from "@/lib/cloudflare-images";
 import type { ImageListItem } from "@/lib/image-library";
 import { formatRelativeTime } from "@/lib/utils";
 
@@ -57,8 +56,10 @@ type LightboxState = {
   height_px: number | null;
 };
 
+type ImageListItemWithUrl = ImageListItem & { previewUrl: string | null };
+
 type ImagesTableProps = {
-  items: ImageListItem[];
+  items: ImageListItemWithUrl[];
   backHref?: string;
 };
 
@@ -72,10 +73,10 @@ function Thumbnail({
   item,
   onClick,
 }: {
-  item: ImageListItem;
+  item: ImageListItemWithUrl;
   onClick?: () => void;
 }) {
-  const url = item.cloudflare_id ? deliveryUrl(item.cloudflare_id) : null;
+  const url = item.previewUrl;
   const alt = item.alt_text ?? item.filename ?? "Library image";
   if (!url) {
     return (
@@ -131,8 +132,8 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
 
-  function openLightbox(item: ImageListItem) {
-    const url = item.cloudflare_id ? deliveryUrl(item.cloudflare_id) : null;
+  function openLightbox(item: ImageListItemWithUrl) {
+    const url = item.previewUrl;
     if (!url) return;
     setLightbox({
       src: url,
@@ -145,7 +146,7 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
     });
   }
 
-  const columns: ColumnDef<ImageListItem>[] = [
+  const columns: ColumnDef<ImageListItemWithUrl>[] = [
     {
       key: "preview",
       header: "Preview",
@@ -154,7 +155,7 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
         <Thumbnail
           item={item}
           onClick={
-            item.cloudflare_id ? () => openLightbox(item) : undefined
+            item.previewUrl ? () => openLightbox(item) : undefined
           }
         />
       ),
@@ -249,7 +250,7 @@ export function ImagesTable({ items, backHref }: ImagesTableProps) {
         selectable
         selectedKeys={selectedKeys}
         onSelectionChange={setSelectedKeys}
-        onRowClick={(item) => router.push(buildDetailHref(item.id, backHref))}
+        onRowClick={(item: ImageListItemWithUrl) => router.push(buildDetailHref(item.id, backHref))}
         testId="images-table"
         emptyState={{
           icon: <NavIcon name="picture" size={20} />,
