@@ -1,0 +1,17 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: customer connect with profile_id (BSP-9) > [snapshot] profile-scoped portal request body 1`] = `
+{
+  "requestBody": {
+    "hidePoweredBy": undefined,
+    "language": "en",
+    "logoUrl": "https://cdn.example.com/logo.png",
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616",
+    "socialAccountTypes": [
+      "LINKEDIN",
+    ],
+    "teamId": "team-profile-scoped",
+    "userName": "Acme Corp",
+  },
+}
+`;
