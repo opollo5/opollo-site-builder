@@ -41,20 +41,20 @@ async function seedCompany(id: string, slug: string): Promise<void> {
   }
 }
 
+// Migration 0119 adds an AFTER INSERT trigger on platform_companies that
+// auto-creates a default profile, so we UPDATE the trigger-seeded row to
+// match the test's expected name instead of INSERTing a new one (which
+// would collide with the partial unique index on is_default=true).
 async function seedDefaultProfile(companyId: string, name: string): Promise<string> {
   const svc = getServiceRoleClient();
   const { data, error } = await svc
     .from("platform_social_profiles")
-    .insert({
-      company_id: companyId,
-      name,
-      kind: "company",
-      is_default: true,
-      bundle_social_team_id: null,
-    })
+    .update({ name })
+    .eq("company_id", companyId)
+    .eq("is_default", true)
     .select("id")
     .single();
-  if (error) throw new Error(`seed default profile: ${error.message}`);
+  if (error) throw new Error(`seed default profile (rename): ${error.message}`);
   return data.id as string;
 }
 

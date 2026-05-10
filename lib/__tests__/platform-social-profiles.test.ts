@@ -52,6 +52,11 @@ async function seedCompany(
   }
 }
 
+// Migration 0119 adds an AFTER INSERT trigger on platform_companies that
+// auto-creates a default profile carrying the company's name +
+// bundle_social_team_id. Helper UPDATEs the trigger-seeded row to
+// match the test's expected name (and bundle team id, in case the
+// test passes a different one than the company carries).
 async function backfillDefaultProfile(
   companyId: string,
   bundleTeamId: string | null,
@@ -60,17 +65,13 @@ async function backfillDefaultProfile(
   const svc = getServiceRoleClient();
   const { data, error } = await svc
     .from("platform_social_profiles")
-    .insert({
-      company_id: companyId,
-      name,
-      kind: "company",
-      is_default: true,
-      bundle_social_team_id: bundleTeamId,
-    })
+    .update({ name, bundle_social_team_id: bundleTeamId })
+    .eq("company_id", companyId)
+    .eq("is_default", true)
     .select("id")
     .single();
   if (error) {
-    throw new Error(`seed profile: ${error.code ?? "?"} ${error.message}`);
+    throw new Error(`seed profile (rename): ${error.code ?? "?"} ${error.message}`);
   }
   return data.id as string;
 }
@@ -106,11 +107,11 @@ describe("BSP-3 — platform_social_profiles", () => {
     expect(profiles[1]?.kind).toBe("executive");
   });
 
-  it("(R2) getDefaultProfileForCompany returns the default row, null if none", async () => {
+  it("(R2) getDefaultProfileForCompany returns the default row created by trigger", async () => {
+    // Migration 0119's AFTER INSERT trigger auto-creates the default,
+    // so a company with no manual seed already has one. The helper
+    // re-shapes that default to match the test's expected name + team.
     await seedCompany(COMPANY_A_ID, "def1", null);
-    const before = await getDefaultProfileForCompany(COMPANY_A_ID);
-    expect(before).toBeNull();
-
     await backfillDefaultProfile(COMPANY_A_ID, null, "Brand");
     const after = await getDefaultProfileForCompany(COMPANY_A_ID);
     expect(after?.is_default).toBe(true);
