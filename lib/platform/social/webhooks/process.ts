@@ -351,7 +351,7 @@ async function handleAccountEvent(
 
   const conn = await svc
     .from("social_connections")
-    .select("id, company_id, status, platform")
+    .select("id, company_id, status, platform, profile_id")
     .eq("bundle_social_account_id", accountId)
     .maybeSingle();
   if (conn.error) {
@@ -372,6 +372,17 @@ async function handleAccountEvent(
   const now = new Date().toISOString();
 
   if (type === "social.account.connected") {
+    // BSP analytics: trigger a post-history import for the newly-
+    // connected account. Idempotent — the active-dedup partial unique
+    // index absorbs duplicate enqueues racing with the connect callback.
+    if (conn.data.profile_id) {
+      void triggerPostHistoryImportSafe({
+        profileId: conn.data.profile_id as string,
+        bundleSocialAccountId: accountId,
+        platform: conn.data.platform as string,
+      });
+    }
+
     if (conn.data.status === "healthy") {
       return { kind: "ok", webhookEventId, action: "account_connected_noop" };
     }
@@ -457,4 +468,43 @@ async function handleAccountEvent(
         ? "account_disconnected"
         : "account_auth_required",
   };
+}
+
+// BSP analytics — fire-and-forget post-history import trigger.
+//
+// Called when a social.account.connected webhook arrives. Idempotent at
+// the row level via the active-dedup partial unique index in migration
+// 0121, so the call is safe to race with the connect-callback enqueue.
+//
+// Errors are swallowed and logged — failing to start the post-history
+// import must NOT cause the webhook to retry (the connection itself is
+// already healthy; the import is a side effect the daily cron will
+// eventually pick up via the snapshot refresh anyway).
+async function triggerPostHistoryImportSafe(args: {
+  profileId: string;
+  bundleSocialAccountId: string;
+  platform: string;
+}): Promise<void> {
+  try {
+    const { enqueuePostHistoryImport } = await import(
+      "@/lib/platform/social/analytics-ingest"
+    );
+    const origin =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
+      "http://localhost:3000";
+    await enqueuePostHistoryImport({
+      profileId: args.profileId,
+      bundleSocialAccountId: args.bundleSocialAccountId,
+      // platform is a SocialPlatform-shaped string at this point; the
+      // enqueue helper narrows internally and skips unsupported values.
+      platform: args.platform as never,
+      origin,
+    });
+  } catch (err) {
+    logger.warn("bundlesocial.webhook.post_history_import_trigger_failed", {
+      err: err instanceof Error ? err.message : String(err),
+      profile_id: args.profileId,
+      bundle_social_account_id: args.bundleSocialAccountId,
+    });
+  }
 }

@@ -93,6 +93,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/social-analytics-refresh",
+      "schedule": "0 4 * * *"
+    },
+    {
       "path": "/api/cron/render-pages",
       "schedule": "*/5 * * * *"
     },
