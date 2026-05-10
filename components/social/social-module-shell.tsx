@@ -1,8 +1,6 @@
 import * as React from "react";
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
-import { NavIcon } from "@/components/ui/nav-icon";
 import { PillTabs, type PillTab } from "@/components/ui/pill-tabs";
 
 // ---------------------------------------------------------------------------
@@ -18,9 +16,6 @@ type SocialView = "calendar" | "posts" | "timeline";
 
 export interface SocialModuleShellProps {
   activeView: SocialView;
-  composerEnabled?: boolean;
-  /** When false, hides the New post CTA from the toolbar. Default: true. */
-  showNewPostCta?: boolean;
   periodNavigator?: React.ReactNode;
   toolbarActions?: React.ReactNode;
   children: React.ReactNode;
@@ -40,16 +35,10 @@ const VIEW_LABEL: Record<SocialView, string> = {
 
 export function SocialModuleShell({
   activeView,
-  composerEnabled = false,
-  showNewPostCta = true,
   periodNavigator,
   toolbarActions,
   children,
 }: SocialModuleShellProps) {
-  const newPostHref = composerEnabled
-    ? "?compose=new"
-    : "/company/social/posts";
-
   return (
     <div data-testid="social-module-shell">
       {/* Breadcrumb row */}
@@ -85,18 +74,6 @@ export function SocialModuleShell({
 
         {/* Toolbar actions slot (calendar passes ProfilesFilter) */}
         {toolbarActions ? <div>{toolbarActions}</div> : null}
-
-        {/* Primary CTA — pushed right; wraps to its own row on narrow viewports */}
-        {showNewPostCta && (
-          <div className="ml-auto">
-            <Button asChild size="sm" data-testid="social-new-post-cta">
-              <Link href={newPostHref}>
-                <NavIcon name="plus" size={16} />
-                New post
-              </Link>
-            </Button>
-          </div>
-        )}
       </div>
 
       {children}

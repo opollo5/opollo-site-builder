@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { NavIcon } from "@/components/ui/nav-icon";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -48,6 +49,7 @@ type Props = {
   connections: Connection[];
   /** Spec 22: when true, "New post" opens ?compose=new instead of navigating to /posts */
   composerEnabled?: boolean;
+  canCreate?: boolean;
 };
 
 const MAX_CHIPS = 3;
@@ -267,6 +269,7 @@ export function SocialCalendarClient({
   monthIso,
   connections,
   composerEnabled = false,
+  canCreate = false,
 }: Props) {
   const [hiddenPlatforms, setHiddenPlatforms] = useState<Set<SocialPlatform>>(
     new Set(),
@@ -354,10 +357,11 @@ export function SocialCalendarClient({
     </div>
   );
 
+  const newPostHref = composerEnabled ? "?compose=new" : "/company/social/posts";
+
   return (
     <SocialModuleShell
       activeView="calendar"
-      composerEnabled={composerEnabled}
       periodNavigator={periodNavigator}
       toolbarActions={
         <ProfilesFilter
@@ -368,6 +372,13 @@ export function SocialCalendarClient({
         />
       }
     >
+      {canCreate && (
+        <div className="mb-4 flex justify-end">
+          <Button asChild data-testid="new-post-button">
+            <Link href={newPostHref}>New post</Link>
+          </Button>
+        </div>
+      )}
       <div data-testid="social-calendar">
         {/* Grid */}
         <div

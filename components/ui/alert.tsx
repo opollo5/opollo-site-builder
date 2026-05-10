@@ -3,6 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 import { NavIcon } from "@/components/ui/nav-icon";
+import type { ErrorContext } from "@/lib/error-reporting/types";
 
 // ---------------------------------------------------------------------------
 // A-6 — Alert primitive.
@@ -57,11 +58,17 @@ export interface AlertProps
   icon?: React.ReactNode | null;
   /** Optional title — renders as a bolder line above the body. */
   title?: React.ReactNode;
+  /**
+   * When provided and OPOLLO_ERROR_REPORTING_ENABLED is on, renders a
+   * "Report to admin" button inside the alert. Only shown for destructive
+   * variant — non-error alerts never need a report button.
+   */
+  reportContext?: ErrorContext;
 }
 
 export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
   function Alert(
-    { className, variant, icon, title, children, role, ...props },
+    { className, variant, icon, title, children, role, reportContext, ...props },
     ref,
   ) {
     const v = variant ?? "info";
@@ -77,6 +84,17 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
                 className="mt-0.5 shrink-0"
               />
             );
+
+    // Lazy-load the report button so it never bloats non-error surfaces.
+    const ReportButton =
+      reportContext && v === "destructive"
+        ? React.lazy(() =>
+            import("@/components/error-reporting/ErrorReportButton").then((m) => ({
+              default: m.ErrorReportButton,
+            })),
+          )
+        : null;
+
     return (
       <div
         ref={ref}
@@ -90,6 +108,13 @@ export const Alert = React.forwardRef<HTMLDivElement, AlertProps>(
             <p className="font-medium leading-tight">{title}</p>
           )}
           <div className={cn(title && "mt-1")}>{children}</div>
+          {ReportButton && reportContext && (
+            <React.Suspense fallback={null}>
+              <div className="mt-2">
+                <ReportButton context={reportContext} />
+              </div>
+            </React.Suspense>
+          )}
         </div>
       </div>
     );

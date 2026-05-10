@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
 import { SocialModuleShell } from "@/components/social/social-module-shell";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listPostMasters } from "@/lib/platform/social/posts";
@@ -62,11 +64,18 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
     );
   }
 
+  const newPostHref =
+    composerEnabled && canCreate ? "?compose=new" : "/company/social/posts";
+
   return (
-    <SocialModuleShell
-      activeView="timeline"
-      composerEnabled={composerEnabled && canCreate}
-    >
+    <SocialModuleShell activeView="timeline">
+      {canCreate && (
+        <div className="mb-4 flex justify-end">
+          <Button asChild data-testid="new-post-button">
+            <Link href={newPostHref}>New post</Link>
+          </Button>
+        </div>
+      )}
       <TimelineFeed
         posts={postsResult.data.posts}
         totalCount={postsResult.data.totalCount}

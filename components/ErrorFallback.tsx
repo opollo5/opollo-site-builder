@@ -1,8 +1,10 @@
 import Link from "next/link";
+import * as React from "react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
+import type { ErrorContext } from "@/lib/error-reporting/types";
 
 // DESIGN-SYSTEM-OVERHAUL PR 14 — uniform "something went wrong"
 // surface. Wherever an admin route has historically dumped a raw
@@ -30,6 +32,8 @@ export interface ErrorFallbackProps {
   };
   supportHref?: string;
   testId?: string;
+  /** When provided and OPOLLO_ERROR_REPORTING_ENABLED is on, renders a "Report to admin" button. */
+  reportContext?: ErrorContext;
 }
 
 export function ErrorFallback({
@@ -38,7 +42,15 @@ export function ErrorFallback({
   action,
   supportHref = "https://opollo.com/contact",
   testId,
+  reportContext,
 }: ErrorFallbackProps) {
+  const ReportButton = reportContext
+    ? React.lazy(() =>
+        import("@/components/error-reporting/ErrorReportButton").then((m) => ({
+          default: m.ErrorReportButton,
+        })),
+      )
+    : null;
   return (
     <div
       className="rounded-md border border-destructive/40 bg-destructive/5 p-5"
@@ -66,6 +78,13 @@ export function ErrorFallback({
                 </Button>
               )}
             </div>
+          )}
+          {ReportButton && reportContext && (
+            <React.Suspense fallback={null}>
+              <div className="pt-1">
+                <ReportButton context={reportContext} />
+              </div>
+            </React.Suspense>
           )}
           <p className="pt-1 text-sm text-muted-foreground">
             Still stuck?{" "}

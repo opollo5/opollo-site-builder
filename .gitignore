@@ -49,3 +49,10 @@ supabase/.temp/
 # Operator docs / marketing collateral — not source code.
 docs/*.docx
 .env*.local
+
+# Session planning docs (ephemeral audit / review artefacts).
+LAYOUT_AUDIT*.md
+
+# Draft probe scripts (prefixed _ = not ready for CI).
+scripts/probes/_*
+scripts/probes/_screenshots/

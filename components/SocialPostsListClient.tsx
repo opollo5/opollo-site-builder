@@ -311,8 +311,6 @@ export function SocialPostsListClient({
   return (
     <SocialModuleShell
       activeView="posts"
-      composerEnabled={composerEnabled}
-      showNewPostCta={false}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

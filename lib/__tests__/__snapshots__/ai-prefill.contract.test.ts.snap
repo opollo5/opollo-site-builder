@@ -1,0 +1,19 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: Anthropic ai-prefill request shape > [snapshot] messages.create payload is stable 1`] = `
+{
+  "max_tokens": 1024,
+  "model": "claude-haiku-4-5-20251001",
+  "system": [
+    {
+      "cache_control": {
+        "type": "ephemeral",
+      },
+      "text": "You extract structured metadata and body content from blog drafts so a CMS can prefill its form. Many documents begin with a metadata pipe-table containing some or all of these labels: Client, Author, SEO Title, Version, SEO Meta Description, URL, Target Keyword(s), Category, Tags. When such a table is present, extract values from it. Map to JSON keys: title, content, seo_title, meta_description, slug, categories, tags, excerpt. IGNORE Client, Version, Target Keyword(s), and Author rows entirely — they must not appear in the output. Tags are written as '#tagA #tagB' — split on whitespace and strip the leading '#', preserving original casing. Category is a single value but output it as a one-element array. Slug comes from the URL row by taking the final path segment after the last '/'. The blog title appears after the metadata table — it may be an H1, a bold-only paragraph, or simply the first non-blank line; pick the strongest cue available. Body content begins at the paragraph AFTER the title and runs to end of document; it MUST exclude the metadata table AND the title line itself. If no metadata table is present, infer fields from the body using ordinary heuristics. Match category and tag names case-insensitively against the provided availableCategories and availableTags lists; when a match exists, output the existing canonical casing with isNew: false. Otherwise output the source casing with isNew: true. Return ONLY a single JSON object matching the required shape — no preamble, no commentary, no code fences.",
+      "type": "text",
+    },
+  ],
+}
+`;
+
+exports[`CONTRACT: Anthropic ai-prefill request shape > buildSystemPrompt output is stable 1`] = `"You extract structured metadata and body content from blog drafts so a CMS can prefill its form. Many documents begin with a metadata pipe-table containing some or all of these labels: Client, Author, SEO Title, Version, SEO Meta Description, URL, Target Keyword(s), Category, Tags. When such a table is present, extract values from it. Map to JSON keys: title, content, seo_title, meta_description, slug, categories, tags, excerpt. IGNORE Client, Version, Target Keyword(s), and Author rows entirely — they must not appear in the output. Tags are written as '#tagA #tagB' — split on whitespace and strip the leading '#', preserving original casing. Category is a single value but output it as a one-element array. Slug comes from the URL row by taking the final path segment after the last '/'. The blog title appears after the metadata table — it may be an H1, a bold-only paragraph, or simply the first non-blank line; pick the strongest cue available. Body content begins at the paragraph AFTER the title and runs to end of document; it MUST exclude the metadata table AND the title line itself. If no metadata table is present, infer fields from the body using ordinary heuristics. Match category and tag names case-insensitively against the provided availableCategories and availableTags lists; when a match exists, output the existing canonical casing with isNew: false. Otherwise output the source casing with isNew: true. Return ONLY a single JSON object matching the required shape — no preamble, no commentary, no code fences."`;
