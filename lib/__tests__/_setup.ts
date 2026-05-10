@@ -94,6 +94,7 @@ export async function truncateAll(): Promise<void> {
         'social_connections',
         'platform_events',
         'platform_notifications',
+        'platform_social_profiles',
         'platform_invitations',
         'platform_company_users',
         'platform_users',
