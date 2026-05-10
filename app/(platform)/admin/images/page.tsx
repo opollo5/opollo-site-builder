@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { BulkImageUpload } from "@/components/BulkImageUpload";
 import { ImagesTable, type ImagesFilterState } from "@/components/ImagesTable";
-import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -181,14 +179,6 @@ export default async function AdminImagesPage({
           </Link>
         </PageHeader.Actions>
       </PageHeader>
-
-      {!parsed.deleted && <BulkImageUpload />}
-
-      {!parsed.deleted && (
-        <div className="mt-4">
-          <ImageMetadataJobTrigger />
-        </div>
-      )}
 
       <div className="mt-6">
         <ImagesTable

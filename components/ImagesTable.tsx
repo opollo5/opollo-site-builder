@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import { BulkImageUpload } from "@/components/BulkImageUpload";
 import { ConfirmActionModal } from "@/components/ConfirmActionModal";
 import { ImageLightbox } from "@/components/ImageLightbox";
 import { Button } from "@/components/ui/button";
@@ -265,7 +266,7 @@ function ImageGrid({
       className="mt-3"
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fill, minmax(149px, 1fr))",
         gap: "8px",
       }}
     >
@@ -296,10 +297,14 @@ function ImagesToolbar({
   view,
   onViewChange,
   filterState,
+  showBulkUpload,
+  onBulkUploadToggle,
 }: {
   view: "grid" | "list";
   onViewChange: (v: "grid" | "list") => void;
   filterState: ImagesFilterState | undefined;
+  showBulkUpload: boolean;
+  onBulkUploadToggle: () => void;
 }) {
   const toggleBtn =
     "flex h-8 w-8 items-center justify-center transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -387,6 +392,18 @@ function ImagesToolbar({
           <option>Any date</option>
         </select>
 
+        {/* Bulk upload toggle — hidden in archived view */}
+        {!filterState?.deleted && (
+          <button
+            type="button"
+            onClick={onBulkUploadToggle}
+            aria-expanded={showBulkUpload}
+            className="flex h-8 items-center gap-1 rounded border bg-background px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Bulk upload {showBulkUpload ? "▴" : "▾"}
+          </button>
+        )}
+
         {/* Search — pushed to far right */}
         <div className="ml-auto flex items-center gap-2">
           <input
@@ -435,6 +452,8 @@ export function ImagesTable({ items, backHref, filterState }: ImagesTableProps) 
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
+
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
 
   // View toggle — grid is the default; persisted in localStorage.
   // Initialised lazily on the client to avoid SSR/hydration mismatch.
@@ -536,7 +555,15 @@ export function ImagesTable({ items, backHref, filterState }: ImagesTableProps) 
         view={view}
         onViewChange={handleViewChange}
         filterState={filterState}
+        showBulkUpload={showBulkUpload}
+        onBulkUploadToggle={() => setShowBulkUpload((v) => !v)}
       />
+
+      {showBulkUpload && !filterState?.deleted && (
+        <div className="mt-2">
+          <BulkImageUpload />
+        </div>
+      )}
 
       {selectedKeys.length > 0 && (
         <div className="mt-2 flex items-center gap-3">
