@@ -171,6 +171,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
       "/admin/system",
       "/admin/email-test",
       "/admin/settings",
+      "/admin/maintenance",
     ],
     testId: "nav-admin-tools",
     sectionNav: {
@@ -181,6 +182,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
           items: [
             { label: "Audit log", href: "/admin/users/audit", testId: "nav-audit-log" },
             { label: "System jobs", href: "/admin/system/jobs", testId: "nav-system-jobs" },
+            { label: "Maintenance", href: "/admin/maintenance", testId: "nav-maintenance" },
             { label: "Email test", href: "/admin/email-test", testId: "nav-email-test" },
             { label: "Design system", href: "/admin/settings/design-system", testId: "nav-design-system-settings" },
           ],
