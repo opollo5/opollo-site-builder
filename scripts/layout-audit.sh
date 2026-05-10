@@ -66,6 +66,10 @@ audit_section "Bug D: hex colours in JSX" '(bg|text|border|fill|stroke)-\[#[0-9a
 audit_section "Bug E: rounded-full inline buttons (likely raw <button>)" '<button[^>]*className="[^"]*rounded-' 'app/'
 audit_section "Bug F: per-page header.mb-8 blocks" '<header className="mb-8"' 'app/'
 audit_section "Bug G: NavShellClient prop usage" 'contentMaxWidth|contentPadding' 'app/ components/'
+# Bug H: <H1> typography component used as page heading instead of PageHeader.Title
+audit_section "Bug H: typography H1 component used instead of PageHeader.Title" '<H1[\s>]' 'app/ components/'
+# Bug I: <PageShell> inside NavShell creates double max-w-7xl container
+audit_section "Bug I: PageShell double container (PageShell inside NavShell)" '<PageShell' 'app/'
 
 echo "## Summary" >> "$OUTPUT_FILE"
 echo "" >> "$OUTPUT_FILE"

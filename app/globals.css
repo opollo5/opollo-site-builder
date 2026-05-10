@@ -258,7 +258,7 @@
 /* ---------------------------------------------------------------------------
  * A-1 — Typography scale.
  *
- *   <H1>      page heading          text-xl  font-display  ~20px
+ *   <H1>      page heading          text-2xl font-display  ~24px
  *   <H2>      section heading       text-base font-display ~16px
  *   <H3>      sub-section / card    text-sm  font-display  ~14px
  *   <Eyebrow> .lbl                  0.75rem  font-body 700 uppercase (12px design exception)

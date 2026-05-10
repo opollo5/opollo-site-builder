@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 //
 // Five components cover every text role on an admin surface:
 //
-//   <H1>      page heading             text-xl font-semibold     ~20px
+//   <H1>      page heading             text-2xl font-semibold    ~24px
 //   <H2>      section heading          text-base font-semibold   ~16px
 //   <H3>      sub-section / card title text-sm font-semibold     ~14px
 //   <Eyebrow> small uppercase label    text-sm font-medium       ~14px
@@ -57,7 +57,7 @@ export const H1 = React.forwardRef<HTMLHeadingElement, HeadingProps>(
       <h1
         ref={ref}
         className={cn(
-          "text-xl font-semibold tracking-tight text-foreground",
+          "text-2xl font-semibold tracking-tight text-foreground",
           className,
         )}
         {...props}
