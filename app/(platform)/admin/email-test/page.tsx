@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { EmailTestForm } from "@/components/EmailTestForm";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // AUTH-FOUNDATION P3.4 — /admin/email-test now gated on super_admin.
@@ -23,7 +22,7 @@ export default async function EmailTestPage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -51,6 +50,6 @@ export default async function EmailTestPage() {
           <EmailTestForm />
         </div>
       </div>
-    </PageShell>
+    </>
   );
 }

@@ -2,7 +2,6 @@ import { redirect, permanentRedirect } from "next/navigation";
 
 import { NavIcon } from "@/components/ui/nav-icon";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // Batches section entry point.
@@ -35,7 +34,7 @@ export default async function BatchesEntryPage({
   }
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -53,6 +52,6 @@ export default async function BatchesEntryPage({
           site, then navigate here again.
         </p>
       </div>
-    </PageShell>
+    </>
   );
 }

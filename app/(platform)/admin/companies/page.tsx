@@ -5,7 +5,6 @@ import { PlatformCompaniesListClient } from "@/components/PlatformCompaniesListC
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { listPlatformCompanies } from "@/lib/platform/companies";
 
 // P3-1 — Opollo admin companies list. Gated by app/admin/layout.tsx's
@@ -25,7 +24,7 @@ export default async function AdminCompaniesPage({
   const result = await listPlatformCompanies();
   if (!result.ok) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -41,7 +40,7 @@ export default async function AdminCompaniesPage({
         >
           Failed to load companies: {result.error.message}
         </div>
-      </PageShell>
+      </>
     );
   }
 
@@ -52,7 +51,7 @@ export default async function AdminCompaniesPage({
       : `${companies.length} ${companies.length === 1 ? "company" : "companies"} on the platform.`;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -80,6 +79,6 @@ export default async function AdminCompaniesPage({
         </div>
       )}
       <PlatformCompaniesListClient companies={companies} />
-    </PageShell>
+    </>
   );
 }

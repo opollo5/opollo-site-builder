@@ -11,15 +11,15 @@ import { cn } from "@/lib/utils";
 // Compound layout (visual order is enforced regardless of JSX order):
 //
 //   ┌──────────────────────────────────────────────────────────┐
-//   │ Test Site 2                              [Run Batch]     │  Title row · Actions right-aligned, vertically centered
-//   │   ↑ 20px gap                                              │
 //   │ Admin › Sites › Test Site 2                              │  Breadcrumb (text-sm muted)
-//   │   ↑ 8px gap (or 20px from title if breadcrumb absent)    │
+//   │   ↑ 8px gap (only when breadcrumb is present)            │
+//   │ Test Site 2                              [Run Batch]     │  Title row · Actions right-aligned, vertically centered
+//   │   ↑ 8px gap                                              │
 //   │ Optional one-line description.                            │  Subtitle (text-base muted)
-//   │   ↑ 12px gap                                              │
+//   │   ↑ 12px gap                                             │
 //   │ ● Active · https://test2... · Tested 2h ago             │  Meta row (text-sm muted, inline)
 //   └──────────────────────────────────────────────────────────┘
-//                       [32px gap to PageShell.Content]
+//                       [32px gap to page content]
 //
 // Slot order is enforced by render order in this component, not by JSX
 // child position. Detection is via `displayName`, NOT reference equality:
@@ -30,11 +30,10 @@ import { cn } from "@/lib/utils";
 // only (console.error, never throws). The `headings-use-page-header`
 // audit rule (Spec 02 PR 3) enforces presence at the build layer.
 //
-// Spec 04 amendment (2026-05-08): slot order reversed from
-// Breadcrumb→Title→… to Title→Breadcrumb→…, and the rhythm spec
-// (20/8/12/32 gaps) added. Title weight bumped 600→700 in
-// app/globals.css. Consumer JSX is unchanged — slot identity
-// (displayName) drives the order, not the JSX order.
+// Spec 04 amendment (2026-05-08) originally reversed to Title→Breadcrumb.
+// Reverted 2026-05-09: Breadcrumb renders above Title so the nav context
+// appears before the page label — standard Linear/Vercel/Stripe pattern.
+// Consumer JSX is unchanged — slot identity (displayName) drives order.
 
 const SLOT_NAMES = {
   Breadcrumb: "PageHeaderBreadcrumb",
@@ -127,27 +126,21 @@ export function PageHeader({ children, className }: PageHeaderProps) {
     }
   }
 
-  // Rhythm gaps below the title row, conditional on which slots are
-  // present so the rhythm collapses cleanly when slots are missing:
-  //   first-rendered-slot-after-title → mt-5  (20px)
-  //   subtitle when breadcrumb shown   → mt-2  (8px)
-  //   meta when subtitle shown         → mt-3  (12px)
-  //   meta when only breadcrumb shown  → mt-2  (8px)
-  //   meta with neither breadcrumb nor subtitle → mt-5 (20px)
-  const subtitleGap = slots.Breadcrumb ? "mt-2" : "mt-5";
-  const metaGap = slots.Subtitle
-    ? "mt-3"
-    : slots.Breadcrumb
-      ? "mt-2"
-      : "mt-5";
+  // Rhythm gaps — breadcrumb is first, title row follows with mt-2 when
+  // breadcrumb is present, then subtitle and meta step down from there.
+  const titleGap = slots.Breadcrumb ? "mt-2" : undefined;
+  const subtitleGap = "mt-2";
+  const metaGap = slots.Subtitle ? "mt-3" : "mt-2";
 
   return (
     <header className={cn("mb-8", className)}>
+      {slots.Breadcrumb && <div>{slots.Breadcrumb}</div>}
+
       {/* Title row — Actions sit on the same horizontal axis, right-aligned,
           vertically centered with the title. flex-wrap so very long titles
           can push Actions onto a second row at narrow widths instead of
           clipping. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className={cn("flex flex-wrap items-center justify-between gap-3", titleGap)}>
         <div className="min-w-0 flex-1">{slots.Title}</div>
         {slots.Actions && (
           <div className="flex shrink-0 items-center gap-2">
@@ -156,7 +149,6 @@ export function PageHeader({ children, className }: PageHeaderProps) {
         )}
       </div>
 
-      {slots.Breadcrumb && <div className="mt-5">{slots.Breadcrumb}</div>}
       {slots.Subtitle && (
         <div className={subtitleGap}>{slots.Subtitle}</div>
       )}
@@ -183,7 +175,7 @@ function PageHeaderTitle({
   className?: string;
 }) {
   return (
-    <h1 className={cn("text-xl text-page-title text-foreground", className)}>
+    <h1 className={cn("text-2xl text-page-title text-foreground", className)}>
       {children}
     </h1>
   );

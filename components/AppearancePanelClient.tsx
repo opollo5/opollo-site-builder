@@ -9,7 +9,7 @@ import { KadencePaletteDiffTable } from "@/components/KadencePaletteDiffTable";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { CardSkeleton } from "@/components/ui/skeleton";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
 import type { AppearanceEventRow } from "@/lib/appearance-events";
 import type {
   KadencePaletteProposal,
@@ -313,14 +313,14 @@ export function AppearancePanelClient({
 
   return (
     <div className="mt-4 space-y-5">
-      <div>
-        <H1>Appearance</H1>
-        <Lead className="mt-0.5">
+      <PageHeader>
+        <PageHeader.Title>Appearance</PageHeader.Title>
+        <PageHeader.Subtitle>
           Sync this site&apos;s design-system palette to Kadence on{" "}
           <span className="font-medium text-foreground">{siteName}</span>{" "}
           ({wpDisplayUrl}).
-        </Lead>
-      </div>
+        </PageHeader.Subtitle>
+      </PageHeader>
 
       {/* Scope clarifier — what Opollo owns vs what the operator owns. */}
       <div

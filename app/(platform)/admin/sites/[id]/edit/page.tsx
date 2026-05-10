@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { SiteEditForm } from "@/components/SiteEditForm";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -31,7 +30,7 @@ export default async function EditSitePage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -45,7 +44,7 @@ export default async function EditSitePage({
         <div className="mx-auto max-w-2xl">
           <Alert variant="destructive">{result.error.message}</Alert>
         </div>
-      </PageShell>
+      </>
     );
   }
 
@@ -53,7 +52,7 @@ export default async function EditSitePage({
   const creds = result.data.credentials;
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -80,6 +79,6 @@ export default async function EditSitePage({
           hasStoredCredentials={creds !== null}
         />
       </div>
-    </PageShell>
+    </>
   );
 }

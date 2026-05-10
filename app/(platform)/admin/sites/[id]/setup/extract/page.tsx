@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { CopyExistingExtractionWizard } from "@/components/CopyExistingExtractionWizard";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -69,7 +68,7 @@ export default async function CopyExistingExtractPage({
   }
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -94,6 +93,6 @@ export default async function CopyExistingExtractPage({
           existingClasses={site.extracted_css_classes}
         />
       </div>
-    </PageShell>
+    </>
   );
 }

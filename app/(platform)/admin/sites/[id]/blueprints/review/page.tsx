@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 
 // /admin/sites/[id]/blueprints/review — M16-7.
@@ -150,7 +149,7 @@ export default function BlueprintReviewPage({
 
   if (loading) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb segments={breadcrumbSegments} />
           <PageHeader.Title>Site Plan Review</PageHeader.Title>
@@ -161,13 +160,13 @@ export default function BlueprintReviewPage({
           <Skeleton className="h-32 w-full" />
           <Skeleton className="h-32 w-full" />
         </div>
-      </PageShell>
+      </>
     );
   }
 
   if (!blueprint) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb segments={breadcrumbSegments} />
           <PageHeader.Title>Site Plan Review</PageHeader.Title>
@@ -178,14 +177,14 @@ export default function BlueprintReviewPage({
           title="No site plan yet"
           body="Run the site planner from the brief run page to generate a plan before approving page generation."
         />
-      </PageShell>
+      </>
     );
   }
 
   const isApproved = blueprint.status === "approved";
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb segments={breadcrumbSegments} />
         <PageHeader.Title>Site Plan Review</PageHeader.Title>
@@ -291,6 +290,6 @@ export default function BlueprintReviewPage({
         </pre>
       </details>
       </div>
-    </PageShell>
+    </>
   );
 }

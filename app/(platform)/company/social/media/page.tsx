@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { MediaLibraryClient } from "@/components/MediaLibraryClient";
-import { H1, Lead } from "@/components/ui/typography";
+import { PageHeader } from "@/components/ui/page-header";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listMediaAssets } from "@/lib/platform/social/media";
 
@@ -43,13 +43,13 @@ export default async function CompanySocialMediaPage() {
 
   return (
     <>
-      <header>
-        <H1>Media library</H1>
-        <Lead className="mt-0.5">
+      <PageHeader>
+        <PageHeader.Title>Media library</PageHeader.Title>
+        <PageHeader.Subtitle>
           Reusable images and video for your social posts. Add an asset
           here, then attach by id when scheduling.
-        </Lead>
-      </header>
+        </PageHeader.Subtitle>
+      </PageHeader>
       <div className="mt-6">
         {listResult.ok ? (
           <MediaLibraryClient
