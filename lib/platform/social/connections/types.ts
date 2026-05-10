@@ -16,6 +16,10 @@ export type SocialConnectionStatus =
 export type SocialConnection = {
   id: string;
   company_id: string;
+  // BSP-8 — non-null after the 0120 backfill. NULL is possible if a
+  // profile was deleted before its connections were reattributed; the
+  // next sync re-resolves attribution via team_id → profile lookup.
+  profile_id: string | null;
   platform: SocialPlatform;
   bundle_social_account_id: string;
   display_name: string | null;
@@ -31,6 +35,9 @@ export type SocialConnection = {
 
 export type ListConnectionsInput = {
   companyId: string;
+  // BSP-8 — optional per-profile filter for the customer UI. When set,
+  // only returns connections attributed to this profile.
+  profileId?: string;
 };
 
 // UI helpers.

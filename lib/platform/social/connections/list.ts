@@ -23,13 +23,17 @@ export async function listConnections(
   }
 
   const svc = getServiceRoleClient();
-  const result = await svc
+  let query = svc
     .from("social_connections")
     .select(
-      "id, company_id, platform, bundle_social_account_id, display_name, avatar_url, status, last_error, connected_at, disconnected_at, last_health_check_at, created_at, updated_at",
+      "id, company_id, profile_id, platform, bundle_social_account_id, display_name, avatar_url, status, last_error, connected_at, disconnected_at, last_health_check_at, created_at, updated_at",
     )
-    .eq("company_id", input.companyId)
-    .order("connected_at", { ascending: false });
+    .eq("company_id", input.companyId);
+  // BSP-8: optional per-profile filter for the customer-facing UI.
+  if (input.profileId) {
+    query = query.eq("profile_id", input.profileId);
+  }
+  const result = await query.order("connected_at", { ascending: false });
 
   if (result.error) {
     logger.error("social.connections.list.failed", {
