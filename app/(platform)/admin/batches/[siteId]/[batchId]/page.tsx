@@ -5,7 +5,6 @@ import { BatchDetailClient } from "@/components/BatchDetailClient";
 import { BatchSuccessMoment } from "@/components/BatchSuccessMoment";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import {
   StatusPill,
   jobStatusKind,
@@ -61,7 +60,7 @@ export default async function BatchDetailPage({
 
   if (jobErr) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -73,7 +72,7 @@ export default async function BatchDetailPage({
           <PageHeader.Title>Failed to load batch</PageHeader.Title>
         </PageHeader>
         <Alert variant="destructive">{jobErr.message}</Alert>
-      </PageShell>
+      </>
     );
   }
   if (!job) {
@@ -120,7 +119,7 @@ export default async function BatchDetailPage({
   const tmpl = job.template as unknown as { name: string; page_type: string };
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -241,6 +240,6 @@ export default async function BatchDetailPage({
           </div>
         </div>
       </div>
-    </PageShell>
+    </>
   );
 }

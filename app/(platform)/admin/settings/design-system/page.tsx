@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { DesignSystemSettingsClient } from "@/components/DesignSystemSettingsClient";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -23,7 +22,7 @@ export default async function DesignSystemSettingsPage() {
     .maybeSingle();
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -40,6 +39,6 @@ export default async function DesignSystemSettingsPage() {
         </PageHeader.Subtitle>
       </PageHeader>
       <DesignSystemSettingsClient initialSettings={data ?? null} />
-    </PageShell>
+    </>
   );
 }

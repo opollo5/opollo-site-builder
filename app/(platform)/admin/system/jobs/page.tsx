@@ -4,7 +4,6 @@ import path from "node:path";
 
 import { H2 } from "@/components/ui/typography";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -256,7 +255,7 @@ export default async function SystemJobsPage() {
   );
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -425,6 +424,6 @@ export default async function SystemJobsPage() {
           </table>
         </div>
       </section>
-    </PageShell>
+    </>
   );
 }

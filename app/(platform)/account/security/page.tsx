@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { AccountSecurityForm } from "@/components/AccountSecurityForm";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -31,7 +30,7 @@ export default async function AccountSecurityPage() {
   }
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -45,6 +44,6 @@ export default async function AccountSecurityPage() {
         </PageHeader.Subtitle>
       </PageHeader>
       <AccountSecurityForm userEmail={user.email} />
-    </PageShell>
+    </>
   );
 }

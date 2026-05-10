@@ -4,7 +4,6 @@ import { SitesListClient } from "@/components/SitesListClient";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   SITE_SORTABLE_COLUMNS,
@@ -86,7 +85,7 @@ export default async function ManageSitesPage({
   const result = await listSites({ status, sort, dir });
   if (!result.ok) {
     return (
-      <PageShell>
+      <>
         <PageHeader>
           <PageHeader.Breadcrumb
             segments={[
@@ -102,7 +101,7 @@ export default async function ManageSitesPage({
         >
           Failed to load sites: {result.error.message}
         </div>
-      </PageShell>
+      </>
     );
   }
   const sites: SiteListItem[] = result.data.sites;
@@ -111,7 +110,7 @@ export default async function ManageSitesPage({
       ? "No WordPress sites connected yet."
       : `${sites.length} WordPress ${sites.length === 1 ? "site" : "sites"} connected to this builder.`;
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -137,6 +136,6 @@ export default async function ManageSitesPage({
         dir={dir}
         isSuperAdmin={isSuperAdmin}
       />
-    </PageShell>
+    </>
   );
 }

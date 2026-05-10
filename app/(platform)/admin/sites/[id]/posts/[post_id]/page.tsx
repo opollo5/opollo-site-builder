@@ -2,7 +2,6 @@ import { notFound, redirect } from "next/navigation";
 
 import { PostDetailClient } from "@/components/PostDetailClient";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getPost } from "@/lib/posts";
 import { preflightSitePublish } from "@/lib/site-preflight";
@@ -76,7 +75,7 @@ export default async function PostDetailPage({
   const preflight = await preflightSitePublish(params.id);
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -95,6 +94,6 @@ export default async function PostDetailPage({
         post={post}
         preflight={preflight}
       />
-    </PageShell>
+    </>
   );
 }

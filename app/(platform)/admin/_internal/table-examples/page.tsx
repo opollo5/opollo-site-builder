@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { ExampleTablesClient } from "@/components/admin/internal/ExampleTablesClient";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // ---------------------------------------------------------------------------
@@ -30,7 +29,7 @@ export default async function TableExamplesPage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -46,6 +45,6 @@ export default async function TableExamplesPage() {
         </PageHeader.Subtitle>
       </PageHeader>
       <ExampleTablesClient />
-    </PageShell>
+    </>
   );
 }

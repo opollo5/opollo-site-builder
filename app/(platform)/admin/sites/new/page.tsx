@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 
 import { SiteCreateForm } from "@/components/SiteCreateForm";
 import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // AUTH-FOUNDATION P2.2 — /admin/sites/new.
@@ -21,7 +20,7 @@ export default async function NewSitePage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <PageShell>
+    <>
       <PageHeader>
         <PageHeader.Breadcrumb
           segments={[
@@ -40,6 +39,6 @@ export default async function NewSitePage() {
       <div className="mx-auto max-w-2xl">
         <SiteCreateForm />
       </div>
-    </PageShell>
+    </>
   );
 }
