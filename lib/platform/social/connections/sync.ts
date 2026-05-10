@@ -148,20 +148,30 @@ export async function syncBundlesocialConnections(
     string,
     { remote: RemoteAccount; profileId: string | null }
   >();
+  // Track per-team success/failure: if EVERY team_get errored, the sync
+  // is fundamentally compromised and must surface INTERNAL_ERROR so
+  // callers (callback + manual refresh) don't silently mark every
+  // healthy connection as disconnected.
+  let teamGetSucceeded = 0;
+  let lastTeamGetError: string | null = null;
   for (const [teamId, mapping] of profileByTeam) {
     let team: { socialAccounts?: RemoteAccount[] };
     try {
       team = (await client.team.teamGetTeam({ id: teamId })) as typeof team;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      lastTeamGetError = message;
       logger.warn("bundlesocial.sync.team_get_failed", {
         err: message,
         team_id: teamId,
         company_id: input.companyId,
       });
-      // One bad team shouldn't tank the whole sync. Skip and continue.
+      // One bad team shouldn't tank the whole sync — skip and continue
+      // so other healthy teams still get walked. The all-failed case is
+      // handled below.
       continue;
     }
+    teamGetSucceeded += 1;
     for (const a of team.socialAccounts ?? []) {
       remoteByAccountId.set(a.id, {
         remote: a,
@@ -169,6 +179,22 @@ export async function syncBundlesocialConnections(
       });
     }
   }
+
+  // All-teams-failed surface: if we attempted at least one team_get
+  // and none succeeded, refuse to proceed with Pass 2 (which would
+  // mark every existing connection as disconnected based on an empty
+  // remote set). Surface INTERNAL_ERROR so callers can retry / alert.
+  if (profileByTeam.size > 0 && teamGetSucceeded === 0) {
+    logger.error("bundlesocial.sync.all_teams_failed", {
+      attempted: profileByTeam.size,
+      last_err: lastTeamGetError,
+      company_id: input.companyId,
+    });
+    return internal(
+      `bundle.social team.get failed for every team (${profileByTeam.size} attempted). Last error: ${lastTeamGetError ?? "unknown"}`,
+    );
+  }
+
   const remoteIds = new Set(remoteByAccountId.keys());
 
   // Read existing social_connections rows for this company.
