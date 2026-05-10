@@ -48,6 +48,9 @@ type Props = {
   initialTeamReadError: string | null;
 };
 
+// Disconnect-busy state is keyed by `${account.id}` so we can spin only
+// the affected row.
+
 type ApiResponse<T> =
   | { ok: true; data: T; timestamp: string }
   | {
@@ -72,8 +75,10 @@ export function AdminProfileConnectionsList({
   initialTeamReadError,
 }: Props) {
   const router = useRouter();
+  const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
   const [showLightbox, setShowLightbox] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // platform value
+  const [disconnectBusy, setDisconnectBusy] = useState<string | null>(null); // account id
   const [error, setError] = useState<string | null>(initialTeamReadError);
   const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
   const popupRef = useRef<Window | null>(null);
@@ -102,6 +107,40 @@ export function AdminProfileConnectionsList({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function handleDisconnect(account: Account) {
+    if (
+      !window.confirm(
+        `Disconnect ${account.type} (${account.displayName ?? account.username ?? account.id}) from ${profileName}? Re-connecting requires the OAuth flow.`,
+      )
+    ) {
+      return;
+    }
+    setError(null);
+    setDisconnectBusy(account.id);
+    const res = await fetch(
+      `/api/admin/companies/${companyId}/social-profiles/${profileId}/disconnect`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: account.type }),
+      },
+    );
+    const json = (await res.json()) as ApiResponse<{
+      team_id: string;
+      platform: string;
+    }>;
+    setDisconnectBusy(null);
+    if (!res.ok || !json.ok) {
+      setError(!json.ok ? json.error.message : "Failed to disconnect.");
+      return;
+    }
+    toastSuccess(`Disconnected ${account.type} from ${profileName}.`);
+    // Optimistic — drop the row locally; router.refresh re-syncs from
+    // bundle.social.
+    setAccounts((prev) => prev.filter((a) => a.id !== account.id));
+    router.refresh();
+  }
 
   async function handleConnect(platform: string) {
     setError(null);
@@ -217,7 +256,7 @@ export function AdminProfileConnectionsList({
         </p>
       ) : null}
 
-      {initialAccounts.length === 0 ? (
+      {accounts.length === 0 ? (
         <div
           className="rounded-md border bg-card p-8 text-center text-sm text-muted-foreground"
           data-testid="connections-empty"
@@ -236,10 +275,11 @@ export function AdminProfileConnectionsList({
                 <th className="px-4 py-2 font-medium">Platform</th>
                 <th className="px-4 py-2 font-medium">Account</th>
                 <th className="px-4 py-2 font-medium">bundle.social id</th>
+                <th className="px-4 py-2 font-medium" />
               </tr>
             </thead>
             <tbody>
-              {initialAccounts.map((a) => (
+              {accounts.map((a) => (
                 <tr
                   key={a.id}
                   className="border-b last:border-b-0 hover:bg-muted/20"
@@ -255,6 +295,17 @@ export function AdminProfileConnectionsList({
                   </td>
                   <td className="px-4 py-3 font-mono text-sm text-muted-foreground">
                     {a.id}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDisconnect(a)}
+                      disabled={disconnectBusy !== null}
+                      data-testid={`account-disconnect-${a.id}`}
+                    >
+                      {disconnectBusy === a.id ? "Disconnecting…" : "Disconnect"}
+                    </Button>
                   </td>
                 </tr>
               ))}
