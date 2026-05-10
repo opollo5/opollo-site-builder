@@ -1,4 +1,4 @@
-import { NextResponse, type NextRequest } from "next/server";
+﻿import { NextResponse, type NextRequest } from "next/server";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
@@ -98,6 +98,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const sync = await syncBundlesocialConnections({
+    companyId,
     attributeNewToCompanyId: companyId,
   });
 

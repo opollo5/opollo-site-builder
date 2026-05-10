@@ -1,11 +1,11 @@
-import "server-only";
+﻿import "server-only";
 
 import {
   getBundlesocialClient,
-  getBundlesocialTeamId,
 } from "@/lib/bundlesocial";
 import { logger } from "@/lib/logger";
 import { resolveBundleUploadIds } from "@/lib/platform/social/media";
+import { getOrCreateBundleSocialTeam } from "@/lib/platform/social/bundle-social/provision";
 import { getQstashClient } from "@/lib/qstash";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
@@ -199,8 +199,7 @@ export async function fireScheduledPublish(
 
   // Step 2: bundle.social call.
   const client = getBundlesocialClient();
-  const teamId = getBundlesocialTeamId();
-  if (!client || !teamId) {
+  if (!client) {
     // We've already claimed the job + advanced master state. Mark the
     // attempt failed so the next manual retry path can pick it up;
     // master state will be flipped to 'failed' by the operator (or
@@ -211,6 +210,20 @@ export async function fireScheduledPublish(
     });
     await markMasterFailed(svc, claim.post_master_id!);
     return internal("bundle.social client not configured.");
+  }
+
+  // Resolve the per-company bundle.social team id.
+  let teamId: string;
+  try {
+    teamId = await getOrCreateBundleSocialTeam(claim.company_id!);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    await markAttemptFailed(svc, claim.publish_attempt_id!, {
+      error_class: "platform_error",
+      error_payload: { code: "TEAM_PROVISION_FAILED", message },
+    });
+    await markMasterFailed(svc, claim.post_master_id!);
+    return internal(`Failed to provision bundle.social team: ${message}`);
   }
 
   const bundlePlatform = PLATFORM_TO_BUNDLE[claim.platform!];
