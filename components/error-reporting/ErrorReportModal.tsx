@@ -135,7 +135,7 @@ export function ErrorReportModal({ open, onClose, report }: ErrorReportModalProp
                 <summary className="cursor-pointer select-none text-xs text-muted-foreground hover:text-foreground">
                   {previewOpen ? "Hide" : "Show"} what will be sent
                 </summary>
-                <pre className="mt-2 max-h-48 overflow-auto rounded border bg-muted/40 p-2 text-[10px] text-muted-foreground">
+                <pre className="mt-2 max-h-48 overflow-auto rounded border bg-muted/40 p-2 text-xs text-muted-foreground">
                   {JSON.stringify(report, null, 2)}
                 </pre>
               </details>
