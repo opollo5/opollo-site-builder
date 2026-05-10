@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -305,6 +306,18 @@ export function AdminSocialProfilesList({ companyId, initialProfiles }: Props) {
                   <td className="px-4 py-3 text-right">
                     {editingId === p.id ? null : (
                       <div className="flex justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          asChild
+                          data-testid={`profile-manage-connections-${p.id}`}
+                        >
+                          <Link
+                            href={`/admin/companies/${companyId}/social-profiles/${p.id}/connections`}
+                          >
+                            Connections
+                          </Link>
+                        </Button>
                         <Button
                           size="sm"
                           variant="ghost"
