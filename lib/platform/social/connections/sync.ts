@@ -69,49 +69,139 @@ export async function syncBundlesocialConnections(
   const client = getBundlesocialClient();
   if (!client) return notConfigured("BUNDLE_SOCIAL_API");
 
-  let teamId: string;
-  try {
-    teamId = await getOrCreateBundleSocialTeam(input.companyId);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.error("bundlesocial.sync.team_provision_failed", {
-      err: message,
-      company_id: input.companyId,
-    });
-    return internal(`Failed to provision bundle.social team: ${message}`);
-  }
-
-  let team: {
-    socialAccounts?: Array<{
-      id: string;
-      type: string;
-      displayName?: string | null;
-      username?: string | null;
-      avatarUrl?: string | null;
-    }>;
-  };
-  try {
-    team = (await client.team.teamGetTeam({ id: teamId })) as typeof team;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.error("bundlesocial.sync.team_get_failed", {
-      err: message,
-      team_id: teamId,
-      company_id: input.companyId,
-    });
-    return internal(`bundle.social team.get failed: ${message}`);
-  }
-
-  const remoteAccounts = team.socialAccounts ?? [];
-  const remoteIds = new Set(remoteAccounts.map((a) => a.id));
-
   const svc = getServiceRoleClient();
 
-  // Read existing social_connections rows for this company only.
+  // BSP-8: read every profile for the company that has a provisioned
+  // bundle.social team. Each profile has its own team; we walk them all
+  // so accounts connected via the BSP-6 admin per-profile flow get
+  // synced too (not just default-profile / company-level accounts).
+  const profilesRead = await svc
+    .from("platform_social_profiles")
+    .select("id, bundle_social_team_id, is_default")
+    .eq("company_id", input.companyId)
+    .not("bundle_social_team_id", "is", null);
+  if (profilesRead.error) {
+    logger.error("bundlesocial.sync.profiles_read_failed", {
+      err: profilesRead.error.message,
+      company_id: input.companyId,
+    });
+    return internal(`Failed to read profiles: ${profilesRead.error.message}`);
+  }
+  const profileRows = (profilesRead.data ?? []) as Array<{
+    id: string;
+    bundle_social_team_id: string;
+    is_default: boolean;
+  }>;
+
+  // Map team_id → profile_id for attribution on insert.
+  const profileByTeam = new Map<string, { profileId: string; isDefault: boolean }>();
+  for (const p of profileRows) {
+    profileByTeam.set(p.bundle_social_team_id, {
+      profileId: p.id,
+      isDefault: p.is_default,
+    });
+  }
+
+  // Resolve the default profile id once — used as the attribution
+  // target when input.attributeNewToCompanyId is set but the team
+  // mapping is missing (defensive only — every team should map post-
+  // migration 0119).
+  const defaultProfileId =
+    profileRows.find((p) => p.is_default)?.id ?? null;
+
+  // Ensure the company's legacy team gets walked too. Pre-BSP-3
+  // companies may still have platform_companies.bundle_social_team_id
+  // set without a corresponding profile row (shouldn't happen post-
+  // migration 0119, but defensive). getOrCreateBundleSocialTeam is
+  // idempotent — it returns the existing team id.
+  try {
+    const companyTeamId = await getOrCreateBundleSocialTeam(input.companyId);
+    if (!profileByTeam.has(companyTeamId)) {
+      profileByTeam.set(companyTeamId, {
+        profileId: defaultProfileId ?? "",
+        isDefault: true,
+      });
+    }
+  } catch (err) {
+    // If the company's legacy team isn't provisioned and we have at
+    // least one profile team, proceed without it. If we have NO teams
+    // at all, surface as not-configured.
+    const message = err instanceof Error ? err.message : String(err);
+    logger.warn("bundlesocial.sync.legacy_team_skipped", {
+      err: message,
+      company_id: input.companyId,
+    });
+    if (profileByTeam.size === 0) {
+      return internal(`No bundle.social teams to sync: ${message}`);
+    }
+  }
+
+  // Collect every (account, profile) pair across all the company's teams.
+  type RemoteAccount = {
+    id: string;
+    type: string;
+    displayName?: string | null;
+    username?: string | null;
+    avatarUrl?: string | null;
+  };
+  const remoteByAccountId = new Map<
+    string,
+    { remote: RemoteAccount; profileId: string | null }
+  >();
+  // Track per-team success/failure: if EVERY team_get errored, the sync
+  // is fundamentally compromised and must surface INTERNAL_ERROR so
+  // callers (callback + manual refresh) don't silently mark every
+  // healthy connection as disconnected.
+  let teamGetSucceeded = 0;
+  let lastTeamGetError: string | null = null;
+  for (const [teamId, mapping] of profileByTeam) {
+    let team: { socialAccounts?: RemoteAccount[] };
+    try {
+      team = (await client.team.teamGetTeam({ id: teamId })) as typeof team;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      lastTeamGetError = message;
+      logger.warn("bundlesocial.sync.team_get_failed", {
+        err: message,
+        team_id: teamId,
+        company_id: input.companyId,
+      });
+      // One bad team shouldn't tank the whole sync — skip and continue
+      // so other healthy teams still get walked. The all-failed case is
+      // handled below.
+      continue;
+    }
+    teamGetSucceeded += 1;
+    for (const a of team.socialAccounts ?? []) {
+      remoteByAccountId.set(a.id, {
+        remote: a,
+        profileId: mapping.profileId || null,
+      });
+    }
+  }
+
+  // All-teams-failed surface: if we attempted at least one team_get
+  // and none succeeded, refuse to proceed with Pass 2 (which would
+  // mark every existing connection as disconnected based on an empty
+  // remote set). Surface INTERNAL_ERROR so callers can retry / alert.
+  if (profileByTeam.size > 0 && teamGetSucceeded === 0) {
+    logger.error("bundlesocial.sync.all_teams_failed", {
+      attempted: profileByTeam.size,
+      last_err: lastTeamGetError,
+      company_id: input.companyId,
+    });
+    return internal(
+      `bundle.social team.get failed for every team (${profileByTeam.size} attempted). Last error: ${lastTeamGetError ?? "unknown"}`,
+    );
+  }
+
+  const remoteIds = new Set(remoteByAccountId.keys());
+
+  // Read existing social_connections rows for this company.
   const existing = await svc
     .from("social_connections")
     .select(
-      "id, company_id, platform, bundle_social_account_id, display_name, avatar_url, status",
+      "id, company_id, platform, bundle_social_account_id, display_name, avatar_url, status, profile_id",
     )
     .eq("company_id", input.companyId);
   if (existing.error) {
@@ -130,6 +220,7 @@ export async function syncBundlesocialConnections(
       display_name: string | null;
       avatar_url: string | null;
       status: string;
+      profile_id: string | null;
     }
   >();
   for (const row of existing.data ?? []) {
@@ -140,6 +231,7 @@ export async function syncBundlesocialConnections(
       display_name: (row.display_name as string | null) ?? null,
       avatar_url: (row.avatar_url as string | null) ?? null,
       status: row.status as string,
+      profile_id: (row.profile_id as string | null) ?? null,
     });
   }
 
@@ -152,7 +244,7 @@ export async function syncBundlesocialConnections(
   const now = new Date().toISOString();
 
   // Pass 1: walk remote accounts.
-  for (const remote of remoteAccounts) {
+  for (const [bundleAccountId, { remote, profileId }] of remoteByAccountId) {
     const platform = BUNDLE_TO_PLATFORM[remote.type];
     if (!platform) {
       result.unmapped_skipped += 1;
@@ -163,12 +255,10 @@ export async function syncBundlesocialConnections(
       | null;
     const avatarUrl = (remote.avatarUrl ?? null) as string | null;
 
-    const localRow = existingById.get(remote.id);
+    const localRow = existingById.get(bundleAccountId);
     if (localRow) {
-      // UPDATE existing — refresh display_name + avatar + status.
-      // status flips back to 'healthy' on every successful sync; the
-      // webhook handler (S1-17) flips it to auth_required / disconnected
-      // when bundle.social signals trouble.
+      // UPDATE existing — refresh display_name + avatar + status. Also
+      // backfill profile_id if it was NULL (e.g. row pre-dates BSP-8).
       const update = await svc
         .from("social_connections")
         .update({
@@ -177,6 +267,9 @@ export async function syncBundlesocialConnections(
           status: "healthy",
           last_health_check_at: now,
           last_error: null,
+          ...(localRow.profile_id === null && profileId
+            ? { profile_id: profileId }
+            : {}),
         })
         .eq("id", localRow.id);
       if (update.error) {
@@ -188,14 +281,18 @@ export async function syncBundlesocialConnections(
         result.updated += 1;
       }
     } else if (input.attributeNewToCompanyId) {
-      // INSERT new — attribute to the company that initiated the
-      // connect (passed via the callback).
+      // INSERT new — attribute to the company that initiated the connect
+      // AND to the profile whose team this account lives in. Falls back
+      // to the default profile id if the team-profile mapping is missing
+      // (defensive — should never fire post-migration 0119).
+      const attributedProfileId = profileId ?? defaultProfileId;
       const insert = await svc
         .from("social_connections")
         .insert({
           company_id: input.attributeNewToCompanyId,
+          profile_id: attributedProfileId,
           platform,
-          bundle_social_account_id: remote.id,
+          bundle_social_account_id: bundleAccountId,
           display_name: displayName,
           avatar_url: avatarUrl,
           status: "healthy",
@@ -205,18 +302,16 @@ export async function syncBundlesocialConnections(
       if (insert.error) {
         logger.warn("bundlesocial.sync.insert_failed", {
           err: insert.error.message,
-          bundle_account_id: remote.id,
+          bundle_account_id: bundleAccountId,
         });
       } else {
         result.inserted += 1;
       }
     }
-    // else: new account, but no attributeNewToCompanyId → skip
-    // silently. A future cron sweep with the right callback context
-    // will pick it up.
+    // else: new account, but no attributeNewToCompanyId → skip.
   }
 
-  // Pass 2: walk local rows; any not in remote = disconnected.
+  // Pass 2: walk local rows; any not in any remote team = disconnected.
   for (const [bundleId, localRow] of existingById.entries()) {
     if (remoteIds.has(bundleId)) continue;
     if (localRow.status === "disconnected") continue;
