@@ -242,7 +242,7 @@ export default async function SiteDetailPage({
           <div className="flex items-center justify-between">
             <H3>Recent batches</H3>
             <Link
-              href={`/admin/batches?site_id=${encodeURIComponent(site.id)}`}
+              href={`/admin/batches/${site.id}`}
               className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               View all →
@@ -287,7 +287,7 @@ export default async function SiteDetailPage({
                       >
                         <td className="px-3 py-2">
                           <Link
-                            href={`/admin/batches/${b.id as string}`}
+                            href={`/admin/batches/${site.id}/${b.id as string}`}
                             className="font-medium hover:underline"
                           >
                             {tmpl?.name ?? "—"}

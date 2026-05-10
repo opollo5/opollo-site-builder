@@ -15,17 +15,9 @@ import { H3 } from "@/components/ui/typography";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
-// ---------------------------------------------------------------------------
-// /admin/batches/[id] — M3-8.
-//
-// Server-rendered per request; BatchDetailClient polls via
-// router.refresh() for non-terminal batches to keep progress live
-// without scaffolding a full SSE stream.
-// ---------------------------------------------------------------------------
+// /admin/batches/[siteId]/[batchId] — batch detail page.
 
 export const dynamic = "force-dynamic";
-
-// StatusBadge + SlotStateBadge folded to A-4's StatusPill primitive.
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -48,7 +40,7 @@ function formatCostCents(cents: number): string {
 export default async function BatchDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: { siteId: string; batchId: string };
 }) {
   const access = await checkAdminAccess({
     requiredRoles: ["super_admin", "admin"],
@@ -62,8 +54,10 @@ export default async function BatchDetailPage({
     .select(
       "id, status, requested_count, succeeded_count, failed_count, created_at, finished_at, cancel_requested_at, total_cost_usd_cents, total_input_tokens, total_output_tokens, created_by, site:sites!inner(name, prefix), template:design_templates!inner(name, page_type)",
     )
-    .eq("id", params.id)
+    .eq("id", params.batchId)
     .maybeSingle();
+
+  const batchesHref = `/admin/batches/${params.siteId}`;
 
   if (jobErr) {
     return (
@@ -72,15 +66,13 @@ export default async function BatchDetailPage({
           <PageHeader.Breadcrumb
             segments={[
               { label: "Admin", href: "/admin/sites" },
-              { label: "Batches", href: "/admin/batches" },
+              { label: "Batches", href: batchesHref },
               { label: "Error" },
             ]}
           />
           <PageHeader.Title>Failed to load batch</PageHeader.Title>
         </PageHeader>
-        <Alert variant="destructive">
-          {jobErr.message}
-        </Alert>
+        <Alert variant="destructive">{jobErr.message}</Alert>
       </PageShell>
     );
   }
@@ -88,17 +80,13 @@ export default async function BatchDetailPage({
     return (
       <div className="rounded-md border p-8 text-center">
         <p className="text-sm text-muted-foreground">Batch not found.</p>
-        <Link
-          href="/admin/batches"
-          className="mt-2 inline-block text-sm underline"
-        >
+        <Link href={batchesHref} className="mt-2 inline-block text-sm underline">
           ← Back to batches
         </Link>
       </div>
     );
   }
 
-  // Operators can only view their own batches.
   if (
     access.user &&
     access.user.role !== "admin" &&
@@ -118,21 +106,18 @@ export default async function BatchDetailPage({
     .select(
       "id, slot_index, state, inputs, attempts, last_error_code, last_error_message, cost_usd_cents, wp_page_id, finished_at",
     )
-    .eq("job_id", params.id)
+    .eq("job_id", params.batchId)
     .order("slot_index", { ascending: true });
 
   const { data: recentEvents } = await svc
     .from("generation_events")
     .select("id, event, details, created_at")
-    .eq("job_id", params.id)
+    .eq("job_id", params.batchId)
     .order("id", { ascending: false })
     .limit(20);
 
   const site = job.site as unknown as { name: string; prefix: string };
-  const tmpl = job.template as unknown as {
-    name: string;
-    page_type: string;
-  };
+  const tmpl = job.template as unknown as { name: string; page_type: string };
 
   return (
     <PageShell>
@@ -140,7 +125,7 @@ export default async function BatchDetailPage({
         <PageHeader.Breadcrumb
           segments={[
             { label: "Admin", href: "/admin/sites" },
-            { label: "Batches", href: "/admin/batches" },
+            { label: "Batches", href: batchesHref },
             { label: `${site.name} · ${tmpl.name}` },
           ]}
         />
@@ -164,15 +149,16 @@ export default async function BatchDetailPage({
           )}
         </PageHeader.Meta>
         <PageHeader.Actions>
-          <BatchDetailClient jobId={params.id} status={job.status as string} />
+          <BatchDetailClient jobId={params.batchId} status={job.status as string} />
         </PageHeader.Actions>
       </PageHeader>
 
       {job.status === "succeeded" && (
         <BatchSuccessMoment
-          jobId={params.id}
+          jobId={params.batchId}
           succeededCount={Number(job.succeeded_count ?? 0)}
           siteName={site.name}
+          siteId={params.siteId}
         />
       )}
 
@@ -196,21 +182,15 @@ export default async function BatchDetailPage({
                 {(slots ?? []).map((s) => {
                   const inputs = s.inputs as Record<string, unknown>;
                   const slug =
-                    typeof inputs?.slug === "string"
-                      ? (inputs.slug as string)
-                      : "—";
+                    typeof inputs?.slug === "string" ? (inputs.slug as string) : "—";
                   return (
                     <tr key={s.id as string} className="border-b last:border-b-0 align-top">
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.slot_index as number}
-                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{s.slot_index as number}</td>
                       <td className="px-3 py-2 font-mono">{slug}</td>
                       <td className="px-3 py-2">
                         <StatusPill kind={slotStateKind(s.state as Parameters<typeof slotStateKind>[0])} />
                       </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {s.attempts as number}
-                      </td>
+                      <td className="px-3 py-2 text-muted-foreground">{s.attempts as number}</td>
                       <td className="px-3 py-2 text-muted-foreground">
                         {s.wp_page_id ? String(s.wp_page_id) : "—"}
                       </td>
@@ -243,10 +223,7 @@ export default async function BatchDetailPage({
           <H3>Recent events</H3>
           <div className="mt-2 flex flex-col gap-2">
             {(recentEvents ?? []).map((e) => (
-              <div
-                key={String(e.id)}
-                className="rounded-md border p-2 text-sm"
-              >
+              <div key={String(e.id)} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
                   <span className="font-medium">{e.event as string}</span>
                   <span className="text-sm text-muted-foreground">

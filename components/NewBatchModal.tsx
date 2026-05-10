@@ -108,8 +108,8 @@ export function NewBatchModal({
       }
       const jobId = payload.data?.job_id as string | undefined;
       onClose();
-      if (jobId) {
-        router.push(`/admin/batches/${jobId}`);
+      if (jobId && site) {
+        router.push(`/admin/batches/${site.id}/${jobId}`);
       } else {
         router.refresh();
       }

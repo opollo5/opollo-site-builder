@@ -33,6 +33,11 @@ export type SectionNavGroup = {
 export type SectionNavConfig = {
   title: string;
   showCompanySelector?: boolean;
+  showSiteSelector?: boolean;
+  /** Index of the siteId in pathname.split("/") — used to extract the active site from the URL. */
+  siteIdSegment?: number;
+  /** Href template for site-switch navigation. "{siteId}" is replaced with the selected site's id. */
+  siteSelectPath?: string;
   groups: SectionNavGroup[];
 };
 
@@ -62,10 +67,24 @@ export const primaryNavItems: PrimaryNavItem[] = [
     key: "posts",
     label: "Blog",
     icon: "blog",
-    href: "/admin/posts/new",
+    href: "/admin/posts",
     pathPrefixes: ["/admin/posts"],
     testId: "nav-post-blog",
-    sectionNav: null,
+    sectionNav: {
+      title: "Blog",
+      showSiteSelector: true,
+      siteIdSegment: 3,
+      siteSelectPath: "/admin/posts/{siteId}/new",
+      groups: [
+        {
+          label: null,
+          items: [
+            { label: "New post", href: "/admin/posts/{siteId}/new", testId: "cnav-new-post" },
+            { label: "Bulk upload", href: "/admin/posts/{siteId}/new", testId: "cnav-bulk-upload" },
+          ],
+        },
+      ],
+    },
   },
   {
     key: "batches",
@@ -74,7 +93,20 @@ export const primaryNavItems: PrimaryNavItem[] = [
     href: "/admin/batches",
     pathPrefixes: ["/admin/batches"],
     testId: "nav-batches",
-    sectionNav: null,
+    sectionNav: {
+      title: "Batches",
+      showSiteSelector: true,
+      siteIdSegment: 3,
+      siteSelectPath: "/admin/batches/{siteId}",
+      groups: [
+        {
+          label: null,
+          items: [
+            { label: "All batches", href: "/admin/batches/{siteId}", testId: "cnav-batches" },
+          ],
+        },
+      ],
+    },
   },
   {
     key: "images",
