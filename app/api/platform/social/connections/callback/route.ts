@@ -1,7 +1,11 @@
 ﻿import { NextResponse, type NextRequest } from "next/server";
 
+import { enqueuePostHistoryImport } from "@/lib/platform/social/analytics-ingest";
+import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
+import { getServiceRoleClient } from "@/lib/supabase";
+import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
 // ---------------------------------------------------------------------------
 // S1-16 — GET /api/platform/social/connections/callback
@@ -102,6 +106,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     attributeNewToCompanyId: companyId,
   });
 
+  // BSP analytics: after the sync attributes new connections, kick off
+  // a post-history import for each. Idempotent — the partial unique
+  // index dedups against the social-account.connected webhook arriving
+  // around the same time.
+  if (sync.ok && sync.data.inserted > 0) {
+    void triggerImportsForRecentConnections(req, companyId);
+  }
+
   const errorParam = [
     "not-enough-permissions",
     "not-enough-pages",
@@ -134,4 +146,49 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     target.searchParams.set("count", String(sync.data.inserted));
   }
   return NextResponse.redirect(target);
+}
+
+// Scans for connections that were just inserted by sync and enqueues a
+// post-history import for each. Idempotent — the import-row table's
+// partial unique index absorbs duplicate enqueues from the
+// social-account.connected webhook arriving in the same second.
+//
+// "Recent" = created in the last 60 seconds. Wider than necessary to
+// tolerate any clock skew between the sync's INSERT and this scan.
+async function triggerImportsForRecentConnections(
+  req: NextRequest,
+  companyId: string,
+): Promise<void> {
+  const svc = getServiceRoleClient();
+  const since = new Date(Date.now() - 60_000).toISOString();
+  const { data, error } = await svc
+    .from("social_connections")
+    .select("profile_id, bundle_social_account_id, platform")
+    .eq("company_id", companyId)
+    .gte("created_at", since)
+    .not("profile_id", "is", null);
+  if (error) {
+    logger.warn("social.callback.post_history_import_scan_failed", {
+      err: error.message,
+      company_id: companyId,
+    });
+    return;
+  }
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ?? new URL(req.url).origin;
+  for (const row of data ?? []) {
+    try {
+      await enqueuePostHistoryImport({
+        profileId: row.profile_id as string,
+        bundleSocialAccountId: row.bundle_social_account_id as string,
+        platform: row.platform as SocialPlatform,
+        origin,
+      });
+    } catch (err) {
+      logger.warn("social.callback.post_history_import_enqueue_failed", {
+        err: err instanceof Error ? err.message : String(err),
+        bundle_social_account_id: row.bundle_social_account_id,
+      });
+    }
+  }
 }
