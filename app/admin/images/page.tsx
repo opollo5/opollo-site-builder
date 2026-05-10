@@ -7,6 +7,7 @@ import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrig
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { deliveryUrl } from "@/lib/cloudflare-images";
 import {
   LIST_IMAGES_DEFAULT_LIMIT,
   LIST_IMAGES_MAX_LIMIT,
@@ -146,7 +147,11 @@ export default async function AdminImagesPage({
     );
   }
 
-  const { items, total } = result.data;
+  const { items: rawItems, total } = result.data;
+  const items = rawItems.map((item) => ({
+    ...item,
+    previewUrl: item.cloudflare_id ? deliveryUrl(item.cloudflare_id, "public") : null,
+  }));
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const currentPage = Math.min(parsed.page, totalPages);
   const rangeStart = total === 0 ? 0 : offset + 1;
