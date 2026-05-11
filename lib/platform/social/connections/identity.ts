@@ -222,53 +222,56 @@ export async function checkCrossTenantConflict(
 
   // Gather every potentially-conflicting row in parallel. Each query
   // hits one of the three partial indices added by migration 0122.
-  const queries: Promise<
-    | { data: CrossTenantConflict[]; error: null }
-    | { data: null; error: { message: string } }
-  >[] = [];
+  type QueryResult = {
+    data: CrossTenantConflict[];
+    error: { message: string } | null;
+  };
+  const queries: Promise<QueryResult>[] = [];
+  const cols =
+    "id, company_id, profile_id, platform, display_name, external_account_id, external_user_id, external_identity_hash";
 
   if (input.identity_hash) {
     queries.push(
-      svc
-        .from("social_connections")
-        .select(
-          "id, company_id, profile_id, platform, display_name, external_account_id, external_user_id, external_identity_hash",
-        )
-        .eq("external_identity_hash", input.identity_hash)
-        .then((r) => ({
+      (async (): Promise<QueryResult> => {
+        const r = await svc
+          .from("social_connections")
+          .select(cols)
+          .eq("external_identity_hash", input.identity_hash as string);
+        return {
           data: (r.data ?? []) as CrossTenantConflict[],
           error: r.error,
-        })),
+        };
+      })(),
     );
   }
   if (input.external_account_id) {
     queries.push(
-      svc
-        .from("social_connections")
-        .select(
-          "id, company_id, profile_id, platform, display_name, external_account_id, external_user_id, external_identity_hash",
-        )
-        .eq("platform", input.platform)
-        .eq("external_account_id", input.external_account_id)
-        .then((r) => ({
+      (async (): Promise<QueryResult> => {
+        const r = await svc
+          .from("social_connections")
+          .select(cols)
+          .eq("platform", input.platform)
+          .eq("external_account_id", input.external_account_id as string);
+        return {
           data: (r.data ?? []) as CrossTenantConflict[],
           error: r.error,
-        })),
+        };
+      })(),
     );
   }
   if (input.external_user_id) {
     queries.push(
-      svc
-        .from("social_connections")
-        .select(
-          "id, company_id, profile_id, platform, display_name, external_account_id, external_user_id, external_identity_hash",
-        )
-        .eq("platform", input.platform)
-        .eq("external_user_id", input.external_user_id)
-        .then((r) => ({
+      (async (): Promise<QueryResult> => {
+        const r = await svc
+          .from("social_connections")
+          .select(cols)
+          .eq("platform", input.platform)
+          .eq("external_user_id", input.external_user_id as string);
+        return {
           data: (r.data ?? []) as CrossTenantConflict[],
           error: r.error,
-        })),
+        };
+      })(),
     );
   }
 
