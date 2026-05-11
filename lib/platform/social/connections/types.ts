@@ -11,7 +11,13 @@ export type SocialConnectionStatus =
   | "healthy"
   | "degraded"
   | "auth_required"
-  | "disconnected";
+  | "disconnected"
+  // Cross-tenant identity-leak defence (migration 0122). Set when
+  // socialAccountGetByType returns null for either external_account_id
+  // or external_user_id (channel/page selection not yet complete on
+  // the platform side). Publishing refuses these connections via the
+  // existing claim_publish_job RPC's status='healthy' gate.
+  | "pending_identity";
 
 export type SocialConnection = {
   id: string;
@@ -29,6 +35,11 @@ export type SocialConnection = {
   connected_at: string;
   disconnected_at: string | null;
   last_health_check_at: string;
+  // Cross-tenant identity-leak defence (migration 0122). See
+  // lib/platform/social/connections/identity.ts.
+  external_account_id: string | null;
+  external_user_id: string | null;
+  external_identity_hash: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -46,6 +57,7 @@ export const STATUS_LABEL: Record<SocialConnectionStatus, string> = {
   degraded: "Degraded",
   auth_required: "Reconnect required",
   disconnected: "Disconnected",
+  pending_identity: "Pending channel selection",
 };
 
 export const STATUS_PILL: Record<SocialConnectionStatus, string> = {
@@ -53,6 +65,7 @@ export const STATUS_PILL: Record<SocialConnectionStatus, string> = {
   degraded: "bg-amber-100 text-amber-900",
   auth_required: "bg-rose-100 text-rose-900",
   disconnected: "bg-muted text-muted-foreground",
+  pending_identity: "bg-amber-100 text-amber-900",
 };
 
 // Re-export so consumers don't need to dive into variants/types just

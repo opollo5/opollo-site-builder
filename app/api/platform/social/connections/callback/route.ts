@@ -131,6 +131,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     reasonParam = sync.error.code;
   } else if (sync.data.inserted > 0) {
     connectParam = "success";
+  } else if (
+    (sync.data as { cross_tenant_blocked?: number }).cross_tenant_blocked !==
+      undefined &&
+    (sync.data as { cross_tenant_blocked?: number }).cross_tenant_blocked! > 0
+  ) {
+    // Cross-tenant identity-leak defence (migration 0122): sync refused
+    // every remote account because the platform identity is already
+    // owned by another company. Surface a specific banner reason so the
+    // UI shows the right copy.
+    connectParam = "error";
+    reasonParam = "cross-tenant-blocked";
   } else {
     connectParam = "noop";
   }

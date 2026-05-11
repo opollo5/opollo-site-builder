@@ -24,6 +24,12 @@
 const mockClient = {
   socialAccount: {
     socialAccountCreatePortalLink: vi.fn(),
+    // resolveIdentityFingerprint calls this; return realistic identity so
+    // sync.ts marks accounts "healthy" rather than "pending_identity".
+    socialAccountGetByType: vi.fn().mockResolvedValue({
+      externalId: "ext-acct-mock",
+      userId: "user-mock",
+    }),
   },
   team: {
     teamGetTeam: vi.fn(),
@@ -65,6 +71,11 @@ async function seedCompany(id: string, slug: string): Promise<void> {
 
 beforeEach(() => {
   mockClient.socialAccount.socialAccountCreatePortalLink.mockReset();
+  mockClient.socialAccount.socialAccountGetByType.mockReset();
+  mockClient.socialAccount.socialAccountGetByType.mockResolvedValue({
+    externalId: "ext-acct-mock",
+    userId: "user-mock",
+  });
   mockClient.team.teamGetTeam.mockReset();
 });
 

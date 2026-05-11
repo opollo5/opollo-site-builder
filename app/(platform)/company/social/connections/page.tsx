@@ -35,6 +35,13 @@ const REASON_LABEL: Record<string, string> = {
   "not-enough-pages": "No eligible pages were attached to that account.",
   "auth-failed": "The platform rejected the sign-in.",
   "user-cancelled": "You cancelled the connection flow.",
+  // Cross-tenant identity-leak defence (migration 0122). Set by the
+  // sync layer when checkCrossTenantConflict refuses an INSERT because
+  // the same platform identity is already owned by another company.
+  "cross-tenant-blocked":
+    "This account is already connected to another company on the Opollo " +
+    "platform. Disconnect it there first, or contact support to set up " +
+    "multi-company sharing.",
 };
 
 function ConnectBanner({ params }: { params: SearchParams }) {
