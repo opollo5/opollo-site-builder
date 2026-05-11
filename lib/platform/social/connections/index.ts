@@ -1,8 +1,3 @@
-export {
-  initiateBundlesocialConnect,
-  type InitiateConnectInput,
-  type InitiateConnectResult,
-} from "./initiate-connect";
 export { listConnections } from "./list";
 export {
   syncBundlesocialConnections,

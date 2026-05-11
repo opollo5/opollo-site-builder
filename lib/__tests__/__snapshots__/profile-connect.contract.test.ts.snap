@@ -11,6 +11,18 @@ exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] Faceb
 }
 `;
 
+exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] Facebook with withBusinessScope: true 1`] = `
+{
+  "requestBody": {
+    "disableAutoLogin": true,
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1",
+    "teamId": "team-contract-bsp6",
+    "type": "FACEBOOK",
+    "withBusinessScope": true,
+  },
+}
+`;
+
 exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] LinkedIn — minimal request body 1`] = `
 {
   "requestBody": {
@@ -27,6 +39,16 @@ exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] disab
     "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1",
     "teamId": "team-contract-bsp6",
     "type": "TWITTER",
+  },
+}
+`;
+
+exports[`CONTRACT: bundle.social socialAccountConnect (BSP-6) > [snapshot] withBusinessScope: false omits the key 1`] = `
+{
+  "requestBody": {
+    "redirectUrl": "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1",
+    "teamId": "team-contract-bsp6",
+    "type": "LINKEDIN",
   },
 }
 `;

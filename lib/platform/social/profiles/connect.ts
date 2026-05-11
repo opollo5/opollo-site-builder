@@ -49,6 +49,10 @@ export type InitiateProfileConnectInput = {
   // to avoid auto-login. Useful for adding a SECOND account on the
   // same browser session.
   disableAutoLogin?: boolean;
+  // Optional. Facebook and Instagram only — when true, requests
+  // business_management, ads_management, ads_read scopes for business
+  // page management. Customer-facing connect should pass this for FB/IG.
+  withBusinessScope?: boolean;
 };
 
 export type InitiateProfileConnectError =
@@ -116,6 +120,7 @@ export async function initiateProfileConnect(
         teamId,
         redirectUrl: input.redirectUrl,
         ...(input.disableAutoLogin === true ? { disableAutoLogin: true } : {}),
+        ...(input.withBusinessScope === true ? { withBusinessScope: true } : {}),
       },
     });
     url = resp.url;

@@ -14,55 +14,68 @@ import { z } from "zod";
 // shape the UI is documented to send. We replicate the route schema
 // here and run the documented UI payloads through it. If anyone
 // changes either end without the other, this fires.
+//
+// BSP-6-CUSTOMER update: the connect route now uses per-platform direct
+// OAuth. Body is { company_id, profile_id, platform } where platform is
+// the bundle.social ProfileSocialPlatform enum.
 // ---------------------------------------------------------------------------
 
 // Replicate the schema declared in
 // app/api/platform/social/connections/connect/route.ts. Hard-coded
-// rather than imported so a refactor of the route schema (e.g. moving
-// it under `lib/`) doesn't silently take this regression with it —
-// this assertion *is* the contract.
+// rather than imported so a refactor of the route schema doesn't
+// silently take this regression with it — this assertion *is* the contract.
 const RouteBodySchema = z.object({
   company_id: z.string().uuid(),
-  platforms: z
-    .array(
-      z.enum([
-        "linkedin_personal",
-        "linkedin_company",
-        "facebook_page",
-        "x",
-        "gbp",
-      ]),
-    )
-    .optional(),
+  profile_id: z.string().uuid(),
+  platform: z.enum([
+    "TIKTOK",
+    "YOUTUBE",
+    "INSTAGRAM",
+    "FACEBOOK",
+    "TWITTER",
+    "THREADS",
+    "LINKEDIN",
+    "PINTEREST",
+    "REDDIT",
+    "MASTODON",
+    "DISCORD",
+    "SLACK",
+    "BLUESKY",
+    "GOOGLE_BUSINESS",
+  ]),
 });
 
+const UUID = "11111111-1111-4111-8111-111111111111";
+
 const validUiPayloads = [
-  // Empty platforms — UI default.
-  { company_id: "11111111-1111-4111-8111-111111111111", platforms: [] },
-  // Single platform — operator chose just X.
-  { company_id: "11111111-1111-4111-8111-111111111111", platforms: ["x"] },
-  // Multiple including LinkedIn dual.
-  {
-    company_id: "11111111-1111-4111-8111-111111111111",
-    platforms: ["linkedin_personal", "linkedin_company", "facebook_page"],
-  },
-  // platforms omitted entirely — also valid.
-  { company_id: "11111111-1111-4111-8111-111111111111" },
+  { company_id: UUID, profile_id: UUID, platform: "LINKEDIN" },
+  { company_id: UUID, profile_id: UUID, platform: "FACEBOOK" },
+  { company_id: UUID, profile_id: UUID, platform: "INSTAGRAM" },
+  { company_id: UUID, profile_id: UUID, platform: "TWITTER" },
+  { company_id: UUID, profile_id: UUID, platform: "GOOGLE_BUSINESS" },
+  { company_id: UUID, profile_id: UUID, platform: "TIKTOK" },
+  { company_id: UUID, profile_id: UUID, platform: "YOUTUBE" },
+  { company_id: UUID, profile_id: UUID, platform: "THREADS" },
 ];
 
 const invalidUiPayloads = [
-  // Wrong field name — covers the "body shape changed" failure mode.
-  { companyId: "11111111-1111-4111-8111-111111111111" },
-  // Bad UUID.
-  { company_id: "not-a-uuid", platforms: ["x"] },
-  // Unknown platform — would 400 at the route, not silently fall through.
-  {
-    company_id: "11111111-1111-4111-8111-111111111111",
-    platforms: ["instagram"],
-  },
+  // Missing profile_id — old schema; now required.
+  { company_id: UUID, platform: "LINKEDIN" },
+  // Missing platform.
+  { company_id: UUID, profile_id: UUID },
+  // Wrong field name for company.
+  { companyId: UUID, profile_id: UUID, platform: "LINKEDIN" },
+  // Bad UUID for company_id.
+  { company_id: "not-a-uuid", profile_id: UUID, platform: "LINKEDIN" },
+  // Bad UUID for profile_id.
+  { company_id: UUID, profile_id: "not-a-uuid", platform: "LINKEDIN" },
+  // Old-style lowercase internal platform — must use bundle.social enum now.
+  { company_id: UUID, profile_id: UUID, platform: "linkedin_personal" },
+  // Old-style platforms array — replaced by single platform string.
+  { company_id: UUID, profile_id: UUID, platforms: ["LINKEDIN"] },
 ];
 
-describe("R3: connect body shape — UI ↔ route Zod schema", () => {
+describe("R3: connect body shape — UI ↔ route Zod schema (BSP-6-CUSTOMER)", () => {
   it.each(validUiPayloads)("accepts documented UI payload %j", (payload) => {
     const result = RouteBodySchema.safeParse(payload);
     expect(result.success).toBe(true);

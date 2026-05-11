@@ -1,53 +1,65 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { dbUuid, readJsonBody, validationError, internalError } from "@/lib/http";
-import { getActiveBrandProfile } from "@/lib/platform/brand/get";
+import { dbUuid, readJsonBody, validationError, invalidState, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import { getServiceRoleClient } from "@/lib/supabase";
 import {
-  initiateBundlesocialConnect,
-  type SocialPlatform,
-} from "@/lib/platform/social/connections";
+  initiateProfileConnect,
+  type ProfileSocialPlatform,
+} from "@/lib/platform/social/profiles/connect";
 
 // ---------------------------------------------------------------------------
-// S1-16 — POST /api/platform/social/connections/connect
+// BSP-6-CUSTOMER — POST /api/platform/social/connections/connect
 //
-// Returns a bundle.social hosted-portal URL the admin's browser opens
-// in a popup for OAuth. After the dance completes, bundle.social
-// redirects to our /callback handler (?popup=1 flags the callback to
-// send a postMessage + window.close() instead of a full-page redirect).
+// Customer-facing per-platform direct OAuth connect.
 //
-// Body:
-//   { company_id: uuid, platforms?: SocialPlatform[] }
-//   - platforms[] empty/omitted = portal shows all configured types.
+// Body: { company_id: uuid, profile_id: uuid, platform: ProfileSocialPlatform }
+//
+// Returns { ok: true, data: { url: string } } — caller opens in a popup.
+// The popup completes against /api/platform/social/connections/callback
+// (?popup=1) which sends a postMessage + window.close() back to the parent.
 //
 // Gate: canDo("manage_connections", company_id) — admin-only.
+//
+// Flags:
+//   disableAutoLogin: always true — avoids silent re-auth of an existing
+//     browser session on Facebook / Instagram / TikTok when adding a
+//     second account.
+//   withBusinessScope: true for FACEBOOK and INSTAGRAM — adds
+//     business_management, ads_management, ads_read scopes needed for
+//     page management and analytics.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const PLATFORM_ENUM = z.enum([
+  "TIKTOK",
+  "YOUTUBE",
+  "INSTAGRAM",
+  "FACEBOOK",
+  "TWITTER",
+  "THREADS",
+  "LINKEDIN",
+  "PINTEREST",
+  "REDDIT",
+  "MASTODON",
+  "DISCORD",
+  "SLACK",
+  "BLUESKY",
+  "GOOGLE_BUSINESS",
+]);
+
 const PostBodySchema = z.object({
   company_id: dbUuid(),
-  // BSP-9: when set, the connect flow targets the profile's
-  // bundle.social team. Sync (BSP-8) attributes new social_connections
-  // rows to this profile. When omitted, the legacy company-level flow
-  // is used (which BSP-9's customer page also uses for the default
-  // profile's section).
-  profile_id: dbUuid().optional(),
-  platforms: z
-    .array(
-      z.enum([
-        "linkedin_personal",
-        "linkedin_company",
-        "facebook_page",
-        "x",
-        "gbp",
-      ]),
-    )
-    .optional(),
+  profile_id: dbUuid(),
+  platform: PLATFORM_ENUM,
 });
+
+const WITH_BUSINESS_SCOPE_PLATFORMS: ReadonlySet<string> = new Set([
+  "FACEBOOK",
+  "INSTAGRAM",
+]);
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
@@ -55,7 +67,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = PostBodySchema.safeParse(body);
   if (!parsed.success) {
     return validationError(
-      "Body must be { company_id: uuid, platforms?: SocialPlatform[] }.",
+      "Body must be { company_id: uuid, profile_id: uuid, platform: ProfileSocialPlatform }.",
       { issues: parsed.error.issues },
     );
   }
@@ -66,42 +78,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
   if (gate.kind === "deny") return gate.response;
 
-  // Use || (not ??) so an empty-string NEXT_PUBLIC_SITE_URL also falls back
-  // to the request origin; nullish coalescing would return "" in that case,
-  // making redirectUrl a relative path that bundle.social rejects with 400.
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     new URL(req.url).origin;
-  // ?popup=1 tells the callback to send a postMessage + window.close()
-  // instead of a full-page redirect back to /connections.
   const redirectUrl =
     `${origin}/api/platform/social/connections/callback` +
     `?company_id=${encodeURIComponent(parsed.data.company_id)}&popup=1`;
 
-  // Fetch branding in parallel — both are graceful-null on miss.
-  const [brand, companyRow] = await Promise.all([
-    getActiveBrandProfile(parsed.data.company_id),
-    getServiceRoleClient()
-      .from("platform_companies")
-      .select("name")
-      .eq("id", parsed.data.company_id)
-      .maybeSingle()
-      .then((r) => r.data),
-  ]);
-
-  const result = await initiateBundlesocialConnect({
-    companyId: parsed.data.company_id,
+  const result = await initiateProfileConnect({
     profileId: parsed.data.profile_id,
-    platforms: (parsed.data.platforms ?? []) as SocialPlatform[],
+    platform: parsed.data.platform as ProfileSocialPlatform,
     redirectUrl,
-    logoUrl: brand?.logo_primary_url ?? brand?.logo_icon_url ?? undefined,
-    userName: companyRow?.name ?? undefined,
-    // TODO: set hidePoweredBy: true once companies have a paid-plan flag.
-    language: "en",
+    disableAutoLogin: true,
+    withBusinessScope: WITH_BUSINESS_SCOPE_PLATFORMS.has(parsed.data.platform),
   });
+
   if (!result.ok) {
-    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
-    return internalError(result.error.message);
+    const { code, message } = result.error;
+    if (code === "VALIDATION_FAILED") return validationError(message);
+    if (code === "RECEIVER_NOT_CONFIGURED") return invalidState(message);
+    return internalError(message);
   }
 
   return NextResponse.json(

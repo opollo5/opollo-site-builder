@@ -14,9 +14,13 @@ import { describe, expect, it } from "vitest";
 // PR #845 fixed this once for /api/platform/companies/switch by switching to
 // a format-only regex. BSP-0 promoted the fix into a shared dbUuid() helper
 // and applied it across every customer-facing route that takes a company_id
-// in the body. This regression test pins the helper's behaviour AND walks
-// the connect endpoint's actual schema with the sentinel to prove the fix
-// at the boundary.
+// or profile_id in the body.
+//
+// BSP-6-CUSTOMER update: the connect route body changed from
+//   { company_id, platforms?: SocialPlatform[] }
+// to
+//   { company_id, profile_id, platform: ProfileSocialPlatform }
+// Both UUID fields use dbUuid() so the sentinel is accepted.
 // ---------------------------------------------------------------------------
 
 import { dbUuid, DB_UUID_RE } from "@/lib/http";
@@ -28,7 +32,6 @@ const RANDOM_HEX = "12345678-90ab-cdef-1234-567890abcdef";
 
 describe("BSP-0 — dbUuid() shared helper", () => {
   it("REGRESSION: accepts the Opollo internal-company sentinel", () => {
-    // Strict z.string().uuid() rejects this; dbUuid() must accept it.
     const r = dbUuid().safeParse(OPOLLO_SENTINEL);
     expect(r.success).toBe(true);
   });
@@ -49,12 +52,10 @@ describe("BSP-0 — dbUuid() shared helper", () => {
     expect(dbUuid().safeParse("not-a-uuid").success).toBe(false);
     expect(dbUuid().safeParse("").success).toBe(false);
     expect(dbUuid().safeParse("12345").success).toBe(false);
-    // Wrong length (off by one in the last group).
     expect(dbUuid().safeParse("00000000-0000-0000-0000-00000000001").success).toBe(false);
   });
 
   it("rejects non-hex chars in the 8-4-4-4-12 shape", () => {
-    // Z is not hex.
     expect(
       dbUuid().safeParse("Z0000000-0000-0000-0000-000000000001").success,
     ).toBe(false);
@@ -66,36 +67,25 @@ describe("BSP-0 — dbUuid() shared helper", () => {
   });
 });
 
-describe("BSP-0 — connect route schema accepts the sentinel", () => {
-  it("REGRESSION: the connect route's exact body shape passes with the sentinel", async () => {
-    // Pin the contract that PostBodySchema in
-    // app/api/platform/social/connections/connect/route.ts uses dbUuid()
-    // (not z.string().uuid()) so the sentinel passes.
-    //
-    // We import the route module to import-check the schema. Vitest's
-    // import resolution will pull in the route file's top-level imports
-    // (no runtime side effects under "use server" since the schema is
-    // pure data).
-    //
-    // Direct import of the route is fragile; instead, replicate the
-    // schema shape and assert dbUuid() accepts the sentinel — same
-    // schema field, same builder.
+describe("BSP-0 — connect route schema accepts the sentinel (BSP-6-CUSTOMER schema)", () => {
+  it("REGRESSION: both company_id and profile_id accept the sentinel", async () => {
     const { z } = await import("zod");
+    // Mirrors PostBodySchema in
+    // app/api/platform/social/connections/connect/route.ts
     const PostBodySchema = z.object({
       company_id: dbUuid(),
-      platforms: z
-        .array(
-          z.enum([
-            "linkedin_personal",
-            "linkedin_company",
-            "facebook_page",
-            "x",
-            "gbp",
-          ]),
-        )
-        .optional(),
+      profile_id: dbUuid(),
+      platform: z.enum([
+        "TIKTOK", "YOUTUBE", "INSTAGRAM", "FACEBOOK", "TWITTER",
+        "THREADS", "LINKEDIN", "PINTEREST", "REDDIT", "MASTODON",
+        "DISCORD", "SLACK", "BLUESKY", "GOOGLE_BUSINESS",
+      ]),
     });
-    const result = PostBodySchema.safeParse({ company_id: OPOLLO_SENTINEL });
+    const result = PostBodySchema.safeParse({
+      company_id: OPOLLO_SENTINEL,
+      profile_id: OPOLLO_SENTINEL,
+      platform: "LINKEDIN",
+    });
     expect(result.success).toBe(true);
     if (!result.success) {
       throw new Error(
@@ -103,49 +93,31 @@ describe("BSP-0 — connect route schema accepts the sentinel", () => {
       );
     }
     expect(result.data.company_id).toBe(OPOLLO_SENTINEL);
-
-    // Same schema with platforms[] also passes.
-    const withPlatforms = PostBodySchema.safeParse({
-      company_id: OPOLLO_SENTINEL,
-      platforms: ["linkedin_personal"],
-    });
-    expect(withPlatforms.success).toBe(true);
+    expect(result.data.profile_id).toBe(OPOLLO_SENTINEL);
   });
 
   it("client-side request body matches the server schema", async () => {
-    // The customer-facing SocialConnectionsList component sends
-    // { company_id: <uuid>, platforms?: [...] } via JSON.stringify
-    // on a fetch to /api/platform/social/connections/connect.
-    //
-    // This test pins that the SHAPE the client sends matches the
-    // server schema for the sentinel case. If a future PR renames
-    // company_id → companyId on either side, the snapshot breaks
-    // immediately rather than at 500-status in production.
+    // Pins that the lightbox sends { company_id, profile_id, platform }
+    // matching the route schema. If either side renames a field, this
+    // fails immediately instead of surfacing as a 400 in production.
     const { z } = await import("zod");
     const PostBodySchema = z.object({
       company_id: dbUuid(),
-      platforms: z
-        .array(
-          z.enum([
-            "linkedin_personal",
-            "linkedin_company",
-            "facebook_page",
-            "x",
-            "gbp",
-          ]),
-        )
-        .optional(),
+      profile_id: dbUuid(),
+      platform: z.enum([
+        "TIKTOK", "YOUTUBE", "INSTAGRAM", "FACEBOOK", "TWITTER",
+        "THREADS", "LINKEDIN", "PINTEREST", "REDDIT", "MASTODON",
+        "DISCORD", "SLACK", "BLUESKY", "GOOGLE_BUSINESS",
+      ]),
     });
 
-    // Exactly what SocialConnectionsList.initiateConnect emits.
     const clientPayload = JSON.parse(
       JSON.stringify({
         company_id: OPOLLO_SENTINEL,
-        // The spread `...(platforms ? { platforms } : {})` omits
-        // platforms entirely when undefined — pinned here.
+        profile_id: OPOLLO_SENTINEL,
+        platform: "LINKEDIN",
       }),
     );
-    expect(clientPayload).toEqual({ company_id: OPOLLO_SENTINEL });
     expect(PostBodySchema.safeParse(clientPayload).success).toBe(true);
   });
 });

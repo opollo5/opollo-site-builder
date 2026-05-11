@@ -8,14 +8,11 @@
 } from "vitest";
 
 // ---------------------------------------------------------------------------
-// S1-16 — initiate-connect + sync against a mocked bundle.social SDK.
+// S1-16 — syncBundlesocialConnections against a mocked bundle.social SDK.
 //
 // Why mock the SDK: tests must run in CI without
 // BUNDLE_SOCIAL_API / BUNDLE_SOCIAL_TEAMID being real. We replace
 // `lib/bundlesocial`'s factories with stubs and assert:
-//
-//   initiate-connect: env-not-configured guard, validation guards,
-//   forwards the right request body, surfaces the SDK URL.
 //
 //   sync: pass-1 INSERT new (with attribution), UPDATE existing
 //   (refresh status to healthy + display_name); pass-2 mark
@@ -42,10 +39,7 @@ vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
   getOrCreateBundleSocialTeam: vi.fn().mockResolvedValue("team-test-1"),
 }));
 
-import {
-  initiateBundlesocialConnect,
-  syncBundlesocialConnections,
-} from "@/lib/platform/social/connections";
+import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 const COMPANY_A_ID = "abcdef00-0000-0000-0000-aaaaaaaa1616";
@@ -76,144 +70,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
-});
-
-describe("initiateBundlesocialConnect", () => {
-  it("rejects empty company id with VALIDATION_FAILED", async () => {
-    const result = await initiateBundlesocialConnect({
-      companyId: "",
-      platforms: [],
-      redirectUrl: "https://opollo.test/cb",
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe("VALIDATION_FAILED");
-  });
-
-  it("rejects missing redirectUrl with VALIDATION_FAILED", async () => {
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: [],
-      redirectUrl: "",
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe("VALIDATION_FAILED");
-  });
-
-  it("forwards mapped platforms + de-dupes LINKEDIN", async () => {
-    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/portal/abc?token=test-session-token",
-    });
-
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: ["linkedin_personal", "linkedin_company", "x"],
-      redirectUrl: "https://opollo.test/cb?company_id=" + COMPANY_A_ID,
-    });
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.data.url).toBe("https://bundle.social/portal/abc?token=test-session-token");
-
-    expect(
-      mockClient.socialAccount.socialAccountCreatePortalLink,
-    ).toHaveBeenCalledTimes(1);
-    const callArg =
-      mockClient.socialAccount.socialAccountCreatePortalLink.mock.calls[0]?.[0];
-    expect(callArg?.requestBody?.teamId).toBe("team-test-1");
-    expect(callArg?.requestBody?.redirectUrl).toContain(COMPANY_A_ID);
-    expect(callArg?.requestBody?.socialAccountTypes).toEqual(
-      expect.arrayContaining(["LINKEDIN", "TWITTER"]),
-    );
-    expect(
-      callArg?.requestBody?.socialAccountTypes.filter(
-        (t: string) => t === "LINKEDIN",
-      ).length,
-    ).toBe(1);
-  });
-
-  it("falls back to all configured types when platforms[] empty", async () => {
-    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/portal/all?token=test-session-token",
-    });
-
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: [],
-      redirectUrl: "https://opollo.test/cb",
-    });
-    expect(result.ok).toBe(true);
-
-    const callArg =
-      mockClient.socialAccount.socialAccountCreatePortalLink.mock.calls[0]?.[0];
-    const types: string[] = callArg?.requestBody?.socialAccountTypes ?? [];
-    expect(types).toHaveLength(4);
-    expect(types).toEqual(
-      expect.arrayContaining(["LINKEDIN", "FACEBOOK", "TWITTER", "GOOGLE_BUSINESS"]),
-    );
-  });
-
-  it("de-dupes LINKEDIN when only linkedin variants are supplied (non-empty path)", async () => {
-    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/portal/li-only?token=test-session-token",
-    });
-
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: ["linkedin_personal", "linkedin_company"],
-      redirectUrl: "https://opollo.test/cb",
-    });
-
-    expect(result.ok).toBe(true);
-    const callArg =
-      mockClient.socialAccount.socialAccountCreatePortalLink.mock.calls[0]?.[0];
-    expect(callArg?.requestBody?.socialAccountTypes).toStrictEqual(["LINKEDIN"]);
-  });
-
-  it("returns INTERNAL_ERROR when SDK throws", async () => {
-    mockClient.socialAccount.socialAccountCreatePortalLink.mockRejectedValueOnce(
-      new Error("HTTP 502"),
-    );
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: ["x"],
-      redirectUrl: "https://opollo.test/cb",
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe("INTERNAL_ERROR");
-    expect(result.error.message).toContain("HTTP 502");
-  });
-
-  it("returns INTERNAL_ERROR when SDK returns a tokenless URL (no query params)", async () => {
-    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce({
-      url: "https://bundle.social/connect",
-    });
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: ["x"],
-      redirectUrl: "https://opollo.test/cb",
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe("INTERNAL_ERROR");
-    expect(result.error.message).toContain("session token");
-  });
-
-  it("returns INTERNAL_ERROR when SDK returns no url", async () => {
-    mockClient.socialAccount.socialAccountCreatePortalLink.mockResolvedValueOnce(
-      {},
-    );
-    const result = await initiateBundlesocialConnect({
-      companyId: COMPANY_A_ID,
-      platforms: ["x"],
-      redirectUrl: "https://opollo.test/cb",
-    });
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.error.code).toBe("INTERNAL_ERROR");
-  });
 });
 
 describe("syncBundlesocialConnections", () => {

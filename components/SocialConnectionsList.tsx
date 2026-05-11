@@ -10,26 +10,38 @@ import {
   STATUS_LABEL,
   STATUS_PILL,
   type SocialConnection,
-  type SocialPlatform,
 } from "@/lib/platform/social/connections/types";
 
 // ---------------------------------------------------------------------------
-// S1-12 / S1-16 — connections roster for /company/social/connections.
+// S1-12 / S1-16 / BSP-6-CUSTOMER — connections roster for
+// /company/social/connections.
 //
 // Connect flow (popup):
-//   1. "Connect new account" → POST /connect → receives bundle.social URL
-//   2. window.open() opens the URL in a 600×700 popup
-//   3. bundle.social OAuth runs inside the popup
-//   4. bundle.social redirects to /callback?popup=1 → callback syncs accounts
-//      and returns HTML that posts { type:"bundle-connect-complete" } to
-//      window.opener, then closes itself
-//   5. Parent receives postMessage → router.refresh() shows new connections
-//   6. Fallback: setInterval polling popup.closed covers user-abandons-popup
-//      and popup-blocked-then-manually-opened cases
+//   1. "Connect new account" → inline platform-picker lightbox
+//   2. User picks a platform → POST /connect { company_id, profile_id, platform }
+//      → receives bundle.social direct-OAuth URL
+//   3. window.open() opens that URL in a 600×700 popup
+//   4. bundle.social OAuth runs; redirects to /callback?popup=1
+//   5. Callback syncs accounts → postMessage { type:"bundle-connect-complete" }
+//      → parent router.refresh()
+//   6. Fallback: setInterval polling popup.closed for abandoned popups
 // ---------------------------------------------------------------------------
 
 const POPUP_FEATURES =
   "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
+
+const PLATFORMS: Array<{ value: string; label: string }> = [
+  { value: "LINKEDIN", label: "LinkedIn" },
+  { value: "FACEBOOK", label: "Facebook" },
+  { value: "INSTAGRAM", label: "Instagram" },
+  { value: "TWITTER", label: "X (Twitter)" },
+  { value: "GOOGLE_BUSINESS", label: "Google Business" },
+  { value: "TIKTOK", label: "TikTok" },
+  { value: "YOUTUBE", label: "YouTube" },
+  { value: "PINTEREST", label: "Pinterest" },
+  { value: "THREADS", label: "Threads" },
+  { value: "REDDIT", label: "Reddit" },
+];
 
 type ConnectMessage = {
   type: "bundle-connect-complete";
@@ -49,8 +61,7 @@ type Props = {
   companyId: string;
   // BSP-9: when set, connect/reconnect calls scope to this profile so
   // new accounts land on the profile's bundle.social team. When
-  // omitted (legacy callers + admin operator view), the connect flow
-  // targets the company-level team.
+  // omitted (legacy callers), the connect flow is unavailable.
   profileId?: string;
   connections: SocialConnection[];
   // Admin-or-Opollo-staff. Drives create-new / sync visibility.
@@ -70,12 +81,12 @@ export function SocialConnectionsList({
 }: Props) {
   const router = useRouter();
   const [busyRow, setBusyRow] = useState<string | null>(null);
-  const [busyTop, setBusyTop] = useState<"connect" | "sync" | null>(null);
+  const [busySync, setBusySync] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // Set when the browser blocks window.open(); shows a fallback link.
   const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
 
-  // Active popup reference — used by polling and to avoid stacking popups.
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -83,12 +94,11 @@ export function SocialConnectionsList({
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = null;
     popupRef.current = null;
-    setBusyTop(null);
+    setBusyPlatform(null);
     if (activeRowId) setBusyRow(null);
   }
 
   function openConnectPopup(url: string, rowId?: string) {
-    // Reuse existing popup if still open, otherwise open a new one.
     if (popupRef.current && !popupRef.current.closed) {
       popupRef.current.focus();
       return;
@@ -97,8 +107,6 @@ export function SocialConnectionsList({
     const popup = window.open(url, "bundle-connect", POPUP_FEATURES);
 
     if (!popup || popup.closed) {
-      // Browser blocked the popup. Show a fallback link so the admin can
-      // still complete the flow.
       setPopupBlockedUrl(url);
       clearPopupState(rowId);
       return;
@@ -107,8 +115,6 @@ export function SocialConnectionsList({
     setPopupBlockedUrl(null);
     popupRef.current = popup;
 
-    // Polling fallback: detects user closing the popup before completing
-    // OAuth and cases where postMessage does not fire (e.g. network error).
     pollRef.current = setInterval(() => {
       if (popup.closed) {
         clearPopupState(rowId);
@@ -117,7 +123,6 @@ export function SocialConnectionsList({
     }, 500);
   }
 
-  // postMessage listener — primary success path.
   useEffect(() => {
     const expectedOrigin = window.location.origin;
 
@@ -126,7 +131,7 @@ export function SocialConnectionsList({
       if (!isConnectMessage(evt.data)) return;
 
       clearPopupState();
-      // The popup closes itself after sending; no need to close it here.
+      setShowLightbox(false);
       router.refresh();
     }
 
@@ -138,33 +143,28 @@ export function SocialConnectionsList({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function initiateConnect(platforms?: SocialPlatform[]) {
+  async function handleConnect(platform: string) {
+    if (!profileId) return;
     setError(null);
+    setBusyPlatform(platform);
+    setPopupBlockedUrl(null);
+
     const res = await fetch("/api/platform/social/connections/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        company_id: companyId,
-        ...(profileId ? { profile_id: profileId } : {}),
-        ...(platforms ? { platforms } : {}),
-      }),
+      body: JSON.stringify({ company_id: companyId, profile_id: profileId, platform }),
     });
     const json = (await res.json()) as
       | { ok: true; data: { url: string } }
       | { ok: false; error: { message: string } };
+
     if (!res.ok || !json.ok) {
-      const msg = !json.ok ? json.error.message : "Failed to start connect.";
-      setError(msg);
-      setBusyTop(null);
+      setError(!json.ok ? json.error.message : "Failed to start connect.");
+      setBusyPlatform(null);
       return;
     }
-    openConnectPopup(json.data.url);
-  }
 
-  async function handleConnectAll() {
-    setBusyTop("connect");
-    await initiateConnect();
-    // busyTop cleared by popup close (poll or postMessage).
+    openConnectPopup(json.data.url);
   }
 
   async function handleReconnect(rowId: string) {
@@ -184,11 +184,10 @@ export function SocialConnectionsList({
       return;
     }
     openConnectPopup(json.data.url, rowId);
-    // busyRow cleared by popup close (poll or postMessage) via rowId arg.
   }
 
   async function handleSync() {
-    setBusyTop("sync");
+    setBusySync(true);
     setError(null);
     try {
       const res = await fetch("/api/platform/social/connections/sync", {
@@ -207,16 +206,17 @@ export function SocialConnectionsList({
           }
         | { ok: false; error: { message: string } };
       if (!res.ok || !json.ok) {
-        const msg = !json.ok ? json.error.message : "Failed to sync.";
-        setError(msg);
+        setError(!json.ok ? json.error.message : "Failed to sync.");
         return;
       }
       toastSuccess("Connections refreshed.");
       router.refresh();
     } finally {
-      setBusyTop(null);
+      setBusySync(false);
     }
   }
+
+  const connectBusy = busyPlatform !== null;
 
   return (
     <div data-testid="connections-list-wrapper">
@@ -226,18 +226,46 @@ export function SocialConnectionsList({
             size="sm"
             variant="ghost"
             onClick={handleSync}
-            disabled={busyTop !== null}
+            disabled={busySync || connectBusy}
             data-testid="connections-sync-button"
           >
-            {busyTop === "sync" ? "Refreshing…" : "Refresh"}
+            {busySync ? "Refreshing…" : "Refresh"}
           </Button>
           <Button
-            onClick={handleConnectAll}
-            disabled={busyTop !== null}
+            onClick={() => setShowLightbox((s) => !s)}
+            disabled={connectBusy}
             data-testid="connections-connect-button"
           >
-            {busyTop === "connect" ? "Opening portal…" : "Connect new account"}
+            {showLightbox ? "Cancel" : "Connect new account"}
           </Button>
+        </div>
+      ) : null}
+
+      {showLightbox && profileId ? (
+        <div
+          className="mb-4 rounded-md border bg-card p-4"
+          data-testid="connect-lightbox"
+        >
+          <h2 className="mb-2 text-base font-semibold">
+            Connect a social account
+          </h2>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Pick a platform. A popup will open the OAuth flow — it closes
+            itself when you finish (or cancel).
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {PLATFORMS.map((p) => (
+              <Button
+                key={p.value}
+                variant="ghost"
+                onClick={() => handleConnect(p.value)}
+                disabled={connectBusy}
+                data-testid={`connect-platform-${p.value}`}
+              >
+                {busyPlatform === p.value ? "Opening…" : p.label}
+              </Button>
+            ))}
+          </div>
         </div>
       ) : null}
 
@@ -265,7 +293,7 @@ export function SocialConnectionsList({
             className="underline"
             data-testid="connections-popup-fallback-link"
           >
-            Open portal →
+            Open OAuth →
           </a>
         </p>
       ) : null}
@@ -277,7 +305,7 @@ export function SocialConnectionsList({
         >
           No social connections yet.{" "}
           {canManage
-            ? "Click Connect new account to start the bundle.social hosted flow."
+            ? "Click Connect new account to start the OAuth flow."
             : "Ask an admin to connect your team's social accounts."}
         </div>
       ) : (
@@ -345,10 +373,10 @@ export function SocialConnectionsList({
                         size="sm"
                         variant="ghost"
                         onClick={() => handleReconnect(c.id)}
-                        disabled={busyRow === c.id || busyTop !== null}
+                        disabled={busyRow === c.id || connectBusy || busySync}
                         data-testid={`connection-reconnect-${c.id}`}
                       >
-                        {busyRow === c.id ? "Opening portal…" : "Reconnect"}
+                        {busyRow === c.id ? "Opening…" : "Reconnect"}
                       </Button>
                     ) : null}
                   </td>
