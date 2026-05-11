@@ -116,6 +116,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const { code, message } = result.error;
     if (code === "VALIDATION_FAILED") return validationError(message);
     if (code === "RECEIVER_NOT_CONFIGURED") return invalidState(message);
+    // bundle.social returned a 4xx (e.g. "this platform is already connected
+    // to this team", or a flag the platform doesn't support). 500 was
+    // misleading and made the surface look broken to the operator. 409
+    // with bundle.social's own message is more actionable.
+    if (code === "UPSTREAM_REJECTED") return invalidState(message);
     return internalError(message);
   }
 

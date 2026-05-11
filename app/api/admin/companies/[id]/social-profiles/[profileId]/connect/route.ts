@@ -109,6 +109,7 @@ export async function POST(
       code,
       message,
     });
+    if (code === "UPSTREAM_REJECTED") return invalidState(message);
     return internalError(message);
   }
 
