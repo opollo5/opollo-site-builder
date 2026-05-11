@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { dbUuid, readJsonBody, validationError, invalidState, internalError } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, invalidState, internalError, notFound } from "@/lib/http";
+import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { getProfileById } from "@/lib/platform/social/profiles";
 import {
   initiateProfileConnect,
   type ProfileSocialPlatform,
@@ -77,6 +79,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     "manage_connections",
   );
   if (gate.kind === "deny") return gate.response;
+
+  // BSP-10: cross-tenant profile_id smuggling guard.
+  // An admin authenticated against company A must not be able to pass a
+  // profile_id belonging to company B — that would initiate OAuth against
+  // B's bundle.social team. The gate above only checks company_id; we must
+  // also verify the profile belongs to the same company.
+  const profile = await getProfileById(parsed.data.profile_id);
+  if (!profile) return notFound("Profile not found.");
+  if (profile.company_id !== parsed.data.company_id) {
+    logger.warn("social.connections.connect.profile_smuggling_attempt", {
+      companyId: parsed.data.company_id,
+      profileId: parsed.data.profile_id,
+      profileCompanyId: profile.company_id,
+      userId: gate.userId,
+    });
+    return notFound("Profile not found in this company.");
+  }
 
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
