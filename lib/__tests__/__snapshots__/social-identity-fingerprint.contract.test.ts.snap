@@ -1,0 +1,99 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] BLUESKY — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "BLUESKY",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] DISCORD — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "DISCORD",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] FACEBOOK — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "FACEBOOK",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] GOOGLE_BUSINESS — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "GOOGLE_BUSINESS",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] INSTAGRAM — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "INSTAGRAM",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] LINKEDIN — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "LINKEDIN",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] MASTODON — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "MASTODON",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] PINTEREST — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "PINTEREST",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] REDDIT — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "REDDIT",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] SLACK — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "SLACK",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] THREADS — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "THREADS",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] TIKTOK — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "TIKTOK",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] TWITTER — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "TWITTER",
+}
+`;
+
+exports[`CONTRACT: socialAccountGetByType request body — per platform > [snapshot] YOUTUBE — request body 1`] = `
+{
+  "teamId": "00000000-0000-0000-0000-aaaaaaaa9999",
+  "type": "YOUTUBE",
+}
+`;
