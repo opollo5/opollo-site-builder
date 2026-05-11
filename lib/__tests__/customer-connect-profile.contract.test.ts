@@ -3,107 +3,117 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // ---------------------------------------------------------------------------
 // LAYER 2 — Contract.
 //
-// BSP-9: pins that when the customer-facing connect API receives a
-// profile_id in the body, initiateBundlesocialConnect routes the
-// hosted-portal request to the PROFILE's bundle.social team (via
-// getOrCreateBundleSocialTeamForProfile) instead of the company-level
-// team (via getOrCreateBundleSocialTeam).
+// BSP-6-CUSTOMER: pins the exact SDK payload the customer-facing connect
+// route produces when a user connects via the platform-picker lightbox.
 //
-// Why this layer: the connect flow has a critical wire-format invariant
-// — the teamId on the bundle.social request must match the team that
-// will receive the OAuth-completed account. If profileId support routes
-// to the wrong team, accounts land on the wrong team and the next sync
-// attributes them to the wrong profile. Snapshot pins the requestBody.
+// The route calls initiateProfileConnect (direct OAuth, not portal link)
+// with:
+//   disableAutoLogin: true  — always, to avoid silent re-auth of an
+//                             existing session on FB/IG/TikTok.
+//   withBusinessScope: true — for FACEBOOK and INSTAGRAM only, to request
+//                             business_management / ads_management scopes.
+//
+// This contract pins those flags so a route refactor cannot silently drop
+// them — snapshot drift gets the same scrutiny as a Zod schema change.
 // ---------------------------------------------------------------------------
 
-const portalMock = vi.fn();
-const provisionCompanyMock = vi.fn();
-const provisionProfileMock = vi.fn();
+const socialAccountConnectMock = vi.fn();
 
 vi.mock("@/lib/bundlesocial", () => ({
   getBundlesocialClient: () => ({
-    socialAccount: { socialAccountCreatePortalLink: portalMock },
+    socialAccount: {
+      socialAccountConnect: socialAccountConnectMock,
+    },
   }),
   getBundlesocialTeamId: () => "ignored-in-this-test",
 }));
 
-vi.mock("@/lib/platform/social/bundle-social/provision", () => ({
-  getOrCreateBundleSocialTeam: (...args: unknown[]) =>
-    provisionCompanyMock(...args),
-}));
-
 vi.mock("@/lib/platform/social/profiles/provision-team", () => ({
-  getOrCreateBundleSocialTeamForProfile: (...args: unknown[]) =>
-    provisionProfileMock(...args),
+  getOrCreateBundleSocialTeamForProfile: vi
+    .fn()
+    .mockResolvedValue("team-customer-contract"),
 }));
 
-import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";
+import { initiateProfileConnect } from "@/lib/platform/social/profiles/connect";
 
-const COMPANY_ID = "abcdef00-0000-0000-0000-aaaaaaaa1616";
-const PROFILE_ID = "abcdef00-0000-0000-0000-aaaaaaaa0190";
+const PROFILE_ID = "abcdef00-0000-0000-0000-aaaaaaaa0191";
 const REDIRECT_URL =
-  "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616";
+  "https://opollo-site-builder.vercel.app/api/platform/social/connections/callback?company_id=abcdef00-0000-0000-0000-aaaaaaaa1616&popup=1";
 
 beforeEach(() => {
-  portalMock.mockReset();
-  provisionCompanyMock.mockReset();
-  provisionProfileMock.mockReset();
-  portalMock.mockResolvedValue({
-    url: "https://bundle.social/portal/abc?token=test-session-token",
+  socialAccountConnectMock.mockReset();
+  socialAccountConnectMock.mockResolvedValue({
+    url: "https://oauth.example.com/start?state=xyz",
   });
-  provisionCompanyMock.mockResolvedValue("team-company-level");
-  provisionProfileMock.mockResolvedValue("team-profile-scoped");
 });
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("CONTRACT: customer connect with profile_id (BSP-9)", () => {
-  it("REGRESSION: profileId routes the portal request to the profile's team", async () => {
-    await initiateBundlesocialConnect({
-      companyId: COMPANY_ID,
+describe("CONTRACT: customer connect direct OAuth flags (BSP-6-CUSTOMER)", () => {
+  it("[snapshot] LINKEDIN — disableAutoLogin:true, no withBusinessScope", async () => {
+    await initiateProfileConnect({
       profileId: PROFILE_ID,
-      platforms: ["x"],
+      platform: "LINKEDIN",
       redirectUrl: REDIRECT_URL,
+      disableAutoLogin: true,
     });
-
-    // Profile-scoped provision must have been called, not company-level.
-    expect(provisionProfileMock).toHaveBeenCalledTimes(1);
-    expect(provisionProfileMock).toHaveBeenCalledWith(PROFILE_ID);
-    expect(provisionCompanyMock).not.toHaveBeenCalled();
-
-    const arg = portalMock.mock.calls[0]?.[0];
-    expect(arg?.requestBody?.teamId).toBe("team-profile-scoped");
-  });
-
-  it("REGRESSION: omitted profileId falls back to company-level team", async () => {
-    await initiateBundlesocialConnect({
-      companyId: COMPANY_ID,
-      platforms: ["x"],
-      redirectUrl: REDIRECT_URL,
-    });
-
-    // Company-level provision must have been called, not profile-scoped.
-    expect(provisionCompanyMock).toHaveBeenCalledTimes(1);
-    expect(provisionCompanyMock).toHaveBeenCalledWith(COMPANY_ID);
-    expect(provisionProfileMock).not.toHaveBeenCalled();
-
-    const arg = portalMock.mock.calls[0]?.[0];
-    expect(arg?.requestBody?.teamId).toBe("team-company-level");
-  });
-
-  it("[snapshot] profile-scoped portal request body", async () => {
-    await initiateBundlesocialConnect({
-      companyId: COMPANY_ID,
-      profileId: PROFILE_ID,
-      platforms: ["linkedin_personal"],
-      redirectUrl: REDIRECT_URL,
-      logoUrl: "https://cdn.example.com/logo.png",
-      userName: "Acme Corp",
-      language: "en",
-    });
-    const arg = portalMock.mock.calls[0]?.[0];
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
     expect(arg).toMatchSnapshot();
+    expect(arg?.requestBody).toHaveProperty("disableAutoLogin", true);
+    expect(arg?.requestBody).not.toHaveProperty("withBusinessScope");
+  });
+
+  it("[snapshot] FACEBOOK — disableAutoLogin:true + withBusinessScope:true", async () => {
+    await initiateProfileConnect({
+      profileId: PROFILE_ID,
+      platform: "FACEBOOK",
+      redirectUrl: REDIRECT_URL,
+      disableAutoLogin: true,
+      withBusinessScope: true,
+    });
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
+    expect(arg).toMatchSnapshot();
+    expect(arg?.requestBody).toHaveProperty("disableAutoLogin", true);
+    expect(arg?.requestBody).toHaveProperty("withBusinessScope", true);
+  });
+
+  it("[snapshot] INSTAGRAM — disableAutoLogin:true + withBusinessScope:true", async () => {
+    await initiateProfileConnect({
+      profileId: PROFILE_ID,
+      platform: "INSTAGRAM",
+      redirectUrl: REDIRECT_URL,
+      disableAutoLogin: true,
+      withBusinessScope: true,
+    });
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
+    expect(arg).toMatchSnapshot();
+    expect(arg?.requestBody).toHaveProperty("disableAutoLogin", true);
+    expect(arg?.requestBody).toHaveProperty("withBusinessScope", true);
+  });
+
+  it("[snapshot] GOOGLE_BUSINESS — disableAutoLogin:true, no withBusinessScope", async () => {
+    await initiateProfileConnect({
+      profileId: PROFILE_ID,
+      platform: "GOOGLE_BUSINESS",
+      redirectUrl: REDIRECT_URL,
+      disableAutoLogin: true,
+    });
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
+    expect(arg).toMatchSnapshot();
+    expect(arg?.requestBody).toHaveProperty("disableAutoLogin", true);
+    expect(arg?.requestBody).not.toHaveProperty("withBusinessScope");
+  });
+
+  it("REGRESSION: profile-scoped team is used, not company-level team", async () => {
+    await initiateProfileConnect({
+      profileId: PROFILE_ID,
+      platform: "LINKEDIN",
+      redirectUrl: REDIRECT_URL,
+      disableAutoLogin: true,
+    });
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
+    expect(arg?.requestBody?.teamId).toBe("team-customer-contract");
   });
 });

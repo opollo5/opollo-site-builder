@@ -93,6 +93,31 @@ describe("CONTRACT: bundle.social socialAccountConnect (BSP-6)", () => {
     expect(arg?.requestBody).not.toHaveProperty("disableAutoLogin");
   });
 
+  it("[snapshot] Facebook with withBusinessScope: true", async () => {
+    await initiateProfileConnect({
+      profileId: PROFILE_ID,
+      platform: "FACEBOOK",
+      redirectUrl: REDIRECT_URL,
+      disableAutoLogin: true,
+      withBusinessScope: true,
+    });
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
+    expect(arg).toMatchSnapshot();
+    expect(arg?.requestBody).toHaveProperty("withBusinessScope", true);
+  });
+
+  it("[snapshot] withBusinessScope: false omits the key", async () => {
+    await initiateProfileConnect({
+      profileId: PROFILE_ID,
+      platform: "LINKEDIN",
+      redirectUrl: REDIRECT_URL,
+      withBusinessScope: false,
+    });
+    const arg = socialAccountConnectMock.mock.calls[0]?.[0];
+    expect(arg).toMatchSnapshot();
+    expect(arg?.requestBody).not.toHaveProperty("withBusinessScope");
+  });
+
   it("returns RECEIVER_NOT_CONFIGURED if BUNDLE_SOCIAL_API is missing", async () => {
     vi.doMock("@/lib/bundlesocial", () => ({
       getBundlesocialClient: () => null,

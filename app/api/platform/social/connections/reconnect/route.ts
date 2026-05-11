@@ -3,9 +3,11 @@ import { z } from "zod";
 
 import { dbUuid, readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { logger } from "@/lib/logger";
-import { getActiveBrandProfile } from "@/lib/platform/brand/get";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import { initiateBundlesocialConnect } from "@/lib/platform/social/connections";
+import {
+  initiateProfileConnect,
+  type ProfileSocialPlatform,
+} from "@/lib/platform/social/profiles/connect";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
@@ -21,11 +23,13 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // Flow:
 //   1. Gate: reconnect_connection (editor+).
 //   2. Validate: connection exists for this company AND is reconnectable
-//      (status = auth_required | disconnected). Returns 409 otherwise
-//      so the client can tell the user "that connection is healthy, no
-//      action needed" vs a generic error.
-//   3. Call initiateBundlesocialConnect with the connection's platform.
-//   4. Return { url } — caller redirects browser there for OAuth.
+//      (status = auth_required | disconnected). Returns 409 otherwise.
+//   3. Resolve profile_id from the connection. Returns 409 if unset
+//      (sync has not yet attributed this connection to a profile —
+//      run a manual sync first).
+//   4. Map internal SocialPlatform → ProfileSocialPlatform (bundle.social enum).
+//   5. Call initiateProfileConnect (direct OAuth, not portal link).
+//   6. Return { url } — caller opens in popup.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -38,6 +42,21 @@ const BodySchema = z.object({
 
 const RECONNECTABLE_STATUSES = ["auth_required", "disconnected"] as const;
 
+// Maps our internal SocialPlatform enum to bundle.social's ProfileSocialPlatform.
+// Keep aligned with lib/platform/social/variants/types.ts SocialPlatform definition.
+const SOCIAL_TO_BUNDLE: Record<string, ProfileSocialPlatform> = {
+  linkedin_personal: "LINKEDIN",
+  linkedin_company: "LINKEDIN",
+  facebook_page: "FACEBOOK",
+  x: "TWITTER",
+  gbp: "GOOGLE_BUSINESS",
+};
+
+const WITH_BUSINESS_SCOPE_PLATFORMS: ReadonlySet<string> = new Set([
+  "FACEBOOK",
+  "INSTAGRAM",
+]);
+
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
   if (body === undefined) return validationError("Request body must be valid JSON.");
@@ -49,17 +68,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { company_id: companyId, connection_id: connectionId } = parsed.data;
 
-  // Auth gate — editor+ for reconnect, not manage_connections (admin).
   const gate = await requireCanDoForApi(companyId, "reconnect_connection");
   if (gate.kind === "deny") return gate.response;
 
-  // Validate connection belongs to this company and is in a reconnectable
-  // state. Service role bypasses RLS — the auth gate above already confirmed
-  // the caller is a member of this company.
   const svc = getServiceRoleClient();
   const { data: conn, error: connErr } = await svc
     .from("social_connections")
-    .select("id, company_id, platform, status")
+    .select("id, company_id, profile_id, platform, status")
     .eq("id", connectionId)
     .eq("company_id", companyId)
     .single();
@@ -77,6 +92,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return invalidState(`Connection is currently "${status}" and does not need reconnecting.`);
   }
 
+  const profileId = conn.profile_id as string | null;
+  if (!profileId) {
+    return invalidState(
+      "This connection has not yet been attributed to a social profile. " +
+      "Run a sync to resolve attribution, then retry.",
+    );
+  }
+
+  const bundlePlatform = SOCIAL_TO_BUNDLE[conn.platform as string];
+  if (!bundlePlatform) {
+    return invalidState(
+      `Platform "${conn.platform}" cannot be reconnected via direct OAuth. Contact support.`,
+    );
+  }
+
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     new URL(req.url).origin;
@@ -88,32 +118,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     companyId,
     connectionId,
     platform: conn.platform,
+    profileId,
     userId: gate.userId,
   });
 
-  const [brand, companyRow] = await Promise.all([
-    getActiveBrandProfile(companyId),
-    svc
-      .from("platform_companies")
-      .select("name")
-      .eq("id", companyId)
-      .maybeSingle()
-      .then((r) => r.data),
-  ]);
-
-  const result = await initiateBundlesocialConnect({
-    companyId,
-    platforms: [conn.platform],
+  const result = await initiateProfileConnect({
+    profileId,
+    platform: bundlePlatform,
     redirectUrl,
-    logoUrl: brand?.logo_primary_url ?? brand?.logo_icon_url ?? undefined,
-    userName: companyRow?.name ?? undefined,
-    // TODO: set hidePoweredBy: true once companies have a paid-plan flag.
-    language: "en",
+    disableAutoLogin: true,
+    withBusinessScope: WITH_BUSINESS_SCOPE_PLATFORMS.has(bundlePlatform),
   });
 
   if (!result.ok) {
-    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
-    return internalError(result.error.message);
+    const { code, message } = result.error;
+    if (code === "VALIDATION_FAILED") return validationError(message);
+    if (code === "RECEIVER_NOT_CONFIGURED") return invalidState(message);
+    return internalError(message);
   }
 
   return NextResponse.json(
