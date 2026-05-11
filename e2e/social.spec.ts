@@ -175,8 +175,14 @@ test.describe("social platform", () => {
       const connectBtn = page.getByTestId("connections-connect-button");
       await expect(connectBtn).toBeVisible({ timeout: 10_000 });
 
-      const popupPromise = page.waitForEvent("popup");
+      // Open the platform-picker lightbox, then select a platform to trigger
+      // the POST and popup open.
       await connectBtn.click();
+      const lightbox = page.getByTestId("connect-lightbox");
+      await expect(lightbox).toBeVisible({ timeout: 5_000 });
+
+      const popupPromise = page.waitForEvent("popup");
+      await page.getByTestId("connect-platform-LINKEDIN").click();
       const popup = await popupPromise;
 
       // Popup loads stub, fires postMessage, then calls window.close().
@@ -224,8 +230,14 @@ test.describe("social platform", () => {
       const connectBtn = page.getByTestId("connections-connect-button");
       await expect(connectBtn).toBeVisible({ timeout: 10_000 });
 
-      const popupPromise = page.waitForEvent("popup");
+      // Open the platform-picker lightbox, then select a platform to trigger
+      // the POST and popup open.
       await connectBtn.click();
+      const lightbox = page.getByTestId("connect-lightbox");
+      await expect(lightbox).toBeVisible({ timeout: 5_000 });
+
+      const popupPromise = page.waitForEvent("popup");
+      await page.getByTestId("connect-platform-LINKEDIN").click();
       const popup = await popupPromise;
 
       // User closes popup without completing OAuth.
