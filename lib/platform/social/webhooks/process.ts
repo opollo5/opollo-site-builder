@@ -383,15 +383,73 @@ async function handleAccountEvent(
       });
     }
 
-    if (conn.data.status === "healthy") {
+    // Cross-tenant identity-leak defence (migration 0122): resolve the
+    // platform-side identity now that bundle.social says the account is
+    // connected. If both identity fields come back populated, flip the
+    // row to 'healthy'; otherwise leave it in 'pending_identity' (the
+    // existing claim_publish_job RPC's status='healthy' gate then
+    // refuses publishing for incomplete-identity rows).
+    //
+    // We resolve identity from bundle.social by reading the connection's
+    // team (via the profile or company team_id). The webhook itself
+    // doesn't carry teamId — we infer from the profile row.
+    let identityUpdate: {
+      external_account_id: string | null;
+      external_user_id: string | null;
+      external_identity_hash: string | null;
+      status: "healthy" | "pending_identity";
+    } | null = null;
+
+    if (conn.data.profile_id) {
+      const profileTeam = await svc
+        .from("platform_social_profiles")
+        .select("bundle_social_team_id")
+        .eq("id", conn.data.profile_id as string)
+        .maybeSingle();
+      const teamId = (profileTeam.data as { bundle_social_team_id?: string } | null)
+        ?.bundle_social_team_id;
+      if (teamId) {
+        const { resolveIdentityFingerprint } = await import(
+          "@/lib/platform/social/connections/identity"
+        );
+        const identity = await resolveIdentityFingerprint({
+          platform: (
+            envelope.data as { type?: string } | undefined
+          )?.type as Parameters<typeof resolveIdentityFingerprint>[0]["platform"],
+          teamId,
+        });
+        identityUpdate = {
+          external_account_id: identity.external_account_id,
+          external_user_id: identity.external_user_id,
+          external_identity_hash: identity.external_identity_hash,
+          status:
+            identity.external_account_id || identity.external_user_id
+              ? "healthy"
+              : "pending_identity",
+        };
+      }
+    }
+
+    if (
+      conn.data.status === "healthy" &&
+      identityUpdate?.status === "healthy"
+    ) {
+      // Idempotent fast path — already healthy, nothing new to write.
       return { kind: "ok", webhookEventId, action: "account_connected_noop" };
     }
     const update = await svc
       .from("social_connections")
       .update({
-        status: "healthy",
+        status: identityUpdate?.status ?? "healthy",
         last_health_check_at: now,
         last_error: null,
+        ...(identityUpdate
+          ? {
+              external_account_id: identityUpdate.external_account_id,
+              external_user_id: identityUpdate.external_user_id,
+              external_identity_hash: identityUpdate.external_identity_hash,
+            }
+          : {}),
       })
       .eq("id", conn.data.id);
     if (update.error) {

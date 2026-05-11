@@ -81,6 +81,15 @@ export function AdminProfileConnectionsList({
   const [disconnectBusy, setDisconnectBusy] = useState<string | null>(null); // account id
   const [error, setError] = useState<string | null>(initialTeamReadError);
   const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
+  // Cross-tenant identity-leak defence (Layer 3): pre-flight modal state.
+  const [preflightModal, setPreflightModal] = useState<
+    | {
+        platform: string;
+        platformLabel: string;
+        others: Array<{ company_name: string; connected_at: string }>;
+      }
+    | null
+  >(null);
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -142,8 +151,50 @@ export function AdminProfileConnectionsList({
     router.refresh();
   }
 
-  async function handleConnect(platform: string) {
+  async function runPreflight(platform: string): Promise<{
+    warn: boolean;
+    others: Array<{ company_name: string; connected_at: string }>;
+  }> {
+    try {
+      const params = new URLSearchParams({
+        platform,
+        target_company_id: companyId,
+        target_profile_id: profileId,
+      });
+      const res = await fetch(
+        `/api/platform/social/connections/identity-preflight?${params.toString()}`,
+      );
+      if (!res.ok) return { warn: false, others: [] };
+      const json = (await res.json()) as {
+        ok: boolean;
+        data?: {
+          warn: boolean;
+          others: Array<{ company_name: string; connected_at: string }>;
+        };
+      };
+      return json.ok && json.data ? json.data : { warn: false, others: [] };
+    } catch {
+      return { warn: false, others: [] };
+    }
+  }
+
+  async function handleConnect(platform: string, opts?: { skipPreflight?: boolean }) {
     setError(null);
+
+    if (!opts?.skipPreflight) {
+      const preflight = await runPreflight(platform);
+      if (preflight.warn) {
+        const platformLabel =
+          PLATFORMS.find((p) => p.value === platform)?.label ?? platform;
+        setPreflightModal({
+          platform,
+          platformLabel,
+          others: preflight.others,
+        });
+        return;
+      }
+    }
+
     setBusy(platform);
     setPopupBlockedUrl(null);
 
@@ -190,6 +241,66 @@ export function AdminProfileConnectionsList({
 
   return (
     <div data-testid="admin-profile-connections">
+      {preflightModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preflight-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          data-testid="preflight-modal"
+        >
+          <div className="max-w-md rounded-lg bg-background p-5 shadow-xl">
+            <h2
+              id="preflight-modal-title"
+              className="mb-2 text-base font-semibold"
+            >
+              Heads up — {preflightModal.platformLabel} is already connected
+              elsewhere
+            </h2>
+            <p className="mb-3 text-sm text-muted-foreground">
+              {preflightModal.platformLabel} was recently connected for:
+            </p>
+            <ul className="mb-3 list-disc pl-5 text-sm">
+              {preflightModal.others.map((o) => (
+                <li key={o.company_name}>
+                  {o.company_name}{" "}
+                  <span className="text-muted-foreground">
+                    (connected {new Date(o.connected_at).toLocaleDateString()})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mb-3 text-sm text-muted-foreground">
+              If the OAuth flow auto-approves with the same{" "}
+              <strong>{preflightModal.platformLabel}</strong> account, it
+              will be <strong>rejected</strong> to prevent cross-tenant
+              publishing. To connect a different {preflightModal.platformLabel}{" "}
+              account, log out of {preflightModal.platformLabel} in another
+              browser tab first.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setPreflightModal(null)}
+                data-testid="preflight-modal-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const platform = preflightModal.platform;
+                  setPreflightModal(null);
+                  void handleConnect(platform, { skipPreflight: true });
+                }}
+                data-testid="preflight-modal-continue"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="mb-4 flex items-center justify-end gap-2">
         <Button
           onClick={() => setShowLightbox((s) => !s)}

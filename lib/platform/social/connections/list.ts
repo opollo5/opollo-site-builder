@@ -26,7 +26,7 @@ export async function listConnections(
   let query = svc
     .from("social_connections")
     .select(
-      "id, company_id, profile_id, platform, bundle_social_account_id, display_name, avatar_url, status, last_error, connected_at, disconnected_at, last_health_check_at, created_at, updated_at",
+      "id, company_id, profile_id, platform, bundle_social_account_id, display_name, avatar_url, status, last_error, connected_at, disconnected_at, last_health_check_at, external_account_id, external_user_id, external_identity_hash, created_at, updated_at",
     )
     .eq("company_id", input.companyId);
   // BSP-8: optional per-profile filter for the customer-facing UI.

@@ -87,6 +87,19 @@ export function SocialConnectionsList({
   const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
+  // Cross-tenant identity-leak defence (Layer 3): pre-flight warning
+  // modal state. When the user clicks Connect, we first call
+  // /identity-preflight; if it returns warn=true, we render a
+  // confirmation modal and only proceed to the popup if the user
+  // confirms.
+  const [preflightModal, setPreflightModal] = useState<
+    | {
+        platform: string;
+        platformLabel: string;
+        others: Array<{ company_name: string; connected_at: string }>;
+      }
+    | null
+  >(null);
 
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -144,9 +157,25 @@ export function SocialConnectionsList({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleConnect(platform: string) {
+  async function handleConnect(platform: string, opts?: { skipPreflight?: boolean }) {
     if (!profileId) return;
     setError(null);
+
+    // Layer 3 — pre-flight check before opening the popup.
+    if (!opts?.skipPreflight) {
+      const preflight = await runPreflight({ platform });
+      if (preflight.warn) {
+        const platformLabel =
+          PLATFORMS.find((p) => p.value === platform)?.label ?? platform;
+        setPreflightModal({
+          platform,
+          platformLabel,
+          others: preflight.others,
+        });
+        return;
+      }
+    }
+
     setBusyPlatform(platform);
     setPopupBlockedUrl(null);
 
@@ -166,6 +195,37 @@ export function SocialConnectionsList({
     }
 
     openConnectPopup(json.data.url);
+  }
+
+  async function runPreflight(args: { platform: string }): Promise<{
+    warn: boolean;
+    others: Array<{ company_name: string; connected_at: string }>;
+  }> {
+    if (!profileId) return { warn: false, others: [] };
+    try {
+      const params = new URLSearchParams({
+        platform: args.platform,
+        target_company_id: companyId,
+        target_profile_id: profileId,
+      });
+      const res = await fetch(
+        `/api/platform/social/connections/identity-preflight?${params.toString()}`,
+      );
+      if (!res.ok) return { warn: false, others: [] };
+      const json = (await res.json()) as {
+        ok: boolean;
+        data?: {
+          warn: boolean;
+          others: Array<{ company_name: string; connected_at: string }>;
+        };
+      };
+      return json.ok && json.data ? json.data : { warn: false, others: [] };
+    } catch {
+      // Pre-flight is advisory only — silent fallback to no-warn means
+      // the popup opens immediately and Layer 2's hard block still
+      // catches actual cross-tenant attachments.
+      return { warn: false, others: [] };
+    }
   }
 
   async function handleReconnect(rowId: string) {
@@ -221,6 +281,67 @@ export function SocialConnectionsList({
 
   return (
     <div data-testid="connections-list-wrapper">
+      {preflightModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="preflight-modal-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          data-testid="preflight-modal"
+        >
+          <div className="max-w-md rounded-lg bg-background p-5 shadow-xl">
+            <h2
+              id="preflight-modal-title"
+              className="mb-2 text-base font-semibold"
+            >
+              Heads up — {preflightModal.platformLabel} is already connected
+              elsewhere
+            </h2>
+            <p className="mb-3 text-sm text-muted-foreground">
+              You (or another admin) previously connected{" "}
+              <strong>{preflightModal.platformLabel}</strong> for:
+            </p>
+            <ul className="mb-3 list-disc pl-5 text-sm">
+              {preflightModal.others.map((o) => (
+                <li key={o.company_name}>
+                  {o.company_name}{" "}
+                  <span className="text-muted-foreground">
+                    (connected {new Date(o.connected_at).toLocaleDateString()})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="mb-3 text-sm text-muted-foreground">
+              If the OAuth flow auto-approves with the same{" "}
+              <strong>{preflightModal.platformLabel}</strong> account, it will
+              be <strong>rejected</strong> to prevent cross-tenant publishing.
+              You&apos;ll see an error after the popup closes. To connect a
+              different {preflightModal.platformLabel} account, log out of{" "}
+              {preflightModal.platformLabel} in another browser tab first.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => setPreflightModal(null)}
+                data-testid="preflight-modal-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  const platform = preflightModal.platform;
+                  setPreflightModal(null);
+                  void handleConnect(platform, { skipPreflight: true });
+                }}
+                data-testid="preflight-modal-continue"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {canManage ? (
         <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
           <Button

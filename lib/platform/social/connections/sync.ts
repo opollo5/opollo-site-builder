@@ -6,6 +6,13 @@ import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
+import {
+  checkCrossTenantConflict,
+  emitCrossTenantBlocked,
+  emitCrossTenantOverride,
+  resolveIdentityFingerprint,
+  type BundlesocialPlatformType,
+} from "./identity";
 import type { SocialPlatform } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +66,11 @@ export type SyncConnectionsResult = {
   updated: number;
   marked_disconnected: number;
   unmapped_skipped: number;
+  // Cross-tenant identity-leak defence: count of remote accounts that
+  // would have been inserted but were refused because the underlying
+  // platform identity is already owned by a different company. Each
+  // emits a cross_tenant_blocked event in platform_events.
+  cross_tenant_blocked: number;
 };
 
 export async function syncBundlesocialConnections(
@@ -136,7 +148,7 @@ export async function syncBundlesocialConnections(
     }
   }
 
-  // Collect every (account, profile) pair across all the company's teams.
+  // Collect every (account, profile, team) tuple across all the company's teams.
   type RemoteAccount = {
     id: string;
     type: string;
@@ -146,7 +158,7 @@ export async function syncBundlesocialConnections(
   };
   const remoteByAccountId = new Map<
     string,
-    { remote: RemoteAccount; profileId: string | null }
+    { remote: RemoteAccount; profileId: string | null; teamId: string }
   >();
   // Track per-team success/failure: if EVERY team_get errored, the sync
   // is fundamentally compromised and must surface INTERNAL_ERROR so
@@ -176,6 +188,7 @@ export async function syncBundlesocialConnections(
       remoteByAccountId.set(a.id, {
         remote: a,
         profileId: mapping.profileId || null,
+        teamId,
       });
     }
   }
@@ -240,11 +253,12 @@ export async function syncBundlesocialConnections(
     updated: 0,
     marked_disconnected: 0,
     unmapped_skipped: 0,
+    cross_tenant_blocked: 0,
   };
   const now = new Date().toISOString();
 
   // Pass 1: walk remote accounts.
-  for (const [bundleAccountId, { remote, profileId }] of remoteByAccountId) {
+  for (const [bundleAccountId, { remote, profileId, teamId }] of remoteByAccountId) {
     const platform = BUNDLE_TO_PLATFORM[remote.type];
     if (!platform) {
       result.unmapped_skipped += 1;
@@ -255,18 +269,36 @@ export async function syncBundlesocialConnections(
       | null;
     const avatarUrl = (remote.avatarUrl ?? null) as string | null;
 
+    // Cross-tenant identity-leak defence (migration 0122). Resolve the
+    // platform-side identity for this account; the result feeds both
+    // the conflict check (Layer 2) and the row's status flag (Layer 5).
+    // socialAccountGetByType is the source-of-truth read — teamGetTeam
+    // sometimes omits externalId/userId for newly-connected accounts.
+    const identity = await resolveIdentityFingerprint({
+      platform: remote.type as BundlesocialPlatformType,
+      teamId,
+    });
+    const status: "healthy" | "pending_identity" =
+      identity.external_account_id || identity.external_user_id
+        ? "healthy"
+        : "pending_identity";
+
     const localRow = existingById.get(bundleAccountId);
     if (localRow) {
       // UPDATE existing — refresh display_name + avatar + status. Also
-      // backfill profile_id if it was NULL (e.g. row pre-dates BSP-8).
+      // backfill profile_id if it was NULL (e.g. row pre-dates BSP-8)
+      // and identity columns if they're newly-populated.
       const update = await svc
         .from("social_connections")
         .update({
           display_name: displayName,
           avatar_url: avatarUrl,
-          status: "healthy",
+          status,
           last_health_check_at: now,
           last_error: null,
+          external_account_id: identity.external_account_id,
+          external_user_id: identity.external_user_id,
+          external_identity_hash: identity.external_identity_hash,
           ...(localRow.profile_id === null && profileId
             ? { profile_id: profileId }
             : {}),
@@ -286,6 +318,62 @@ export async function syncBundlesocialConnections(
       // to the default profile id if the team-profile mapping is missing
       // (defensive — should never fire post-migration 0119).
       const attributedProfileId = profileId ?? defaultProfileId;
+
+      // Cross-tenant identity check BEFORE insert. Block the INSERT if
+      // the identity is already owned by a different company (refuse
+      // unless override) or by a different profile in the same company
+      // (always refuse). Emit audit events on the platform_events table.
+      const conflict = await checkCrossTenantConflict({
+        platform,
+        identity_hash: identity.external_identity_hash,
+        external_account_id: identity.external_account_id,
+        external_user_id: identity.external_user_id,
+        target_company_id: input.attributeNewToCompanyId,
+        target_profile_id: attributedProfileId,
+      });
+
+      if (!conflict.ok && !conflict.override_allowed) {
+        result.cross_tenant_blocked += 1;
+        logger.warn("social.cross_tenant_blocked", {
+          platform,
+          identity_hash: identity.external_identity_hash,
+          target_company_id: input.attributeNewToCompanyId,
+          target_profile_id: attributedProfileId,
+          bundle_account_id: bundleAccountId,
+          conflict_code: conflict.code,
+          conflicting_company_ids: conflict.conflicting_rows.map((r) => r.company_id),
+        });
+        void emitCrossTenantBlocked({
+          platform,
+          identity_hash: identity.external_identity_hash,
+          external_account_id: identity.external_account_id,
+          external_user_id: identity.external_user_id,
+          target_company_id: input.attributeNewToCompanyId,
+          target_profile_id: attributedProfileId,
+          conflicting_rows: conflict.conflicting_rows,
+        });
+        continue;
+      }
+      if (!conflict.ok && conflict.override_allowed) {
+        logger.warn("social.cross_tenant_override", {
+          platform,
+          identity_hash: identity.external_identity_hash,
+          target_company_id: input.attributeNewToCompanyId,
+          target_profile_id: attributedProfileId,
+          bundle_account_id: bundleAccountId,
+        });
+        void emitCrossTenantOverride({
+          platform,
+          identity_hash: identity.external_identity_hash,
+          external_account_id: identity.external_account_id,
+          external_user_id: identity.external_user_id,
+          target_company_id: input.attributeNewToCompanyId,
+          target_profile_id: attributedProfileId,
+          conflicting_rows: conflict.conflicting_rows,
+        });
+        // Fall through to insert.
+      }
+
       const insert = await svc
         .from("social_connections")
         .insert({
@@ -295,8 +383,11 @@ export async function syncBundlesocialConnections(
           bundle_social_account_id: bundleAccountId,
           display_name: displayName,
           avatar_url: avatarUrl,
-          status: "healthy",
+          status,
           last_health_check_at: now,
+          external_account_id: identity.external_account_id,
+          external_user_id: identity.external_user_id,
+          external_identity_hash: identity.external_identity_hash,
         })
         .select("id");
       if (insert.error) {
