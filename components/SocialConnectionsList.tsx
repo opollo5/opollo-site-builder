@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toastSuccess } from "@/lib/toast-success";
 
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   PLATFORM_LABEL,
@@ -270,13 +271,14 @@ export function SocialConnectionsList({
       ) : null}
 
       {error ? (
-        <p
-          className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
-          role="alert"
+        <Alert
+          variant="destructive"
+          className="mb-3"
           data-testid="connections-error"
+          reportContext={{ message: error }}
         >
           {error}
-        </p>
+        </Alert>
       ) : null}
 
       {popupBlockedUrl ? (

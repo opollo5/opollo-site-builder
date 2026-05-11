@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SocialConnectionsList } from "@/components/SocialConnectionsList";
+import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
@@ -159,13 +160,13 @@ export default async function CompanySocialConnectionsPage({
       <div className="mt-6 space-y-8">
         <ConnectBanner params={searchParams ?? {}} />
         {!listResult.ok ? (
-          <div
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            role="alert"
+          <Alert
+            variant="destructive"
             data-testid="connections-error"
+            reportContext={{ message: `Failed to load connections: ${listResult.error.message}` }}
           >
             Failed to load connections: {listResult.error.message}
-          </div>
+          </Alert>
         ) : (
           profiles.map((p) => (
             <section
