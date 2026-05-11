@@ -1,25 +1,29 @@
 import "server-only";
 
+import { Client } from "pg";
+
 import { getBundlesocialClient } from "@/lib/bundlesocial";
+import { requireDbConfig } from "@/lib/db-direct";
 import { logger } from "@/lib/logger";
-import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
-// BSP-6 — per-profile bundle.social team provisioning.
+// BSP-2-REDO — per-profile bundle.social team provisioning with cross-process
+// race protection via Postgres advisory locks.
 //
-// Same race-protection shape as lib/platform/social/bundle-social/provision.ts
-// (BSP-2), but operating on platform_social_profiles.bundle_social_team_id
-// instead of platform_companies.bundle_social_team_id.
+// Two layers of race protection:
 //
-//   1. In-process Promise dedup — module-level Map keyed by profileId.
-//   2. Optimistic UPDATE WHERE bundle_social_team_id IS NULL — first
-//      writer wins; loser re-reads.
-//   3. UNIQUE partial index on bundle_social_team_id (migration 0118)
-//      — defence-in-depth.
+//   1. In-process Promise dedup (module-level Map) — concurrent calls within
+//      the same Vercel function instance share a single Promise. This is the
+//      fast path for the common case.
 //
-// Worst-case orphan: cross-process race → one bundle.social team is
-// orphaned. Reconciled by scripts/bundlesocial-reconcile-orphans.ts
-// (BSP-4), which already checks platform_social_profiles.bundle_social_team_id.
+//   2. pg_advisory_xact_lock — acquired inside a single pg transaction that
+//      covers the entire read → teamCreate → UPDATE sequence. Any cross-process
+//      race (two Vercel instances, cron + webhook racing) blocks at the lock
+//      until the first writer commits, then reads the already-stored team id
+//      and returns without calling teamCreateTeam again.
+//
+// The SQL function provision_company_lock_key(uuid) (migration 0117) is a
+// generic UUID → bigint hash; safe to use with profile ids.
 // ---------------------------------------------------------------------------
 
 const inflight = new Map<string, Promise<string>>();
@@ -30,89 +34,92 @@ export async function getOrCreateBundleSocialTeamForProfile(
   const existing = inflight.get(profileId);
   if (existing) return existing;
 
-  const promise = provisionImpl(profileId).finally(() => {
+  const promise = provisionWithAdvisoryLock(profileId).finally(() => {
     inflight.delete(profileId);
   });
   inflight.set(profileId, promise);
   return promise;
 }
 
-async function provisionImpl(profileId: string): Promise<string> {
-  const svc = getServiceRoleClient();
-
-  const { data: row, error: readErr } = await svc
-    .from("platform_social_profiles")
-    .select("bundle_social_team_id, name, company_id")
-    .eq("id", profileId)
-    .single();
-
-  if (readErr) {
-    throw new Error(`Failed to read profile ${profileId}: ${readErr.message}`);
-  }
-  if (!row) {
-    throw new Error(`Profile ${profileId} not found.`);
-  }
-
-  const stored = row.bundle_social_team_id as string | null;
-  if (stored) return stored;
-
-  const client = getBundlesocialClient();
-  if (!client) {
-    throw new Error(
-      "BUNDLE_SOCIAL_API is not configured — cannot provision a bundle.social team.",
-    );
-  }
-
-  // Use the profile's name as the bundle.social team name. Append a short
-  // company-id suffix so multiple companies can have profiles with the
-  // same name (e.g., "Brand Social") without colliding visually in the
-  // bundle.social dashboard.
-  const teamName = `${row.name as string} (${(row.company_id as string).slice(0, 8)})`;
-
-  let newTeamId: string;
+async function provisionWithAdvisoryLock(profileId: string): Promise<string> {
+  const pg = new Client(requireDbConfig());
+  await pg.connect();
   try {
-    const team = await client.team.teamCreateTeam({
-      requestBody: { name: teamName },
-    });
-    newTeamId = team.id;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.error("bundlesocial.profile.provision.create_team_failed", {
-      profile_id: profileId,
-      err: msg,
-    });
-    throw new Error(`bundle.social team creation failed: ${msg}`);
-  }
-
-  await svc
-    .from("platform_social_profiles")
-    .update({ bundle_social_team_id: newTeamId })
-    .eq("id", profileId)
-    .is("bundle_social_team_id", null);
-
-  const { data: confirmed, error: confirmErr } = await svc
-    .from("platform_social_profiles")
-    .select("bundle_social_team_id")
-    .eq("id", profileId)
-    .single();
-
-  if (confirmErr || !confirmed?.bundle_social_team_id) {
-    throw new Error(
-      `bundle_social_team_id missing after provision attempt: ${confirmErr?.message ?? "null value"}`,
+    await pg.query("BEGIN");
+    // Acquire xact-scoped advisory lock — auto-released on COMMIT or ROLLBACK.
+    await pg.query(
+      "SELECT pg_advisory_xact_lock(provision_company_lock_key($1::uuid))",
+      [profileId],
     );
+
+    const { rows } = await pg.query<{
+      bundle_social_team_id: string | null;
+      name: string;
+      company_id: string;
+    }>(
+      "SELECT bundle_social_team_id, name, company_id FROM platform_social_profiles WHERE id = $1",
+      [profileId],
+    );
+    if (rows.length === 0) throw new Error(`Profile ${profileId} not found.`);
+    const row = rows[0];
+
+    if (row.bundle_social_team_id) {
+      await pg.query("COMMIT");
+      return row.bundle_social_team_id;
+    }
+
+    const client = getBundlesocialClient();
+    if (!client) {
+      throw new Error(
+        "BUNDLE_SOCIAL_API is not configured — cannot provision a bundle.social team.",
+      );
+    }
+
+    const teamName = `${row.name} (${row.company_id.slice(0, 8)})`;
+
+    let newTeamId: string;
+    try {
+      const team = await client.team.teamCreateTeam({
+        requestBody: { name: teamName },
+      });
+      newTeamId = team.id;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.error("bundlesocial.profile.provision.create_team_failed", {
+        profile_id: profileId,
+        err: msg,
+      });
+      throw new Error(`bundle.social team creation failed: ${msg}`);
+    }
+
+    await pg.query(
+      "UPDATE platform_social_profiles SET bundle_social_team_id = $1 WHERE id = $2 AND bundle_social_team_id IS NULL",
+      [newTeamId, profileId],
+    );
+    await pg.query("COMMIT");
+
+    logger.info("bundlesocial.profile.provision.team_provisioned", {
+      profile_id: profileId,
+      team_id: newTeamId,
+    });
+
+    return newTeamId;
+  } catch (err) {
+    await pg.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    await pg.end().catch(() => {});
   }
-
-  const storedId = confirmed.bundle_social_team_id as string;
-
-  logger.info("bundlesocial.profile.provision.team_provisioned", {
-    profile_id: profileId,
-    team_id: storedId,
-    race_winner: storedId !== newTeamId,
-  });
-
-  return storedId;
 }
 
 export function __resetInflightForTesting(): void {
   inflight.clear();
+}
+
+// Bypasses the in-process Map so integration tests can exercise the advisory
+// lock directly, simulating cross-process concurrent provision attempts.
+export function __provisionWithoutInflightForTesting(
+  profileId: string,
+): Promise<string> {
+  return provisionWithAdvisoryLock(profileId);
 }
