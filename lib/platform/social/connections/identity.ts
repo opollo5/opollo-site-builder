@@ -101,7 +101,7 @@ export function computeIdentityHash(
 ): string | null {
   if (!accountId && !userId) return null;
   const input = `${platform}:${accountId ?? ""}:${userId ?? ""}`;
-  return createHash("md5").update(input).digest("hex");
+  return createHash("sha256").update(input).digest("hex");
 }
 
 // Resolve identity from bundle.social. Caller passes the bundle.social

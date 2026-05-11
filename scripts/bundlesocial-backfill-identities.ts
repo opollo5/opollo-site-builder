@@ -20,7 +20,6 @@
 
 import { createHash } from "node:crypto";
 import * as fs from "node:fs";
-import * as os from "node:os";
 import * as path from "node:path";
 
 import { config } from "dotenv";
@@ -30,9 +29,9 @@ import { Bundlesocial } from "bundlesocial";
 config({ path: ".env.production.local" });
 config({ path: ".env.local" });
 
-// Resume-state lives in the OS temp dir, not the repo. Survives across
-// runs on the same machine; never committable (no .gitignore needed).
-const STATE_FILE = path.join(os.tmpdir(), "backfill-identities-state.json");
+// Resume-state lives alongside the script, not in os.tmpdir() (CodeQL:
+// avoid insecure temp-dir file creation). Add to .gitignore if needed.
+const STATE_FILE = path.join(__dirname, ".backfill-identities-state.json");
 const PER_REQUEST_DELAY_MS = 100; // ≤ 10 SDK calls/sec.
 
 function requireEnv(name: string): string {
@@ -59,7 +58,7 @@ function computeIdentityHash(
   userId: string | null,
 ): string | null {
   if (!accountId && !userId) return null;
-  return createHash("md5")
+  return createHash("sha256")
     .update(`${platform}:${accountId ?? ""}:${userId ?? ""}`)
     .digest("hex");
 }
