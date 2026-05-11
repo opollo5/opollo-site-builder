@@ -8,6 +8,7 @@ import type { ApiResponse } from "@/lib/tool-schemas";
 
 import {
   checkCrossTenantConflict,
+  computeIdentityHash,
   emitCrossTenantBlocked,
   emitCrossTenantOverride,
   resolveIdentityFingerprint,
@@ -274,10 +275,23 @@ export async function syncBundlesocialConnections(
     // the conflict check (Layer 2) and the row's status flag (Layer 5).
     // socialAccountGetByType is the source-of-truth read — teamGetTeam
     // sometimes omits externalId/userId for newly-connected accounts.
-    const identity = await resolveIdentityFingerprint({
+    const rawIdentity = await resolveIdentityFingerprint({
       platform: remote.type as BundlesocialPlatformType,
       teamId,
     });
+    // Recompute hash with the DB platform value (e.g. "linkedin_personal")
+    // so all stored hashes are consistent with the backfill script and the
+    // cross-profile check in checkCrossTenantConflict (which keys on hash
+    // equality). resolveIdentityFingerprint hashes with the bundle.social
+    // type ("LINKEDIN"), which differs from the DB enum value.
+    const identity = {
+      ...rawIdentity,
+      external_identity_hash: computeIdentityHash(
+        platform,
+        rawIdentity.external_account_id,
+        rawIdentity.external_user_id,
+      ),
+    };
     const status: "healthy" | "pending_identity" =
       identity.external_account_id || identity.external_user_id
         ? "healthy"

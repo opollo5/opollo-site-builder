@@ -409,15 +409,24 @@ async function handleAccountEvent(
       const teamId = (profileTeam.data as { bundle_social_team_id?: string } | null)
         ?.bundle_social_team_id;
       if (teamId) {
-        const { resolveIdentityFingerprint } = await import(
+        const { resolveIdentityFingerprint, computeIdentityHash } = await import(
           "@/lib/platform/social/connections/identity"
         );
-        const identity = await resolveIdentityFingerprint({
+        const rawIdentity = await resolveIdentityFingerprint({
           platform: (
             envelope.data as { type?: string } | undefined
           )?.type as Parameters<typeof resolveIdentityFingerprint>[0]["platform"],
           teamId,
         });
+        const platformDb = conn.data.platform as string;
+        const identity = {
+          ...rawIdentity,
+          external_identity_hash: computeIdentityHash(
+            platformDb,
+            rawIdentity.external_account_id,
+            rawIdentity.external_user_id,
+          ),
+        };
         identityUpdate = {
           external_account_id: identity.external_account_id,
           external_user_id: identity.external_user_id,

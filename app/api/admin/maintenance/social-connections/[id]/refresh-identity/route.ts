@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireAdminForApi } from "@/lib/admin-api-gate";
 import { internalError, notFound, validateUuidParam } from "@/lib/http";
 import { logger } from "@/lib/logger";
-import { resolveIdentityFingerprint } from "@/lib/platform/social/connections/identity";
+import { computeIdentityHash, resolveIdentityFingerprint } from "@/lib/platform/social/connections/identity";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // Cross-tenant identity-leak defence — Layer 4 admin maintenance.
@@ -66,10 +66,19 @@ export async function POST(
   const bundleType = PLATFORM_TO_BUNDLE[row.data.platform as string];
   if (!bundleType) return internalError(`Unsupported platform: ${row.data.platform}`);
 
-  const identity = await resolveIdentityFingerprint({
+  const rawIdentity = await resolveIdentityFingerprint({
     platform: bundleType as Parameters<typeof resolveIdentityFingerprint>[0]["platform"],
     teamId,
   });
+  const platformDb = row.data.platform as string;
+  const identity = {
+    ...rawIdentity,
+    external_identity_hash: computeIdentityHash(
+      platformDb,
+      rawIdentity.external_account_id,
+      rawIdentity.external_user_id,
+    ),
+  };
 
   const update = await svc
     .from("social_connections")
