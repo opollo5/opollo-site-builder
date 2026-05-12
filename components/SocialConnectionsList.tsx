@@ -69,6 +69,10 @@ type ConnectMessage = {
   connect: "success" | "noop" | "error" | "sync-failed" | "needs_channel";
   reason?: string;
   connection_id?: string;
+  // Bug-fix 2026-05-12: set on noop when the user re-connected a platform
+  // they already have (sync updated=1, inserted=0). Drives the actionable
+  // "already connected" banner and row highlight.
+  attempted_platform?: string;
 };
 
 function isConnectMessage(v: unknown): v is ConnectMessage {
@@ -97,6 +101,10 @@ type Props = {
   // the page passes the id here so we auto-open the picker against
   // that row on first render.
   autoOpenPickerForConnectionId?: string | null;
+  // Bug-fix 2026-05-12: when the callback route signals noop+updated,
+  // the page passes the attempted platform (lowercase, e.g. "linkedin")
+  // so we show an actionable banner and highlight the blocking row.
+  noopdForPlatform?: string | null;
 };
 
 export function SocialConnectionsList({
@@ -106,6 +114,7 @@ export function SocialConnectionsList({
   canManage,
   canReconnect,
   autoOpenPickerForConnectionId,
+  noopdForPlatform,
 }: Props) {
   const router = useRouter();
   const [busyRow, setBusyRow] = useState<string | null>(null);
@@ -121,6 +130,12 @@ export function SocialConnectionsList({
   >(null);
   // Track per-row disconnect spinner state.
   const [disconnectBusy, setDisconnectBusy] = useState<string | null>(null);
+  // Bug-fix 2026-05-12: "already connected" banner — set from prop (non-
+  // popup redirect) or from the popup postMessage when noop+updated fires.
+  // Lowercase bundle.social platform string, e.g. "linkedin".
+  const [noopdPlatform, setNoopdPlatform] = useState<string | null>(
+    noopdForPlatform ?? null,
+  );
 
   // Auto-open the picker when the page hands us a connection_id (after
   // a fresh OAuth that needs channel selection). The effect only fires
@@ -201,6 +216,14 @@ export function SocialConnectionsList({
         typeof evt.data.connection_id === "string"
       ) {
         setPickerForConnectionId(evt.data.connection_id);
+      }
+      // Bug-fix 2026-05-12: if the callback signalled noop with an
+      // attempted_platform, show the actionable "already connected" banner.
+      if (
+        evt.data.connect === "noop" &&
+        typeof evt.data.attempted_platform === "string"
+      ) {
+        setNoopdPlatform(evt.data.attempted_platform);
       }
       router.refresh();
     }
@@ -354,6 +377,19 @@ export function SocialConnectionsList({
       })()
     : null;
 
+  // Bug-fix 2026-05-12: the "already connected" blocking row — find the
+  // first healthy (or pending_identity) connection whose bundle.social
+  // platform matches the attempted_platform signal. Used for the
+  // actionable banner and yellow row highlight.
+  const noopdConnection = noopdPlatform
+    ? connections.find(
+        (c) =>
+          (PLATFORM_TO_BUNDLE_LABEL[c.platform]?.platform ?? "").toLowerCase() ===
+            noopdPlatform.toLowerCase() &&
+          (c.status === "healthy" || c.status === "pending_identity"),
+      ) ?? null
+    : null;
+
   async function handleSync() {
     setBusySync(true);
     setError(null);
@@ -401,6 +437,31 @@ export function SocialConnectionsList({
             router.refresh();
           }}
         />
+      ) : null}
+
+      {noopdConnection ? (
+        <div
+          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="alert"
+          data-testid="connections-already-connected-banner"
+        >
+          <p className="font-medium">
+            This profile already has a{" "}
+            {PLATFORM_LABEL[noopdConnection.platform] ?? noopdConnection.platform}{" "}
+            connection
+            {noopdConnection.display_name ? ` (${noopdConnection.display_name})` : ""},
+            connected{" "}
+            {new Date(noopdConnection.connected_at).toLocaleDateString("en-AU", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}.
+          </p>
+          <p className="mt-1 text-amber-900/80">
+            Disconnect the existing connection below to connect a different
+            account, or ask an admin to create a new profile.
+          </p>
+        </div>
       ) : null}
 
       {overdueConnections.length > 0 ? (
@@ -590,7 +651,11 @@ export function SocialConnectionsList({
               {connections.map((c) => (
                 <tr
                   key={c.id}
-                  className="border-b last:border-b-0 hover:bg-muted/20"
+                  className={`border-b last:border-b-0 ${
+                    noopdConnection?.id === c.id
+                      ? "bg-amber-50"
+                      : "hover:bg-muted/20"
+                  }`}
                   data-testid={`connection-row-${c.id}`}
                 >
                   <td className="px-4 py-3 font-medium">

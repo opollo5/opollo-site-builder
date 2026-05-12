@@ -270,7 +270,7 @@ export async function syncBundlesocialConnections(
       result.unmapped_skipped += 1;
       continue;
     }
-    const displayName = (remote.displayName ?? remote.username ?? null) as
+    const remoteDisplayName = (remote.displayName ?? remote.username ?? null) as
       | string
       | null;
     const avatarUrl = (remote.avatarUrl ?? null) as string | null;
@@ -279,7 +279,8 @@ export async function syncBundlesocialConnections(
     // platform-side identity for this account; the result feeds both
     // the conflict check (Layer 2) and the row's status flag (Layer 5).
     // socialAccountGetByType is the source-of-truth read — teamGetTeam
-    // sometimes omits externalId/userId for newly-connected accounts.
+    // sometimes omits externalId/userId and displayName for newly-
+    // connected accounts; prefer the identity fingerprint's displayName.
     const rawIdentity = await resolveIdentityFingerprint({
       platform: remote.type as BundlesocialPlatformType,
       teamId,
@@ -315,6 +316,11 @@ export async function syncBundlesocialConnections(
       : isChannelPlatform && !hasChannel && !isPersonal
         ? "pending_identity"
         : "healthy";
+
+    // Prefer the display name from socialAccountGetByType (identity) over
+    // teamGetTeam (remote) — the former populates userDisplayName even for
+    // freshly-connected accounts where teamGetTeam returns null.
+    const displayName = rawIdentity.displayName ?? remoteDisplayName;
 
     const localRow = existingById.get(bundleAccountId);
     if (localRow) {

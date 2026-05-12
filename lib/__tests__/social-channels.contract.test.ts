@@ -112,7 +112,6 @@ describe("setChannel / unsetChannel — platform support", () => {
   it("setChannel refuses TWITTER (not a channel-selection platform)", async () => {
     const r = await setChannel({
       teamId: TEAM_ID,
-      // @ts-expect-error — intentionally widening to test the runtime guard
       platform: "TWITTER",
       channelId: "x",
     });
@@ -124,7 +123,6 @@ describe("setChannel / unsetChannel — platform support", () => {
   it("unsetChannel refuses DISCORD (not a channel-selection platform)", async () => {
     const r = await unsetChannel({
       teamId: TEAM_ID,
-      // @ts-expect-error — intentionally widening to test the runtime guard
       platform: "DISCORD",
     });
     expect(r.ok).toBe(false);

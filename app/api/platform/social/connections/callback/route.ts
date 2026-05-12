@@ -133,6 +133,7 @@ function popupCloseResponse(
   connectParam: string,
   reason?: string,
   connectionId?: string,
+  attemptedPlatform?: string,
 ): NextResponse {
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
@@ -143,6 +144,7 @@ function popupCloseResponse(
     connect: connectParam,
     ...(reason ? { reason } : {}),
     ...(connectionId ? { connection_id: connectionId } : {}),
+    ...(attemptedPlatform ? { attempted_platform: attemptedPlatform } : {}),
   });
 
   // Strict target origin — only our own origin accepts this message.
@@ -241,6 +243,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   let connectParam: string;
   let reasonParam: string | undefined;
+  // Bug-fix 2026-05-12: when the user re-connected a platform they already
+  // have (sync found existing row → updated=1, inserted=0), surface the
+  // platform name so the customer page can render an actionable
+  // "already connected" banner and highlight the blocking row.
+  let attemptedPlatform: string | undefined;
   if (!sync.ok) {
     connectParam = "sync-failed";
     reasonParam = sync.error.code;
@@ -261,6 +268,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     reasonParam = "cross-tenant-blocked";
   } else {
     connectParam = "noop";
+    // If the user deliberately went through OAuth but landed back with
+    // nothing inserted (updated=1 means the account already exists),
+    // pass the platform so the UI can show which connection is blocking.
+    if (classified?.kind === "success" && sync.data.updated > 0) {
+      attemptedPlatform = classified.platform;
+    }
   }
 
   if (isPopup) {
@@ -269,6 +282,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       connectParam,
       reasonParam,
       needsChannelConnectionId ?? undefined,
+      attemptedPlatform,
     );
   }
 
@@ -280,6 +294,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
   if (needsChannelConnectionId) {
     target.searchParams.set("connection_id", needsChannelConnectionId);
+  }
+  if (attemptedPlatform) {
+    target.searchParams.set("attempted_platform", attemptedPlatform);
   }
   return NextResponse.redirect(target);
 }

@@ -32,6 +32,10 @@ type SearchParams = {
   // sets this on success-with-channel-needed so the client can auto-
   // open the channel-picker modal against the freshly-inserted row.
   connection_id?: string;
+  // Bug-fix 2026-05-12: set on noop+updated to identify which platform
+  // the user tried to connect (already had one). Drives the actionable
+  // "already connected" banner + row highlight in SocialConnectionsList.
+  attempted_platform?: string;
 };
 
 const REASON_LABEL: Record<string, string> = {
@@ -233,6 +237,11 @@ export default async function CompanySocialConnectionsPage({
                 autoOpenPickerForConnectionId={
                   (searchParams ?? {}).connect === "needs_channel"
                     ? ((searchParams ?? {}).connection_id ?? null)
+                    : null
+                }
+                noopdForPlatform={
+                  (searchParams ?? {}).connect === "noop"
+                    ? ((searchParams ?? {}).attempted_platform ?? null)
                     : null
                 }
               />

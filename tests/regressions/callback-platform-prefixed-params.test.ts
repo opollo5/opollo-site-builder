@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 
 // ---------------------------------------------------------------------------
 // REGRESSION — callback platform-prefixed param recognition.
@@ -37,6 +37,8 @@ vi.mock("@/lib/platform/social/connections", () => ({
     timestamp: new Date().toISOString(),
   }),
 }));
+
+import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
 
 vi.mock("@/lib/platform/social/analytics-ingest", () => ({
   enqueuePostHistoryImport: vi.fn(),
@@ -185,5 +187,37 @@ describe("R-CALLBACK: success path is unaffected by absent error params", () => 
   it("no platform params + sync.inserted=0 → connect=noop", async () => {
     const out = await reasonFor({});
     expect(out.connect).toBe("noop");
+  });
+});
+
+describe("R-CALLBACK: noop+already-connected surfaces attempted_platform", () => {
+  it("linkedin-callback=true + sync.updated=1 → noop with attempted_platform=linkedin", async () => {
+    // Bug-fix 2026-05-12: when the user re-connects a platform they already
+    // have, the callback surfaces the platform so the UI can show an
+    // actionable "already connected" banner and highlight the blocking row.
+    vi.mocked(syncBundlesocialConnections as unknown as MockInstance).mockResolvedValueOnce({
+      ok: true,
+      data: {
+        inserted: 0,
+        updated: 1,
+        marked_disconnected: 0,
+        unmapped_skipped: 0,
+        cross_tenant_blocked: 0,
+      },
+      timestamp: new Date().toISOString(),
+    });
+    const out = await reasonFor({ "linkedin-callback": "true" });
+    expect(out.connect).toBe("noop");
+    const loc = new URL(out.location, "http://localhost");
+    expect(loc.searchParams.get("attempted_platform")).toBe("linkedin");
+  });
+
+  it("linkedin-callback=true + sync.updated=0 → plain noop (no attempted_platform)", async () => {
+    // When there was no update either, don't add the platform hint — the
+    // user may just have a delay on the bundle.social side.
+    const out = await reasonFor({ "linkedin-callback": "true" });
+    expect(out.connect).toBe("noop");
+    const loc = new URL(out.location, "http://localhost");
+    expect(loc.searchParams.get("attempted_platform")).toBeNull();
   });
 });

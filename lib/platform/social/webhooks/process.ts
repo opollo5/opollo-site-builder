@@ -399,6 +399,7 @@ async function handleAccountEvent(
       external_account_id: string | null;
       external_user_id: string | null;
       external_identity_hash: string | null;
+      display_name: string | null;
       status: "healthy" | "pending_identity";
     } | null = null;
 
@@ -452,6 +453,7 @@ async function handleAccountEvent(
           external_account_id: identity.external_account_id,
           external_user_id: identity.external_user_id,
           external_identity_hash: identity.external_identity_hash,
+          display_name: identity.displayName,
           status,
         };
       }
@@ -475,6 +477,9 @@ async function handleAccountEvent(
               external_account_id: identityUpdate.external_account_id,
               external_user_id: identityUpdate.external_user_id,
               external_identity_hash: identityUpdate.external_identity_hash,
+              ...(identityUpdate.display_name !== null
+                ? { display_name: identityUpdate.display_name }
+                : {}),
             }
           : {}),
       })

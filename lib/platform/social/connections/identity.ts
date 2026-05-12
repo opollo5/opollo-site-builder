@@ -89,10 +89,15 @@ export type BundlesocialPlatformType =
 // FACEBOOK, INSTAGRAM, YOUTUBE, GOOGLE_BUSINESS) require a non-empty
 // channels[] OR an explicit personal-mode opt-in before publishing is
 // allowed — see lib/platform/social/connections/channels.ts.
+//
+// `displayName` is resolved from socialAccountGetByType's userDisplayName
+// (or userUsername as fallback) — more reliable than teamGetTeam's
+// displayName which is often null for freshly-connected accounts.
 export type IdentityFingerprint = {
   external_account_id: string | null;
   external_user_id: string | null;
   external_identity_hash: string | null;
+  displayName: string | null;
   channels: Array<{
     id: string;
     name: string | null;
@@ -155,6 +160,7 @@ export async function resolveIdentityFingerprint(input: {
       external_account_id: null,
       external_user_id: null,
       external_identity_hash: null,
+      displayName: null,
       channels: [],
       raw: {},
     };
@@ -186,6 +192,7 @@ export async function resolveIdentityFingerprint(input: {
         accountId,
         userId,
       ),
+      displayName: resp.userDisplayName ?? resp.userUsername ?? null,
       channels: (resp.channels ?? []).map((c) => ({
         id: c.id,
         name: c.name ?? null,
@@ -205,6 +212,7 @@ export async function resolveIdentityFingerprint(input: {
       external_account_id: null,
       external_user_id: null,
       external_identity_hash: null,
+      displayName: null,
       channels: [],
       raw: {},
     };

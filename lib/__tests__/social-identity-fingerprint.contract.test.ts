@@ -111,5 +111,46 @@ describe("resolveIdentityFingerprint — response mapping", () => {
     expect(result.external_account_id).toBeNull();
     expect(result.external_user_id).toBeNull();
     expect(result.external_identity_hash).toBeNull();
+    expect(result.displayName).toBeNull();
+  });
+
+  it("displayName uses userDisplayName from the SDK response", async () => {
+    socialAccountGetByTypeMock.mockResolvedValueOnce({
+      externalId: "ext-1",
+      userId: "user-1",
+      userDisplayName: "Steven Morey",
+      userUsername: "stevenm",
+    });
+    const result = await resolveIdentityFingerprint({
+      platform: "LINKEDIN",
+      teamId: TEAM_ID,
+    });
+    expect(result.displayName).toBe("Steven Morey");
+  });
+
+  it("displayName falls back to userUsername when userDisplayName is null", async () => {
+    socialAccountGetByTypeMock.mockResolvedValueOnce({
+      externalId: "ext-1",
+      userId: "user-1",
+      userDisplayName: null,
+      userUsername: "stevenm",
+    });
+    const result = await resolveIdentityFingerprint({
+      platform: "LINKEDIN",
+      teamId: TEAM_ID,
+    });
+    expect(result.displayName).toBe("stevenm");
+  });
+
+  it("displayName is null when both userDisplayName and userUsername are absent", async () => {
+    socialAccountGetByTypeMock.mockResolvedValueOnce({
+      externalId: "ext-1",
+      userId: "user-1",
+    });
+    const result = await resolveIdentityFingerprint({
+      platform: "LINKEDIN",
+      teamId: TEAM_ID,
+    });
+    expect(result.displayName).toBeNull();
   });
 });
