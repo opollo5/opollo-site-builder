@@ -3,8 +3,23 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Button } from "@/components/ui/button";
 import { toastSuccess } from "@/lib/toast-success";
+
+const PLATFORM_TO_BUNDLE_LABEL: Record<
+  string,
+  {
+    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
+    label: string;
+  } | null
+> = {
+  LINKEDIN: { platform: "LINKEDIN", label: "LinkedIn" },
+  FACEBOOK: { platform: "FACEBOOK", label: "Facebook" },
+  INSTAGRAM: { platform: "INSTAGRAM", label: "Instagram" },
+  YOUTUBE: { platform: "YOUTUBE", label: "YouTube" },
+  GOOGLE_BUSINESS: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
+};
 
 // BSP-6 — per-profile connections list with connect lightbox.
 //
@@ -59,7 +74,13 @@ type ApiResponse<T> =
       timestamp: string;
     };
 
-function isConnectMessage(v: unknown): boolean {
+type ConnectMessage = {
+  type: "bundle-connect-complete";
+  connect?: string;
+  connection_id?: string;
+};
+
+function isConnectMessage(v: unknown): v is ConnectMessage {
   return (
     typeof v === "object" &&
     v !== null &&
@@ -90,6 +111,13 @@ export function AdminProfileConnectionsList({
       }
     | null
   >(null);
+  // Channel-selection flow (incident 2026-05-12): the connection_id
+  // currently targeted by the picker modal.
+  const [pickerTarget, setPickerTarget] = useState<{
+    connectionId: string;
+    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
+    label: string;
+  } | null>(null);
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -105,8 +133,26 @@ export function AdminProfileConnectionsList({
     function handleMessage(evt: MessageEvent) {
       if (evt.origin !== expectedOrigin) return;
       if (!isConnectMessage(evt.data)) return;
+      // Snapshot busy BEFORE clearPopupState wipes it — we need the
+      // platform value to resolve the picker shape below.
+      const platformValue = busy;
       clearPopupState();
       setShowLightbox(false);
+      if (
+        evt.data.connect === "needs_channel" &&
+        typeof evt.data.connection_id === "string"
+      ) {
+        const mapped = platformValue
+          ? PLATFORM_TO_BUNDLE_LABEL[platformValue]
+          : null;
+        if (mapped) {
+          setPickerTarget({
+            connectionId: evt.data.connection_id,
+            platform: mapped.platform,
+            label: mapped.label,
+          });
+        }
+      }
       router.refresh();
     }
     window.addEventListener("message", handleMessage);
@@ -115,7 +161,7 @@ export function AdminProfileConnectionsList({
       if (pollRef.current) clearInterval(pollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [busy]);
 
   async function handleDisconnect(account: Account) {
     if (
@@ -241,6 +287,23 @@ export function AdminProfileConnectionsList({
 
   return (
     <div data-testid="admin-profile-connections">
+      {pickerTarget ? (
+        <ChannelPickerModal
+          connectionId={pickerTarget.connectionId}
+          platform={pickerTarget.platform}
+          platformLabel={pickerTarget.label}
+          isOpen={true}
+          onClose={() => setPickerTarget(null)}
+          onSelected={() => {
+            setPickerTarget(null);
+            toastSuccess(
+              `${pickerTarget.label} channel set — ready to publish.`,
+            );
+            router.refresh();
+          }}
+        />
+      ) : null}
+
       {preflightModal ? (
         <div
           role="dialog"

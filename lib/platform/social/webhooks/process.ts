@@ -351,7 +351,9 @@ async function handleAccountEvent(
 
   const conn = await svc
     .from("social_connections")
-    .select("id, company_id, status, platform, profile_id")
+    .select(
+      "id, company_id, status, platform, profile_id, is_personal_mode",
+    )
     .eq("bundle_social_account_id", accountId)
     .maybeSingle();
   if (conn.error) {
@@ -409,13 +411,16 @@ async function handleAccountEvent(
       const teamId = (profileTeam.data as { bundle_social_team_id?: string } | null)
         ?.bundle_social_team_id;
       if (teamId) {
-        const { resolveIdentityFingerprint, computeIdentityHash } = await import(
-          "@/lib/platform/social/connections/identity"
-        );
+        const {
+          resolveIdentityFingerprint,
+          computeIdentityHash,
+          requiresChannelSelection,
+        } = await import("@/lib/platform/social/connections/identity");
+        const bsType = (
+          envelope.data as { type?: string } | undefined
+        )?.type as Parameters<typeof resolveIdentityFingerprint>[0]["platform"];
         const rawIdentity = await resolveIdentityFingerprint({
-          platform: (
-            envelope.data as { type?: string } | undefined
-          )?.type as Parameters<typeof resolveIdentityFingerprint>[0]["platform"],
+          platform: bsType,
           teamId,
         });
         const platformDb = conn.data.platform as string;
@@ -427,14 +432,27 @@ async function handleAccountEvent(
             rawIdentity.external_user_id,
           ),
         };
+        // Channel-selection flow (migration 0123): mirror sync.ts. The
+        // row's is_personal_mode may already be true (user previously
+        // opted into LinkedIn personal-mode); preserve it if so.
+        const hasIdentity =
+          identity.external_account_id !== null ||
+          identity.external_user_id !== null;
+        const isChannelPlatform = requiresChannelSelection(bsType);
+        const hasChannel = identity.channels.length > 0;
+        const isPersonal = Boolean(
+          (conn.data as { is_personal_mode?: boolean }).is_personal_mode,
+        );
+        const status: "healthy" | "pending_identity" = !hasIdentity
+          ? "pending_identity"
+          : isChannelPlatform && !hasChannel && !isPersonal
+            ? "pending_identity"
+            : "healthy";
         identityUpdate = {
           external_account_id: identity.external_account_id,
           external_user_id: identity.external_user_id,
           external_identity_hash: identity.external_identity_hash,
-          status:
-            identity.external_account_id || identity.external_user_id
-              ? "healthy"
-              : "pending_identity",
+          status,
         };
       }
     }

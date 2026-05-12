@@ -11,6 +11,7 @@ import {
   computeIdentityHash,
   emitCrossTenantBlocked,
   emitCrossTenantOverride,
+  requiresChannelSelection,
   resolveIdentityFingerprint,
   type BundlesocialPlatformType,
 } from "./identity";
@@ -215,7 +216,7 @@ export async function syncBundlesocialConnections(
   const existing = await svc
     .from("social_connections")
     .select(
-      "id, company_id, platform, bundle_social_account_id, display_name, avatar_url, status, profile_id",
+      "id, company_id, platform, bundle_social_account_id, display_name, avatar_url, status, profile_id, is_personal_mode",
     )
     .eq("company_id", input.companyId);
   if (existing.error) {
@@ -235,6 +236,7 @@ export async function syncBundlesocialConnections(
       avatar_url: string | null;
       status: string;
       profile_id: string | null;
+      is_personal_mode: boolean;
     }
   >();
   for (const row of existing.data ?? []) {
@@ -246,6 +248,9 @@ export async function syncBundlesocialConnections(
       avatar_url: (row.avatar_url as string | null) ?? null,
       status: row.status as string,
       profile_id: (row.profile_id as string | null) ?? null,
+      is_personal_mode: Boolean(
+        (row as { is_personal_mode?: boolean }).is_personal_mode,
+      ),
     });
   }
 
@@ -292,10 +297,24 @@ export async function syncBundlesocialConnections(
         rawIdentity.external_user_id,
       ),
     };
-    const status: "healthy" | "pending_identity" =
-      identity.external_account_id || identity.external_user_id
-        ? "healthy"
-        : "pending_identity";
+    // Channel-selection flow (migration 0123): the channel-selection
+    // platforms (LINKEDIN/FACEBOOK/INSTAGRAM/YOUTUBE/GOOGLE_BUSINESS)
+    // need a channel bound before publishing can succeed. bundle.social
+    // returns populated externalId+userId even when channels[] is empty,
+    // so the identity-only check below would wrongly mark them
+    // 'healthy'. Refuse 'healthy' until the user has either picked a
+    // channel OR explicitly opted into personal-mode (LinkedIn).
+    const hasIdentity =
+      identity.external_account_id !== null ||
+      identity.external_user_id !== null;
+    const isChannelPlatform = requiresChannelSelection(remote.type);
+    const hasChannel = identity.channels.length > 0;
+    const isPersonal = existingById.get(bundleAccountId)?.is_personal_mode ?? false;
+    const status: "healthy" | "pending_identity" = !hasIdentity
+      ? "pending_identity"
+      : isChannelPlatform && !hasChannel && !isPersonal
+        ? "pending_identity"
+        : "healthy";
 
     const localRow = existingById.get(bundleAccountId);
     if (localRow) {
