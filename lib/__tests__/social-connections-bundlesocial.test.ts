@@ -129,7 +129,10 @@ describe("syncBundlesocialConnections", () => {
     expect(rows.data?.length).toBe(2);
     expect(rows.data?.[0]?.platform).toBe("linkedin_personal");
     expect(rows.data?.[0]?.display_name).toBe("Acme LI");
-    expect(rows.data?.[0]?.status).toBe("healthy");
+    // Post-877: LINKEDIN requires channel selection before becoming healthy;
+    // a brand-new INSERT lands as pending_identity until the user picks a
+    // channel or opts into personal mode via /connect-as-personal.
+    expect(rows.data?.[0]?.status).toBe("pending_identity");
     expect(rows.data?.[1]?.platform).toBe("x");
     expect(rows.data?.[1]?.display_name).toBe("acme");
   });
@@ -146,6 +149,9 @@ describe("syncBundlesocialConnections", () => {
         display_name: "Old Name",
         status: "auth_required",
         last_error: "old token expired",
+        // Simulate a personal-mode account whose auth expired; is_personal_mode
+        // lets sync restore healthy without requiring a channel pick.
+        is_personal_mode: true,
       })
       .select("id")
       .single();
