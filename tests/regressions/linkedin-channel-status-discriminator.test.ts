@@ -27,13 +27,16 @@ import {
 function computeStatus(opts: {
   platform: string;
   externalAccountId: string | null;
+  externalUserId?: string | null;
   isPersonal: boolean;
 }): "healthy" | "pending_identity" {
+  const hasIdentity =
+    opts.externalAccountId !== null || (opts.externalUserId ?? null) !== null;
   const needsChannelSelection =
     requiresChannelSelection(opts.platform) &&
     opts.externalAccountId === null &&
     !opts.isPersonal;
-  return needsChannelSelection ? "pending_identity" : "healthy";
+  return !hasIdentity || needsChannelSelection ? "pending_identity" : "healthy";
 }
 
 describe("R-884: LinkedIn channel-status discriminator", () => {
@@ -66,28 +69,26 @@ describe("R-884: LinkedIn channel-status discriminator", () => {
     expect(status).toBe("healthy");
   });
 
-  it("TWITTER: non-channel platform → healthy regardless of externalAccountId", () => {
-    // TWITTER/X does not require channel selection; any externalId state is fine.
-    const withNull = computeStatus({
+  it("TWITTER: non-channel platform → healthy when identity is populated", () => {
+    // TWITTER/X does not require channel selection. Normal OAuth populates
+    // userId (externalUserId); externalAccountId stays null for TWITTER.
+    const status = computeStatus({
       platform: "TWITTER",
       externalAccountId: null,
+      externalUserId: "urn:twitter:user:12345",
       isPersonal: false,
     });
-    const withValue = computeStatus({
-      platform: "TWITTER",
-      externalAccountId: "twitter-user-id",
-      isPersonal: false,
-    });
-    expect(withNull).toBe("healthy");
-    expect(withValue).toBe("healthy");
+    expect(status).toBe("healthy");
   });
 
   it("LINKEDIN personal mode: is_personal_mode=true bypasses channel requirement → healthy", () => {
-    // User clicked "Connect as personal profile" — externalId stays null but
-    // channel selection is not required in this mode.
+    // User clicked "Connect as personal profile" — externalAccountId stays
+    // null (no org channel bound) but externalUserId is populated after
+    // OAuth. Channel selection is not required in personal mode.
     const status = computeStatus({
       platform: "LINKEDIN",
       externalAccountId: null,
+      externalUserId: "urn:li:person:cn_0IGowb1",
       isPersonal: true,
     });
     expect(status).toBe("healthy");
