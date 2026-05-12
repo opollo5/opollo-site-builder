@@ -1,0 +1,150 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`CONTRACT: socialAccountRefreshChannels — per platform > [snapshot] DISCORD — request body (refresh-only platform) 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "DISCORD",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountRefreshChannels — per platform > [snapshot] FACEBOOK — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "FACEBOOK",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountRefreshChannels — per platform > [snapshot] GOOGLE_BUSINESS — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "GOOGLE_BUSINESS",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountRefreshChannels — per platform > [snapshot] INSTAGRAM — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "INSTAGRAM",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountRefreshChannels — per platform > [snapshot] LINKEDIN — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "LINKEDIN",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountRefreshChannels — per platform > [snapshot] YOUTUBE — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "YOUTUBE",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountSetChannel — per platform > [snapshot] FACEBOOK — request body 1`] = `
+{
+  "requestBody": {
+    "channelId": "channel-fixture-1",
+    "teamId": "team-channels-contract",
+    "type": "FACEBOOK",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountSetChannel — per platform > [snapshot] GOOGLE_BUSINESS — request body 1`] = `
+{
+  "requestBody": {
+    "channelId": "channel-fixture-1",
+    "teamId": "team-channels-contract",
+    "type": "GOOGLE_BUSINESS",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountSetChannel — per platform > [snapshot] INSTAGRAM — request body 1`] = `
+{
+  "requestBody": {
+    "channelId": "channel-fixture-1",
+    "teamId": "team-channels-contract",
+    "type": "INSTAGRAM",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountSetChannel — per platform > [snapshot] LINKEDIN — request body 1`] = `
+{
+  "requestBody": {
+    "channelId": "channel-fixture-1",
+    "teamId": "team-channels-contract",
+    "type": "LINKEDIN",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountSetChannel — per platform > [snapshot] YOUTUBE — request body 1`] = `
+{
+  "requestBody": {
+    "channelId": "channel-fixture-1",
+    "teamId": "team-channels-contract",
+    "type": "YOUTUBE",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountUnsetChannel — per platform > [snapshot] FACEBOOK — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "FACEBOOK",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountUnsetChannel — per platform > [snapshot] GOOGLE_BUSINESS — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "GOOGLE_BUSINESS",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountUnsetChannel — per platform > [snapshot] INSTAGRAM — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "INSTAGRAM",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountUnsetChannel — per platform > [snapshot] LINKEDIN — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "LINKEDIN",
+  },
+}
+`;
+
+exports[`CONTRACT: socialAccountUnsetChannel — per platform > [snapshot] YOUTUBE — request body 1`] = `
+{
+  "requestBody": {
+    "teamId": "team-channels-contract",
+    "type": "YOUTUBE",
+  },
+}
+`;
