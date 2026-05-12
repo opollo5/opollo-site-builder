@@ -1,18 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// REGRESSION — popup OAuth callback redirects to in-popup channel picker
-// (2026-05-13 UX change).
+// REGRESSION — popup OAuth callback posts needs_channel back to the parent
+// window (2026-05-13 take 2 — reverted the in-popup picker attempt).
 //
-// Before: popup callback posted { connect: "needs_channel", connection_id }
-//         to window.opener and closed the popup. The parent window opened
-//         a ChannelPickerModal. Two-window UX.
+// Brief experiment: in-popup picker (callback 302'd the popup to
+// /connect/pick-channel). The popup→opener relationship turned out to
+// be fragile under cross-origin OAuth redirects, so we reverted to the
+// auto-opening parent-window modal approach.
 //
-// After:  popup callback 302s the popup ITSELF to
-//         /connect/pick-channel?connection_id=<id>. Single-window UX.
+// Current expectation: popup callback returns the postMessage HTML
+// envelope with connect=needs_channel and connection_id, NOT a 307.
+// The parent's message handler then mounts ChannelPickerModal.
 //
-// This test pins the new redirect target. Also asserts non-popup mode
-// and non-channel-selection success keep their existing behaviour.
+// /connect/pick-channel still exists as a fallback / direct-link page
+// but is not used by the OAuth flow.
 // ---------------------------------------------------------------------------
 
 vi.mock("@/lib/platform/auth/api-gate", () => ({
@@ -100,25 +102,28 @@ function urlWith(params: Record<string, string>): string {
   return url.toString();
 }
 
-describe("R-CALLBACK-POPUP-PICKER: in-popup channel picker redirect", () => {
-  it("popup + linkedin-callback + sync-inserted → 302 to /connect/pick-channel", async () => {
+describe("R-CALLBACK-POPUP-PICKER: popup needs_channel postMessage envelope", () => {
+  it("popup + linkedin-callback + sync-inserted → postMessage HTML with needs_channel + connection_id", async () => {
     const res = await GET(
       new Request(urlWith({ popup: "1", "linkedin-callback": "true" })) as never,
     );
-    expect(res.status).toBe(307);
-    const loc = res.headers.get("location") ?? "";
-    expect(loc).toContain("/connect/pick-channel");
-    expect(loc).toContain(`connection_id=${CONNECTION_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain('"connect":"needs_channel"');
+    expect(html).toContain(`"connection_id":"${CONNECTION_ID}"`);
+    expect(html).toContain("window.close");
   });
 
-  it("popup + facebook-callback + sync-inserted → 302 to /connect/pick-channel", async () => {
+  it("popup + facebook-callback + sync-inserted → postMessage HTML with needs_channel", async () => {
     const res = await GET(
       new Request(urlWith({ popup: "1", "facebook-callback": "true" })) as never,
     );
-    expect(res.status).toBe(307);
-    const loc = res.headers.get("location") ?? "";
-    expect(loc).toContain("/connect/pick-channel");
-    expect(loc).toContain(`connection_id=${CONNECTION_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    const html = await res.text();
+    expect(html).toContain('"connect":"needs_channel"');
+    expect(html).toContain(`"connection_id":"${CONNECTION_ID}"`);
   });
 
   it("non-popup mode for needs_channel keeps non-popup redirect to /company/social/connections", async () => {

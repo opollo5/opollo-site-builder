@@ -277,17 +277,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   if (isPopup) {
-    // In-popup channel picker (2026-05-13). When the callback would
-    // have postMessage'd connect=needs_channel and asked the parent
-    // window to open ChannelPickerModal, instead 302 the POPUP itself
-    // to /connect/pick-channel?connection_id=…. The popup loads that
-    // page, the user picks a channel inline, and the picker page fires
-    // its own postMessage + window.close. Single-window UX.
-    if (connectParam === "needs_channel" && needsChannelConnectionId) {
-      const pickerTarget = new URL("/connect/pick-channel", req.url);
-      pickerTarget.searchParams.set("connection_id", needsChannelConnectionId);
-      return NextResponse.redirect(pickerTarget);
-    }
+    // Channel picker now opens as an auto-opening modal in the parent
+    // window (2026-05-13 take 2). The previous attempt — 302'ing the
+    // popup itself to /connect/pick-channel — had fragile UX when the
+    // popup's opener relationship broke under cross-origin navigation
+    // or popup-blocker policies. Steven explicitly accepted the modal
+    // fallback. The popup closes via postMessage, the parent's message
+    // handler mounts ChannelPickerModal against connection_id.
     return popupCloseResponse(
       req,
       connectParam,

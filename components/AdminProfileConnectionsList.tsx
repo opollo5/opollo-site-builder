@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -29,6 +30,26 @@ import { toastSuccess } from "@/lib/toast-success";
 const POPUP_FEATURES =
   "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
 
+// Bundle.social platform enum → ChannelPickerModal props. null entries
+// indicate platforms that don't go through channel selection (they
+// won't trigger the modal).
+const PLATFORM_TO_BUNDLE_LABEL: Record<
+  string,
+  {
+    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
+    label: string;
+  } | null
+> = {
+  LINKEDIN: { platform: "LINKEDIN", label: "LinkedIn" },
+  FACEBOOK: { platform: "FACEBOOK", label: "Facebook" },
+  INSTAGRAM: { platform: "INSTAGRAM", label: "Instagram" },
+  YOUTUBE: { platform: "YOUTUBE", label: "YouTube" },
+  GOOGLE_BUSINESS: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
+};
+
+// 2026-05-13 platform trim: TikTok, Pinterest, Threads, and Reddit are
+// removed from the UI surface. Backend Zod enums still accept the full
+// set so any existing rows continue working.
 const PLATFORMS: Array<{
   value: SocialPlatformIconKey;
   label: string;
@@ -38,11 +59,7 @@ const PLATFORMS: Array<{
   { value: "INSTAGRAM", label: "Instagram" },
   { value: "TWITTER", label: "X (Twitter)" },
   { value: "GOOGLE_BUSINESS", label: "Google Business" },
-  { value: "TIKTOK", label: "TikTok" },
   { value: "YOUTUBE", label: "YouTube" },
-  { value: "PINTEREST", label: "Pinterest" },
-  { value: "THREADS", label: "Threads" },
-  { value: "REDDIT", label: "Reddit" },
 ];
 
 type Account = {
@@ -109,6 +126,13 @@ export function AdminProfileConnectionsList({
       }
     | null
   >(null);
+  // 2026-05-13 take 2: channel picker opens as a modal in this parent
+  // window. Tracks the connection_id currently targeted.
+  const [pickerTarget, setPickerTarget] = useState<{
+    connectionId: string;
+    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
+    label: string;
+  } | null>(null);
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -124,12 +148,26 @@ export function AdminProfileConnectionsList({
     function handleMessage(evt: MessageEvent) {
       if (evt.origin !== expectedOrigin) return;
       if (!isConnectMessage(evt.data)) return;
-      // 2026-05-13: needs_channel is no longer routed through the
-      // parent — the popup-mode picker page handles it inline and
-      // posts back `success`. Any inbound message just clears the
-      // popup state and refreshes the list.
+      // Snapshot busy BEFORE clearPopupState wipes it — we need the
+      // platform value to resolve the picker shape below.
+      const platformValue = busy;
       clearPopupState();
       setPickerOpen(false);
+      if (
+        evt.data.connect === "needs_channel" &&
+        typeof evt.data.connection_id === "string"
+      ) {
+        const mapped = platformValue
+          ? PLATFORM_TO_BUNDLE_LABEL[platformValue]
+          : null;
+        if (mapped) {
+          setPickerTarget({
+            connectionId: evt.data.connection_id,
+            platform: mapped.platform,
+            label: mapped.label,
+          });
+        }
+      }
       router.refresh();
     }
     window.addEventListener("message", handleMessage);
@@ -138,7 +176,7 @@ export function AdminProfileConnectionsList({
       if (pollRef.current) clearInterval(pollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [busy]);
 
   async function handleDisconnect(account: Account) {
     if (
@@ -264,6 +302,23 @@ export function AdminProfileConnectionsList({
 
   return (
     <div data-testid="admin-profile-connections">
+      {pickerTarget ? (
+        <ChannelPickerModal
+          connectionId={pickerTarget.connectionId}
+          platform={pickerTarget.platform}
+          platformLabel={pickerTarget.label}
+          isOpen={true}
+          onClose={() => setPickerTarget(null)}
+          onSelected={() => {
+            setPickerTarget(null);
+            toastSuccess(
+              `${pickerTarget.label} channel set — ready to publish.`,
+            );
+            router.refresh();
+          }}
+        />
+      ) : null}
+
       {preflightModal ? (
         <div
           role="dialog"

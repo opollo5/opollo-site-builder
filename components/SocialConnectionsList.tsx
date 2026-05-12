@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toastSuccess } from "@/lib/toast-success";
 
+import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -59,6 +60,10 @@ const PLATFORM_TO_BUNDLE_LABEL: Record<
 const POPUP_FEATURES =
   "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
 
+// 2026-05-13 platform trim: TikTok, Pinterest, Threads, and Reddit are
+// removed from the UI surface. Backend Zod schemas still accept the
+// full 14-platform enum, so any existing rows (or future re-enable)
+// keep working — only the user-facing connect menu is filtered.
 const PLATFORMS: Array<{
   value: SocialPlatformIconKey;
   label: string;
@@ -68,11 +73,7 @@ const PLATFORMS: Array<{
   { value: "INSTAGRAM", label: "Instagram" },
   { value: "TWITTER", label: "X (Twitter)" },
   { value: "GOOGLE_BUSINESS", label: "Google Business" },
-  { value: "TIKTOK", label: "TikTok" },
   { value: "YOUTUBE", label: "YouTube" },
-  { value: "PINTEREST", label: "Pinterest" },
-  { value: "THREADS", label: "Threads" },
-  { value: "REDDIT", label: "Reddit" },
 ];
 
 type ConnectMessage = {
@@ -149,19 +150,20 @@ export function SocialConnectionsList({
     noopdForPlatform ?? null,
   );
 
-  // 2026-05-13: when the customer page is loaded with ?connection_id=… and
-  // ?connect=needs_channel (the legacy non-popup redirect path), open a
-  // popup window to the popup-mode picker page. The new popup-mode picker
-  // (/connect/pick-channel) handles selection inside the popup itself.
+  // 2026-05-13 take 2: channel picker now auto-opens as a modal in
+  // THIS parent window when the popup posts back connect=needs_channel
+  // (or when the page is loaded with ?connect=needs_channel from the
+  // non-popup callback redirect). Replaces the brief popup-in-popup
+  // experiment whose opener relationship broke in some browsers.
+  const [pickerForConnectionId, setPickerForConnectionId] = useState<
+    string | null
+  >(null);
+
   useEffect(() => {
     if (!autoOpenPickerForConnectionId) return;
     if (!connections.some((c) => c.id === autoOpenPickerForConnectionId))
       return;
-    const url = `/connect/pick-channel?connection_id=${encodeURIComponent(
-      autoOpenPickerForConnectionId,
-    )}`;
-    openConnectPopup(url);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setPickerForConnectionId(autoOpenPickerForConnectionId);
   }, [autoOpenPickerForConnectionId, connections]);
   // Cross-tenant identity-leak defence (Layer 3): pre-flight warning
   // modal state. When the user clicks Connect, we first call
@@ -222,10 +224,15 @@ export function SocialConnectionsList({
 
       clearPopupState();
       setPickerOpen(false);
-      // 2026-05-13: needs_channel is no longer routed through the parent
-      // (the popup-mode picker page handles it inline and posts back
-      // `success`). If a legacy popup still posts needs_channel, treat
-      // it as a no-op refresh.
+      // Auto-open the channel-picker modal in the parent window when
+      // the callback signals needs_channel. The OAuth popup has just
+      // closed itself; the modal slots in immediately.
+      if (
+        evt.data.connect === "needs_channel" &&
+        typeof evt.data.connection_id === "string"
+      ) {
+        setPickerForConnectionId(evt.data.connection_id);
+      }
       // Bug-fix 2026-05-12: if the callback signalled noop with an
       // attempted_platform, show the actionable "already connected" banner.
       if (
@@ -417,8 +424,36 @@ export function SocialConnectionsList({
 
   const connectBusy = busyPlatform !== null;
 
+  // Resolve the picker target to its bundle.social platform shape so
+  // the modal renders the right labels. null when the connection isn't
+  // a channel-selection platform (modal stays closed).
+  const pickerTarget = pickerForConnectionId
+    ? (() => {
+        const c = connections.find((x) => x.id === pickerForConnectionId);
+        if (!c) return null;
+        const bundle = PLATFORM_TO_BUNDLE_LABEL[c.platform];
+        if (!bundle) return null;
+        return { conn: c, ...bundle };
+      })()
+    : null;
+
   return (
     <div data-testid="connections-list-wrapper">
+      {pickerTarget ? (
+        <ChannelPickerModal
+          connectionId={pickerTarget.conn.id}
+          platform={pickerTarget.platform}
+          platformLabel={pickerTarget.label}
+          isOpen={true}
+          onClose={() => setPickerForConnectionId(null)}
+          onSelected={() => {
+            setPickerForConnectionId(null);
+            toastSuccess("Channel set — this connection is ready to publish.");
+            router.refresh();
+          }}
+        />
+      ) : null}
+
       {noopdConnection ? (
         <div
           className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
@@ -719,10 +754,7 @@ export function SocialConnectionsList({
                       PLATFORM_TO_BUNDLE_LABEL[c.platform] !== null ? (
                         <Button
                           size="sm"
-                          onClick={() => {
-                            const url = `/connect/pick-channel?connection_id=${encodeURIComponent(c.id)}`;
-                            openConnectPopup(url);
-                          }}
+                          onClick={() => setPickerForConnectionId(c.id)}
                           disabled={
                             busyRow === c.id ||
                             connectBusy ||
