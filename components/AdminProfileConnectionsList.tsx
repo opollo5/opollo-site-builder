@@ -5,6 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Button } from "@/components/ui/button";
+import {
+  SocialPlatformIcon,
+  type SocialPlatformIconKey,
+} from "@/components/ui/SocialPlatformIcon";
 import { toastSuccess } from "@/lib/toast-success";
 
 const PLATFORM_TO_BUNDLE_LABEL: Record<
@@ -35,7 +39,10 @@ const PLATFORM_TO_BUNDLE_LABEL: Record<
 const POPUP_FEATURES =
   "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
 
-const PLATFORMS: Array<{ value: string; label: string }> = [
+const PLATFORMS: Array<{
+  value: SocialPlatformIconKey;
+  label: string;
+}> = [
   { value: "LINKEDIN", label: "LinkedIn" },
   { value: "FACEBOOK", label: "Facebook" },
   { value: "INSTAGRAM", label: "Instagram" },
@@ -381,23 +388,39 @@ export function AdminProfileConnectionsList({
           <h2 className="mb-2 text-base font-semibold">
             Connect a social account to {profileName}
           </h2>
-          <p className="mb-3 text-sm text-muted-foreground">
+          <p className="mb-4 text-sm text-muted-foreground">
             Pick a platform. A popup will open the OAuth flow for the
             chosen network. The popup closes itself when the user
             finishes (or when they cancel).
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {PLATFORMS.map((p) => (
-              <Button
-                key={p.value}
-                variant="ghost"
-                onClick={() => handleConnect(p.value)}
-                disabled={busy !== null}
-                data-testid={`connect-platform-${p.value}`}
-              >
-                {busy === p.value ? "Opening…" : p.label}
-              </Button>
-            ))}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {PLATFORMS.map((p) => {
+              const isBusy = busy === p.value;
+              return (
+                <button
+                  key={p.value}
+                  type="button"
+                  onClick={() => handleConnect(p.value)}
+                  disabled={busy !== null}
+                  className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border bg-card p-4 transition hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
+                  data-testid={`connect-platform-${p.value}`}
+                  aria-label={`Connect ${p.label}`}
+                >
+                  <SocialPlatformIcon
+                    platform={p.value}
+                    size={32}
+                    className="text-foreground"
+                  />
+                  <span className="text-sm font-medium">{p.label}</span>
+                  <span
+                    className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
+                    aria-hidden="true"
+                  >
+                    {isBusy ? "Opening…" : "Connect"}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}
