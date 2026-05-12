@@ -181,6 +181,12 @@ export function SocialConnectionsList({
 
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Timestamp set when the popup opens so we can identify connections
+  // created AFTER the popup (needed for auto-picker after sync).
+  const popupOpenedAtRef = useRef<number | null>(null);
+  // Set to Date.now() when a post-popup sync inserted > 0 rows.
+  // Drives the auto-open picker effect below.
+  const [postPopupSyncAt, setPostPopupSyncAt] = useState<number | null>(null);
 
   function clearPopupState(activeRowId?: string) {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -188,6 +194,31 @@ export function SocialConnectionsList({
     popupRef.current = null;
     setBusyPlatform(null);
     if (activeRowId) setBusyRow(null);
+  }
+
+  // When bundle.social redirects the popup to their own dashboard instead
+  // of our /callback URL (the redirectUrl parameter is not honoured as a
+  // browser redirect — confirmed 2026-05-13), the popup-close poll is the
+  // only signal we get. Trigger an explicit sync so bundle.social-created
+  // connections land in our DB even without a callback hit.
+  async function syncOnPopupClose(rowId?: string) {
+    clearPopupState(rowId);
+    let inserted = 0;
+    try {
+      const r = await fetch("/api/platform/social/connections/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId }),
+      });
+      if (r.ok) {
+        const json = (await r.json()) as { data?: { inserted: number } };
+        inserted = json?.data?.inserted ?? 0;
+      }
+    } catch {
+      // Non-fatal — router.refresh() still picks up state via server fetch.
+    }
+    if (inserted > 0) setPostPopupSyncAt(Date.now());
+    router.refresh();
   }
 
   function openConnectPopup(url: string, rowId?: string) {
@@ -206,14 +237,38 @@ export function SocialConnectionsList({
 
     setPopupBlockedUrl(null);
     popupRef.current = popup;
+    popupOpenedAtRef.current = Date.now();
 
+    let closedHandled = false;
     pollRef.current = setInterval(() => {
-      if (popup.closed) {
-        clearPopupState(rowId);
-        router.refresh();
+      if (popup.closed && !closedHandled) {
+        closedHandled = true;
+        void syncOnPopupClose(rowId);
       }
     }, 500);
   }
+
+  // After a sync-on-popup-close finds inserted > 0, check whether a new
+  // pending_identity connection appeared. If so, auto-open the picker.
+  useEffect(() => {
+    if (postPopupSyncAt === null) return;
+    if (pickerForConnectionId) { setPostPopupSyncAt(null); return; }
+    const since = (popupOpenedAtRef.current ?? 0) - 5_000;
+    const newPending = connections.find(
+      (c) =>
+        c.status === "pending_identity" &&
+        PLATFORM_TO_BUNDLE_LABEL[c.platform] !== null &&
+        new Date(c.connected_at).getTime() >= since,
+    );
+    if (newPending) {
+      setPickerForConnectionId(newPending.id);
+      setPostPopupSyncAt(null);
+      return;
+    }
+    // Give up after 10 s to avoid a stuck state (e.g. inserted but no
+    // pending_identity — TWITTER goes straight to healthy).
+    if (Date.now() - postPopupSyncAt > 10_000) setPostPopupSyncAt(null);
+  }, [connections, pickerForConnectionId, postPopupSyncAt]);
 
   useEffect(() => {
     const expectedOrigin = window.location.origin;
