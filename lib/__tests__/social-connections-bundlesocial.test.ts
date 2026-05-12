@@ -24,10 +24,10 @@
 const mockClient = {
   socialAccount: {
     socialAccountCreatePortalLink: vi.fn(),
-    // resolveIdentityFingerprint calls this; return realistic identity so
-    // sync.ts marks accounts "healthy" rather than "pending_identity".
+    // resolveIdentityFingerprint calls this; externalId=null simulates a
+    // fresh OAuth where no channel has been selected yet (post-#884 fix).
     socialAccountGetByType: vi.fn().mockResolvedValue({
-      externalId: "ext-acct-mock",
+      externalId: null,
       userId: "user-mock",
     }),
   },
@@ -72,8 +72,11 @@ async function seedCompany(id: string, slug: string): Promise<void> {
 beforeEach(() => {
   mockClient.socialAccount.socialAccountCreatePortalLink.mockReset();
   mockClient.socialAccount.socialAccountGetByType.mockReset();
+  // Simulate fresh OAuth: externalId=null (no channel selected yet), userId
+  // populated. With the #884 fix, LINKEDIN lands as pending_identity until
+  // the user calls setChannel and externalId becomes non-null.
   mockClient.socialAccount.socialAccountGetByType.mockResolvedValue({
-    externalId: "ext-acct-mock",
+    externalId: null,
     userId: "user-mock",
   });
   mockClient.team.teamGetTeam.mockReset();

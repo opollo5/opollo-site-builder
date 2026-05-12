@@ -305,17 +305,17 @@ export async function syncBundlesocialConnections(
     // so the identity-only check below would wrongly mark them
     // 'healthy'. Refuse 'healthy' until the user has either picked a
     // channel OR explicitly opted into personal-mode (LinkedIn).
-    const hasIdentity =
-      identity.external_account_id !== null ||
-      identity.external_user_id !== null;
-    const isChannelPlatform = requiresChannelSelection(remote.type);
-    const hasChannel = identity.channels.length > 0;
+    // Post-877 fix (#884): externalId (= external_account_id) is null until
+    // the user calls socialAccountSetChannel. channels.length > 0 fires
+    // immediately after OAuth so it is NOT a valid "channel selected" signal.
     const isPersonal = existingById.get(bundleAccountId)?.is_personal_mode ?? false;
-    const status: "healthy" | "pending_identity" = !hasIdentity
+    const needsChannelSelection =
+      requiresChannelSelection(remote.type) &&
+      identity.external_account_id === null &&
+      !isPersonal;
+    const status: "healthy" | "pending_identity" = needsChannelSelection
       ? "pending_identity"
-      : isChannelPlatform && !hasChannel && !isPersonal
-        ? "pending_identity"
-        : "healthy";
+      : "healthy";
 
     // Prefer the display name from socialAccountGetByType (identity) over
     // teamGetTeam (remote) — the former populates userDisplayName even for
