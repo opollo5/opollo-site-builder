@@ -669,6 +669,14 @@ export function SocialConnectionsList({
                         </span>
                       )}
                     </div>
+                    {c.status === "healthy" && c.is_personal_mode ? (
+                      <div
+                        className="mt-0.5 text-xs italic text-muted-foreground"
+                        data-testid={`connection-personal-mode-${c.id}`}
+                      >
+                        Personal profile
+                      </div>
+                    ) : null}
                     {c.last_error ? (
                       <div
                         className="mt-1 text-sm text-rose-700"

@@ -8,7 +8,7 @@ import {
 } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import { refreshChannels } from "@/lib/platform/social/connections/channels";
+import { getChannels } from "@/lib/platform/social/connections/channels";
 import {
   CHANNEL_SELECTION_PLATFORMS,
 } from "@/lib/platform/social/connections/identity";
@@ -50,7 +50,12 @@ export async function GET(
     );
   }
 
-  const result = await refreshChannels({
+  // Use getChannels (socialAccountGetByType — reads cached channels) rather
+  // than refreshChannels (socialAccountRefreshChannels — forces a platform
+  // re-fetch). Refresh 500s on LinkedIn at bundle.social's end; the cached
+  // list is populated immediately after OAuth so it's all the picker needs.
+  // Incident: docs/incidents/2026-05-12-channel-picker-second-pass.md §B.
+  const result = await getChannels({
     teamId: conn.teamId,
     platform: conn.bundlePlatform,
   });
