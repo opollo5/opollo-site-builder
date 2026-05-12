@@ -612,12 +612,19 @@ export async function verifyBundlesocialDisconnect(input: {
   teamId: string;
   platform: BundlesocialPlatformType;
   // Defaults: 2s settle + one retry after 5s ⇒ ~7s wall-clock worst case.
+  // Tests override these via BUNDLE_VERIFY_*_MS env vars (set to 0).
   initialWaitMs?: number;
   retryWaitMs?: number;
   retries?: number;
 }): Promise<{ clean: boolean; reason: string }> {
-  const initialWaitMs = input.initialWaitMs ?? 2_000;
-  const retryWaitMs = input.retryWaitMs ?? 5_000;
+  const envInitial = Number(process.env.BUNDLE_VERIFY_INITIAL_WAIT_MS);
+  const envRetry = Number(process.env.BUNDLE_VERIFY_RETRY_WAIT_MS);
+  const initialWaitMs =
+    input.initialWaitMs ??
+    (Number.isFinite(envInitial) && envInitial >= 0 ? envInitial : 2_000);
+  const retryWaitMs =
+    input.retryWaitMs ??
+    (Number.isFinite(envRetry) && envRetry >= 0 ? envRetry : 5_000);
   const retries = input.retries ?? 1;
 
   await new Promise((r) => setTimeout(r, initialWaitMs));

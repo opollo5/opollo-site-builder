@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Make the L4 verify-loop's setTimeout windows zero so this test file
+// doesn't pay the 2s + 5s wall-clock cost per retry case.
+process.env.BUNDLE_VERIFY_INITIAL_WAIT_MS = "0";
+process.env.BUNDLE_VERIFY_RETRY_WAIT_MS = "0";
+
 // ---------------------------------------------------------------------------
 // REGRESSION — Layer 6 disconnect ordering.
 //
@@ -24,6 +29,14 @@ const unsetChannelSdkMock = vi.fn(async () => {
 const disconnectSdkMock = vi.fn(async () => {
   callOrder.push("disconnect");
 });
+// L4 verify-then-delete: after the disconnect, the route calls
+// socialAccountGetByType to confirm BS released the account. Returning
+// null = clean (verify succeeds). Tests overriding this to return an
+// account object simulate split-brain.
+const getByTypeSdkMock = vi.fn(async () => {
+  callOrder.push("verify-getByType");
+  return null;
+});
 const deleteMock = vi.fn(async () => {
   callOrder.push("delete");
   return { error: null };
@@ -35,6 +48,7 @@ vi.mock("@/lib/bundlesocial", () => ({
     socialAccount: {
       socialAccountUnsetChannel: unsetChannelSdkMock,
       socialAccountDisconnect: disconnectSdkMock,
+      socialAccountGetByType: getByTypeSdkMock,
     },
   }),
 }));
@@ -105,6 +119,11 @@ beforeEach(() => {
   callOrder.length = 0;
   unsetChannelSdkMock.mockClear();
   disconnectSdkMock.mockClear();
+  getByTypeSdkMock.mockClear();
+  getByTypeSdkMock.mockImplementation(async () => {
+    callOrder.push("verify-getByType");
+    return null;
+  });
   deleteMock.mockClear();
   insertEventMock.mockClear();
   connRow = {
@@ -128,45 +147,98 @@ async function callDisconnect(): Promise<Response> {
   });
 }
 
-describe("R-DISCONNECT: order is unset → disconnect → DELETE", () => {
-  it("channel-selection platform with bound channel: unset runs first", async () => {
+describe("R-DISCONNECT: order is unset → disconnect → verify → DELETE", () => {
+  it("channel-selection platform with bound channel: unset runs first, verify gates delete", async () => {
     const res = await callDisconnect();
     expect(res.status).toBe(200);
-    expect(callOrder).toEqual(["unsetChannel", "disconnect", "delete"]);
+    expect(callOrder).toEqual([
+      "unsetChannel",
+      "disconnect",
+      "verify-getByType",
+      "delete",
+    ]);
   });
 
   it("personal-mode LinkedIn skips unsetChannel (no channel bound)", async () => {
     connRow.is_personal_mode = true;
     const res = await callDisconnect();
     expect(res.status).toBe(200);
-    expect(callOrder).toEqual(["disconnect", "delete"]);
+    expect(callOrder).toEqual(["disconnect", "verify-getByType", "delete"]);
   });
 
   it("non-channel-selection platform (X) skips unsetChannel", async () => {
     connRow.platform = "x";
     const res = await callDisconnect();
     expect(res.status).toBe(200);
-    expect(callOrder).toEqual(["disconnect", "delete"]);
+    expect(callOrder).toEqual(["disconnect", "verify-getByType", "delete"]);
   });
 
-  it("DELETE still runs when unsetChannel errors", async () => {
+  it("DELETE still runs when unsetChannel errors (verify still clean)", async () => {
     unsetChannelSdkMock.mockImplementationOnce(async () => {
       callOrder.push("unsetChannel");
       throw new Error("upstream fail");
     });
     const res = await callDisconnect();
     expect(res.status).toBe(200);
-    expect(callOrder).toEqual(["unsetChannel", "disconnect", "delete"]);
+    expect(callOrder).toEqual([
+      "unsetChannel",
+      "disconnect",
+      "verify-getByType",
+      "delete",
+    ]);
   });
 
-  it("DELETE still runs when socialAccountDisconnect errors", async () => {
+  it("DELETE still runs when socialAccountDisconnect errors but verify is clean (idempotent)", async () => {
     disconnectSdkMock.mockImplementationOnce(async () => {
       callOrder.push("disconnect");
       throw new Error("upstream fail");
     });
     const res = await callDisconnect();
     expect(res.status).toBe(200);
-    expect(callOrder).toEqual(["unsetChannel", "disconnect", "delete"]);
+    expect(callOrder).toEqual([
+      "unsetChannel",
+      "disconnect",
+      "verify-getByType",
+      "delete",
+    ]);
+  });
+
+  it("SPLIT-BRAIN: BS still has account after disconnect → 409, NO delete, audit logged", async () => {
+    // Simulate bundle.social NOT releasing the account after disconnect.
+    // verify-getByType returns a non-null account on every call.
+    getByTypeSdkMock.mockImplementation(async () => {
+      callOrder.push("verify-getByType");
+      return { id: "bs-acct-1" };
+    });
+    const res = await callDisconnect();
+    expect(res.status).toBe(409);
+    const body = (await res.json()) as {
+      ok: boolean;
+      error: { code: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("INVALID_STATE");
+    // The route MUST NOT delete the row when verify never goes clean.
+    expect(callOrder).not.toContain("delete");
+    // The route should have retried the disconnect once before giving up.
+    // Final order: initial unset/disconnect + verify (still has) + retry
+    // disconnect + verify (still has).
+    expect(disconnectSdkMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("SPLIT-BRAIN-RECOVERY: verify clean after one retry → delete proceeds", async () => {
+    // First verify returns account, retry-disconnect runs, then second
+    // verify returns null → clean → delete.
+    let call = 0;
+    getByTypeSdkMock.mockImplementation(async () => {
+      callOrder.push("verify-getByType");
+      call += 1;
+      return call === 1 ? { id: "bs-acct-1" } : null;
+    });
+    const res = await callDisconnect();
+    expect(res.status).toBe(200);
+    expect(callOrder).toContain("delete");
+    expect(disconnectSdkMock).toHaveBeenCalledTimes(2);
   });
 
   it("400 'Team does not have' is idempotent-success, not a failure", async () => {
