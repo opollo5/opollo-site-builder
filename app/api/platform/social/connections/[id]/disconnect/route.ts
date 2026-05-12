@@ -13,6 +13,7 @@ import { unsetChannel } from "@/lib/platform/social/connections/channels";
 import {
   CHANNEL_SELECTION_PLATFORMS,
 } from "@/lib/platform/social/connections/identity";
+import { verifyBundlesocialDisconnect } from "@/lib/platform/social/connections/reconcile";
 import { loadConnectionWithTeam } from "@/lib/platform/social/connections/route-helpers";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -77,6 +78,10 @@ export async function POST(
     unset_error: string | null;
     disconnect_ok: boolean;
     disconnect_error: string | null;
+    // L4: post-disconnect verify. Did bundle.social actually drop the
+    // account? deleted only flips true when verify_clean is also true.
+    verify_clean: boolean | null;
+    verify_reason: string | null;
     deleted: boolean;
     delete_error: string | null;
   } = {
@@ -84,6 +89,8 @@ export async function POST(
     unset_error: null,
     disconnect_ok: false,
     disconnect_error: null,
+    verify_clean: null,
+    verify_reason: null,
     deleted: false,
     delete_error: null,
   };
@@ -133,9 +140,57 @@ export async function POST(
     }
   }
 
-  // Step 4: DELETE the row regardless of upstream outcome. The customer
-  // pressed disconnect; the row must go away.
+  // Step 4: VERIFY (L4 split-brain defence). bundle.social must
+  // confirm the account is actually gone before we delete the DB row.
+  // verifyBundlesocialDisconnect handles the wait + retry-on-still-
+  // present internally.
+  const verify = await verifyBundlesocialDisconnect({
+    teamId: conn.teamId,
+    platform: conn.bundlePlatform,
+  });
+  audit.verify_clean = verify.clean;
+  audit.verify_reason = verify.reason;
+
   const svc = getServiceRoleClient();
+  if (!verify.clean) {
+    // Split-brain detected — bundle.social still holds the account
+    // after our disconnect + retry. DO NOT delete the DB row; it
+    // remains the source of truth so the reconcile cron / admin
+    // surface can resolve it.
+    logger.error("social.connections.disconnect.split_brain_detected", {
+      connection_id: conn.id,
+      team_id: conn.teamId,
+      platform: conn.bundlePlatform,
+      reason: verify.reason,
+    });
+    void (async () => {
+      try {
+        await svc.from("platform_events").insert({
+          event_type: "disconnect_split_brain_detected",
+          company_id: conn.company_id,
+          actor_id: gate.userId,
+          entity_type: "social_connection",
+          entity_id: conn.id,
+          payload: {
+            team_id: conn.teamId,
+            platform: conn.bundlePlatform,
+            bundle_social_account_id: conn.bundle_social_account_id,
+            reason: verify.reason,
+            ...audit,
+          },
+        });
+      } catch (err) {
+        logger.warn("social.connections.disconnect.split_brain_audit_failed", {
+          err: err instanceof Error ? err.message : String(err),
+        });
+      }
+    })();
+    return invalidState(
+      "Disconnect could not be verified on bundle.social; the row was kept. An admin can resolve this from the maintenance reconcile surface.",
+    );
+  }
+
+  // Step 5: bundle.social confirmed clean — DELETE the row.
   const del = await svc.from("social_connections").delete().eq("id", conn.id);
   if (del.error) {
     audit.delete_error = del.error.message;
@@ -147,7 +202,7 @@ export async function POST(
     audit.deleted = true;
   }
 
-  // Step 5: audit event. Fire-and-forget; the disconnect succeeded from
+  // Step 6: audit event. Fire-and-forget; the disconnect succeeded from
   // the customer's perspective regardless of audit insertion.
   void (async () => {
     try {

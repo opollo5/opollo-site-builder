@@ -4,11 +4,13 @@ import { z } from "zod";
 import { dbUuid, readJsonBody, validationError, invalidState, internalError, notFound } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { preConnectGhostCheck } from "@/lib/platform/social/connections/reconcile";
 import { getProfileById } from "@/lib/platform/social/profiles";
 import {
   initiateProfileConnect,
   type ProfileSocialPlatform,
 } from "@/lib/platform/social/profiles/connect";
+import { getOrCreateBundleSocialTeamForProfile } from "@/lib/platform/social/profiles/provision-team";
 
 // ---------------------------------------------------------------------------
 // BSP-6-CUSTOMER — POST /api/platform/social/connections/connect
@@ -95,6 +97,67 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       userId: gate.userId,
     });
     return notFound("Profile not found in this company.");
+  }
+
+  // L1 pre-connect ghost check (failsafe, 2026-05-12). Before opening
+  // OAuth, ask bundle.social whether the team already holds an account
+  // for this platform.
+  //   - clean → proceed as today
+  //   - ghost_cleared → BS had a ghost; auto-disconnected; proceed
+  //   - db_match → an existing DB row matches; tell the UI to surface it
+  //   - error → defensive: proceed; the connect step will surface
+  //     bundle.social's own error if it still rejects
+  try {
+    const teamId = await getOrCreateBundleSocialTeamForProfile(parsed.data.profile_id);
+    const pre = await preConnectGhostCheck({
+      teamId,
+      platform: parsed.data.platform as ProfileSocialPlatform,
+      actorId: gate.userId,
+    });
+    if (pre.kind === "ghost_cleared") {
+      logger.info("social.connections.connect.pre_ghost_cleared", {
+        company_id: parsed.data.company_id,
+        profile_id: parsed.data.profile_id,
+        platform: parsed.data.platform,
+        team_id: teamId,
+        bundle_account_id: pre.bundle_account_id,
+      });
+    } else if (pre.kind === "db_match") {
+      logger.info("social.connections.connect.pre_db_match", {
+        company_id: parsed.data.company_id,
+        platform: parsed.data.platform,
+        existing_connection_id: pre.existing_connection_id,
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "ALREADY_CONNECTED",
+            message: `${parsed.data.platform} is already connected on this profile. Disconnect the existing account first.`,
+            existing_connection_id: pre.existing_connection_id,
+            existing_company_id: pre.existing_company_id,
+            existing_display_name: pre.existing_display_name,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 409 },
+      );
+    } else if (pre.kind === "error") {
+      logger.warn("social.connections.connect.pre_check_failed", {
+        company_id: parsed.data.company_id,
+        platform: parsed.data.platform,
+        message: pre.message,
+      });
+      // Continue to initiateProfileConnect anyway — the SDK will surface
+      // a real "already connected" error if there's genuinely a clash.
+    }
+  } catch (err) {
+    logger.warn("social.connections.connect.pre_check_setup_failed", {
+      company_id: parsed.data.company_id,
+      profile_id: parsed.data.profile_id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    // Fall through — the connect path will handle its own provisioning.
   }
 
   const origin =
