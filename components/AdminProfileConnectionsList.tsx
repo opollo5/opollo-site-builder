@@ -3,29 +3,19 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
-import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   SocialPlatformIcon,
   type SocialPlatformIconKey,
 } from "@/components/ui/SocialPlatformIcon";
 import { toastSuccess } from "@/lib/toast-success";
 
-const PLATFORM_TO_BUNDLE_LABEL: Record<
-  string,
-  {
-    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
-    label: string;
-  } | null
-> = {
-  LINKEDIN: { platform: "LINKEDIN", label: "LinkedIn" },
-  FACEBOOK: { platform: "FACEBOOK", label: "Facebook" },
-  INSTAGRAM: { platform: "INSTAGRAM", label: "Instagram" },
-  YOUTUBE: { platform: "YOUTUBE", label: "YouTube" },
-  GOOGLE_BUSINESS: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
-};
-
-// BSP-6 — per-profile connections list with connect lightbox.
+// BSP-6 — per-profile connections list with connect dropdown.
 //
 // Lightbox is a simple inline panel with platform buttons; clicking a
 // platform opens a popup window pointing at the bundle.social OAuth URL
@@ -104,7 +94,8 @@ export function AdminProfileConnectionsList({
 }: Props) {
   const router = useRouter();
   const [accounts, setAccounts] = useState<Account[]>(initialAccounts);
-  const [showLightbox, setShowLightbox] = useState(false);
+  // Popover open state for the platform-picker dropdown (G1).
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null); // platform value
   const [disconnectBusy, setDisconnectBusy] = useState<string | null>(null); // account id
   const [error, setError] = useState<string | null>(initialTeamReadError);
@@ -118,13 +109,6 @@ export function AdminProfileConnectionsList({
       }
     | null
   >(null);
-  // Channel-selection flow (incident 2026-05-12): the connection_id
-  // currently targeted by the picker modal.
-  const [pickerTarget, setPickerTarget] = useState<{
-    connectionId: string;
-    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
-    label: string;
-  } | null>(null);
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -140,26 +124,12 @@ export function AdminProfileConnectionsList({
     function handleMessage(evt: MessageEvent) {
       if (evt.origin !== expectedOrigin) return;
       if (!isConnectMessage(evt.data)) return;
-      // Snapshot busy BEFORE clearPopupState wipes it — we need the
-      // platform value to resolve the picker shape below.
-      const platformValue = busy;
+      // 2026-05-13: needs_channel is no longer routed through the
+      // parent — the popup-mode picker page handles it inline and
+      // posts back `success`. Any inbound message just clears the
+      // popup state and refreshes the list.
       clearPopupState();
-      setShowLightbox(false);
-      if (
-        evt.data.connect === "needs_channel" &&
-        typeof evt.data.connection_id === "string"
-      ) {
-        const mapped = platformValue
-          ? PLATFORM_TO_BUNDLE_LABEL[platformValue]
-          : null;
-        if (mapped) {
-          setPickerTarget({
-            connectionId: evt.data.connection_id,
-            platform: mapped.platform,
-            label: mapped.label,
-          });
-        }
-      }
+      setPickerOpen(false);
       router.refresh();
     }
     window.addEventListener("message", handleMessage);
@@ -168,7 +138,7 @@ export function AdminProfileConnectionsList({
       if (pollRef.current) clearInterval(pollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busy]);
+  }, []);
 
   async function handleDisconnect(account: Account) {
     if (
@@ -285,7 +255,7 @@ export function AdminProfileConnectionsList({
     pollRef.current = setInterval(() => {
       if (popup.closed) {
         clearPopupState();
-        setShowLightbox(false);
+        setPickerOpen(false);
         router.refresh();
         toastSuccess(`${platform} connection flow closed.`);
       }
@@ -294,23 +264,6 @@ export function AdminProfileConnectionsList({
 
   return (
     <div data-testid="admin-profile-connections">
-      {pickerTarget ? (
-        <ChannelPickerModal
-          connectionId={pickerTarget.connectionId}
-          platform={pickerTarget.platform}
-          platformLabel={pickerTarget.label}
-          isOpen={true}
-          onClose={() => setPickerTarget(null)}
-          onSelected={() => {
-            setPickerTarget(null);
-            toastSuccess(
-              `${pickerTarget.label} channel set — ready to publish.`,
-            );
-            router.refresh();
-          }}
-        />
-      ) : null}
-
       {preflightModal ? (
         <div
           role="dialog"
@@ -372,58 +325,69 @@ export function AdminProfileConnectionsList({
       ) : null}
 
       <div className="mb-4 flex items-center justify-end gap-2">
-        <Button
-          onClick={() => setShowLightbox((s) => !s)}
-          data-testid="connect-lightbox-toggle"
-        >
-          {showLightbox ? "Cancel" : "Connect new account"}
-        </Button>
-      </div>
-
-      {showLightbox ? (
-        <div
-          className="mb-4 rounded-md border bg-card p-4"
-          data-testid="connect-lightbox"
-        >
-          <h2 className="mb-2 text-base font-semibold">
-            Connect a social account to {profileName}
-          </h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Pick a platform. A popup will open the OAuth flow for the
-            chosen network. The popup closes itself when the user
-            finishes (or when they cancel).
-          </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {PLATFORMS.map((p) => {
-              const isBusy = busy === p.value;
-              return (
-                <button
-                  key={p.value}
-                  type="button"
-                  onClick={() => handleConnect(p.value)}
-                  disabled={busy !== null}
-                  className="flex cursor-pointer flex-col items-center gap-3 rounded-lg border bg-card p-4 transition hover:bg-muted/50 disabled:cursor-not-allowed disabled:opacity-60"
-                  data-testid={`connect-platform-${p.value}`}
-                  aria-label={`Connect ${p.label}`}
-                >
-                  <SocialPlatformIcon
-                    platform={p.value}
-                    size={32}
-                    className="text-foreground"
-                  />
-                  <span className="text-sm font-medium">{p.label}</span>
-                  <span
-                    className="inline-flex h-8 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground"
-                    aria-hidden="true"
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              disabled={busy !== null}
+              data-testid="connect-lightbox-toggle"
+              aria-haspopup="menu"
+              aria-expanded={pickerOpen}
+            >
+              Connect new account
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="w-[280px] p-1"
+            data-testid="connect-platform-menu"
+          >
+            {/* `connect-lightbox` alias preserved for e2e backward compat. */}
+            <div
+              role="menu"
+              className="flex flex-col"
+              data-testid="connect-lightbox"
+            >
+              {PLATFORMS.map((p) => {
+                const isBusy = busy === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    role="menuitem"
+                    type="button"
+                    onClick={() => {
+                      setPickerOpen(false);
+                      void handleConnect(p.value);
+                    }}
+                    disabled={busy !== null}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted/60 focus:bg-muted/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    data-testid={`connect-platform-${p.value}`}
+                    aria-label={`Connect ${p.label} to ${profileName}`}
                   >
-                    {isBusy ? "Opening…" : "Connect"}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                    <SocialPlatformIcon
+                      platform={p.value}
+                      size={16}
+                      className="flex-shrink-0 text-foreground"
+                    />
+                    <span className="flex-1 font-medium">{p.label}</span>
+                    {isBusy ? (
+                      <span className="text-xs text-muted-foreground">
+                        Opening…
+                      </span>
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="text-muted-foreground"
+                      >
+                        ›
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
 
       {error ? (
         <p

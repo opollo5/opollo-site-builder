@@ -4,13 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SocialConnectionsList } from "@/components/SocialConnectionsList";
 
 // ---------------------------------------------------------------------------
-// P1 — Connect tile grid render + click behaviour.
+// 2026-05-13 — Connect dropdown menu render + click behaviour.
+//
+// The platform-picker was a 3-column tile grid (PR #880). It's now a
+// Popover dropdown — click "Connect new account" → menu opens → menu
+// items are role="menuitem" with the same data-testid="connect-platform-
+// <KEY>" so the existing e2e selectors and the OAuth click path still work.
 //
 // Asserts:
-//   1. Clicking "Connect new account" reveals the tile grid with all 10
-//      platform tiles, each with the correct test-id, label, and SVG icon.
-//   2. Clicking a tile calls runPreflight (GET) and then the connect POST.
-//   3. The popup opens with the URL the route returned.
+//   1. Clicking "Connect new account" opens the popover; all 10 platform
+//      menu items render with icon + label.
+//   2. Each menu item carries an accessible name 'Connect <platform>'.
+//   3. Clicking a menu item triggers the OAuth handler (preflight GET +
+//      connect POST + window.open).
 // ---------------------------------------------------------------------------
 
 vi.mock("sonner", () => ({
@@ -87,38 +93,51 @@ function renderList() {
   );
 }
 
-describe("SocialConnectionsList — tile grid (P1)", () => {
-  it("renders all 10 platform tiles when the lightbox opens", () => {
+describe("SocialConnectionsList — Connect dropdown", () => {
+  it("renders all 10 platform menu items when the popover opens", () => {
     renderList();
 
-    // Open the lightbox.
+    // Click trigger to open the popover. Radix portals the content
+    // into document.body — testing-library queries against the document
+    // by default so getByTestId still resolves.
     fireEvent.click(screen.getByTestId("connections-connect-button"));
-    expect(screen.getByTestId("connect-lightbox")).toBeInTheDocument();
+    expect(screen.getByTestId("connect-platform-menu")).toBeInTheDocument();
 
     for (const platform of PLATFORMS) {
-      const tile = screen.getByTestId(`connect-platform-${platform}`);
-      expect(tile).toBeInTheDocument();
-      // Each tile carries the platform label as a text node.
-      expect(tile).toHaveTextContent(PLATFORM_LABEL[platform]!);
+      const item = screen.getByTestId(`connect-platform-${platform}`);
+      expect(item).toBeInTheDocument();
+      // Each item shows the platform label as a text node.
+      expect(item).toHaveTextContent(PLATFORM_LABEL[platform]!);
       // And renders an inline SVG icon (brand glyph).
-      const svg = tile.querySelector("svg");
+      const svg = item.querySelector("svg");
       expect(svg).not.toBeNull();
+      // And is a menuitem.
+      expect(item.getAttribute("role")).toBe("menuitem");
     }
   });
 
-  it("each tile carries an accessible name 'Connect <platform>'", () => {
+  it("each menu item carries an accessible name 'Connect <platform>'", () => {
     renderList();
     fireEvent.click(screen.getByTestId("connections-connect-button"));
 
     for (const platform of PLATFORMS) {
-      const tile = screen.getByLabelText(
+      const item = screen.getByLabelText(
         `Connect ${PLATFORM_LABEL[platform]}`,
       );
-      expect(tile).toBe(screen.getByTestId(`connect-platform-${platform}`));
+      expect(item).toBe(screen.getByTestId(`connect-platform-${platform}`));
     }
   });
 
-  it("clicking a tile triggers the OAuth handler (preflight + connect POST + window.open)", async () => {
+  it("trigger button is aria-haspopup=menu and aria-expanded reflects open state", () => {
+    renderList();
+    const trigger = screen.getByTestId("connections-connect-button");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("menu");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("clicking a menu item triggers the OAuth handler (preflight + connect POST + window.open)", async () => {
     // Pre-flight returns no warning, then connect returns an OAuth URL.
     fetchMock
       .mockResolvedValueOnce(
@@ -141,7 +160,6 @@ describe("SocialConnectionsList — tile grid (P1)", () => {
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
 
-    // Wait for the two fetches and the window.open to fire.
     await vi.waitFor(() => {
       expect(openMock).toHaveBeenCalledTimes(1);
     });
@@ -154,7 +172,6 @@ describe("SocialConnectionsList — tile grid (P1)", () => {
       "/api/platform/social/connections/connect",
     );
 
-    // Connect POST body shape.
     const connectInit = fetchMock.mock.calls[1]?.[1] as RequestInit | undefined;
     const body = connectInit?.body
       ? (JSON.parse(connectInit.body as string) as Record<string, unknown>)
@@ -165,7 +182,6 @@ describe("SocialConnectionsList — tile grid (P1)", () => {
       platform: "FACEBOOK",
     });
 
-    // window.open invoked with the URL the route returned + the popup name.
     expect(openMock).toHaveBeenCalledWith(
       "https://www.facebook.com/v23.0/dialog/oauth?xyz=1",
       "bundle-connect",
