@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { H1, Lead } from "@/components/ui/typography";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
+import { emitOverdueEventsIfNeeded } from "@/lib/platform/social/connections/overdue-events";
 import { listProfilesForCompany } from "@/lib/platform/social/profiles";
 
 // ---------------------------------------------------------------------------
@@ -27,6 +28,14 @@ type SearchParams = {
   connect?: string;
   reason?: string;
   count?: string;
+  // Channel-selection flow (incident 2026-05-12): the callback route
+  // sets this on success-with-channel-needed so the client can auto-
+  // open the channel-picker modal against the freshly-inserted row.
+  connection_id?: string;
+  // Bug-fix 2026-05-12: set on noop+updated to identify which platform
+  // the user tried to connect (already had one). Drives the actionable
+  // "already connected" banner + row highlight in SocialConnectionsList.
+  attempted_platform?: string;
 };
 
 const REASON_LABEL: Record<string, string> = {
@@ -35,6 +44,20 @@ const REASON_LABEL: Record<string, string> = {
   "not-enough-pages": "No eligible pages were attached to that account.",
   "auth-failed": "The platform rejected the sign-in.",
   "user-cancelled": "You cancelled the connection flow.",
+  // Channel-selection flow (incident 2026-05-12). Platform-specific
+  // error codes surfaced when the user's OAuth grant is valid but the
+  // account lacks the resource needed to publish — no admin orgs on
+  // LinkedIn, no business pages on Facebook, etc.
+  "not-enough-channels":
+    "Your account doesn't admin any pages or channels for this platform. " +
+    "Connect a different account or, for LinkedIn, choose personal-mode.",
+  "not-enough-accounts":
+    "Your Instagram account isn't linked to a Facebook Page. " +
+    "Link them via Meta Business Suite, then reconnect here.",
+  "not-enough-servers":
+    "Your Discord account doesn't admin any servers Opollo can post to.",
+  "not-enough-workspaces":
+    "Your Slack account isn't a member of any workspace Opollo can post to.",
   // Cross-tenant identity-leak defence (migration 0122). Set by the
   // sync layer when checkCrossTenantConflict refuses an INSERT because
   // the same platform identity is already owned by another company.
@@ -46,6 +69,10 @@ const REASON_LABEL: Record<string, string> = {
 
 function ConnectBanner({ params }: { params: SearchParams }) {
   if (!params.connect) return null;
+  // Channel-selection flow: the channel-picker modal handles its own
+  // UX state. The banner stays silent so the modal isn't competing
+  // for attention.
+  if (params.connect === "needs_channel") return null;
   if (params.connect === "success") {
     const n = Number(params.count ?? "1");
     return (
@@ -145,10 +172,17 @@ export default async function CompanySocialConnectionsPage({
     import("@/lib/platform/social/connections/types").SocialConnection[]
   > = {};
   if (listResult.ok) {
+    // Channel-selection flow: emit connection_channel_overdue events
+    // for any pending_identity rows > 24h that haven't emitted yet.
+    // The helper flips has_emitted_overdue_event in the DB and returns
+    // a patched list so the banner stays in sync with DB state.
+    const connections = await emitOverdueEventsIfNeeded(
+      listResult.data.connections,
+    );
     for (const p of profiles) buckets[p.id] = [];
     const defaultProfileId =
       profiles.find((p) => p.is_default)?.id ?? profiles[0]?.id;
-    for (const c of listResult.data.connections) {
+    for (const c of connections) {
       const targetId = c.profile_id ?? defaultProfileId;
       if (targetId && buckets[targetId]) buckets[targetId].push(c);
     }
@@ -200,6 +234,16 @@ export default async function CompanySocialConnectionsPage({
                 connections={buckets[p.id] ?? []}
                 canManage={canManage}
                 canReconnect={canReconnect}
+                autoOpenPickerForConnectionId={
+                  (searchParams ?? {}).connect === "needs_channel"
+                    ? ((searchParams ?? {}).connection_id ?? null)
+                    : null
+                }
+                noopdForPlatform={
+                  (searchParams ?? {}).connect === "noop"
+                    ? ((searchParams ?? {}).attempted_platform ?? null)
+                    : null
+                }
               />
             </section>
           ))

@@ -40,6 +40,12 @@ export type SocialConnection = {
   external_account_id: string | null;
   external_user_id: string | null;
   external_identity_hash: string | null;
+  // Channel-selection flow (migration 0123). is_personal_mode flips
+  // true when the user explicitly chose to connect their personal
+  // profile on LinkedIn (no org-page picker). has_emitted_overdue_event
+  // is the idempotency flag for the >24h pending_identity banner.
+  is_personal_mode: boolean;
+  has_emitted_overdue_event: boolean;
   created_at: string;
   updated_at: string;
 };

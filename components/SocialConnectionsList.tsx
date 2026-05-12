@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toastSuccess } from "@/lib/toast-success";
 
+import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,25 @@ import {
   STATUS_PILL,
   type SocialConnection,
 } from "@/lib/platform/social/connections/types";
+
+// Map our DB SocialPlatform enum to the bundle.social platform type
+// the picker modal expects. Identical mapping to
+// lib/platform/social/connections/route-helpers.ts's PLATFORM_TO_BUNDLE.
+const PLATFORM_TO_BUNDLE_LABEL: Record<
+  string,
+  {
+    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
+    label: string;
+  } | null
+> = {
+  linkedin_personal: { platform: "LINKEDIN", label: "LinkedIn" },
+  linkedin_company: { platform: "LINKEDIN", label: "LinkedIn" },
+  facebook_page: { platform: "FACEBOOK", label: "Facebook" },
+  gbp: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
+  // Twitter / X is NOT a channel-selection platform; render undefined
+  // so the banner / modal don't try to pick a channel for it.
+  x: null,
+};
 
 // ---------------------------------------------------------------------------
 // S1-12 / S1-16 / BSP-6-CUSTOMER — connections roster for
@@ -46,8 +66,13 @@ const PLATFORMS: Array<{ value: string; label: string }> = [
 
 type ConnectMessage = {
   type: "bundle-connect-complete";
-  connect: "success" | "noop" | "error" | "sync-failed";
+  connect: "success" | "noop" | "error" | "sync-failed" | "needs_channel";
   reason?: string;
+  connection_id?: string;
+  // Bug-fix 2026-05-12: set on noop when the user re-connected a platform
+  // they already have (sync updated=1, inserted=0). Drives the actionable
+  // "already connected" banner and row highlight.
+  attempted_platform?: string;
 };
 
 function isConnectMessage(v: unknown): v is ConnectMessage {
@@ -71,6 +96,15 @@ type Props = {
   // connections. Admins already have this via canManage; editors can
   // reconnect but not create new connections (S8).
   canReconnect: boolean;
+  // Channel-selection flow (incident 2026-05-12): when the callback
+  // route redirects with ?connect=needs_channel&connection_id=<id>,
+  // the page passes the id here so we auto-open the picker against
+  // that row on first render.
+  autoOpenPickerForConnectionId?: string | null;
+  // Bug-fix 2026-05-12: when the callback route signals noop+updated,
+  // the page passes the attempted platform (lowercase, e.g. "linkedin")
+  // so we show an actionable banner and highlight the blocking row.
+  noopdForPlatform?: string | null;
 };
 
 export function SocialConnectionsList({
@@ -79,6 +113,8 @@ export function SocialConnectionsList({
   connections,
   canManage,
   canReconnect,
+  autoOpenPickerForConnectionId,
+  noopdForPlatform,
 }: Props) {
   const router = useRouter();
   const [busyRow, setBusyRow] = useState<string | null>(null);
@@ -87,6 +123,31 @@ export function SocialConnectionsList({
   const [busyPlatform, setBusyPlatform] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
+  // Channel-selection flow (incident 2026-05-12): which connection
+  // (if any) should the picker modal be open against?
+  const [pickerForConnectionId, setPickerForConnectionId] = useState<
+    string | null
+  >(null);
+  // Track per-row disconnect spinner state.
+  const [disconnectBusy, setDisconnectBusy] = useState<string | null>(null);
+  // Bug-fix 2026-05-12: "already connected" banner — set from prop (non-
+  // popup redirect) or from the popup postMessage when noop+updated fires.
+  // Lowercase bundle.social platform string, e.g. "linkedin".
+  const [noopdPlatform, setNoopdPlatform] = useState<string | null>(
+    noopdForPlatform ?? null,
+  );
+
+  // Auto-open the picker when the page hands us a connection_id (after
+  // a fresh OAuth that needs channel selection). The effect only fires
+  // when the prop is non-null and the connection is actually in this
+  // list's bucket — guards against the parent passing us another
+  // profile's connection.
+  useEffect(() => {
+    if (!autoOpenPickerForConnectionId) return;
+    if (!connections.some((c) => c.id === autoOpenPickerForConnectionId))
+      return;
+    setPickerForConnectionId(autoOpenPickerForConnectionId);
+  }, [autoOpenPickerForConnectionId, connections]);
   // Cross-tenant identity-leak defence (Layer 3): pre-flight warning
   // modal state. When the user clicks Connect, we first call
   // /identity-preflight; if it returns warn=true, we render a
@@ -146,6 +207,24 @@ export function SocialConnectionsList({
 
       clearPopupState();
       setShowLightbox(false);
+      // Channel-selection flow: if the callback signalled needs_channel,
+      // open the picker directly without waiting for a router.refresh
+      // round-trip. router.refresh still fires so the row appears in
+      // the list (status='pending_identity') in the same tick.
+      if (
+        evt.data.connect === "needs_channel" &&
+        typeof evt.data.connection_id === "string"
+      ) {
+        setPickerForConnectionId(evt.data.connection_id);
+      }
+      // Bug-fix 2026-05-12: if the callback signalled noop with an
+      // attempted_platform, show the actionable "already connected" banner.
+      if (
+        evt.data.connect === "noop" &&
+        typeof evt.data.attempted_platform === "string"
+      ) {
+        setNoopdPlatform(evt.data.attempted_platform);
+      }
       router.refresh();
     }
 
@@ -247,6 +326,70 @@ export function SocialConnectionsList({
     openConnectPopup(json.data.url, rowId);
   }
 
+  async function handleDisconnect(connectionId: string) {
+    if (
+      !window.confirm(
+        "Disconnect this account? Drafts that reference it will be released back to drafts.",
+      )
+    ) {
+      return;
+    }
+    setDisconnectBusy(connectionId);
+    setError(null);
+    const res = await fetch(
+      `/api/platform/social/connections/${connectionId}/disconnect`,
+      { method: "POST" },
+    );
+    const json = (await res.json()) as
+      | { ok: true }
+      | { ok: false; error: { message: string } };
+    setDisconnectBusy(null);
+    if (!res.ok || !json.ok) {
+      setError(!json.ok ? json.error.message : "Failed to disconnect.");
+      return;
+    }
+    toastSuccess("Connection disconnected.");
+    router.refresh();
+  }
+
+  // Connections that have been sitting in pending_identity for >24h.
+  // The server emits the connection_channel_overdue audit on first
+  // render via emitOverdueEventsIfNeeded; the client renders the banner
+  // here.
+  const OVERDUE_THRESHOLD_MS = 24 * 60 * 60 * 1000;
+  const overdueConnections = connections.filter((c) => {
+    if (c.status !== "pending_identity") return false;
+    const age = Date.now() - new Date(c.connected_at).getTime();
+    return age > OVERDUE_THRESHOLD_MS;
+  });
+
+  // Resolve the currently-targeted picker connection to its platform
+  // shape so the modal renders the right labels. Returns null when
+  // the connection is missing or the platform isn't a channel-selection
+  // platform.
+  const pickerTarget = pickerForConnectionId
+    ? (() => {
+        const c = connections.find((x) => x.id === pickerForConnectionId);
+        if (!c) return null;
+        const bundle = PLATFORM_TO_BUNDLE_LABEL[c.platform];
+        if (!bundle) return null;
+        return { conn: c, ...bundle };
+      })()
+    : null;
+
+  // Bug-fix 2026-05-12: the "already connected" blocking row — find the
+  // first healthy (or pending_identity) connection whose bundle.social
+  // platform matches the attempted_platform signal. Used for the
+  // actionable banner and yellow row highlight.
+  const noopdConnection = noopdPlatform
+    ? connections.find(
+        (c) =>
+          (PLATFORM_TO_BUNDLE_LABEL[c.platform]?.platform ?? "").toLowerCase() ===
+            noopdPlatform.toLowerCase() &&
+          (c.status === "healthy" || c.status === "pending_identity"),
+      ) ?? null
+    : null;
+
   async function handleSync() {
     setBusySync(true);
     setError(null);
@@ -281,6 +424,64 @@ export function SocialConnectionsList({
 
   return (
     <div data-testid="connections-list-wrapper">
+      {pickerTarget ? (
+        <ChannelPickerModal
+          connectionId={pickerTarget.conn.id}
+          platform={pickerTarget.platform}
+          platformLabel={pickerTarget.label}
+          isOpen={true}
+          onClose={() => setPickerForConnectionId(null)}
+          onSelected={() => {
+            setPickerForConnectionId(null);
+            toastSuccess("Channel set — this connection is ready to publish.");
+            router.refresh();
+          }}
+        />
+      ) : null}
+
+      {noopdConnection ? (
+        <div
+          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="alert"
+          data-testid="connections-already-connected-banner"
+        >
+          <p className="font-medium">
+            This profile already has a{" "}
+            {PLATFORM_LABEL[noopdConnection.platform] ?? noopdConnection.platform}{" "}
+            connection
+            {noopdConnection.display_name ? ` (${noopdConnection.display_name})` : ""},
+            connected{" "}
+            {new Date(noopdConnection.connected_at).toLocaleDateString("en-AU", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}.
+          </p>
+          <p className="mt-1 text-amber-900/80">
+            Disconnect the existing connection below to connect a different
+            account, or ask an admin to create a new profile.
+          </p>
+        </div>
+      ) : null}
+
+      {overdueConnections.length > 0 ? (
+        <div
+          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          role="alert"
+          data-testid="connections-overdue-banner"
+        >
+          <p className="font-medium">
+            {overdueConnections.length}{" "}
+            {overdueConnections.length === 1 ? "connection needs" : "connections need"}{" "}
+            a channel.
+          </p>
+          <p className="mt-1 text-amber-900/80">
+            Pick a channel below to start publishing. Connections without a
+            channel can&apos;t post.
+          </p>
+        </div>
+      ) : null}
+
       {preflightModal ? (
         <div
           role="dialog"
@@ -450,7 +651,11 @@ export function SocialConnectionsList({
               {connections.map((c) => (
                 <tr
                   key={c.id}
-                  className="border-b last:border-b-0 hover:bg-muted/20"
+                  className={`border-b last:border-b-0 ${
+                    noopdConnection?.id === c.id
+                      ? "bg-amber-50"
+                      : "hover:bg-muted/20"
+                  }`}
                   data-testid={`connection-row-${c.id}`}
                 >
                   <td className="px-4 py-3 font-medium">
@@ -489,19 +694,56 @@ export function SocialConnectionsList({
                     })}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    {(canManage || canReconnect) &&
-                    (c.status === "auth_required" ||
-                      c.status === "disconnected") ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleReconnect(c.id)}
-                        disabled={busyRow === c.id || connectBusy || busySync}
-                        data-testid={`connection-reconnect-${c.id}`}
-                      >
-                        {busyRow === c.id ? "Opening…" : "Reconnect"}
-                      </Button>
-                    ) : null}
+                    <div className="flex justify-end gap-1">
+                      {canManage &&
+                      c.status === "pending_identity" &&
+                      PLATFORM_TO_BUNDLE_LABEL[c.platform] !== null ? (
+                        <Button
+                          size="sm"
+                          onClick={() => setPickerForConnectionId(c.id)}
+                          disabled={
+                            busyRow === c.id ||
+                            connectBusy ||
+                            busySync ||
+                            disconnectBusy !== null
+                          }
+                          data-testid={`connection-select-channel-${c.id}`}
+                        >
+                          Select channel
+                        </Button>
+                      ) : null}
+                      {(canManage || canReconnect) &&
+                      (c.status === "auth_required" ||
+                        c.status === "disconnected") ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleReconnect(c.id)}
+                          disabled={busyRow === c.id || connectBusy || busySync}
+                          data-testid={`connection-reconnect-${c.id}`}
+                        >
+                          {busyRow === c.id ? "Opening…" : "Reconnect"}
+                        </Button>
+                      ) : null}
+                      {canManage ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDisconnect(c.id)}
+                          disabled={
+                            disconnectBusy === c.id ||
+                            busySync ||
+                            connectBusy ||
+                            busyRow !== null
+                          }
+                          data-testid={`connection-disconnect-${c.id}`}
+                        >
+                          {disconnectBusy === c.id
+                            ? "Disconnecting…"
+                            : "Disconnect"}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}

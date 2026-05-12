@@ -80,15 +80,57 @@ export type BundlesocialPlatformType =
   | "GOOGLE_BUSINESS";
 
 // Identity fingerprint resolved from bundle.social for a (team, type)
-// pair. external_identity_hash is null when EITHER identity field is
+// pair. external_identity_hash is null when BOTH identity fields are
 // null — the connection is in "pending_identity" state until the user
 // completes channel selection on the platform side.
+//
+// `channels` is the raw channels[] array bundle.social currently has
+// cached for this (team, type). Channel-selection platforms (LINKEDIN,
+// FACEBOOK, INSTAGRAM, YOUTUBE, GOOGLE_BUSINESS) require a non-empty
+// channels[] OR an explicit personal-mode opt-in before publishing is
+// allowed — see lib/platform/social/connections/channels.ts.
+//
+// `displayName` is resolved from socialAccountGetByType's userDisplayName
+// (or userUsername as fallback) — more reliable than teamGetTeam's
+// displayName which is often null for freshly-connected accounts.
 export type IdentityFingerprint = {
   external_account_id: string | null;
   external_user_id: string | null;
   external_identity_hash: string | null;
+  displayName: string | null;
+  channels: Array<{
+    id: string;
+    name: string | null;
+    username: string | null;
+    address: string | null;
+    avatarUrl: string | null;
+  }>;
   raw: Record<string, unknown>;
 };
+
+// Platforms whose OAuth grants are necessary-but-not-sufficient — the
+// user must additionally pick a channel (org page / FB page / IG page /
+// YT channel / GBP location) before publishing can succeed. See
+// https://info.bundle.social/api-reference/connect-social-accounts.
+//
+// Bundle.social's SDK exposes set-channel / unset-channel for exactly
+// these five platforms; refresh-channels covers a wider superset
+// (DISCORD/SLACK/REDDIT/PINTEREST also) but those are post-OAuth
+// fan-out subscriptions, not the same blocking-channel-pick UX.
+export const CHANNEL_SELECTION_PLATFORMS: ReadonlySet<BundlesocialPlatformType> =
+  new Set([
+    "LINKEDIN",
+    "FACEBOOK",
+    "INSTAGRAM",
+    "YOUTUBE",
+    "GOOGLE_BUSINESS",
+  ]);
+
+export function requiresChannelSelection(
+  platform: BundlesocialPlatformType | string,
+): boolean {
+  return CHANNEL_SELECTION_PLATFORMS.has(platform as BundlesocialPlatformType);
+}
 
 // Deterministic identity hash. Returns null when both ids are null
 // (no platform identity to fingerprint yet). When only one is null,
@@ -118,6 +160,8 @@ export async function resolveIdentityFingerprint(input: {
       external_account_id: null,
       external_user_id: null,
       external_identity_hash: null,
+      displayName: null,
+      channels: [],
       raw: {},
     };
   }
@@ -130,6 +174,13 @@ export async function resolveIdentityFingerprint(input: {
       userId?: string | null;
       userUsername?: string | null;
       userDisplayName?: string | null;
+      channels?: Array<{
+        id: string;
+        name?: string | null;
+        username?: string | null;
+        address?: string | null;
+        avatarUrl?: string | null;
+      }> | null;
     };
     const accountId = resp.externalId ?? null;
     const userId = resp.userId ?? null;
@@ -141,6 +192,14 @@ export async function resolveIdentityFingerprint(input: {
         accountId,
         userId,
       ),
+      displayName: resp.userDisplayName ?? resp.userUsername ?? null,
+      channels: (resp.channels ?? []).map((c) => ({
+        id: c.id,
+        name: c.name ?? null,
+        username: c.username ?? null,
+        address: c.address ?? null,
+        avatarUrl: c.avatarUrl ?? null,
+      })),
       raw: resp as Record<string, unknown>,
     };
   } catch (err) {
@@ -153,6 +212,8 @@ export async function resolveIdentityFingerprint(input: {
       external_account_id: null,
       external_user_id: null,
       external_identity_hash: null,
+      displayName: null,
+      channels: [],
       raw: {},
     };
   }
