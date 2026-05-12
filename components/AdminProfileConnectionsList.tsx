@@ -47,6 +47,22 @@ const PLATFORM_TO_BUNDLE_LABEL: Record<
   GOOGLE_BUSINESS: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
 };
 
+// DB social_platform enum → ChannelPickerModal props. Used when auto-opening
+// the picker after a sync-on-popup-close picks up a pending_identity row.
+const DB_PLATFORM_TO_PICKER: Record<
+  string,
+  {
+    platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "YOUTUBE" | "GOOGLE_BUSINESS";
+    label: string;
+  } | null
+> = {
+  linkedin_personal: { platform: "LINKEDIN", label: "LinkedIn" },
+  linkedin_company: { platform: "LINKEDIN", label: "LinkedIn" },
+  facebook_page: { platform: "FACEBOOK", label: "Facebook" },
+  gbp: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
+  x: null,
+};
+
 // 2026-05-13 platform trim: TikTok, Pinterest, Threads, and Reddit are
 // removed from the UI surface. Backend Zod enums still accept the full
 // set so any existing rows continue working.
@@ -135,12 +151,71 @@ export function AdminProfileConnectionsList({
   } | null>(null);
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const popupOpenedAtRef = useRef<number | null>(null);
 
   function clearPopupState() {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = null;
     popupRef.current = null;
     setBusy(null);
+  }
+
+  // Sync-on-popup-close (same reasoning as SocialConnectionsList):
+  // bundle.social redirects the popup to their dashboard instead of our
+  // callback URL, so we sync explicitly when the popup closes. If a
+  // pending_identity connection appears, auto-open the channel picker.
+  async function syncOnPopupClose() {
+    clearPopupState();
+    setPickerOpen(false);
+    let inserted = 0;
+    try {
+      const r = await fetch("/api/platform/social/connections/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId }),
+      });
+      if (r.ok) {
+        const json = (await r.json()) as { data?: { inserted: number } };
+        inserted = json?.data?.inserted ?? 0;
+      }
+    } catch {}
+    if (inserted > 0) {
+      try {
+        const connRes = await fetch(
+          `/api/platform/social/connections?company_id=${encodeURIComponent(companyId)}`,
+        );
+        if (connRes.ok) {
+          const data = (await connRes.json()) as {
+            data?: {
+              connections: Array<{
+                id: string;
+                platform: string;
+                status: string;
+                connected_at: string;
+              }>;
+            };
+          };
+          const since = (popupOpenedAtRef.current ?? 0) - 5_000;
+          const newPending = (data?.data?.connections ?? []).find(
+            (c) =>
+              c.status === "pending_identity" &&
+              DB_PLATFORM_TO_PICKER[c.platform] !== null &&
+              DB_PLATFORM_TO_PICKER[c.platform] !== undefined &&
+              new Date(c.connected_at).getTime() >= since,
+          );
+          if (newPending) {
+            const picker = DB_PLATFORM_TO_PICKER[newPending.platform]!;
+            setPickerTarget({
+              connectionId: newPending.id,
+              platform: picker.platform,
+              label: picker.label,
+            });
+          }
+        }
+      } catch {}
+    }
+    router.refresh();
+    toastSuccess("Connection flow completed.");
   }
 
   useEffect(() => {
@@ -290,12 +365,12 @@ export function AdminProfileConnectionsList({
       return;
     }
     popupRef.current = popup;
+    popupOpenedAtRef.current = Date.now();
+    let closedHandled = false;
     pollRef.current = setInterval(() => {
-      if (popup.closed) {
-        clearPopupState();
-        setPickerOpen(false);
-        router.refresh();
-        toastSuccess(`${platform} connection flow closed.`);
+      if (popup.closed && !closedHandled) {
+        closedHandled = true;
+        void syncOnPopupClose();
       }
     }, 500);
   }
