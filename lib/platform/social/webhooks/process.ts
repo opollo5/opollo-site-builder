@@ -436,19 +436,22 @@ async function handleAccountEvent(
         // Channel-selection flow (migration 0123): mirror sync.ts. The
         // row's is_personal_mode may already be true (user previously
         // opted into LinkedIn personal-mode); preserve it if so.
+        // Post-877 fix (#884): mirror sync.ts — external_account_id is null
+        // until setChannel is called; channels.length > 0 is not a valid
+        // "channel selected" discriminator. Retain hasIdentity guard so
+        // any platform with both fields null stays pending_identity.
         const hasIdentity =
           identity.external_account_id !== null ||
           identity.external_user_id !== null;
-        const isChannelPlatform = requiresChannelSelection(bsType);
-        const hasChannel = identity.channels.length > 0;
         const isPersonal = Boolean(
           (conn.data as { is_personal_mode?: boolean }).is_personal_mode,
         );
-        const status: "healthy" | "pending_identity" = !hasIdentity
-          ? "pending_identity"
-          : isChannelPlatform && !hasChannel && !isPersonal
-            ? "pending_identity"
-            : "healthy";
+        const needsChannelSelection =
+          requiresChannelSelection(bsType) &&
+          identity.external_account_id === null &&
+          !isPersonal;
+        const status: "healthy" | "pending_identity" =
+          !hasIdentity || needsChannelSelection ? "pending_identity" : "healthy";
         identityUpdate = {
           external_account_id: identity.external_account_id,
           external_user_id: identity.external_user_id,
