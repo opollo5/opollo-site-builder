@@ -551,7 +551,14 @@ export function SocialConnectionsList({
                 className="w-[280px] p-1"
                 data-testid="connect-platform-menu"
               >
-                <div role="menu" className="flex flex-col">
+                {/* `connect-lightbox` alias preserved for the e2e suite
+                    (e2e/social.spec.ts asserts the picker is visible
+                    via this testid). */}
+                <div
+                  role="menu"
+                  className="flex flex-col"
+                  data-testid="connect-lightbox"
+                >
                   {PLATFORMS.map((p) => {
                     const isBusy = busyPlatform === p.value;
                     return (

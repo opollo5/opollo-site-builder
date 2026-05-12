@@ -341,7 +341,12 @@ export function AdminProfileConnectionsList({
             className="w-[280px] p-1"
             data-testid="connect-platform-menu"
           >
-            <div role="menu" className="flex flex-col">
+            {/* `connect-lightbox` alias preserved for e2e backward compat. */}
+            <div
+              role="menu"
+              className="flex flex-col"
+              data-testid="connect-lightbox"
+            >
               {PLATFORMS.map((p) => {
                 const isBusy = busy === p.value;
                 return (
