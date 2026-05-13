@@ -47,6 +47,13 @@ type FetchState =
   | { kind: "loaded"; channels: Channel[] }
   | { kind: "error"; message: string };
 
+type ConflictState = {
+  channelId: string;
+  conflictingCompany: string | null;
+  conflictingChannelName: string | null;
+  overrideAllowed: boolean;
+};
+
 export function ChannelPickerBody({
   connectionId,
   platform,
@@ -57,6 +64,7 @@ export function ChannelPickerBody({
   const [state, setState] = useState<FetchState>({ kind: "idle" });
   const [busyChannelId, setBusyChannelId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [conflictError, setConflictError] = useState<ConflictState | null>(null);
   const [busyPersonal, setBusyPersonal] = useState(false);
 
   useEffect(() => {
@@ -95,26 +103,57 @@ export function ChannelPickerBody({
     };
   }, [autoFetch, connectionId]);
 
-  async function handleSelect(channel: Channel) {
+  async function handleSelect(channel: Channel, opts?: { force?: boolean }) {
+    // Fix C: explicit guard prevents duplicate POSTs if React batches or
+    // the user clicks before the disabled attr takes effect.
+    if (busyChannelId !== null) return;
     setBusyChannelId(channel.id);
     setActionError(null);
+    setConflictError(null);
     const res = await fetch(
       `/api/platform/social/connections/${connectionId}/set-channel`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ channel_id: channel.id }),
+        body: JSON.stringify({
+          channel_id: channel.id,
+          ...(opts?.force ? { force: true } : {}),
+        }),
       },
     );
-    const json = (await res.json()) as
-      | { ok: true }
-      | { ok: false; error: { message: string } };
+    type ErrorBody = {
+      ok: false;
+      error: {
+        code: string;
+        message: string;
+        details?: {
+          conflicting_company?: string | null;
+          conflicting_channel_name?: string | null;
+          override_allowed?: boolean;
+        };
+      };
+    };
+    const json = (await res.json()) as { ok: true } | ErrorBody;
     setBusyChannelId(null);
     if (!res.ok || !json.ok) {
-      setActionError(!json.ok ? json.error.message : "Failed to set channel.");
+      const err = (json as ErrorBody).error;
+      if (res.status === 409 && err.code === "CROSS_TENANT_CONFLICT") {
+        setConflictError({
+          channelId: channel.id,
+          conflictingCompany: err.details?.conflicting_company ?? null,
+          conflictingChannelName: err.details?.conflicting_channel_name ?? null,
+          overrideAllowed: err.details?.override_allowed === true,
+        });
+        return;
+      }
+      setActionError(err?.message ?? "Failed to set channel.");
       return;
     }
     onSelected();
+  }
+
+  async function retryWithOverride(channel: Channel) {
+    await handleSelect(channel, { force: true });
   }
 
   async function handlePersonalMode() {
@@ -219,6 +258,63 @@ export function ChannelPickerBody({
           ))}
         </ul>
       )}
+
+      {conflictError ? (
+        <div
+          className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          role="alert"
+          data-testid="channel-picker-conflict-error"
+        >
+          <p className="mb-1 font-medium">
+            This {platformLabel} channel is already connected to another
+            company
+            {conflictError.conflictingCompany
+              ? ` (${conflictError.conflictingCompany})`
+              : ""}.
+          </p>
+          {conflictError.conflictingChannelName ? (
+            <p className="mb-2 text-amber-800">
+              Channel: {conflictError.conflictingChannelName}
+            </p>
+          ) : null}
+          {conflictError.overrideAllowed ? (
+            <>
+              <p className="mb-2">
+                If you manage social media for both companies, you can connect
+                it to this one too.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const ch = (
+                      state.kind === "loaded" ? state.channels : []
+                    ).find((c) => c.id === conflictError.channelId);
+                    if (ch) void retryWithOverride(ch);
+                  }}
+                  disabled={busyChannelId !== null}
+                  data-testid="channel-picker-connect-both"
+                >
+                  {busyChannelId !== null ? "Connecting…" : "Connect to both companies"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConflictError(null)}
+                  data-testid="channel-picker-conflict-cancel"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-amber-800">
+              Contact support to set up multi-company sharing, or disconnect
+              the channel from the other company first.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {actionError ? (
         <p

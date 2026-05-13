@@ -95,6 +95,8 @@ export const ERROR_CODES = [
   "RECEIVER_NOT_CONFIGURED",
   // S8 reconnect - healthy-connection guard.
   "CONFLICT",
+  // Cross-tenant channel conflict (set-channel Layer 2 block with override path).
+  "CROSS_TENANT_CONFLICT",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -225,6 +227,7 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "RECEIVER_NOT_CONFIGURED":
       return 503;
     case "CONFLICT":
+    case "CROSS_TENANT_CONFLICT":
       return 409;
   }
 }

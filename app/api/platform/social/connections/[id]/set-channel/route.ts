@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import {
+  conflict,
   internalError,
   invalidState,
   notFound,
@@ -17,6 +18,7 @@ import {
   checkCrossTenantConflict,
   computeIdentityHash,
   emitCrossTenantBlocked,
+  emitCrossTenantOverride,
   resolveIdentityFingerprint,
 } from "@/lib/platform/social/connections/identity";
 import { loadConnectionWithTeam } from "@/lib/platform/social/connections/route-helpers";
@@ -41,6 +43,10 @@ export const dynamic = "force-dynamic";
 
 const SetChannelSchema = z.object({
   channel_id: z.string().min(1).max(512),
+  // Explicit operator override: when true and the target company has
+  // allow_cross_tenant_identity=true, bypass the cross-tenant block and
+  // emit a cross_tenant_override audit event instead of refusing.
+  force: z.boolean().optional(),
 });
 
 export async function POST(
@@ -101,7 +107,7 @@ export async function POST(
     fingerprint.external_user_id,
   );
 
-  const conflict = await checkCrossTenantConflict({
+  const tenantCheck = await checkCrossTenantConflict({
     platform: conn.platform,
     identity_hash: externalIdentityHash,
     external_account_id: fingerprint.external_account_id,
@@ -110,14 +116,63 @@ export async function POST(
     target_profile_id: conn.profile_id,
     excludeConnectionId: conn.id,
   });
-  if (!conflict.ok && !conflict.override_allowed) {
-    logger.warn("social.channels.set_cross_tenant_blocked", {
+  if (!tenantCheck.ok) {
+    const forceOverride = parsed.data.force === true && tenantCheck.override_allowed;
+
+    if (!forceOverride) {
+      // Emit audit + return structured 409 the UI can act on.
+      logger.warn("social.channels.set_cross_tenant_blocked", {
+        connection_id: conn.id,
+        platform: conn.platform,
+        target_company_id: conn.company_id,
+        conflict_code: tenantCheck.code,
+        override_allowed: tenantCheck.override_allowed,
+      });
+      void emitCrossTenantBlocked({
+        platform: conn.platform,
+        identity_hash: externalIdentityHash,
+        external_account_id: fingerprint.external_account_id,
+        external_user_id: fingerprint.external_user_id,
+        target_company_id: conn.company_id,
+        target_profile_id: conn.profile_id,
+        actor_user_id: gate.userId,
+        conflicting_rows: tenantCheck.conflicting_rows,
+      });
+
+      // Look up the conflicting company name for the UI prompt.
+      const conflictingRow = tenantCheck.conflicting_rows[0] ?? null;
+      let conflictingCompany: string | null = null;
+      if (conflictingRow) {
+        const svc2 = getServiceRoleClient();
+        const companyRead = await svc2
+          .from("platform_companies")
+          .select("name")
+          .eq("id", conflictingRow.company_id)
+          .maybeSingle();
+        conflictingCompany =
+          (companyRead.data as { name?: string } | null)?.name ?? null;
+      }
+
+      return conflict(
+        "CROSS_TENANT_CONFLICT",
+        "This channel is already attached to another company on Opollo. " +
+          "If you manage social media for both companies, use the override option.",
+        {
+          conflicting_company: conflictingCompany,
+          conflicting_channel_name: conflictingRow?.display_name ?? null,
+          override_allowed: tenantCheck.override_allowed,
+        },
+      );
+    }
+
+    // force=true + override_allowed: proceed and emit override audit.
+    logger.info("social.channels.set_cross_tenant_override", {
       connection_id: conn.id,
       platform: conn.platform,
       target_company_id: conn.company_id,
-      conflict_code: conflict.code,
+      actor_user_id: gate.userId,
     });
-    void emitCrossTenantBlocked({
+    void emitCrossTenantOverride({
       platform: conn.platform,
       identity_hash: externalIdentityHash,
       external_account_id: fingerprint.external_account_id,
@@ -125,12 +180,8 @@ export async function POST(
       target_company_id: conn.company_id,
       target_profile_id: conn.profile_id,
       actor_user_id: gate.userId,
-      conflicting_rows: conflict.conflicting_rows,
+      conflicting_rows: tenantCheck.conflicting_rows,
     });
-    return invalidState(
-      "This channel is already attached to another company on Opollo. " +
-        "Contact support to set up multi-company sharing.",
-    );
   }
 
   const selectedChannel = fingerprint.channels.find(
