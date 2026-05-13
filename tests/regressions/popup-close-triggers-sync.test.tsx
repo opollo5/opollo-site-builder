@@ -1,5 +1,21 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+// @vitest-environment jsdom
+
+import { act, cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    refresh: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}));
 
 import { SocialConnectionsList } from "@/components/SocialConnectionsList";
 
@@ -38,6 +54,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  cleanup();
   global.fetch = originalFetch;
   Object.defineProperty(window, "open", { configurable: true, writable: true, value: originalOpen });
   vi.clearAllMocks();
@@ -89,24 +106,26 @@ describe("R-POPUP-SYNC: sync fires when popup closes without postMessage", () =>
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
 
-    // Wait for the popup to be opened
-    await waitFor(() => expect(openMock).toHaveBeenCalledTimes(1));
+    // Flush async handlers (preflight + connect fetch chain) so window.open fires.
+    await act(async () => {});
+    expect(openMock).toHaveBeenCalledTimes(1);
 
     // Simulate popup closing (user closes bundle.social dashboard manually)
     fakePopup.closed = true;
 
-    // Advance timer by 600ms to trigger the popup-close poll
-    await vi.advanceTimersByTimeAsync(600);
+    // Advance timer by 600ms to trigger the popup-close poll, then flush
+    // the resulting async fetch chain.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
 
     // Sync endpoint must be called
-    await waitFor(() => {
-      const syncCalls = fetchMock.mock.calls.filter(
-        (c) =>
-          typeof c[0] === "string" &&
-          (c[0] as string).includes("/connections/sync"),
-      );
-      expect(syncCalls.length).toBeGreaterThan(0);
-    });
+    const syncCalls = fetchMock.mock.calls.filter(
+      (c) =>
+        typeof c[0] === "string" &&
+        (c[0] as string).includes("/connections/sync"),
+    );
+    expect(syncCalls.length).toBeGreaterThan(0);
 
     // Verify the sync call used POST with the right company_id
     const syncCall = fetchMock.mock.calls.find(
@@ -142,7 +161,9 @@ describe("R-POPUP-SYNC: sync fires when popup closes without postMessage", () =>
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
 
-    await waitFor(() => expect(openMock).toHaveBeenCalledTimes(1));
+    // Flush the async fetch chain so window.open fires.
+    await act(async () => {});
+    expect(openMock).toHaveBeenCalledTimes(1);
 
     // Simulate our callback firing a postMessage (happy path).
     window.dispatchEvent(
@@ -157,7 +178,9 @@ describe("R-POPUP-SYNC: sync fires when popup closes without postMessage", () =>
 
     // The postMessage handler clears the poll immediately. Advancing
     // the timer should NOT trigger a sync call.
-    await vi.advanceTimersByTimeAsync(600);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
 
     const syncCalls = fetchMock.mock.calls.filter(
       (c) =>

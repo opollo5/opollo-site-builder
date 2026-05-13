@@ -47,7 +47,7 @@ export default defineConfig({
     include: [
       "lib/__tests__/**/*.contract.test.ts",
       "lib/__tests__/**/*.unit.test.ts",
-      "tests/regressions/**/*.test.ts",
+      "tests/regressions/**/*.test.{ts,tsx}",
       "tests/security/**/*.security.test.ts",
     ],
     testTimeout: 10_000,

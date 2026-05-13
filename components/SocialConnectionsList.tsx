@@ -184,6 +184,9 @@ export function SocialConnectionsList({
   // Timestamp set when the popup opens so we can identify connections
   // created AFTER the popup (needed for auto-picker after sync).
   const popupOpenedAtRef = useRef<number | null>(null);
+  // Shown-set for the auto-open effect. useRef resets on unmount (page
+  // refresh) so a new mount always re-evaluates pending rows.
+  const pickerShownRef = useRef<Set<string>>(new Set());
   // Set to Date.now() when a post-popup sync inserted > 0 rows.
   // Drives the auto-open picker effect below.
   const [postPopupSyncAt, setPostPopupSyncAt] = useState<number | null>(null);
@@ -269,6 +272,23 @@ export function SocialConnectionsList({
     // pending_identity — TWITTER goes straight to healthy).
     if (Date.now() - postPopupSyncAt > 10_000) setPostPopupSyncAt(null);
   }, [connections, pickerForConnectionId, postPopupSyncAt]);
+
+  // Auto-open the channel picker for any pending_identity row that hasn't
+  // been shown this component lifetime. Runs on mount and whenever the
+  // connections array or open-picker state changes.
+  useEffect(() => {
+    if (pickerForConnectionId) return;
+    const pending = connections.find(
+      (c) =>
+        c.status === "pending_identity" &&
+        PLATFORM_TO_BUNDLE_LABEL[c.platform] !== null &&
+        PLATFORM_TO_BUNDLE_LABEL[c.platform] !== undefined &&
+        !pickerShownRef.current.has(c.id),
+    );
+    if (!pending) return;
+    pickerShownRef.current.add(pending.id);
+    setPickerForConnectionId(pending.id);
+  }, [connections, pickerForConnectionId]);
 
   useEffect(() => {
     const expectedOrigin = window.location.origin;
