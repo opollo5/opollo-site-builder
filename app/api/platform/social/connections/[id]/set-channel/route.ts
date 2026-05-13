@@ -133,12 +133,18 @@ export async function POST(
     );
   }
 
+  const selectedChannel = fingerprint.channels.find(
+    (c) => c.id === parsed.data.channel_id,
+  );
+  const channelDisplayName = selectedChannel?.name ?? null;
+
   const svc = getServiceRoleClient();
   const now = new Date().toISOString();
   const update = await svc
     .from("social_connections")
     .update({
       status: "healthy",
+      display_name: channelDisplayName,
       external_account_id: fingerprint.external_account_id,
       external_user_id: fingerprint.external_user_id,
       external_identity_hash: externalIdentityHash,
@@ -154,6 +160,21 @@ export async function POST(
     });
     return internalError(`Failed to record channel selection: ${update.error.message}`);
   }
+
+  void svc.from("platform_events").insert({
+    company_id: conn.company_id,
+    actor_id: gate.userId,
+    event_type: "connection_channel_selected",
+    entity_type: "social_connection",
+    entity_id: conn.id,
+    payload: {
+      connection_id: conn.id,
+      channel_id: parsed.data.channel_id,
+      channel_name: channelDisplayName,
+      previous_external_account_id: conn.external_account_id,
+      previous_display_name: conn.display_name,
+    },
+  });
 
   return NextResponse.json(
     {

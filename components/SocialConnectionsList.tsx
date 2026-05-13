@@ -780,7 +780,9 @@ export function SocialConnectionsList({
                   data-testid={`connection-row-${c.id}`}
                 >
                   <td className="px-4 py-3 font-medium">
-                    {PLATFORM_LABEL[c.platform] ?? c.platform}
+                    {c.platform.startsWith("linkedin") && !c.is_personal_mode
+                      ? "LinkedIn"
+                      : (PLATFORM_LABEL[c.platform] ?? c.platform)}
                   </td>
                   <td className="px-4 py-3">
                     <div>
