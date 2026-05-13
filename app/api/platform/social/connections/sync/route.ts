@@ -28,6 +28,14 @@ export const dynamic = "force-dynamic";
 
 const PostBodySchema = z.object({
   company_id: dbUuid(),
+  // When present, new bundle.social accounts that have no local DB row are
+  // inserted and attributed to this company. The popup-close fallback path
+  // (syncOnPopupClose in SocialConnectionsList) passes this so that
+  // platforms whose OAuth redirects bundle.social's own dashboard instead
+  // of our /callback URL (e.g. X/Twitter) still get a DB row created.
+  // Omit for the manual "Refresh" UI action (should only update existing
+  // rows, not create new ones without explicit user intent).
+  attribute_new_to_company_id: dbUuid().optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -46,6 +54,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const result = await syncBundlesocialConnections({
     companyId: parsed.data.company_id,
+    ...(parsed.data.attribute_new_to_company_id
+      ? { attributeNewToCompanyId: parsed.data.attribute_new_to_company_id }
+      : {}),
   });
   if (!result.ok) {
     return internalError(result.error.message);
