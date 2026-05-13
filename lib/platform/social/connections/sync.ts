@@ -62,6 +62,12 @@ export type SyncConnectionsInput = {
   // this company on insert. Leave undefined for pure health-refresh
   // (no inserts, just updates to existing rows).
   attributeNewToCompanyId?: string | null;
+  // When true, the cross-tenant identity conflict check is bypassed for
+  // this sync call and the insert proceeds. The caller is responsible for
+  // ensuring the user explicitly confirmed the override (e.g. clicked
+  // "I manage both" in the preflight warning modal). A cross_tenant_override
+  // audit event is emitted regardless so the action is traceable.
+  forceCrossTenantOverride?: boolean;
 };
 
 export type SyncConnectionsResult = {
@@ -383,7 +389,14 @@ export async function syncBundlesocialConnections(
         target_profile_id: attributedProfileId,
       });
 
-      if (!conflict.ok && !conflict.override_allowed) {
+      // forceCrossTenantOverride: user explicitly clicked "I manage both" in
+      // the preflight warning modal. Treat as override_allowed=true so the
+      // insert proceeds. An audit event is always emitted.
+      const effectiveOverrideAllowed =
+        !conflict.ok &&
+        (conflict.override_allowed || input.forceCrossTenantOverride === true);
+
+      if (!conflict.ok && !effectiveOverrideAllowed) {
         result.cross_tenant_blocked += 1;
         logger.warn("social.cross_tenant_blocked", {
           platform,
@@ -405,13 +418,14 @@ export async function syncBundlesocialConnections(
         });
         continue;
       }
-      if (!conflict.ok && conflict.override_allowed) {
+      if (effectiveOverrideAllowed) {
         logger.warn("social.cross_tenant_override", {
           platform,
           identity_hash: identity.external_identity_hash,
           target_company_id: input.attributeNewToCompanyId,
           target_profile_id: attributedProfileId,
           bundle_account_id: bundleAccountId,
+          via: input.forceCrossTenantOverride ? "user_confirmed" : "company_flag",
         });
         void emitCrossTenantOverride({
           platform,

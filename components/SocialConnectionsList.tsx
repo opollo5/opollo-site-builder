@@ -188,6 +188,10 @@ export function SocialConnectionsList({
   // effect can read the platform the user originally clicked (needed to
   // distinguish Instagram from Facebook — both land as facebook_page rows).
   const busyPlatformRef = useRef<string | null>(null);
+  // Set to true when the user clicks "I manage both" in the preflight modal.
+  // Passed to /connect (encodes into callback URL) and to syncOnPopupClose
+  // (passed to /sync) so the cross-tenant block is bypassed for this flow.
+  const forceCrossTenantRef = useRef<boolean>(false);
   // When needs_channel fires after an Instagram connect, override the
   // picker modal's platform so it shows Instagram-specific copy.
   const [pickerPlatformOverride, setPickerPlatformOverride] = useState<
@@ -211,6 +215,7 @@ export function SocialConnectionsList({
     pollRef.current = null;
     popupRef.current = null;
     setBusyPlatform(null);
+    forceCrossTenantRef.current = false;
     if (activeRowId) setBusyRow(null);
   }
 
@@ -220,6 +225,7 @@ export function SocialConnectionsList({
   // only signal we get. Trigger an explicit sync so bundle.social-created
   // connections land in our DB even without a callback hit.
   async function syncOnPopupClose(rowId?: string) {
+    const forceCrossTenant = forceCrossTenantRef.current;
     clearPopupState(rowId);
     let inserted = 0;
     try {
@@ -232,6 +238,9 @@ export function SocialConnectionsList({
         body: JSON.stringify({
           company_id: companyId,
           ...(rowId ? {} : { attribute_new_to_company_id: companyId }),
+          ...(forceCrossTenant && !rowId
+            ? { force_cross_tenant_override: true }
+            : {}),
         }),
       });
       if (r.ok) {
@@ -258,6 +267,9 @@ export function SocialConnectionsList({
               body: JSON.stringify({
                 company_id: companyId,
                 attribute_new_to_company_id: companyId,
+                ...(forceCrossTenant
+                  ? { force_cross_tenant_override: true }
+                  : {}),
               }),
             });
             if (r2.ok) {
@@ -371,6 +383,19 @@ export function SocialConnectionsList({
       ) {
         setNoopdPlatform(evt.data.attempted_platform);
       }
+      // Cross-tenant block: the sync refused the account because the
+      // platform identity is already owned by another company. Surface an
+      // actionable error so the user knows they can click "I manage both"
+      // on the next attempt to override the block.
+      if (
+        evt.data.connect === "error" &&
+        evt.data.reason === "cross-tenant-blocked"
+      ) {
+        setError(
+          "This account is already connected to another client. " +
+            'To connect it here, click Connect and choose "I manage both" when prompted.',
+        );
+      }
       router.refresh();
     }
 
@@ -382,7 +407,10 @@ export function SocialConnectionsList({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleConnect(platform: string, opts?: { skipPreflight?: boolean }) {
+  async function handleConnect(
+    platform: string,
+    opts?: { skipPreflight?: boolean; forceCrossTenant?: boolean },
+  ) {
     if (!profileId) return;
     setError(null);
 
@@ -401,6 +429,10 @@ export function SocialConnectionsList({
       }
     }
 
+    // Record the cross-tenant override decision before the popup opens so
+    // syncOnPopupClose can read it if the popup bypasses the callback URL.
+    forceCrossTenantRef.current = opts?.forceCrossTenant === true;
+
     setBusyPlatform(platform);
     busyPlatformRef.current = platform;
     setPopupBlockedUrl(null);
@@ -408,7 +440,12 @@ export function SocialConnectionsList({
     const res = await fetch("/api/platform/social/connections/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ company_id: companyId, profile_id: profileId, platform }),
+      body: JSON.stringify({
+        company_id: companyId,
+        profile_id: profileId,
+        platform,
+        ...(opts?.forceCrossTenant ? { force_cross_tenant: true } : {}),
+      }),
     });
     const json = (await res.json()) as
       | { ok: true; data: { url: string } }
@@ -693,12 +730,11 @@ export function SocialConnectionsList({
               ))}
             </ul>
             <p className="mb-3 text-sm text-muted-foreground">
-              If the OAuth flow auto-approves with the same{" "}
-              <strong>{preflightModal.platformLabel}</strong> account, it will
-              be <strong>rejected</strong> to prevent cross-tenant publishing.
-              You&apos;ll see an error after the popup closes. To connect a
-              different {preflightModal.platformLabel} account, log out of{" "}
-              {preflightModal.platformLabel} in another browser tab first.
+              If you personally manage{" "}
+              <strong>{preflightModal.platformLabel}</strong> for multiple
+              clients, click &ldquo;I manage both&rdquo; to proceed. The
+              connection will be audited. To connect a different account,
+              log out of {preflightModal.platformLabel} in another tab first.
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -712,11 +748,14 @@ export function SocialConnectionsList({
                 onClick={() => {
                   const platform = preflightModal.platform;
                   setPreflightModal(null);
-                  void handleConnect(platform, { skipPreflight: true });
+                  void handleConnect(platform, {
+                    skipPreflight: true,
+                    forceCrossTenant: true,
+                  });
                 }}
                 data-testid="preflight-modal-continue"
               >
-                Continue
+                I manage both
               </Button>
             </div>
           </div>

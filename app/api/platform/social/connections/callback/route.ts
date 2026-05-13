@@ -209,9 +209,16 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(target);
   }
 
+  // cross_tenant_override=1 is set by /connect when the user clicked "I
+  // manage both" in the preflight warning modal. Pass it through to the
+  // sync so the cross-tenant block is bypassed for this connect.
+  const forceCrossTenantOverride =
+    url.searchParams.get("cross_tenant_override") === "1";
+
   const sync = await syncBundlesocialConnections({
     companyId,
     attributeNewToCompanyId: companyId,
+    ...(forceCrossTenantOverride ? { forceCrossTenantOverride: true } : {}),
   });
 
   // BSP analytics: after the sync attributes new connections, kick off

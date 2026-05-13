@@ -36,6 +36,11 @@ const PostBodySchema = z.object({
   // Omit for the manual "Refresh" UI action (should only update existing
   // rows, not create new ones without explicit user intent).
   attribute_new_to_company_id: dbUuid().optional(),
+  // When true, bypasses the cross-tenant identity conflict block. Only set
+  // by syncOnPopupClose when the user explicitly clicked "I manage both"
+  // in the preflight warning modal. Emits a cross_tenant_override audit
+  // event regardless so the action is traceable.
+  force_cross_tenant_override: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -56,6 +61,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     companyId: parsed.data.company_id,
     ...(parsed.data.attribute_new_to_company_id
       ? { attributeNewToCompanyId: parsed.data.attribute_new_to_company_id }
+      : {}),
+    ...(parsed.data.force_cross_tenant_override
+      ? { forceCrossTenantOverride: true }
       : {}),
   });
   if (!result.ok) {
