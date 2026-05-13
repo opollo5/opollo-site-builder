@@ -54,6 +54,7 @@ const PLATFORM_ENUM = z.enum([
 const ConnectSchema = z.object({
   platform: PLATFORM_ENUM,
   disable_auto_login: z.boolean().optional(),
+  force_cross_tenant: z.boolean().optional(),
 });
 
 export async function POST(
@@ -89,7 +90,10 @@ export async function POST(
   const origin =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     new URL(req.url).origin;
-  const redirectUrl = `${origin}/api/platform/social/connections/callback?company_id=${idCheck.value}&popup=1`;
+  const redirectUrl =
+    `${origin}/api/platform/social/connections/callback` +
+    `?company_id=${idCheck.value}&popup=1` +
+    (parsed.data.force_cross_tenant ? "&cross_tenant_override=1" : "");
 
   const result = await initiateProfileConnect({
     profileId: profileCheck.value,
