@@ -41,6 +41,8 @@ export type LoadedConnection = {
   bundle_social_account_id: string;
   status: string;
   is_personal_mode: boolean;
+  display_name: string | null;
+  external_account_id: string | null;
   teamId: string;
 };
 
@@ -62,7 +64,7 @@ export async function loadConnectionWithTeam(
   const connRead = await svc
     .from("social_connections")
     .select(
-      "id, company_id, profile_id, platform, bundle_social_account_id, status, is_personal_mode",
+      "id, company_id, profile_id, platform, bundle_social_account_id, status, is_personal_mode, display_name, external_account_id",
     )
     .eq("id", connectionId)
     .maybeSingle();
@@ -82,6 +84,8 @@ export async function loadConnectionWithTeam(
     bundle_social_account_id: string;
     status: string;
     is_personal_mode: boolean | null;
+    display_name: string | null;
+    external_account_id: string | null;
   };
 
   if (!row.profile_id) {
@@ -125,6 +129,8 @@ export async function loadConnectionWithTeam(
       bundle_social_account_id: row.bundle_social_account_id,
       status: row.status,
       is_personal_mode: Boolean(row.is_personal_mode),
+      display_name: row.display_name ?? null,
+      external_account_id: row.external_account_id ?? null,
       teamId,
     },
   };
