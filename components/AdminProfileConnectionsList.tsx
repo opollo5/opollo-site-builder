@@ -153,6 +153,9 @@ export function AdminProfileConnectionsList({
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const popupOpenedAtRef = useRef<number | null>(null);
+  // Shown-set for the auto-open effect. useRef resets on unmount (page
+  // refresh) so a new mount always re-evaluates pending rows.
+  const pickerShownRef = useRef<Set<string>>(new Set());
 
   function clearPopupState() {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -253,6 +256,46 @@ export function AdminProfileConnectionsList({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [busy]);
+
+  // On mount and after any accounts change, fetch DB connections and
+  // auto-open the picker for any pending_identity row not shown yet
+  // this component lifetime.
+  useEffect(() => {
+    if (pickerTarget) return;
+    void (async () => {
+      try {
+        const res = await fetch(
+          `/api/platform/social/connections?company_id=${encodeURIComponent(companyId)}`,
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          data?: {
+            connections: Array<{
+              id: string;
+              platform: string;
+              status: string;
+              connected_at: string;
+            }>;
+          };
+        };
+        const pending = (data?.data?.connections ?? []).find(
+          (c) =>
+            c.status === "pending_identity" &&
+            DB_PLATFORM_TO_PICKER[c.platform] !== null &&
+            DB_PLATFORM_TO_PICKER[c.platform] !== undefined &&
+            !pickerShownRef.current.has(c.id),
+        );
+        if (!pending) return;
+        const picker = DB_PLATFORM_TO_PICKER[pending.platform]!;
+        pickerShownRef.current.add(pending.id);
+        setPickerTarget({
+          connectionId: pending.id,
+          platform: picker.platform,
+          label: picker.label,
+        });
+      } catch {}
+    })();
+  }, [accounts, pickerTarget, companyId]);
 
   async function handleDisconnect(account: Account) {
     if (
