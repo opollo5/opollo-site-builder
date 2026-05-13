@@ -225,7 +225,13 @@ export function SocialConnectionsList({
       const r = await fetch("/api/platform/social/connections/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId }),
+        // For fresh connects (no rowId), attribute new accounts so
+        // platforms that don't redirect to our callback (e.g. X/Twitter
+        // going to bundle.social's dashboard) still get a DB row created.
+        body: JSON.stringify({
+          company_id: companyId,
+          ...(rowId ? {} : { attribute_new_to_company_id: companyId }),
+        }),
       });
       if (r.ok) {
         const json = (await r.json()) as { data?: { inserted: number } };
@@ -523,27 +529,51 @@ export function SocialConnectionsList({
   // Resolve the picker target to its bundle.social platform shape so
   // the modal renders the right labels. null when the connection isn't
   // a channel-selection platform (modal stays closed).
-  const pickerTarget = pickerForConnectionId
-    ? (() => {
-        const c = connections.find((x) => x.id === pickerForConnectionId);
-        if (!c) return null;
-        // Instagram Business connects via Facebook OAuth and creates a
-        // facebook_page row. If the user originally clicked Instagram,
-        // override the platform label so the modal shows Instagram copy.
-        if (pickerPlatformOverride === "INSTAGRAM" && c.platform === "facebook_page") {
-          return { conn: c, platform: "INSTAGRAM" as const, label: "Instagram" };
-        }
-        const bundle = PLATFORM_TO_BUNDLE_LABEL[c.platform];
-        if (!bundle) return null;
-        return { conn: c, ...bundle };
-      })()
-    : null;
+  //
+  // Three-tier resolution:
+  //   1. pickerPlatformOverride (Instagram-via-Facebook click intent)
+  //   2. DB row platform (connections prop, available after router.refresh)
+  //   3. busyPlatformRef (clicked platform, available immediately on
+  //      needs_channel — before the RSC re-render delivers the new row)
+  //
+  // Tier 3 fixes the race where handleMessage fires needs_channel with a
+  // connection_id but connections still contains the pre-connect snapshot
+  // and the row can't be found.
+  const pickerTarget = (() => {
+    if (!pickerForConnectionId) return null;
+
+    if (pickerPlatformOverride === "INSTAGRAM") {
+      return { platform: "INSTAGRAM" as const, label: "Instagram" };
+    }
+
+    const c = connections.find((x) => x.id === pickerForConnectionId);
+    if (c) {
+      const bundle = PLATFORM_TO_BUNDLE_LABEL[c.platform];
+      if (!bundle) return null;
+      return { platform: bundle.platform, label: bundle.label };
+    }
+
+    // Row not yet in prop (router.refresh() in flight). Derive platform
+    // from the captured click intent so the modal opens immediately.
+    const hint = busyPlatformRef.current;
+    if (!hint) return null;
+    const HINT_TO_PICKER: Record<
+      string,
+      { platform: "LINKEDIN" | "FACEBOOK" | "INSTAGRAM" | "GOOGLE_BUSINESS"; label: string } | undefined
+    > = {
+      LINKEDIN: { platform: "LINKEDIN", label: "LinkedIn" },
+      FACEBOOK: { platform: "FACEBOOK", label: "Facebook" },
+      INSTAGRAM: { platform: "INSTAGRAM", label: "Instagram" },
+      GOOGLE_BUSINESS: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
+    };
+    return HINT_TO_PICKER[hint] ?? null;
+  })();
 
   return (
     <div data-testid="connections-list-wrapper">
       {pickerTarget ? (
         <ChannelPickerModal
-          connectionId={pickerTarget.conn.id}
+          connectionId={pickerForConnectionId!}
           platform={pickerTarget.platform}
           platformLabel={pickerTarget.label}
           isOpen={true}
