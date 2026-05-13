@@ -30,6 +30,7 @@ const PLATFORM_TO_BUNDLE: Record<string, string> = {
   linkedin_personal: "LINKEDIN",
   linkedin_company: "LINKEDIN",
   facebook_page: "FACEBOOK",
+  instagram_business: "INSTAGRAM",
   x: "TWITTER",
   gbp: "GOOGLE_BUSINESS",
 };

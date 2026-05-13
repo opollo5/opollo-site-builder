@@ -8,6 +8,7 @@ export const PLATFORM_COLOR: Record<SocialPlatform, string> = {
   linkedin_personal: "#0a66c2",
   linkedin_company: "#0a66c2",
   facebook_page: "#1877f2",
+  instagram_business: "#e1306c",
   x: "#111827",
   gbp: "#34a853",
 };
@@ -19,6 +20,7 @@ export const PLATFORM_INITIALS: Record<SocialPlatform, string> = {
   linkedin_personal: "Li",
   linkedin_company: "Li",
   facebook_page: "Fb",
+  instagram_business: "Ig",
   x: "X",
   gbp: "GB",
 };

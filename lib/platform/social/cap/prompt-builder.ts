@@ -14,6 +14,7 @@ export const PLATFORM_CHAR_LIMITS: Record<SocialPlatform, number> = {
   linkedin_company: 2800,
   linkedin_personal: 2800,
   facebook_page: 450,
+  instagram_business: 2200,
   x: 270,
   gbp: 1400,
 };
@@ -25,6 +26,8 @@ const PLATFORM_GUIDANCE: Record<SocialPlatform, string> = {
     "Conversational professional tone. First-person voice appropriate. 1–3 paragraphs.",
   facebook_page:
     "Warm and engaging. Shorter than LinkedIn. Encourage interaction. Emojis OK if brand allows.",
+  instagram_business:
+    "Visual-first storytelling. Short punchy caption. Emojis welcome. Hashtags at end if brand allows.",
   x: "Punchy, direct. No thread — single tweet only. Fit in the character limit.",
   gbp:
     "Local-business-friendly. Highlight offers, events, or services. Clear call to action.",

@@ -36,6 +36,7 @@ const PLATFORM_TO_BUNDLE_LABEL: Record<
   linkedin_personal: { platform: "LINKEDIN", label: "LinkedIn" },
   linkedin_company: { platform: "LINKEDIN", label: "LinkedIn" },
   facebook_page: { platform: "FACEBOOK", label: "Facebook" },
+  instagram_business: { platform: "INSTAGRAM", label: "Instagram" },
   gbp: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
   // Twitter / X is NOT a channel-selection platform; render undefined
   // so the banner / modal don't try to pick a channel for it.
@@ -242,6 +243,34 @@ export function SocialConnectionsList({
     }
     if (inserted > 0) setPostPopupSyncAt(Date.now());
     router.refresh();
+    // X/Twitter (and any platform whose OAuth bundle.social processes
+    // asynchronously): if the first sync fires before bundle.social has
+    // finished creating the account, inserted=0. One retry after 3 s
+    // catches the common case where the account appears a few seconds
+    // after the popup closes.
+    if (inserted === 0 && !rowId) {
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const r2 = await fetch("/api/platform/social/connections/sync", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                company_id: companyId,
+                attribute_new_to_company_id: companyId,
+              }),
+            });
+            if (r2.ok) {
+              const json2 = (await r2.json()) as { data?: { inserted: number } };
+              if ((json2?.data?.inserted ?? 0) > 0) setPostPopupSyncAt(Date.now());
+            }
+          } catch {
+            // Non-fatal.
+          }
+          router.refresh();
+        })();
+      }, 3000);
+    }
   }
 
   function openConnectPopup(url: string, rowId?: string) {

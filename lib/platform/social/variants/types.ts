@@ -7,6 +7,7 @@ export type SocialPlatform =
   | "linkedin_personal"
   | "linkedin_company"
   | "facebook_page"
+  | "instagram_business"
   | "x"
   | "gbp";
 
@@ -24,6 +25,7 @@ export const PLATFORM_LABEL: Record<SocialPlatform, string> = {
   linkedin_personal: "LinkedIn (personal)",
   linkedin_company: "LinkedIn (company)",
   facebook_page: "Facebook Page",
+  instagram_business: "Instagram Business",
   x: "X",
   gbp: "Google Business Profile",
 };

@@ -50,6 +50,7 @@ import type { SocialPlatform } from "./types";
 const BUNDLE_TO_PLATFORM: Record<string, SocialPlatform> = {
   LINKEDIN: "linkedin_personal",
   FACEBOOK: "facebook_page",
+  INSTAGRAM: "instagram_business",
   TWITTER: "x",
   GOOGLE_BUSINESS: "gbp",
 };
