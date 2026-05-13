@@ -58,6 +58,12 @@ const PostBodySchema = z.object({
   company_id: dbUuid(),
   profile_id: dbUuid(),
   platform: PLATFORM_ENUM,
+  // When true, the cross-tenant conflict block is bypassed for the sync
+  // that runs after this OAuth completes. Only set when the user explicitly
+  // clicked "I manage both" in the preflight warning modal. The flag is
+  // encoded in the callback redirectUrl as &cross_tenant_override=1 so the
+  // callback route can pass it through to syncBundlesocialConnections.
+  force_cross_tenant: z.boolean().optional(),
 });
 
 const WITH_BUSINESS_SCOPE_PLATFORMS: ReadonlySet<string> = new Set([
@@ -165,7 +171,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     new URL(req.url).origin;
   const redirectUrl =
     `${origin}/api/platform/social/connections/callback` +
-    `?company_id=${encodeURIComponent(parsed.data.company_id)}&popup=1`;
+    `?company_id=${encodeURIComponent(parsed.data.company_id)}&popup=1` +
+    (parsed.data.force_cross_tenant ? "&cross_tenant_override=1" : "");
 
   const result = await initiateProfileConnect({
     profileId: parsed.data.profile_id,
