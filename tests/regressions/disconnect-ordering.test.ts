@@ -33,7 +33,7 @@ const disconnectSdkMock = vi.fn(async () => {
 // socialAccountGetByType to confirm BS released the account. Returning
 // null = clean (verify succeeds). Tests overriding this to return an
 // account object simulate split-brain.
-const getByTypeSdkMock = vi.fn(async () => {
+const getByTypeSdkMock = vi.fn(async (): Promise<{ id: string } | null> => {
   callOrder.push("verify-getByType");
   return null;
 });
