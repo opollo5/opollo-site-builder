@@ -113,6 +113,7 @@ type ConnectMessage = {
   type: "bundle-connect-complete";
   connect?: string;
   connection_id?: string;
+  reason?: string;
 };
 
 function isConnectMessage(v: unknown): v is ConnectMessage {
@@ -160,12 +161,14 @@ export function AdminProfileConnectionsList({
   // Shown-set for the auto-open effect. useRef resets on unmount (page
   // refresh) so a new mount always re-evaluates pending rows.
   const pickerShownRef = useRef<Set<string>>(new Set());
+  const forceCrossTenantRef = useRef<boolean>(false);
 
   function clearPopupState() {
     if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = null;
     popupRef.current = null;
     setBusy(null);
+    forceCrossTenantRef.current = false;
   }
 
   // Sync-on-popup-close (same reasoning as SocialConnectionsList):
@@ -173,6 +176,7 @@ export function AdminProfileConnectionsList({
   // callback URL, so we sync explicitly when the popup closes. If a
   // pending_identity connection appears, auto-open the channel picker.
   async function syncOnPopupClose() {
+    const forceCrossTenant = forceCrossTenantRef.current;
     clearPopupState();
     setPickerOpen(false);
     let inserted = 0;
@@ -180,7 +184,11 @@ export function AdminProfileConnectionsList({
       const r = await fetch("/api/platform/social/connections/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId }),
+        body: JSON.stringify({
+          company_id: companyId,
+          attribute_new_to_company_id: companyId,
+          ...(forceCrossTenant ? { force_cross_tenant_override: true } : {}),
+        }),
       });
       if (r.ok) {
         const json = (await r.json()) as { data?: { inserted: number } };
@@ -250,6 +258,15 @@ export function AdminProfileConnectionsList({
             label: mapped.label,
           });
         }
+      }
+      if (
+        evt.data.connect === "error" &&
+        evt.data.reason === "cross-tenant-blocked"
+      ) {
+        setError(
+          "This account is already connected to another client. " +
+            'To connect it here, click Connect and choose "I manage both" when prompted.',
+        );
       }
       router.refresh();
     }
@@ -362,7 +379,10 @@ export function AdminProfileConnectionsList({
     }
   }
 
-  async function handleConnect(platform: string, opts?: { skipPreflight?: boolean }) {
+  async function handleConnect(
+    platform: string,
+    opts?: { skipPreflight?: boolean; forceCrossTenant?: boolean },
+  ) {
     setError(null);
 
     if (!opts?.skipPreflight) {
@@ -379,6 +399,7 @@ export function AdminProfileConnectionsList({
       }
     }
 
+    forceCrossTenantRef.current = opts?.forceCrossTenant === true;
     setBusy(platform);
     setPopupBlockedUrl(null);
 
@@ -387,7 +408,10 @@ export function AdminProfileConnectionsList({
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ platform }),
+        body: JSON.stringify({
+          platform,
+          ...(opts?.forceCrossTenant ? { force_cross_tenant: true } : {}),
+        }),
       },
     );
     const json = (await res.json()) as ApiResponse<{
@@ -472,12 +496,11 @@ export function AdminProfileConnectionsList({
               ))}
             </ul>
             <p className="mb-3 text-sm text-muted-foreground">
-              If the OAuth flow auto-approves with the same{" "}
-              <strong>{preflightModal.platformLabel}</strong> account, it
-              will be <strong>rejected</strong> to prevent cross-tenant
-              publishing. To connect a different {preflightModal.platformLabel}{" "}
-              account, log out of {preflightModal.platformLabel} in another
-              browser tab first.
+              If you personally manage{" "}
+              <strong>{preflightModal.platformLabel}</strong> for multiple
+              clients, click &ldquo;I manage both&rdquo; to proceed. The
+              connection will be audited. To connect a different account,
+              log out of {preflightModal.platformLabel} in another tab first.
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -491,11 +514,14 @@ export function AdminProfileConnectionsList({
                 onClick={() => {
                   const platform = preflightModal.platform;
                   setPreflightModal(null);
-                  void handleConnect(platform, { skipPreflight: true });
+                  void handleConnect(platform, {
+                    skipPreflight: true,
+                    forceCrossTenant: true,
+                  });
                 }}
                 data-testid="preflight-modal-continue"
               >
-                Continue
+                I manage both
               </Button>
             </div>
           </div>
