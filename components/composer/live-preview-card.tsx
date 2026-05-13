@@ -25,6 +25,7 @@ const PLATFORM_STRIPE: Record<SocialPlatform, string> = {
   linkedin_personal: "bg-[#0077B5]",
   linkedin_company: "bg-[#0077B5]",
   facebook_page: "bg-[#1877F2]",
+  instagram_business: "bg-[#e1306c]",
   x: "bg-black",
   gbp: "bg-[#4285F4]",
 };

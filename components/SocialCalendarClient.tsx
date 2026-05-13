@@ -60,6 +60,7 @@ const CHIP_CLASS: Record<SocialPlatform, string> = {
   linkedin_personal: "bg-blue-100 text-blue-700",
   linkedin_company: "bg-blue-100 text-blue-700",
   facebook_page: "bg-indigo-100 text-indigo-700",
+  instagram_business: "bg-pink-100 text-pink-700",
   x: "bg-gray-100 text-gray-700",
   gbp: "bg-emerald-100 text-emerald-700",
 };
@@ -68,6 +69,7 @@ const PLATFORM_ABBR: Record<SocialPlatform, string> = {
   linkedin_personal: "LI",
   linkedin_company: "LI·P",
   facebook_page: "FB",
+  instagram_business: "IG",
   x: "X",
   gbp: "GBP",
 };
