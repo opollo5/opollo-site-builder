@@ -32,15 +32,14 @@ const openMock = vi.fn();
 const originalOpen = window.open;
 const originalFetch = global.fetch;
 
-// 2026-05-13: trimmed from 10 → 6. TikTok, Pinterest, Threads, Reddit
-// were removed from the UI surface.
+// 2026-05-13: trimmed from 10 → 5. TikTok, Pinterest, Threads, Reddit,
+// and YouTube were removed from the UI surface.
 const PLATFORMS = [
   "LINKEDIN",
   "FACEBOOK",
   "INSTAGRAM",
   "TWITTER",
   "GOOGLE_BUSINESS",
-  "YOUTUBE",
 ] as const;
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -49,7 +48,6 @@ const PLATFORM_LABEL: Record<string, string> = {
   INSTAGRAM: "Instagram",
   TWITTER: "X (Twitter)",
   GOOGLE_BUSINESS: "Google Business",
-  YOUTUBE: "YouTube",
 };
 
 const REMOVED_PLATFORMS = ["TIKTOK", "PINTEREST", "THREADS", "REDDIT"] as const;
@@ -90,7 +88,7 @@ function renderList() {
 }
 
 describe("SocialConnectionsList — Connect dropdown", () => {
-  it("renders only the 6 supported platform menu items when the popover opens", () => {
+  it("renders only the 5 supported platform menu items when the popover opens", () => {
     renderList();
 
     // Click trigger to open the popover. Radix portals the content

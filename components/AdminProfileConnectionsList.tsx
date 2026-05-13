@@ -27,8 +27,13 @@ import { toastSuccess } from "@/lib/toast-success";
 // Same handshake as the existing SocialConnectionsList (reuse the
 // origin-validated message listener pattern).
 
-const POPUP_FEATURES =
-  "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
+function getPopupFeatures(): string {
+  const w = 900;
+  const h = 820;
+  const left = Math.floor(window.screen.width / 2 - w / 2);
+  const top = Math.floor(window.screen.height / 2 - h / 2);
+  return `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+}
 
 // Bundle.social platform enum → ChannelPickerModal props. null entries
 // indicate platforms that don't go through channel selection (they
@@ -76,7 +81,6 @@ const PLATFORMS: Array<{
   { value: "INSTAGRAM", label: "Instagram" },
   { value: "TWITTER", label: "X (Twitter)" },
   { value: "GOOGLE_BUSINESS", label: "Google Business" },
-  { value: "YOUTUBE", label: "YouTube" },
 ];
 
 type Account = {
@@ -402,7 +406,7 @@ export function AdminProfileConnectionsList({
       setBusy(null);
       return;
     }
-    const popup = window.open(json.data.url, "bundle-connect", POPUP_FEATURES);
+    const popup = window.open(json.data.url, "bundle-connect", getPopupFeatures());
     if (!popup || popup.closed) {
       setPopupBlockedUrl(json.data.url);
       setBusy(null);

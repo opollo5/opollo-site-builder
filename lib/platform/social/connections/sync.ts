@@ -319,12 +319,21 @@ export async function syncBundlesocialConnections(
     const status: "healthy" | "pending_identity" =
       !hasIdentity || needsChannelSelection ? "pending_identity" : "healthy";
 
-    // Prefer the display name from socialAccountGetByType (identity) over
-    // teamGetTeam (remote) — the former populates userDisplayName even for
-    // freshly-connected accounts where teamGetTeam returns null.
-    const displayName = rawIdentity.displayName ?? remoteDisplayName;
-
+    // For channel-selection platforms (LinkedIn, Facebook, etc.), prefer
+    // the channel's own name when a channel is bound (external_account_id
+    // set, not personal mode). Falls back to the OAuth personal display
+    // name so new/unbound rows still get a readable label.
     const localRow = existingById.get(bundleAccountId);
+    const isChannelBound =
+      requiresChannelSelection(remote.type) &&
+      identity.external_account_id !== null &&
+      !(localRow?.is_personal_mode ?? false);
+    const displayName: string | null = isChannelBound
+      ? (rawIdentity.channels.find(
+          (c) => c.id === identity.external_account_id,
+        )?.name ?? rawIdentity.displayName ?? remoteDisplayName)
+      : (rawIdentity.displayName ?? remoteDisplayName);
+
     if (localRow) {
       // UPDATE existing — refresh display_name + avatar + status. Also
       // backfill profile_id if it was NULL (e.g. row pre-dates BSP-8)

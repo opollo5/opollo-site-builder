@@ -80,12 +80,15 @@ export function PopupChannelPicker({
             className="text-foreground"
           />
           <h1 className="text-base font-semibold">
-            Pick a {platformLabel} channel
+            {platform === "INSTAGRAM"
+              ? "Pick a Facebook Page connected to your Instagram account"
+              : `Pick a ${platformLabel} channel`}
           </h1>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Posts to this connection will be published to the channel you pick.
-          You can change it later from the connections page.
+          {platform === "INSTAGRAM"
+            ? "Instagram Business publishing goes through the Facebook Page your Instagram account is linked to."
+            : "Posts to this connection will be published to the channel you pick. You can change it later from the connections page."}
         </p>
       </header>
 
