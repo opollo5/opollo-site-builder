@@ -1,4 +1,5 @@
 import { AdminSocialConnectionsMaintenance } from "@/components/AdminSocialConnectionsMaintenance";
+import { BundlesocialReconcileSection } from "@/components/BundlesocialReconcileSection";
 import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -84,6 +85,7 @@ export default async function SocialConnectionsMaintenancePage() {
           disconnect, refresh, or reattribute.
         </PageHeader.Subtitle>
       </PageHeader>
+      <BundlesocialReconcileSection />
       <AdminSocialConnectionsMaintenance
         connections={(connectionsRead.data ?? []) as ConnectionRow[]}
         companies={(companiesRead.data ?? []) as CompanyRow[]}
