@@ -356,7 +356,7 @@ export function BriefRunClient({
   }
 
   return (
-    <div className="mt-6 space-y-6">
+    <div className="mt-6 space-y-6 pb-24">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
           <span>
