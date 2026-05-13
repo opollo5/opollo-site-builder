@@ -45,11 +45,14 @@ export function ChannelPickerModal({
             className="text-base font-semibold"
             data-testid="channel-picker-title"
           >
-            Pick a {platformLabel} channel
+            {platform === "INSTAGRAM"
+              ? "Pick a Facebook Page connected to your Instagram account"
+              : `Pick a ${platformLabel} channel`}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Posts to this connection will be published to the channel you
-            pick. You can change it later.
+            {platform === "INSTAGRAM"
+              ? "Instagram Business publishing goes through the Facebook Page your Instagram account is linked to."
+              : "Posts to this connection will be published to the channel you pick. You can change it later."}
           </p>
         </header>
 

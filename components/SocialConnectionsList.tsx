@@ -57,8 +57,13 @@ const PLATFORM_TO_BUNDLE_LABEL: Record<
 //   6. Fallback: setInterval polling popup.closed for abandoned popups
 // ---------------------------------------------------------------------------
 
-const POPUP_FEATURES =
-  "width=600,height=700,scrollbars=yes,resizable=yes,noopener=no";
+function getPopupFeatures(): string {
+  const w = 900;
+  const h = 820;
+  const left = Math.floor(window.screen.width / 2 - w / 2);
+  const top = Math.floor(window.screen.height / 2 - h / 2);
+  return `width=${w},height=${h},left=${left},top=${top},scrollbars=yes,resizable=yes`;
+}
 
 // 2026-05-13 platform trim: TikTok, Pinterest, Threads, and Reddit are
 // removed from the UI surface. Backend Zod schemas still accept the
@@ -73,7 +78,6 @@ const PLATFORMS: Array<{
   { value: "INSTAGRAM", label: "Instagram" },
   { value: "TWITTER", label: "X (Twitter)" },
   { value: "GOOGLE_BUSINESS", label: "Google Business" },
-  { value: "YOUTUBE", label: "YouTube" },
 ];
 
 type ConnectMessage = {
@@ -179,6 +183,16 @@ export function SocialConnectionsList({
     | null
   >(null);
 
+  // Mirrors busyPlatform in a ref so the stale-closed handleMessage
+  // effect can read the platform the user originally clicked (needed to
+  // distinguish Instagram from Facebook — both land as facebook_page rows).
+  const busyPlatformRef = useRef<string | null>(null);
+  // When needs_channel fires after an Instagram connect, override the
+  // picker modal's platform so it shows Instagram-specific copy.
+  const [pickerPlatformOverride, setPickerPlatformOverride] = useState<
+    string | null
+  >(null);
+
   const popupRef = useRef<Window | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Timestamp set when the popup opens so we can identify connections
@@ -230,7 +244,7 @@ export function SocialConnectionsList({
       return;
     }
 
-    const popup = window.open(url, "bundle-connect", POPUP_FEATURES);
+    const popup = window.open(url, "bundle-connect", getPopupFeatures());
 
     if (!popup || popup.closed) {
       setPopupBlockedUrl(url);
@@ -297,6 +311,7 @@ export function SocialConnectionsList({
       if (evt.origin !== expectedOrigin) return;
       if (!isConnectMessage(evt.data)) return;
 
+      const clickedPlatform = busyPlatformRef.current;
       clearPopupState();
       setPickerOpen(false);
       // Auto-open the channel-picker modal in the parent window when
@@ -306,6 +321,11 @@ export function SocialConnectionsList({
         evt.data.connect === "needs_channel" &&
         typeof evt.data.connection_id === "string"
       ) {
+        // Instagram Business creates a facebook_page DB row — preserve
+        // the original click intent so the modal shows Instagram copy.
+        if (clickedPlatform === "INSTAGRAM") {
+          setPickerPlatformOverride("INSTAGRAM");
+        }
         setPickerForConnectionId(evt.data.connection_id);
       }
       // Bug-fix 2026-05-12: if the callback signalled noop with an
@@ -347,6 +367,7 @@ export function SocialConnectionsList({
     }
 
     setBusyPlatform(platform);
+    busyPlatformRef.current = platform;
     setPopupBlockedUrl(null);
 
     const res = await fetch("/api/platform/social/connections/connect", {
@@ -506,6 +527,12 @@ export function SocialConnectionsList({
     ? (() => {
         const c = connections.find((x) => x.id === pickerForConnectionId);
         if (!c) return null;
+        // Instagram Business connects via Facebook OAuth and creates a
+        // facebook_page row. If the user originally clicked Instagram,
+        // override the platform label so the modal shows Instagram copy.
+        if (pickerPlatformOverride === "INSTAGRAM" && c.platform === "facebook_page") {
+          return { conn: c, platform: "INSTAGRAM" as const, label: "Instagram" };
+        }
         const bundle = PLATFORM_TO_BUNDLE_LABEL[c.platform];
         if (!bundle) return null;
         return { conn: c, ...bundle };
@@ -520,9 +547,13 @@ export function SocialConnectionsList({
           platform={pickerTarget.platform}
           platformLabel={pickerTarget.label}
           isOpen={true}
-          onClose={() => setPickerForConnectionId(null)}
+          onClose={() => {
+            setPickerForConnectionId(null);
+            setPickerPlatformOverride(null);
+          }}
           onSelected={() => {
             setPickerForConnectionId(null);
+            setPickerPlatformOverride(null);
             toastSuccess("Channel set — this connection is ready to publish.");
             router.refresh();
           }}
