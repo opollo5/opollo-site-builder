@@ -64,6 +64,7 @@ const DB_PLATFORM_TO_PICKER: Record<
   linkedin_personal: { platform: "LINKEDIN", label: "LinkedIn" },
   linkedin_company: { platform: "LINKEDIN", label: "LinkedIn" },
   facebook_page: { platform: "FACEBOOK", label: "Facebook" },
+  instagram_business: { platform: "INSTAGRAM", label: "Instagram" },
   gbp: { platform: "GOOGLE_BUSINESS", label: "Google Business" },
   x: null,
 };
@@ -162,6 +163,14 @@ export function AdminProfileConnectionsList({
   // refresh) so a new mount always re-evaluates pending rows.
   const pickerShownRef = useRef<Set<string>>(new Set());
   const forceCrossTenantRef = useRef<boolean>(false);
+  // Mirrors busyPlatform in a ref so the stale-closed handleMessage effect
+  // can read the platform the user originally clicked regardless of whether
+  // syncOnPopupClose already cleared the busy state (500ms poll race).
+  const busyPlatformRef = useRef<string | null>(null);
+  // Set to Date.now() when any popup message arrives. Added to the auto-open
+  // effect's deps so it re-fires and checks for new pending_identity rows even
+  // when connect:"success" is sent without a connection_id.
+  const [lastPopupAt, setLastPopupAt] = useState<number | null>(null);
 
   function clearPopupState() {
     if (pollRef.current) clearInterval(pollRef.current);
@@ -230,6 +239,7 @@ export function AdminProfileConnectionsList({
         }
       } catch {}
     }
+    setLastPopupAt(Date.now());
     router.refresh();
     toastSuccess("Connection flow completed.");
   }
@@ -239,9 +249,11 @@ export function AdminProfileConnectionsList({
     function handleMessage(evt: MessageEvent) {
       if (evt.origin !== expectedOrigin) return;
       if (!isConnectMessage(evt.data)) return;
-      // Snapshot busy BEFORE clearPopupState wipes it — we need the
-      // platform value to resolve the picker shape below.
-      const platformValue = busy;
+      // Read from ref — not from the busy state closure. The 500ms
+      // popup-close poll can call clearPopupState() (and setBusy(null))
+      // before the postMessage event is processed; reading busy from a
+      // stale closure would produce null and silently drop the picker open.
+      const platformValue = busyPlatformRef.current;
       clearPopupState();
       setPickerOpen(false);
       if (
@@ -268,6 +280,11 @@ export function AdminProfileConnectionsList({
             'To connect it here, click Connect and choose "I manage both" when prompted.',
         );
       }
+      // Signal the auto-open effect to re-check DB connections. Handles the
+      // connect:"success" case where the callback didn't send a connection_id
+      // (findMostRecentlyInsertedConnectionId returned null) — the effect will
+      // do a fresh fetch and pick up any new pending_identity row.
+      setLastPopupAt(Date.now());
       router.refresh();
     }
     window.addEventListener("message", handleMessage);
@@ -276,7 +293,7 @@ export function AdminProfileConnectionsList({
       if (pollRef.current) clearInterval(pollRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [busy]);
+  }, []);
 
   // On mount and after any accounts change, fetch DB connections and
   // auto-open the picker for any pending_identity row not shown yet
@@ -316,7 +333,7 @@ export function AdminProfileConnectionsList({
         });
       } catch {}
     })();
-  }, [accounts, pickerTarget, companyId]);
+  }, [accounts, pickerTarget, companyId, lastPopupAt]);
 
   async function handleDisconnect(account: Account) {
     if (
@@ -401,6 +418,7 @@ export function AdminProfileConnectionsList({
 
     forceCrossTenantRef.current = opts?.forceCrossTenant === true;
     setBusy(platform);
+    busyPlatformRef.current = platform;
     setPopupBlockedUrl(null);
 
     const res = await fetch(
