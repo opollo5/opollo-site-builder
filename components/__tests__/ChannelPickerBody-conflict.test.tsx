@@ -167,6 +167,57 @@ describe("ChannelPickerBody: 409 conflict renders actionable UI", () => {
   });
 });
 
+describe("ChannelPickerBody: conflict banner replaces channel list (mutual exclusion)", () => {
+  it("hides the channel list when conflict is active", async () => {
+    fetchMock
+      .mockResolvedValueOnce(channelsResponse([CHANNEL]))
+      .mockResolvedValueOnce(conflictResponse(true));
+
+    await act(async () => {
+      await renderBody();
+    });
+
+    // List visible before click.
+    expect(screen.getByTestId("channel-picker-list")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("channel-picker-row-ch-1"));
+    });
+
+    // Conflict banner must be visible.
+    expect(screen.getByTestId("channel-picker-conflict-error")).toBeTruthy();
+
+    // Channel list must be gone — user cannot click another channel while
+    // override prompt is shown (prevents the 6× POST loop).
+    expect(screen.queryByTestId("channel-picker-list")).toBeNull();
+    expect(screen.queryByTestId("channel-picker-row-ch-1")).toBeNull();
+  });
+
+  it("restores the channel list after Cancel is clicked", async () => {
+    fetchMock
+      .mockResolvedValueOnce(channelsResponse([CHANNEL]))
+      .mockResolvedValueOnce(conflictResponse(true));
+
+    await act(async () => {
+      await renderBody();
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("channel-picker-row-ch-1"));
+    });
+
+    expect(screen.getByTestId("channel-picker-conflict-error")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("channel-picker-conflict-cancel"));
+    });
+
+    // After cancel, list is restored.
+    expect(screen.queryByTestId("channel-picker-conflict-error")).toBeNull();
+    expect(screen.getByTestId("channel-picker-list")).toBeTruthy();
+  });
+});
+
 describe("ChannelPickerBody: Fix C — duplicate click fires only one POST", () => {
   it("clicking a row twice in quick succession fires only one set-channel POST", async () => {
     // set-channel never resolves — simulates in-flight request.
