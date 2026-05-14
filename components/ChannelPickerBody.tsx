@@ -133,11 +133,23 @@ export function ChannelPickerBody({
         };
       };
     };
-    const json = (await res.json()) as { ok: true } | ErrorBody;
+    // Clear spinner before JSON parse so a parse failure doesn't leave the
+    // channel row stuck in "Selecting…" forever.
     setBusyChannelId(null);
+    let json: { ok: true } | ErrorBody;
+    try {
+      json = (await res.json()) as { ok: true } | ErrorBody;
+    } catch {
+      setActionError("Failed to set channel.");
+      return;
+    }
     if (!res.ok || !json.ok) {
       const err = (json as ErrorBody).error;
       if (res.status === 409 && err.code === "CROSS_TENANT_CONFLICT") {
+        console.error("channel-picker: cross-tenant conflict", {
+          code: err.code,
+          details: err.details,
+        });
         setConflictError({
           channelId: channel.id,
           conflictingCompany: err.details?.conflicting_company ?? null,
@@ -178,7 +190,64 @@ export function ChannelPickerBody({
 
   return (
     <div data-testid="channel-picker-body">
-      {state.kind === "loading" || state.kind === "idle" ? (
+      {conflictError ? (
+        // Conflict replaces the channel list entirely so the user can't
+        // click another channel while the override prompt is visible.
+        <div
+          className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          role="alert"
+          data-testid="channel-picker-conflict-error"
+        >
+          <p className="mb-1 font-medium">
+            This {platformLabel} channel is already connected to another
+            company
+            {conflictError.conflictingCompany
+              ? ` (${conflictError.conflictingCompany})`
+              : ""}.
+          </p>
+          {conflictError.conflictingChannelName ? (
+            <p className="mb-2 text-amber-800">
+              Channel: {conflictError.conflictingChannelName}
+            </p>
+          ) : null}
+          {conflictError.overrideAllowed ? (
+            <>
+              <p className="mb-2">
+                If you manage social media for both companies, you can connect
+                it to this one too.
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    const ch = (
+                      state.kind === "loaded" ? state.channels : []
+                    ).find((c) => c.id === conflictError.channelId);
+                    if (ch) void retryWithOverride(ch);
+                  }}
+                  disabled={busyChannelId !== null}
+                  data-testid="channel-picker-connect-both"
+                >
+                  {busyChannelId !== null ? "Connecting…" : "Connect to both companies"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setConflictError(null)}
+                  data-testid="channel-picker-conflict-cancel"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-amber-800">
+              Contact support to set up multi-company sharing, or disconnect
+              the channel from the other company first.
+            </p>
+          )}
+        </div>
+      ) : state.kind === "loading" || state.kind === "idle" ? (
         <p
           className="text-sm text-muted-foreground"
           data-testid="channel-picker-loading"
@@ -258,63 +327,6 @@ export function ChannelPickerBody({
           ))}
         </ul>
       )}
-
-      {conflictError ? (
-        <div
-          className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
-          role="alert"
-          data-testid="channel-picker-conflict-error"
-        >
-          <p className="mb-1 font-medium">
-            This {platformLabel} channel is already connected to another
-            company
-            {conflictError.conflictingCompany
-              ? ` (${conflictError.conflictingCompany})`
-              : ""}.
-          </p>
-          {conflictError.conflictingChannelName ? (
-            <p className="mb-2 text-amber-800">
-              Channel: {conflictError.conflictingChannelName}
-            </p>
-          ) : null}
-          {conflictError.overrideAllowed ? (
-            <>
-              <p className="mb-2">
-                If you manage social media for both companies, you can connect
-                it to this one too.
-              </p>
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    const ch = (
-                      state.kind === "loaded" ? state.channels : []
-                    ).find((c) => c.id === conflictError.channelId);
-                    if (ch) void retryWithOverride(ch);
-                  }}
-                  disabled={busyChannelId !== null}
-                  data-testid="channel-picker-connect-both"
-                >
-                  {busyChannelId !== null ? "Connecting…" : "Connect to both companies"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setConflictError(null)}
-                  data-testid="channel-picker-conflict-cancel"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </>
-          ) : (
-            <p className="text-amber-800">
-              Contact support to set up multi-company sharing, or disconnect
-              the channel from the other company first.
-            </p>
-          )}
-        </div>
-      ) : null}
 
       {actionError ? (
         <p
