@@ -76,7 +76,12 @@ const ORIGINAL_FETCH = global.fetch;
 const ORIGINAL_OPEN = window.open;
 
 function makeFakePopup() {
-  return { closed: false, focus: vi.fn(), close() { (this as { closed: boolean }).closed = true; } };
+  return {
+    closed: false,
+    focus: vi.fn(),
+    location: { href: "" },
+    close() { (this as { closed: boolean }).closed = true; },
+  };
 }
 
 beforeEach(() => {

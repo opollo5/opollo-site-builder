@@ -56,7 +56,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   openMock.mockReset();
   // Default popup mock — returns a fake window with a no-op close().
-  openMock.mockReturnValue({ closed: false, focus: vi.fn() });
+  openMock.mockReturnValue({ closed: false, focus: vi.fn(), location: { href: "" } });
   Object.defineProperty(window, "open", {
     configurable: true,
     writable: true,

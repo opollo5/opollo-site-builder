@@ -41,7 +41,7 @@ const originalFetch = global.fetch;
 
 // Simulated popup object: starts open, can be programmatically closed.
 function makeFakePopup() {
-  const popup = { closed: false, focus: vi.fn(), close() { this.closed = true; } };
+  const popup = { closed: false, focus: vi.fn(), location: { href: "" }, close() { this.closed = true; } };
   return popup;
 }
 

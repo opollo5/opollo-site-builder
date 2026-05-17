@@ -95,7 +95,7 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch;
 
   openMock.mockReset();
-  openMock.mockReturnValue({ closed: false, focus: vi.fn() });
+  openMock.mockReturnValue({ closed: false, focus: vi.fn(), location: { href: "" } });
   Object.defineProperty(window, "open", {
     configurable: true,
     writable: true,

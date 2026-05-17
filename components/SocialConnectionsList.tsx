@@ -295,13 +295,27 @@ export function SocialConnectionsList({
     }
   }
 
-  function openConnectPopup(url: string, rowId?: string) {
+  // preOpenedPopup: a Window already opened synchronously in the click
+  // handler. When supplied we navigate it to url rather than calling
+  // window.open again, preserving the user-gesture activation across the
+  // async gap between click and OAuth-URL resolution.
+  function openConnectPopup(
+    url: string,
+    rowId?: string,
+    preOpenedPopup?: Window | null,
+  ) {
     if (popupRef.current && !popupRef.current.closed) {
       popupRef.current.focus();
       return;
     }
 
-    const popup = window.open(url, "bundle-connect", getPopupFeatures());
+    let popup: Window | null;
+    if (preOpenedPopup && !preOpenedPopup.closed) {
+      preOpenedPopup.location.href = url;
+      popup = preOpenedPopup;
+    } else {
+      popup = window.open(url, "bundle-connect", getPopupFeatures());
+    }
 
     if (!popup || popup.closed) {
       setPopupBlockedUrl(url);
@@ -313,9 +327,10 @@ export function SocialConnectionsList({
     popupRef.current = popup;
     popupOpenedAtRef.current = Date.now();
 
+    const p = popup;
     let closedHandled = false;
     pollRef.current = setInterval(() => {
-      if (popup.closed && !closedHandled) {
+      if (p.closed && !closedHandled) {
         closedHandled = true;
         void syncOnPopupClose(rowId);
       }
@@ -422,15 +437,35 @@ export function SocialConnectionsList({
 
   async function handleConnect(
     platform: string,
-    opts?: { skipPreflight?: boolean; forceCrossTenant?: boolean },
+    opts?: {
+      skipPreflight?: boolean;
+      forceCrossTenant?: boolean;
+      skipIdentityConfirm?: boolean;
+    },
   ) {
     if (!profileId) return;
     setError(null);
+
+    // Bug 2 gate — inserted in the next commit. Guarded by skipIdentityConfirm
+    // so the preflight "I manage both" path and the modal Continue path both
+    // skip this check without an infinite loop.
+    // (Intentionally left as a no-op placeholder here; the modal state and
+    //  render are added in the identity-confirm commit.)
+
+    // Bug 1 fix: open a blank popup SYNCHRONOUSLY before the first await so
+    // we remain inside the browser's user-gesture activation window. After the
+    // async preflight + connect-API calls resolve we navigate the already-open
+    // window to the OAuth URL via openConnectPopup(..., prePopup).
+    const prePopup =
+      typeof window !== "undefined"
+        ? window.open("", "bundle-connect", getPopupFeatures())
+        : null;
 
     // Layer 3 — pre-flight check before opening the popup.
     if (!opts?.skipPreflight) {
       const preflight = await runPreflight({ platform });
       if (preflight.warn) {
+        prePopup?.close();
         const platformLabel =
           PLATFORMS.find((p) => p.value === platform)?.label ?? platform;
         setPreflightModal({
@@ -465,12 +500,13 @@ export function SocialConnectionsList({
       | { ok: false; error: { message: string } };
 
     if (!res.ok || !json.ok) {
+      prePopup?.close();
       setError(!json.ok ? json.error.message : "Failed to start connect.");
       setBusyPlatform(null);
       return;
     }
 
-    openConnectPopup(json.data.url);
+    openConnectPopup(json.data.url, undefined, prePopup);
   }
 
   async function runPreflight(args: { platform: string }): Promise<{
@@ -504,7 +540,7 @@ export function SocialConnectionsList({
     }
   }
 
-  async function handleReconnect(rowId: string) {
+  async function handleReconnect(rowId: string, prePopup?: Window | null) {
     setBusyRow(rowId);
     setError(null);
     const res = await fetch("/api/platform/social/connections/reconnect", {
@@ -516,11 +552,12 @@ export function SocialConnectionsList({
       | { ok: true; data: { url: string } }
       | { ok: false; error: { message: string } };
     if (!res.ok || !json.ok) {
+      prePopup?.close();
       setError(!json.ok ? json.error.message : "Failed to start reconnect.");
       setBusyRow(null);
       return;
     }
-    openConnectPopup(json.data.url, rowId);
+    openConnectPopup(json.data.url, rowId, prePopup);
   }
 
   async function handleDisconnect(connectionId: string) {
@@ -763,6 +800,7 @@ export function SocialConnectionsList({
                   setPreflightModal(null);
                   void handleConnect(platform, {
                     skipPreflight: true,
+                    skipIdentityConfirm: true,
                     forceCrossTenant: true,
                   });
                 }}
@@ -991,7 +1029,14 @@ export function SocialConnectionsList({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleReconnect(c.id)}
+                          onClick={() => {
+                            const popup = window.open(
+                              "",
+                              "bundle-connect",
+                              getPopupFeatures(),
+                            );
+                            void handleReconnect(c.id, popup);
+                          }}
                           disabled={busyRow === c.id || connectBusy || busySync}
                           data-testid={`connection-reconnect-${c.id}`}
                         >

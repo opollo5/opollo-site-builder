@@ -54,6 +54,7 @@ function makeFakePopup() {
   return {
     closed: false,
     focus: vi.fn(),
+    location: { href: "" },
     close() {
       (this as { closed: boolean }).closed = true;
     },

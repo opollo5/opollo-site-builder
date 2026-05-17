@@ -45,7 +45,12 @@ const ORIGINAL_OPEN = window.open;
 const COMPANY_ID = "00000000-0000-0000-0000-000000000001";
 
 function makeFakePopup() {
-  return { closed: false, focus: vi.fn(), close() { (this as { closed: boolean }).closed = true; } };
+  return {
+    closed: false,
+    focus: vi.fn(),
+    location: { href: "" },
+    close() { (this as { closed: boolean }).closed = true; },
+  };
 }
 
 function renderList() {
