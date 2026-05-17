@@ -66,6 +66,31 @@ export const AccountEventDataSchema = z
 
 export type AccountEventData = z.infer<typeof AccountEventDataSchema>;
 
+// social-account.updated: same identity fields as AccountEvent, plus
+// optional updated state fields.  The handler re-resolves identity from
+// the API rather than trusting the partial payload.
+export const AccountUpdatedDataSchema = z
+  .object({
+    accountId: z.string().min(1).optional(),
+    socialAccountId: z.string().min(1).optional(),
+    // bundle.social platform type string (e.g. "LINKEDIN", "FACEBOOK")
+    type: z.string().optional(),
+  })
+  .passthrough();
+
+export type AccountUpdatedData = z.infer<typeof AccountUpdatedDataSchema>;
+
+// team.updated: fires when channel roster changes for a bundle.social team.
+// teamId is redundant with the envelope but may also appear in data.
+export const TeamUpdatedDataSchema = z
+  .object({
+    teamId: z.string().optional(),
+    reason: z.string().optional(),
+  })
+  .passthrough();
+
+export type TeamUpdatedData = z.infer<typeof TeamUpdatedDataSchema>;
+
 // Map bundle.social's free-form error.class strings to our enum.
 // Anything unknown lands in 'unknown' so the row still validates.
 export type SocialErrorClass =

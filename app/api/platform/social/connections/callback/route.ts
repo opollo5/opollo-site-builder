@@ -1,4 +1,4 @@
-﻿import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, type NextRequest } from "next/server";
 
 import { enqueuePostHistoryImport } from "@/lib/platform/social/analytics-ingest";
 import { logger } from "@/lib/logger";
@@ -8,16 +8,29 @@ import { CHANNEL_SELECTION_PLATFORMS } from "@/lib/platform/social/connections/i
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
-// Per the bundle.social docs at
-// https://info.bundle.social/api-reference/connect-social-accounts,
-// every per-platform OAuth redirect lands with a `<platform>-callback=`
-// query param (either `true` for success or `error` for generic OAuth
-// failure), plus optional platform-specific error params.
+// ---------------------------------------------------------------------------
+// bundle.social OAuth callback param handling.
 //
-// The set below is normalised to lowercase bundle.social platform
-// names; `find` against this set rather than the hand-rolled four-
-// generic-string list that used to live here. New platforms only need
-// adding to the PLATFORM_KEYS list below — error-handling stays generic.
+// bundle.social has two param formats:
+//
+// OLD (per-platform named params, pre-2026-05-18 deploy):
+//   ?<platform>-callback=true|error
+//   ?<platform>-not-enough-channels  (presence indicates error)
+//   ?not-enough-permissions           (legacy generic)
+//
+// NEW (?success=<code> / ?error=<code>, post-2026-05-18 deploy):
+//   ?success=linkedin-callback
+//   ?error=linkedin-not-enough-channels
+//   ?error=instagram-not-professional-account
+//
+// The code after ?success= / ?error= is the same string that was
+// previously the param NAME in the old format. We support both formats
+// so the transition window is seamless.
+//
+// Source: https://info.bundle.social/api-reference/connect-social-accounts
+// ---------------------------------------------------------------------------
+
+// Internal platform keys used throughout this file.
 const PLATFORM_KEYS = [
   "linkedin",
   "facebook",
@@ -37,30 +50,107 @@ const PLATFORM_KEYS = [
 
 type PlatformKey = (typeof PLATFORM_KEYS)[number];
 
-// Error-suffix → reason code mapping. Reason codes are the values
-// surfaced via ?reason= to /company/social/connections, where
-// REASON_LABEL maps them to copy.
-const ERROR_SUFFIXES: Array<{ suffix: string; reason: string }> = [
-  { suffix: "-not-enough-channels", reason: "not-enough-channels" },
-  { suffix: "-not-enough-permissions", reason: "not-enough-permissions" },
-  { suffix: "-not-enough-pages", reason: "not-enough-pages" },
-  { suffix: "-not-enough-accounts", reason: "not-enough-accounts" },
-  { suffix: "-not-enough-servers", reason: "not-enough-servers" },
-  { suffix: "-not-enough-workspaces", reason: "not-enough-workspaces" },
+// bundle.social uses hyphens in codes (google-business-callback) but our
+// internal PLATFORM_KEYS uses underscores (google_business).  Map longest
+// prefix first so "google-business" is matched before a hypothetical bare
+// "google" prefix.
+const BUNDLE_PREFIX_TO_KEY: Array<{ prefix: string; key: PlatformKey }> = [
+  { prefix: "google-business", key: "google_business" },
+  { prefix: "linkedin",        key: "linkedin" },
+  { prefix: "facebook",        key: "facebook" },
+  { prefix: "instagram",       key: "instagram" },
+  { prefix: "twitter",         key: "twitter" },
+  { prefix: "threads",         key: "threads" },
+  { prefix: "tiktok",          key: "tiktok" },
+  { prefix: "youtube",         key: "youtube" },
+  { prefix: "pinterest",       key: "pinterest" },
+  { prefix: "reddit",          key: "reddit" },
+  { prefix: "bluesky",         key: "bluesky" },
+  { prefix: "mastodon",        key: "mastodon" },
+  { prefix: "discord",         key: "discord" },
+  { prefix: "slack",           key: "slack" },
 ];
 
-// Scan the URL for the first platform-prefixed signal and classify.
-// Returns `null` when nothing matches — the caller falls through to
-// the sync-driven outcome.
-function classifyPlatformParams(
-  url: URL,
-):
-  | { kind: "success"; platform: PlatformKey }
-  | { kind: "error"; platform: PlatformKey; reason: string }
-  | null {
-  // Pre-existing generic keys (legacy bundle.social paths and our own
-  // ad-hoc signals from PR #868). Treated as error with the suffix as
-  // the reason code.
+// Error suffix → reason code.  Used for both the new-format error codes
+// (?error=<platform><suffix>) and the old-format named params
+// (?<platform><suffix>).
+const ERROR_SUFFIX_TO_REASON: Array<{ suffix: string; reason: string }> = [
+  { suffix: "-not-enough-channels",        reason: "not-enough-channels" },
+  { suffix: "-not-enough-permissions",     reason: "not-enough-permissions" },
+  { suffix: "-not-enough-pages",           reason: "not-enough-pages" },
+  { suffix: "-not-enough-accounts",        reason: "not-enough-accounts" },
+  { suffix: "-not-enough-servers",         reason: "not-enough-servers" },
+  { suffix: "-not-enough-workspaces",      reason: "not-enough-workspaces" },
+  // New in bundle.social 2026-05-18 deploy:
+  { suffix: "-not-professional-account",   reason: "not-professional-account" },
+  // Generic auth fail when code ends in -callback or -direct-callback via
+  // ?error= param:
+  { suffix: "-direct-callback",            reason: "auth-failed" },
+  { suffix: "-callback",                   reason: "auth-failed" },
+];
+
+// Resolve a bundle.social platform code prefix → our PlatformKey.
+function matchBundlePrefix(code: string): PlatformKey | null {
+  for (const { prefix, key } of BUNDLE_PREFIX_TO_KEY) {
+    if (code.startsWith(prefix)) return key;
+  }
+  return null;
+}
+
+type ClassifyResult =
+  | { kind: "success";        platform: PlatformKey }
+  | { kind: "error";          platform: PlatformKey; reason: string }
+  | { kind: "unknown_success"; code: string }
+  | { kind: "unknown_error";   code: string }
+  | null;
+
+// Scan the URL for bundle.social OAuth outcome signals and classify them.
+// Returns null when no signal is present — the caller falls through to the
+// sync-driven outcome.
+function classifyPlatformParams(url: URL): ClassifyResult {
+  // -----------------------------------------------------------------------
+  // NEW FORMAT: ?success=<code> or ?error=<code>
+  // -----------------------------------------------------------------------
+  const successCode = url.searchParams.get("success");
+  if (successCode !== null) {
+    const platform = matchBundlePrefix(successCode);
+    if (platform) {
+      // Any -callback or -direct-callback suffix is a success signal.
+      const suffix = successCode.slice(
+        BUNDLE_PREFIX_TO_KEY.find((e) => e.key === platform)!.prefix.length,
+      );
+      if (suffix === "-callback" || suffix === "-direct-callback") {
+        return { kind: "success", platform };
+      }
+    }
+    // Unknown success code — log and show generic error (see handler).
+    return { kind: "unknown_success", code: successCode };
+  }
+
+  const errorCode = url.searchParams.get("error");
+  if (errorCode !== null) {
+    const platform = matchBundlePrefix(errorCode);
+    if (platform) {
+      const suffix = errorCode.slice(
+        BUNDLE_PREFIX_TO_KEY.find((e) => e.key === platform)!.prefix.length,
+      );
+      for (const { suffix: s, reason } of ERROR_SUFFIX_TO_REASON) {
+        if (suffix === s) return { kind: "error", platform, reason };
+      }
+      // Known platform, unrecognised suffix → generic auth fail.
+      return { kind: "error", platform, reason: "auth-failed" };
+    }
+    // Unknown platform prefix — log and show generic error.
+    return { kind: "unknown_error", code: errorCode };
+  }
+
+  // -----------------------------------------------------------------------
+  // OLD FORMAT — backward compat for deployments still sending named params.
+  // -----------------------------------------------------------------------
+
+  // Legacy generic keys (pre-platform-prefix era and our own ad-hoc signals
+  // from PR #868). Use "linkedin" as synthetic platform — the UI only shows
+  // the reason copy, not the platform name for these legacy paths.
   for (const key of [
     "not-enough-permissions",
     "not-enough-pages",
@@ -68,31 +158,28 @@ function classifyPlatformParams(
     "user-cancelled",
   ]) {
     if (url.searchParams.has(key)) {
-      // Use 'unknown' as a synthetic platform — the customer-facing
-      // banner only renders the reason copy, not the platform.
       return { kind: "error", platform: "linkedin", reason: key };
     }
   }
-  // Platform-prefixed signals.
+
+  // Platform-prefixed named params: ?<platform>-callback=true|error and
+  // ?<platform>-<error-suffix>.
   for (const platform of PLATFORM_KEYS) {
-    // <platform>-callback=true|error
     const cb = url.searchParams.get(`${platform}-callback`);
     if (cb !== null) {
-      if (cb === "error") {
-        return { kind: "error", platform, reason: "auth-failed" };
-      }
-      // 'true' or anything else non-error → success signal. Note: we
-      // still rely on the sync to do the actual DB insert; this branch
-      // only suppresses the noop fall-through.
+      if (cb === "error") return { kind: "error", platform, reason: "auth-failed" };
       return { kind: "success", platform };
     }
-    // Platform-specific error suffixes.
-    for (const { suffix, reason } of ERROR_SUFFIXES) {
+    for (const { suffix, reason } of ERROR_SUFFIX_TO_REASON) {
+      // Skip the -callback / -direct-callback suffixes here; they only apply
+      // via the ?error= new-format path (not as standalone named params).
+      if (suffix === "-callback" || suffix === "-direct-callback") continue;
       if (url.searchParams.has(`${platform}${suffix}`)) {
         return { kind: "error", platform, reason };
       }
     }
   }
+
   return null;
 }
 
@@ -101,15 +188,15 @@ function classifyPlatformParams(
 //
 // bundle.social redirects here after the OAuth dance completes (or
 // errors). Query params:
-//   company_id           — set by /connect when minting the portal URL
-//   popup=1              — present when the flow ran in a popup window;
-//                          triggers postMessage + window.close() instead
-//                          of a full-page redirect.
-//   <platform>-callback  — bundle.social's success signal (e.g.
-//                          twitter-callback=true). We don't act on it
-//                          beyond logging; the sync below is the source
-//                          of truth.
-//   not-enough-permissions / not-enough-pages / etc — error signals.
+//   company_id             — set by /connect when minting the portal URL
+//   popup=1                — present when the flow ran in a popup window;
+//                            triggers postMessage + window.close() instead
+//                            of a full-page redirect.
+//   success=<code> /       — NEW bundle.social format (2026-05-18 deploy).
+//   error=<code>
+//   <platform>-callback=   — OLD bundle.social format (still supported).
+//   <platform>-<suffix>
+//   not-enough-permissions / etc — legacy generic error signals.
 //
 // Non-popup behaviour: 302 redirect back to /company/social/connections
 // with ?connect=success|error|noop.
@@ -194,12 +281,42 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return gate.response;
   }
 
-  // Classify URL params BEFORE running the sync — bundle.social's
-  // error signals like <platform>-not-enough-channels mean OAuth never
-  // completed (no account created), so the sync would just no-op and
-  // produce a misleading "noop" banner. Surface the error directly.
+  // Classify URL params BEFORE running the sync — bundle.social error
+  // signals mean OAuth never completed (no account created), so the sync
+  // would just no-op and produce a misleading "noop" banner.
   const classified = classifyPlatformParams(url);
-  if (classified && classified.kind === "error") {
+
+  // Unknown code: log to platform_events so ops can investigate, then
+  // show a generic error to the user (we can't determine the outcome).
+  if (
+    classified?.kind === "unknown_success" ||
+    classified?.kind === "unknown_error"
+  ) {
+    logger.warn("social.callback.unknown_code", {
+      code: classified.code,
+      kind: classified.kind,
+      company_id: companyId,
+    });
+    void getServiceRoleClient()
+      .from("platform_events")
+      .insert({
+        company_id: companyId,
+        actor_id: gate.userId,
+        event_type: "unknown_oauth_callback",
+        entity_type: "oauth_callback",
+        entity_id: null,
+        payload: { code: classified.code, kind: classified.kind },
+      });
+    if (isPopup) {
+      return popupCloseResponse(req, "error", "unknown-callback-code");
+    }
+    const target = new URL("/company/social/connections", req.url);
+    target.searchParams.set("connect", "error");
+    target.searchParams.set("reason", "unknown-callback-code");
+    return NextResponse.redirect(target);
+  }
+
+  if (classified?.kind === "error") {
     if (isPopup) {
       return popupCloseResponse(req, "error", classified.reason);
     }
