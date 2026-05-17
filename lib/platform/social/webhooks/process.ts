@@ -6,6 +6,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 
 import {
   AccountEventDataSchema,
+  AccountUpdatedDataSchema,
+  TeamUpdatedDataSchema,
   mapErrorClass,
   PostEventDataSchema,
   type WebhookEnvelope,
@@ -59,6 +61,7 @@ export async function processBundlesocialWebhook(input: {
     .insert({
       event_id: envelope.id,
       event_type: envelope.type,
+      team_id: envelope.teamId ?? null,
       raw_payload: rawPayload as Record<string, unknown>,
       signature_valid: signatureValid,
     })
@@ -143,6 +146,16 @@ async function dispatch(
     type === "social.account.connected"
   ) {
     return handleAccountEvent(envelope, type, webhookEventId, svc);
+  }
+  // social-account.updated: bundle.social treats its data as source of
+  // truth — re-resolve identity from the API and upsert our row.
+  if (type === "social.account.updated") {
+    return handleAccountUpdated(envelope, webhookEventId, svc);
+  }
+  // team.updated: channel list changed (pages added/removed, etc.).
+  // Re-sync the company associated with this team.
+  if (type === "team.updated") {
+    return handleTeamUpdated(envelope, webhookEventId, svc);
   }
 
   return {
@@ -561,6 +574,238 @@ async function handleAccountEvent(
         ? "account_disconnected"
         : "account_auth_required",
   };
+}
+
+// ---------------------------------------------------------------------------
+// social-account.updated handler
+//
+// bundle.social is the source of truth for connection state. When this
+// event fires we re-resolve the identity fingerprint from the bundle.social
+// API and upsert our row so it stays in sync without waiting for the daily
+// health cron.
+// ---------------------------------------------------------------------------
+async function handleAccountUpdated(
+  envelope: WebhookEnvelope,
+  webhookEventId: string,
+  svc: ReturnType<typeof getServiceRoleClient>,
+): Promise<ProcessOutcome> {
+  const parsed = AccountUpdatedDataSchema.safeParse(envelope.data ?? {});
+  if (!parsed.success) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `social-account.updated data did not validate: ${parsed.error.message}`,
+    };
+  }
+  const accountId =
+    parsed.data.socialAccountId ?? parsed.data.accountId ?? null;
+  if (!accountId) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: "social-account.updated missing socialAccountId/accountId.",
+    };
+  }
+
+  const conn = await svc
+    .from("social_connections")
+    .select("id, company_id, profile_id, platform, status, is_personal_mode")
+    .eq("bundle_social_account_id", accountId)
+    .maybeSingle();
+  if (conn.error) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `Connection lookup failed: ${conn.error.message}`,
+    };
+  }
+  if (!conn.data) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `No social_connections row for bundle_social_account_id=${accountId}.`,
+    };
+  }
+
+  // Re-resolve identity from bundle.social API (source of truth).
+  if (!conn.data.profile_id) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: "Connection has no profile_id; cannot resolve team for identity refresh.",
+    };
+  }
+  const profileTeam = await svc
+    .from("platform_social_profiles")
+    .select("bundle_social_team_id")
+    .eq("id", conn.data.profile_id as string)
+    .maybeSingle();
+  const teamId = (
+    profileTeam.data as { bundle_social_team_id?: string } | null
+  )?.bundle_social_team_id;
+  if (!teamId) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: "Profile has no bundle_social_team_id; skipping identity refresh.",
+    };
+  }
+
+  const {
+    resolveIdentityFingerprint,
+    computeIdentityHash,
+    requiresChannelSelection,
+  } = await import("@/lib/platform/social/connections/identity");
+  // envelope.data.type carries the bundle.social platform type string.
+  const bsType = (parsed.data as { type?: string }).type as Parameters<
+    typeof resolveIdentityFingerprint
+  >[0]["platform"];
+  const rawIdentity = await resolveIdentityFingerprint({
+    platform: bsType,
+    teamId,
+  });
+
+  const platformDb = conn.data.platform as string;
+  const identityHash = computeIdentityHash(
+    platformDb,
+    rawIdentity.external_account_id,
+    rawIdentity.external_user_id,
+  );
+
+  const isPersonal = Boolean(
+    (conn.data as { is_personal_mode?: boolean }).is_personal_mode,
+  );
+  const needsChannelSelection =
+    requiresChannelSelection(bsType) &&
+    rawIdentity.external_account_id === null &&
+    !isPersonal;
+  const hasIdentity =
+    rawIdentity.external_account_id !== null ||
+    rawIdentity.external_user_id !== null;
+  const newStatus: "healthy" | "pending_identity" =
+    !hasIdentity || needsChannelSelection ? "pending_identity" : "healthy";
+
+  const now = new Date().toISOString();
+  const update = await svc
+    .from("social_connections")
+    .update({
+      status: newStatus,
+      external_account_id: rawIdentity.external_account_id,
+      external_user_id: rawIdentity.external_user_id,
+      external_identity_hash: identityHash,
+      ...(rawIdentity.displayName !== null
+        ? { display_name: rawIdentity.displayName }
+        : {}),
+      last_health_check_at: now,
+      last_error: null,
+    })
+    .eq("id", conn.data.id as string);
+
+  if (update.error) {
+    logger.warn("bundlesocial.webhook.account_updated_write_failed", {
+      err: update.error.message,
+      connection_id: conn.data.id,
+    });
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `Connection update failed: ${update.error.message}`,
+    };
+  }
+
+  logger.info("bundlesocial.webhook.account_updated", {
+    connection_id: conn.data.id,
+    platform: platformDb,
+    new_status: newStatus,
+    had_identity_change:
+      rawIdentity.external_account_id !==
+      (conn.data as { external_account_id?: string | null }).external_account_id,
+  });
+
+  return { kind: "ok", webhookEventId, action: "account_updated" };
+}
+
+// ---------------------------------------------------------------------------
+// team.updated handler
+//
+// Fires when channel state changes (pages added/removed, etc.) per
+// bundle.social. Re-sync the company linked to this team so our DB
+// reflects the current channel roster.
+// ---------------------------------------------------------------------------
+async function handleTeamUpdated(
+  envelope: WebhookEnvelope,
+  webhookEventId: string,
+  svc: ReturnType<typeof getServiceRoleClient>,
+): Promise<ProcessOutcome> {
+  const parsed = TeamUpdatedDataSchema.safeParse(envelope.data ?? {});
+  if (!parsed.success) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `team.updated data did not validate: ${parsed.error.message}`,
+    };
+  }
+
+  // teamId is on the envelope envelope; also accept it from the payload.
+  const teamId = envelope.teamId ?? parsed.data.teamId ?? null;
+  if (!teamId) {
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: "team.updated missing teamId in envelope and data.",
+    };
+  }
+
+  // Find the company associated with this bundle.social team.
+  const profile = await svc
+    .from("platform_social_profiles")
+    .select("company_id")
+    .eq("bundle_social_team_id", teamId)
+    .limit(1)
+    .maybeSingle();
+  if (profile.error || !profile.data) {
+    logger.info("bundlesocial.webhook.team_updated_no_company", {
+      team_id: teamId,
+      err: profile.error?.message,
+    });
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `No platform_social_profiles row for bundle_social_team_id=${teamId}.`,
+    };
+  }
+  const companyId = profile.data.company_id as string;
+
+  const { syncBundlesocialConnections } = await import(
+    "@/lib/platform/social/connections"
+  );
+  const syncResult = await syncBundlesocialConnections({
+    companyId,
+    // No attribution — this is a state-refresh, not a new-connection flow.
+  });
+
+  if (!syncResult.ok) {
+    logger.warn("bundlesocial.webhook.team_updated_sync_failed", {
+      team_id: teamId,
+      company_id: companyId,
+      code: syncResult.error.code,
+    });
+    return {
+      kind: "stored_no_action",
+      webhookEventId,
+      reason: `Sync failed for company ${companyId}: ${syncResult.error.code}`,
+    };
+  }
+
+  logger.info("bundlesocial.webhook.team_updated_synced", {
+    team_id: teamId,
+    company_id: companyId,
+    inserted: syncResult.data.inserted,
+    updated: syncResult.data.updated,
+    marked_disconnected: syncResult.data.marked_disconnected,
+  });
+
+  return { kind: "ok", webhookEventId, action: "team_updated_synced" };
 }
 
 // BSP analytics — fire-and-forget post-history import trigger.

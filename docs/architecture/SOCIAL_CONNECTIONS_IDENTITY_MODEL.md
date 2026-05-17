@@ -2,6 +2,71 @@
 
 **Status:** Active. Migration 0122 shipped. Backfill produced clean report.
 
+## Source of truth (updated 2026-05-18)
+
+**Bundle.social is the source of truth for connection state.** Our database
+is a reference cache and audit log.
+
+| Mechanism | Role |
+|---|---|
+| **Webhooks** (`social-account.*`, `team.updated`) | Primary sync — bundle.social pushes state changes in near-real time |
+| **OAuth callback sync** | Runs immediately after connect to insert the initial row |
+| **Daily health cron** (`/api/cron/social-connections-health`) | Full reconcile; catches anything webhooks missed |
+| **DB rows** | Reference cache + audit trail; NOT authoritative if they diverge from bundle.social |
+
+### Defensive layers (L1/L2/L4) — still active, new role
+
+These layers were built when we treated our DB as authoritative and used to
+catch cross-tenant publishing leaks *proactively*. Now that bundle.social is
+the source of truth:
+
+- **L1 ghost check** (pre-connect preflight) — catches "bundle.social state
+  changed while we weren't looking, before user-initiated action." The user
+  is about to connect a platform; we check whether another company already
+  has the same identity on bundle.social's side.
+- **L2 reconcile** (`/api/admin/maintenance/reconcile-bundlesocial`) —
+  catches "extended webhook downtime caused us to miss multiple state changes."
+  A manual full-reconcile between bundle.social API and our DB rows.
+- **L4 verify-then-delete** (admin maintenance page) — catches "webhook
+  arrived but didn't process in time before user-initiated disconnect." Admin
+  can re-verify identity before destroying a row.
+
+These are defence-in-depth, not the primary sync path. Webhooks do the work;
+L1/L2/L4 catch edge cases.
+
+### Webhook event coverage (post-2026-05-18)
+
+| Event type | Handler | Action |
+|---|---|---|
+| `social-account.connected` | `handleAccountEvent` | Flip to healthy / pending_identity, resolve identity |
+| `social-account.updated` | `handleAccountUpdated` | Re-resolve identity from API, upsert our row |
+| `social-account.disconnected` | `handleAccountEvent` | Flip to disconnected, insert alert |
+| `social-account.auth-required` | `handleAccountEvent` | Flip to auth_required, insert alert |
+| `team.updated` | `handleTeamUpdated` | Full sync for the team's company |
+| `post.published` | `handlePostEvent` | Flip publish_attempt + master to succeeded |
+| `post.failed` | `handlePostEvent` | Flip publish_attempt + master to failed |
+
+### Webhook health monitoring
+
+`/api/cron/check-webhook-health` runs daily and inserts a warning alert for
+any active team that hasn't delivered a webhook in 24 hours. Silence usually
+means bundle.social auto-disabled our endpoint after 50 consecutive delivery
+failures (their documented behaviour).
+
+### Manual replay
+
+If webhook delivery was disrupted, unprocessed `social_webhook_events` rows
+can be replayed via:
+
+```
+POST /api/admin/maintenance/webhooks/replay
+{ "team_id": "...", "since": "2026-05-18T00:00:00Z", "limit": 100 }
+```
+
+Bundle.social does not offer API-side replay — this endpoint is the only
+recovery path for missed events.
+
+
 This document describes how the bundle.social integration identifies the
 platform-side identity behind every `social_connections` row, and how
 that identity is used to prevent cross-tenant publishing leaks.
