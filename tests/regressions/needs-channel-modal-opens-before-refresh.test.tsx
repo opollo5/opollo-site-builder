@@ -113,6 +113,11 @@ function renderEmpty() {
   );
 }
 
+function confirmIdentity() {
+  fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+  fireEvent.click(screen.getByTestId("identity-confirm-continue"));
+}
+
 const CONN_ID = "20acab14-d422-463e-9920-297f998bce38";
 
 describe("R-NEEDS-CHANNEL-RACE: modal opens immediately on needs_channel postMessage", () => {
@@ -139,6 +144,7 @@ describe("R-NEEDS-CHANNEL-RACE: modal opens immediately on needs_channel postMes
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
+    confirmIdentity();
 
     // Flush preflight + connect fetches so window.open fires.
     await act(async () => {});
@@ -188,6 +194,7 @@ describe("R-NEEDS-CHANNEL-RACE: modal opens immediately on needs_channel postMes
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -231,6 +238,7 @@ describe("R-NEEDS-CHANNEL-RACE: modal opens immediately on needs_channel postMes
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-INSTAGRAM"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -275,6 +283,7 @@ describe("R-NEEDS-CHANNEL-RACE: modal opens immediately on needs_channel postMes
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-TWITTER"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);

@@ -65,6 +65,11 @@ function renderList() {
   );
 }
 
+function confirmIdentity() {
+  fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+  fireEvent.click(screen.getByTestId("identity-confirm-continue"));
+}
+
 beforeEach(() => {
   fetchMock.mockReset();
   openMock.mockReset();
@@ -119,6 +124,7 @@ describe("R-X-SYNC-RETRY: popup-close sync retries when first sync inserts nothi
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-TWITTER"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -181,6 +187,7 @@ describe("R-X-SYNC-RETRY: popup-close sync retries when first sync inserts nothi
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);

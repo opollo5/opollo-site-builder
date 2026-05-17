@@ -81,6 +81,22 @@ const PLATFORMS: Array<{
   { value: "GOOGLE_BUSINESS", label: "Google Business" },
 ];
 
+// URLs that surface the currently-signed-in account on each platform.
+// Used by the identity-confirmation modal so users can verify they're
+// authorising the correct account before the OAuth popup fires.
+const PLATFORM_CHECK_URLS: Record<string, string> = {
+  LINKEDIN:       "https://www.linkedin.com/in/me/",
+  FACEBOOK:       "https://www.facebook.com/settings",
+  INSTAGRAM:      "https://www.instagram.com/accounts/edit/",
+  TWITTER:        "https://x.com/settings/account",
+  GOOGLE_BUSINESS:"https://myaccount.google.com",
+  TIKTOK:         "https://www.tiktok.com/setting",
+  YOUTUBE:        "https://myaccount.google.com",
+  PINTEREST:      "https://www.pinterest.com/settings/",
+  THREADS:        "https://www.threads.net",
+  REDDIT:         "https://www.reddit.com/settings/account",
+};
+
 type ConnectMessage = {
   type: "bundle-connect-complete";
   // 2026-05-13: needs_channel is no longer emitted to the parent — the
@@ -193,6 +209,16 @@ export function SocialConnectionsList({
       }
     | null
   >(null);
+
+  // Identity confirmation modal — shown before every connect attempt so
+  // the user can verify they're signed into the correct platform account.
+  // Fires before preflight; dismissed by Cancel or by ticking the checkbox
+  // and clicking Continue.
+  const [identityConfirmModal, setIdentityConfirmModal] = useState<{
+    platform: string;
+    platformLabel: string;
+  } | null>(null);
+  const [identityConfirmChecked, setIdentityConfirmChecked] = useState(false);
 
   // Mirrors busyPlatform in a ref so the stale-closed handleMessage
   // effect can read the platform the user originally clicked (needed to
@@ -446,11 +472,15 @@ export function SocialConnectionsList({
     if (!profileId) return;
     setError(null);
 
-    // Bug 2 gate — inserted in the next commit. Guarded by skipIdentityConfirm
-    // so the preflight "I manage both" path and the modal Continue path both
-    // skip this check without an infinite loop.
-    // (Intentionally left as a no-op placeholder here; the modal state and
-    //  render are added in the identity-confirm commit.)
+    // Identity confirmation gate — show the "verify your account" modal on
+    // every fresh connect. skipIdentityConfirm is set by the modal's Continue
+    // button and by the preflight "I manage both" path (user already confirmed).
+    if (!opts?.skipIdentityConfirm) {
+      const platformLabel =
+        PLATFORMS.find((p) => p.value === platform)?.label ?? platform;
+      setIdentityConfirmModal({ platform, platformLabel });
+      return;
+    }
 
     // Bug 1 fix: open a blank popup SYNCHRONOUSLY before the first await so
     // we remain inside the browser's user-gesture activation window. After the
@@ -746,6 +776,81 @@ export function SocialConnectionsList({
             Pick a channel below to start publishing. Connections without a
             channel can&apos;t post.
           </p>
+        </div>
+      ) : null}
+
+      {identityConfirmModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="identity-confirm-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          data-testid="identity-confirm-modal"
+        >
+          <div className="max-w-md rounded-lg bg-background p-5 shadow-xl">
+            <h2
+              id="identity-confirm-title"
+              className="mb-2 text-base font-semibold"
+            >
+              Connecting {identityConfirmModal.platformLabel}
+            </h2>
+            <p className="mb-3 text-sm text-muted-foreground">
+              You&apos;re about to authorise Opollo using the{" "}
+              <strong>{identityConfirmModal.platformLabel}</strong> account
+              currently signed into your browser. Make sure you&apos;re signed
+              into the correct account before continuing.
+            </p>
+            {PLATFORM_CHECK_URLS[identityConfirmModal.platform] ? (
+              <a
+                href={PLATFORM_CHECK_URLS[identityConfirmModal.platform]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-4 inline-flex items-center gap-1 text-sm text-primary underline underline-offset-2"
+                data-testid="identity-confirm-check-link"
+              >
+                Open {identityConfirmModal.platformLabel} to check which account
+                ↗
+              </a>
+            ) : null}
+            <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 shrink-0 accent-primary"
+                checked={identityConfirmChecked}
+                onChange={(e) => setIdentityConfirmChecked(e.target.checked)}
+                data-testid="identity-confirm-checkbox"
+              />
+              <span>
+                I&apos;ve verified this is the correct account to authorise
+              </span>
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIdentityConfirmModal(null);
+                  setIdentityConfirmChecked(false);
+                }}
+                data-testid="identity-confirm-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!identityConfirmChecked}
+                aria-disabled={!identityConfirmChecked}
+                onClick={() => {
+                  if (!identityConfirmChecked) return;
+                  const { platform } = identityConfirmModal;
+                  setIdentityConfirmModal(null);
+                  setIdentityConfirmChecked(false);
+                  void handleConnect(platform, { skipIdentityConfirm: true });
+                }}
+                data-testid="identity-confirm-continue"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
         </div>
       ) : null}
 
