@@ -166,8 +166,18 @@ export function SocialConnectionsList({
 
   useEffect(() => {
     if (!autoOpenPickerForConnectionId) return;
-    if (!connections.some((c) => c.id === autoOpenPickerForConnectionId))
+    // Only open for connections still pending channel selection. Once
+    // set-channel succeeds the status flips to healthy; without this
+    // guard router.refresh() would re-open the modal for the now-healthy row.
+    if (
+      !connections.some(
+        (c) =>
+          c.id === autoOpenPickerForConnectionId &&
+          c.status === "pending_identity",
+      )
+    )
       return;
+    pickerShownRef.current.add(autoOpenPickerForConnectionId);
     setPickerForConnectionId(autoOpenPickerForConnectionId);
   }, [autoOpenPickerForConnectionId, connections]);
   // Cross-tenant identity-leak defence (Layer 3): pre-flight warning
@@ -373,6 +383,9 @@ export function SocialConnectionsList({
         if (clickedPlatform === "INSTAGRAM") {
           setPickerPlatformOverride("INSTAGRAM");
         }
+        // Mark shown so the auto-open effect doesn't re-open the modal
+        // while router.refresh() is in-flight with stale pending_identity data.
+        pickerShownRef.current.add(evt.data.connection_id);
         setPickerForConnectionId(evt.data.connection_id);
       }
       // Bug-fix 2026-05-12: if the callback signalled noop with an
