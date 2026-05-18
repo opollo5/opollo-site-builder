@@ -33,6 +33,8 @@ export type PublishAttempt = {
   error_payload: Record<string, unknown> | null;
   retry_count: number;
   original_attempt_id: string | null;
+  next_retry_at: string | null;
+  dead_lettered_at: string | null;
   started_at: string;
   completed_at: string | null;
 };
@@ -81,7 +83,7 @@ export async function listPublishAttempts(
   const attempts = await svc
     .from("social_publish_attempts")
     .select(
-      "id, publish_job_id, post_variant_id, status, bundle_post_id, platform_post_url, error_class, error_payload, retry_count, original_attempt_id, started_at, completed_at",
+      "id, publish_job_id, post_variant_id, status, bundle_post_id, platform_post_url, error_class, error_payload, retry_count, original_attempt_id, next_retry_at, dead_lettered_at, started_at, completed_at",
     )
     .in("post_variant_id", variantIds)
     .order("started_at", { ascending: false })
@@ -142,6 +144,8 @@ export async function listPublishAttempts(
         (a.error_payload as Record<string, unknown> | null) ?? null,
       retry_count: (a.retry_count as number | null) ?? 0,
       original_attempt_id: (a.original_attempt_id as string | null) ?? null,
+      next_retry_at: (a.next_retry_at as string | null) ?? null,
+      dead_lettered_at: (a.dead_lettered_at as string | null) ?? null,
       started_at: a.started_at as string,
       completed_at: (a.completed_at as string | null) ?? null,
     });
