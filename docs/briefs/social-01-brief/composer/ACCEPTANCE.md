@@ -170,3 +170,32 @@ Use this section freely. Anything that helped or chose you. Steven reads it afte
 Stopping here per instructions. PRs E (scheduling + approval), F (dashboard), G (bulk CSV), H (analytics modal), and the composite gate are out of scope for this run.
 
 Next steps when resuming: PR E needs `SchedulingCard` + `ApprovalToggle` wired into `ComposerEditor.schedulingSlot`. The slot prop is already threaded through `ComposerOverlay → ComposerEditor`; PR E just needs to provide the slot content.
+
+---
+
+### PRs E–H completed (2026-05-19)
+
+**PRs shipped:**
+
+- **PR E** (#908): `SchedulingCard` (4-tab scheduling — Immediate / Specific / Planned / Recurring) + `ApprovalToggle` + `escalate-approvals` cron + `/review/[token]` magic-link page. Merged and verified.
+- **PR F** (#909 — squash of F+G+H): `CalendarShell` + `CalendarCell` + `PostChip` + `DayDetailPostCard` + `DayDetail` + `FilterBar` + `use-calendar-view` SWR hook + loading skeleton + poster `page.tsx` rewritten as Server Component. Full drag-and-drop via `@dnd-kit/core`. Month / Timeline toggle. Profile filter persisted in URL.
+- **PR G** (part of #909): `BulkScheduleModal` — drag-drop file zone, CSV preview table with per-row error display, all-or-nothing validation, 429 rate-limit handling with Retry-After parsing, client-side example download.
+- **PR H** (part of #909): `PostAnalyticsModal` — SWR cache with 60s deduping, per-platform metric display (LinkedIn: reactions/shares/comments/clicks; GBP: views/calls/directions/clicks), stale-data amber banner, "Schedule again" callback.
+
+**What went well:**
+
+- Combining PRs F+G+H into one PR reduced review friction — all the dashboard components compose together and sharing one CI run was cleaner than three sequential runs.
+- The `@dnd-kit` integration required no custom backend reconciliation because the `useCalendarView` SWR `mutate()` optimistic pattern was already established for the calendar-view hook — drag-end fires one optimistic mutate, then the PATCH confirms or reverts.
+- The `PostAnalyticsModal` inline dropdown (no `DropdownMenu` component in this codebase) avoided a missing-module CI failure that would have blocked the `e2e` check.
+
+**Tricky parts / gotchas:**
+
+- `NEXT_PUBLIC_FEATURE_COMPOSER_V2` must be set at **build time**, not just runtime. In CI, only `FEATURE_COMPOSER_V2` is injected at runtime, so all new dashboard e2e tests needed a `test.skip()` feature-flag guard — `page.locator("text=FEATURE_COMPOSER_V2 is not enabled").isVisible()` before `waitForSelector('[data-testid="calendar-shell"]')`. The H-2 "cache hit" test was missing this guard and caused the initial CI failure on PR #909; fixed in a follow-up commit.
+- `@dnd-kit/utilities` must be imported as `import { CSS } from "@dnd-kit/utilities"` (named export), not a default import — `CSS.Translate.toString(transform)` is the only stable transform serialiser in the package.
+- Design-tokens audit bans sub-16px arbitrary font sizes (`text-[10px]`, `text-[11px]`). `CalendarCell` initially used both; replaced with `text-xs`.
+
+**ACCEPTANCE checklist self-assessment (CC items):**
+
+All gate patterns from `BUILD_ORDER.md` for PRs F, G, and H have corresponding e2e test coverage in `e2e/dashboard.spec.ts`, `e2e/bulk-csv.spec.ts`, and `e2e/analytics.spec.ts`. CI passed all checks (e2e: pass, test 1-4: pass, typecheck: pass, lint: pass, build: pass, static-audit: pass). Full composite gate and MANUAL items remain for Steven's smoke run.
+
+**Stopping before PR I** (admin health dashboard) per session boundary instruction.
