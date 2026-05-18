@@ -165,9 +165,8 @@ test.describe("composer modal", () => {
     const dialog6 = page.getByRole("dialog", { name: /new post/i });
     await expect(dialog6.getByText(/select at least one account/i)).toBeVisible({ timeout: 10_000 });
 
-    // Submit button must be disabled.
-    const submitBtn = page.getByRole("button", { name: /post now|schedule|save as draft/i }).last();
-    await expect(submitBtn).toBeDisabled({ timeout: 5_000 });
+    // Submit button must be disabled (use testid to avoid matching mode tab buttons).
+    await expect(page.getByTestId("composer-submit")).toBeDisabled({ timeout: 5_000 });
   });
 
   test("(7) GIF picker panel opens when GIF button is clicked", async ({ page, context }) => {
