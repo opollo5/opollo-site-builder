@@ -2,8 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { dbUuid, internalError, invalidState, notFound, readJsonBody, validationError } from "@/lib/http";
-import { canDo } from "@/lib/platform/auth";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import {
+  authenticateRequest,
+  validateServiceActorCompany,
+  recordServiceAction,
+} from "@/lib/platform/auth/service-auth";
 import { getDraft } from "@/lib/platform/social/drafts";
 import {
   approvePost,
@@ -65,10 +69,32 @@ export async function POST(
 
   const { company_id: companyId, mode } = parsed.data;
 
-  // For "draft" mode we only need create_post; for post/schedule we also
-  // need submit_for_approval. Use the stricter gate to cover both paths.
-  const gate = await requireCanDoForApi(companyId, "create_post");
-  if (gate.kind === "deny") return gate.response;
+  // Auth: service key (CAP) or user session.
+  const auth = await authenticateRequest(req);
+  if (auth.kind === "deny") return auth.response;
+
+  let userId: string;
+  let hasApprovePermission: boolean;
+
+  if (auth.kind === "service") {
+    const companyCheck = await validateServiceActorCompany(companyId);
+    if (!companyCheck.ok) return companyCheck.response;
+    recordServiceAction(companyId, auth.actorId, {
+      route: `POST /api/platform/social/drafts/${draftId}/publish`,
+      mode,
+    });
+    userId = auth.actorId;
+    // Service actors auto-approve (CAP manages the approval lifecycle itself).
+    hasApprovePermission = true;
+  } else {
+    // For "draft" mode we only need create_post; for post/schedule we also
+    // need submit_for_approval. Use the stricter gate to cover both paths.
+    const gate = await requireCanDoForApi(companyId, "create_post");
+    if (gate.kind === "deny") return gate.response;
+    userId = gate.userId;
+    const { canDo } = await import("@/lib/platform/auth");
+    hasApprovePermission = await canDo(companyId, "approve_post");
+  }
 
   // Load draft.
   const draftResult = await getDraft({ draftId, companyId });
@@ -89,7 +115,7 @@ export async function POST(
     masterText: dd.master_text || null,
     linkUrl: dd.link_url || null,
     sourceType: "manual",
-    createdBy: gate.userId,
+    createdBy: userId,
   });
   if (!postResult.ok) {
     if (postResult.error.code === "VALIDATION_FAILED") return validationError(postResult.error.message);
@@ -149,9 +175,8 @@ export async function POST(
   }
 
   // 4. Auto-approve unless the post explicitly requires a human approval step
-  //    or the user lacks approve_post permission.
-  const canApprove = await canDo(companyId, "approve_post");
-  if (!canApprove || dd.approval_required) {
+  //    or the actor lacks approve_post permission.
+  if (!hasApprovePermission || dd.approval_required) {
     return NextResponse.json(
       {
         ok: true,
@@ -230,7 +255,7 @@ export async function POST(
           companyId,
           platform: platform as SocialPlatform,
           scheduledAt,
-          scheduledBy: gate.userId,
+          scheduledBy: userId,
           origin,
         }),
       ),

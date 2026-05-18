@@ -6,20 +6,22 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
-// S1-watchdog — recover in_flight publish attempts that never received a
-// bundle.social webhook.
+// S1-watchdog — recover in_flight publish attempts whose lease has expired.
 //
-// When fireScheduledPublish succeeds the attempt enters 'in_flight'. The
-// webhook handler (S1-17) is expected to flip it to 'succeeded' / 'failed'
-// within seconds. If the webhook is lost or bundle.social never sends it,
-// the attempt stays stuck indefinitely.
+// Spec §2.4: workers set claimed_until when claiming an attempt. If the
+// worker crashes (Vercel timeout, network blip, deploy mid-flight) the lease
+// expires without the attempt being marked succeeded or failed.
 //
-// This watchdog runs every 5 minutes and marks any attempt that has been
-// in_flight for >STUCK_AFTER_MINUTES as 'failed', advances the master state,
-// and fires a post_failed notification so operators are alerted.
+// This watchdog runs every 5 minutes and marks any attempt where
+// claimed_until < now() AND status = 'in_flight' as failed with
+// error_class = 'worker_died', advances master state, and fires a
+// post_failed notification so operators are alerted.
 //
-// Idempotent: the attempt update is predicate-guarded on status='in_flight',
-// so concurrent runs are safe and manual retries are benign.
+// Fallback for pre-0126 rows (claimed_until IS NULL): also catches attempts
+// in_flight for >STUCK_AFTER_MINUTES without a claimed_until column value.
+// This preserves backward compatibility while the deploy propagates.
+//
+// Idempotent: predicate-guarded on status='in_flight'.
 // ---------------------------------------------------------------------------
 
 const STUCK_AFTER_MINUTES = 3;
@@ -34,11 +36,40 @@ export async function runPublishWatchdog(): Promise<ApiResponse<WatchdogResult>>
   const svc = getServiceRoleClient();
   const cutoff = new Date(Date.now() - STUCK_AFTER_MINUTES * 60 * 1000).toISOString();
 
-  const attemptsR = await svc
+  // Expired-lease attempts (post-0126 rows with claimed_until set).
+  const leaseExpiredR = await svc
     .from("social_publish_attempts")
     .select("id, post_variant_id, company_id")
     .eq("status", "in_flight")
-    .lt("started_at", cutoff);
+    .lt("claimed_until", new Date().toISOString())
+    .not("claimed_until", "is", null);
+
+  // Legacy fallback: pre-0126 rows where claimed_until is NULL but started_at is stale.
+  const staleFallbackR = await svc
+    .from("social_publish_attempts")
+    .select("id, post_variant_id, company_id")
+    .eq("status", "in_flight")
+    .lt("started_at", cutoff)
+    .is("claimed_until", null);
+
+  if (leaseExpiredR.error) {
+    logger.error("social.publish.watchdog.query_failed", { err: leaseExpiredR.error.message });
+    return {
+      ok: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: `Watchdog query failed: ${leaseExpiredR.error.message}`,
+        retryable: true,
+        suggested_action: "Retry. If persistent, check DB connectivity.",
+      },
+      timestamp: new Date().toISOString(),
+    };
+  }
+
+  const attemptsR = {
+    data: [...(leaseExpiredR.data ?? []), ...(staleFallbackR.data ?? [])],
+    error: staleFallbackR.error,
+  };
 
   if (attemptsR.error) {
     logger.error("social.publish.watchdog.query_failed", {
@@ -72,11 +103,13 @@ export async function runPublishWatchdog(): Promise<ApiResponse<WatchdogResult>>
       .from("social_publish_attempts")
       .update({
         status: "failed",
-        error_class: "timeout",
+        error_class: "worker_died",
         error_payload: {
-          reason: `No webhook received after ${STUCK_AFTER_MINUTES} minutes.`,
+          reason: "Worker lease expired without completing publish.",
+          stuck_after_minutes: STUCK_AFTER_MINUTES,
         },
         completed_at: now,
+        claimed_until: null,
       })
       .eq("id", attemptId)
       .eq("status", "in_flight");
@@ -141,8 +174,8 @@ export async function runPublishWatchdog(): Promise<ApiResponse<WatchdogResult>>
         postMasterId: masterId,
         submitterUserId: submitterId,
         platform,
-        errorClass: "timeout",
-        errorMessage: `Publish timed out after ${STUCK_AFTER_MINUTES} minutes — no webhook received.`,
+        errorClass: "worker_died",
+        errorMessage: "Worker lease expired without completing publish.",
       });
     }
 
