@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeEach, afterAll } from "vitest";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -37,20 +37,20 @@ async function seedCompany(id: string, slug: string) {
   if (error) throw new Error(`seed company: ${error.message}`);
 }
 
-beforeAll(async () => {
+// Re-seed before every test so cross-shard deletions by other test files
+// (CI runs 4 shards sharing one Supabase DB) can't invalidate FK parents.
+// Deleting the company cascades away campaigns/drafts/events/grants/deliveries,
+// giving each test a clean slate.
+beforeEach(async () => {
   await seedCompany(COMPANY_ID,   "m0126-co-1");
   await seedCompany(COMPANY_ID_2, "m0126-co-2");
 });
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
-  // Clean up in reverse FK order
-  await svc.from("platform_session_grants").delete().eq("company_id", COMPANY_ID);
-  await svc.from("platform_event_deliveries").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-  await svc.from("platform_event_subscriptions").delete().eq("subscriber_name", "m0126-test-subscriber");
-  await svc.from("platform_events").delete().eq("company_id", COMPANY_ID);
-  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
-  await svc.from("social_campaigns").delete().eq("company_id", COMPANY_ID);
+  // Subscriptions have no company FK so they survive cascade — clean them up by name prefix.
+  await svc.from("platform_event_subscriptions").delete().like("subscriber_name", "m0126-%");
+  // Company deletes cascade: campaigns, drafts, events, session_grants, deliveries.
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID_2);
 });
