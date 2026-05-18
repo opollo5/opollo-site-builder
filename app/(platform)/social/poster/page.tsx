@@ -39,17 +39,13 @@ export default function SocialPosterPage() {
         Open composer
       </button>
 
+      {/* TODO(PR-F): pass real companyId + availableConnections from session */}
       <ComposerOverlay
         open={composerState.open}
-        onClose={() => {
-          if (composerState.dirty && !composerState.pendingClose) {
-            // Trigger pending-close path in the hook
-            openComposer(); // no-op shape — overlay handles dirty state via pendingClose
-          }
-          discardChanges();
-        }}
+        onClose={discardChanges}
         initialDraft={composerState.draft}
         prefilledDate={composerState.prefilledDate}
+        companyId=""
         availableConnections={[]}
       />
     </main>
