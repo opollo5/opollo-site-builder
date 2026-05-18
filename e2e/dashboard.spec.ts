@@ -77,8 +77,6 @@ async function mockDashboardApis(
 async function goToDashboard(page: import("@playwright/test").Page) {
   await page.goto("/social/poster");
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
-  // Wait for SWR fetches to complete so post chips are in the DOM
-  await page.waitForLoadState("networkidle");
   return true;
 }
 
@@ -88,6 +86,12 @@ test.describe("dashboard — calendar grid (PR F)", () => {
   });
 
   test("(F-1) month view renders calendar grid with day cells", async ({ page, context }) => {
+    // Arm the response waiter BEFORE navigation so we don't miss the SWR fetch
+    const calendarFetched = page.waitForResponse(
+      (r) => r.url().includes("/api/platform/social/drafts/calendar-view"),
+      { timeout: 15_000 },
+    );
+
     await mockDashboardApis(context, [makePost()]);
     const ready = await goToDashboard(page);
     if (!ready) return;
@@ -105,6 +109,9 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const cells = page.getByTestId("calendar-cell");
     const count = await cells.count();
     expect(count).toBeGreaterThanOrEqual(28);
+
+    // Wait for SWR to finish so post chips render
+    await calendarFetched;
 
     // Post chip should be visible for the mocked post
     await expect(page.getByTestId("post-chip").first()).toBeVisible();

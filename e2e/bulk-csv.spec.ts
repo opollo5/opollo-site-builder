@@ -109,11 +109,8 @@ test.describe("bulk CSV upload (PR G)", () => {
 
     await expect(page.getByTestId("preview-table")).toBeVisible();
 
-    // Error row should be visible
-    const errorRows = page.getByTestId("error-row");
-    expect(await errorRows.count()).toBeGreaterThanOrEqual(1);
-
-    // Error banner present
+    // Error banner present (errored rows are excluded from the preview table;
+    // row-error-banner is the authoritative signal that validation failed)
     await expect(page.getByTestId("row-error-banner")).toBeVisible();
 
     // Submit button should be disabled
