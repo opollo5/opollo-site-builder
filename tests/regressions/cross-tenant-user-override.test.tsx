@@ -54,6 +54,7 @@ function makeFakePopup() {
   return {
     closed: false,
     focus: vi.fn(),
+    location: { href: "" },
     close() {
       (this as { closed: boolean }).closed = true;
     },
@@ -70,6 +71,11 @@ function renderList() {
       canReconnect={true}
     />,
   );
+}
+
+function confirmIdentity() {
+  fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+  fireEvent.click(screen.getByTestId("identity-confirm-continue"));
 }
 
 beforeEach(() => {
@@ -133,6 +139,7 @@ describe("R-CROSS-TENANT-OVERRIDE: preflight 'I manage both' sends force_cross_t
     // Open platform picker and click LinkedIn.
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    confirmIdentity();
 
     // Wait for preflight fetch to resolve and modal to render.
     await act(async () => {});
@@ -197,6 +204,7 @@ describe("R-CROSS-TENANT-OVERRIDE: cross-tenant-blocked postMessage surfaces vis
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);

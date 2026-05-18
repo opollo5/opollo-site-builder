@@ -134,6 +134,18 @@ test.describe("social platform", () => {
     }, testInfo) => {
       await page.goto("/company/social/connections");
 
+      // Mock preflight — always returns clean (no cross-tenant conflict).
+      await context.route(
+        "**/api/platform/social/connections/identity-preflight*",
+        (route) => {
+          void route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ ok: true, data: { warn: false, others: [] } }),
+          });
+        },
+      );
+
       // Mock connect API — return a URL on our own origin so same-origin
       // postMessage passes the parent's origin check.
       await context.route(
@@ -175,14 +187,20 @@ test.describe("social platform", () => {
       const connectBtn = page.getByTestId("connections-connect-button");
       await expect(connectBtn).toBeVisible({ timeout: 10_000 });
 
-      // Open the platform-picker lightbox, then select a platform to trigger
-      // the POST and popup open.
+      // Open the platform-picker lightbox, then select a platform.
+      // The identity confirm modal now appears before the popup opens.
       await connectBtn.click();
       const lightbox = page.getByTestId("connect-lightbox");
       await expect(lightbox).toBeVisible({ timeout: 5_000 });
 
-      const popupPromise = page.waitForEvent("popup");
       await page.getByTestId("connect-platform-LINKEDIN").click();
+
+      // Dismiss the identity confirm modal (tick checkbox, then Continue).
+      // Continue opens the pre-popup (blank URL), so register the popup
+      // listener before clicking Continue.
+      await page.getByTestId("identity-confirm-checkbox").check();
+      const popupPromise = page.waitForEvent("popup");
+      await page.getByTestId("identity-confirm-continue").click();
       const popup = await popupPromise;
 
       // Popup loads stub, fires postMessage, then calls window.close().
@@ -202,6 +220,18 @@ test.describe("social platform", () => {
       context,
     }) => {
       await page.goto("/company/social/connections");
+
+      // Mock preflight — always returns clean.
+      await context.route(
+        "**/api/platform/social/connections/identity-preflight*",
+        (route) => {
+          void route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({ ok: true, data: { warn: false, others: [] } }),
+          });
+        },
+      );
 
       await context.route(
         "**/api/platform/social/connections/connect",
@@ -230,14 +260,15 @@ test.describe("social platform", () => {
       const connectBtn = page.getByTestId("connections-connect-button");
       await expect(connectBtn).toBeVisible({ timeout: 10_000 });
 
-      // Open the platform-picker lightbox, then select a platform to trigger
-      // the POST and popup open.
+      // Open platform picker, click platform, dismiss identity confirm modal.
       await connectBtn.click();
       const lightbox = page.getByTestId("connect-lightbox");
       await expect(lightbox).toBeVisible({ timeout: 5_000 });
 
-      const popupPromise = page.waitForEvent("popup");
       await page.getByTestId("connect-platform-LINKEDIN").click();
+      await page.getByTestId("identity-confirm-checkbox").check();
+      const popupPromise = page.waitForEvent("popup");
+      await page.getByTestId("identity-confirm-continue").click();
       const popup = await popupPromise;
 
       // User closes popup without completing OAuth.

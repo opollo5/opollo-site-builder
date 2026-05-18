@@ -81,6 +81,22 @@ const PLATFORMS: Array<{
   { value: "GOOGLE_BUSINESS", label: "Google Business" },
 ];
 
+// URLs that surface the currently-signed-in account on each platform.
+// Used by the identity-confirmation modal so users can verify they're
+// authorising the correct account before the OAuth popup fires.
+const PLATFORM_CHECK_URLS: Record<string, string> = {
+  LINKEDIN:       "https://www.linkedin.com/in/me/",
+  FACEBOOK:       "https://www.facebook.com/settings",
+  INSTAGRAM:      "https://www.instagram.com/accounts/edit/",
+  TWITTER:        "https://x.com/settings/account",
+  GOOGLE_BUSINESS:"https://myaccount.google.com",
+  TIKTOK:         "https://www.tiktok.com/setting",
+  YOUTUBE:        "https://myaccount.google.com",
+  PINTEREST:      "https://www.pinterest.com/settings/",
+  THREADS:        "https://www.threads.net",
+  REDDIT:         "https://www.reddit.com/settings/account",
+};
+
 type ConnectMessage = {
   type: "bundle-connect-complete";
   // 2026-05-13: needs_channel is no longer emitted to the parent — the
@@ -166,8 +182,18 @@ export function SocialConnectionsList({
 
   useEffect(() => {
     if (!autoOpenPickerForConnectionId) return;
-    if (!connections.some((c) => c.id === autoOpenPickerForConnectionId))
+    // Only open for connections still pending channel selection. Once
+    // set-channel succeeds the status flips to healthy; without this
+    // guard router.refresh() would re-open the modal for the now-healthy row.
+    if (
+      !connections.some(
+        (c) =>
+          c.id === autoOpenPickerForConnectionId &&
+          c.status === "pending_identity",
+      )
+    )
       return;
+    pickerShownRef.current.add(autoOpenPickerForConnectionId);
     setPickerForConnectionId(autoOpenPickerForConnectionId);
   }, [autoOpenPickerForConnectionId, connections]);
   // Cross-tenant identity-leak defence (Layer 3): pre-flight warning
@@ -183,6 +209,16 @@ export function SocialConnectionsList({
       }
     | null
   >(null);
+
+  // Identity confirmation modal — shown before every connect attempt so
+  // the user can verify they're signed into the correct platform account.
+  // Fires before preflight; dismissed by Cancel or by ticking the checkbox
+  // and clicking Continue.
+  const [identityConfirmModal, setIdentityConfirmModal] = useState<{
+    platform: string;
+    platformLabel: string;
+  } | null>(null);
+  const [identityConfirmChecked, setIdentityConfirmChecked] = useState(false);
 
   // Mirrors busyPlatform in a ref so the stale-closed handleMessage
   // effect can read the platform the user originally clicked (needed to
@@ -285,13 +321,27 @@ export function SocialConnectionsList({
     }
   }
 
-  function openConnectPopup(url: string, rowId?: string) {
+  // preOpenedPopup: a Window already opened synchronously in the click
+  // handler. When supplied we navigate it to url rather than calling
+  // window.open again, preserving the user-gesture activation across the
+  // async gap between click and OAuth-URL resolution.
+  function openConnectPopup(
+    url: string,
+    rowId?: string,
+    preOpenedPopup?: Window | null,
+  ) {
     if (popupRef.current && !popupRef.current.closed) {
       popupRef.current.focus();
       return;
     }
 
-    const popup = window.open(url, "bundle-connect", getPopupFeatures());
+    let popup: Window | null;
+    if (preOpenedPopup && !preOpenedPopup.closed) {
+      preOpenedPopup.location.href = url;
+      popup = preOpenedPopup;
+    } else {
+      popup = window.open(url, "bundle-connect", getPopupFeatures());
+    }
 
     if (!popup || popup.closed) {
       setPopupBlockedUrl(url);
@@ -303,9 +353,10 @@ export function SocialConnectionsList({
     popupRef.current = popup;
     popupOpenedAtRef.current = Date.now();
 
+    const p = popup;
     let closedHandled = false;
     pollRef.current = setInterval(() => {
-      if (popup.closed && !closedHandled) {
+      if (p.closed && !closedHandled) {
         closedHandled = true;
         void syncOnPopupClose(rowId);
       }
@@ -373,6 +424,9 @@ export function SocialConnectionsList({
         if (clickedPlatform === "INSTAGRAM") {
           setPickerPlatformOverride("INSTAGRAM");
         }
+        // Mark shown so the auto-open effect doesn't re-open the modal
+        // while router.refresh() is in-flight with stale pending_identity data.
+        pickerShownRef.current.add(evt.data.connection_id);
         setPickerForConnectionId(evt.data.connection_id);
       }
       // Bug-fix 2026-05-12: if the callback signalled noop with an
@@ -409,15 +463,39 @@ export function SocialConnectionsList({
 
   async function handleConnect(
     platform: string,
-    opts?: { skipPreflight?: boolean; forceCrossTenant?: boolean },
+    opts?: {
+      skipPreflight?: boolean;
+      forceCrossTenant?: boolean;
+      skipIdentityConfirm?: boolean;
+    },
   ) {
     if (!profileId) return;
     setError(null);
+
+    // Identity confirmation gate — show the "verify your account" modal on
+    // every fresh connect. skipIdentityConfirm is set by the modal's Continue
+    // button and by the preflight "I manage both" path (user already confirmed).
+    if (!opts?.skipIdentityConfirm) {
+      const platformLabel =
+        PLATFORMS.find((p) => p.value === platform)?.label ?? platform;
+      setIdentityConfirmModal({ platform, platformLabel });
+      return;
+    }
+
+    // Bug 1 fix: open a blank popup SYNCHRONOUSLY before the first await so
+    // we remain inside the browser's user-gesture activation window. After the
+    // async preflight + connect-API calls resolve we navigate the already-open
+    // window to the OAuth URL via openConnectPopup(..., prePopup).
+    const prePopup =
+      typeof window !== "undefined"
+        ? window.open("", "bundle-connect", getPopupFeatures())
+        : null;
 
     // Layer 3 — pre-flight check before opening the popup.
     if (!opts?.skipPreflight) {
       const preflight = await runPreflight({ platform });
       if (preflight.warn) {
+        prePopup?.close();
         const platformLabel =
           PLATFORMS.find((p) => p.value === platform)?.label ?? platform;
         setPreflightModal({
@@ -452,12 +530,13 @@ export function SocialConnectionsList({
       | { ok: false; error: { message: string } };
 
     if (!res.ok || !json.ok) {
+      prePopup?.close();
       setError(!json.ok ? json.error.message : "Failed to start connect.");
       setBusyPlatform(null);
       return;
     }
 
-    openConnectPopup(json.data.url);
+    openConnectPopup(json.data.url, undefined, prePopup);
   }
 
   async function runPreflight(args: { platform: string }): Promise<{
@@ -491,7 +570,7 @@ export function SocialConnectionsList({
     }
   }
 
-  async function handleReconnect(rowId: string) {
+  async function handleReconnect(rowId: string, prePopup?: Window | null) {
     setBusyRow(rowId);
     setError(null);
     const res = await fetch("/api/platform/social/connections/reconnect", {
@@ -503,11 +582,12 @@ export function SocialConnectionsList({
       | { ok: true; data: { url: string } }
       | { ok: false; error: { message: string } };
     if (!res.ok || !json.ok) {
+      prePopup?.close();
       setError(!json.ok ? json.error.message : "Failed to start reconnect.");
       setBusyRow(null);
       return;
     }
-    openConnectPopup(json.data.url, rowId);
+    openConnectPopup(json.data.url, rowId, prePopup);
   }
 
   async function handleDisconnect(connectionId: string) {
@@ -699,6 +779,81 @@ export function SocialConnectionsList({
         </div>
       ) : null}
 
+      {identityConfirmModal ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="identity-confirm-title"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          data-testid="identity-confirm-modal"
+        >
+          <div className="max-w-md rounded-lg bg-background p-5 shadow-xl">
+            <h2
+              id="identity-confirm-title"
+              className="mb-2 text-base font-semibold"
+            >
+              Connecting {identityConfirmModal.platformLabel}
+            </h2>
+            <p className="mb-3 text-sm text-muted-foreground">
+              You&apos;re about to authorise Opollo using the{" "}
+              <strong>{identityConfirmModal.platformLabel}</strong> account
+              currently signed into your browser. Make sure you&apos;re signed
+              into the correct account before continuing.
+            </p>
+            {PLATFORM_CHECK_URLS[identityConfirmModal.platform] ? (
+              <a
+                href={PLATFORM_CHECK_URLS[identityConfirmModal.platform]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-4 inline-flex items-center gap-1 text-sm text-primary underline underline-offset-2"
+                data-testid="identity-confirm-check-link"
+              >
+                Open {identityConfirmModal.platformLabel} to check which account
+                ↗
+              </a>
+            ) : null}
+            <label className="mb-4 flex cursor-pointer items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-0.5 shrink-0 accent-primary"
+                checked={identityConfirmChecked}
+                onChange={(e) => setIdentityConfirmChecked(e.target.checked)}
+                data-testid="identity-confirm-checkbox"
+              />
+              <span>
+                I&apos;ve verified this is the correct account to authorise
+              </span>
+            </label>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setIdentityConfirmModal(null);
+                  setIdentityConfirmChecked(false);
+                }}
+                data-testid="identity-confirm-cancel"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={!identityConfirmChecked}
+                aria-disabled={!identityConfirmChecked}
+                onClick={() => {
+                  if (!identityConfirmChecked) return;
+                  const { platform } = identityConfirmModal;
+                  setIdentityConfirmModal(null);
+                  setIdentityConfirmChecked(false);
+                  void handleConnect(platform, { skipIdentityConfirm: true });
+                }}
+                data-testid="identity-confirm-continue"
+              >
+                Continue
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {preflightModal ? (
         <div
           role="dialog"
@@ -750,6 +905,7 @@ export function SocialConnectionsList({
                   setPreflightModal(null);
                   void handleConnect(platform, {
                     skipPreflight: true,
+                    skipIdentityConfirm: true,
                     forceCrossTenant: true,
                   });
                 }}
@@ -978,7 +1134,14 @@ export function SocialConnectionsList({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleReconnect(c.id)}
+                          onClick={() => {
+                            const popup = window.open(
+                              "",
+                              "bundle-connect",
+                              getPopupFeatures(),
+                            );
+                            void handleReconnect(c.id, popup);
+                          }}
                           disabled={busyRow === c.id || connectBusy || busySync}
                           data-testid={`connection-reconnect-${c.id}`}
                         >

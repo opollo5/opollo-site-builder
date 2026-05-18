@@ -46,7 +46,19 @@ const ORIGINAL_FETCH = global.fetch;
 const ORIGINAL_OPEN = window.open;
 
 function makeFakePopup() {
-  return { closed: false, focus: vi.fn(), close() { (this as { closed: boolean }).closed = true; } };
+  return {
+    closed: false,
+    focus: vi.fn(),
+    location: { href: "" },
+    close() { (this as { closed: boolean }).closed = true; },
+  };
+}
+
+// Helper: traverse the identity-confirm modal that now appears before every
+// connect attempt. Tick the checkbox and click Continue.
+function confirmIdentity() {
+  fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+  fireEvent.click(screen.getByTestId("identity-confirm-continue"));
 }
 
 const COMPANY_ID = "00000000-0000-0000-0000-000000000001";
@@ -110,6 +122,7 @@ describe("R-POPUP-SYNC-ATTRIBUTION: popup-close sync passes attribute_new_to_com
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-TWITTER"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -221,6 +234,7 @@ describe("R-POPUP-SYNC-ATTRIBUTION: popup-close sync passes attribute_new_to_com
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);

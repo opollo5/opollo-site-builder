@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SocialConnectionsList } from "@/components/SocialConnectionsList";
@@ -56,7 +56,7 @@ beforeEach(() => {
   fetchMock.mockReset();
   openMock.mockReset();
   // Default popup mock — returns a fake window with a no-op close().
-  openMock.mockReturnValue({ closed: false, focus: vi.fn() });
+  openMock.mockReturnValue({ closed: false, focus: vi.fn(), location: { href: "" } });
   Object.defineProperty(window, "open", {
     configurable: true,
     writable: true,
@@ -164,10 +164,13 @@ describe("SocialConnectionsList — Connect dropdown", () => {
     renderList();
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
+    // Dismiss the identity confirm modal so the OAuth flow proceeds.
+    fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+    fireEvent.click(screen.getByTestId("identity-confirm-continue"));
 
-    await vi.waitFor(() => {
-      expect(openMock).toHaveBeenCalledTimes(1);
-    });
+    // Flush the preflight + connect fetch chain. The pre-popup is opened
+    // synchronously (blank URL), then navigated via popup.location.href.
+    await act(async () => {});
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(fetchMock.mock.calls[0]?.[0]).toContain(
@@ -187,10 +190,10 @@ describe("SocialConnectionsList — Connect dropdown", () => {
       platform: "FACEBOOK",
     });
 
-    expect(openMock).toHaveBeenCalledWith(
-      "https://www.facebook.com/v23.0/dialog/oauth?xyz=1",
-      "bundle-connect",
-      expect.any(String),
-    );
+    // Bug 1 fix: popup is pre-opened with blank URL then navigated in-place.
+    expect(openMock).toHaveBeenCalledTimes(1);
+    expect(openMock).toHaveBeenCalledWith("", "bundle-connect", expect.any(String));
+    const fakeResult = openMock.mock.results[0]?.value as { location: { href: string } } | null;
+    expect(fakeResult?.location.href).toBe("https://www.facebook.com/v23.0/dialog/oauth?xyz=1");
   });
 });

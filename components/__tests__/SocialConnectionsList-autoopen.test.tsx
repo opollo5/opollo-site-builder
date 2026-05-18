@@ -95,7 +95,7 @@ beforeEach(() => {
   global.fetch = fetchMock as unknown as typeof fetch;
 
   openMock.mockReset();
-  openMock.mockReturnValue({ closed: false, focus: vi.fn() });
+  openMock.mockReturnValue({ closed: false, focus: vi.fn(), location: { href: "" } });
   Object.defineProperty(window, "open", {
     configurable: true,
     writable: true,
@@ -240,6 +240,10 @@ describe("SocialConnectionsList — postMessage needs_channel auto-open", () => 
     await act(async () => {
       fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
     });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+      fireEvent.click(screen.getByTestId("identity-confirm-continue"));
+    });
 
     // Wait for the connect POST to fire and the popup to open.
     await waitFor(() => {
@@ -281,6 +285,10 @@ describe("SocialConnectionsList — postMessage needs_channel auto-open", () => 
     });
     await act(async () => {
       fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+      fireEvent.click(screen.getByTestId("identity-confirm-continue"));
     });
 
     await waitFor(() => {

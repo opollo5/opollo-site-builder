@@ -41,7 +41,7 @@ const originalFetch = global.fetch;
 
 // Simulated popup object: starts open, can be programmatically closed.
 function makeFakePopup() {
-  const popup = { closed: false, focus: vi.fn(), close() { this.closed = true; } };
+  const popup = { closed: false, focus: vi.fn(), location: { href: "" }, close() { this.closed = true; } };
   return popup;
 }
 
@@ -71,6 +71,11 @@ function renderList(connections = []) {
       canReconnect={true}
     />,
   );
+}
+
+function confirmIdentity() {
+  fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+  fireEvent.click(screen.getByTestId("identity-confirm-continue"));
 }
 
 describe("R-POPUP-SYNC: sync fires when popup closes without postMessage", () => {
@@ -105,6 +110,7 @@ describe("R-POPUP-SYNC: sync fires when popup closes without postMessage", () =>
     // Open platform picker and click LinkedIn
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    confirmIdentity();
 
     // Flush async handlers (preflight + connect fetch chain) so window.open fires.
     await act(async () => {});
@@ -160,6 +166,7 @@ describe("R-POPUP-SYNC: sync fires when popup closes without postMessage", () =>
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-FACEBOOK"));
+    confirmIdentity();
 
     // Flush the async fetch chain so window.open fires.
     await act(async () => {});

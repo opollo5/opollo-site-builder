@@ -45,7 +45,12 @@ const ORIGINAL_OPEN = window.open;
 const COMPANY_ID = "00000000-0000-0000-0000-000000000001";
 
 function makeFakePopup() {
-  return { closed: false, focus: vi.fn(), close() { (this as { closed: boolean }).closed = true; } };
+  return {
+    closed: false,
+    focus: vi.fn(),
+    location: { href: "" },
+    close() { (this as { closed: boolean }).closed = true; },
+  };
 }
 
 function renderList() {
@@ -58,6 +63,11 @@ function renderList() {
       canReconnect={true}
     />,
   );
+}
+
+function confirmIdentity() {
+  fireEvent.click(screen.getByTestId("identity-confirm-checkbox"));
+  fireEvent.click(screen.getByTestId("identity-confirm-continue"));
 }
 
 beforeEach(() => {
@@ -114,6 +124,7 @@ describe("R-X-SYNC-RETRY: popup-close sync retries when first sync inserts nothi
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-TWITTER"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);
@@ -176,6 +187,7 @@ describe("R-X-SYNC-RETRY: popup-close sync retries when first sync inserts nothi
 
     fireEvent.click(screen.getByTestId("connections-connect-button"));
     fireEvent.click(screen.getByTestId("connect-platform-LINKEDIN"));
+    confirmIdentity();
 
     await act(async () => {});
     expect(openMock).toHaveBeenCalledTimes(1);
