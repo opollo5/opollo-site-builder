@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05 — Composer (Schedule tab detail) — Opollo Wireframe</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-opollo-sprite>
+
+
+<div class="composer-overlay">
+  
+    <div class="composer__pane composer__pane--left">
+      <button class="composer__close" aria-label="Close composer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+      <h2 class="composer__title">Edit post</h2>
+      
+  <div class="profile-selector">
+    <button class="profile-chip profile-chip--selected" aria-label="linkedin"><svg viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#0A66C2"/><path fill="white" d="M5.5 8.5h2.6v8h-2.6zm1.3-3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm3.7 3.5h2.5v1.1c.4-.7 1.4-1.4 2.8-1.4 3 0 3.6 2 3.6 4.6v4.7h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.3h-2.5z"/></svg></button><button class="profile-chip" aria-label="gbp"><svg viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6S11 15.6 13.5 15.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg></button><button class="profile-chip" aria-label="facebook"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#1877F2"/><path fill="white" d="M14.9 14l.4-2.9h-2.8V9.1c0-.8.4-1.5 1.6-1.5h1.3V5.1S14.3 4.9 13.2 4.9c-2.3 0-3.8 1.4-3.8 3.9V11H6.9v2.9h2.5V21h3.1v-7h2.4z"/></svg></button><button class="profile-chip" aria-label="x"><svg viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#000"/><path fill="white" d="M14.7 5h2.4l-5.2 5.9 6.1 8.1h-4.7L9.5 14l-4.2 5H3l5.5-6.3L2.7 5H7.5l3.3 4.4L14.7 5z"/></svg></button><button class="profile-chip" aria-label="instagram"><svg viewBox="0 0 22 22"><defs><linearGradient id="ig-g-gwtop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F58529"/><stop offset=".3" stop-color="#DD2A7B"/><stop offset=".6" stop-color="#8134AF"/><stop offset="1" stop-color="#515BD4"/></linearGradient></defs><rect width="22" height="22" rx="6" fill="url(#ig-g-fixed)"/><rect x="5" y="5" width="12" height="12" rx="4" fill="none" stroke="white" stroke-width="1.6"/><circle cx="11" cy="11" r="3" fill="none" stroke="white" stroke-width="1.6"/><circle cx="15.2" cy="6.8" r=".9" fill="white"/></svg></button>
+    <button class="profile-chip profile-chip__add" aria-label="Add profile"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+    <button class="profile-selector__deselect">Deselect all</button>
+  </div>
+      
+  <div class="content-card">
+    <textarea class="content-card__textarea" placeholder="Write your post or generate one with AI">A behind-the-scenes look at how we're thinking about content automation for cybersecurity firms.</textarea>
+    
+      <div class="content-card__media">
+        <div class="media-thumb" style="background: linear-gradient(135deg, #FF03A5, #FFB574);"></div>
+        <button class="media-thumb-add" aria-label="Add media"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+      </div>
+    <div class="content-card__counter">96 / 3000</div>
+    <div class="tools-row">
+      <button class="tool-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg> AI assistant</button>
+      <button class="tool-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg> Media</button>
+      <button class="tool-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg> Emoji</button>
+      <button class="tool-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg> GIF</button>
+      <button class="tool-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> Shorten URL</button>
+      <button class="tool-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg> UTM tags</button>
+    </div>
+  </div>
+      
+      <div class="platform-actions">
+      <div class="platform-action">
+        <span class="platform-action__icon"><svg viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#0A66C2"/><path fill="white" d="M5.5 8.5h2.6v8h-2.6zm1.3-3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm3.7 3.5h2.5v1.1c.4-.7 1.4-1.4 2.8-1.4 3 0 3.6 2 3.6 4.6v4.7h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.3h-2.5z"/></svg></span>
+        <span>LinkedIn</span>
+        <a href="#" class="platform-action__link">+ Add link</a>
+      </div></div>
+      
+  <div class="scheduling-card">
+    <div class="scheduling-tabs">
+      <button class="scheduling-tabs__item">Post now</button><button class="scheduling-tabs__item scheduling-tabs__item--active">Schedule</button><button class="scheduling-tabs__item">Publish regularly</button><button class="scheduling-tabs__item">Save as draft</button>
+    </div>
+    <div class="scheduling-content">
+      
+      <p class="scheduling-content__hint">Pick a date and time. Times are in Australia/Sydney; the recipient platform's timezone applies on publish.</p>
+      <div class="schedule-row">
+        <input type="date" class="schedule-input" value="2026-05-21">
+        <input type="time" class="schedule-input" value="09:00">
+        <button class="schedule-row__delete" aria-label="Remove time"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+      <div class="schedule-row">
+        <input type="date" class="schedule-input" value="2026-05-21">
+        <input type="time" class="schedule-input" value="14:30">
+        <button class="schedule-row__delete" aria-label="Remove time"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+      </div>
+      <button class="schedule-add"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add time</button>
+      <div class="approval-row" style="margin-top: var(--space-4);">
+        <div class="toggle toggle--on" role="switch" aria-checked="true"></div>
+        <span class="approval-row__label">Send for client approval before publishing</span>
+        <a href="#" class="approval-row__link">Learn more</a>
+      </div>
+    </div>
+  </div>
+  
+      
+  <div class="submit-row">
+    <button class="btn btn--secondary">Discard</button>
+    <button class="btn btn--primary btn--lg submit-row__primary">Schedule post</button>
+  </div>
+    </div>
+  
+    <div class="composer__pane composer__pane--right">
+      <div class="preview-tabs">
+        <button class="preview-tabs__item">Post preview</button>
+        <button class="preview-tabs__item preview-tabs__item--active">Calendar</button>
+      </div>
+      
+  <div class="mini-cal">
+    <div class="mini-cal__head">
+      <h3 class="mini-cal__title">May 2026</h3>
+      <button class="btn btn--ghost btn--icon btn--sm" aria-label="Previous"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+      <button class="btn btn--ghost btn--icon btn--sm" aria-label="Next"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+    </div>
+    <div class="mini-cal__grid">
+      <div class="mini-cal__weekday">M</div><div class="mini-cal__weekday">T</div><div class="mini-cal__weekday">W</div><div class="mini-cal__weekday">T</div><div class="mini-cal__weekday">F</div><div class="mini-cal__weekday">S</div><div class="mini-cal__weekday">S</div>
+      <button class="mini-cal__day mini-cal__day--other-month">27</button><button class="mini-cal__day mini-cal__day--other-month">28</button><button class="mini-cal__day mini-cal__day--other-month">29</button><button class="mini-cal__day mini-cal__day--other-month">30</button><button class="mini-cal__day mini-cal__day--has-post">1</button><button class="mini-cal__day">2</button><button class="mini-cal__day">3</button><button class="mini-cal__day">4</button><button class="mini-cal__day">5</button><button class="mini-cal__day">6</button><button class="mini-cal__day mini-cal__day--has-post">7</button><button class="mini-cal__day">8</button><button class="mini-cal__day mini-cal__day--has-post">9</button><button class="mini-cal__day">10</button><button class="mini-cal__day">11</button><button class="mini-cal__day">12</button><button class="mini-cal__day">13</button><button class="mini-cal__day">14</button><button class="mini-cal__day mini-cal__day--has-post">15</button><button class="mini-cal__day">16</button><button class="mini-cal__day">17</button><button class="mini-cal__day mini-cal__day--today">18</button><button class="mini-cal__day">19</button><button class="mini-cal__day">20</button><button class="mini-cal__day">21</button><button class="mini-cal__day">22</button><button class="mini-cal__day mini-cal__day--has-post">23</button><button class="mini-cal__day">24</button><button class="mini-cal__day">25</button><button class="mini-cal__day">26</button><button class="mini-cal__day">27</button><button class="mini-cal__day">28</button><button class="mini-cal__day">29</button><button class="mini-cal__day">30</button><button class="mini-cal__day">31</button>
+    </div>
+  </div>
+    </div>
+</div>
+<script src="interactions.js"></script>
+</body>
+</html>

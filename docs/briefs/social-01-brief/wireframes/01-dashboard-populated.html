@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01 — Social Poster Dashboard (populated) — Opollo Wireframe</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-opollo-sprite>
+
+<div class="app-shell">
+  <!-- Sidebar (identical to 00) -->
+  <aside class="app-shell__sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__logo">O</div>
+      <div class="sidebar__brand-name">Opollo</div>
+    </div>
+    <div class="sidebar__group">
+      <div class="sidebar__group-label">Workspace</div>
+      <a href="#" class="sidebar__item"><svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>Home</a>
+      <a href="#" class="sidebar__item"><svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>Sites</a>
+    </div>
+    <div class="sidebar__group">
+      <div class="sidebar__group-label">Social</div>
+      <a href="#" class="sidebar__item sidebar__item--active"><svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Social Poster</a>
+      <a href="#" class="sidebar__item"><svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 4 4 5-5"/></svg>Analytics</a>
+      <a href="#" class="sidebar__item"><svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>Connections</a>
+      <a href="#" class="sidebar__item"><svg class="sidebar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z"/></svg>CAP<span class="sidebar__badge">new</span></a>
+    </div>
+  </aside>
+
+  <header class="app-shell__topbar">
+    <button class="topbar__company-switcher" aria-label="Switch company">
+      <div class="topbar__company-icon"></div>
+      <span>Stellar Systems</span>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div class="topbar__search">
+      <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input class="topbar__search-input" type="search" placeholder="Search">
+    </div>
+    <div class="topbar__actions">
+      <a href="#" class="topbar__nav-link">Invite users</a>
+      <a href="#" class="topbar__nav-link">Pricing</a>
+      <button class="topbar__avatar">S</button>
+    </div>
+  </header>
+
+  <main class="app-shell__content">
+    <div class="page-header">
+      <nav class="breadcrumb"><a href="#">Home</a><span class="breadcrumb__sep">›</span><a href="#">Social</a><span class="breadcrumb__sep">›</span><span class="breadcrumb__current">Social Poster</span></nav>
+      <div class="page-title-row">
+        <h1 class="page-title">Social Poster</h1>
+        <div class="page-actions">
+          <button class="btn btn--secondary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Chrome extension</button>
+          <button class="btn btn--secondary">Share</button>
+          <button class="btn btn--secondary btn--icon" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+        </div>
+      </div>
+      <nav class="tab-line">
+        <a href="#" class="tab-line__item tab-line__item--active">Calendar</a>
+        <a href="#" class="tab-line__item">Posts</a>
+        <a href="#" class="tab-line__item">Content ideas</a>
+        <div class="tab-line__meta"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Australia/Sydney</div>
+      </nav>
+    </div>
+
+    <div class="filter-bar">
+      <div class="btn-group">
+        <button class="btn btn--primary"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>New post</button>
+        <button class="btn btn--primary btn--icon" aria-label="Bulk schedule"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></button>
+      </div>
+      <button class="filter-bar__profile-select">All profiles<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:auto;opacity:0.5"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="pill-group" style="margin-left:auto;">
+        <button class="pill-group__item pill-group__item--active">Month</button>
+        <button class="pill-group__item">Timeline</button>
+      </div>
+    </div>
+
+    <div class="calendar-shell">
+      <div class="calendar__month-header">
+        <h2 class="calendar__month-title">May 2026</h2>
+        <button class="btn btn--ghost btn--icon btn--sm" aria-label="Previous month"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+        <button class="btn btn--ghost btn--icon btn--sm" aria-label="Next month"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        <button class="btn btn--ghost btn--sm" style="margin-left:var(--space-1)">Today</button>
+      </div>
+
+      <div class="calendar__day-header">
+        <div class="calendar__day-title">Mon, May 18</div>
+        <div class="u-flex u-gap-2">
+          <button class="btn btn--ghost btn--icon btn--sm" aria-label="Create post"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button>
+          <button class="btn btn--ghost btn--icon btn--sm" aria-label="Previous day"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg></button>
+          <button class="btn btn--ghost btn--icon btn--sm" aria-label="Next day"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></button>
+        </div>
+      </div>
+
+      <div class="calendar__grid">
+        <div class="calendar__cell calendar__cell--other-month"><div class="calendar__weekday">Mon</div><span class="calendar__day-number">27</span></div>
+        <div class="calendar__cell calendar__cell--other-month"><div class="calendar__weekday">Tue</div><span class="calendar__day-number">28</span></div>
+        <div class="calendar__cell calendar__cell--other-month"><div class="calendar__weekday">Wed</div><span class="calendar__day-number">29</span></div>
+        <div class="calendar__cell calendar__cell--other-month"><div class="calendar__weekday">Thu</div><span class="calendar__day-number">30</span></div>
+        <div class="calendar__cell calendar__cell--past">
+          <div class="calendar__weekday">Fri</div><span class="calendar__day-number">1</span>
+          <div class="post-chip">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6s2.1 4.6 4.6 4.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg>
+            <span class="post-chip__time">18:31</span>
+            <svg class="post-chip__state post-chip__state--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="calendar__cell calendar__cell--past"><div class="calendar__weekday">Sat</div><span class="calendar__day-number">2</span></div>
+        <div class="calendar__cell calendar__cell--past"><div class="calendar__weekday">Sun</div><span class="calendar__day-number">3</span></div>
+
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">4</span></div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">5</span></div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">6</span></div>
+        <div class="calendar__cell calendar__cell--past">
+          <span class="calendar__day-number">7</span>
+          <div class="post-chip">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#0A66C2"/><path fill="white" d="M5.5 8.5h2.6v8h-2.6zm1.3-3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm3.7 3.5h2.5v1.1c.4-.7 1.4-1.4 2.8-1.4 3 0 3.6 2 3.6 4.6v4.7h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.3h-2.5z"/></svg>
+            <span class="post-chip__time">08:00</span>
+            <svg class="post-chip__state post-chip__state--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">8</span></div>
+        <div class="calendar__cell calendar__cell--past">
+          <span class="calendar__day-number">9</span>
+          <div class="post-chip">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6s2.1 4.6 4.6 4.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg>
+            <span class="post-chip__time">18:34</span>
+            <svg class="post-chip__state post-chip__state--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">10</span></div>
+
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">11</span></div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">12</span></div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">13</span></div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">14</span></div>
+        <div class="calendar__cell calendar__cell--past">
+          <span class="calendar__day-number">15</span>
+          <div class="post-chip">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6s2.1 4.6 4.6 4.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg>
+            <span class="post-chip__time">18:35</span>
+            <svg class="post-chip__state post-chip__state--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">16</span></div>
+        <div class="calendar__cell calendar__cell--past"><span class="calendar__day-number">17</span></div>
+
+        <!-- Selected: today, May 18 -->
+        <div class="calendar__cell calendar__cell--selected">
+          <span class="calendar__day-number calendar__day-number--today">18</span>
+          <div class="post-chip">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#0A66C2"/><path fill="white" d="M5.5 8.5h2.6v8h-2.6zm1.3-3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm3.7 3.5h2.5v1.1c.4-.7 1.4-1.4 2.8-1.4 3 0 3.6 2 3.6 4.6v4.7h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.3h-2.5z"/></svg>
+            <span class="post-chip__time">16:37</span>
+            <svg class="post-chip__state post-chip__state--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <div class="post-chip">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6s2.1 4.6 4.6 4.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg>
+            <span class="post-chip__time">16:37</span>
+            <svg class="post-chip__state post-chip__state--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+        </div>
+        <div class="calendar__cell"><span class="calendar__day-number">19</span><button class="calendar__cell-add" aria-label="Create post"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button></div>
+        <div class="calendar__cell"><span class="calendar__day-number">20</span><button class="calendar__cell-add" aria-label="Create post"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button></div>
+        <div class="calendar__cell"><span class="calendar__day-number">21</span><button class="calendar__cell-add" aria-label="Create post"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button></div>
+        <div class="calendar__cell"><span class="calendar__day-number">22</span><button class="calendar__cell-add" aria-label="Create post"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button></div>
+        <div class="calendar__cell">
+          <span class="calendar__day-number">23</span>
+          <div class="post-chip" style="filter:none; opacity:1;">
+            <svg class="post-chip__icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6s2.1 4.6 4.6 4.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg>
+            <span class="post-chip__time" style="color: var(--color-text-default); font-weight: var(--weight-medium);">18:36</span>
+            <svg class="post-chip__state post-chip__state--pending" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          </div>
+        </div>
+        <div class="calendar__cell"><span class="calendar__day-number">24</span><button class="calendar__cell-add" aria-label="Create post"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg></button></div>
+
+        <div class="calendar__cell"><span class="calendar__day-number">25</span></div>
+        <div class="calendar__cell"><span class="calendar__day-number">26</span></div>
+        <div class="calendar__cell"><span class="calendar__day-number">27</span></div>
+        <div class="calendar__cell"><span class="calendar__day-number">28</span></div>
+        <div class="calendar__cell"><span class="calendar__day-number">29</span></div>
+        <div class="calendar__cell"><span class="calendar__day-number">30</span></div>
+        <div class="calendar__cell"><span class="calendar__day-number">31</span></div>
+      </div>
+
+      <!-- Right day-detail: two posts on May 18 -->
+      <div class="calendar__day-detail">
+        <div class="day-detail__list">
+          <div class="day-detail__post" draggable="true">
+            <div class="day-detail__post-body">
+              <div class="day-detail__post-head">
+                <svg class="day-detail__platform-icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#0A66C2"/><path fill="white" d="M5.5 8.5h2.6v8h-2.6zm1.3-3.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm3.7 3.5h2.5v1.1c.4-.7 1.4-1.4 2.8-1.4 3 0 3.6 2 3.6 4.6v4.7h-2.6v-4.2c0-1 0-2.3-1.4-2.3s-1.6 1.1-1.6 2.2v4.3h-2.5z"/></svg>
+                <span class="day-detail__time">16:37</span>
+              </div>
+              <p class="day-detail__excerpt">Building marketing automation for MSPs is hard. Here's what we've learned shipping CAP this quarter.</p>
+            </div>
+            <div style="width:56px; height:56px; border-radius: var(--radius-sm); background: linear-gradient(135deg, #003F88, #0A66C2); flex-shrink:0;" class="day-detail__thumb"></div>
+            <div class="day-detail__state day-detail__state--success"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <div class="day-detail__hover-actions">
+              <button class="day-detail__hover-action" aria-label="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+              <button class="day-detail__hover-action" aria-label="Reschedule"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
+            </div>
+          </div>
+
+          <div class="day-detail__post" draggable="true">
+            <div class="day-detail__post-body">
+              <div class="day-detail__post-head">
+                <svg class="day-detail__platform-icon" viewBox="0 0 22 22"><rect width="22" height="22" rx="3" fill="#4584ED"/><path fill="white" d="M18.9 10.3h-3.8v1.5h2.2c-.3 1.3-1.4 2.2-2.8 2.2-1.7 0-3-1.4-3-3s1.3-3 3-3c.8 0 1.5.3 2 .8l1.2-1.1c-.9-.9-2-1.4-3.2-1.4-2.5 0-4.6 2-4.6 4.6s2.1 4.6 4.6 4.6c2.7 0 4.5-1.9 4.5-4.6 0-.2 0-.5-.1-.7z"/></svg>
+                <span class="day-detail__time">16:37</span>
+              </div>
+              <p class="day-detail__excerpt">Visit us at 1 Walters Dr — now open Saturdays 9–2 for the autumn season.</p>
+            </div>
+            <div style="width:56px; height:56px; border-radius: var(--radius-sm); background: linear-gradient(135deg, #FF03A5, #FFB574); flex-shrink:0;" class="day-detail__thumb"></div>
+            <div class="day-detail__state day-detail__state--success"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <div class="day-detail__hover-actions">
+              <button class="day-detail__hover-action" aria-label="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+              <button class="day-detail__hover-action" aria-label="Reschedule"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="interactions.js"></script>
+</body>
+</html>

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>09a — Bulk CSV upload modal (file uploaded, with errors) — Opollo Wireframe</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-opollo-sprite>
+<div class="app-shell"><aside class="app-shell__sidebar"></aside><header class="app-shell__topbar"></header><main class="app-shell__content"></main></div>
+<div class="modal-backdrop">
+  <div class="modal">
+    <div class="modal__head">
+      <h2 class="modal__title">Bulk scheduling</h2>
+      <button class="modal__close" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <div class="modal__body" style="padding: 0;">
+      
+    <div style="padding: var(--space-4); ">
+      <div class="u-flex u-items-center u-gap-3" style="padding: var(--space-3); background: var(--color-bg-muted); border-radius: var(--radius-sm); margin-bottom: var(--space-4);">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <div style="flex:1;">
+          <div class="u-text-sm" style="font-weight: var(--weight-medium);">opollo-may-content.csv</div>
+          <div class="u-text-xs u-text-muted">24 KB · 87 rows · 3 errors</div>
+        </div>
+        <button class="btn btn--ghost btn--sm">Replace</button>
+      </div>
+      <div style="border: 1px solid var(--color-border-soft); border-radius: var(--radius-md); overflow: hidden; margin-bottom: var(--space-4);">
+        <table style="width: 100%; border-collapse: collapse; font-size: var(--text-xs);">
+          <thead style="background: var(--color-bg-muted);">
+            <tr><th style="text-align:left; padding: var(--space-2) var(--space-3); color: var(--color-text-muted); font-weight: var(--weight-semibold);">#</th><th style="text-align:left; padding: var(--space-2) var(--space-3); color: var(--color-text-muted); font-weight: var(--weight-semibold);">Content</th><th style="text-align:left; padding: var(--space-2) var(--space-3); color: var(--color-text-muted); font-weight: var(--weight-semibold);">Date</th><th style="text-align:left; padding: var(--space-2) var(--space-3); color: var(--color-text-muted); font-weight: var(--weight-semibold);">Time</th><th style="text-align:left; padding: var(--space-2) var(--space-3); color: var(--color-text-muted); font-weight: var(--weight-semibold);">Channel</th></tr>
+          </thead>
+          <tbody>
+            <tr style="border-top: 1px solid var(--color-border-soft);"><td style="padding: var(--space-2) var(--space-3); color: var(--color-text-muted);">1</td><td style="padding: var(--space-2) var(--space-3); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Tips for running a secure MSP in 2026.</td><td style="padding: var(--space-2) var(--space-3);">05/21/2026</td><td style="padding: var(--space-2) var(--space-3);">09:00</td><td style="padding: var(--space-2) var(--space-3);">LinkedIn</td></tr>
+            <tr style="border-top: 1px solid var(--color-border-soft); background: var(--color-danger-soft);"><td style="padding: var(--space-2) var(--space-3); color: var(--color-danger);">2</td><td style="padding: var(--space-2) var(--space-3); color: var(--color-danger); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Welcome our new — date in past</td><td style="padding: var(--space-2) var(--space-3); color: var(--color-danger);">04/15/2025</td><td style="padding: var(--space-2) var(--space-3);">10:00</td><td style="padding: var(--space-2) var(--space-3);">LinkedIn</td></tr>
+            <tr style="border-top: 1px solid var(--color-border-soft);"><td style="padding: var(--space-2) var(--space-3); color: var(--color-text-muted);">3</td><td style="padding: var(--space-2) var(--space-3); max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Visit us this Saturday — autumn hours start now.</td><td style="padding: var(--space-2) var(--space-3);">05/21/2026</td><td style="padding: var(--space-2) var(--space-3);">14:00</td><td style="padding: var(--space-2) var(--space-3);">(all)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding: var(--space-3) var(--space-4); background: var(--color-danger-soft); border-radius: var(--radius-sm); color: var(--color-danger); font-size: var(--text-xs);">
+        3 errors found. Fix them in your CSV and re-upload — partial imports are not supported.
+      </div>
+    </div>
+    </div>
+    
+    <div class="modal__foot">
+      <button class="btn btn--secondary">Cancel</button>
+      <button class="btn btn--primary" disabled style="opacity: 0.5;">Schedule all (fix errors first)</button>
+    </div>
+  </div>
+</div>
+<script src="interactions.js"></script>
+</body>
+</html>
