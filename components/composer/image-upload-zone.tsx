@@ -220,7 +220,7 @@ export function ImageUploadZone({
   }
 
   return (
-    <div>
+    <div data-testid="image-upload-zone">
       {/* Trigger */}
       {!open && (
         <button

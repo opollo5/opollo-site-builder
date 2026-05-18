@@ -123,7 +123,9 @@ test.describe("composer modal", () => {
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: /schedule/i }).click();
+    // Scope to dialog to avoid matching page-level "Scheduled" filter button.
+    const dialog3 = page.getByRole("dialog", { name: /new post/i });
+    await dialog3.getByRole("button", { name: /^schedule$/i }).click();
     await expect(page.getByRole("group").or(page.locator("input[type='date']"))).toBeVisible({ timeout: 5_000 });
     await expect(page.locator("input[type='time']").first()).toBeVisible();
   });
@@ -133,7 +135,8 @@ test.describe("composer modal", () => {
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: /schedule/i }).click();
+    const dialog4 = page.getByRole("dialog", { name: /new post/i });
+    await dialog4.getByRole("button", { name: /^schedule$/i }).click();
     await expect(page.getByRole("button", { name: /\+ add time/i })).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole("button", { name: /\+ add time/i }).click();
@@ -158,10 +161,9 @@ test.describe("composer modal", () => {
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    // Zero-account warning must be visible.
-    await expect(page.getByRole("alert").or(
-      page.getByText(/select at least one account/i),
-    )).toBeVisible({ timeout: 10_000 });
+    // Zero-account warning must be visible (scope to dialog to avoid Next.js route announcer).
+    const dialog6 = page.getByRole("dialog", { name: /new post/i });
+    await expect(dialog6.getByText(/select at least one account/i)).toBeVisible({ timeout: 10_000 });
 
     // Submit button must be disabled.
     const submitBtn = page.getByRole("button", { name: /post now|schedule|save as draft/i }).last();
@@ -227,9 +229,7 @@ test.describe("composer modal", () => {
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    // Image upload zone must render.
-    await expect(page.locator("[data-testid='image-upload-zone']").or(
-      page.getByText(/drag.*(drop|upload)|add image|upload image/i),
-    )).toBeVisible({ timeout: 10_000 });
+    // Image upload zone must render (data-testid on ImageUploadZone outer div).
+    await expect(page.locator("[data-testid='image-upload-zone']")).toBeVisible({ timeout: 10_000 });
   });
 });
