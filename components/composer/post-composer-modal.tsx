@@ -9,6 +9,7 @@ import { toastSuccess } from "@/lib/toast-success";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAutoSave } from "@/lib/hooks/use-auto-save";
 import type { DraftData, MediaRef } from "@/lib/platform/social/drafts";
+import { trackEvent } from "@/lib/observability/track-event";
 import type { SocialConnection } from "@/lib/platform/social/connections/types";
 import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
@@ -61,6 +62,7 @@ export function PostComposerModal({
 
   // Transient UI state — not persisted in draft_data per D13.
   const [mode, setMode] = useState<ComposerMode>("post_now");
+  const prevModeRef = useRef<ComposerMode>("post_now");
   const [scheduleDate, setScheduleDate] = useState(
     () => new Date().toISOString().slice(0, 10),
   );
@@ -118,14 +120,20 @@ export function PostComposerModal({
           return;
         }
 
+        const draftId = result.data.id as string;
         dispatch({
           type: "LOAD_SUCCESS",
           draft: {
-            id: result.data.id,
+            id: draftId,
             draft_version: result.data.draft_version,
             draft_data: result.data.draft_data,
           },
         });
+        if (initialDraftId === null) {
+          trackEvent({ name: "composer.draft.created", props: { correlation_id: correlationId, draft_id: draftId } });
+        } else {
+          trackEvent({ name: "composer.draft.loaded", props: { correlation_id: correlationId, draft_id: draftId } });
+        }
       } catch (err) {
         if (cancelled) return;
         dispatch({
@@ -137,6 +145,28 @@ export function PostComposerModal({
 
     void init();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // FIX 12: Popstate (browser Back) + FIX 13: composer.opened event
+  // ---------------------------------------------------------------------------
+
+  const handleCloseRef = useRef<() => Promise<void>>(async () => {/* replaced below */});
+
+  useEffect(() => {
+    trackEvent({ name: "composer.opened", props: { correlation_id: correlationId, draft_id: initialDraftId } });
+    // Push a history entry so Back button triggers popstate rather than navigating away.
+    history.pushState({ composerOpen: true }, "");
+
+    function onPopState() {
+      // Restore the state entry so the URL stays stable while the dialog is shown.
+      history.pushState({ composerOpen: true }, "");
+      void handleCloseRef.current();
+    }
+
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -200,13 +230,18 @@ export function PostComposerModal({
   }, []);
 
   const aiReplace = useCallback((text: string, meta: AiMeta) => {
+    const s = stateRef.current;
+    const draftIdForEvent = (s.status === "editing" || s.status === "saved") ? s.draft.id : "";
+    trackEvent({ name: "composer.ai_assist.triggered", props: { correlation_id: correlationId, draft_id: draftIdForEvent, action: "replace" } });
     dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text, ai_metadata: { prompt: meta.prompt, tone: meta.tone, generated_at: meta.generated_at } } });
     setAiPanelOpen(false);
-  }, []);
+  }, [correlationId]);
 
   const aiAppend = useCallback((text: string, meta: AiMeta) => {
     const s = stateRef.current;
     if (s.status !== "editing" && s.status !== "saved") return;
+    const draftIdForEvent = s.draft.id;
+    trackEvent({ name: "composer.ai_assist.triggered", props: { correlation_id: correlationId, draft_id: draftIdForEvent, action: "append" } });
     const current = s.draft.draft_data.master_text ?? "";
     dispatch({
       type: "UPDATE_DRAFT",
@@ -216,7 +251,7 @@ export function PostComposerModal({
       },
     });
     setAiPanelOpen(false);
-  }, []);
+  }, [correlationId]);
 
   // Keep schedule in draft_data for autosave.
   const updateScheduleDate = useCallback((date: string) => {
@@ -308,6 +343,7 @@ export function PostComposerModal({
           if (current) {
             const stale: Draft = { id: draftId, draft_version: snapshot.version, draft_data: snapshot.data };
             dispatch({ type: "CONFLICT_DETECTED", staleDraft: stale, freshDraft: current });
+            trackEvent({ name: "composer.conflict.detected", props: { correlation_id: correlationId, draft_id: draftId } });
           }
         }
         throw new Error(result.error?.message ?? "Save failed.");
@@ -333,6 +369,10 @@ export function PostComposerModal({
     getValue,
     save: saveDraftToServer,
     enabled: state.status === "editing" && !!draftId,
+    localStorageBackup: true,
+    onSuccess: () => {
+      if (draftId) trackEvent({ name: "composer.draft.autosaved", props: { correlation_id: correlationId, draft_id: draftId } });
+    },
   });
 
   // ---------------------------------------------------------------------------
@@ -351,6 +391,7 @@ export function PostComposerModal({
 
     setSubmitting(true);
     setSubmitError(null);
+    trackEvent({ name: "composer.submit.clicked", props: { correlation_id: correlationId, draft_id: s.draft.id, mode, create_another: createAnother } });
 
     try {
       // Flush pending autosave first.
@@ -373,6 +414,7 @@ export function PostComposerModal({
 
       const postId: string = result.data.post.id;
       dispatch({ type: "PUBLISH_SUCCESS", postId });
+      trackEvent({ name: "composer.submit.success", props: { correlation_id: correlationId, draft_id: s.draft.id, post_id: postId, state: result.data.state as string, scheduled: result.data.scheduled as boolean } });
 
       const scheduled: boolean = result.data.scheduled;
       const postState: string = result.data.state;
@@ -409,10 +451,12 @@ export function PostComposerModal({
         dispatch({ type: "RESET" });
       }
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Submit failed.");
+      const errMsg = err instanceof Error ? err.message : "Submit failed.";
+      setSubmitError(errMsg);
+      trackEvent({ name: "composer.submit.error", props: { correlation_id: correlationId, draft_id: s.draft.id, error_code: "SUBMIT_FAILED" } });
       dispatch({
         type: "PUBLISH_FAIL",
-        error: { message: err instanceof Error ? err.message : "Submit failed.", code: "SUBMIT_FAILED", correlationId },
+        error: { message: errMsg, code: "SUBMIT_FAILED", correlationId },
         retryable: true,
       });
     } finally {
@@ -424,19 +468,21 @@ export function PostComposerModal({
   // Close — FIX 5: show confirm dialog when draft is dirty
   // ---------------------------------------------------------------------------
 
-  const doClose = useCallback(() => {
+  const doClose = useCallback((reason: "close_button" | "backdrop" | "escape" | "back_button" | "submit" = "close_button") => {
+    const s = stateRef.current;
+    const draftIdForEvent = (s.status === "editing" || s.status === "saved" || s.status === "saving") ? s.draft.id : null;
+    trackEvent({ name: "composer.closed", props: { correlation_id: correlationId, draft_id: draftIdForEvent, reason } });
     const url = new URL(window.location.href);
     url.searchParams.delete("compose");
     url.searchParams.delete("date");
     router.replace(url.pathname + (url.search || ""), { scroll: false });
     dispatch({ type: "RESET" });
-  }, [router]);
+  }, [router, correlationId]);
 
-  const handleClose = useCallback(async () => {
+  const handleClose = useCallback(async (reason: "close_button" | "backdrop" | "escape" | "back_button" = "close_button") => {
     const s = stateRef.current;
     const dirty = s.status === "editing" && s.dirty;
     if (dirty) {
-      // Try a background flush; if it fails or draft has meaningful content, confirm.
       const dd = s.draft.draft_data;
       const hasContent = !!(dd.master_text?.trim() || dd.link_url?.trim() || dd.media_refs.length > 0);
       if (hasContent) {
@@ -445,8 +491,11 @@ export function PostComposerModal({
       }
       try { await flush(); } catch { /* ignore */ }
     }
-    doClose();
+    doClose(reason);
   }, [flush, doClose]);
+
+  // Keep ref current for popstate handler (stable closure).
+  handleCloseRef.current = () => handleClose("back_button");
 
   // ---------------------------------------------------------------------------
   // Keyboard: Esc closes, focus trap
@@ -454,7 +503,7 @@ export function PostComposerModal({
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") void handleClose();
+      if (e.key === "Escape") void handleClose("escape");
       if (e.key === "Tab" && modalRef.current) {
         const focusable = Array.from(
           modalRef.current.querySelectorAll<HTMLElement>(
@@ -721,7 +770,11 @@ export function PostComposerModal({
               mode={mode}
               scheduleDate={scheduleDate}
               scheduleTimes={scheduleTimes}
-              onModeChange={setMode}
+              onModeChange={(m) => {
+                trackEvent({ name: "composer.mode.changed", props: { correlation_id: correlationId, from: prevModeRef.current, to: m } });
+                prevModeRef.current = m;
+                setMode(m);
+              }}
               onScheduleDate={updateScheduleDate}
               onScheduleTime={updateScheduleTime}
               onAddScheduleTime={addScheduleTime}

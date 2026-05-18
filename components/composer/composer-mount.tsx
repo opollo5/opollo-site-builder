@@ -34,6 +34,7 @@ function ComposerMountInner({ companyId, userId }: ComposerMountProps) {
 
   return (
     <PostComposerModal
+      key={compose}
       companyId={companyId}
       userId={userId}
       initialDraftId={initialDraftId}
