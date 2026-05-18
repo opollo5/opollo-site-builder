@@ -16,9 +16,9 @@ import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 // ---------------------------------------------------------------------------
 // POST /api/platform/social/drafts
 //
-// V1 path (legacy): Body = { company_id, idempotency_key? } — blank draft.
-// V2 path (composer V2): Body includes `content`, `mode`, `target_profile_ids` etc.
-//   Detected by presence of `mode` field. Gated by FEATURE_COMPOSER_V2.
+// V2 path: Body includes `content`, `mode`, `target_profile_ids` etc.
+//   Detected by presence of `mode` field.
+// V1 legacy path: Body = { company_id, idempotency_key? } — blank draft.
 //
 // Auth path A — user session: requires "create_post" permission.
 // Auth path B — service key: x-platform-service-key + x-platform-actor-id headers.
@@ -33,8 +33,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
   const bodyObj = body as Record<string, unknown>;
 
-  // V2 path: `mode` field present AND feature flag enabled.
-  if ("mode" in bodyObj && process.env.NEXT_PUBLIC_FEATURE_COMPOSER_V2 === "true") {
+  // V2 path: `mode` field present.
+  if ("mode" in bodyObj) {
     return handleV2Post(req, bodyObj);
   }
 

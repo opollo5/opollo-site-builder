@@ -11,8 +11,8 @@ This file is the authoritative list of feature flags used in the social composer
 | `FEATURE_AI_ASSISTANT_COMPOSER` | `false` | AI-assisted copy generation inside composer (Spec 22 PR 4) | Phase 2 |
 | `FEATURE_TIMELINE_VIEW` | `false` | Visual timeline / calendar view (Spec 22 PR 5) | Phase 2 |
 | `FEATURE_PRE_EXPIRY_WARNINGS` | `false` | Pre-expiry connection warning banner + notifications (Spec 23 PR 1) | Migration 0110 + cron |
-| `FEATURE_COMPOSER_V2` | `false` | Social composer rebuild (social-01-brief). New split-pane composer + dashboard. Old poster remains. | PR A–H merged + manual smoke |
-| `NEXT_PUBLIC_FEATURE_COMPOSER_V2` | `false` | Client-side companion to FEATURE_COMPOSER_V2. Must match. | Same as above |
+| ~~`FEATURE_COMPOSER_V2`~~ | removed | Removed in cutover PR (post PR I). Composer V2 is now the only path. | — |
+| ~~`NEXT_PUBLIC_FEATURE_COMPOSER_V2`~~ | removed | Client-side companion — removed in same cutover PR. | — |
 
 ## Rules
 

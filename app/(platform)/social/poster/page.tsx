@@ -11,11 +11,7 @@ import type { Connection, Platform } from "@/lib/social/types";
 //
 // Server Component: fetches session + connections, then renders the
 // CalendarShell client component which owns all calendar state + DnD.
-//
-// Feature flag: FEATURE_COMPOSER_V2 must be "true".
 // ---------------------------------------------------------------------------
-
-const FEATURE_ON = process.env.NEXT_PUBLIC_FEATURE_COMPOSER_V2 === "true";
 
 // Maps V1 SocialPlatform values to V2 Platform values
 function mapPlatform(p: string): Platform {
@@ -27,14 +23,6 @@ function mapPlatform(p: string): Platform {
 }
 
 export default async function SocialPosterPage() {
-  if (!FEATURE_ON) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-        FEATURE_COMPOSER_V2 is not enabled.
-      </div>
-    );
-  }
-
   const session = await getCurrentPlatformSession();
   if (!session) redirect("/login?next=/social/poster");
 

@@ -51,8 +51,6 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
     canDo(companyId, "create_post"),
   ]);
 
-  const composerEnabled = process.env.FEATURE_COMPOSER_V2 !== "false";
-
   if (!postsResult.ok) {
     return (
       <div
@@ -64,8 +62,7 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
     );
   }
 
-  const newPostHref =
-    composerEnabled && canCreate ? "?compose=new" : "/company/social/posts";
+  const newPostHref = canCreate ? "?compose=new" : "/company/social/posts";
 
   return (
     <SocialModuleShell activeView="timeline">

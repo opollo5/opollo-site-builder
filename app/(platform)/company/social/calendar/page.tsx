@@ -79,8 +79,6 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
         }))
       : [];
 
-  const composerEnabled = process.env.FEATURE_COMPOSER_V2 !== "false";
-
   return (
     <>
       {entriesResult.ok ? (
@@ -94,7 +92,7 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
           }))}
           monthIso={monthIso}
           connections={connections}
-          composerEnabled={composerEnabled}
+          composerEnabled={true}
           canCreate={canCreate}
         />
       ) : (

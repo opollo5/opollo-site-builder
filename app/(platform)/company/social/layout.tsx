@@ -13,8 +13,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // staff who haven't yet selected a company via the Social section nav
 // selector, we render an inline prompt rather than redirecting.
 //
-// FEATURE_COMPOSER_V2: when enabled, mounts PostComposerModal here so it
-// is available on every social sub-route via ?compose=new or ?compose=<id>.
+// Mounts PostComposerModal here so it is available on every social
+// sub-route via ?compose=new or ?compose=<id>.
 
 export default async function CompanySocialLayout({
   children,
@@ -41,29 +41,23 @@ export default async function CompanySocialLayout({
     redirect("/company");
   }
 
-  const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
-
   let companyTimezone = "UTC";
-  if (composerEnabled && session.company) {
-    const svc = getServiceRoleClient();
-    const { data: tzRow } = await svc
-      .from("platform_companies")
-      .select("timezone")
-      .eq("id", session.company.companyId)
-      .maybeSingle();
-    companyTimezone = (tzRow?.timezone as string | null) ?? "UTC";
-  }
+  const svc = getServiceRoleClient();
+  const { data: tzRow } = await svc
+    .from("platform_companies")
+    .select("timezone")
+    .eq("id", session.company.companyId)
+    .maybeSingle();
+  companyTimezone = (tzRow?.timezone as string | null) ?? "UTC";
 
   return (
     <>
       {children}
-      {composerEnabled && (
-        <ComposerMount
-          companyId={session.company.companyId}
-          userId={session.userId}
-          companyTimezone={companyTimezone}
-        />
-      )}
+      <ComposerMount
+        companyId={session.company.companyId}
+        userId={session.userId}
+        companyTimezone={companyTimezone}
+      />
     </>
   );
 }
