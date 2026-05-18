@@ -143,6 +143,9 @@ type Props = {
   // the page passes the attempted platform (lowercase, e.g. "linkedin")
   // so we show an actionable banner and highlight the blocking row.
   noopdForPlatform?: string | null;
+  // WS2 reconnect deep link: when set, scrolls to and highlights this
+  // connection row so the user can immediately click Reconnect.
+  reconnectConnectionId?: string | null;
 };
 
 export function SocialConnectionsList({
@@ -153,6 +156,7 @@ export function SocialConnectionsList({
   canReconnect,
   autoOpenPickerForConnectionId,
   noopdForPlatform,
+  reconnectConnectionId,
 }: Props) {
   const router = useRouter();
   const [busyRow, setBusyRow] = useState<string | null>(null);
@@ -196,6 +200,16 @@ export function SocialConnectionsList({
     pickerShownRef.current.add(autoOpenPickerForConnectionId);
     setPickerForConnectionId(autoOpenPickerForConnectionId);
   }, [autoOpenPickerForConnectionId, connections]);
+
+  // WS2 reconnect deep link: scroll the highlighted row into view on mount.
+  useEffect(() => {
+    if (!reconnectConnectionId) return;
+    const el = document.querySelector(
+      `[data-testid="connection-row-${reconnectConnectionId}"]`,
+    );
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [reconnectConnectionId]);
+
   // Cross-tenant identity-leak defence (Layer 3): pre-flight warning
   // modal state. When the user clicks Connect, we first call
   // /identity-preflight; if it returns warn=true, we render a
@@ -1058,9 +1072,11 @@ export function SocialConnectionsList({
                 <tr
                   key={c.id}
                   className={`border-b last:border-b-0 ${
-                    noopdConnection?.id === c.id
-                      ? "bg-amber-50"
-                      : "hover:bg-muted/20"
+                    reconnectConnectionId === c.id
+                      ? "bg-blue-50 ring-1 ring-inset ring-blue-200"
+                      : noopdConnection?.id === c.id
+                        ? "bg-amber-50"
+                        : "hover:bg-muted/20"
                   }`}
                   data-testid={`connection-row-${c.id}`}
                 >

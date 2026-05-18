@@ -56,6 +56,8 @@ async function handle(req: NextRequest): Promise<NextResponse> {
           examined: result.data.examined,
           enqueued: result.data.enqueued,
           failed: result.data.failed,
+          retries_attempted: result.data.retries_attempted,
+          retries_failed: result.data.retries_failed,
         }
       : { reason: result.data.reason }),
   });

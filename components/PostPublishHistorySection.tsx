@@ -27,12 +27,15 @@ import {
 type Attempt = {
   id: string;
   platform: SocialPlatform;
+  connection_id: string | null;
   status: string;
   bundle_post_id: string | null;
   platform_post_url: string | null;
   error_class: string | null;
   retry_count: number;
   original_attempt_id: string | null;
+  next_retry_at: string | null;
+  dead_lettered_at: string | null;
   started_at: string;
   completed_at: string | null;
 };
@@ -71,6 +74,22 @@ const ERROR_LABEL: Record<string, string> = {
   media_invalid: "Media could not be processed",
   unknown: "Unknown error",
 };
+
+function attemptStatusPill(a: Attempt): string {
+  if (a.status === "failed") {
+    if (a.dead_lettered_at) return "bg-gray-200 text-gray-700";
+    if (a.next_retry_at) return "bg-amber-100 text-amber-900";
+  }
+  return STATUS_PILL[a.status] ?? "bg-muted text-muted-foreground";
+}
+
+function attemptStatusLabel(a: Attempt): string {
+  if (a.status === "failed") {
+    if (a.dead_lettered_at) return "Dead-lettered";
+    if (a.next_retry_at) return "Retry scheduled";
+  }
+  return STATUS_LABEL[a.status] ?? a.status;
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("en-AU", {
@@ -202,9 +221,9 @@ export function PostPublishHistorySection({
                   {PLATFORM_LABEL[a.platform] ?? a.platform}
                 </span>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-sm font-medium ${STATUS_PILL[a.status] ?? "bg-muted text-muted-foreground"}`}
+                  className={`rounded-full px-2 py-0.5 text-sm font-medium ${attemptStatusPill(a)}`}
                 >
-                  {STATUS_LABEL[a.status] ?? a.status}
+                  {attemptStatusLabel(a)}
                 </span>
                 {a.retry_count > 0 ? (
                   <span className="text-sm text-muted-foreground">
@@ -216,6 +235,16 @@ export function PostPublishHistorySection({
                 Started {formatDate(a.started_at)}
                 {a.completed_at ? ` · finished ${formatDate(a.completed_at)}` : ""}
               </div>
+              {a.status === "failed" && !a.dead_lettered_at && a.next_retry_at ? (
+                <div className="mt-1 text-sm text-amber-700">
+                  Auto-retry at {formatDate(a.next_retry_at)}
+                </div>
+              ) : null}
+              {a.status === "failed" && a.dead_lettered_at ? (
+                <div className="mt-1 text-sm text-muted-foreground">
+                  No further retries. Use the Retry button to override.
+                </div>
+              ) : null}
               {a.platform_post_url ? (
                 <a
                   href={a.platform_post_url}
@@ -229,6 +258,17 @@ export function PostPublishHistorySection({
               {a.status === "failed" && a.error_class ? (
                 <div className="mt-1 text-sm text-rose-700">
                   {ERROR_LABEL[a.error_class] ?? a.error_class}
+                  {a.error_class === "auth" && a.connection_id ? (
+                    <>
+                      {" "}
+                      <a
+                        href={`/company/social/connections?reconnect=${encodeURIComponent(a.connection_id)}`}
+                        className="underline hover:no-underline"
+                      >
+                        Go to Connections
+                      </a>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
             </div>

@@ -5,6 +5,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
 import { enqueueScheduledPublish } from "./enqueue";
+import { retryPublishAttempt } from "./retry";
 
 // ---------------------------------------------------------------------------
 // S1-19 — backfill QStash messages for schedule entries that were
@@ -38,6 +39,8 @@ export type BackfillResult =
       examined: number;
       enqueued: number;
       failed: number;
+      retries_attempted: number;
+      retries_failed: number;
     }
   | { status: "skipped"; reason: "no_qstash" };
 
@@ -46,22 +49,72 @@ export async function backfillScheduledPublishes(
 ): Promise<ApiResponse<BackfillResult>> {
   if (!input.origin) return validation("origin is required.");
 
-  // Cheap pre-check so we don't even read from the DB if QStash is
-  // unconfigured. We probe via process.env directly because the
-  // enqueue lib's no-op path still reads the row count, which is wasted
-  // work in the env-unset case.
+  const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
+  const svc = getServiceRoleClient();
+  const nowIso = new Date().toISOString();
+
+  // Pass 1: auto-retry — pick up failed attempts whose next_retry_at is due.
+  // This runs regardless of QStash config because retryPublishAttempt calls
+  // bundle.social directly.
+  let retriesAttempted = 0;
+  let retriesFailed = 0;
+  {
+    const retryRows = await svc
+      .from("social_publish_attempts")
+      .select("id")
+      .eq("status", "failed")
+      .is("dead_lettered_at", null)
+      .not("next_retry_at", "is", null)
+      .lte("next_retry_at", nowIso)
+      .limit(limit);
+
+    if (retryRows.error) {
+      logger.warn("social.publish.backfill.retry_read_failed", {
+        err: retryRows.error.message,
+      });
+    } else {
+      for (const row of retryRows.data ?? []) {
+        retriesAttempted += 1;
+        const result = await retryPublishAttempt({ attemptId: row.id as string });
+        if (
+          !result.ok ||
+          result.data.outcome === "publish_failed" ||
+          result.data.outcome === "no_connection" ||
+          result.data.outcome === "connection_degraded"
+        ) {
+          retriesFailed += 1;
+          logger.warn("social.publish.backfill.retry_failed", {
+            attempt_id: row.id,
+            outcome: result.ok ? result.data.outcome : result.error.message,
+          });
+        }
+      }
+    }
+  }
+
+  // Pass 2: enqueue missed schedule entries (requires QStash).
   if (!process.env.QSTASH_TOKEN) {
+    if (retriesAttempted === 0) {
+      return {
+        ok: true,
+        data: { status: "skipped", reason: "no_qstash" },
+        timestamp: new Date().toISOString(),
+      };
+    }
     return {
       ok: true,
-      data: { status: "skipped", reason: "no_qstash" },
+      data: {
+        status: "ok",
+        examined: 0,
+        enqueued: 0,
+        failed: 0,
+        retries_attempted: retriesAttempted,
+        retries_failed: retriesFailed,
+      },
       timestamp: new Date().toISOString(),
     };
   }
 
-  const limit = Math.max(1, Math.min(input.limit ?? 100, 500));
-  const svc = getServiceRoleClient();
-
-  const nowIso = new Date().toISOString();
   const rows = await svc
     .from("social_schedule_entries")
     .select("id, scheduled_at")
@@ -91,8 +144,6 @@ export async function backfillScheduledPublishes(
     if (result.ok && result.data.messageId) {
       enqueued += 1;
     } else if (result.ok) {
-      // QStash unconfigured mid-loop (shouldn't happen — pre-check
-      // above) — count as failed without spamming logs.
       failed += 1;
     } else {
       failed += 1;
@@ -110,6 +161,8 @@ export async function backfillScheduledPublishes(
       examined: candidates.length,
       enqueued,
       failed,
+      retries_attempted: retriesAttempted,
+      retries_failed: retriesFailed,
     },
     timestamp: new Date().toISOString(),
   };
