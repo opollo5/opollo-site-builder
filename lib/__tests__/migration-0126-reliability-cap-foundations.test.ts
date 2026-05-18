@@ -558,6 +558,9 @@ describe("platform_events extended CHECK constraint", () => {
     "campaign_completed", "campaign_paused", "campaign_resumed", "campaign_cancelled",
     "worker_died", "webhook_dispatched", "webhook_dispatch_failed",
     "subscription_disabled", "magic_link_consumed", "service_action_taken",
+    // Pre-0126 types that must not be dropped (0122/0123 additions)
+    "cross_tenant_blocked", "cross_tenant_override", "connection_reattributed",
+    "connection_channel_overdue", "connection_disconnected",
   ] as const;
 
   it.each(newEventTypes)("accepts event_type '%s'", async (eventType) => {

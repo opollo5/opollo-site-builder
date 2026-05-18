@@ -334,10 +334,12 @@ ALTER TABLE platform_events
       -- Connection lifecycle
       'connection_connected',
       'connection_broken', 'connection_expired', 'connection_pre_expiry',
-      'connection_lost',
+      'connection_lost', 'connection_disconnected', 'connection_channel_overdue',
       -- Reconnect lifecycle
       'reconnect_required',
       'reconnect_started', 'reconnect_completed',
+      -- Cross-tenant identity (migration 0122)
+      'cross_tenant_blocked', 'cross_tenant_override', 'connection_reattributed',
       -- Notifications
       'notification_emitted',
       -- Approval lifecycle

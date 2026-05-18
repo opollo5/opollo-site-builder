@@ -18,7 +18,9 @@ ALTER TABLE IF EXISTS platform_events
       'reconnect_started', 'reconnect_completed',
       'connection_broken', 'connection_expired', 'connection_pre_expiry',
       'notification_emitted',
-      'approval_requested', 'approval_granted', 'approval_rejected'
+      'approval_requested', 'approval_granted', 'approval_rejected',
+      'cross_tenant_blocked', 'cross_tenant_override', 'connection_reattributed',
+      'connection_channel_overdue', 'connection_disconnected'
     ));
 
 -- 11. Drop extend_lease RPC
