@@ -1000,3 +1000,55 @@ Site graph replaces HTML-as-canonical with a structured JSON page model. Full ar
 - **Gutenberg block registry** (instead of Custom HTML) — v1 uses `<!-- wp:html -->` wrapper. Future: register an Opollo block plugin on WP and use `<!-- wp:opollo/section -->` with a block.json schema. Trigger is WP block editor compatibility requirement from a client.
 - **`generation_job_pages.pages_id` auto-link** — pre-linking the slot to the M16 pages row is currently done by the batch worker. A migration adding a trigger to auto-populate would eliminate one manual step. Deferred until a second pipeline stage needs the same pattern.
 - **Vision pass on WP drift** — fetch a screenshot of the live WP page and compare visually (not just HTML hash). Trigger is false-positive drift reports on themes that inject dynamic markup post-publish.
+
+---
+
+## Add Development-scoped env vars to opollo-site-builder Vercel project (opened 2026-05-18)
+
+**Tags:** `env`, `dx`, `ops`
+
+**What:** 35 Opollo env vars are configured in Vercel for Preview and/or Production scopes only. `vercel env pull --environment=development` does not fetch them, so a local end-to-end run against real services silently misses them. The following keys are absent from Development scope (verified against `vercel env ls` on 2026-05-18):
+
+Auth / sessions:
+- `COOKIE_SIGNING_SECRET`, `IP_HASH_PEPPER`, `NEXT_PUBLIC_SITE_URL`, `FEATURE_SUPABASE_AUTH`
+
+Feature flags:
+- `FEATURE_DESIGN_SYSTEM_V2`, `DESIGN_CONTEXT_ENABLED`
+
+AI / generation:
+- `OPENAI_API_KEY`
+
+Social posting:
+- `BUNDLE_SOCIAL_API`, `BUNDLE_SOCIAL_TEAMID`, `BUNDLESOCIAL_WEBHOOK_SIGNING_SECRET`
+
+QStash:
+- `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
+
+Cloudflare Images:
+- `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_IMAGES_API_TOKEN`, `CLOUDFLARE_IMAGES_HASH`
+
+Observability (optional, fail-open):
+- `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`
+- `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`
+- `AXIOM_TOKEN`, `AXIOM_DATASET`, `SENTRY_DSN`
+
+Email:
+- `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `SENDGRID_FROM_NAME`
+
+Ops / admin:
+- `OPOLLO_EMERGENCY_KEY`, `CRON_SECRET`, `OPOLLO_FIRST_ADMIN_EMAIL`
+
+Error reporting:
+- `ERROR_REPORT_RECIPIENT`, `OPOLLO_ERROR_REPORTING_ENABLED`, `NEXT_PUBLIC_VERCEL_ENV`
+- `PLATFORM_SERVICE_API_KEY`, `NEXT_PUBLIC_OPOLLO_ERROR_REPORTING_ENABLED`
+
+Build-time only (not needed at runtime):
+- `SENTRY_AUTH_TOKEN`
+
+Note: `docs/auth-decisions.md §21` referenced in the original task does not exist. List is sourced directly from `vercel env ls` output.
+
+**Why deferred:** Not blocking. The app boots and generates content locally with only the Development-scoped keys. Observability and social-posting features degrade gracefully (fail-open). The auth keys (`COOKIE_SIGNING_SECRET`, `IP_HASH_PEPPER`) are the highest-priority gap — sessions sign with a missing secret, which may cause silent failures in auth flows locally.
+
+**Trigger:** Next attempt to run the full app locally against real services, or any local debugging session that hits 401s, broken social connections, missing image uploads, or silent rate-limit failures.
+
+**Scope:** ~15 min. In the Vercel dashboard → opollo-site-builder → Settings → Environment Variables: for each key listed above, expand its row and add `Development` to its scope. Then re-run `vercel env pull .env.local --environment=development` to pick up the new values.
