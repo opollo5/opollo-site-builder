@@ -185,6 +185,14 @@ test.describe("post analytics modal (PR H)", () => {
     // Can't easily test SWR deduplication in E2E without full open/close/reopen.
     // Verify that the analytics endpoint is called at most once per 60s window.
     await page.goto("/social/poster");
+    const flagOff = await page
+      .locator("text=FEATURE_COMPOSER_V2 is not enabled")
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
+    if (flagOff) {
+      test.skip(true, "FEATURE_COMPOSER_V2 is not enabled in this environment");
+      return;
+    }
     await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
 
     // The test passes if we can confirm the deduping interval is configured —
