@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { ComposerMount } from "@/components/composer/composer-mount";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // /company/social/* — session + company guard.
 //
@@ -42,6 +43,17 @@ export default async function CompanySocialLayout({
 
   const composerEnabled = process.env.FEATURE_COMPOSER_V2 === "true";
 
+  let companyTimezone = "UTC";
+  if (composerEnabled && session.company) {
+    const svc = getServiceRoleClient();
+    const { data: tzRow } = await svc
+      .from("platform_companies")
+      .select("timezone")
+      .eq("id", session.company.companyId)
+      .maybeSingle();
+    companyTimezone = (tzRow?.timezone as string | null) ?? "UTC";
+  }
+
   return (
     <>
       {children}
@@ -49,6 +61,7 @@ export default async function CompanySocialLayout({
         <ComposerMount
           companyId={session.company.companyId}
           userId={session.userId}
+          companyTimezone={companyTimezone}
         />
       )}
     </>

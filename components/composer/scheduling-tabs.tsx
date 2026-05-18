@@ -24,6 +24,9 @@ interface SchedulingTabsProps {
   onAddScheduleTime: () => void;
   onRemoveScheduleTime: (index: number) => void;
   disabled?: boolean;
+  // IANA timezone string (e.g. "Australia/Melbourne"). Displayed next
+  // to each time input so users know what timezone they're scheduling in.
+  timezone?: string;
 }
 
 const MAX_TIMES = 10;
@@ -35,6 +38,19 @@ const TABS: { id: ComposerMode | "recurring"; label: string; disabled?: boolean 
   { id: "recurring", label: "Publish regularly", disabled: true },
 ];
 
+function getTimezoneLabel(tz: string | undefined): string {
+  if (!tz) return "UTC";
+  try {
+    const parts = new Intl.DateTimeFormat("en-AU", {
+      timeZone: tz,
+      timeZoneName: "short",
+    }).formatToParts(new Date());
+    return parts.find((p) => p.type === "timeZoneName")?.value ?? tz;
+  } catch {
+    return tz;
+  }
+}
+
 export function SchedulingTabs({
   mode,
   scheduleDate,
@@ -45,8 +61,10 @@ export function SchedulingTabs({
   onAddScheduleTime,
   onRemoveScheduleTime,
   disabled,
+  timezone,
 }: SchedulingTabsProps) {
   const today = new Date().toISOString().slice(0, 10);
+  const tzLabel = getTimezoneLabel(timezone);
 
   return (
     <div className="space-y-3">
@@ -110,7 +128,7 @@ export function SchedulingTabs({
                   aria-label={`Schedule time ${i + 1}`}
                   className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-foreground [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-white/20 disabled:opacity-50"
                 />
-                <span className="text-xs text-muted-foreground">UTC</span>
+                <span className="text-xs text-muted-foreground">{tzLabel}</span>
                 {scheduleTimes.length > 1 && (
                   <button
                     type="button"

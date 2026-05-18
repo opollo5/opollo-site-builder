@@ -43,6 +43,9 @@ interface PostComposerModalProps {
   /** null = new draft; string = load existing draft by ID */
   initialDraftId: string | null;
   correlationId: string;
+  // IANA timezone string for the company (e.g. "Australia/Melbourne").
+  // Passed to SchedulingTabs so users see local times, not UTC.
+  companyTimezone?: string;
 }
 
 const AUTOSAVE_KEY_PREFIX = "composer-draft";
@@ -52,6 +55,7 @@ export function PostComposerModal({
   userId,
   initialDraftId,
   correlationId,
+  companyTimezone,
 }: PostComposerModalProps) {
   const router = useRouter();
   const [state, dispatch] = useReducer(composerReducer, INITIAL_STATE);
@@ -780,6 +784,7 @@ export function PostComposerModal({
               onAddScheduleTime={addScheduleTime}
               onRemoveScheduleTime={removeScheduleTime}
               disabled={isLoading || submitting}
+              timezone={companyTimezone}
             />
 
             {/* Primary action */}

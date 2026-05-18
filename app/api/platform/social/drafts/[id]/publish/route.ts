@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { fromZonedTime } from "date-fns-tz";
 
 import { dbUuid, internalError, invalidState, notFound, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
@@ -202,6 +203,15 @@ export async function POST(
   // 5. Build list of scheduledAt timestamps.
   //    post_now = single entry 2 min from now.
   //    schedule = one entry per time in dd.schedule.times (multi-time support).
+  //    Times entered in the composer are in the company's local timezone;
+  //    convert to UTC using fromZonedTime.
+  const { data: companyRow } = await svc
+    .from("platform_companies")
+    .select("timezone")
+    .eq("id", companyId)
+    .maybeSingle();
+  const companyTimezone = (companyRow?.timezone as string | null) ?? "UTC";
+
   const scheduledAts: string[] = [];
   if (mode === "post_now") {
     scheduledAts.push(new Date(Date.now() + 2 * 60 * 1000).toISOString());
@@ -219,8 +229,11 @@ export async function POST(
       );
     }
     for (const t of times) {
-      const s = `${dd.schedule.date}T${t}:00.000Z`;
-      if (Date.parse(s) <= Date.now()) {
+      // Convert from company local timezone to UTC.
+      const localStr = `${dd.schedule.date}T${t}:00`;
+      const utcDate = fromZonedTime(localStr, companyTimezone);
+      const s = utcDate.toISOString();
+      if (utcDate.getTime() <= Date.now()) {
         return invalidState(`Scheduled time ${t} must be in the future.`);
       }
       scheduledAts.push(s);
