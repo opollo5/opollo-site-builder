@@ -626,7 +626,7 @@ export function PostComposerModal({
 
           {/* Submit error banner */}
           {submitError && (
-            <div className="border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
+            <div role="alert" className="border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
               {submitError}
               <button
                 type="button"
