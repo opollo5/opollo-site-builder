@@ -146,4 +146,27 @@ Example: `2026-05-19 | components/social/composer/RecurrencePicker.tsx:84 | Defa
 
 ## Notes (Claude Code working notes)
 
-Use this section freely. Anything that helped or confused you. Steven reads it after the workstream is done to understand what went well and what didn't.
+Use this section freely. Anything that helped or chose you. Steven reads it after the workstream is done to understand what went well and what didn't.
+
+### PRs A–D completed (2026-05-18/19)
+
+**What went well:**
+
+- The `withHealthMonitoring()` wrapper from PR B composed cleanly into the AI assist and media upload flows without any friction.
+- Splitting MediaTray into a purely presentational component (no file input) and having ContentEditor own the single `<input type="file">` was the right call — it meant both the MediaTray `+` chip and the ToolsRow "Media" button share one upload flow without duplicate event handlers or ref gymnastics.
+- The `PLATFORM_SUPPORTS_LINK` / `PLATFORM_SUPPORTS_CTA` maps in PlatformActionsList made the visibility logic a single `if (!supportsLink && !supportsCta) return null` — easy to extend when platforms add features.
+- Design token audit (`audit:static`) caught two violations during PR C development: `text-[10px]` in MiniCalendar (changed to `text-xs`) and `#fff` hex in ProfileSelector's boxShadow (changed to CSS `white`). Both caught before CI ran.
+
+**Tricky parts / gotchas:**
+
+- `GIPHY_API_KEY` in ENV.md has no `NEXT_PUBLIC_` prefix (server-only), but the GIF picker is a client component. Used `NEXT_PUBLIC_GIPHY_API_KEY` and shows a "not configured" graceful state when absent. This means GIF picker won't work locally unless the env var is added with the public prefix in `.env.local`.
+- `@/components/ui/select` doesn't exist in this codebase — only shadcn primitives that have been explicitly added. Used a native `<select>` in Pagination and PlatformActionsList. No action needed unless you want to add the shadcn Select component.
+- The PR C `use-composer-state` hook test was initially placed in `lib/__tests__/` (node env, no DOM) but `renderHook` from `@testing-library/react` requires jsdom. Moved to `components/__tests__/ComposerState.test.ts` where the jsdom environment is configured. Future hook tests that use DOM APIs belong there, not in `lib/__tests__/`.
+- Test selector collisions: ToolsRow panel headers ("Emoji", "AI assistant", "UTM tags") have the same text as the toolbar buttons. `screen.getByText("Emoji")` finds both. Fix: query for panel-specific child elements (the first emoji button `🎉`, the close button aria-label, the URL input placeholder) instead of the header text.
+- `gh pr merge --auto` bypasses CI on this repo (branch protection doesn't require checks). Always poll `gh pr checks` until all green, then `gh pr merge <PR> --squash` without `--auto`.
+
+**Scope stop — PRs E–I:**
+
+Stopping here per instructions. PRs E (scheduling + approval), F (dashboard), G (bulk CSV), H (analytics modal), and the composite gate are out of scope for this run.
+
+Next steps when resuming: PR E needs `SchedulingCard` + `ApprovalToggle` wired into `ComposerEditor.schedulingSlot`. The slot prop is already threaded through `ComposerOverlay → ComposerEditor`; PR E just needs to provide the slot content.
