@@ -76,6 +76,12 @@ describe("parseCsv — validation errors", () => {
     expect(errors.length).toBeGreaterThan(0);
   });
 
+  test("past date is rejected", () => {
+    const input = HEADER + '"Post",04/01/2024,09:00,LinkedIn';
+    const { errors } = parseCsv(input);
+    expect(errors.some((e) => e.column === "Date" && e.message.includes("future"))).toBe(true);
+  });
+
   test("errors do not include valid rows — invalid row excluded from rows array", () => {
     const input =
       HEADER +
