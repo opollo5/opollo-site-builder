@@ -36,6 +36,9 @@ type SearchParams = {
   // the user tried to connect (already had one). Drives the actionable
   // "already connected" banner + row highlight in SocialConnectionsList.
   attempted_platform?: string;
+  // WS2 reconnect deep link: when set, scrolls to and highlights the
+  // matching connection row so the user can click Reconnect.
+  reconnect?: string;
 };
 
 const REASON_LABEL: Record<string, string> = {
@@ -244,6 +247,7 @@ export default async function CompanySocialConnectionsPage({
                     ? ((searchParams ?? {}).attempted_platform ?? null)
                     : null
                 }
+                reconnectConnectionId={(searchParams ?? {}).reconnect ?? null}
               />
             </section>
           ))

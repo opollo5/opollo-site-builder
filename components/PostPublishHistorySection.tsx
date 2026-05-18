@@ -27,6 +27,7 @@ import {
 type Attempt = {
   id: string;
   platform: SocialPlatform;
+  connection_id: string | null;
   status: string;
   bundle_post_id: string | null;
   platform_post_url: string | null;
@@ -257,6 +258,17 @@ export function PostPublishHistorySection({
               {a.status === "failed" && a.error_class ? (
                 <div className="mt-1 text-sm text-rose-700">
                   {ERROR_LABEL[a.error_class] ?? a.error_class}
+                  {a.error_class === "auth" && a.connection_id ? (
+                    <>
+                      {" "}
+                      <a
+                        href={`/company/social/connections?reconnect=${encodeURIComponent(a.connection_id)}`}
+                        className="underline hover:no-underline"
+                      >
+                        Go to Connections
+                      </a>
+                    </>
+                  ) : null}
                 </div>
               ) : null}
             </div>
