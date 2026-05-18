@@ -64,18 +64,38 @@ export type Draft = {
 export async function createDraft(params: {
   companyId: string;
   userId: string;
+  idempotencyKey?: string;
 }): Promise<ApiResponse<Draft>> {
   const client = getServiceRoleClient();
 
+  // When an idempotency_key is supplied, return the existing draft if one
+  // already exists for (company_id, idempotency_key) — CAP retry safety.
+  if (params.idempotencyKey) {
+    const { data: existing } = await client
+      .from("social_post_drafts")
+      .select()
+      .eq("company_id", params.companyId)
+      .eq("idempotency_key", params.idempotencyKey)
+      .is("archived_at", null)
+      .maybeSingle();
+
+    if (existing) {
+      return { ok: true, data: existing as unknown as Draft, timestamp: new Date().toISOString() };
+    }
+  }
+
+  const insertRow: Record<string, unknown> = {
+    company_id: params.companyId,
+    created_by: params.userId,
+    updated_by: params.userId,
+    draft_version: 1,
+    draft_data: DraftDataSchema.parse({}),
+  };
+  if (params.idempotencyKey) insertRow.idempotency_key = params.idempotencyKey;
+
   const { data, error } = await client
     .from("social_post_drafts")
-    .insert({
-      company_id: params.companyId,
-      created_by: params.userId,
-      updated_by: params.userId,
-      draft_version: 1,
-      draft_data: DraftDataSchema.parse({}),
-    })
+    .insert(insertRow)
     .select()
     .single();
 
