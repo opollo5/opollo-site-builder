@@ -277,18 +277,10 @@ async function mockV2DraftApis(context: import("@playwright/test").BrowserContex
 
 async function openV2Composer(page: import("@playwright/test").Page) {
   await page.goto("/social/poster");
+  await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
 
-  // If the feature flag is off, the page shows a disabled message — skip.
-  const featureOff = await page.locator("text=FEATURE_COMPOSER_V2 is not enabled").isVisible({ timeout: 3_000 }).catch(() => false);
-  if (featureOff) {
-    return false;
-  }
-
-  // Click the "Open composer" button on the placeholder dashboard
-  const openBtn = page.getByRole("button", { name: /open composer/i });
-  if (await openBtn.isVisible({ timeout: 5_000 })) {
-    await openBtn.click();
-  }
+  // Open the composer via the FilterBar "New post" button
+  await page.getByTestId("new-post-btn").click();
 
   // Wait for the overlay
   await expect(page.getByRole("dialog", { name: /compose post|new post/i })).toBeVisible({ timeout: 10_000 });

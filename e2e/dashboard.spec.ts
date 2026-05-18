@@ -76,17 +76,9 @@ async function mockDashboardApis(
 
 async function goToDashboard(page: import("@playwright/test").Page) {
   await page.goto("/social/poster");
-  // Check if feature flag is off
-  const flagOff = await page
-    .locator("text=FEATURE_COMPOSER_V2 is not enabled")
-    .isVisible({ timeout: 3_000 })
-    .catch(() => false);
-  if (flagOff) {
-    test.skip(true, "FEATURE_COMPOSER_V2 is not enabled in this environment");
-    return false;
-  }
-  // Wait for dashboard to mount
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
+  // Wait for SWR fetches to complete so post chips are in the DOM
+  await page.waitForLoadState("networkidle");
   return true;
 }
 
@@ -137,19 +129,17 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const ready = await goToDashboard(page);
     if (!ready) return;
 
-    // Find a future cell (not past, not other-month)
-    // The + button is hidden until hover — use force to click it
-    const addBtn = page.getByTestId("cell-add-btn").first();
-    // Hover the parent cell first to reveal the button
-    const cell = page.getByTestId("calendar-cell").filter({ hasNot: page.locator('[data-testid="calendar-cell"][class*="other-month"]') }).first();
-    await cell.hover();
+    // Find the first non-past, non-other-month cell (these have cell-add-btn rendered)
+    const cellWithAdd = page.getByTestId("calendar-cell").filter({ has: page.getByTestId("cell-add-btn") }).first();
+    // Hover to trigger group:hover → group-hover:flex transition on the button
+    await cellWithAdd.hover();
+    // Scope addBtn to the hovered cell so the hover state applies
+    const addBtn = cellWithAdd.getByTestId("cell-add-btn");
+    // Button transitions from display:none to display:flex on hover — wait for it
+    await expect(addBtn).toBeVisible({ timeout: 2_000 });
+    await addBtn.click();
 
-    // The add button should be visible (via group-hover)
-    // We use force click since CSS :hover-based visibility may not be driven by Playwright hover
-    await addBtn.click({ force: true });
-
-    // Composer overlay should open (if FEATURE_ON, composer renders)
-    // We just check that new-post-btn exists in filter bar as a secondary signal
+    // FilterBar's New post button is always rendered — confirm it's accessible
     await expect(page.getByTestId("new-post-btn")).toBeVisible();
   });
 
