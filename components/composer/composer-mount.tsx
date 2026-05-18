@@ -21,9 +21,10 @@ import { PostComposerModal } from "./post-composer-modal";
 interface ComposerMountProps {
   companyId: string;
   userId: string;
+  companyTimezone?: string;
 }
 
-function ComposerMountInner({ companyId, userId }: ComposerMountProps) {
+function ComposerMountInner({ companyId, userId, companyTimezone }: ComposerMountProps) {
   const searchParams = useSearchParams();
   const compose = searchParams.get("compose");
   const correlationId = useId().replace(/:/g, "");
@@ -39,14 +40,15 @@ function ComposerMountInner({ companyId, userId }: ComposerMountProps) {
       userId={userId}
       initialDraftId={initialDraftId}
       correlationId={correlationId}
+      companyTimezone={companyTimezone}
     />
   );
 }
 
-export function ComposerMount({ companyId, userId }: ComposerMountProps) {
+export function ComposerMount({ companyId, userId, companyTimezone }: ComposerMountProps) {
   return (
     <Suspense fallback={null}>
-      <ComposerMountInner companyId={companyId} userId={userId} />
+      <ComposerMountInner companyId={companyId} userId={userId} companyTimezone={companyTimezone} />
     </Suspense>
   );
 }
