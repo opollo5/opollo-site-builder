@@ -315,7 +315,7 @@ describe("platform_companies timezone provenance", () => {
 // 7. platform_event_subscriptions + deliveries
 // ---------------------------------------------------------------------------
 describe("platform_event_subscriptions + deliveries", () => {
-  it("inserts a subscription and delivery row", async () => {
+  it("inserts a subscription; fan-out trigger creates delivery row on event insert", async () => {
     const svc = getServiceRoleClient();
 
     const { data: sub, error: subErr } = await svc
@@ -331,7 +331,7 @@ describe("platform_event_subscriptions + deliveries", () => {
       .single();
     expect(subErr).toBeNull();
 
-    // Insert an event to get an event_id
+    // Inserting an event fires the fan-out trigger which auto-creates the delivery row.
     const { data: evt, error: evtErr } = await svc
       .from("platform_events")
       .insert({ company_id: COMPANY_ID, event_type: "publish_succeeded" })
@@ -339,16 +339,14 @@ describe("platform_event_subscriptions + deliveries", () => {
       .single();
     expect(evtErr).toBeNull();
 
-    const { error: delivErr } = await svc
+    // Verify the trigger created a delivery row automatically.
+    const { data: deliveries } = await svc
       .from("platform_event_deliveries")
-      .insert({
-        subscription_id: sub!.id,
-        event_id: evt!.id,
-        status: "pending",
-        attempt_count: 0,
-        next_attempt_at: new Date().toISOString(),
-      });
-    expect(delivErr).toBeNull();
+      .select("id, status")
+      .eq("subscription_id", sub!.id)
+      .eq("event_id", evt!.id);
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries![0].status).toBe("pending");
   });
 
   it("rejects duplicate (subscription_id, event_id)", async () => {
@@ -362,6 +360,7 @@ describe("platform_event_subscriptions + deliveries", () => {
       .single();
     if (!sub) return;
 
+    // Inserting the event fires the trigger which creates (sub.id, evt.id) automatically.
     const { data: evt } = await svc
       .from("platform_events")
       .insert({ company_id: COMPANY_ID, event_type: "publish_failed" })
@@ -369,13 +368,7 @@ describe("platform_event_subscriptions + deliveries", () => {
       .single();
     if (!evt) return;
 
-    await svc.from("platform_event_deliveries").insert({
-      subscription_id: sub.id,
-      event_id: evt.id,
-      status: "pending",
-      next_attempt_at: new Date().toISOString(),
-    });
-
+    // Trigger already owns (sub.id, evt.id) — manual insert must be rejected.
     const { error } = await svc.from("platform_event_deliveries").insert({
       subscription_id: sub.id,
       event_id: evt.id,
