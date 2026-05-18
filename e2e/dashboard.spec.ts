@@ -35,21 +35,10 @@ async function mockDashboardApis(
   posts: unknown[] = [],
   hasConnections = true,
 ) {
-  // Mock session / connections endpoint used by the server page
-  // (connections come from server render, so we mock the API that the server calls)
-
-  // Mock calendar-view
-  await context.route("**/api/platform/social/drafts/calendar-view**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        ok: true,
-        data: { posts, range: { from: "2026-01-01", to: "2026-12-31" } },
-        timestamp: new Date().toISOString(),
-      }),
-    });
-  });
+  // IMPORTANT: Playwright uses reverse registration order — last registered wins.
+  // Register the broad wildcard handlers first so the specific calendar-view
+  // mock (registered last) takes highest priority and isn't shadowed by the
+  // `**/drafts/*` pattern that also matches `calendar-view`.
 
   // Mock PATCH draft (reschedule)
   await context.route("**/api/platform/social/drafts/*/", async (route) => {
@@ -72,6 +61,20 @@ async function mockDashboardApis(
       await route.continue();
     }
   });
+
+  // Mock calendar-view — registered LAST so it has highest priority and is
+  // not intercepted by the broader **/drafts/* handler above.
+  await context.route("**/api/platform/social/drafts/calendar-view**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        ok: true,
+        data: { posts, range: { from: "2026-01-01", to: "2026-12-31" } },
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  });
 }
 
 async function goToDashboard(page: import("@playwright/test").Page) {
@@ -87,11 +90,6 @@ test.describe("dashboard — calendar grid (PR F)", () => {
 
   test("(F-1) month view renders calendar grid with day cells", async ({ page, context }) => {
     // Arm the response waiter BEFORE navigation so we don't miss the SWR fetch
-    const calendarFetched = page.waitForResponse(
-      (r) => r.url().includes("/api/platform/social/drafts/calendar-view"),
-      { timeout: 15_000 },
-    );
-
     await mockDashboardApis(context, [makePost()]);
     const ready = await goToDashboard(page);
     if (!ready) return;
@@ -110,10 +108,8 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const count = await cells.count();
     expect(count).toBeGreaterThanOrEqual(28);
 
-    // Wait for SWR to finish so post chips render
-    await calendarFetched;
-
-    // Post chip should be visible for the mocked post
+    // Post chip should be visible for the mocked post (SWR hydrates from the
+    // calendar-view mock; toBeVisible retries for up to 10 s)
     await expect(page.getByTestId("post-chip").first()).toBeVisible();
   });
 
