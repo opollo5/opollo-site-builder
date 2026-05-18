@@ -115,6 +115,30 @@
     {
       "path": "/api/cron/extract-image-metadata",
       "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/cron/publish-due",
+      "schedule": "* * * * *"
+    },
+    {
+      "path": "/api/internal/cron/heartbeat-check",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/cron/health-check",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/cron/cleanup-cache",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/internal/cron/escalate-approvals",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/internal/cron/health-digest",
+      "schedule": "0 23 * * *"
     }
   ]
 }
