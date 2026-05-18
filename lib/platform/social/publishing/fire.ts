@@ -10,6 +10,9 @@ import { getQstashClient } from "@/lib/qstash";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
+import { computeRetryUpdate } from "./auto-retry";
+import { record429 } from "./rate-limits";
+
 // ---------------------------------------------------------------------------
 // S1-18 — fire a scheduled publish (called by the QStash callback).
 //
@@ -385,20 +388,42 @@ async function markAttemptFailed(
   attemptId: string,
   fields: { error_class: string; error_payload: Record<string, unknown> },
 ): Promise<void> {
-  const update = await svc
+  const now = new Date().toISOString();
+
+  const { data: attempt } = await svc
+    .from("social_publish_attempts")
+    .select("retry_count, max_retries, connection_id")
+    .eq("id", attemptId)
+    .maybeSingle();
+
+  const retryCount = (attempt?.retry_count as number | null) ?? 0;
+  const maxRetries = (attempt?.max_retries as number | null) ?? 5;
+  const { next_retry_at, dead_lettered_at } = computeRetryUpdate(
+    retryCount,
+    maxRetries,
+    fields.error_class,
+  );
+
+  const { error } = await svc
     .from("social_publish_attempts")
     .update({
       status: "failed",
       error_class: fields.error_class,
       error_payload: fields.error_payload,
-      completed_at: new Date().toISOString(),
+      completed_at: now,
+      next_retry_at,
+      dead_lettered_at,
     })
     .eq("id", attemptId);
-  if (update.error) {
+  if (error) {
     logger.warn("social.publish.fire.attempt_fail_failed", {
-      err: update.error.message,
+      err: error.message,
       attempt_id: attemptId,
     });
+  }
+
+  if (fields.error_class === "rate_limit" && attempt?.connection_id) {
+    await record429(attempt.connection_id as string);
   }
 }
 
