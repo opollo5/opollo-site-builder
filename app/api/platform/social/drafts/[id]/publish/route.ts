@@ -148,9 +148,10 @@ export async function POST(
     );
   }
 
-  // 4. Auto-approve if the user has the permission.
+  // 4. Auto-approve unless the post explicitly requires a human approval step
+  //    or the user lacks approve_post permission.
   const canApprove = await canDo(companyId, "approve_post");
-  if (!canApprove) {
+  if (!canApprove || dd.approval_required) {
     return NextResponse.json(
       {
         ok: true,
@@ -173,13 +174,16 @@ export async function POST(
     );
   }
 
-  // 5. Schedule (post_now = 2 min from now; schedule = draft schedule time).
-  let scheduledAt: string;
+  // 5. Build list of scheduledAt timestamps.
+  //    post_now = single entry 2 min from now.
+  //    schedule = one entry per time in dd.schedule.times (multi-time support).
+  const scheduledAts: string[] = [];
   if (mode === "post_now") {
-    scheduledAt = new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    scheduledAts.push(new Date(Date.now() + 2 * 60 * 1000).toISOString());
   } else {
     // mode === "schedule"
-    if (!dd.schedule?.date || !dd.schedule.times[0]) {
+    const times = dd.schedule?.times ?? [];
+    if (!dd.schedule?.date || times.length === 0) {
       return NextResponse.json(
         {
           ok: true,
@@ -189,13 +193,16 @@ export async function POST(
         { status: 201 },
       );
     }
-    scheduledAt = `${dd.schedule.date}T${dd.schedule.times[0]}:00.000Z`;
-    if (Date.parse(scheduledAt) <= Date.now()) {
-      return invalidState("Scheduled time must be in the future.");
+    for (const t of times) {
+      const s = `${dd.schedule.date}T${t}:00.000Z`;
+      if (Date.parse(s) <= Date.now()) {
+        return invalidState(`Scheduled time ${t} must be in the future.`);
+      }
+      scheduledAts.push(s);
     }
   }
 
-  // Create one schedule entry per unique platform of selected connections.
+  // Resolve platforms from selected connections.
   const platformsToSchedule = new Set<string>();
   if (dd.target_connection_ids.length > 0) {
     const connectionsResult = await listConnections({ companyId });
@@ -214,16 +221,19 @@ export async function POST(
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
     new URL(req.url).origin;
 
+  // Create one entry per platform × time.
   const scheduleResults = await Promise.allSettled(
-    Array.from(platformsToSchedule).map((platform) =>
-      createScheduleEntry({
-        postMasterId: post.id,
-        companyId,
-        platform: platform as SocialPlatform,
-        scheduledAt,
-        scheduledBy: gate.userId,
-        origin,
-      }),
+    Array.from(platformsToSchedule).flatMap((platform) =>
+      scheduledAts.map((scheduledAt) =>
+        createScheduleEntry({
+          postMasterId: post.id,
+          companyId,
+          platform: platform as SocialPlatform,
+          scheduledAt,
+          scheduledBy: gate.userId,
+          origin,
+        }),
+      ),
     ),
   );
 
@@ -234,7 +244,13 @@ export async function POST(
   return NextResponse.json(
     {
       ok: true,
-      data: { post, state: "approved", scheduled: anyScheduled, scheduledAt: anyScheduled ? scheduledAt : null },
+      data: {
+        post,
+        state: "approved",
+        scheduled: anyScheduled,
+        scheduledAt: anyScheduled ? scheduledAts[0] : null,
+        scheduledAts: anyScheduled ? scheduledAts : [],
+      },
       timestamp: new Date().toISOString(),
     },
     { status: 201 },

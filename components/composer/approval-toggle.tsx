@@ -21,6 +21,7 @@ export function ApprovalToggle({ value, onChange, disabled }: ApprovalToggleProp
         type="button"
         role="switch"
         aria-checked={value}
+        aria-label="Post needs approval"
         disabled={disabled}
         onClick={() => onChange(!value)}
         className={[

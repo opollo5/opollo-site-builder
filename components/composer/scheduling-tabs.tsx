@@ -3,12 +3,12 @@
 import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 2 — SchedulingTabs.
+// Spec 22 — SchedulingTabs.
 //
 // Four-tab row: Post now | Schedule | Save as draft | Publish regularly
 // (last tab is disabled stub per spec §3 exclusions).
 //
-// When mode === "schedule", renders date + time inputs below the tab bar.
+// When mode === "schedule", renders a date picker + up to 10 time inputs.
 // Times are in UTC (V1); timezone picker is a follow-up.
 // ---------------------------------------------------------------------------
 
@@ -16,13 +16,17 @@ export type ComposerMode = "post_now" | "schedule" | "draft";
 
 interface SchedulingTabsProps {
   mode: ComposerMode;
-  scheduleDate: string;    // YYYY-MM-DD
-  scheduleTime: string;    // HH:MM
+  scheduleDate: string;     // YYYY-MM-DD
+  scheduleTimes: string[];  // HH:MM[], min 1 when in schedule mode
   onModeChange: (mode: ComposerMode) => void;
   onScheduleDate: (date: string) => void;
-  onScheduleTime: (time: string) => void;
+  onScheduleTime: (time: string, index: number) => void;
+  onAddScheduleTime: () => void;
+  onRemoveScheduleTime: (index: number) => void;
   disabled?: boolean;
 }
+
+const MAX_TIMES = 10;
 
 const TABS: { id: ComposerMode | "recurring"; label: string; disabled?: boolean }[] = [
   { id: "post_now", label: "Post now" },
@@ -34,13 +38,14 @@ const TABS: { id: ComposerMode | "recurring"; label: string; disabled?: boolean 
 export function SchedulingTabs({
   mode,
   scheduleDate,
-  scheduleTime,
+  scheduleTimes,
   onModeChange,
   onScheduleDate,
   onScheduleTime,
+  onAddScheduleTime,
+  onRemoveScheduleTime,
   disabled,
 }: SchedulingTabsProps) {
-  // Today's date in YYYY-MM-DD for min attribute.
   const today = new Date().toISOString().slice(0, 10);
 
   return (
@@ -78,9 +83,10 @@ export function SchedulingTabs({
 
       {/* Date / time pickers — only shown in Schedule mode */}
       {mode === "schedule" && (
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-start gap-3">
+          {/* Date */}
           <div className="flex items-center gap-2">
-            <NavIcon name="calendar-full" size={14} className="text-muted-foreground" />
+            <NavIcon name="calendar-full" size={14} className="shrink-0 text-muted-foreground" />
             <input
               type="date"
               value={scheduleDate}
@@ -90,16 +96,45 @@ export function SchedulingTabs({
               className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-foreground [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-white/20 disabled:opacity-50"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <NavIcon name="clock" size={14} className="text-muted-foreground" />
-            <input
-              type="time"
-              value={scheduleTime}
-              onChange={(e) => onScheduleTime(e.target.value)}
-              disabled={disabled}
-              className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-foreground [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-white/20 disabled:opacity-50"
-            />
-            <span className="text-xs text-muted-foreground">UTC</span>
+
+          {/* Times list */}
+          <div className="flex flex-col gap-1.5">
+            {scheduleTimes.map((t, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <NavIcon name="clock" size={14} className="shrink-0 text-muted-foreground" />
+                <input
+                  type="time"
+                  value={t}
+                  onChange={(e) => onScheduleTime(e.target.value, i)}
+                  disabled={disabled}
+                  aria-label={`Schedule time ${i + 1}`}
+                  className="rounded-md border border-white/10 bg-white/[0.03] px-3 py-1.5 text-sm text-foreground [color-scheme:dark] focus:outline-none focus:ring-1 focus:ring-white/20 disabled:opacity-50"
+                />
+                <span className="text-xs text-muted-foreground">UTC</span>
+                {scheduleTimes.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => onRemoveScheduleTime(i)}
+                    disabled={disabled}
+                    aria-label={`Remove time ${i + 1}`}
+                    className="text-muted-foreground hover:text-destructive disabled:opacity-40"
+                  >
+                    <NavIcon name="cross" size={12} />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            {scheduleTimes.length < MAX_TIMES && (
+              <button
+                type="button"
+                onClick={onAddScheduleTime}
+                disabled={disabled}
+                className="self-start text-xs text-muted-foreground hover:text-foreground disabled:opacity-40"
+              >
+                + Add time
+              </button>
+            )}
           </div>
         </div>
       )}

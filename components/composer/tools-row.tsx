@@ -5,13 +5,9 @@ import { useRef, useState } from "react";
 import { NavIcon } from "@/components/ui/nav-icon";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 2 — ToolsRow.
+// Spec 22 — ToolsRow.
 //
-// Emoji | GIF (stub) | UTM (stub) | Add tag (stub) | AI Assistant (stub → PR 4)
-//
-// Emoji: a small popover with 24 common emojis that appends to the textarea
-// value. GIF / UTM / Add tag / AI Assistant show "coming in a future update"
-// tooltips; the AI Assistant button slot is wired in PR 4.
+// Emoji | GIF | Link/UTM | Add tag | AI Assistant
 // ---------------------------------------------------------------------------
 
 const COMMON_EMOJIS = [
@@ -22,11 +18,21 @@ const COMMON_EMOJIS = [
 
 interface ToolsRowProps {
   onEmojiInsert: (emoji: string) => void;
+  onGifClick?: () => void;
+  onLinkClick?: () => void;
+  onTagClick?: () => void;
   onAIAssistant?: () => void;
   disabled?: boolean;
 }
 
-export function ToolsRow({ onEmojiInsert, onAIAssistant, disabled }: ToolsRowProps) {
+export function ToolsRow({
+  onEmojiInsert,
+  onGifClick,
+  onLinkClick,
+  onTagClick,
+  onAIAssistant,
+  disabled,
+}: ToolsRowProps) {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const emojiRef = useRef<HTMLDivElement>(null);
 
@@ -65,41 +71,46 @@ export function ToolsRow({ onEmojiInsert, onAIAssistant, disabled }: ToolsRowPro
         )}
       </div>
 
-      {/* GIF stub */}
+      {/* GIF */}
       <button
         type="button"
-        disabled
-        title="GIF picker — coming soon"
-        aria-label="GIF"
-        className="rounded px-2 py-1.5 text-xs font-medium text-muted-foreground/50"
+        disabled={disabled || !onGifClick}
+        onClick={onGifClick}
+        title="GIF"
+        aria-label="Insert GIF"
+        data-testid="gif-button"
+        className="rounded px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-white/10 hover:text-foreground disabled:opacity-40"
       >
         GIF
       </button>
 
-      {/* UTM stub */}
+      {/* Link / UTM */}
       <button
         type="button"
-        disabled
-        title="UTM tags — coming soon"
-        aria-label="UTM tags"
-        className="rounded p-1.5 text-muted-foreground/50"
+        disabled={disabled || !onLinkClick}
+        onClick={onLinkClick}
+        title="Insert link / UTM"
+        aria-label="Insert link"
+        data-testid="link-button"
+        className="rounded p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground disabled:opacity-40"
       >
         <NavIcon name="link" size={16} />
       </button>
 
-      {/* Add tag stub */}
+      {/* Add tag */}
       <button
         type="button"
-        disabled
-        title="Add tag — coming soon"
-        aria-label="Add tag"
-        className="rounded p-1.5 text-muted-foreground/50"
+        disabled={disabled || !onTagClick}
+        onClick={onTagClick}
+        title="Add hashtag"
+        aria-label="Add hashtag"
+        data-testid="tag-button"
+        className="rounded p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground disabled:opacity-40"
       >
         <NavIcon name="tag" size={16} />
       </button>
 
       <div className="ml-auto">
-        {/* AI Assistant — placeholder; PR 4 wires the inline expansion */}
         <button
           type="button"
           disabled={disabled || !onAIAssistant}

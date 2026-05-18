@@ -29,6 +29,8 @@ jobs:
       # Force the admin gate ON so E2E exercises the real Supabase
       # Auth flow (matches the webServer config in playwright.config).
       FEATURE_SUPABASE_AUTH: "true"
+      # Enable the social post composer (Spec 22) so E2E can exercise it.
+      FEATURE_COMPOSER_V2: "true"
       # Deterministic key — matches what lib/__tests__/_setup.ts seeds
       # for the vitest suite. Never used for production-grade
       # encryption; this stack is ephemeral.

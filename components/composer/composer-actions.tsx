@@ -47,6 +47,7 @@ export function ComposerActions({
       {/* Primary action */}
       <button
         type="button"
+        data-testid="composer-submit"
         onClick={onSubmit}
         disabled={disabled || submitting}
         className="min-w-[100px] rounded-md bg-pk px-4 py-2 text-sm font-medium text-white hover:bg-pk/80 disabled:opacity-50"

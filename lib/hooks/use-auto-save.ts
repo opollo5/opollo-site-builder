@@ -60,6 +60,13 @@ export interface UseAutoSaveOptions<T> {
   onError?: (err: Error) => void;
   /** When false, the hook is fully inert. Use for read-only views. */
   enabled?: boolean;
+  /**
+   * When true, a JSON snapshot is also written to localStorage under
+   * `autosave_backup:<key>` after every successful server save. This
+   * provides a client-side recovery layer if the server is unreachable
+   * on reload.
+   */
+  localStorageBackup?: boolean;
 }
 
 const NORMAL_CADENCE_MS = 60_000;
@@ -75,7 +82,7 @@ export function useAutoSave<T>(opts: UseAutoSaveOptions<T>): {
   /** Manually flush a save right now (still respects dirty + leader gates). */
   flush: () => Promise<void>;
 } {
-  const { key, getValue, save, serialize, onSuccess, onError, enabled = true } = opts;
+  const { key, getValue, save, serialize, onSuccess, onError, enabled = true, localStorageBackup = false } = opts;
 
   const grace = useSessionGrace();
   const { isLeader } = useTabLeader(`autosave:${key}`);
@@ -119,6 +126,9 @@ export function useAutoSave<T>(opts: UseAutoSaveOptions<T>): {
       setLastSavedAt(Date.now());
       setStatus("saved");
       setError(null);
+      if (localStorageBackup) {
+        try { localStorage.setItem(`autosave_backup:${key}`, serialized); } catch { /* quota / private mode */ }
+      }
       onSuccess?.(value);
     } catch (err) {
       const e = err instanceof Error ? err : new Error(String(err));
@@ -130,7 +140,7 @@ export function useAutoSave<T>(opts: UseAutoSaveOptions<T>): {
     } finally {
       inFlightRef.current = false;
     }
-  }, [enabled, isLeader, getValue, ser, save, onSuccess, onError]);
+  }, [enabled, isLeader, getValue, ser, save, onSuccess, onError, key, localStorageBackup]);
 
   // Mark dirty on any value change so the UI's status pill flips even
   // before the next tick.

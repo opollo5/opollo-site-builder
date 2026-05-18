@@ -11,7 +11,7 @@ import type { ApiResponse } from "@/lib/tool-schemas";
 // ---------------------------------------------------------------------------
 
 export const MediaRefSchema = z.object({
-  type: z.enum(["upload", "ai_generated", "istock"]),
+  type: z.enum(["upload", "ai_generated", "istock", "tenor_gif"]),
   url: z.string().url(),
   cloudflare_id: z.string().optional(),
   alt_text: z.string().optional(),
