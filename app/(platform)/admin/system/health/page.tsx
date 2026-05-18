@@ -4,11 +4,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
-import {
-  ServiceStatusGrid,
-  computeServiceStatuses,
-} from "@/components/admin/health/ServiceStatusGrid";
+import { ServiceStatusGrid } from "@/components/admin/health/ServiceStatusGrid";
 import { EventTimeline } from "@/components/admin/health/EventTimeline";
+import { computeServiceStatuses } from "@/lib/platform/service-health/status";
 import type { ServiceHealthEvent } from "@/lib/platform/service-health/types";
 
 export const dynamic = "force-dynamic";

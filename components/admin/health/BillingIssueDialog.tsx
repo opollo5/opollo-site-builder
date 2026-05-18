@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { MONITORED_SERVICES } from "./ServiceStatusGrid";
+import { MONITORED_SERVICES } from "@/lib/platform/service-health/status";
 
 interface Props {
   defaultService: string;
