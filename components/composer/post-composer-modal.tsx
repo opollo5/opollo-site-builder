@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { toastSuccess } from "@/lib/toast-success";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useAutoSave } from "@/lib/hooks/use-auto-save";
-import type { DraftData } from "@/lib/platform/social/drafts";
+import type { DraftData, MediaRef } from "@/lib/platform/social/drafts";
 import type { SocialConnection } from "@/lib/platform/social/connections/types";
 import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
@@ -17,23 +18,22 @@ import { ApprovalToggle } from "./approval-toggle";
 import { ComposerActions } from "./composer-actions";
 import { ComposerPreview } from "./composer-preview";
 import { ComposerTextarea } from "./composer-textarea";
+import { GifPickerPanel } from "./gif-picker";
 import { ImageUploadZone } from "./image-upload-zone";
+import { LinkModal } from "./link-modal";
 import { ProfileSelector } from "./profile-selector";
 import type { ComposerMode } from "./scheduling-tabs";
 import { SchedulingTabs } from "./scheduling-tabs";
+import { TagPickerPanel } from "./tag-picker";
 import { ToolsRow } from "./tools-row";
 import {
   composerReducer,
   INITIAL_STATE,
 } from "./use-composer-reducer";
-import type { ComposerError, Draft } from "./use-composer-reducer";
+import type { Draft } from "./use-composer-reducer";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 3 — PostComposerModal with live preview pane.
-//
-// PR 2 shipped all editor components. PR 3 replaces the right-pane
-// placeholder with ComposerPreview (LivePreviewCard per platform +
-// MiniCalendarPreview on the Calendar tab).
+// Spec 22 — PostComposerModal.
 // ---------------------------------------------------------------------------
 
 interface PostComposerModalProps {
@@ -64,15 +64,24 @@ export function PostComposerModal({
   const [scheduleDate, setScheduleDate] = useState(
     () => new Date().toISOString().slice(0, 10),
   );
-  const [scheduleTime, setScheduleTime] = useState("09:00");
+  const [scheduleTimes, setScheduleTimes] = useState<string[]>(["09:00"]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Connections list — loaded by ProfileSelector, also needed for publish call.
   const [connections, setConnections] = useState<SocialConnection[]>([]);
 
-  // AI assistant panel open/close.
+  // Auto-select guard: only fires once per new draft session.
+  const autoSelectedRef = useRef(false);
+
+  // Tool panels.
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [gifPanelOpen, setGifPanelOpen] = useState(false);
+  const [tagPanelOpen, setTagPanelOpen] = useState(false);
+  const [linkModalOpen, setLinkModalOpen] = useState(false);
+
+  // Dirty-close confirm dialog.
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false);
 
   // ---------------------------------------------------------------------------
   // Initialise: create or load draft on mount
@@ -132,6 +141,27 @@ export function PostComposerModal({
   }, []);
 
   // ---------------------------------------------------------------------------
+  // FIX 4: Auto-select up to 5 healthy connections for new drafts.
+  // ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    if (initialDraftId !== null) return;
+    if (autoSelectedRef.current) return;
+    const s = state;
+    if (
+      (s.status === "editing" || s.status === "saved") &&
+      s.draft.draft_data.target_connection_ids.length === 0 &&
+      connections.length > 0
+    ) {
+      const healthy = connections.filter((c) => c.status === "healthy").slice(0, 5);
+      if (healthy.length > 0) {
+        autoSelectedRef.current = true;
+        dispatch({ type: "UPDATE_DRAFT", patch: { target_connection_ids: healthy.map((c) => c.id) } });
+      }
+    }
+  }, [state, connections, initialDraftId]);
+
+  // ---------------------------------------------------------------------------
   // Helpers to update draft_data fields
   // ---------------------------------------------------------------------------
 
@@ -147,7 +177,7 @@ export function PostComposerModal({
     dispatch({ type: "UPDATE_DRAFT", patch: { target_connection_ids: ids } });
   }, []);
 
-  const updateMediaRef = useCallback((ref: import("@/lib/platform/social/drafts").MediaRef | null) => {
+  const updateMediaRef = useCallback((ref: MediaRef | null) => {
     dispatch({ type: "UPDATE_DRAFT", patch: { media_refs: ref ? [ref] : [] } });
   }, []);
 
@@ -160,6 +190,13 @@ export function PostComposerModal({
     if (s.status !== "editing" && s.status !== "saved") return;
     const text = s.draft.draft_data.master_text ?? "";
     dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text + emoji } });
+  }, []);
+
+  const insertTag = useCallback((tag: string) => {
+    const s = stateRef.current;
+    if (s.status !== "editing" && s.status !== "saved") return;
+    const text = s.draft.draft_data.master_text ?? "";
+    dispatch({ type: "UPDATE_DRAFT", patch: { master_text: text ? `${text} ${tag}` : tag } });
   }, []);
 
   const aiReplace = useCallback((text: string, meta: AiMeta) => {
@@ -186,16 +223,43 @@ export function PostComposerModal({
     setScheduleDate(date);
     const s = stateRef.current;
     if (s.status !== "editing" && s.status !== "saved") return;
-    const times = s.draft.draft_data.schedule?.times ?? [scheduleTime];
-    dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date, times } } });
-  }, [scheduleTime]);
+    dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date, times: scheduleTimes } } });
+  }, [scheduleTimes]);
 
-  const updateScheduleTime = useCallback((time: string) => {
-    setScheduleTime(time);
-    const s = stateRef.current;
-    if (s.status !== "editing" && s.status !== "saved") return;
-    const date = s.draft.draft_data.schedule?.date ?? scheduleDate;
-    dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date, times: [time] } } });
+  const updateScheduleTime = useCallback((time: string, index: number) => {
+    setScheduleTimes((prev) => {
+      const next = [...prev];
+      next[index] = time;
+      const s = stateRef.current;
+      if (s.status === "editing" || s.status === "saved") {
+        dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date: scheduleDate, times: next } } });
+      }
+      return next;
+    });
+  }, [scheduleDate]);
+
+  const addScheduleTime = useCallback(() => {
+    setScheduleTimes((prev) => {
+      if (prev.length >= 10) return prev;
+      const next = [...prev, "09:00"];
+      const s = stateRef.current;
+      if (s.status === "editing" || s.status === "saved") {
+        dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date: scheduleDate, times: next } } });
+      }
+      return next;
+    });
+  }, [scheduleDate]);
+
+  const removeScheduleTime = useCallback((index: number) => {
+    setScheduleTimes((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      const s = stateRef.current;
+      if (s.status === "editing" || s.status === "saved") {
+        dispatch({ type: "UPDATE_DRAFT", patch: { schedule: { date: scheduleDate, times: next } } });
+      }
+      return next;
+    });
   }, [scheduleDate]);
 
   // ---------------------------------------------------------------------------
@@ -357,21 +421,32 @@ export function PostComposerModal({
   }, [mode, companyId, correlationId, flush, router]);
 
   // ---------------------------------------------------------------------------
-  // Close
+  // Close — FIX 5: show confirm dialog when draft is dirty
   // ---------------------------------------------------------------------------
 
-  const handleClose = useCallback(async () => {
-    const s = stateRef.current;
-    const dirty = s.status === "editing" && s.dirty;
-    if (dirty) {
-      try { await flush(); } catch { /* ignore */ }
-    }
+  const doClose = useCallback(() => {
     const url = new URL(window.location.href);
     url.searchParams.delete("compose");
     url.searchParams.delete("date");
     router.replace(url.pathname + (url.search || ""), { scroll: false });
     dispatch({ type: "RESET" });
-  }, [flush, router]);
+  }, [router]);
+
+  const handleClose = useCallback(async () => {
+    const s = stateRef.current;
+    const dirty = s.status === "editing" && s.dirty;
+    if (dirty) {
+      // Try a background flush; if it fails or draft has meaningful content, confirm.
+      const dd = s.draft.draft_data;
+      const hasContent = !!(dd.master_text?.trim() || dd.link_url?.trim() || dd.media_refs.length > 0);
+      if (hasContent) {
+        setConfirmCloseOpen(true);
+        return;
+      }
+      try { await flush(); } catch { /* ignore */ }
+    }
+    doClose();
+  }, [flush, doClose]);
 
   // ---------------------------------------------------------------------------
   // Keyboard: Esc closes, focus trap
@@ -421,7 +496,9 @@ export function PostComposerModal({
     )];
   })();
 
-  const canSubmit = !isLoading && !submitting && !!draftData &&
+  // FIX 3: block submit when no accounts selected.
+  const hasAccounts = (draftData?.target_connection_ids ?? []).length > 0;
+  const canSubmit = !isLoading && !submitting && !!draftData && hasAccounts &&
     (!!draftData.master_text?.trim() || !!draftData.link_url?.trim());
 
   // ---------------------------------------------------------------------------
@@ -429,211 +506,259 @@ export function PostComposerModal({
   // ---------------------------------------------------------------------------
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={initialDraftId ? "Edit post" : "New post"}
-      className="fixed inset-0 z-50 flex items-stretch"
-    >
-      {/* Backdrop */}
+    <>
       <div
-        className="absolute inset-0 bg-black/60"
-        aria-hidden="true"
-        onClick={() => void handleClose()}
-      />
-
-      {/* Modal panel */}
-      <div
-        ref={modalRef}
-        className="relative z-10 m-auto flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-white/10 bg-background shadow-2xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label={initialDraftId ? "Edit post" : "New post"}
+        className="fixed inset-0 z-50 flex items-stretch"
       >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
-          <h2 className="text-base font-semibold">
-            {initialDraftId ? "Edit post" : "New post"}
-          </h2>
-          <div className="flex items-center gap-3">
-            {saveStatus === "saving" && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <span className="inline-flex animate-spin">
-                  <NavIcon name="sync" size={12} />
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/60"
+          aria-hidden="true"
+          onClick={() => void handleClose()}
+        />
+
+        {/* Modal panel */}
+        <div
+          ref={modalRef}
+          className="relative z-10 m-auto flex h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-white/10 bg-background shadow-2xl"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+            <h2 className="text-base font-semibold">
+              {initialDraftId ? "Edit post" : "New post"}
+            </h2>
+            <div className="flex items-center gap-3">
+              {saveStatus === "saving" && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground" aria-live="polite" aria-label="Saving draft">
+                  <span className="inline-flex animate-spin">
+                    <NavIcon name="sync" size={12} />
+                  </span>
+                  Saving…
                 </span>
-                Saving…
-              </span>
-            )}
-            {saveStatus === "saved" && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <NavIcon name="checkmark-circle" size={12} />
-                Saved
-              </span>
-            )}
-            {saveStatus === "error" && (
-              <span className="text-xs text-destructive">Save failed — retrying</span>
-            )}
-            <button
-              ref={firstFocusRef}
-              type="button"
-              onClick={() => void handleClose()}
-              aria-label="Close composer"
-              className="rounded p-1 text-muted-foreground hover:bg-white/10 hover:text-foreground"
-            >
-              <NavIcon name="cross" size={18} />
-            </button>
+              )}
+              {saveStatus === "saved" && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground" aria-live="polite" aria-label="Draft saved">
+                  <NavIcon name="checkmark-circle" size={12} />
+                  Saved
+                </span>
+              )}
+              {saveStatus === "error" && (
+                <span className="text-xs text-destructive" aria-live="assertive">Save failed — retrying</span>
+              )}
+              <button
+                ref={firstFocusRef}
+                type="button"
+                onClick={() => void handleClose()}
+                aria-label="Close composer"
+                className="rounded p-1 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+              >
+                <NavIcon name="cross" size={18} />
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Conflict banner */}
-        {isConflict && (
-          <div className="border-b border-amber-500/30 bg-amber-500/10 px-6 py-3 text-sm text-amber-200">
-            <span className="font-medium">Draft updated elsewhere.</span>{" "}
-            <button
-              type="button"
-              onClick={() => dispatch({ type: "CONFLICT_RESOLVED_RELOAD" })}
-              className="underline hover:no-underline"
+          {/* Conflict banner */}
+          {isConflict && (
+            <div className="border-b border-amber-500/30 bg-amber-500/10 px-6 py-3 text-sm text-amber-200">
+              <span className="font-medium">Draft updated elsewhere.</span>{" "}
+              <button
+                type="button"
+                onClick={() => dispatch({ type: "CONFLICT_RESOLVED_RELOAD" })}
+                className="underline hover:no-underline"
+              >
+                Reload latest
+              </button>{" "}
+              or continue editing (your changes will overwrite on next save).
+            </div>
+          )}
+
+          {/* Submit error banner */}
+          {submitError && (
+            <div className="border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
+              {submitError}
+              <button
+                type="button"
+                onClick={() => setSubmitError(null)}
+                className="ml-2 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Body — split panes */}
+          <div className="flex min-h-0 flex-1">
+            {/* Left pane — editor (60%) */}
+            <div
+              className={cn(
+                "flex w-[60%] flex-col border-r border-white/10",
+                (isLoading || isLoadFailed) && "items-center justify-center",
+              )}
             >
-              Reload latest
-            </button>{" "}
-            or continue editing (your changes will overwrite on next save).
-          </div>
-        )}
-
-        {/* Submit error banner */}
-        {submitError && (
-          <div className="border-b border-destructive/30 bg-destructive/10 px-6 py-2 text-xs text-destructive">
-            {submitError}
-            <button
-              type="button"
-              onClick={() => setSubmitError(null)}
-              className="ml-2 underline"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Body — split panes */}
-        <div className="flex min-h-0 flex-1">
-          {/* Left pane — editor (60%).
-              Centering applied directly on the pane (which has a well-defined
-              height from the flex-row body) so items-center/justify-center
-              works reliably in the loading/error states without a flex-1 inner
-              wrapper that can collapse inside overflow-y-auto. */}
-          <div
-            className={cn(
-              "flex w-[60%] flex-col border-r border-white/10",
-              (isLoading || isLoadFailed) && "items-center justify-center",
-            )}
-          >
-            {isLoadFailed && state.status === "load_failed" ? (
-              <div className="flex flex-col items-center gap-3 p-6 text-center">
-                <p className="text-sm text-destructive">
-                  {state.error.message}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => void handleClose()}
-                  className="text-xs text-muted-foreground underline hover:text-foreground"
-                >
-                  Close
-                </button>
-              </div>
-            ) : isLoading ? (
-              <span className="inline-flex animate-spin text-muted-foreground">
-                <NavIcon name="sync" size={24} />
-              </span>
-            ) : (
-              <div className="flex flex-col gap-4 overflow-y-auto p-6">
-                {/* Profile selector */}
-                <ProfileSelector
-                  companyId={companyId}
-                  selectedIds={draftData?.target_connection_ids ?? []}
-                  onChange={updateConnections}
-                  onConnectionsLoaded={setConnections}
-                  disabled={submitting}
-                />
-
-                {/* Composer textarea */}
-                <ComposerTextarea
-                  value={draftData?.master_text ?? ""}
-                  linkUrl={draftData?.link_url}
-                  selectedPlatforms={selectedPlatforms}
-                  onChange={updateText}
-                  onLinkUrl={updateLinkUrl}
-                  disabled={submitting}
-                />
-
-                {/* Image upload zone */}
-                <ImageUploadZone
-                  companyId={companyId}
-                  mediaRef={draftData?.media_refs[0] ?? null}
-                  onSelect={updateMediaRef}
-                  disabled={submitting}
-                />
-
-                {/* Tools row */}
-                <ToolsRow
-                  onEmojiInsert={insertEmoji}
-                  onAIAssistant={() => setAiPanelOpen((v) => !v)}
-                  disabled={submitting}
-                />
-
-                {/* AI assistant inline panel */}
-                {aiPanelOpen && (
-                  <AiAssistantPanel
+              {isLoadFailed && state.status === "load_failed" ? (
+                <div className="flex flex-col items-center gap-3 p-6 text-center">
+                  <p className="text-sm text-destructive">
+                    {state.error.message}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleClose()}
+                    className="text-xs text-muted-foreground underline hover:text-foreground"
+                  >
+                    Close
+                  </button>
+                </div>
+              ) : isLoading ? (
+                <span className="inline-flex animate-spin text-muted-foreground">
+                  <NavIcon name="sync" size={24} />
+                </span>
+              ) : (
+                <div className="flex flex-col gap-4 overflow-y-auto p-6">
+                  {/* Profile selector */}
+                  <ProfileSelector
                     companyId={companyId}
-                    correlationId={correlationId}
-                    onReplace={aiReplace}
-                    onAppend={aiAppend}
-                    onClose={() => setAiPanelOpen(false)}
+                    selectedIds={draftData?.target_connection_ids ?? []}
+                    onChange={updateConnections}
+                    onConnectionsLoaded={setConnections}
+                    disabled={submitting}
                   />
-                )}
 
-                {/* Approval toggle */}
-                <ApprovalToggle
-                  value={draftData?.approval_required ?? false}
-                  onChange={updateApproval}
-                  disabled={submitting}
-                />
-              </div>
-            )}
+                  {/* FIX 3: zero-account warning */}
+                  {!isLoading && draftData && !hasAccounts && (
+                    <p className="text-xs text-amber-400" role="alert">
+                      Select at least one account to publish.
+                    </p>
+                  )}
+
+                  {/* Composer textarea */}
+                  <ComposerTextarea
+                    value={draftData?.master_text ?? ""}
+                    linkUrl={draftData?.link_url}
+                    selectedPlatforms={selectedPlatforms}
+                    onChange={updateText}
+                    onLinkUrl={updateLinkUrl}
+                    disabled={submitting}
+                  />
+
+                  {/* Image upload zone */}
+                  <ImageUploadZone
+                    companyId={companyId}
+                    mediaRef={draftData?.media_refs[0] ?? null}
+                    onSelect={updateMediaRef}
+                    disabled={submitting}
+                  />
+
+                  {/* Tools row */}
+                  <ToolsRow
+                    onEmojiInsert={insertEmoji}
+                    onGifClick={() => { setGifPanelOpen((v) => !v); setTagPanelOpen(false); }}
+                    onLinkClick={() => setLinkModalOpen(true)}
+                    onTagClick={() => { setTagPanelOpen((v) => !v); setGifPanelOpen(false); }}
+                    onAIAssistant={() => { setAiPanelOpen((v) => !v); setGifPanelOpen(false); setTagPanelOpen(false); }}
+                    disabled={submitting}
+                  />
+
+                  {/* GIF picker inline panel */}
+                  {gifPanelOpen && (
+                    <GifPickerPanel
+                      onSelect={(ref) => updateMediaRef(ref)}
+                      onClose={() => setGifPanelOpen(false)}
+                    />
+                  )}
+
+                  {/* Tag picker inline panel */}
+                  {tagPanelOpen && (
+                    <TagPickerPanel
+                      draftText={draftData?.master_text ?? ""}
+                      onInsert={insertTag}
+                      onClose={() => setTagPanelOpen(false)}
+                    />
+                  )}
+
+                  {/* AI assistant inline panel */}
+                  {aiPanelOpen && (
+                    <AiAssistantPanel
+                      companyId={companyId}
+                      correlationId={correlationId}
+                      onReplace={aiReplace}
+                      onAppend={aiAppend}
+                      onClose={() => setAiPanelOpen(false)}
+                    />
+                  )}
+
+                  {/* FIX 6: ApprovalToggle hidden in "post_now" mode */}
+                  {mode !== "post_now" && (
+                    <ApprovalToggle
+                      value={draftData?.approval_required ?? false}
+                      onChange={updateApproval}
+                      disabled={submitting}
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Right pane — preview (40%) */}
+            <div className="flex w-[40%] flex-col overflow-y-auto">
+              <ComposerPreview
+                draftData={draftData}
+                selectedPlatforms={selectedPlatforms}
+                connections={connections}
+                mode={mode}
+                scheduleDate={scheduleDate}
+                scheduleTime={scheduleTimes[0] ?? "09:00"}
+              />
+            </div>
           </div>
 
-          {/* Right pane — preview (40%) */}
-          <div className="flex w-[40%] flex-col overflow-y-auto">
-            <ComposerPreview
-              draftData={draftData}
-              selectedPlatforms={selectedPlatforms}
-              connections={connections}
+          {/* Footer */}
+          <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
+            {/* Scheduling tabs — FIX 10: multi-time */}
+            <SchedulingTabs
               mode={mode}
               scheduleDate={scheduleDate}
-              scheduleTime={scheduleTime}
+              scheduleTimes={scheduleTimes}
+              onModeChange={setMode}
+              onScheduleDate={updateScheduleDate}
+              onScheduleTime={updateScheduleTime}
+              onAddScheduleTime={addScheduleTime}
+              onRemoveScheduleTime={removeScheduleTime}
+              disabled={isLoading || submitting}
+            />
+
+            {/* Primary action */}
+            <ComposerActions
+              mode={mode}
+              submitting={submitting}
+              disabled={!canSubmit}
+              onSubmit={() => void handleSubmit()}
+              onSubmitAndCreateAnother={() => void handleSubmit(true)}
             />
           </div>
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/10 px-6 py-4">
-          {/* Scheduling tabs */}
-          <SchedulingTabs
-            mode={mode}
-            scheduleDate={scheduleDate}
-            scheduleTime={scheduleTime}
-            onModeChange={setMode}
-            onScheduleDate={updateScheduleDate}
-            onScheduleTime={updateScheduleTime}
-            disabled={isLoading || submitting}
-          />
-
-          {/* Primary action */}
-          <ComposerActions
-            mode={mode}
-            submitting={submitting}
-            disabled={!canSubmit}
-            onSubmit={() => void handleSubmit()}
-            onSubmitAndCreateAnother={() => void handleSubmit(true)}
-          />
-        </div>
       </div>
-    </div>
+
+      {/* FIX 5: Dirty-draft close confirm */}
+      <ConfirmDialog
+        open={confirmCloseOpen}
+        onOpenChange={setConfirmCloseOpen}
+        title="Discard unsaved changes?"
+        description="Your draft has unsaved changes. Close anyway?"
+        confirmLabel="Discard"
+        confirmVariant="destructive"
+        onConfirm={doClose}
+      />
+
+      {/* FIX 8: Link / UTM modal */}
+      <LinkModal
+        open={linkModalOpen}
+        initialUrl={draftData?.link_url}
+        onConfirm={updateLinkUrl}
+        onClose={() => setLinkModalOpen(false)}
+      />
+    </>
   );
 }
