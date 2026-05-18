@@ -17,6 +17,8 @@ import { FilterBar } from "./FilterBar";
 import { useCalendarView } from "@/hooks/use-calendar-view";
 import { Callout } from "@/components/ui/callout";
 import { ComposerOverlay } from "@/components/social/composer/ComposerOverlay";
+import { BulkScheduleModal } from "./BulkScheduleModal";
+import { PostAnalyticsModal } from "./PostAnalyticsModal";
 import { useComposerState } from "@/hooks/use-composer-state";
 import type { CalendarPost, Connection } from "@/lib/social/types";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
@@ -91,6 +93,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
   const [viewMode, setViewMode] = React.useState<"month" | "timeline">("month");
   const [calloutDismissed, setCalloutDismissed] = React.useState(false);
   const [bulkOpen, setBulkOpen] = React.useState(false);
+  const [analyticsPostId, setAnalyticsPostId] = React.useState<string | null>(null);
   const [activeDragPost, setActiveDragPost] = React.useState<CalendarPost | null>(null);
 
   // Profile filter from URL
@@ -309,10 +312,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
             <DayDetail
               date={selectedDate}
               posts={selectedDayPosts}
-              onPostClick={(id) => {
-                // open analytics modal — wired in PR H
-                void id;
-              }}
+              onPostClick={(id) => setAnalyticsPostId(id)}
               onDelete={handleDelete}
               onReschedule={handleReschedule}
               onAddPost={() => openComposer({ prefilledDate: selectedDate })}
@@ -336,11 +336,42 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
           from={from}
           to={to}
           isLoading={isLoading}
-          onPostClick={() => void 0}
+          onPostClick={(id) => setAnalyticsPostId(id)}
           onDelete={handleDelete}
           onAddPost={() => openComposer()}
         />
       )}
+
+      {/* Post analytics modal */}
+      <PostAnalyticsModal
+        open={analyticsPostId !== null}
+        onClose={() => setAnalyticsPostId(null)}
+        draftId={analyticsPostId ?? ""}
+        onScheduleAgain={(draft) => {
+          openComposer({
+            initialDraft: {
+              content: draft.content,
+              media_urls: draft.media_urls,
+              target_profile_ids: draft.target_profiles.map((p) => p.profile_id),
+              platform_variants: draft.platform_variants,
+              approval_required: false,
+            },
+          });
+        }}
+        onDelete={(id) => {
+          void handleDelete(id);
+        }}
+      />
+
+      {/* Bulk CSV upload modal */}
+      <BulkScheduleModal
+        open={bulkOpen}
+        onClose={() => setBulkOpen(false)}
+        onSuccess={(_batchId, _count) => {
+          setBulkOpen(false);
+          void mutate();
+        }}
+      />
 
       {/* Composer overlay */}
       <ComposerOverlay
