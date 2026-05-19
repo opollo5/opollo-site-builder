@@ -36,6 +36,9 @@ export type ProposalReviewProps = {
     payload: Record<string, unknown>;
   }>;
   pageUrl: string | null;
+  /** When true, suppresses the internal PageHeader (headline/subtitle/actions).
+   *  Use when the parent page already renders page chrome via a template. */
+  hidePageHeader?: boolean;
 };
 
 const REJECTION_REASONS = [
@@ -50,6 +53,7 @@ export function ProposalReview({
   proposal,
   evidence,
   pageUrl,
+  hidePageHeader = false,
 }: ProposalReviewProps) {
   const router = useRouter();
   const [reprompt, setReprompt] = useState("");
@@ -135,20 +139,22 @@ export function ProposalReview({
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <div className="space-y-6">
-        <PageHeader>
-          <PageHeader.Title>{proposal.headline}</PageHeader.Title>
-          {proposal.problem_summary && (
-            <PageHeader.Subtitle className="text-sm">
-              {proposal.problem_summary}
-            </PageHeader.Subtitle>
-          )}
-          <PageHeader.Actions>
-            {pageUrl && (
-              <span className="font-mono text-sm text-muted-foreground">{pageUrl}</span>
+        {!hidePageHeader && (
+          <PageHeader>
+            <PageHeader.Title>{proposal.headline}</PageHeader.Title>
+            {proposal.problem_summary && (
+              <PageHeader.Subtitle className="text-sm">
+                {proposal.problem_summary}
+              </PageHeader.Subtitle>
             )}
-            <RiskPill risk={proposal.risk_level} />
-          </PageHeader.Actions>
-        </PageHeader>
+            <PageHeader.Actions>
+              {pageUrl && (
+                <span className="font-mono text-sm text-muted-foreground">{pageUrl}</span>
+              )}
+              <RiskPill risk={proposal.risk_level} />
+            </PageHeader.Actions>
+          </PageHeader>
+        )}
 
         <Section title="Suggested change">
           <div className="rounded-md border border-border bg-card p-4 text-sm whitespace-pre-wrap">

@@ -76,10 +76,25 @@ export default async function OptimiserProposalReviewPage({
         { label: "Proposals", href: "/optimiser/proposals" },
         { label: "Review" },
       ]}
+      subtitle={proposal.problem_summary ?? undefined}
       meta={
-        <span className="text-sm text-muted-foreground">
-          Status: <code>{proposal.status}</code>
-        </span>
+        <>
+          <span className="text-sm text-muted-foreground">
+            Status: <code>{proposal.status}</code>
+          </span>
+          {page?.url && (
+            <span className="font-mono text-sm text-muted-foreground">{page.url}</span>
+          )}
+          <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${
+            proposal.risk_level === "high"
+              ? "bg-red-100 text-red-900 border-red-200"
+              : proposal.risk_level === "medium"
+                ? "bg-amber-100 text-amber-900 border-amber-200"
+                : "bg-emerald-100 text-emerald-900 border-emerald-200"
+          }`}>
+            {proposal.risk_level} risk
+          </span>
+        </>
       }
       actions={
         <Button asChild variant="outline" size="sm">
@@ -125,6 +140,7 @@ export default async function OptimiserProposalReviewPage({
               />
             )}
             <ProposalReview
+              hidePageHeader
               proposal={{
                 id: proposal.id,
                 headline: proposal.headline,
