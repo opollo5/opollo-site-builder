@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { DesignSystemSettingsClient } from "@/components/DesignSystemSettingsClient";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TSettingsFlat } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -23,23 +22,18 @@ export default async function DesignSystemSettingsPage() {
     .maybeSingle();
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Settings" },
-            { label: "Design system" },
-          ]}
-        />
-        <PageHeader.Title>Design system settings</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Override design tokens globally. Changes inject CSS variables at the
-          root layout level — all operator surfaces update immediately after
-          save.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <DesignSystemSettingsClient initialSettings={data ?? null} />
-    </PageShell>
+    <TSettingsFlat
+      title="Design system settings"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Settings" },
+        { label: "Design system" },
+      ]}
+      subtitle="Override design tokens globally. Changes inject CSS variables at the root layout level — all operator surfaces update immediately after save."
+      sections={[{
+        title: "Global tokens",
+        content: <DesignSystemSettingsClient initialSettings={data ?? null} />,
+      }]}
+    />
   );
 }

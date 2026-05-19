@@ -2,8 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { BlogPostComposer } from "@/components/BlogPostComposer";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TForm } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 
@@ -39,25 +38,18 @@ export default async function BlogPostEntryPage({
   const site = result.data.site;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Posts", href: `/admin/sites/${site.id}/posts` },
-            { label: "New post" },
-          ]}
-        />
-        <PageHeader.Title>New blog post</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Paste a markdown / HTML / YAML-fronted post. We&apos;ll parse the
-          metadata into the fields below — every value is editable before you
-          save the draft.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <BlogPostComposer siteId={site.id} />
-    </PageShell>
+    <TForm
+      title="New blog post"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name, href: `/admin/sites/${site.id}` },
+        { label: "Posts", href: `/admin/sites/${site.id}/posts` },
+        { label: "New post" },
+      ]}
+      subtitle="Paste a markdown / HTML / YAML-fronted post. We'll parse the metadata into the fields below — every value is editable before you save the draft."
+      width="standard"
+      formSections={[{ content: <BlogPostComposer siteId={site.id} /> }]}
+    />
   );
 }
