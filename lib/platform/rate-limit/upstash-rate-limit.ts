@@ -2,6 +2,7 @@ import "server-only";
 
 import { checkRateLimit, type LimiterName } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
+import { withHealthMonitoring } from "@/lib/platform/service-health/monitor";
 
 // ---------------------------------------------------------------------------
 // Upstash primary implementation for the two-layer rate-limit module.
@@ -27,7 +28,9 @@ export async function checkUpstashRateLimit(
   identifier: string,
 ): Promise<PlatformRateLimitResult> {
   try {
-    const result = await checkRateLimit(name, identifier);
+    const result = await withHealthMonitoring("upstash", "rate-limit", () =>
+      checkRateLimit(name, identifier),
+    );
     if (result.ok) return { ok: true };
     return { ok: false, retryAfterSec: result.retryAfterSec };
   } catch (err) {

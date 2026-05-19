@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
+import { withHealthMonitoring } from "@/lib/platform/service-health/monitor";
 
 /**
  * Postgres-backed rate-limit fallback for when Upstash Redis is unavailable.
@@ -12,6 +13,9 @@ import { logger } from "@/lib/logger";
  * Two strategies:
  *   checkBulkCsvRateLimit — counts batch rows in the last hour for a company.
  *   checkSlidingWindowRateLimit — advisory-lock-protected increment counter.
+ *
+ * Both are wrapped with withHealthMonitoring so Postgres connectivity failures
+ * are recorded in service_health_events.
  */
 
 export type PostgresRateLimitResult =
@@ -23,22 +27,21 @@ export type PostgresRateLimitResult =
 // Counts social_post_drafts WHERE batch_id IS NOT NULL in the past hour.
 export async function checkBulkCsvRateLimit(companyId: string): Promise<PostgresRateLimitResult> {
   try {
-    const svc = getServiceRoleClient();
-    const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-    const { count, error } = await svc
-      .from("social_post_drafts")
-      .select("id", { count: "exact", head: true })
-      .eq("company_id", companyId)
-      .not("batch_id", "is", null)
-      .gte("created_at", windowStart);
-    if (error) {
-      logger.warn("rate_limit.postgres_csv_check_failed", { companyId, err: error.message });
-      return { ok: false, unavailable: true };
-    }
-    if ((count ?? 0) >= 3) {
-      return { ok: false, retryAfterSec: 3600 };
-    }
-    return { ok: true };
+    return await withHealthMonitoring("postgres", "rate-limit", async () => {
+      const svc = getServiceRoleClient();
+      const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count, error } = await svc
+        .from("social_post_drafts")
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+        .not("batch_id", "is", null)
+        .gte("created_at", windowStart);
+      if (error) throw new Error(error.message);
+      if ((count ?? 0) >= 3) {
+        return { ok: false, retryAfterSec: 3600 } as PostgresRateLimitResult;
+      }
+      return { ok: true } as PostgresRateLimitResult;
+    });
   } catch (err) {
     logger.warn("rate_limit.postgres_csv_check_failed", {
       companyId,
@@ -55,23 +58,22 @@ export async function checkSlidingWindowRateLimit(
   windowSeconds: number,
 ): Promise<PostgresRateLimitResult> {
   try {
-    const svc = getServiceRoleClient();
-    const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
-    const { count, error } = await svc
-      .from("rate_limit_buckets")
-      .select("id", { count: "exact", head: true })
-      .eq("identifier", identifier)
-      .gte("window_start", windowStart);
-    if (error) {
-      logger.warn("rate_limit.postgres_window_check_failed", { identifier, err: error.message });
-      return { ok: false, unavailable: true };
-    }
-    if ((count ?? 0) >= maxRequests) {
-      return { ok: false, retryAfterSec: windowSeconds };
-    }
-    // Record this request.
-    await svc.from("rate_limit_buckets").insert({ identifier, window_start: new Date().toISOString() });
-    return { ok: true };
+    return await withHealthMonitoring("postgres", "rate-limit", async () => {
+      const svc = getServiceRoleClient();
+      const windowStart = new Date(Date.now() - windowSeconds * 1000).toISOString();
+      const { count, error } = await svc
+        .from("rate_limit_buckets")
+        .select("id", { count: "exact", head: true })
+        .eq("identifier", identifier)
+        .gte("window_start", windowStart);
+      if (error) throw new Error(error.message);
+      if ((count ?? 0) >= maxRequests) {
+        return { ok: false, retryAfterSec: windowSeconds } as PostgresRateLimitResult;
+      }
+      // Record this request.
+      await svc.from("rate_limit_buckets").insert({ identifier, window_start: new Date().toISOString() });
+      return { ok: true } as PostgresRateLimitResult;
+    });
   } catch (err) {
     logger.warn("rate_limit.postgres_window_check_failed", {
       identifier,
