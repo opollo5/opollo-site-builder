@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
-import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
+import {
+  checkPlatformRateLimit,
+  platformRateLimitExceeded,
+  platformRateLimitUnavailable,
+} from "@/lib/platform/rate-limit";
 import { getAnalytics, setAnalytics, getAnalyticsStale } from "@/lib/platform/cache";
 import { fetchAnalytics } from "@/lib/social/publishing/bundle-social-client";
 import { internalError, notFound, validateUuidParam } from "@/lib/http";
@@ -39,8 +43,11 @@ export async function GET(
   const gate = await requireCanDoForApi(draft.company_id as string, "view_calendar");
   if (gate.kind === "deny") return gate.response;
 
-  const rl = await checkRateLimit("chat", `user:${gate.userId}`);
-  if (!rl.ok) return rateLimitExceeded(rl);
+  const rl = await checkPlatformRateLimit("chat", `user:${gate.userId}`);
+  if (!rl.ok) {
+    if ("unavailable" in rl) return platformRateLimitUnavailable();
+    return platformRateLimitExceeded(rl.retryAfterSec);
+  }
 
   // 1. Try hot+cold cache.
   const cached = await getAnalytics(idCheck.value, 60);
