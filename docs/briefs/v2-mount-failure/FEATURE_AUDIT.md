@@ -1,7 +1,7 @@
 # V2 Composer Mount — Feature Audit
 
 **Date:** 2026-05-20
-**Status:** Phase 2 complete. Phase 4 fixes tracked below.
+**Status:** Complete. All phases shipped. PR #953 (Phase 3 mount) and PR #954 (Phase 4 gaps) merged and deployed to production.
 
 ## What was audited
 
@@ -34,46 +34,39 @@ after PR #953 (`fix/v2-composer-mount`) is merged. The audit covers two planes:
 | Approval toggle | PR E | `ApprovalToggle.tsx` | ✅ | ✅ |
 | Recurrence picker | PR E | `RecurrencePicker.tsx` | ✅ | ✅ |
 | URL-param open (`?compose=new`) | #953 | `ComposerMountV2` | ✅ | ✅ |
-| URL-param edit (`?compose=<id>`) | #953 | `ComposerMountV2` | ⚠️ Opens empty | Gap G1 |
-| CAP push-to-composer link | — | `CapCampaignDetail` | ❌ No link shown | Gap G2 |
+| URL-param edit (`?compose=<id>`) | #954 | `ComposerMountV2` | ✅ Pre-fills content | ✅ |
+| CAP push-to-composer link | #954 | `CapCampaignDetail` | ✅ "Open in composer" link | ✅ |
 
 ---
 
-## Known gaps
+## Closed gaps
 
-### G1 — `?compose=<id>` opens empty content (Priority 1)
+### G1 — `?compose=<id>` opens empty content — CLOSED (PR #954)
 
-**Location:** `components/composer/composer-mount-v2.tsx:48`
+**Location:** `components/composer/composer-mount-v2.tsx`
 
-**What happens:** When `?compose=<draftId>` is in the URL, `ComposerMountV2Inner`
-creates an `initialDraft` with the `id` set but `content: ""`. The `ComposerOverlay`
-renders with an empty editor — the existing draft's content is never loaded.
+**Was:** When `?compose=<draftId>` is in the URL, `ComposerMountV2Inner` created
+an `initialDraft` with the `id` set but `content: ""`. The `ComposerOverlay`
+rendered with an empty editor — the existing draft's content was never loaded.
 
-**Root cause:** No fetch call to `GET /api/platform/social/drafts/${id}`. The V1
-draft data is in `draft_data.master_text` (JSONB), not in the V2 `Draft.content`
-field; a mapping step is required.
-
-**Fix (Phase 4 — PR #954):** In `ComposerMountV2Inner`, when `initialDraftId` is
-present, fetch `GET /api/platform/social/drafts/${initialDraftId}`, map
+**Fix:** `ComposerMountV2Inner` now runs a `useEffect` that fetches
+`GET /api/platform/social/drafts/${initialDraftId}` and maps
 `draft_data.master_text → content`, `draft_data.media_refs[].url → media_urls[]`,
-`draft_data.target_connection_ids → target_profile_ids`. Hold rendering until
-fetch resolves (return `null` while pending). Graceful degradation if fetch fails.
+`draft_data.target_connection_ids → target_profile_ids`. Rendering is held
+(`return null`) until the fetch resolves. Graceful degradation on 4xx/5xx.
 
-### G2 — No "Open in composer" action after CAP push (Priority 2)
+**Regression test:** `e2e/composer-mount.spec.ts` — "pre-fills content when
+`?compose=<id>` opens an existing draft" (mocks the draft API, asserts textarea value).
 
-**Location:** `components/CapCampaignDetail.tsx:196`
+### G2 — No "Open in composer" action after CAP push — CLOSED (PR #954)
 
-**What happens:** After "Push to composer" succeeds, the UI shows:
-```
-Draft ID: <uuid-monospace>
-```
-There is no button or link to open the pushed draft in the V2 composer. The user
-must manually navigate to `/company/social/posts?compose=<id>` and the company
-context must be set in the Social nav selector.
+**Location:** `components/CapCampaignDetail.tsx`
 
-**Fix (Phase 4 — PR #954):** Replace the plain `Draft ID: <id>` display with an
-`"Open in composer"` link pointing to `/company/social/posts?compose=<id>`.
-Staff users will still need their company context set in the social nav selector.
+**Was:** After "Push to composer" succeeded, the UI showed a plain `Draft ID: <uuid>`
+text with no navigation affordance.
+
+**Fix:** Replaced with an "Open in composer" Next.js `<Link>` pointing to
+`/company/social/posts?compose=${post.social_draft_id}`.
 
 ---
 
