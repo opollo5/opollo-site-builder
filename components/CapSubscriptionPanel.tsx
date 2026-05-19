@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { VOICE_TONE_LABELS, type CapVoiceProfile, type VoiceTone } from "@/lib/cap/voice-profiles";
+import { VOICE_TONE_LABELS, type VoiceTone } from "@/lib/cap/voice-tone-labels";
+import type { CapVoiceProfile } from "@/lib/cap/voice-profiles";
 import type { CapSubscription, CapTier, CapStatus } from "@/lib/cap/subscriptions";
 
 type ApiResponse<T> =
