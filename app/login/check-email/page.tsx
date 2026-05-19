@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { CheckEmailPolling } from "@/components/CheckEmailPolling";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 import { lookupChallengeById } from "@/lib/2fa/challenges";
 import {
   PENDING_2FA_COOKIE,
@@ -69,33 +69,29 @@ export default async function CheckEmailPage({ searchParams }: PageProps) {
   const next = searchParams.next ?? "/admin/sites";
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <H1>Check your email</H1>
-          <Lead className="mt-1">
-            We sent an approval link to{" "}
-            <strong className="text-foreground">{userEmail}</strong>.
-            Click the link and this page will sign you in
-            automatically.
-          </Lead>
-        </div>
-
-        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
-          {emailSendFailed && (
-            <Alert variant="destructive">
-              Email delivery failed. Use the Resend button below — it
-              skips the cooldown.
-            </Alert>
-          )}
-
-          <CheckEmailPolling
-            challengeId={challenge.id}
-            next={next}
-            initialEmailFailed={emailSendFailed}
-          />
-        </div>
+    <TAuthChrome
+      title="Check your email"
+      subtitle={
+        <>
+          We sent an approval link to{" "}
+          <strong className="text-foreground">{userEmail}</strong>.
+          Click the link and this page will sign you in automatically.
+        </>
+      }
+    >
+      <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+        {emailSendFailed && (
+          <Alert variant="destructive">
+            Email delivery failed. Use the Resend button below — it skips
+            the cooldown.
+          </Alert>
+        )}
+        <CheckEmailPolling
+          challengeId={challenge.id}
+          next={next}
+          initialEmailFailed={emailSendFailed}
+        />
       </div>
-    </main>
+    </TAuthChrome>
   );
 }

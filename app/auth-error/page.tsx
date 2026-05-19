@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { TErrorState } from "@/templates";
+
 // ---------------------------------------------------------------------------
 // /auth-error
 //
@@ -18,18 +20,17 @@ export const dynamic = "force-static";
 
 export default function AuthErrorPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6 text-center">
-      <h1 className="text-page-title text-foreground">Authentication error</h1>
-      <p className="text-base text-muted-foreground">
-        We couldn&rsquo;t verify your session. Try signing in again — if this
-        keeps happening, contact an operator.
-      </p>
-      <Link
-        href="/login"
-        className="text-sm font-medium underline underline-offset-4"
-      >
-        Back to sign in
-      </Link>
-    </main>
+    <TErrorState
+      title="Authentication error"
+      body="We couldn't verify your session. Try signing in again — if this keeps happening, contact an operator."
+      cta={
+        <Link
+          href="/login"
+          className="text-sm font-medium underline underline-offset-4"
+        >
+          Back to sign in
+        </Link>
+      }
+    />
   );
 }

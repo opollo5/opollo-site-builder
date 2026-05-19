@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ApproveAutoClose } from "@/components/ApproveAutoClose";
 import { ApproveCompleteHere } from "@/components/ApproveCompleteHere";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 import {
   approveChallenge,
   lookupChallengeByToken,
@@ -87,30 +87,6 @@ async function resolveState(rawToken: string | undefined): Promise<RenderState> 
   };
 }
 
-function PageShell({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <H1>{title}</H1>
-          {subtitle && <Lead className="mt-1">{subtitle}</Lead>}
-        </div>
-        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
-          {children}
-        </div>
-      </div>
-    </main>
-  );
-}
-
 function StartOverLink() {
   return (
     <Link
@@ -127,39 +103,43 @@ export default async function ApprovePage({ searchParams }: PageProps) {
 
   if (state.kind === "invalid") {
     return (
-      <PageShell title="Approval link">
-        <Alert variant="destructive">
-          This approval link is invalid. Sign in again from your
-          original device to receive a fresh email.
-        </Alert>
-        <StartOverLink />
-      </PageShell>
+      <TAuthChrome title="Approval link">
+        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+          <Alert variant="destructive">
+            This approval link is invalid. Sign in again from your original
+            device to receive a fresh email.
+          </Alert>
+          <StartOverLink />
+        </div>
+      </TAuthChrome>
     );
   }
   if (state.kind === "expired") {
     return (
-      <PageShell title="Approval link expired">
-        <Alert variant="destructive">
-          This link expired (15-minute window). Sign in again to
-          receive a fresh email.
-        </Alert>
-        <StartOverLink />
-      </PageShell>
+      <TAuthChrome title="Approval link expired">
+        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+          <Alert variant="destructive">
+            This link expired (15-minute window). Sign in again to receive a
+            fresh email.
+          </Alert>
+          <StartOverLink />
+        </div>
+      </TAuthChrome>
     );
   }
   if (state.kind === "consumed") {
     return (
-      <PageShell title="Approval link used">
-        <Alert>
-          This approval link has been used. You can close this tab.
-        </Alert>
-        <StartOverLink />
-      </PageShell>
+      <TAuthChrome title="Approval link used">
+        <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+          <Alert>This approval link has been used. You can close this tab.</Alert>
+          <StartOverLink />
+        </div>
+      </TAuthChrome>
     );
   }
 
   return (
-    <PageShell
+    <TAuthChrome
       title="Sign-in approved"
       subtitle={
         state.tokenWasJustApproved
@@ -167,16 +147,17 @@ export default async function ApprovePage({ searchParams }: PageProps) {
           : "Sign-in already approved. Return to your original tab, or complete here if that tab is gone."
       }
     >
-      <ApproveAutoClose tokenWasJustApproved={state.tokenWasJustApproved} />
+      <div className="rounded-lg border bg-background p-6 shadow-sm space-y-4">
+        <ApproveAutoClose tokenWasJustApproved={state.tokenWasJustApproved} />
 
-      <div className="border-t pt-4">
-        <p className="text-sm font-medium">Lost your original tab?</p>
-        <p className="text-sm text-muted-foreground mt-1 mb-3">
-          Use the button below to finish signing in on this device
-          instead.
-        </p>
-        <ApproveCompleteHere challengeId={state.challengeId} />
+        <div className="border-t pt-4">
+          <p className="text-sm font-medium">Lost your original tab?</p>
+          <p className="text-sm text-muted-foreground mt-1 mb-3">
+            Use the button below to finish signing in on this device instead.
+          </p>
+          <ApproveCompleteHere challengeId={state.challengeId} />
+        </div>
       </div>
-    </PageShell>
+    </TAuthChrome>
   );
 }

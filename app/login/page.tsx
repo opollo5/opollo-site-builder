@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { LoginForm } from "@/components/LoginForm";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 import { PENDING_2FA_COOKIE } from "@/lib/2fa/cookies";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
@@ -68,16 +68,10 @@ export default async function LoginPage({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <H1>Opollo Site Builder</H1>
-          <Lead className="mt-1">Sign in to continue.</Lead>
-        </div>
-        <div className="rounded-lg border bg-background p-6 shadow-sm">
-          <LoginForm next={next} />
-        </div>
+    <TAuthChrome title="Opollo Site Builder" subtitle="Sign in to continue.">
+      <div className="rounded-lg border bg-background p-6 shadow-sm">
+        <LoginForm next={next} />
       </div>
-    </main>
+    </TAuthChrome>
   );
 }

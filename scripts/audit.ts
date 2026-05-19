@@ -1243,9 +1243,15 @@ const PAGE_HEADER_EXEMPT_ROUTES: readonly string[] = [
   // PageHeader would be dead code. The file is a single
   // `redirect("/admin/sites")` call (Spec 04 PR B).
   "app/admin/page.tsx",
+  "app/(platform)/admin/page.tsx",
   // reason: redirect-only — `redirect("/admin/settings/design-system")`.
   // No chrome to host (Spec 04 PR C).
   "app/admin/settings/page.tsx",
+  "app/(platform)/admin/settings/page.tsx",
+  // reason: redirect-only — permanentRedirect("/admin/posts"). No chrome.
+  "app/(platform)/admin/posts/new/page.tsx",
+  // reason: redirect-only — redirect("/company/social/calendar"). No chrome.
+  "app/(platform)/company/social/page.tsx",
 ];
 
 function isPageHeaderDeferred(rel: string): boolean {

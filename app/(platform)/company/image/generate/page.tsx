@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MoodBoardClient } from "@/components/MoodBoardClient";
-import { PageHeader } from "@/components/ui/page-header";
+import { Alert } from "@/components/ui/alert";
+import { TFullBleedEditor } from "@/templates";
 import { getAllowedStyles } from "@/lib/image";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getActiveBrandProfile } from "@/lib/platform/brand";
@@ -34,15 +34,17 @@ export default async function MoodBoardPage() {
 
   if (!session.company) {
     return (
-      <main className="mx-auto max-w-3xl p-6 text-sm">
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
-          <p className="font-medium">Account not provisioned to a company.</p>
-          <p className="mt-1 text-muted-foreground">
-            Your account isn&apos;t a member of any company on the platform
-            yet. Ask an admin to invite you, or contact Opollo support.
-          </p>
-        </div>
-      </main>
+      <TFullBleedEditor
+        title="Mood board generator"
+        subtitle="Generate background images for your social posts. Click an image to select it and copy its URL."
+        backHref="/company"
+        backLabel="Dashboard"
+      >
+        <Alert variant="destructive" title="Account not provisioned">
+          Your account isn&apos;t a member of any company on the platform yet. Ask an
+          admin to invite you, or contact Opollo support.
+        </Alert>
+      </TFullBleedEditor>
     );
   }
 
@@ -55,41 +57,33 @@ export default async function MoodBoardPage() {
 
   if (!canCreate) {
     return (
-      <main className="mx-auto max-w-3xl p-6 text-sm">
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-4">
-          <p className="font-medium">Permission denied.</p>
-          <p className="mt-1 text-muted-foreground">
-            Editor or admin permissions are required to generate images.
-          </p>
-        </div>
-      </main>
+      <TFullBleedEditor
+        title="Mood board generator"
+        subtitle="Generate background images for your social posts. Click an image to select it and copy its URL."
+        backHref="/company"
+        backLabel="Dashboard"
+      >
+        <Alert variant="destructive" title="Permission denied">
+          Editor or admin permissions are required to generate images.
+        </Alert>
+      </TFullBleedEditor>
     );
   }
 
   const allowedStyles = getAllowedStyles(brand);
 
   return (
-    <>
-      <div className="mb-4 text-sm">
-        <Link
-          href="/company"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          ← Dashboard
-        </Link>
-      </div>
-      <PageHeader>
-        <PageHeader.Title>Mood board generator</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Generate background images for your social posts. Click an image to
-          select it and copy its URL.
-        </PageHeader.Subtitle>
-      </PageHeader>
+    <TFullBleedEditor
+      title="Mood board generator"
+      subtitle="Generate background images for your social posts. Click an image to select it and copy its URL."
+      backHref="/company"
+      backLabel="Dashboard"
+    >
       <MoodBoardClient
         companyId={companyId}
         allowedStyles={allowedStyles}
         primaryColour={brand?.primary_colour ?? null}
       />
-    </>
+    </TFullBleedEditor>
   );
 }

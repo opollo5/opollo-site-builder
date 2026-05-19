@@ -1,3 +1,17 @@
+## Wave 4 in progress 2026-05-19
+
+- Templates used: T-AUTH-CHROME (8 routes), T-FULL-BLEED-EDITOR (1 route), T-ERROR-STATE (1 route)
+- Routes migrated: login, login/check-email, auth/forgot-password, auth/reset-password, auth/accept-invite, invite/[token], auth/approve, auth/expired, auth-error, company/image/generate
+- Redirect stubs already existed: admin, admin/settings, admin/posts/new, company/social — added all to PAGE_HEADER_EXEMPT_ROUTES
+- Deferred: auth/callback (renders AuthCallbackClient only, no chrome needed)
+- Waves 2c + 3 + 4 stacked PRs open: #916, #917, wave-4
+
+## Wave 3 in progress 2026-05-19
+
+- Templates used: T-DETAIL-EDITOR (2 routes), T-WIZARD-STEP (5 routes), T-REVIEW-LINK (1 route), T-GRID (1 route)
+- Routes migrated: admin/sites/[id]/posts/[post_id], admin/sites/[id]/pages/[pageId], admin/sites/[id]/setup, admin/sites/[id]/setup/extract, admin/sites/[id]/onboarding, optimiser/onboarding, optimiser/onboarding/[id], admin/sites/[id]/briefs/[brief_id]/review, company/social/media
+- Deferred: admin/sites/[id]/blueprints/review (use client with own PageShell), design-system/components (layout-driven)
+
 ## Wave 2c in progress 2026-05-19
 
 - Templates used: T-FORM (6 routes), T-SETTINGS-FLAT (7 routes)

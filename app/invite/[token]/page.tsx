@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { PlatformAcceptInviteForm } from "@/components/PlatformAcceptInviteForm";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // Platform-layer invitation accept page (P2-3 follow-up).
@@ -94,8 +94,7 @@ export default async function PlatformInviteAcceptPage({ params }: PageProps) {
 
   if (result.kind === "err") {
     return (
-      <div className="mx-auto max-w-md space-y-4">
-        <H1>Invitation</H1>
+      <TAuthChrome title="Invitation">
         <Alert variant="destructive">
           {result.reason === "missing" && "No invitation token provided."}
           {result.reason === "invalid" &&
@@ -107,28 +106,31 @@ export default async function PlatformInviteAcceptPage({ params }: PageProps) {
           {result.reason === "revoked" &&
             "This invitation was revoked. Ask the inviter for a new one."}
         </Alert>
-      </div>
+      </TAuthChrome>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <H1>Join {result.invite.companyName}</H1>
-      <Lead className="mt-1">
-        Setting up your Opollo account for{" "}
-        <strong className="text-foreground">{result.invite.email}</strong> as{" "}
-        <strong className="text-foreground">
-          {capitaliseRole(result.invite.role)}
-        </strong>
-        .
-      </Lead>
-      <div className="mt-6">
+    <TAuthChrome
+      title={`Join ${result.invite.companyName}`}
+      subtitle={
+        <>
+          Setting up your Opollo account for{" "}
+          <strong className="text-foreground">{result.invite.email}</strong> as{" "}
+          <strong className="text-foreground">
+            {capitaliseRole(result.invite.role)}
+          </strong>
+          .
+        </>
+      }
+    >
+      <div className="rounded-lg border bg-background p-6 shadow-sm">
         <PlatformAcceptInviteForm
           token={params.token}
           email={result.invite.email}
         />
       </div>
-    </div>
+    </TAuthChrome>
   );
 }
 
