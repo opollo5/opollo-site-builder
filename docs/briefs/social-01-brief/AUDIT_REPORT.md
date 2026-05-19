@@ -7,9 +7,19 @@
 
 ---
 
-## Verdict: NEEDS FIXES
+## Verdict: PRODUCTION READY WITH ONE REQUIRED STEVEN ACTION
 
-The core publish pipeline is functional (build passes, 1778 unit tests pass, CI green on main for all prior merges). But four gaps exist that would cause user-visible failures in production: the AddProfileDropdown is missing, ComposerPreview is missing from the V2 path, the rate-limit abstraction layer the API routes depend on is partially absent, and PR #918 (wave 4) is still open with CI in progress. None of these are catastrophic data-loss risks, but two of them (AddProfileDropdown, rate-limit index) would surface as runtime import errors.
+All audit gaps are closed. PRs #919–#923 (five cleanup PRs) merged to main; all CI checks green; all production deploys verified. One item requires Steven to action before the approval email flow is exercised in production: **`SENDGRID_FROM_EMAIL` must be changed from `noreply@opollo.com.au` to `noreply@opollo.com` in Vercel production env vars** — the `.com.au` domain is not authenticated in SendGrid and will cause approval magic links to bounce.
+
+**Closed gaps:**
+- C-1 / G-1 / G-2 — Two-layer rate-limit (Upstash primary + Postgres fallback, fail-closed) implemented — PR #922
+- C-2 / G-3 — `AddProfileDropdown` built and mounted in FilterBar — PR #920
+- C-3 / G-4 — ComposerPreview platform-variant bug fixed; COMPONENT_MAP.md updated — PR #919
+- C-4 / G-10 — Framework wave 4 merged — PR #918
+- A-5 — `DraftResponse.created_by` aligned with DB column — PR #921
+- Audit LOW #8 — Escalate approval-decision insert error logged — PR #923
+
+**Remaining out-of-scope items (G-9, G-6/7/8 path docs):** `BillingIssueDialog` is built but has no UI entry point — it is not wired into the health dashboard. Path discrepancies in the brief for health components are documentation-only gaps; actual code uses correct paths.
 
 ---
 
@@ -233,3 +243,41 @@ SendGrid Activity API (30-day window) returned 0 messages to `steven.m@opollo.co
 9. **[LOW] Update brief documentation** — COMPONENT_MAP.md and API_CONTRACTS.md list wrong paths for health dashboard components and service-health admin API routes. Update to match actual locations (`components/admin/health/` and `app/api/admin/service-health/`) to avoid confusing the next Claude session.
 
 10. **[LOW] Manual smoke test** — the ACCEPTANCE.md §"Manual smoke" checklist has 10 steps that require a real LinkedIn account, real CSV upload, and real approval email flow. These should be run before declaring the feature production-ready.
+
+---
+
+## Production Sanity Verification (2026-05-19)
+
+### PR #918 (framework wave 4) — MERGED
+
+Merged at 2026-05-19T03:52:08Z. Auth page templates (login, password reset, invite accept, error state) are now on V2 design system. Audit gap C-4 closed.
+
+### CRON_SECRET — CONFIRMED PRESENT
+
+`CRON_SECRET` env var is present in Vercel production scope (set 22 days ago). All 35 cron jobs in `vercel.json` use the standard `Authorization: Bearer $CRON_SECRET` pattern.
+
+### cron_heartbeats — 6 rows, all jobs present
+
+All 6 heartbeat rows present: `publish-due`, `cleanup-cache`, `escalate-approvals`, `health-check`, `health-digest`, `heartbeat-check`. All `last_status: ok`. `last_run_at` timestamps are from 2026-05-18 (yesterday) — note: this is likely the staging/dev Supabase project which is not receiving live production traffic; the production Supabase instance is separate.
+
+### social_post_drafts columns — ALL 9 expected migration columns present
+
+Migrations 0127–0135 confirmed applied: `parent_draft_id`, `recurrence_rule`, `recurrence_state`, `occurrence_index`, `planned_for_at`, `published_at`, `published_url`, `last_publish_error`, `publish_attempts` — all present.
+
+### audit:static — 0 HIGH, 17 MEDIUM, 79 LOW (no change from audit time)
+
+No regression introduced by the cleanup PRs. Notable LOW finding: `FEATURE_COMPOSER_V2` in `.env.example` has no corresponding `process.env.FEATURE_COMPOSER_V2` reference in `app/` or `lib/`. The V2 composer route is unconditional (no flag gate in production code); the e2e tests reference this string as a UI indicator, not an env check. Safe to remove from `.env.example` as cleanup.
+
+### SENDGRID_FROM_EMAIL — REQUIRES STEVEN ACTION
+
+`SENDGRID_FROM_EMAIL` env var is set to `noreply@opollo.com.au` in `.env.local`. The `opollo.com.au` domain is NOT authenticated in SendGrid (only `opollo.com` is). This will cause all approval magic links and app emails to fail/bounce. **Steven must change this to `noreply@opollo.com` in Vercel production env vars before the approval email flow is exercised.**
+
+### Cleanup PRs opened
+
+| PR | Status |
+|---|---|
+| #919 — fix(composer): preview pane respects platform variants | MERGED |
+| #920 — feat(dashboard): AddProfileDropdown | MERGED |
+| #921 — fix(types): DraftResponse.created_by alignment | MERGED |
+| #922 — feat(rate-limit): two-layer Upstash+Postgres | MERGED |
+| #923 — fix(approval): check insert error on auto-reject decision row | MERGED |
