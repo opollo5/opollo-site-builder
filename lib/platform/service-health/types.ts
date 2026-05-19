@@ -11,7 +11,8 @@ export type EventType =
   | "recovered"
   | "manual_flag"
   | "cost_cap_exceeded"
-  | "missing_voice_profile";
+  | "missing_voice_profile"
+  | "missing_objective_template";
 
 export type Severity = "info" | "warning" | "critical";
 

@@ -3,11 +3,13 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { runCampaign } from "@/lib/cap/generation/campaign-runner";
+import { recordHealthEvent } from "@/lib/platform/service-health/record";
 
 export interface MonthlyGenerationResult {
   subscriptionsProcessed: number;
   campaignsCreated: number;
   campaignsGenerated: number;
+  skippedMissingTemplate: number;
   failed: number;
 }
 
@@ -24,7 +26,7 @@ export async function runMonthlyCapGeneration(): Promise<MonthlyGenerationResult
   const { data: subscriptions, error: subErr } = await svc
     .from("cap_subscriptions")
     .select(
-      `id, company_id,
+      `id, company_id, monthly_objective_template,
        cap_voice_profiles!cap_voice_profiles_cap_subscription_id_fkey(id, is_default)`,
     )
     .in("status", ["active", "trial"]);
@@ -46,13 +48,38 @@ export async function runMonthlyCapGeneration(): Promise<MonthlyGenerationResult
 
   let campaignsCreated = 0;
   let campaignsGenerated = 0;
+  let skippedMissingTemplate = 0;
   let failed = 0;
 
   for (const sub of activeSubscriptions as {
     id: string;
+    company_id: string;
+    monthly_objective_template: string | null;
     cap_voice_profiles: { id: string; is_default: boolean }[];
   }[]) {
     try {
+      // Skip subscriptions without an objective template — cron cannot generate
+      // voice-matched content without a specific objective.
+      if (!sub.monthly_objective_template) {
+        await recordHealthEvent({
+          serviceName: "cap-cron",
+          operation: "monthly-generation",
+          eventType: "missing_objective_template",
+          severity: "warning",
+          details: {
+            reason: "missing_objective_template",
+            company_id: sub.company_id,
+            cap_subscription_id: sub.id,
+          },
+        });
+        logger.warn("cap.monthly-gen.skipped_missing_template", {
+          subscriptionId: sub.id,
+          companyId: sub.company_id,
+        });
+        skippedMissingTemplate++;
+        continue;
+      }
+
       const defaultProfile =
         sub.cap_voice_profiles.find((p) => p.is_default) ?? sub.cap_voice_profiles[0];
 
@@ -64,7 +91,7 @@ export async function runMonthlyCapGeneration(): Promise<MonthlyGenerationResult
             cap_subscription_id: sub.id,
             voice_profile_id: defaultProfile.id,
             month: campaignMonth,
-            monthly_objective: `Monthly LinkedIn content campaign for ${campaignMonth}`,
+            monthly_objective: sub.monthly_objective_template,
             status: "draft",
           },
           { onConflict: "cap_subscription_id,month", ignoreDuplicates: true },
@@ -120,6 +147,7 @@ export async function runMonthlyCapGeneration(): Promise<MonthlyGenerationResult
     subscriptionsProcessed: activeSubscriptions.length,
     campaignsCreated,
     campaignsGenerated,
+    skippedMissingTemplate,
     failed,
   };
 }
