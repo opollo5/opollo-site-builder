@@ -16,11 +16,12 @@ import { SocialPlatformIcon, type SocialPlatformIconKey } from "@/components/ui/
 // CLAUDE-ASSUMPTION (PR 1.1): /company/social/connections/connect/[platform] is a
 // redirect stub because the real connect flow is popup-based via POST
 // /api/platform/social/connections/connect. Logged in DECISION_TRAIL.md.
-const PLATFORMS: Array<{ value: string; icon: SocialPlatformIconKey; label: string }> = [
+const PLATFORMS: Array<{ value: string; icon: SocialPlatformIconKey; label: string; isNew?: boolean }> = [
   { value: "linkedin", icon: "LINKEDIN", label: "LinkedIn" },
   { value: "facebook", icon: "FACEBOOK", label: "Facebook" },
   { value: "instagram", icon: "INSTAGRAM", label: "Instagram" },
   { value: "x", icon: "TWITTER", label: "X (Twitter)" },
+  { value: "tiktok", icon: "TIKTOK", label: "TikTok", isNew: true },
   { value: "google_business_profile", icon: "GOOGLE_BUSINESS", label: "Google Business Profile" },
 ];
 
@@ -91,7 +92,7 @@ export function AddProfileDropdown({ className }: AddProfileDropdownProps) {
           className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-border bg-popover shadow-lg"
         >
           <div className="p-1">
-            {PLATFORMS.map(({ value, icon, label }) => (
+            {PLATFORMS.map(({ value, icon, label, isNew }) => (
               <Link
                 key={value}
                 href={`/company/social/connections/connect/${value}`}
@@ -101,7 +102,12 @@ export function AddProfileDropdown({ className }: AddProfileDropdownProps) {
                 className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
               >
                 <SocialPlatformIcon platform={icon} size={16} className="shrink-0" />
-                {label}
+                <span className="flex-1">{label}</span>
+                {isNew && (
+                  <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-xs font-semibold text-primary leading-none">
+                    New
+                  </span>
+                )}
               </Link>
             ))}
           </div>
