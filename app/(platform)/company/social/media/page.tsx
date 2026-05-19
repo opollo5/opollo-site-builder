@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { MediaLibraryClient } from "@/components/MediaLibraryClient";
-import { H1, Lead } from "@/components/ui/typography";
+import { Alert } from "@/components/ui/alert";
+import { TGrid } from "@/templates";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listMediaAssets } from "@/lib/platform/social/media";
 
@@ -23,15 +24,21 @@ export default async function CompanySocialMediaPage() {
   if (!session) {
     redirect(`/login?next=${encodeURIComponent("/company/social/media")}`);
   }
+
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-base">
-        <p className="font-medium">Account not provisioned to a company.</p>
-        <p className="mt-1 text-muted-foreground">
-          Your account isn&apos;t a member of any company on the platform
-          yet. Ask an admin to invite you, or contact Opollo support.
-        </p>
-      </div>
+      <TGrid
+        title="Media library"
+        subtitle="Reusable images and video for your social posts. Add an asset here, then attach by id when scheduling."
+        inlineAlert={
+          <Alert variant="destructive" title="Account not provisioned">
+            Your account isn&apos;t a member of any company on the platform yet. Ask an admin to
+            invite you, or contact Opollo support.
+          </Alert>
+        }
+      >
+        <></>
+      </TGrid>
     );
   }
 
@@ -42,31 +49,25 @@ export default async function CompanySocialMediaPage() {
   ]);
 
   return (
-    <>
-      <header>
-        <H1>Media library</H1>
-        <Lead className="mt-0.5">
-          Reusable images and video for your social posts. Add an asset
-          here, then attach by id when scheduling.
-        </Lead>
-      </header>
-      <div className="mt-6">
-        {listResult.ok ? (
-          <MediaLibraryClient
-            companyId={companyId}
-            initialAssets={listResult.data.assets}
-            initialNextCursor={listResult.data.nextCursor}
-            canEdit={canEdit}
-          />
-        ) : (
-          <div
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
-            role="alert"
-          >
-            Failed to load media: {listResult.error.message}
-          </div>
-        )}
-      </div>
-    </>
+    <TGrid
+      title="Media library"
+      subtitle="Reusable images and video for your social posts. Add an asset here, then attach by id when scheduling."
+      inlineAlert={
+        listResult.ok ? undefined : (
+          <Alert variant="destructive" title="Failed to load media">
+            {listResult.error.message}
+          </Alert>
+        )
+      }
+    >
+      {listResult.ok && (
+        <MediaLibraryClient
+          companyId={companyId}
+          initialAssets={listResult.data.assets}
+          initialNextCursor={listResult.data.nextCursor}
+          canEdit={canEdit}
+        />
+      )}
+    </TGrid>
   );
 }

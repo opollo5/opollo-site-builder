@@ -3,13 +3,12 @@ import { notFound, redirect } from "next/navigation";
 
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { H3 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
 import { RegenerateButton } from "@/components/RegenerateButton";
+import { TDetailEditor } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getPage } from "@/lib/pages";
 import { listRegenJobsForPage } from "@/lib/regeneration-publisher";
@@ -113,28 +112,27 @@ export default async function PageDetail({
   );
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: page.site_name, href: `/admin/sites/${params.id}` },
-            { label: "Pages", href: backHref },
-            { label: page.title.slice(0, 60) },
-          ]}
-        />
-        <PageHeader.Title>{page.title}</PageHeader.Title>
-        <PageHeader.Meta>
+    <TDetailEditor
+      title={page.title}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: page.site_name, href: `/admin/sites/${params.id}` },
+        { label: "Pages", href: backHref },
+        { label: page.title.slice(0, 60) },
+      ]}
+      meta={
+        <>
           {statusBadge(page.status)}
           <span className="rounded bg-muted px-2 py-0.5">
             {page.page_type.replace(/_/g, " ")}
           </span>
           <span>/{page.slug}</span>
           <span>· updated {formatRelativeTime(page.updated_at)}</span>
-        </PageHeader.Meta>
-        <PageHeader.Actions>
-          <div className="flex items-center gap-3">
+        </>
+      }
+      actions={
+        <div className="flex items-center gap-3">
           <RegenerateButton
             siteId={params.id}
             pageId={page.id}
@@ -177,10 +175,9 @@ export default async function PageDetail({
               )}
             </>
           )}
-          </div>
-        </PageHeader.Actions>
-      </PageHeader>
-
+        </div>
+      }
+    >
       <section className="grid gap-6 md:grid-cols-[2fr_1fr]">
         <PageHtmlPreview html={page.generated_html} />
 
@@ -232,6 +229,6 @@ export default async function PageDetail({
           <RegenHistoryPanel jobs={regenJobs} />
         </div>
       </section>
-    </PageShell>
+    </TDetailEditor>
   );
 }

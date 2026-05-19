@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { SetupWizard } from "@/components/SetupWizard";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TWizardStep } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import {
   computeResumeStep,
@@ -89,24 +88,16 @@ export default async function SiteSetupPage({
   const step: SetupStep = requested;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Setup" },
-          ]}
-        />
-        <PageHeader.Title>Set up {site.name}</PageHeader.Title>
-        <PageHeader.Subtitle>
-          A two-step setup that gives every generated page a consistent
-          look and voice. Skip any step to fall back to the default
-          styles — you can return any time.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
+    <TWizardStep
+      title={`Set up ${site.name}`}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name, href: `/admin/sites/${site.id}` },
+        { label: "Setup" },
+      ]}
+      subtitle="A two-step setup that gives every generated page a consistent look and voice. Skip any step to fall back to the default styles — you can return any time."
+    >
       <div className="mx-auto max-w-4xl">
         <SetupWizard
           siteId={site.id}
@@ -114,6 +105,6 @@ export default async function SiteSetupPage({
           status={status}
         />
       </div>
-    </PageShell>
+    </TWizardStep>
   );
 }

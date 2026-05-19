@@ -21,3 +21,15 @@ export type { TDashboardKpiProps, KpiItem } from "./T-DASHBOARD-KPI";
 
 export { TDetailTabbed } from "./T-DETAIL-TABBED";
 export type { TDetailTabbedProps, TabItem } from "./T-DETAIL-TABBED";
+
+export { TDetailEditor } from "./T-DETAIL-EDITOR";
+export type { TDetailEditorProps } from "./T-DETAIL-EDITOR";
+
+export { TWizardStep } from "./T-WIZARD-STEP";
+export type { TWizardStepProps } from "./T-WIZARD-STEP";
+
+export { TReviewLink } from "./T-REVIEW-LINK";
+export type { TReviewLinkProps } from "./T-REVIEW-LINK";
+
+export { TGrid } from "./T-GRID";
+export type { TGridProps } from "./T-GRID";

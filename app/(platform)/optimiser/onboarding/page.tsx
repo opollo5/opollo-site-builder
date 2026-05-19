@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import { listClients } from "@/lib/optimiser/clients";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { NewClientForm } from "@/components/optimiser/NewClientForm";
+import { TWizardStep } from "@/templates";
 
 export const metadata = { title: "Optimiser · Onboarding" };
 export const dynamic = "force-dynamic";
@@ -14,78 +14,76 @@ export default async function OptimiserOnboardingHome() {
   const onboarded = clients.filter((c) => c.onboarded_at);
 
   return (
-    <div className="space-y-8">
-      <PageHeader>
-        <PageHeader.Title>Onboarding</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Five-step gated checklist per spec §7.1. Steps unlock as each verification passes.
-        </PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <Button asChild variant="outline">
-            <Link href="/optimiser">Back to optimiser</Link>
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
+    <TWizardStep
+      title="Onboarding"
+      subtitle="Five-step gated checklist per spec §7.1. Steps unlock as each verification passes."
+      actions={
+        <Button asChild variant="outline">
+          <Link href="/optimiser">Back to optimiser</Link>
+        </Button>
+      }
+    >
+      <div className="space-y-8">
+        <section className="space-y-3 rounded-lg border border-border bg-card p-6">
+          <h2 className="text-lg font-medium">Add a client</h2>
+          <NewClientForm />
+        </section>
 
-      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium">Add a client</h2>
-        <NewClientForm />
-      </section>
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">In progress</h2>
+          {onboarding.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None.</p>
+          ) : (
+            <ul className="space-y-2">
+              {onboarding.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between rounded-md border border-border bg-card px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium">{c.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {c.client_slug} · created {new Date(c.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <Button asChild>
+                    <Link href={`/optimiser/onboarding/${c.id}`}>Continue</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">In progress</h2>
-        {onboarding.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None.</p>
-        ) : (
-          <ul className="space-y-2">
-            {onboarding.map((c) => (
-              <li
-                key={c.id}
-                className="flex items-center justify-between rounded-md border border-border bg-card px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium">{c.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {c.client_slug} · created {new Date(c.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <Button asChild>
-                  <Link href={`/optimiser/onboarding/${c.id}`}>Continue</Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Onboarded</h2>
-        {onboarded.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None yet.</p>
-        ) : (
-          <ul className="space-y-2">
-            {onboarded.map((c) => (
-              <li
-                key={c.id}
-                className="flex items-center justify-between rounded-md border border-border bg-card px-4 py-3"
-              >
-                <div>
-                  <p className="font-medium">{c.name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {c.client_slug} ·{" "}
-                    {c.onboarded_at
-                      ? `onboarded ${new Date(c.onboarded_at).toLocaleDateString()}`
-                      : ""}
-                  </p>
-                </div>
-                <Button asChild variant="outline">
-                  <Link href={`/optimiser/onboarding/${c.id}`}>Settings</Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+        <section className="space-y-3">
+          <h2 className="text-lg font-medium">Onboarded</h2>
+          {onboarded.length === 0 ? (
+            <p className="text-sm text-muted-foreground">None yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {onboarded.map((c) => (
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between rounded-md border border-border bg-card px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium">{c.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {c.client_slug} ·{" "}
+                      {c.onboarded_at
+                        ? `onboarded ${new Date(c.onboarded_at).toLocaleDateString()}`
+                        : ""}
+                    </p>
+                  </div>
+                  <Button asChild variant="outline">
+                    <Link href={`/optimiser/onboarding/${c.id}`}>Settings</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </TWizardStep>
   );
 }
