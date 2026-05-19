@@ -2,12 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { AbTestStatusBanner } from "@/components/optimiser/AbTestStatusBanner";
 import { ScoreBreakdownPanel } from "@/components/optimiser/ScoreBreakdownPanel";
 import { StagedRolloutBanner } from "@/components/optimiser/StagedRolloutBanner";
 import { ScoreHistoryTable } from "@/components/optimiser/ScoreHistoryTable";
 import { ScoreSparkline } from "@/components/optimiser/ScoreSparkline";
+import { TDetailSummary } from "@/templates";
 import {
   buildDeltaMapByProposal,
   listCausalDeltasForPage,
@@ -127,48 +127,53 @@ export default async function OptimiserPageDetail({
   const latestRollout = await getLatestRolloutForLandingPage(page.id);
 
   return (
-    <div className="space-y-6">
-      <PageHeader>
-        <PageHeader.Title>{page.display_name ?? page.url}</PageHeader.Title>
-        <PageHeader.Subtitle>
-          <span className="font-mono">{page.url}</span>
-        </PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <Button asChild variant="outline">
-            <Link href={`/optimiser/clients/${client.id}/settings`}>
-              Score weights
-            </Link>
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
-
-      <AbTestStatusBanner test={latestTest as never} />
-      <StagedRolloutBanner rollout={latestRollout} />
-
-      {composite ? (
-        <ScoreBreakdownPanel
-          result={composite}
-          subscores={{
-            alignment: alignmentScore,
-            behaviour: behaviour?.score ?? null,
-            conversion: conversion?.score ?? null,
-            technical: technical?.score ?? null,
-          }}
-          reliability={reliability.reliability}
-          draggingSubscore={dragging}
-        />
-      ) : (
-        <section className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          Gathering data — composite score available once §9.5 thresholds
-          are met (sessions ≥ 100, freshness ≤ 7 days, behaviour data
-          present).
-        </section>
-      )}
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
-        <header className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">Score history</h2>
-          {sparkline.length > 0 && (
+    <TDetailSummary
+      title={page.display_name ?? page.url}
+      breadcrumb={[
+        { label: "Optimiser", href: "/optimiser" },
+        { label: "Pages", href: `/optimiser/clients/${client.id}` },
+        { label: page.display_name ?? page.url },
+      ]}
+      meta={<span className="font-mono">{page.url}</span>}
+      actions={
+        <Button asChild variant="outline">
+          <Link href={`/optimiser/clients/${client.id}/settings`}>
+            Score weights
+          </Link>
+        </Button>
+      }
+      sections={[
+        {
+          title: "Performance",
+          content: (
+            <div className="space-y-4">
+              <AbTestStatusBanner test={latestTest as never} />
+              <StagedRolloutBanner rollout={latestRollout} />
+              {composite ? (
+                <ScoreBreakdownPanel
+                  result={composite}
+                  subscores={{
+                    alignment: alignmentScore,
+                    behaviour: behaviour?.score ?? null,
+                    conversion: conversion?.score ?? null,
+                    technical: technical?.score ?? null,
+                  }}
+                  reliability={reliability.reliability}
+                  draggingSubscore={dragging}
+                />
+              ) : (
+                <section className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                  Gathering data — composite score available once §9.5 thresholds
+                  are met (sessions ≥ 100, freshness ≤ 7 days, behaviour data
+                  present).
+                </section>
+              )}
+            </div>
+          ),
+        },
+        {
+          title: "Score history",
+          actions: sparkline.length > 0 ? (
             <ScoreSparkline
               points={sparkline.map((row) => ({
                 value: row.composite_score,
@@ -178,15 +183,17 @@ export default async function OptimiserPageDetail({
               width={240}
               height={56}
             />
-          )}
-        </header>
-        <ScoreHistoryTable
-          pageId={page.id}
-          history={history}
-          causalDeltas={causalDeltas}
-        />
-      </section>
-    </div>
+          ) : undefined,
+          content: (
+            <ScoreHistoryTable
+              pageId={page.id}
+              history={history}
+              causalDeltas={causalDeltas}
+            />
+          ),
+        },
+      ]}
+    />
   );
 }
 

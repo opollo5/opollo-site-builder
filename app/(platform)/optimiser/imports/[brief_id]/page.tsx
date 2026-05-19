@@ -2,8 +2,8 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { ImportSideBySide } from "@/components/optimiser/ImportSideBySide";
+import { TDetailSummary } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getImportDetails } from "@/lib/optimiser/page-import/read-import";
 
@@ -28,41 +28,44 @@ export default async function OptimiserImportReviewPage({
     : null;
 
   return (
-    <div className="space-y-6">
-      <PageHeader>
-        <PageHeader.Title>
-          Import review — {details.brief_page.title}
-        </PageHeader.Title>
-        <PageHeader.Subtitle>
-          Brief status:{" "}
-          <code className="font-mono text-sm">{details.brief.status}</code>
-          {" · "}
-          {details.brief_page.word_count.toLocaleString()} words captured
+    <TDetailSummary
+      title={`Import review — ${details.brief_page.title}`}
+      breadcrumb={[
+        { label: "Optimiser", href: "/optimiser" },
+        { label: "Imports" },
+      ]}
+      meta={
+        <>
+          <span>
+            Brief status:{" "}
+            <code className="font-mono text-sm">{details.brief.status}</code>
+          </span>
+          <span>{details.brief_page.word_count.toLocaleString()} words captured</span>
           {details.brief_page.import_source_url && (
-            <>
-              {" · "}
-              <span className="font-mono text-sm">
-                {details.brief_page.import_source_url}
-              </span>
-            </>
+            <span className="font-mono text-sm">
+              {details.brief_page.import_source_url}
+            </span>
           )}
-        </PageHeader.Subtitle>
-        {briefRunHref && (
-          <PageHeader.Actions>
-            <Button asChild variant="outline">
-              <Link href={briefRunHref}>Brief run progress</Link>
-            </Button>
-          </PageHeader.Actions>
-        )}
-      </PageHeader>
-
-      <ImportSideBySide
-        cachedHtml={details.brief_page.source_text}
-        liveUrl={details.brief_page.import_source_url}
-        briefRunStatus={details.brief_run?.status ?? null}
-        briefRunHref={briefRunHref}
-        briefRunCreatedAt={details.brief_run?.created_at ?? null}
-      />
-    </div>
+        </>
+      }
+      actions={
+        briefRunHref ? (
+          <Button asChild variant="outline">
+            <Link href={briefRunHref}>Brief run progress</Link>
+          </Button>
+        ) : undefined
+      }
+      sections={[{
+        content: (
+          <ImportSideBySide
+            cachedHtml={details.brief_page.source_text}
+            liveUrl={details.brief_page.import_source_url}
+            briefRunStatus={details.brief_run?.status ?? null}
+            briefRunHref={briefRunHref}
+            briefRunCreatedAt={details.brief_run?.created_at ?? null}
+          />
+        ),
+      }]}
+    />
   );
 }

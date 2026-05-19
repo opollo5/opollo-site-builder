@@ -4,8 +4,7 @@ import { BatchesTable, type BatchRow } from "@/components/BatchesTable";
 import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TListStandard } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -63,23 +62,22 @@ export default async function AdminBatchesSitePage({
 
   const site = { id: siteRes.data.id as string, name: siteRes.data.name as string };
 
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Batches", href: "/admin/batches" },
+    { label: site.name },
+  ];
+
   if (error) {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb
-            segments={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Batches", href: "/admin/batches" },
-              { label: site.name },
-            ]}
-          />
-          <PageHeader.Title>Batches — {site.name}</PageHeader.Title>
-        </PageHeader>
+      <TListStandard
+        title={`Batches — ${site.name}`}
+        breadcrumb={breadcrumb}
+      >
         <Alert variant="destructive" title="Failed to load batches">
           {error.message}
         </Alert>
-      </PageShell>
+      </TListStandard>
     );
   }
 
@@ -142,25 +140,13 @@ export default async function AdminBatchesSitePage({
   const subtitle = `${rows.length} ${rows.length === 1 ? "batch" : "batches"} for ${site.name}.`;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Batches", href: "/admin/batches" },
-            { label: site.name },
-          ]}
-        />
-        <PageHeader.Title>Batches — {site.name}</PageHeader.Title>
-        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <NewBatchButton site={site} templates={templateOptions} label="New batch" />
-        </PageHeader.Actions>
-      </PageHeader>
-
-      <div>
-        <BatchesTable rows={rows} siteId={params.siteId} />
-      </div>
-    </PageShell>
+    <TListStandard
+      title={`Batches — ${site.name}`}
+      breadcrumb={breadcrumb}
+      subtitle={subtitle}
+      actions={<NewBatchButton site={site} templates={templateOptions} label="New batch" />}
+    >
+      <BatchesTable rows={rows} siteId={params.siteId} />
+    </TListStandard>
   );
 }

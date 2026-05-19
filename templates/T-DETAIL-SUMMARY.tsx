@@ -8,7 +8,7 @@ import type { CalloutProps } from "@/components/ui/callout";
 import type { BreadcrumbSegment } from "./T-LIST-STANDARD";
 
 export interface TDetailSummarySection {
-  title: string;
+  title?: string;
   subtitle?: string;
   actions?: React.ReactNode;
   content: React.ReactNode;
@@ -17,7 +17,7 @@ export interface TDetailSummarySection {
 export interface TDetailSummaryProps {
   title: string;
   breadcrumb?: BreadcrumbSegment[];
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   actions?: React.ReactNode;
   meta?: React.ReactNode;
   /** Optional stacked callout banners above the sections. */
@@ -74,14 +74,19 @@ export function TDetailSummary({
 
       <div className={sidebar ? "flex gap-6" : undefined}>
         <div className={sidebar ? "min-w-0 flex-1 space-y-8" : "space-y-8"}>
-          {sections.map((section) => (
-            <section key={section.title} aria-labelledby={`section-${section.title.replace(/\s+/g, "-").toLowerCase()}`}>
-              <SectionHeader
-                title={section.title}
-                subtitle={section.subtitle}
-                actions={section.actions}
-                className="mb-4"
-              />
+          {sections.map((section, i) => (
+            <section
+              key={section.title ?? i}
+              aria-labelledby={section.title ? `section-${section.title.replace(/\s+/g, "-").toLowerCase()}` : undefined}
+            >
+              {section.title && (
+                <SectionHeader
+                  title={section.title}
+                  subtitle={section.subtitle}
+                  actions={section.actions}
+                  className="mb-4"
+                />
+              )}
               {section.content}
             </section>
           ))}

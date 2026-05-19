@@ -6,11 +6,8 @@ import { DownloadImageButton } from "@/components/DownloadImageButton";
 import { ImageDeleteButton } from "@/components/ImageDeleteButton";
 import { ImageDetailLightbox } from "@/components/ImageDetailLightbox";
 import { ReextractMetadataButton } from "@/components/ReextractMetadataButton";
-import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { H3 } from "@/components/ui/typography";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TDetailSummary } from "@/templates";
 import { EditImageMetadataButton } from "@/components/EditImageMetadataButton";
 import { ImageArchiveButton } from "@/components/ImageArchiveButton";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -112,9 +109,23 @@ export default async function AdminImageDetailPage({
   if (!result.ok) {
     if (result.error.code === "NOT_FOUND") notFound();
     return (
-      <Alert variant="destructive" title="Failed to load image">
-        {result.error.message}
-      </Alert>
+      <TDetailSummary
+        title="Failed to load image"
+        breadcrumb={[
+          { label: "Admin", href: "/admin/sites" },
+          { label: "Images", href: "/admin/images" },
+        ]}
+        sections={[{
+          content: (
+            <div
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+              role="alert"
+            >
+              {result.error.message}
+            </div>
+          ),
+        }]}
+      />
     );
   }
 
@@ -133,27 +144,27 @@ export default async function AdminImageDetailPage({
   const thumbUrl = publicUrl;
 
   const titleLabel = image.title ?? image.filename ?? "Untitled image";
+
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Images", href: backHref },
-            { label: image.title ?? image.caption?.slice(0, 60) ?? image.filename ?? image.id },
-          ]}
-        />
-        <PageHeader.Title>{titleLabel}</PageHeader.Title>
-        <PageHeader.Meta>
+    <TDetailSummary
+      title={titleLabel}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Images", href: backHref },
+        { label: image.title ?? image.caption?.slice(0, 60) ?? image.filename ?? image.id },
+      ]}
+      meta={
+        <>
           <span>Imported {formatDate(image.created_at)}</span>
           {image.deleted_at && (
             <span className="text-destructive">
               archived {formatRelativeTime(image.deleted_at)}
             </span>
           )}
-        </PageHeader.Meta>
-        <PageHeader.Actions>
-          <div className="flex flex-wrap items-center gap-3">
+        </>
+      }
+      actions={
+        <div className="flex flex-wrap items-center gap-3">
           {!image.deleted_at && (
             <EditImageMetadataButton
               image={{
@@ -180,219 +191,210 @@ export default async function AdminImageDetailPage({
           {image.deleted_at && (
             <ImageDeleteButton imageId={image.id} />
           )}
-          </div>
-        </PageHeader.Actions>
-      </PageHeader>
-
-      <section className="grid gap-6 md:grid-cols-[1fr_2fr]">
-        <div className="flex flex-col gap-3">
-          <div className="overflow-hidden rounded-md border bg-muted/30">
-            {publicUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={publicUrl}
-                alt={image.alt_text ?? image.filename ?? "Library image"}
-                className="h-full w-full object-contain"
-                data-testid="image-detail-preview"
-              />
-            ) : (
-              <div className="flex h-64 w-full items-center justify-center text-sm text-muted-foreground">
-                Preview unavailable (no Cloudflare id or delivery hash).
-              </div>
-            )}
-          </div>
-          {thumbUrl && (
-            <div className="flex items-center gap-3 text-sm text-muted-foreground">
-              <span>Thumbnail:</span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumbUrl}
-                alt=""
-                className="h-10 w-10 rounded object-cover"
-              />
-              <ImageDetailLightbox
-                src={thumbUrl}
-                alt={image.alt_text ?? image.filename ?? "Library image"}
-                title={image.title}
-                caption={image.caption}
-                tags={image.tags}
-                width_px={image.width_px}
-                height_px={image.height_px}
-              />
-            </div>
-          )}
         </div>
-
-        <dl
-          className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"
-          data-testid="image-detail-fields"
-        >
-          <dt className="text-muted-foreground">Title</dt>
-          <dd>
-            {image.title ?? (
-              <span className="text-muted-foreground">(not set)</span>
-            )}
-          </dd>
-          <dt className="text-muted-foreground">Caption</dt>
-          <dd>
-            {image.caption ?? (
-              <span className="text-muted-foreground">(no caption yet)</span>
-            )}
-          </dd>
-          <dt className="text-muted-foreground">Alt text</dt>
-          <dd>
-            {image.alt_text ?? (
-              <span className="text-muted-foreground">(not set)</span>
-            )}
-          </dd>
-          <dt className="text-muted-foreground">Tags</dt>
-          <dd>
-            {image.tags.length === 0 ? (
-              <span className="text-muted-foreground">—</span>
-            ) : (
-              <div className="flex flex-wrap gap-1">
-                {image.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded bg-muted px-2 py-0.5 text-sm"
-                  >
-                    {tag}
-                  </span>
-                ))}
+      }
+      sections={[
+        {
+          content: (
+            <section className="grid gap-6 md:grid-cols-[1fr_2fr]">
+              <div className="flex flex-col gap-3">
+                <div className="overflow-hidden rounded-md border bg-muted/30">
+                  {publicUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={publicUrl}
+                      alt={image.alt_text ?? image.filename ?? "Library image"}
+                      className="h-full w-full object-contain"
+                      data-testid="image-detail-preview"
+                    />
+                  ) : (
+                    <div className="flex h-64 w-full items-center justify-center text-sm text-muted-foreground">
+                      Preview unavailable (no Cloudflare id or delivery hash).
+                    </div>
+                  )}
+                </div>
+                {thumbUrl && (
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <span>Thumbnail:</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={thumbUrl}
+                      alt=""
+                      className="h-10 w-10 rounded object-cover"
+                    />
+                    <ImageDetailLightbox
+                      src={thumbUrl}
+                      alt={image.alt_text ?? image.filename ?? "Library image"}
+                      title={image.title}
+                      caption={image.caption}
+                      tags={image.tags}
+                      width_px={image.width_px}
+                      height_px={image.height_px}
+                    />
+                  </div>
+                )}
               </div>
-            )}
-          </dd>
-          <dt className="text-muted-foreground">Source</dt>
-          <dd className="capitalize">
-            {image.source}
-            {image.source_ref && (
-              <span className="ml-2 text-sm text-muted-foreground">
-                ({image.source_ref})
-              </span>
-            )}
-          </dd>
-          <dt className="text-muted-foreground">Dimensions</dt>
-          <dd>
-            {image.width_px && image.height_px
-              ? `${image.width_px}×${image.height_px} px`
-              : "—"}
-          </dd>
-          <dt className="text-muted-foreground">File size</dt>
-          <dd>{formatBytes(image.bytes)}</dd>
-        </dl>
-      </section>
 
-      <section className="mt-8">
-        <H3>
-          Used on sites{" "}
-          <span className="text-sm font-normal text-muted-foreground">
-            ({usage.length})
-          </span>
-        </H3>
-        <p className="text-base text-muted-foreground">
-          Every WP site this image has been mirrored to via the publish pipeline.
-        </p>
-        <div className="mt-3" data-testid="image-usage-list">
-          {usage.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              Not yet used on any site.
-            </div>
-          ) : (
-            <div className="overflow-hidden rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-2 font-medium">Site</th>
-                    <th className="px-4 py-2 font-medium">State</th>
-                    <th className="px-4 py-2 font-medium">WP media</th>
-                    <th className="px-4 py-2 font-medium">Transferred</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {usage.map((u) => (
-                    <tr
-                      key={u.id}
-                      className="border-b last:border-b-0"
-                      data-site-id={u.site_id}
-                    >
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/sites/${u.site_id}`}
-                          className="font-medium hover:underline"
+              <dl
+                className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm"
+                data-testid="image-detail-fields"
+              >
+                <dt className="text-muted-foreground">Title</dt>
+                <dd>
+                  {image.title ?? (
+                    <span className="text-muted-foreground">(not set)</span>
+                  )}
+                </dd>
+                <dt className="text-muted-foreground">Caption</dt>
+                <dd>
+                  {image.caption ?? (
+                    <span className="text-muted-foreground">(no caption yet)</span>
+                  )}
+                </dd>
+                <dt className="text-muted-foreground">Alt text</dt>
+                <dd>
+                  {image.alt_text ?? (
+                    <span className="text-muted-foreground">(not set)</span>
+                  )}
+                </dd>
+                <dt className="text-muted-foreground">Tags</dt>
+                <dd>
+                  {image.tags.length === 0 ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {image.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded bg-muted px-2 py-0.5 text-sm"
                         >
-                          {u.site_name}
-                        </Link>
-                        {u.wp_url && (
-                          <div className="text-sm text-muted-foreground">
-                            {u.wp_url}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{usageStateBadge(u.state)}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {u.wp_media_id !== null ? (
-                          u.wp_source_url ? (
-                            <a
-                              href={u.wp_source_url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="hover:underline"
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </dd>
+                <dt className="text-muted-foreground">Source</dt>
+                <dd className="capitalize">
+                  {image.source}
+                  {image.source_ref && (
+                    <span className="ml-2 text-sm text-muted-foreground">
+                      ({image.source_ref})
+                    </span>
+                  )}
+                </dd>
+                <dt className="text-muted-foreground">Dimensions</dt>
+                <dd>
+                  {image.width_px && image.height_px
+                    ? `${image.width_px}×${image.height_px} px`
+                    : "—"}
+                </dd>
+                <dt className="text-muted-foreground">File size</dt>
+                <dd>{formatBytes(image.bytes)}</dd>
+              </dl>
+            </section>
+          ),
+        },
+        {
+          title: `Used on sites (${usage.length})`,
+          subtitle: "Every WP site this image has been mirrored to via the publish pipeline.",
+          content: (
+            <div data-testid="image-usage-list">
+              {usage.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Not yet used on any site.
+                </div>
+              ) : (
+                <div className="overflow-hidden rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="border-b bg-muted/40 text-left text-sm uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-2 font-medium">Site</th>
+                        <th className="px-4 py-2 font-medium">State</th>
+                        <th className="px-4 py-2 font-medium">WP media</th>
+                        <th className="px-4 py-2 font-medium">Transferred</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usage.map((u) => (
+                        <tr
+                          key={u.id}
+                          className="border-b last:border-b-0"
+                          data-site-id={u.site_id}
+                        >
+                          <td className="px-4 py-3">
+                            <Link
+                              href={`/admin/sites/${u.site_id}`}
+                              className="font-medium hover:underline"
                             >
-                              #{u.wp_media_id}
-                            </a>
-                          ) : (
-                            `#${u.wp_media_id}`
-                          )
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">
-                        {u.transferred_at
-                          ? formatRelativeTime(u.transferred_at)
-                          : "—"}
-                      </td>
-                    </tr>
+                              {u.site_name}
+                            </Link>
+                            {u.wp_url && (
+                              <div className="text-sm text-muted-foreground">
+                                {u.wp_url}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">{usageStateBadge(u.state)}</td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {u.wp_media_id !== null ? (
+                              u.wp_source_url ? (
+                                <a
+                                  href={u.wp_source_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="hover:underline"
+                                >
+                                  #{u.wp_media_id}
+                                </a>
+                              ) : (
+                                `#${u.wp_media_id}`
+                              )
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {u.transferred_at
+                              ? formatRelativeTime(u.transferred_at)
+                              : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          ),
+        },
+        {
+          title: `Additional metadata (${metadata.length})`,
+          subtitle: "EXIF, licensing notes, model info, and any other per-image attributes tracked outside the main row.",
+          content: (
+            <div data-testid="image-metadata-list">
+              {metadata.length === 0 ? (
+                <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  No additional metadata.
+                </div>
+              ) : (
+                <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 rounded-md border p-4 text-sm">
+                  {metadata.map((m) => (
+                    <Fragment key={m.key}>
+                      <dt className="font-mono text-sm text-muted-foreground">
+                        {m.key}
+                      </dt>
+                      <dd className="break-all font-mono text-sm">
+                        {formatJsonValue(m.value_jsonb)}
+                      </dd>
+                    </Fragment>
                   ))}
-                </tbody>
-              </table>
+                </dl>
+              )}
             </div>
-          )}
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <H3>
-          Additional metadata{" "}
-          <span className="text-sm font-normal text-muted-foreground">
-            ({metadata.length})
-          </span>
-        </H3>
-        <p className="text-base text-muted-foreground">
-          EXIF, licensing notes, model info, and any other per-image attributes
-          tracked outside the main row.
-        </p>
-        <div className="mt-3" data-testid="image-metadata-list">
-          {metadata.length === 0 ? (
-            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No additional metadata.
-            </div>
-          ) : (
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 rounded-md border p-4 text-sm">
-              {metadata.map((m) => (
-                <Fragment key={m.key}>
-                  <dt className="font-mono text-sm text-muted-foreground">
-                    {m.key}
-                  </dt>
-                  <dd className="break-all font-mono text-sm">
-                    {formatJsonValue(m.value_jsonb)}
-                  </dd>
-                </Fragment>
-              ))}
-            </dl>
-          )}
-        </div>
-      </section>
-    </PageShell>
+          ),
+        },
+      ]}
+    />
   );
 }

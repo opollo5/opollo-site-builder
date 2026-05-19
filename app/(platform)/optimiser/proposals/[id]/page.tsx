@@ -8,6 +8,7 @@ import { PatternPriorsPanel } from "@/components/optimiser/PatternPriorsPanel";
 import { ProposalAppliedMoment } from "@/components/optimiser/ProposalAppliedMoment";
 import { ProposalReview } from "@/components/optimiser/ProposalReview";
 import { ProposalRolloutLink } from "@/components/optimiser/ProposalRolloutLink";
+import { TDetailSummary } from "@/templates";
 import { getClient } from "@/lib/optimiser/clients";
 import { listRecentCausalDeltasForPlaybook } from "@/lib/optimiser/causal/read-deltas";
 import { listRelevantPatterns } from "@/lib/optimiser/pattern-library/priors";
@@ -68,72 +69,88 @@ export default async function OptimiserProposalReviewPage({
   const rollout = await getRolloutForProposal(proposal.id);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Button asChild variant="outline" size="sm">
-          <Link href="/optimiser/proposals">← All proposals</Link>
-        </Button>
+    <TDetailSummary
+      title={proposal.headline}
+      breadcrumb={[
+        { label: "Optimiser", href: "/optimiser" },
+        { label: "Proposals", href: "/optimiser/proposals" },
+        { label: "Review" },
+      ]}
+      meta={
         <span className="text-sm text-muted-foreground">
           Status: <code>{proposal.status}</code>
         </span>
-      </div>
-      {proposal.status === "applied" && (
-        <ProposalAppliedMoment
-          proposalId={proposal.id}
-          rolloutHref={
-            rollout
-              ? `/optimiser/pages/${proposal.landing_page_id}`
-              : null
-          }
-        />
-      )}
-      <ProposalRolloutLink
-        rollout={rollout}
-        landingPageId={proposal.landing_page_id}
-      />
-      <PastCausalDeltasPanel
-        deltas={pastDeltas}
-        playbookId={proposal.triggering_playbook_id}
-      />
-      <PatternPriorsPanel
-        patterns={relevantPatterns}
-        playbookId={proposal.triggering_playbook_id}
-      />
-      {canCreateVariant && client && (
-        <CreateVariantButton
-          proposalId={proposal.id}
-          hostingMode={
-            client.hosting_mode as
-              | "opollo_subdomain"
-              | "opollo_cname"
-              | "client_slice"
-          }
-        />
-      )}
-      <ProposalReview
-        proposal={{
-          id: proposal.id,
-          headline: proposal.headline,
-          problem_summary: proposal.problem_summary,
-          risk_level: proposal.risk_level,
-          priority_score: proposal.priority_score,
-          confidence_score: proposal.confidence_score,
-          confidence_sample: proposal.confidence_sample,
-          confidence_freshness: proposal.confidence_freshness,
-          confidence_stability: proposal.confidence_stability,
-          confidence_signal: proposal.confidence_signal,
-          expected_impact_min_pp: proposal.expected_impact_min_pp,
-          expected_impact_max_pp: proposal.expected_impact_max_pp,
-          effort_bucket: proposal.effort_bucket,
-          expires_at: proposal.expires_at,
-          triggering_playbook_id: proposal.triggering_playbook_id,
-          change_set: proposal.change_set,
-          before_snapshot: proposal.before_snapshot,
-          current_performance: proposal.current_performance,
-        }}
-        evidence={evidence}
-        pageUrl={page?.url ?? null}
-      />
-    </div>
+      }
+      actions={
+        <Button asChild variant="outline" size="sm">
+          <Link href="/optimiser/proposals">← All proposals</Link>
+        </Button>
+      }
+      inlineAlert={
+        proposal.status === "applied" ? (
+          <ProposalAppliedMoment
+            proposalId={proposal.id}
+            rolloutHref={
+              rollout
+                ? `/optimiser/pages/${proposal.landing_page_id}`
+                : null
+            }
+          />
+        ) : undefined
+      }
+      sections={[{
+        content: (
+          <div className="space-y-4">
+            <ProposalRolloutLink
+              rollout={rollout}
+              landingPageId={proposal.landing_page_id}
+            />
+            <PastCausalDeltasPanel
+              deltas={pastDeltas}
+              playbookId={proposal.triggering_playbook_id}
+            />
+            <PatternPriorsPanel
+              patterns={relevantPatterns}
+              playbookId={proposal.triggering_playbook_id}
+            />
+            {canCreateVariant && client && (
+              <CreateVariantButton
+                proposalId={proposal.id}
+                hostingMode={
+                  client.hosting_mode as
+                    | "opollo_subdomain"
+                    | "opollo_cname"
+                    | "client_slice"
+                }
+              />
+            )}
+            <ProposalReview
+              proposal={{
+                id: proposal.id,
+                headline: proposal.headline,
+                problem_summary: proposal.problem_summary,
+                risk_level: proposal.risk_level,
+                priority_score: proposal.priority_score,
+                confidence_score: proposal.confidence_score,
+                confidence_sample: proposal.confidence_sample,
+                confidence_freshness: proposal.confidence_freshness,
+                confidence_stability: proposal.confidence_stability,
+                confidence_signal: proposal.confidence_signal,
+                expected_impact_min_pp: proposal.expected_impact_min_pp,
+                expected_impact_max_pp: proposal.expected_impact_max_pp,
+                effort_bucket: proposal.effort_bucket,
+                expires_at: proposal.expires_at,
+                triggering_playbook_id: proposal.triggering_playbook_id,
+                change_set: proposal.change_set,
+                before_snapshot: proposal.before_snapshot,
+                current_performance: proposal.current_performance,
+              }}
+              evidence={evidence}
+              pageUrl={page?.url ?? null}
+            />
+          </div>
+        ),
+      }]}
+    />
   );
 }

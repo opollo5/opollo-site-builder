@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AdminProfileConnectionsList } from "@/components/AdminProfileConnectionsList";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TDetailSummary } from "@/templates";
 import { getPlatformCompany } from "@/lib/platform/companies";
 import { getProfileById } from "@/lib/platform/social/profiles";
 import { readProfileTeamAccounts } from "@/lib/platform/social/profiles/connect";
@@ -33,17 +32,19 @@ export default async function ProfileConnectionsPage({
   if (!companyResult.ok) {
     if (companyResult.error.code === "NOT_FOUND") notFound();
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Title>Failed to load company</PageHeader.Title>
-        </PageHeader>
-        <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-          role="alert"
-        >
-          {companyResult.error.message}
-        </div>
-      </PageShell>
+      <TDetailSummary
+        title="Failed to load company"
+        sections={[{
+          content: (
+            <div
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+              role="alert"
+            >
+              {companyResult.error.message}
+            </div>
+          ),
+        }]}
+      />
     );
   }
   if (!profile) notFound();
@@ -72,42 +73,40 @@ export default async function ProfileConnectionsPage({
   }
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Companies", href: "/admin/companies" },
-            { label: company.name, href: `/admin/companies/${company.id}` },
-            {
-              label: "Social profiles",
-              href: `/admin/companies/${company.id}/social-profiles`,
-            },
-            { label: profile.name },
-          ]}
-        />
-        <PageHeader.Title>
-          {profile.name} — connections
-        </PageHeader.Title>
-        <PageHeader.Meta>
-          {profile.bundle_social_team_id ? (
-            <span className="font-mono" data-testid="profile-team-id">
-              team {profile.bundle_social_team_id}
-            </span>
-          ) : (
-            <span className="italic text-muted-foreground">
-              team not yet provisioned
-            </span>
-          )}
-        </PageHeader.Meta>
-      </PageHeader>
-      <AdminProfileConnectionsList
-        companyId={company.id}
-        profileId={profile.id}
-        profileName={profile.name}
-        initialAccounts={initialAccounts}
-        initialTeamReadError={teamReadError}
-      />
-    </PageShell>
+    <TDetailSummary
+      title={`${profile.name} — connections`}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Companies", href: "/admin/companies" },
+        { label: company.name, href: `/admin/companies/${company.id}` },
+        {
+          label: "Social profiles",
+          href: `/admin/companies/${company.id}/social-profiles`,
+        },
+        { label: profile.name },
+      ]}
+      meta={
+        profile.bundle_social_team_id ? (
+          <span className="font-mono" data-testid="profile-team-id">
+            team {profile.bundle_social_team_id}
+          </span>
+        ) : (
+          <span className="italic text-muted-foreground">
+            team not yet provisioned
+          </span>
+        )
+      }
+      sections={[{
+        content: (
+          <AdminProfileConnectionsList
+            companyId={company.id}
+            profileId={profile.id}
+            profileName={profile.name}
+            initialAccounts={initialAccounts}
+            initialTeamReadError={teamReadError}
+          />
+        ),
+      }]}
+    />
   );
 }

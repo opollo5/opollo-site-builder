@@ -4,14 +4,12 @@ import { redirect } from "next/navigation";
 import { BatchDetailClient } from "@/components/BatchDetailClient";
 import { BatchSuccessMoment } from "@/components/BatchSuccessMoment";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import {
   StatusPill,
   jobStatusKind,
   slotStateKind,
 } from "@/components/ui/status-pill";
-import { H3 } from "@/components/ui/typography";
+import { TDetailSummary } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -61,19 +59,15 @@ export default async function BatchDetailPage({
 
   if (jobErr) {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb
-            segments={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Batches", href: batchesHref },
-              { label: "Error" },
-            ]}
-          />
-          <PageHeader.Title>Failed to load batch</PageHeader.Title>
-        </PageHeader>
-        <Alert variant="destructive">{jobErr.message}</Alert>
-      </PageShell>
+      <TDetailSummary
+        title="Failed to load batch"
+        breadcrumb={[
+          { label: "Admin", href: "/admin/sites" },
+          { label: "Batches", href: batchesHref },
+          { label: "Error" },
+        ]}
+        sections={[{ content: <Alert variant="destructive">{jobErr.message}</Alert> }]}
+      />
     );
   }
   if (!job) {
@@ -120,19 +114,15 @@ export default async function BatchDetailPage({
   const tmpl = job.template as unknown as { name: string; page_type: string };
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Batches", href: batchesHref },
-            { label: `${site.name} · ${tmpl.name}` },
-          ]}
-        />
-        <PageHeader.Title>
-          {site.name} · {tmpl.name}
-        </PageHeader.Title>
-        <PageHeader.Meta>
+    <TDetailSummary
+      title={`${site.name} · ${tmpl.name}`}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Batches", href: batchesHref },
+        { label: `${site.name} · ${tmpl.name}` },
+      ]}
+      meta={
+        <>
           <StatusPill kind={jobStatusKind(job.status as Parameters<typeof jobStatusKind>[0])} />
           <span>
             {job.succeeded_count} ok · {job.failed_count} fail ·{" "}
@@ -147,25 +137,23 @@ export default async function BatchDetailPage({
           {job.finished_at && (
             <span>finished {formatDate(job.finished_at as string)}</span>
           )}
-        </PageHeader.Meta>
-        <PageHeader.Actions>
-          <BatchDetailClient jobId={params.batchId} status={job.status as string} />
-        </PageHeader.Actions>
-      </PageHeader>
-
-      {job.status === "succeeded" && (
-        <BatchSuccessMoment
-          jobId={params.batchId}
-          succeededCount={Number(job.succeeded_count ?? 0)}
-          siteName={site.name}
-          siteId={params.siteId}
-        />
-      )}
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div>
-          <H3>Slots</H3>
-          <div className="mt-2 overflow-x-auto rounded-md border">
+        </>
+      }
+      actions={<BatchDetailClient jobId={params.batchId} status={job.status as string} />}
+      inlineAlert={
+        job.status === "succeeded" ? (
+          <BatchSuccessMoment
+            jobId={params.batchId}
+            succeededCount={Number(job.succeeded_count ?? 0)}
+            siteName={site.name}
+            siteId={params.siteId}
+          />
+        ) : undefined
+      }
+      sections={[{
+        title: "Slots",
+        content: (
+          <div className="overflow-x-auto rounded-md border">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40 text-left text-muted-foreground">
@@ -217,11 +205,12 @@ export default async function BatchDetailPage({
               </tbody>
             </table>
           </div>
-        </div>
-
-        <div>
-          <H3>Recent events</H3>
-          <div className="mt-2 flex flex-col gap-2">
+        ),
+      }]}
+      sidebar={
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold">Recent events</h3>
+          <div className="flex flex-col gap-2">
             {(recentEvents ?? []).map((e) => (
               <div key={String(e.id)} className="rounded-md border p-2 text-sm">
                 <div className="flex items-center justify-between">
@@ -240,7 +229,7 @@ export default async function BatchDetailPage({
             )}
           </div>
         </div>
-      </div>
-    </PageShell>
+      }
+    />
   );
 }
