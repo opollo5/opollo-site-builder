@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 import { constantTimeEqual } from "@/lib/crypto-compare";
+import { sideEffectsGuarded } from "@/lib/runtime-env";
 
 export function authorisedCronRequest(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -17,6 +18,25 @@ export function unauthorisedResponse(): NextResponse {
   return NextResponse.json(
     { ok: false, error: { code: "UNAUTHORIZED", message: "Invalid cron secret.", retryable: false }, timestamp: new Date().toISOString() },
     { status: 401 },
+  );
+}
+
+/**
+ * Returns a 200 skip response when the current environment has side-effects
+ * guarded (staging without STAGING_SIDE_EFFECTS_ENABLED=1). Cron routes that
+ * trigger external calls (AI generation, email sends, social publish) should
+ * call this and return early if the result is non-null.
+ *
+ * Usage:
+ *   const skip = guardedCronSkip("cap-monthly-generation");
+ *   if (skip) return skip;
+ */
+export function guardedCronSkip(jobName: string): NextResponse | null {
+  if (!sideEffectsGuarded()) return null;
+  logger.info(`${jobName}.skipped_in_staging`, { reason: "STAGING_SIDE_EFFECTS_ENABLED not set" });
+  return NextResponse.json(
+    { ok: true, data: { status: "skipped", reason: "staging_side_effects_guarded" }, timestamp: new Date().toISOString() },
+    { status: 200 },
   );
 }
 

@@ -4,6 +4,7 @@ import sgMail from "@sendgrid/mail";
 
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { stagingEmailRecipient } from "@/lib/runtime-env";
 
 // ---------------------------------------------------------------------------
 // AUTH-FOUNDATION P1 — SendGrid send wrapper.
@@ -76,6 +77,17 @@ export type SendEmailResult =
     };
 
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
+  // In staging environments, redirect all email to the staging override recipient
+  // so real users are never contacted during staging tests.
+  const stagingOverride = stagingEmailRecipient();
+  const effectiveTo = stagingOverride ?? input.to;
+  const effectiveSubject = stagingOverride
+    ? `[STAGING → ${input.to}] ${input.subject}`
+    : input.subject;
+  const effectiveInput = stagingOverride
+    ? { ...input, to: effectiveTo, subject: effectiveSubject }
+    : input;
+
   let result: SendEmailResult;
   try {
     configureSendGrid();
@@ -93,27 +105,27 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 
   const from = fromAddress();
   const message = {
-    to: input.to,
+    to: effectiveInput.to,
     from: { email: from.email, name: from.name },
     replyTo: input.replyTo,
-    subject: input.subject,
-    html: input.html,
-    text: input.text,
+    subject: effectiveInput.subject,
+    html: effectiveInput.html,
+    text: effectiveInput.text,
   };
 
   // First attempt + one retry on 5xx. 4xx surfaces immediately.
   result = await attemptSend(message);
   if (!result.ok && result.error.code === "SENDGRID_5XX") {
     logger.warn("sendgrid 5xx — retrying once after 250ms", {
-      to: input.to,
-      subject: input.subject,
+      to: effectiveInput.to,
+      subject: effectiveInput.subject,
       status: result.error.statusCode,
     });
     await new Promise((r) => setTimeout(r, 250));
     result = await attemptSend(message);
   }
 
-  await writeEmailLog(input, result);
+  await writeEmailLog(effectiveInput, result);
   return result;
 }
 
