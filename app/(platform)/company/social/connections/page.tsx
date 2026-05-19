@@ -2,11 +2,11 @@ import { redirect } from "next/navigation";
 
 import { SocialConnectionsList } from "@/components/SocialConnectionsList";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
 import { emitOverdueEventsIfNeeded } from "@/lib/platform/social/connections/overdue-events";
 import { listProfilesForCompany } from "@/lib/platform/social/profiles";
+import { TListStandard } from "@/templates";
 
 // ---------------------------------------------------------------------------
 // S1-12 / S1-16 — customer connections roster at /company/social/connections.
@@ -192,16 +192,11 @@ export default async function CompanySocialConnectionsPage({
   }
 
   return (
-    <>
-      <header>
-        <H1>Social connections</H1>
-        <Lead className="mt-0.5">
-          Each platform you publish to has one connection. Reconnect
-          flows when a credential expires.
-        </Lead>
-      </header>
-
-      <div className="mt-6 space-y-8">
+    <TListStandard
+      title="Social connections"
+      subtitle="Each platform you publish to has one connection. Reconnect flows when a credential expires."
+    >
+      <div className="space-y-8">
         <ConnectBanner params={searchParams ?? {}} />
         {!listResult.ok ? (
           <Alert
@@ -253,6 +248,6 @@ export default async function CompanySocialConnectionsPage({
           ))
         )}
       </div>
-    </>
+    </TListStandard>
   );
 }

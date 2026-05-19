@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { AdminProfileAnalyticsClient } from "@/components/AdminProfileAnalyticsClient";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { Alert } from "@/components/ui/alert";
 import { getPlatformCompany } from "@/lib/platform/companies";
+import { TDashboardKpi } from "@/templates";
 import { getProfileAnalyticsDashboard } from "@/lib/platform/social/analytics-ingest";
 import { getProfileById } from "@/lib/platform/social/profiles";
 
@@ -32,17 +32,11 @@ export default async function ProfileAnalyticsPage({
   if (!companyResult.ok) {
     if (companyResult.error.code === "NOT_FOUND") notFound();
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Title>Failed to load company</PageHeader.Title>
-        </PageHeader>
-        <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-          role="alert"
-        >
-          {companyResult.error.message}
-        </div>
-      </PageShell>
+      <TDashboardKpi
+        title="Analytics"
+        kpis={[]}
+        dataSections={[{ title: "Error", content: <Alert variant="destructive">{companyResult.error.message}</Alert> }]}
+      />
     );
   }
   if (!profile) notFound();
@@ -56,34 +50,33 @@ export default async function ProfileAnalyticsPage({
   });
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Companies", href: "/admin/companies" },
-            { label: company.name, href: `/admin/companies/${company.id}` },
-            {
-              label: "Social profiles",
-              href: `/admin/companies/${company.id}/social-profiles`,
-            },
-            { label: profile.name },
-            { label: "Analytics" },
-          ]}
-        />
-        <PageHeader.Title>{profile.name} — analytics</PageHeader.Title>
-        <PageHeader.Meta>
-          <span className="text-muted-foreground">
-            bundle.social-sourced engagement metrics
-          </span>
-        </PageHeader.Meta>
-      </PageHeader>
-      <AdminProfileAnalyticsClient
-        companyId={company.id}
-        profileId={profile.id}
-        profileName={profile.name}
-        initialDashboard={initialDashboard}
-      />
-    </PageShell>
+    <TDashboardKpi
+      title={`${profile.name} — analytics`}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Companies", href: "/admin/companies" },
+        { label: company.name, href: `/admin/companies/${company.id}` },
+        {
+          label: "Social profiles",
+          href: `/admin/companies/${company.id}/social-profiles`,
+        },
+        { label: profile.name },
+        { label: "Analytics" },
+      ]}
+      kpis={[]}
+      dataSections={[
+        {
+          title: "bundle.social-sourced engagement metrics",
+          content: (
+            <AdminProfileAnalyticsClient
+              companyId={company.id}
+              profileId={profile.id}
+              profileName={profile.name}
+              initialDashboard={initialDashboard}
+            />
+          ),
+        },
+      ]}
+    />
   );
 }

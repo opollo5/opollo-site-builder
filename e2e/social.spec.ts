@@ -107,8 +107,8 @@ test.describe("social platform", () => {
     const empty = page.getByTestId("timeline-empty");
     await expect(feed.or(empty)).toBeVisible({ timeout: 15_000 });
 
-    // Shell toolbar must be present.
-    await expect(page.getByTestId("social-module-shell")).toBeVisible();
+    // Page heading must be present.
+    await expect(page.getByRole("heading", { name: /timeline/i })).toBeVisible();
 
     await auditA11y(page, testInfo);
   });

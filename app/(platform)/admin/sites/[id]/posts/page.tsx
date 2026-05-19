@@ -5,10 +5,9 @@ import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBan
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
 import { NavIcon } from "@/components/ui/nav-icon";
+import { TListStandard } from "@/templates";
 import {
   LIST_POSTS_DEFAULT_LIMIT,
   listPostsForSite,
@@ -140,20 +139,20 @@ export default async function SitePostsList({
       ? "No posts on this site yet."
       : `${total} ${total === 1 ? "post" : "posts"}${total > 0 && items.length < total ? ` · showing ${rangeStart}–${rangeEnd}` : ""}`;
 
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Sites", href: "/admin/sites" },
+    { label: site.name, href: `/admin/sites/${site.id}` },
+    { label: "Posts" },
+  ];
+
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Posts" },
-          ]}
-        />
-        <PageHeader.Title>Posts</PageHeader.Title>
-        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
-        <PageHeader.Actions>
+    <TListStandard
+      title="Posts"
+      breadcrumb={breadcrumb}
+      subtitle={subtitle}
+      actions={
+        <>
           {total > 0 && (
             <Button asChild variant="outline" size="sm">
               <a
@@ -188,200 +187,194 @@ export default async function SitePostsList({
               </Link>
             </Button>
           )}
-        </PageHeader.Actions>
-      </PageHeader>
-
-      {blogGateBlocked && <BlogStyleCalibrationBanner siteId={site.id} />}
-
-      <>
-
-      <form
-        method="get"
-        action={`/admin/sites/${site.id}/posts`}
-        className="mt-4 flex flex-wrap items-end gap-3 rounded-lg border p-3"
-        role="search"
-        aria-label="Filter posts"
-      >
-        <div>
-          <label
-            htmlFor="status-filter"
-            className="block text-sm font-medium text-muted-foreground"
+        </>
+      }
+      filterBar={
+        <>
+          {blogGateBlocked && <BlogStyleCalibrationBanner siteId={site.id} />}
+          <form
+            method="get"
+            action={`/admin/sites/${site.id}/posts`}
+            className="flex flex-wrap items-end gap-3 rounded-lg border p-3"
+            role="search"
+            aria-label="Filter posts"
           >
-            Status
-          </label>
-          <select
-            id="status-filter"
-            name="status"
-            defaultValue={parsed.status ?? ""}
-            className="mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm"
+            <div>
+              <label
+                htmlFor="status-filter"
+                className="block text-sm font-medium text-muted-foreground"
+              >
+                Status
+              </label>
+              <select
+                id="status-filter"
+                name="status"
+                defaultValue={parsed.status ?? ""}
+                className="mt-1 rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm"
+              >
+                <option value="">All</option>
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="scheduled">Scheduled</option>
+              </select>
+            </div>
+            <div className="flex-1">
+              <label
+                htmlFor="q-filter"
+                className="block text-sm font-medium text-muted-foreground"
+              >
+                Search title / slug
+              </label>
+              <input
+                id="q-filter"
+                type="search"
+                name="q"
+                defaultValue={parsed.query ?? ""}
+                placeholder="e.g. welcome, best-practices"
+                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm"
+              />
+            </div>
+            <Button type="submit" size="sm">
+              Apply
+            </Button>
+            {(parsed.status || parsed.query) && (
+              <Link
+                href={`/admin/sites/${site.id}/posts`}
+                className="text-sm text-muted-foreground underline hover:text-foreground"
+              >
+                Clear filters
+              </Link>
+            )}
+          </form>
+        </>
+      }
+      pagination={
+        totalPages > 1 ? (
+          <nav
+            aria-label="Post list pagination"
+            className="flex items-center justify-between text-sm"
           >
-            <option value="">All</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="scheduled">Scheduled</option>
-          </select>
-        </div>
-        <div className="flex-1">
-          <label
-            htmlFor="q-filter"
-            className="block text-sm font-medium text-muted-foreground"
-          >
-            Search title / slug
-          </label>
-          <input
-            id="q-filter"
-            type="search"
-            name="q"
-            defaultValue={parsed.query ?? ""}
-            placeholder="e.g. welcome, best-practices"
-            className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm shadow-sm"
-          />
-        </div>
-        <Button type="submit" size="sm">
-          Apply
-        </Button>
-        {(parsed.status || parsed.query) && (
-          <Link
-            href={`/admin/sites/${site.id}/posts`}
-            className="text-sm text-muted-foreground underline hover:text-foreground"
-          >
-            Clear filters
-          </Link>
-        )}
-      </form>
-
+            {currentPage > 1 ? (
+              <Link
+                href={buildHref(site.id, parsed, { page: currentPage - 1 })}
+                className="underline hover:no-underline"
+              >
+                ← Previous
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">← Previous</span>
+            )}
+            <span className="text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            {currentPage < totalPages ? (
+              <Link
+                href={buildHref(site.id, parsed, { page: currentPage + 1 })}
+                className="underline hover:no-underline"
+              >
+                Next →
+              </Link>
+            ) : (
+              <span className="text-muted-foreground">Next →</span>
+            )}
+          </nav>
+        ) : undefined
+      }
+    >
       {items.length === 0 ? (
-        <div className="mt-4">
-          <EmptyState
-            icon={<NavIcon name="file-empty" size={20} />}
-            iconLabel="No posts"
-            title={
-              parsed.status || parsed.query
-                ? "No posts match the current filters"
-                : "No posts on this site yet"
-            }
-            body={
-              parsed.status || parsed.query ? (
-                <>
-                  Adjust the filters above, or clear them to see every post.
-                </>
-              ) : (
-                <>
-                  Create your first single-post draft, or generate a batch
-                  of posts via a post-mode brief.
-                </>
-              )
-            }
-            cta={
-              !parsed.status && !parsed.query ? (
-                blogGateBlocked ? (
-                  <span title="Calibrate blog styling first">
-                    <Button disabled aria-disabled="true">
-                      <NavIcon name="plus" size={16} />
-                      New post
-                    </Button>
-                  </span>
-                ) : (
-                  <Button asChild>
-                    <Link href={`/admin/sites/${site.id}/posts/new`}>
-                      <NavIcon name="plus" size={16} />
-                      New post
-                    </Link>
+        <EmptyState
+          icon={<NavIcon name="file-empty" size={20} />}
+          iconLabel="No posts"
+          title={
+            parsed.status || parsed.query
+              ? "No posts match the current filters"
+              : "No posts on this site yet"
+          }
+          body={
+            parsed.status || parsed.query ? (
+              <>Adjust the filters above, or clear them to see every post.</>
+            ) : (
+              <>
+                Create your first single-post draft, or generate a batch of
+                posts via a post-mode brief.
+              </>
+            )
+          }
+          cta={
+            !parsed.status && !parsed.query ? (
+              blogGateBlocked ? (
+                <span title="Calibrate blog styling first">
+                  <Button disabled aria-disabled="true">
+                    <NavIcon name="plus" size={16} />
+                    New post
                   </Button>
-                )
+                </span>
               ) : (
-                <Button asChild variant="outline">
-                  <Link href={`/admin/sites/${site.id}/posts`}>
-                    Clear filters
+                <Button asChild>
+                  <Link href={`/admin/sites/${site.id}/posts/new`}>
+                    <NavIcon name="plus" size={16} />
+                    New post
                   </Link>
                 </Button>
               )
-            }
-          />
-        </div>
+            ) : (
+              <Button asChild variant="outline">
+                <Link href={`/admin/sites/${site.id}/posts`}>
+                  Clear filters
+                </Link>
+              </Button>
+            )
+          }
+        />
       ) : (
-        <ol className="mt-4 space-y-2">
-          {items.map((post) => {
-            return (
-              <li
-                key={post.id}
-                className="rounded-lg border p-3 transition-smooth hover:bg-muted/40"
-                aria-labelledby={`post-${post.id}-title`}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h2
-                      id={`post-${post.id}-title`}
-                      className="text-sm font-semibold"
+        <ol className="space-y-2">
+          {items.map((post) => (
+            <li
+              key={post.id}
+              className="rounded-lg border p-3 transition-smooth hover:bg-muted/40"
+              aria-labelledby={`post-${post.id}-title`}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <h2
+                    id={`post-${post.id}-title`}
+                    className="text-sm font-semibold"
+                  >
+                    <Link
+                      href={`/admin/sites/${site.id}/posts/${post.id}`}
+                      className="transition-smooth hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
                     >
-                      <Link
-                        href={`/admin/sites/${site.id}/posts/${post.id}`}
-                        className="transition-smooth hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-                      >
-                        {post.title}
-                      </Link>
-                    </h2>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      <code className="font-mono text-xs">/{post.slug}</code>
-                      {post.status === "published" && post.wp_post_id && site.wp_url ? (
-                        <>
-                          {" · "}
-                          <a
-                            href={`${site.wp_url.replace(/\/+$/, "")}/${post.slug}/`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline hover:text-foreground"
-                          >
-                            View live ↗
-                          </a>
-                        </>
-                      ) : post.wp_post_id ? (
-                        ` · WP id ${post.wp_post_id}`
-                      ) : null}
-                    </p>
-                  </div>
-                  <StatusPill
-                    kind={postStatusKind(post.status)}
-                    className="shrink-0 capitalize"
-                  />
+                      {post.title}
+                    </Link>
+                  </h2>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    <code className="font-mono text-xs">/{post.slug}</code>
+                    {post.status === "published" && post.wp_post_id && site.wp_url ? (
+                      <>
+                        {" · "}
+                        <a
+                          href={`${site.wp_url.replace(/\/+$/, "")}/${post.slug}/`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="underline hover:text-foreground"
+                        >
+                          View live ↗
+                        </a>
+                      </>
+                    ) : post.wp_post_id ? (
+                      ` · WP id ${post.wp_post_id}`
+                    ) : null}
+                  </p>
                 </div>
-              </li>
-            );
-          })}
+                <StatusPill
+                  kind={postStatusKind(post.status)}
+                  className="shrink-0 capitalize"
+                />
+              </div>
+            </li>
+          ))}
         </ol>
       )}
-
-      {totalPages > 1 && (
-        <nav
-          aria-label="Post list pagination"
-          className="mt-6 flex items-center justify-between text-sm"
-        >
-          {currentPage > 1 ? (
-            <Link
-              href={buildHref(site.id, parsed, { page: currentPage - 1 })}
-              className="underline hover:no-underline"
-            >
-              ← Previous
-            </Link>
-          ) : (
-            <span className="text-muted-foreground">← Previous</span>
-          )}
-          <span className="text-muted-foreground">
-            Page {currentPage} of {totalPages}
-          </span>
-          {currentPage < totalPages ? (
-            <Link
-              href={buildHref(site.id, parsed, { page: currentPage + 1 })}
-              className="underline hover:no-underline"
-            >
-              Next →
-            </Link>
-          ) : (
-            <span className="text-muted-foreground">Next →</span>
-          )}
-        </nav>
-      )}
-      </>
-    </PageShell>
+    </TListStandard>
   );
 }

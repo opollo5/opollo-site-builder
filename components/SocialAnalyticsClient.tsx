@@ -17,7 +17,7 @@ import {
 } from "recharts";
 
 import { Button } from "@/components/ui/button";
-import { H1, H3, Lead } from "@/components/ui/typography";
+import { H3 } from "@/components/ui/typography";
 import type { SocialAnalytics } from "@/lib/platform/social/analytics";
 
 // ---------------------------------------------------------------------------
@@ -133,14 +133,7 @@ export function SocialAnalyticsClient({
   const hasStateData = data.postsByState.length > 0;
 
   return (
-    <main className="mx-auto max-w-6xl space-y-10 p-6">
-      <header>
-        <H1>Analytics</H1>
-        <Lead className="mt-0.5">
-          Your social media performance at a glance.
-        </Lead>
-      </header>
-
+    <div className="space-y-10">
       {!hasAnyPosts && (
         <div
           className="rounded-lg border border-dashed p-8 text-center"
@@ -464,6 +457,6 @@ export function SocialAnalyticsClient({
           </div>
         </Section>
       )}
-    </main>
+    </div>
   );
 }

@@ -4,6 +4,7 @@ import { SocialPostsListClient } from "@/components/SocialPostsListClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listPostMasters } from "@/lib/platform/social/posts";
 import type { SocialPostState } from "@/lib/platform/social/posts";
+import { TListStandard } from "@/templates";
 
 // ---------------------------------------------------------------------------
 // S1-2 — customer-facing social posts list at /company/social/posts.
@@ -103,19 +104,21 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
   }
 
   return (
-    <SocialPostsListClient
-      companyId={companyId}
-      initialPosts={postsResult.data.posts}
-      canCreate={canCreate}
-      canApprove={canApprove}
-      initialQ={searchTerm}
-      initialState={stateFilter ?? "all"}
-      page={page}
-      pageSize={PAGE_SIZE}
-      totalCount={postsResult.data.totalCount}
-      sortBy={sortBy}
-      sortDir={sortDir}
-      composerEnabled={true}
-    />
+    <TListStandard title="Social posts">
+      <SocialPostsListClient
+        companyId={companyId}
+        initialPosts={postsResult.data.posts}
+        canCreate={canCreate}
+        canApprove={canApprove}
+        initialQ={searchTerm}
+        initialState={stateFilter ?? "all"}
+        page={page}
+        pageSize={PAGE_SIZE}
+        totalCount={postsResult.data.totalCount}
+        sortBy={sortBy}
+        sortDir={sortDir}
+        composerEnabled={true}
+      />
+    </TListStandard>
   );
 }

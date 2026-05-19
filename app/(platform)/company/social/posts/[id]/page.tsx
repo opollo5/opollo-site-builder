@@ -2,10 +2,10 @@ import { notFound, redirect } from "next/navigation";
 
 import { PostApprovalSection } from "@/components/PostApprovalSection";
 import { PostDecisionsAudit } from "@/components/PostDecisionsAudit";
+import { PostDetailTabbedClient } from "@/components/PostDetailTabbedClient";
 import { PostPublishHistorySection } from "@/components/PostPublishHistorySection";
 import { PostScheduleSection } from "@/components/PostScheduleSection";
 import { PostVariantsSection } from "@/components/PostVariantsSection";
-import { SocialPostDetailClient } from "@/components/SocialPostDetailClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import {
   listApprovalEvents,
@@ -150,90 +150,86 @@ export default async function CompanySocialPostDetailPage({
     }
   }
 
-  return (
-    <>
-      <SocialPostDetailClient
-        post={postResult.data}
-        canEdit={canEdit}
-        canSubmit={canSubmit}
-        canCreate={canCreate}
-        canApprove={canApprove}
-      />
-      {variantsResult.ok ? (
-        <PostVariantsSection
-          postId={postResult.data.id}
-          companyId={companyId}
-          initialResolved={variantsResult.data.resolved}
-          masterText={variantsResult.data.masterText}
-          canEdit={canEdit && postResult.data.state === "draft"}
-        />
-      ) : null}
-      {isPendingApproval && initialRecipients?.ok ? (
-        <PostApprovalSection
-          postId={postResult.data.id}
-          companyId={companyId}
-          initialRecipients={initialRecipients.data.recipients}
-          initialApprovalRequestId={approvalRequestId}
-          canManage={canSubmit && isPendingApproval}
-        />
-      ) : null}
-      {isPostDecision && auditEvents?.ok ? (
-        <PostDecisionsAudit events={auditEvents.data.events} />
-      ) : null}
-      {(postResult.data.state === "approved" || postResult.data.state === "scheduled")
-        ? await renderScheduleSection({
-            postId: postResult.data.id,
-            companyId,
-            canSchedule,
-          })
-        : null}
-      {PUBLISH_VISIBLE_STATES.has(postResult.data.state)
-        ? await renderPublishHistorySection({
-            postId: postResult.data.id,
-            companyId,
-            canRetry: canSchedule,
-          })
-        : null}
-    </>
-  );
-}
-
-async function renderPublishHistorySection(args: {
-  postId: string;
-  companyId: string;
-  canRetry: boolean;
-}) {
-  const result = await listPublishAttempts({
-    postMasterId: args.postId,
-    companyId: args.companyId,
-  });
-  if (!result.ok) return null;
-  return (
-    <PostPublishHistorySection
-      postId={args.postId}
-      companyId={args.companyId}
-      initialAttempts={result.data.attempts}
-      canRetry={args.canRetry}
+  // Await conditional sections so they can be passed as ReactNode props
+  // to the client wrapper (RSC "hole" pattern).
+  const variantsSection = variantsResult.ok ? (
+    <PostVariantsSection
+      postId={postResult.data.id}
+      companyId={companyId}
+      initialResolved={variantsResult.data.resolved}
+      masterText={variantsResult.data.masterText}
+      canEdit={canEdit && postResult.data.state === "draft"}
     />
-  );
-}
+  ) : null;
 
-async function renderScheduleSection(args: {
-  postId: string;
-  companyId: string;
-  canSchedule: boolean;
-}) {
-  const entries = await listScheduleEntries({
-    postMasterId: args.postId,
-    companyId: args.companyId,
-  });
-  if (!entries.ok) return null;
+  const approvalSection =
+    isPendingApproval && initialRecipients?.ok ? (
+      <PostApprovalSection
+        postId={postResult.data.id}
+        companyId={companyId}
+        initialRecipients={initialRecipients.data.recipients}
+        initialApprovalRequestId={approvalRequestId}
+        canManage={canSubmit && isPendingApproval}
+      />
+    ) : null;
+
+  const decisionsSection =
+    isPostDecision && auditEvents?.ok ? (
+      <PostDecisionsAudit events={auditEvents.data.events} />
+    ) : null;
+
+  const scheduleSection =
+    postResult.data.state === "approved" ||
+    postResult.data.state === "scheduled"
+      ? await (async () => {
+          const entries = await listScheduleEntries({
+            postMasterId: postResult.data.id,
+            companyId,
+          });
+          if (!entries.ok) return null;
+          return (
+            <PostScheduleSection
+              postId={postResult.data.id}
+              companyId={companyId}
+              initialEntries={entries.data.entries}
+              canSchedule={canSchedule}
+            />
+          );
+        })()
+      : null;
+
+  const publishHistorySection = PUBLISH_VISIBLE_STATES.has(
+    postResult.data.state,
+  )
+    ? await (async () => {
+        const result = await listPublishAttempts({
+          postMasterId: postResult.data.id,
+          companyId,
+        });
+        if (!result.ok) return null;
+        return (
+          <PostPublishHistorySection
+            postId={postResult.data.id}
+            companyId={companyId}
+            initialAttempts={result.data.attempts}
+            canRetry={canSchedule}
+          />
+        );
+      })()
+    : null;
+
   return (
-    <PostScheduleSection
-      postId={args.postId}
-      companyId={args.companyId}
-      initialEntries={entries.data.entries}
-      canSchedule={args.canSchedule}
+    <PostDetailTabbedClient
+      post={postResult.data}
+      canEdit={canEdit}
+      canSubmit={canSubmit}
+      canCreate={canCreate}
+      canApprove={canApprove}
+      variantsSection={variantsSection}
+      approvalSection={approvalSection}
+      decisionsSection={decisionsSection}
+      scheduleSection={scheduleSection}
+      publishHistorySection={publishHistorySection}
     />
   );
 }

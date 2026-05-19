@@ -2,12 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-
 import { SocialPostsDashboardCard } from "@/components/SocialPostsDashboardCard";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getActiveBrandProfile, getBrandTier } from "@/lib/platform/brand";
 import { getSocialPostsStats } from "@/lib/platform/social/posts";
+import { TDashboardKpi } from "@/templates";
 
 // ---------------------------------------------------------------------------
 // /company — customer landing dashboard (S1-11).
@@ -76,19 +75,11 @@ export default async function CompanyLandingPage() {
   const showImageGenerator =
     process.env.IMAGE_FEATURE_MOOD_BOARD === "true" && canCreate;
 
-  return (
-    <div className="space-y-6">
-      <PageHeader>
-        <PageHeader.Title>Welcome back</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Here&apos;s where your social content sits today.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
+  const overviewContent = (
+    <div className="space-y-4">
       {showCompletionBanner && isAdmin ? (
         <BrandCompletionBanner tier={brandTier} />
       ) : null}
-
       {statsResult.ok ? (
         <SocialPostsDashboardCard stats={statsResult.data} />
       ) : (
@@ -100,99 +91,112 @@ export default async function CompanyLandingPage() {
           Failed to load stats: {statsResult.error.message}
         </div>
       )}
-
-      <nav
-        className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
-        aria-label="Customer surfaces"
-      >
-        <Link
-          href="/company/social/posts"
-          className="block rounded-md border bg-card p-4 hover:border-primary/40"
-          data-testid="dashboard-link-posts"
-        >
-          <div className="font-medium">Social posts</div>
-          <div className="mt-1 text-base text-muted-foreground">
-            Drafts, approvals, scheduling, audit trail.
-          </div>
-        </Link>
-        <Link
-          href="/company/social/calendar"
-          className="block rounded-md border bg-card p-4 hover:border-primary/40"
-          data-testid="dashboard-link-calendar"
-        >
-          <div className="font-medium">Calendar</div>
-          <div className="mt-1 text-base text-muted-foreground">
-            30-day view of everything queued to publish.
-          </div>
-        </Link>
-        <Link
-          href="/company/social/connections"
-          className="block rounded-md border bg-card p-4 hover:border-primary/40"
-          data-testid="dashboard-link-connections"
-        >
-          <div className="font-medium">Connections</div>
-          <div className="mt-1 text-base text-muted-foreground">
-            Linked social accounts and platform status.
-          </div>
-        </Link>
-        <Link
-          href="/company/social/media"
-          className="block rounded-md border bg-card p-4 hover:border-primary/40"
-          data-testid="dashboard-link-media"
-        >
-          <div className="font-medium">Media library</div>
-          <div className="mt-1 text-base text-muted-foreground">
-            Images and videos attached to posts.
-          </div>
-        </Link>
-        {isAdmin ? (
-          <Link
-            href="/company/social/sharing"
-            className="block rounded-md border bg-card p-4 hover:border-primary/40"
-            data-testid="dashboard-link-sharing"
-          >
-            <div className="font-medium">Calendar sharing</div>
-            <div className="mt-1 text-base text-muted-foreground">
-              Mint read-only links to share the calendar with clients.
-            </div>
-          </Link>
-        ) : null}
-        <Link
-          href="/company/users"
-          className="block rounded-md border bg-card p-4 hover:border-primary/40"
-          data-testid="dashboard-link-users"
-        >
-          <div className="font-medium">Users</div>
-          <div className="mt-1 text-base text-muted-foreground">
-            Manage team members and pending invitations.
-          </div>
-        </Link>
-        {isAdmin ? (
-          <Link
-            href="/company/settings/brand"
-            className="block rounded-md border bg-card p-4 hover:border-primary/40"
-            data-testid="dashboard-link-brand"
-          >
-            <div className="font-medium">Brand profile</div>
-            <div className="mt-1 text-base text-muted-foreground">
-              Visual identity + tone + content rules. Drives every output.
-            </div>
-          </Link>
-        ) : null}
-        {showImageGenerator ? (
-          <Link
-            href="/company/image/generate"
-            className="block rounded-md border bg-card p-4 hover:border-primary/40"
-            data-testid="dashboard-link-image-generator"
-          >
-            <div className="font-medium">Image generator</div>
-            <div className="mt-1 text-base text-muted-foreground">
-              Generate mood board backgrounds for your social posts.
-            </div>
-          </Link>
-        ) : null}
-      </nav>
     </div>
+  );
+
+  const quickLinksContent = (
+    <nav
+      className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+      aria-label="Customer surfaces"
+    >
+      <Link
+        href="/company/social/posts"
+        className="block rounded-md border bg-card p-4 hover:border-primary/40"
+        data-testid="dashboard-link-posts"
+      >
+        <div className="font-medium">Social posts</div>
+        <div className="mt-1 text-base text-muted-foreground">
+          Drafts, approvals, scheduling, audit trail.
+        </div>
+      </Link>
+      <Link
+        href="/company/social/calendar"
+        className="block rounded-md border bg-card p-4 hover:border-primary/40"
+        data-testid="dashboard-link-calendar"
+      >
+        <div className="font-medium">Calendar</div>
+        <div className="mt-1 text-base text-muted-foreground">
+          30-day view of everything queued to publish.
+        </div>
+      </Link>
+      <Link
+        href="/company/social/connections"
+        className="block rounded-md border bg-card p-4 hover:border-primary/40"
+        data-testid="dashboard-link-connections"
+      >
+        <div className="font-medium">Connections</div>
+        <div className="mt-1 text-base text-muted-foreground">
+          Linked social accounts and platform status.
+        </div>
+      </Link>
+      <Link
+        href="/company/social/media"
+        className="block rounded-md border bg-card p-4 hover:border-primary/40"
+        data-testid="dashboard-link-media"
+      >
+        <div className="font-medium">Media library</div>
+        <div className="mt-1 text-base text-muted-foreground">
+          Images and videos attached to posts.
+        </div>
+      </Link>
+      {isAdmin ? (
+        <Link
+          href="/company/social/sharing"
+          className="block rounded-md border bg-card p-4 hover:border-primary/40"
+          data-testid="dashboard-link-sharing"
+        >
+          <div className="font-medium">Calendar sharing</div>
+          <div className="mt-1 text-base text-muted-foreground">
+            Mint read-only links to share the calendar with clients.
+          </div>
+        </Link>
+      ) : null}
+      <Link
+        href="/company/users"
+        className="block rounded-md border bg-card p-4 hover:border-primary/40"
+        data-testid="dashboard-link-users"
+      >
+        <div className="font-medium">Users</div>
+        <div className="mt-1 text-base text-muted-foreground">
+          Manage team members and pending invitations.
+        </div>
+      </Link>
+      {isAdmin ? (
+        <Link
+          href="/company/settings/brand"
+          className="block rounded-md border bg-card p-4 hover:border-primary/40"
+          data-testid="dashboard-link-brand"
+        >
+          <div className="font-medium">Brand profile</div>
+          <div className="mt-1 text-base text-muted-foreground">
+            Visual identity + tone + content rules. Drives every output.
+          </div>
+        </Link>
+      ) : null}
+      {showImageGenerator ? (
+        <Link
+          href="/company/image/generate"
+          className="block rounded-md border bg-card p-4 hover:border-primary/40"
+          data-testid="dashboard-link-image-generator"
+        >
+          <div className="font-medium">Image generator</div>
+          <div className="mt-1 text-base text-muted-foreground">
+            Generate mood board backgrounds for your social posts.
+          </div>
+        </Link>
+      ) : null}
+    </nav>
+  );
+
+  return (
+    <TDashboardKpi
+      title="Welcome back"
+      kpis={[]}
+      dataSections={[
+        { title: "Today's activity", content: overviewContent },
+        { title: "Quick links", content: quickLinksContent },
+      ]}
+    />
   );
 }
 
@@ -229,26 +233,27 @@ function BrandCompletionBanner({ tier }: { tier: "none" | "minimal" }) {
 
 function MinimalLanding({ role }: { role: string }) {
   return (
-    <div className="max-w-3xl">
-      <PageHeader>
-        <PageHeader.Title>Welcome back</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Your role ({role}) doesn&apos;t have access to the calendar.
-          Ask an admin to elevate your permissions if you need to see
-          post stats.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <nav className="grid gap-3 sm:grid-cols-2">
-        <Link
-          href="/company/users"
-          className="block rounded-md border bg-card p-4 hover:border-primary/40"
-        >
-          <div className="font-medium">Users</div>
-          <div className="mt-1 text-muted-foreground">
-            See teammates and (if admin) manage invitations.
-          </div>
-        </Link>
-      </nav>
-    </div>
+    <TDashboardKpi
+      title="Welcome back"
+      kpis={[]}
+      dataSections={[
+        {
+          title: "Quick links",
+          content: (
+            <nav className="grid gap-3 sm:grid-cols-2">
+              <Link
+                href="/company/users"
+                className="block rounded-md border bg-card p-4 hover:border-primary/40"
+              >
+                <div className="font-medium">Users</div>
+                <div className="mt-1 text-muted-foreground">
+                  See teammates and (if admin) manage invitations.
+                </div>
+              </Link>
+            </nav>
+          ),
+        },
+      ]}
+    />
   );
 }
