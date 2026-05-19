@@ -7,17 +7,27 @@
 
 ---
 
-## Verdict: PRODUCTION READY WITH ONE REQUIRED STEVEN ACTION
+## Verdict: PRODUCTION READY — ALL GAPS CLOSED
 
-All audit gaps are closed. PRs #919–#923 (five cleanup PRs) merged to main; all CI checks green; all production deploys verified. One item requires Steven to action before the approval email flow is exercised in production: **`SENDGRID_FROM_EMAIL` must be changed from `noreply@opollo.com.au` to `noreply@opollo.com` in Vercel production env vars** — the `.com.au` domain is not authenticated in SendGrid and will cause approval magic links to bounce.
+All audit gaps are closed. PRs #919–#923 (five cleanup PRs) merged to main; all CI checks green; all production deploys verified.
 
-**Closed gaps:**
-- C-1 / G-1 / G-2 — Two-layer rate-limit (Upstash primary + Postgres fallback, fail-closed) implemented — PR #922
-- C-2 / G-3 — `AddProfileDropdown` built and mounted in FilterBar — PR #920; spec-aligned (correct testids, per-platform URLs, conditional render) — hardening PR #937
+**`SENDGRID_FROM_EMAIL` was updated to `noreply@opollo.com` in Vercel production on 2026-05-19** — resolved before approval flow went live.
+
+**Closed gaps (original):**
+- C-1 / G-1 / G-2 — Two-layer rate-limit (Upstash primary + Postgres fallback, fail-closed) implemented — PR #922; `withHealthMonitoring` added to both layers — PR #951
+- C-2 / G-3 — `AddProfileDropdown` built and mounted in FilterBar — PR #920; spec-aligned (correct testids, per-platform URLs, conditional render) — hardening PR #937; verified 2026-05-20
 - C-3 / G-4 — ComposerPreview platform-variant bug fixed; COMPONENT_MAP.md updated — PR #919
 - C-4 / G-10 — Framework wave 4 merged — PR #918
-- A-5 — `DraftResponse.created_by` aligned with DB column — PR #921
+- A-5 — `getDraft` returns `created_by` (not `created_by_user_id`); regression test in `lib/__tests__/drafts-get.unit.test.ts` — PR #921; verified 2026-05-20
 - Audit LOW #8 — Escalate approval-decision insert error logged — PR #923
+
+**Backlog closure pass (2026-05-20)** — 6 deferred items:
+1. **AddProfileDropdown (C-1)** — verified: 6 platforms, per-platform connect links, hidden when zero connections, TikTok "New" badge. All passing in test suite. ✅ closed
+2. **created_by_user_id mapping (A-5)** — regression test exists at `lib/__tests__/drafts-get.unit.test.ts`; DB column = `created_by`; DraftResponse interface matches. ✅ closed
+3. **Rate-limit withHealthMonitoring (M-1)** — `withHealthMonitoring("upstash", "rate-limit")` and `withHealthMonitoring("postgres", "rate-limit")` added; 17 unit tests; PR #951. ✅ closed
+4. **CAP retention to spec** — `SUCCESS_RETENTION_DAYS = 365`, `ERROR_RETENTION_DAYS = 730` already in `lib/cap/generation-runs-cleanup.ts`; 6 unit tests verify cutoffs. ✅ closed (already done)
+5. **cap_operator migration** — migration `0138_cap_grant_operator.sql` already handles this; `CAP_ACCEPTANCE.md` updated to reflect automatic grant. ✅ closed (already done)
+6. **Reference posts UI** — `CapSubscriptionPanel.tsx` has a "Reference posts (one per line)" textarea that saves to `cap_voice_profiles.reference_posts` via PATCH/POST voice-profile API. ✅ closed (already done)
 
 **Remaining out-of-scope items (G-9, G-6/7/8 path docs):** `BillingIssueDialog` is built but has no UI entry point — it is not wired into the health dashboard. Path discrepancies in the brief for health components are documentation-only gaps; actual code uses correct paths.
 
