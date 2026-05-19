@@ -187,7 +187,7 @@ function GenericPreview({ platform, content, mediaUrls, connection }: PreviewCar
 
 export function PreviewCard({ platform, content, mediaUrls, connection, className }: PreviewCardProps) {
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-2", className)} data-testid="preview-card">
       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         <span
           className="inline-block h-2 w-2 rounded-full"

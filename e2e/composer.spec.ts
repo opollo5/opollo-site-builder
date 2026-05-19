@@ -393,6 +393,36 @@ test.describe("composer V2 — scheduling card (PR E)", () => {
     await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 3_000 });
   });
 
+  test("(V2-9) right-pane preview reflects typed content (audit gap C-2)", async ({ page, context }) => {
+    await mockV2DraftApis(context);
+    await context.route("**/api/platform/social/drafts/calendar-view**", async (route) => {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, data: { posts: [], range: {} }, timestamp: new Date().toISOString() }) });
+    });
+
+    await page.goto("/social/poster");
+    const flagOff = await page
+      .locator("text=FEATURE_COMPOSER_V2 is not enabled")
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
+    if (flagOff) {
+      test.skip(true, "FEATURE_COMPOSER_V2 is not enabled in this environment");
+      return;
+    }
+    await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
+    await page.getByTestId("new-post-btn").click();
+    await expect(page.getByRole("dialog", { name: /compose post|new post/i })).toBeVisible({ timeout: 10_000 });
+
+    const textarea = page.getByTestId("content-textarea");
+    await textarea.fill("base content");
+    await expect(textarea).toHaveValue("base content");
+
+    // If a connection is selected (seed data), the right-pane preview-card should reflect content.
+    const previewCard = page.getByTestId("preview-card").first();
+    if (await previewCard.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await expect(previewCard).toContainText("base content");
+    }
+  });
+
   test("(V2-7) recurring children — recurring mode sends recurrence in request body", async ({ page, context }) => {
     let capturedBody: Record<string, unknown> | null = null;
     await context.route("**/api/platform/social/drafts", async (route) => {

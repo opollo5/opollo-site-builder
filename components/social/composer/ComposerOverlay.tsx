@@ -314,7 +314,7 @@ export function ComposerOverlay({
                     )}
                     <PreviewCard
                       platform={previewConnection.platform}
-                      content={draft.content}
+                      content={draft.platform_variants[previewConnection.platform]?.content ?? draft.content}
                       mediaUrls={draft.media_urls}
                       connection={previewConnection}
                     />
