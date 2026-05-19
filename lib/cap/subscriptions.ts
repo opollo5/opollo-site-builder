@@ -13,6 +13,7 @@ export interface CapSubscription {
   status: CapStatus;
   approval_required: boolean;
   monthly_cost_cap_usd: number;
+  monthly_objective_template: string | null;
   trial_ends_at: string | null;
   cancelled_at: string | null;
   created_at: string;
@@ -81,4 +82,22 @@ export async function updateCapSubscriptionStatus(
   if (error) {
     throw new Error(`Failed to update CAP subscription status: ${error.message}`);
   }
+}
+
+export async function updateCapSubscriptionObjectiveTemplate(
+  subscriptionId: string,
+  monthlyObjectiveTemplate: string | null,
+): Promise<CapSubscription> {
+  const svc = getServiceRoleClient();
+  const { data, error } = await svc
+    .from("cap_subscriptions")
+    .update({ monthly_objective_template: monthlyObjectiveTemplate })
+    .eq("id", subscriptionId)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update CAP subscription objective template: ${error.message}`);
+  }
+  return data as CapSubscription;
 }

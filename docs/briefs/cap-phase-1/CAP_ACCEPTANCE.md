@@ -21,6 +21,10 @@ UPDATE platform_users SET is_cap_operator = true WHERE email = 'hi@opollo.com';
 - [ ] "Enable CAP subscription" form is visible
 - [ ] Create a subscription: tier = `starter`, status = `active`, monthly cap = `$20`
 - [ ] Subscription panel shows with status badge = **Active**
+- [ ] Amber warning callout "Monthly objective template not set" is visible above Voice Profiles
+- [ ] **Default monthly objective template** textarea is visible below subscription details
+- [ ] Enter an objective (e.g. "Drive LinkedIn engagement for our MSP team targeting SMB IT managers.") and click **Save template**
+- [ ] Amber warning callout disappears after saving
 - [ ] "Add voice profile" form is visible
 - [ ] Create a voice profile: name = `Test Profile`, tone = `Professional & Friendly`, industry = `IT Services`, target audience = `SMB owners`
 - [ ] Profile appears in the list; shows as default
