@@ -43,12 +43,15 @@ export async function runEscalationCycle(): Promise<{ escalated: number; autoRej
         .from("social_post_drafts")
         .update({ state: "rejected", updated_at: new Date().toISOString() })
         .eq("id", draft.id);
-      await svc.from("social_post_approval_decisions").insert({
+      const { error: decisionErr } = await svc.from("social_post_approval_decisions").insert({
         draft_id: draft.id,
         approver_user_id: null,
         decision: "rejected",
         rejection_reason: "Approval timeout (96h).",
       });
+      if (decisionErr) {
+        logger.warn("escalate.decision_insert_failed", { draftId: draft.id, err: decisionErr.message });
+      }
       autoRejected++;
       logger.info("escalate.auto_rejected", { draftId: draft.id });
     } else if (age >= 72 * 60 * 60 * 1000) {
