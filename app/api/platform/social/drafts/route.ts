@@ -11,7 +11,11 @@ import {
 import { createDraft } from "@/lib/platform/social/drafts";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { CreateDraftSchema } from "@/lib/social/schemas/create-draft";
-import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
+import {
+  checkPlatformRateLimit,
+  platformRateLimitExceeded,
+  platformRateLimitUnavailable,
+} from "@/lib/platform/rate-limit";
 
 // ---------------------------------------------------------------------------
 // POST /api/platform/social/drafts
@@ -81,9 +85,12 @@ async function handleV2Post(req: Request, bodyObj: Record<string, unknown>): Pro
   if (gate.kind === "deny") return gate.response;
   const userId = gate.userId;
 
-  // Rate limit: 60/min per user for single-draft creates.
-  const rl = await checkRateLimit("chat", `user:${userId}`);
-  if (!rl.ok) return rateLimitExceeded(rl);
+  // Rate limit: Upstash primary, Postgres fallback. Fail-closed.
+  const rl = await checkPlatformRateLimit("chat", `user:${userId}`);
+  if (!rl.ok) {
+    if ("unavailable" in rl) return platformRateLimitUnavailable();
+    return platformRateLimitExceeded(rl.retryAfterSec);
+  }
 
   const parsed = parseBodyWith(CreateDraftSchema, bodyObj);
   if (!parsed.ok) return parsed.response;

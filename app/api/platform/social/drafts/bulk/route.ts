@@ -2,8 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
-import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
-import { checkBulkCsvRateLimit } from "@/lib/platform/rate-limit/postgres-rate-limit";
+import {
+  checkPlatformRateLimit,
+  platformRateLimitExceeded,
+  platformRateLimitUnavailable,
+} from "@/lib/platform/rate-limit";
 import { parseCsv } from "@/lib/social/bulk-csv/parse";
 import { internalError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
@@ -28,18 +31,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireCanDoForApi(companyId, "create_post");
   if (gate.kind === "deny") return gate.response;
 
-  // Rate limit: primary Upstash, fallback Postgres.
-  const rl = await checkRateLimit("csv_upload", `company:${companyId}`);
+  // Rate limit: Upstash primary, Postgres fallback. Fail-closed.
+  const rl = await checkPlatformRateLimit("csv_upload", `company:${companyId}`);
   if (!rl.ok) {
-    // Try Postgres fallback.
-    const pgRl = await checkBulkCsvRateLimit(companyId);
-    if ("unavailable" in pgRl) {
-      return NextResponse.json(
-        { ok: false, error: { code: "SERVICE_UNAVAILABLE", message: "Rate limit service unavailable. Please try again later." }, timestamp: new Date().toISOString() },
-        { status: 503 },
-      );
-    }
-    if (!pgRl.ok) return rateLimitExceeded(rl);
+    if ("unavailable" in rl) return platformRateLimitUnavailable();
+    return platformRateLimitExceeded(rl.retryAfterSec);
   }
 
   const contentType = req.headers.get("content-type") ?? "";
