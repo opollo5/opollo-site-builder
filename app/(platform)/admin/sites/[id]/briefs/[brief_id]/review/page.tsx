@@ -1,8 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { BriefReviewClient } from "@/components/BriefReviewClient";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TReviewLink } from "@/templates";
 import { getBriefWithPages } from "@/lib/briefs";
 import { getSite } from "@/lib/sites";
 
@@ -58,22 +57,21 @@ export default async function BriefReviewPage({
   const { brief, pages } = briefResult.data;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Briefs", href: `/admin/sites/${site.id}` },
-            { label: brief.title },
-          ]}
-        />
-        <PageHeader.Title>{brief.title}</PageHeader.Title>
-        <PageHeader.Subtitle>
+    <TReviewLink
+      title={brief.title}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name, href: `/admin/sites/${site.id}` },
+        { label: "Briefs", href: `/admin/sites/${site.id}` },
+        { label: brief.title },
+      ]}
+      subtitle={
+        <>
           Brief for <span className="font-medium">{site.name}</span>
-        </PageHeader.Subtitle>
-      </PageHeader>
+        </>
+      }
+    >
       <BriefReviewClient
         siteId={site.id}
         siteName={site.name}
@@ -82,6 +80,6 @@ export default async function BriefReviewPage({
         brief={brief}
         initialPages={pages}
       />
-    </PageShell>
+    </TReviewLink>
   );
 }

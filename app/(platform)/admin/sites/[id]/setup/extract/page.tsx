@@ -2,8 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { CopyExistingExtractionWizard } from "@/components/CopyExistingExtractionWizard";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TWizardStep } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -69,23 +68,16 @@ export default async function CopyExistingExtractPage({
   }
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Extract design" },
-          ]}
-        />
-        <PageHeader.Title>Extract design from {site.wp_url}</PageHeader.Title>
-        <PageHeader.Subtitle>
-          We&apos;ll fetch your live site and pull out the colours, fonts, and
-          common CSS class names so generated content matches the existing
-          theme. Review and tweak before saving.
-        </PageHeader.Subtitle>
-      </PageHeader>
+    <TWizardStep
+      title={`Extract design from ${site.wp_url}`}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name, href: `/admin/sites/${site.id}` },
+        { label: "Extract design" },
+      ]}
+      subtitle="We'll fetch your live site and pull out the colours, fonts, and common CSS class names so generated content matches the existing theme. Review and tweak before saving."
+    >
       <div className="max-w-3xl">
         <CopyExistingExtractionWizard
           siteId={site.id}
@@ -94,6 +86,6 @@ export default async function CopyExistingExtractPage({
           existingClasses={site.extracted_css_classes}
         />
       </div>
-    </PageShell>
+    </TWizardStep>
   );
 }

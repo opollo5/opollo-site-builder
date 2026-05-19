@@ -4,9 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { FirstSiteConnectedMoment } from "@/components/onboarding/first-site-connected-moment";
 import { SiteOnboardingForm } from "@/components/SiteOnboardingForm";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { H3 } from "@/components/ui/typography";
+import { TWizardStep } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -66,25 +65,16 @@ export default async function SiteOnboardingPage({
   }
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Onboarding" },
-          ]}
-        />
-        <PageHeader.Title>
-          How would you like to use this site?
-        </PageHeader.Title>
-        <PageHeader.Subtitle>
-          Pick one. We&apos;ll tailor the rest of the setup — and how
-          generated content is styled — based on your choice. You can
-          re-onboard later if you change your mind.
-        </PageHeader.Subtitle>
-      </PageHeader>
+    <TWizardStep
+      title="How would you like to use this site?"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name, href: `/admin/sites/${site.id}` },
+        { label: "Onboarding" },
+      ]}
+      subtitle="Pick one. We'll tailor the rest of the setup — and how generated content is styled — based on your choice. You can re-onboard later if you change your mind."
+    >
       <div className="max-w-3xl">
         {searchParams?.fresh === "1" && (
           <div className="mb-6">
@@ -117,6 +107,6 @@ export default async function SiteOnboardingPage({
           </Link>
         </section>
       </div>
-    </PageShell>
+    </TWizardStep>
   );
 }
