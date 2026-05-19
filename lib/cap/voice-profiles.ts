@@ -2,21 +2,10 @@ import "server-only";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
+import type { VoiceTone } from "@/lib/cap/voice-tone-labels";
 
-export type VoiceTone =
-  | "professional-friendly"
-  | "authoritative"
-  | "conversational"
-  | "technical"
-  | "irreverent";
-
-export const VOICE_TONE_LABELS: Record<VoiceTone, string> = {
-  "professional-friendly": "Professional & Friendly",
-  authoritative: "Authoritative",
-  conversational: "Conversational",
-  technical: "Technical",
-  irreverent: "Irreverent",
-};
+export type { VoiceTone };
+export { VOICE_TONE_LABELS } from "@/lib/cap/voice-tone-labels";
 
 export interface CapVoiceProfile {
   id: string;
