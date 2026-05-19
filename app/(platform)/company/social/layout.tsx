@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { NavIcon } from "@/components/ui/nav-icon";
-import { ComposerMount } from "@/components/composer/composer-mount";
+import { ComposerMountV2 } from "@/components/composer/composer-mount-v2";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
-import { getServiceRoleClient } from "@/lib/supabase";
+import { listConnections } from "@/lib/platform/social/connections";
+import type { Connection, Platform } from "@/lib/social/types";
 
 // /company/social/* — session + company guard.
 //
@@ -13,8 +14,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // staff who haven't yet selected a company via the Social section nav
 // selector, we render an inline prompt rather than redirecting.
 //
-// Mounts PostComposerModal here so it is available on every social
-// sub-route via ?compose=new or ?compose=<id>.
+// Mounts ComposerOverlay (V2) via ComposerMountV2 so it is available on
+// every social sub-route via ?compose=new or ?compose=<id>.
 
 export default async function CompanySocialLayout({
   children,
@@ -41,23 +42,35 @@ export default async function CompanySocialLayout({
     redirect("/company");
   }
 
-  let companyTimezone = "UTC";
-  const svc = getServiceRoleClient();
-  const { data: tzRow } = await svc
-    .from("platform_companies")
-    .select("timezone")
-    .eq("id", session.company.companyId)
-    .maybeSingle();
-  companyTimezone = (tzRow?.timezone as string | null) ?? "UTC";
+  const companyId = session.company.companyId;
+  const connectionsResult = await listConnections({ companyId });
+
+  const rawConnections = connectionsResult.ok ? connectionsResult.data.connections : [];
+  const availableConnections: Connection[] = rawConnections
+    .filter((c) => c.status !== "disconnected")
+    .map((c) => ({
+      id: c.id,
+      platform: mapSocialPlatform(c.platform),
+      account_name: c.display_name ?? c.platform,
+      account_avatar_url: c.avatar_url ?? "",
+    }));
 
   return (
     <>
       {children}
-      <ComposerMount
-        companyId={session.company.companyId}
-        userId={session.userId}
-        companyTimezone={companyTimezone}
+      <ComposerMountV2
+        companyId={companyId}
+        availableConnections={availableConnections}
       />
     </>
   );
+}
+
+// Maps V1 SocialPlatform values to V2 Platform values.
+function mapSocialPlatform(p: string): Platform {
+  if (p === "linkedin_personal" || p === "linkedin_company") return "linkedin";
+  if (p === "facebook_page") return "facebook";
+  if (p === "instagram_business") return "instagram";
+  if (p === "gbp") return "google_business_profile";
+  return p as Platform;
 }
