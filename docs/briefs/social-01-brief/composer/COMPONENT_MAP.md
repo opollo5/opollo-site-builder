@@ -27,7 +27,7 @@ Block class names become PascalCase components. Element names (`__head`, `__body
 |---|---|---|
 | `.composer-overlay` | `components/social/composer/ComposerOverlay.tsx` | `{ open: boolean, onClose: () => void, initialDraft?: Draft, prefilledDate?: Date }` |
 | `.composer__pane--left` | `components/social/composer/ComposerEditor.tsx` | `{ draft: Draft, onChange: (d: Draft) => void, onSubmit: (mode: SchedulingMode) => Promise<void> }` |
-| `.composer__pane--right` | `components/social/composer/ComposerPreview.tsx` | `{ draft: Draft, activeTab: 'preview' \| 'calendar', onTabChange: (t) => void }` |
+| `.composer__pane--right` | Rendered inline in `components/social/composer/ComposerOverlay.tsx` (lines 272–342). `ComposerPreview.tsx` was NOT created as a separate file — the right-pane state (`previewTab`, `activePreviewIndex`) is owned by `ComposerOverlay` directly. `PreviewCard` component handles per-platform card rendering. See audit gap C-2 (closed). | — |
 | `.composer__close` | Inline `<Button variant="ghost" size="icon">` |
 | `.composer__title` | `<H2>` from existing typography components |
 | `.profile-selector` | `components/social/composer/ProfileSelector.tsx` | `{ available: Connection[], selected: string[], onChange: (ids: string[]) => void }` |

@@ -102,6 +102,7 @@ export function ContentEditor({
     <div className={cn("rounded-xl border border-border bg-white overflow-hidden", className)}>
       <textarea
         ref={textareaRef}
+        data-testid="content-textarea"
         value={value}
         onChange={(e) => { onChange(e.target.value); autoResize(); }}
         onInput={autoResize}
