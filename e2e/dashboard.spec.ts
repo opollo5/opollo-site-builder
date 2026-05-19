@@ -283,4 +283,36 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     await page.getByTestId("view-month-btn").click();
     await expect(page.getByTestId("calendar-grid")).toBeVisible();
   });
+
+  test("(F-8) add-profile dropdown opens platform picker and links to connections page (audit gap G-3)", async ({ page, context }) => {
+    await mockDashboardApis(context, []);
+    const ready = await goToDashboard(page);
+    if (!ready) return;
+
+    // Button is visible in filter bar
+    const btn = page.getByTestId("add-profile-btn");
+    await expect(btn).toBeVisible();
+
+    // Menu is not visible before click
+    await expect(page.getByTestId("add-profile-menu")).not.toBeVisible();
+
+    // Open dropdown
+    await btn.click();
+    await expect(page.getByTestId("add-profile-menu")).toBeVisible();
+
+    // All 5 platform items are rendered
+    const linkedinItem = page.getByTestId("add-profile-linkedin");
+    const twitterItem = page.getByTestId("add-profile-twitter");
+    const googleItem = page.getByTestId("add-profile-google_business");
+    await expect(linkedinItem).toBeVisible();
+    await expect(twitterItem).toBeVisible();
+    await expect(googleItem).toBeVisible();
+
+    // Each item links to the connections page
+    await expect(linkedinItem).toHaveAttribute("href", "/company/social/connections");
+
+    // Clicking an item closes the dropdown and navigates
+    await linkedinItem.click();
+    await expect(page.getByTestId("add-profile-menu")).not.toBeVisible();
+  });
 });

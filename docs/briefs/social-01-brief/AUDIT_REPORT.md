@@ -158,6 +158,45 @@ ORDER BY ordinal_position;
 
 ---
 
+## Auth & Email Delivery (Investigation 2 — 2026-05-19)
+
+**Investigated:** Auth email non-delivery for `steven.m@opollo.com`  
+**Method:** Supabase admin auth API, SendGrid REST API v3 messages, SendGrid domain authentication
+
+### Finding 1 — `steven.m@opollo.com` does not exist in `auth.users` (ROOT CAUSE for reset failure)
+
+The Supabase project (`sazapxgmrdaewrkwoxby`) contains only 2 auth users. `steven.m@opollo.com` is not among them. A password reset email was never sent because there was no user record to reset. **Action: create the account via Supabase dashboard invite flow or `auth.admin.inviteUserByEmail()`.**
+
+### Finding 2 — `SENDGRID_FROM_EMAIL` env var points to an unauthenticated domain (HIGH — approval magic links will fail)
+
+| Setting | Value |
+|---|---|
+| `.env.local` / production `SENDGRID_FROM_EMAIL` | `noreply@opollo.com.au` |
+| Code comment expectation (`lib/email/sendgrid.ts:47`) | `noreply@opollo.com` |
+| `opollo.com` in SendGrid domain auth | **VALID** (subdomain `em3442`) |
+| `opollo.com.au` in SendGrid domain auth | **NOT PRESENT** |
+
+All application-level emails (composer approval magic links, invite accepts, bulk CSV approvals) use `SENDGRID_FROM_EMAIL`. If this is set to `noreply@opollo.com.au`, SendGrid will either reject or soft-bounce every email, because `opollo.com.au` has no DKIM/SPF records configured in SendGrid.
+
+**Fix (required before approval flow goes to production):** Set `SENDGRID_FROM_EMAIL=noreply@opollo.com` in Vercel production env vars. The `opollo.com` domain is already authenticated.
+
+### Finding 3 — Supabase auth emails use `hi@opollo.com` (correct — no action needed)
+
+Supabase SMTP is configured as:
+- Host: `smtp.sendgrid.net:587`
+- From: `hi@opollo.com` (configured as `smtp_admin_email`)
+- `hi@opollo.com` is a verified sender in SendGrid
+
+Password reset, signup confirmation, and invite emails from Supabase will deliver correctly once the account exists.
+
+### Finding 4 — Zero SendGrid message history for `steven.m@opollo.com`
+
+SendGrid Activity API (30-day window) returned 0 messages to `steven.m@opollo.com`. Consistent with the account not existing.
+
+**Cross-impact:** The approval magic link in social post approval flow uses `SENDGRID_FROM_EMAIL`. If Finding 2 is not fixed before approval flow is exercised in production, approvers will never receive their action links.
+
+---
+
 ## PR State at Audit Time
 
 | PR | Title | State | Merged |
