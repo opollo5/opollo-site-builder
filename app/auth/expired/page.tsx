@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 
 // ---------------------------------------------------------------------------
 // /auth/expired — Spec 14 PR C.
@@ -70,50 +70,43 @@ export default function SessionExpiredPage({
   const loginHref = `/login?returnTo=${encodeURIComponent(returnToSafe)}`;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-lg space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950">
-            <NavIcon name="lock" size={24} className="text-amber-600 dark:text-amber-400" />
-          </div>
-          <H1>Your session has expired</H1>
-          <Lead className="mt-2">
-            Opollo signs you out automatically every 48 hours. Here&apos;s
-            why this policy exists.
-          </Lead>
+    <TAuthChrome
+      title="Your session has expired"
+      subtitle="Opollo signs you out automatically every 48 hours. Here's why this policy exists."
+      titleIcon={
+        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-950">
+          <NavIcon name="lock" size={24} className="text-amber-600 dark:text-amber-400" />
         </div>
-
-        {/* Why-bullets card */}
-        <div className="rounded-lg border bg-background p-6 shadow-sm">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            Why Opollo has a 48-hour session limit
-          </h2>
-          <ul className="space-y-5">
-            {WHY_BULLETS.map(({ icon, heading, body }) => (
-              <li key={heading} className="flex gap-3">
-                <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
-                  <NavIcon name={icon} size={14} className="text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-foreground">{heading}</p>
-                  <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* CTA */}
-        <div className="flex flex-col items-center gap-3">
-          <Button asChild className="w-full">
-            <Link href={loginHref}>Sign in again</Link>
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Your work was auto-saved before sign-out.
-          </p>
-        </div>
+      }
+      width="lg"
+    >
+      <div className="rounded-lg border bg-background p-6 shadow-sm">
+        <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Why Opollo has a 48-hour session limit
+        </h2>
+        <ul className="space-y-5">
+          {WHY_BULLETS.map(({ icon, heading, body }) => (
+            <li key={heading} className="flex gap-3">
+              <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted">
+                <NavIcon name={icon} size={14} className="text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-foreground">{heading}</p>
+                <p className="mt-0.5 text-sm text-muted-foreground">{body}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
-    </main>
+
+      <div className="flex flex-col items-center gap-3">
+        <Button asChild className="w-full">
+          <Link href={loginHref}>Sign in again</Link>
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          Your work was auto-saved before sign-out.
+        </p>
+      </div>
+    </TAuthChrome>
   );
 }

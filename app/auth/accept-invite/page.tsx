@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 
 import { AcceptInviteForm } from "@/components/AcceptInviteForm";
 import { Alert } from "@/components/ui/alert";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // AUTH-FOUNDATION P3.2 — /auth/accept-invite.
@@ -68,8 +68,7 @@ export default async function AcceptInvitePage({ searchParams }: PageProps) {
 
   if (result.kind === "err") {
     return (
-      <div className="mx-auto max-w-md space-y-4">
-        <H1>Invite link</H1>
+      <TAuthChrome title="Invite link">
         <Alert variant="destructive">
           {result.reason === "missing" && "No invite token provided."}
           {result.reason === "invalid" &&
@@ -79,20 +78,23 @@ export default async function AcceptInvitePage({ searchParams }: PageProps) {
           {result.reason === "consumed" &&
             "This invite has already been accepted. Sign in normally."}
         </Alert>
-      </div>
+      </TAuthChrome>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md">
-      <H1>Set your password</H1>
-      <Lead className="mt-1">
-        Setting up Opollo Site Builder for{" "}
-        <strong className="text-foreground">{result.invite.email}</strong>.
-      </Lead>
-      <div className="mt-6">
+    <TAuthChrome
+      title="Set your password"
+      subtitle={
+        <>
+          Setting up Opollo Site Builder for{" "}
+          <strong className="text-foreground">{result.invite.email}</strong>.
+        </>
+      }
+    >
+      <div className="rounded-lg border bg-background p-6 shadow-sm">
         <AcceptInviteForm token={rawToken} email={result.invite.email} />
       </div>
-    </div>
+    </TAuthChrome>
   );
 }

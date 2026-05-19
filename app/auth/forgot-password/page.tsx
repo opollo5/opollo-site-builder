@@ -1,5 +1,7 @@
+import Link from "next/link";
+
 import { ForgotPasswordForm } from "@/components/ForgotPasswordForm";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 
 // ---------------------------------------------------------------------------
 // /auth/forgot-password — M14-3.
@@ -18,26 +20,21 @@ export const dynamic = "force-static";
 
 export default function ForgotPasswordPage() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <H1>Forgot your password?</H1>
-          <Lead className="mt-2">
-            Enter your email and we&apos;ll send you a reset link.
-          </Lead>
-        </div>
-        <div className="rounded-lg border bg-background p-6 shadow-sm">
-          <ForgotPasswordForm />
-        </div>
-        <p className="text-center text-sm text-muted-foreground">
-          <a
-            href="/login"
-            className="underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-          >
-            Back to sign in
-          </a>
-        </p>
+    <TAuthChrome
+      title="Forgot your password?"
+      subtitle="Enter your email and we'll send you a reset link."
+      footer={
+        <Link
+          href="/login"
+          className="underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        >
+          Back to sign in
+        </Link>
+      }
+    >
+      <div className="rounded-lg border bg-background p-6 shadow-sm">
+        <ForgotPasswordForm />
       </div>
-    </main>
+    </TAuthChrome>
   );
 }

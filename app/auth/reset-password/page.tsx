@@ -1,6 +1,8 @@
+import Link from "next/link";
+
 import { ResetPasswordForm } from "@/components/ResetPasswordForm";
 import { Button } from "@/components/ui/button";
-import { H1, Lead } from "@/components/ui/typography";
+import { TAuthChrome } from "@/templates";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -21,52 +23,43 @@ import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const backLink = (
+  <Link
+    href="/login"
+    className="underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+  >
+    Back to sign in
+  </Link>
+);
+
 export default async function ResetPasswordPage() {
   const supabase = createRouteAuthClient();
   const user = await getCurrentUser(supabase);
 
   if (!user) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-        <div className="w-full max-w-md space-y-6">
-          <div className="text-center">
-            <H1>Reset link expired</H1>
-            <Lead className="mt-2">
-              This reset link has expired or was already used. Request a new
-              link to continue.
-            </Lead>
-          </div>
-          <div className="rounded-lg border bg-background p-6 text-center shadow-sm">
-            <Button asChild>
-              <a href="/auth/forgot-password">Request a new link</a>
-            </Button>
-          </div>
-          <p className="text-center text-sm text-muted-foreground">
-            <a
-              href="/login"
-              className="underline transition-smooth hover:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
-            >
-              Back to sign in
-            </a>
-          </p>
+      <TAuthChrome
+        title="Reset link expired"
+        subtitle="This reset link has expired or was already used. Request a new link to continue."
+        footer={backLink}
+      >
+        <div className="rounded-lg border bg-background p-6 text-center shadow-sm">
+          <Button asChild>
+            <a href="/auth/forgot-password">Request a new link</a>
+          </Button>
         </div>
-      </main>
+      </TAuthChrome>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas p-4">
-      <div className="w-full max-w-md space-y-6">
-        <div className="text-center">
-          <H1>Set a new password</H1>
-          <Lead className="mt-2">
-            Choose a strong password. Minimum 12 characters.
-          </Lead>
-        </div>
-        <div className="rounded-lg border bg-background p-6 shadow-sm">
-          <ResetPasswordForm userEmail={user.email} />
-        </div>
+    <TAuthChrome
+      title="Set a new password"
+      subtitle="Choose a strong password. Minimum 12 characters."
+    >
+      <div className="rounded-lg border bg-background p-6 shadow-sm">
+        <ResetPasswordForm userEmail={user.email} />
       </div>
-    </main>
+    </TAuthChrome>
   );
 }

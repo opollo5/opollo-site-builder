@@ -33,3 +33,12 @@ export type { TReviewLinkProps } from "./T-REVIEW-LINK";
 
 export { TGrid } from "./T-GRID";
 export type { TGridProps } from "./T-GRID";
+
+export { TAuthChrome } from "./T-AUTH-CHROME";
+export type { TAuthChromeProps } from "./T-AUTH-CHROME";
+
+export { TFullBleedEditor } from "./T-FULL-BLEED-EDITOR";
+export type { TFullBleedEditorProps } from "./T-FULL-BLEED-EDITOR";
+
+export { TErrorState } from "./T-ERROR-STATE";
+export type { TErrorStateProps } from "./T-ERROR-STATE";
