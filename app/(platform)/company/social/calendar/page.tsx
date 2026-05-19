@@ -4,6 +4,7 @@ import { SocialCalendarClient } from "@/components/SocialCalendarClient";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
 import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
+import { TDashboardFeed } from "@/templates";
 
 // ---------------------------------------------------------------------------
 // /company/social/calendar — monthly grid view (default social landing).
@@ -80,29 +81,42 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
       : [];
 
   return (
-    <>
-      {entriesResult.ok ? (
-        <SocialCalendarClient
-          entries={entriesResult.data.entries.map((e) => ({
-            id: e.id,
-            post_master_id: e.post_master_id,
-            platform: e.platform,
-            scheduled_at: e.scheduled_at,
-            preview: e.preview,
-          }))}
-          monthIso={monthIso}
-          connections={connections}
-          composerEnabled={true}
-          canCreate={canCreate}
-        />
-      ) : (
-        <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-          role="alert"
-        >
-          Failed to load calendar: {entriesResult.error.message}
-        </div>
-      )}
-    </>
+    <TDashboardFeed
+      title="Calendar"
+      breadcrumb={[
+        { label: "Social", href: "/company/social" },
+        { label: "Calendar" },
+      ]}
+      width="full-bleed"
+      inlineAlert={
+        !entriesResult.ok ? (
+          <div
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+            role="alert"
+          >
+            Failed to load calendar: {entriesResult.error.message}
+          </div>
+        ) : undefined
+      }
+      feed={
+        entriesResult.ok ? (
+          <SocialCalendarClient
+            entries={entriesResult.data.entries.map((e) => ({
+              id: e.id,
+              post_master_id: e.post_master_id,
+              platform: e.platform,
+              scheduled_at: e.scheduled_at,
+              preview: e.preview,
+            }))}
+            monthIso={monthIso}
+            connections={connections}
+            composerEnabled={true}
+            canCreate={canCreate}
+          />
+        ) : (
+          <div />
+        )
+      }
+    />
   );
 }

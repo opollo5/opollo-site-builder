@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 import { SitesListClient } from "@/components/SitesListClient";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { TListStandard } from "@/templates";
 import {
   SITE_SORTABLE_COLUMNS,
   listSites,
@@ -84,25 +84,18 @@ export default async function ManageSitesPage({
   const dir = readSortDir(searchParams?.dir);
 
   const result = await listSites({ status, sort, dir });
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Sites" },
+  ];
+
   if (!result.ok) {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb
-            segments={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Sites" },
-            ]}
-          />
-          <PageHeader.Title>Sites</PageHeader.Title>
-        </PageHeader>
-        <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-          role="alert"
-        >
+      <TListStandard title="Sites" breadcrumb={breadcrumb}>
+        <Alert variant="destructive">
           Failed to load sites: {result.error.message}
-        </div>
-      </PageShell>
+        </Alert>
+      </TListStandard>
     );
   }
   const sites: SiteListItem[] = result.data.sites;
@@ -111,25 +104,19 @@ export default async function ManageSitesPage({
       ? "No WordPress sites connected yet."
       : `${sites.length} WordPress ${sites.length === 1 ? "site" : "sites"} connected to this builder.`;
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites" },
-          ]}
-        />
-        <PageHeader.Title>Sites</PageHeader.Title>
-        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <Button asChild data-testid="add-site-button">
-            <Link href="/admin/sites/new">
-              <NavIcon name="plus" size={16} />
-              New site
-            </Link>
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
+    <TListStandard
+      title="Sites"
+      breadcrumb={breadcrumb}
+      subtitle={subtitle}
+      actions={
+        <Button asChild data-testid="add-site-button">
+          <Link href="/admin/sites/new">
+            <NavIcon name="plus" size={16} />
+            New site
+          </Link>
+        </Button>
+      }
+    >
       <SitesListClient
         sites={sites}
         filter={status}
@@ -137,6 +124,6 @@ export default async function ManageSitesPage({
         dir={dir}
         isSuperAdmin={isSuperAdmin}
       />
-    </PageShell>
+    </TListStandard>
   );
 }

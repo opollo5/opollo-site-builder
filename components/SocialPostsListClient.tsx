@@ -7,7 +7,7 @@ import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
-import { H1, Lead } from "@/components/ui/typography";
+import { Lead } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import type {
   PostMasterListItem,
@@ -313,10 +313,7 @@ export function SocialPostsListClient({
       activeView="posts"
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <H1>Social posts</H1>
-          <Lead className="mt-0.5">{countLabel}</Lead>
-        </div>
+        <Lead className="mt-0.5">{countLabel}</Lead>
         {canCreate ? (
           <div className="flex items-center gap-2">
             <BulkUploadButton

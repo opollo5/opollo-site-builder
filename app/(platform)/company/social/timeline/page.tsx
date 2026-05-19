@@ -2,9 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { SocialModuleShell } from "@/components/social/social-module-shell";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listPostMasters } from "@/lib/platform/social/posts";
+import { TDashboardFeed } from "@/templates";
 
 import { TimelineFeed } from "./timeline-feed";
 
@@ -18,6 +19,12 @@ import { TimelineFeed } from "./timeline-feed";
 export const dynamic = "force-dynamic";
 
 const PAGE_SIZE = 50;
+
+const SOCIAL_TABS = [
+  { value: "calendar", label: "Calendar", href: "/company/social/calendar" },
+  { value: "posts", label: "Posts", href: "/company/social/posts" },
+  { value: "timeline", label: "Timeline", href: "/company/social/timeline" },
+] as const;
 
 type Props = { searchParams: Promise<{ page?: string }> };
 
@@ -65,20 +72,32 @@ export default async function CompanySocialTimelinePage({ searchParams }: Props)
   const newPostHref = canCreate ? "?compose=new" : "/company/social/posts";
 
   return (
-    <SocialModuleShell activeView="timeline">
-      {canCreate && (
-        <div className="mb-4 flex justify-end">
+    <TDashboardFeed
+      title="Timeline"
+      breadcrumb={[
+        { label: "Social", href: "/company/social" },
+        { label: "Timeline" },
+      ]}
+      actions={
+        canCreate ? (
           <Button asChild data-testid="new-post-button">
             <Link href={newPostHref}>New post</Link>
           </Button>
+        ) : undefined
+      }
+      feed={
+        <div>
+          <div className="mb-4">
+            <PillTabs tabs={SOCIAL_TABS} activeValue="timeline" />
+          </div>
+          <TimelineFeed
+            posts={postsResult.data.posts}
+            totalCount={postsResult.data.totalCount}
+            page={page}
+            pageSize={PAGE_SIZE}
+          />
         </div>
-      )}
-      <TimelineFeed
-        posts={postsResult.data.posts}
-        totalCount={postsResult.data.totalCount}
-        page={page}
-        pageSize={PAGE_SIZE}
-      />
-    </SocialModuleShell>
+      }
+    />
   );
 }

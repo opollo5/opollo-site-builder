@@ -7,9 +7,8 @@ import { NavIcon } from "@/components/ui/nav-icon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TListStandard } from "@/templates";
 import {
   Dialog,
   DialogContent,
@@ -141,22 +140,16 @@ export default function SharedContentPage({
   }, {});
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: "Site", href: `/admin/sites/${siteId}` },
-            { label: "Shared Content" },
-          ]}
-        />
-        <PageHeader.Title>Shared Content</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Reusable content objects referenced from generated pages.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
+    <TListStandard
+      title="Shared Content"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: "Site", href: `/admin/sites/${siteId}` },
+        { label: "Shared Content" },
+      ]}
+      subtitle="Reusable content objects referenced from generated pages."
+    >
       <div className="space-y-6">
       {error && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
@@ -268,6 +261,6 @@ export default function SharedContentPage({
         </Dialog>
       )}
       </div>
-    </PageShell>
+    </TListStandard>
   );
 }

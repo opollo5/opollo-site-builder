@@ -2,13 +2,11 @@ import { redirect } from "next/navigation";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { H2 } from "@/components/ui/typography";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill } from "@/components/ui/status-pill";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { TDashboardKpi } from "@/templates";
 
 // /admin/system/jobs — cron + queue overview surface.
 //
@@ -255,176 +253,174 @@ export default async function SystemJobsPage() {
       q.failed > 0,
   );
 
-  return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "System", href: "/admin/system/jobs" },
-            { label: "Jobs" },
-          ]}
-        />
-        <PageHeader.Title>System jobs</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Cron schedule + queue depth across the worker pipelines. Refresh the
-          page to re-read; counts come straight from the queue tables.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
-      {stuckQueues.length > 0 && (
-        <div
-          role="alert"
-          className="mt-4 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-warning"
-        >
-          <strong>Attention:</strong> {stuckQueues.length} queue
-          {stuckQueues.length === 1 ? "" : "s"} {" "}
-          look{stuckQueues.length === 1 ? "s" : ""} stuck — items pending more
-          than 2 minutes or failed rows present. Check the table below.
-        </div>
-      )}
-
-      <section className="mt-6">
-        <H2>Library maintenance</H2>
-        <p className="mt-1 text-base text-muted-foreground">
-          One-off and on-demand jobs for the image library. Each batch processes
-          up to 10 images; run repeatedly until all images are done.
-        </p>
-        <div className="mt-3">
-          <ImageMetadataJobTrigger />
-        </div>
-      </section>
-
-      <section className="mt-6">
-        <H2>Queue depth</H2>
-        <p className="mt-1 text-base text-muted-foreground">
-          Pending = waiting for a worker. Running = leased and in flight. Failed
-          = terminal failure (no further retries).
-        </p>
-        <div className="mt-3 overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Queue</th>
-                <th className="px-3 py-2 font-medium">Cron</th>
-                <th className="px-3 py-2 font-medium">Pending</th>
-                <th className="px-3 py-2 font-medium">Running</th>
-                <th className="px-3 py-2 font-medium">Failed</th>
-                <th className="px-3 py-2 font-medium">Oldest pending</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queues.map((q) => {
-                const stuck =
-                  q.pending > 0 && (q.oldestPendingAgeSec ?? 0) > 120;
-                return (
-                  <tr
-                    key={q.table}
-                    className="border-b last:border-b-0 hover:bg-muted/30"
-                  >
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{q.label}</div>
-                      <code className="text-xs text-muted-foreground">
-                        {q.table}
-                      </code>
-                    </td>
-                    <td className="px-3 py-2">
-                      <code className="text-xs">{q.cron}</code>
-                    </td>
-                    <td className="px-3 py-2">
-                      {q.pending < 0 ? (
-                        <span className="text-destructive">err</span>
-                      ) : q.pending === 0 ? (
-                        <span className="text-muted-foreground">0</span>
-                      ) : stuck ? (
-                        <span className="font-semibold text-warning">
-                          {q.pending}
-                        </span>
-                      ) : (
-                        q.pending
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {q.running < 0 ? (
-                        <span className="text-destructive">err</span>
-                      ) : q.running === 0 ? (
-                        <span className="text-muted-foreground">0</span>
-                      ) : (
-                        <span className="font-medium">{q.running}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2">
-                      {q.failed < 0 ? (
-                        <span className="text-destructive">err</span>
-                      ) : q.failed === 0 ? (
-                        <span className="text-muted-foreground">0</span>
-                      ) : (
-                        <span className="font-semibold text-destructive">
-                          {q.failed}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 text-muted-foreground">
-                      {ageString(q.oldestPendingAgeSec)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <section className="mt-8">
-        <H2>Cron schedule</H2>
-        <p className="mt-1 text-base text-muted-foreground">
-          Sourced from <code>vercel.json</code>. Last-run timestamps are not
-          mirrored locally — check Vercel Dashboard → Cron Jobs for invocation
-          history.
-        </p>
-        <div className="mt-3 overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2 font-medium">Cadence</th>
-                <th className="px-3 py-2 font-medium">Path</th>
-                <th className="px-3 py-2 font-medium">Schedule</th>
-                <th className="px-3 py-2 font-medium">Purpose</th>
-              </tr>
-            </thead>
-            <tbody>
-              {crons.map((c) => (
+  const queueContent = (
+    <>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Pending = waiting for a worker. Running = leased and in flight. Failed
+        = terminal failure (no further retries).
+      </p>
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Queue</th>
+              <th className="px-3 py-2 font-medium">Cron</th>
+              <th className="px-3 py-2 font-medium">Pending</th>
+              <th className="px-3 py-2 font-medium">Running</th>
+              <th className="px-3 py-2 font-medium">Failed</th>
+              <th className="px-3 py-2 font-medium">Oldest pending</th>
+            </tr>
+          </thead>
+          <tbody>
+            {queues.map((q) => {
+              const stuck =
+                q.pending > 0 && (q.oldestPendingAgeSec ?? 0) > 120;
+              return (
                 <tr
-                  key={c.path}
-                  className="border-b align-top last:border-b-0 hover:bg-muted/30"
+                  key={q.table}
+                  className="border-b last:border-b-0 hover:bg-muted/30"
                 >
-                  <td className="px-3 py-2 text-muted-foreground">
-                    <StatusPill
-                      kind={
-                        c.schedule === "* * * * *"
-                          ? "run_running"
-                          : "brief_committed"
-                      }
-                      label={c.cadence}
-                    />
-                  </td>
                   <td className="px-3 py-2">
-                    <code className="text-xs">{c.path}</code>
-                  </td>
-                  <td className="px-3 py-2">
+                    <div className="font-medium">{q.label}</div>
                     <code className="text-xs text-muted-foreground">
-                      {c.schedule}
+                      {q.table}
                     </code>
                   </td>
+                  <td className="px-3 py-2">
+                    <code className="text-xs">{q.cron}</code>
+                  </td>
+                  <td className="px-3 py-2">
+                    {q.pending < 0 ? (
+                      <span className="text-destructive">err</span>
+                    ) : q.pending === 0 ? (
+                      <span className="text-muted-foreground">0</span>
+                    ) : stuck ? (
+                      <span className="font-semibold text-warning">
+                        {q.pending}
+                      </span>
+                    ) : (
+                      q.pending
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {q.running < 0 ? (
+                      <span className="text-destructive">err</span>
+                    ) : q.running === 0 ? (
+                      <span className="text-muted-foreground">0</span>
+                    ) : (
+                      <span className="font-medium">{q.running}</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {q.failed < 0 ? (
+                      <span className="text-destructive">err</span>
+                    ) : q.failed === 0 ? (
+                      <span className="text-muted-foreground">0</span>
+                    ) : (
+                      <span className="font-semibold text-destructive">
+                        {q.failed}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-muted-foreground">
-                    {c.description}
+                    {ageString(q.oldestPendingAgeSec)}
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </PageShell>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+
+  const cronContent = (
+    <>
+      <p className="mb-3 text-sm text-muted-foreground">
+        Sourced from <code>vercel.json</code>. Last-run timestamps are not
+        mirrored locally — check Vercel Dashboard → Cron Jobs for invocation
+        history.
+      </p>
+      <div className="overflow-x-auto rounded-md border">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2 font-medium">Cadence</th>
+              <th className="px-3 py-2 font-medium">Path</th>
+              <th className="px-3 py-2 font-medium">Schedule</th>
+              <th className="px-3 py-2 font-medium">Purpose</th>
+            </tr>
+          </thead>
+          <tbody>
+            {crons.map((c) => (
+              <tr
+                key={c.path}
+                className="border-b align-top last:border-b-0 hover:bg-muted/30"
+              >
+                <td className="px-3 py-2 text-muted-foreground">
+                  <StatusPill
+                    kind={
+                      c.schedule === "* * * * *"
+                        ? "run_running"
+                        : "brief_committed"
+                    }
+                    label={c.cadence}
+                  />
+                </td>
+                <td className="px-3 py-2">
+                  <code className="text-xs">{c.path}</code>
+                </td>
+                <td className="px-3 py-2">
+                  <code className="text-xs text-muted-foreground">
+                    {c.schedule}
+                  </code>
+                </td>
+                <td className="px-3 py-2 text-muted-foreground">
+                  {c.description}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+
+  return (
+    <TDashboardKpi
+      title="System jobs"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "System", href: "/admin/system/jobs" },
+        { label: "Jobs" },
+      ]}
+      callout={
+        stuckQueues.length > 0
+          ? {
+              variant: "warning",
+              title: `${stuckQueues.length} queue${stuckQueues.length === 1 ? "" : "s"} look${stuckQueues.length === 1 ? "s" : ""} stuck`,
+              body: "Items pending more than 2 minutes or failed rows present. Check the Queue depth section below.",
+            }
+          : undefined
+      }
+      kpis={[]}
+      dataSections={[
+        {
+          title: "Library maintenance",
+          content: (
+            <>
+              <p className="mb-3 text-sm text-muted-foreground">
+                One-off and on-demand jobs for the image library. Each batch
+                processes up to 10 images; run repeatedly until all images are
+                done.
+              </p>
+              <ImageMetadataJobTrigger />
+            </>
+          ),
+        },
+        { title: "Queue depth", content: queueContent },
+        { title: "Cron schedule", content: cronContent },
+      ]}
+    />
   );
 }

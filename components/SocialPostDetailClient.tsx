@@ -10,7 +10,7 @@ import {
   ConfirmDialog,
   CommentDialog,
 } from "@/components/ui/confirm-dialog";
-import { H1, Lead } from "@/components/ui/typography";
+import { Lead } from "@/components/ui/typography";
 import type {
   PostMaster,
   SocialPostState,
@@ -428,13 +428,6 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
     <>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <Link
-            href="/company/social/posts"
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            ← Back to posts
-          </Link>
-          <H1 className="mt-2">Post detail</H1>
           <Lead className="mt-0.5">
             <span
               className="inline-block rounded-full bg-muted px-2 py-0.5 text-sm font-medium"

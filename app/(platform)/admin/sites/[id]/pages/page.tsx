@@ -3,9 +3,8 @@ import { notFound, redirect } from "next/navigation";
 
 import { PagesTable } from "@/components/PagesTable";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { checkAdminAccess } from "@/lib/admin-gate";
+import { TListStandard } from "@/templates";
 import {
   LIST_PAGES_DEFAULT_LIMIT,
   listPagesForSite,
@@ -129,139 +128,139 @@ export default async function SitePagesList({
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + limit, total);
 
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Sites", href: "/admin/sites" },
+    { label: site.name, href: `/admin/sites/${params.id}` },
+    { label: "Pages" },
+  ];
+
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${params.id}` },
-            { label: "Pages" },
-          ]}
-        />
-        <PageHeader.Title>Pages</PageHeader.Title>
-        <PageHeader.Subtitle>
-          {total === 0
-            ? `No pages generated for ${site.name} yet.`
-            : `${total} ${total === 1 ? "page" : "pages"} generated for ${site.name}.`}
-        </PageHeader.Subtitle>
-      </PageHeader>
-
-      <form
-        method="GET"
-        action={`/admin/sites/${params.id}/pages`}
-        className="mt-6 flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3"
-      >
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="pages-q"
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Search
-          </label>
-          <input
-            id="pages-q"
-            type="search"
-            name="q"
-            defaultValue={parsed.query ?? ""}
-            placeholder="managed IT"
-            className="h-8 min-w-56 rounded border bg-background px-2 text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="pages-status"
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Status
-          </label>
-          <select
-            id="pages-status"
-            name="status"
-            defaultValue={parsed.status ?? ""}
-            className="h-8 rounded border bg-background px-2 text-sm"
-          >
-            <option value="">Any</option>
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label
-            htmlFor="pages-type"
-            className="text-sm font-medium text-muted-foreground"
-          >
-            Type
-          </label>
-          <select
-            id="pages-type"
-            name="page_type"
-            defaultValue={parsed.page_type ?? ""}
-            className="h-8 rounded border bg-background px-2 text-sm"
-          >
-            <option value="">Any</option>
-            {TEMPLATE_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="submit"
-          className="h-8 rounded bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+    <TListStandard
+      title="Pages"
+      breadcrumb={breadcrumb}
+      subtitle={
+        total === 0
+          ? `No pages generated for ${site.name} yet.`
+          : `${total} ${total === 1 ? "page" : "pages"} generated for ${site.name}.`
+      }
+      filterBar={
+        <form
+          method="GET"
+          action={`/admin/sites/${params.id}/pages`}
+          className="flex flex-wrap items-end gap-3 rounded-md border bg-muted/30 p-3"
         >
-          Apply
-        </button>
-        {(parsed.query || parsed.status || parsed.page_type) && (
-          <Link
-            href={buildHref(params.id, parsed, {
-              query: null,
-              status: null,
-              page_type: null,
-              page: 1,
-            })}
-            className="text-sm text-muted-foreground hover:text-foreground"
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="pages-q"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              Search
+            </label>
+            <input
+              id="pages-q"
+              type="search"
+              name="q"
+              defaultValue={parsed.query ?? ""}
+              placeholder="managed IT"
+              className="h-8 min-w-56 rounded border bg-background px-2 text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="pages-status"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              Status
+            </label>
+            <select
+              id="pages-status"
+              name="status"
+              defaultValue={parsed.status ?? ""}
+              className="h-8 rounded border bg-background px-2 text-sm"
+            >
+              <option value="">Any</option>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label
+              htmlFor="pages-type"
+              className="text-sm font-medium text-muted-foreground"
+            >
+              Type
+            </label>
+            <select
+              id="pages-type"
+              name="page_type"
+              defaultValue={parsed.page_type ?? ""}
+              className="h-8 rounded border bg-background px-2 text-sm"
+            >
+              <option value="">Any</option>
+              {TEMPLATE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            className="h-8 rounded bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90"
           >
-            Clear
-          </Link>
-        )}
-      </form>
-
-      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-        <div data-testid="pages-range">
+            Apply
+          </button>
+          {(parsed.query || parsed.status || parsed.page_type) && (
+            <Link
+              href={buildHref(params.id, parsed, {
+                query: null,
+                status: null,
+                page_type: null,
+                page: 1,
+              })}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </Link>
+          )}
+        </form>
+      }
+      meta={
+        <span data-testid="pages-range" className="text-sm text-muted-foreground">
           {total === 0 ? "0 pages" : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
-        </div>
-        <div className="flex items-center gap-2">
-          {currentPage > 1 && (
-            <Link
-              href={buildHref(params.id, parsed, { page: currentPage - 1 })}
-              className="rounded border px-2 py-1 hover:bg-muted"
-              rel="prev"
-            >
-              ← Previous
-            </Link>
-          )}
-          {currentPage < totalPages && (
-            <Link
-              href={buildHref(params.id, parsed, { page: currentPage + 1 })}
-              className="rounded border px-2 py-1 hover:bg-muted"
-              rel="next"
-            >
-              Next →
-            </Link>
-          )}
-        </div>
-      </div>
-
-      <div className="mt-3">
-        <PagesTable
-          items={items}
-          siteId={params.id}
-          backHref={buildHref(params.id, parsed, {})}
-        />
-      </div>
-    </PageShell>
+        </span>
+      }
+      pagination={
+        totalPages > 1 ? (
+          <div className="flex items-center justify-end gap-2 text-sm">
+            {currentPage > 1 && (
+              <Link
+                href={buildHref(params.id, parsed, { page: currentPage - 1 })}
+                className="rounded border px-2 py-1 hover:bg-muted"
+                rel="prev"
+              >
+                ← Previous
+              </Link>
+            )}
+            {currentPage < totalPages && (
+              <Link
+                href={buildHref(params.id, parsed, { page: currentPage + 1 })}
+                className="rounded border px-2 py-1 hover:bg-muted"
+                rel="next"
+              >
+                Next →
+              </Link>
+            )}
+          </div>
+        ) : undefined
+      }
+    >
+      <PagesTable
+        items={items}
+        siteId={params.id}
+        backHref={buildHref(params.id, parsed, {})}
+      />
+    </TListStandard>
   );
 }
