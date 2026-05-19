@@ -7,11 +7,8 @@ All steps require a user with `is_cap_operator = true` on `platform_users`.
 
 ## Prerequisites
 
-Set `is_cap_operator = true` for your admin user:
-
-```sql
-UPDATE platform_users SET is_cap_operator = true WHERE email = 'hi@opollo.com';
-```
+`hi@opollo.com` is granted `is_cap_operator = true` automatically by migration `0138_cap_grant_operator.sql`.
+No manual SQL step required after that migration has applied.
 
 ---
 
