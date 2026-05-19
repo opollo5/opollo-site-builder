@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { TListStandard } from "@/templates";
 import { listClients } from "@/lib/optimiser/clients";
 import { listChangeLog } from "@/lib/optimiser/change-log";
 
@@ -20,37 +20,39 @@ export default async function OptimiserChangeLogPage({
     ? await listChangeLog({ clientId: selectedId, limit: 200 })
     : [];
 
-  return (
-    <div className="space-y-6">
-      <PageHeader>
-        <PageHeader.Title>Change log</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Append-only audit trail of every page change applied through the engine.
-        </PageHeader.Subtitle>
-        <PageHeader.Actions>
-          {onboarded.length > 1 && (
-            <form method="get" action="/optimiser/change-log" className="flex items-center gap-1">
-              <select
-                name="client"
-                defaultValue={selectedId}
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-              >
-                {onboarded.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <Button size="sm" variant="outline" type="submit">
-                Switch
-              </Button>
-            </form>
-          )}
-          <Button asChild variant="outline">
-            <Link href="/optimiser">Page browser</Link>
+  const actions = (
+    <>
+      {onboarded.length > 1 && (
+        <form method="get" action="/optimiser/change-log" className="flex items-center gap-1">
+          <select
+            name="client"
+            defaultValue={selectedId}
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          >
+            {onboarded.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="outline" type="submit">
+            Switch
           </Button>
-        </PageHeader.Actions>
-      </PageHeader>
+        </form>
+      )}
+      <Button asChild variant="outline">
+        <Link href="/optimiser">Page browser</Link>
+      </Button>
+    </>
+  );
+
+  return (
+    <TListStandard
+      title="Change log"
+      breadcrumb={[{ label: "Optimiser", href: "/optimiser" }, { label: "Change log" }]}
+      subtitle="Append-only audit trail of every page change applied through the engine."
+      actions={actions}
+    >
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left">
@@ -101,6 +103,6 @@ export default async function OptimiserChangeLogPage({
           </tbody>
         </table>
       </div>
-    </div>
+    </TListStandard>
   );
 }

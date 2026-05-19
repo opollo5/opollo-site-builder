@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TListWide } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { formatRelativeTime } from "@/lib/utils";
@@ -46,21 +45,15 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
   const totalPages = count ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : 1;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Users", href: "/admin/users" },
-            { label: "Audit log" },
-          ]}
-        />
-        <PageHeader.Title>User audit log</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Append-only record of every user-management action. super_admin only.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
+    <TListWide
+      title="User audit log"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Users", href: "/admin/users" },
+        { label: "Audit log" },
+      ]}
+      subtitle="Append-only record of every user-management action. super_admin only."
+    >
       {error ? (
         <Alert variant="destructive" className="mt-6" title="Failed to load audit log">
           {error.message}
@@ -152,6 +145,6 @@ export default async function UserAuditPage({ searchParams }: PageProps) {
           )}
         </>
       )}
-    </PageShell>
+    </TListWide>
   );
 }

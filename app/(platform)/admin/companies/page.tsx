@@ -4,8 +4,7 @@ import { FirstCustomerOnboardedMoment } from "@/components/onboarding/first-cust
 import { PlatformCompaniesListClient } from "@/components/PlatformCompaniesListClient";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TListWide } from "@/templates";
 import { listPlatformCompanies } from "@/lib/platform/companies";
 
 // P3-1 — Opollo admin companies list. Gated by app/admin/layout.tsx's
@@ -22,26 +21,22 @@ export default async function AdminCompaniesPage({
 }: {
   searchParams?: { created?: string; name?: string };
 }) {
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Companies" },
+  ];
+
   const result = await listPlatformCompanies();
   if (!result.ok) {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb
-            segments={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Companies" },
-            ]}
-          />
-          <PageHeader.Title>Companies</PageHeader.Title>
-        </PageHeader>
+      <TListWide title="Companies" breadcrumb={breadcrumb}>
         <div
           className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
           role="alert"
         >
           Failed to load companies: {result.error.message}
         </div>
-      </PageShell>
+      </TListWide>
     );
   }
 
@@ -52,25 +47,19 @@ export default async function AdminCompaniesPage({
       : `${companies.length} ${companies.length === 1 ? "company" : "companies"} on the platform.`;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Companies" },
-          ]}
-        />
-        <PageHeader.Title>Companies</PageHeader.Title>
-        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <Button asChild data-testid="add-company-button">
-            <Link href="/admin/companies/new">
-              <NavIcon name="plus" size={16} />
-              New company
-            </Link>
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
+    <TListWide
+      title="Companies"
+      breadcrumb={breadcrumb}
+      subtitle={subtitle}
+      actions={
+        <Button asChild data-testid="add-company-button">
+          <Link href="/admin/companies/new">
+            <NavIcon name="plus" size={16} />
+            New company
+          </Link>
+        </Button>
+      }
+    >
       {searchParams?.created && (
         <div className="mb-6">
           <FirstCustomerOnboardedMoment
@@ -80,6 +69,6 @@ export default async function AdminCompaniesPage({
         </div>
       )}
       <PlatformCompaniesListClient companies={companies} />
-    </PageShell>
+    </TListWide>
   );
 }

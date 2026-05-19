@@ -1,3 +1,9 @@
+## Wave 2a in progress 2026-05-19
+
+- Templates added: T-LIST-WIDE, T-DETAIL-SUMMARY, T-FORM, T-SETTINGS-FLAT
+- Routes migrated: 11 (T-LIST-WIDE: /admin/users, /admin/users/audit, /admin/companies, /admin/maintenance/social-connections, /admin/images; T-LIST-STANDARD deferred: /optimiser/proposals, /optimiser/change-log, /company/users; T-DASHBOARD-FEED deferred: /admin/_internal/table-examples, /company/internal/autosave-lab)
+- Wave 2b (T-DETAIL-SUMMARY) and Wave 2c (T-FORM + T-SETTINGS-FLAT) to follow
+
 ## Wave 1 complete 2026-05-19
 
 - Templates shipped: T-DETAIL-TABBED, T-LIST-STANDARD, T-DASHBOARD-FEED, T-DASHBOARD-KPI

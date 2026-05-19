@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 
 import { ImagesTable, type ImagesFilterState } from "@/components/ImagesTable";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
+import { TListWide } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { deliveryUrl } from "@/lib/cloudflare-images";
 import {
@@ -126,22 +126,18 @@ export default async function AdminImagesPage({
     offset: offset > LIST_IMAGES_MAX_LIMIT * 1000 ? 0 : offset,
   });
 
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Images" },
+  ];
+
   if (!result.ok) {
     return (
-      <>
-        <PageHeader>
-          <PageHeader.Breadcrumb
-            segments={[
-              { label: "Admin", href: "/admin/sites" },
-              { label: "Images" },
-            ]}
-          />
-          <PageHeader.Title>Image library</PageHeader.Title>
-        </PageHeader>
+      <TListWide title="Image library" breadcrumb={breadcrumb}>
         <Alert variant="destructive" title="Failed to load images">
           {result.error.message}
         </Alert>
-      </>
+      </TListWide>
     );
   }
 
@@ -155,74 +151,67 @@ export default async function AdminImagesPage({
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = Math.min(offset + limit, total);
 
-  return (
-    <>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Images" },
-          ]}
-        />
-        <PageHeader.Title>Image library</PageHeader.Title>
-        <PageHeader.Subtitle>
-          {parsed.deleted
-            ? `${total} archived ${total === 1 ? "image" : "images"} (soft-deleted). Restore from the detail view.`
-            : `${total} ${total === 1 ? "image" : "images"} available to the chat builder. Filter by caption, tag, or source.`}
-        </PageHeader.Subtitle>
-        <PageHeader.Actions>
+  const subtitle = parsed.deleted
+    ? `${total} archived ${total === 1 ? "image" : "images"} (soft-deleted). Restore from the detail view.`
+    : `${total} ${total === 1 ? "image" : "images"} available to the chat builder. Filter by caption, tag, or source.`;
+
+  const pagination = (
+    <div className="flex items-center justify-between text-sm text-muted-foreground">
+      <div data-testid="images-range">
+        {total === 0
+          ? "0 images"
+          : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
+      </div>
+      <div className="flex items-center gap-2">
+        {currentPage > 1 && (
           <Link
-            href={buildHref(parsed, { deleted: !parsed.deleted, page: 1 })}
-            className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            href={buildHref(parsed, { page: currentPage - 1 })}
+            className="rounded border px-2 py-1 hover:bg-muted"
+            rel="prev"
           >
-            {parsed.deleted ? "← Active images" : "View archived →"}
+            ← Previous
           </Link>
-        </PageHeader.Actions>
-      </PageHeader>
-
-      <div className="mt-6">
-        <ImagesTable
-          items={items}
-          backHref={buildHref(parsed, {})}
-          filterState={
-            {
-              query: parsed.query,
-              tags: parsed.tags,
-              source: parsed.source,
-              deleted: parsed.deleted,
-            } satisfies ImagesFilterState
-          }
-        />
+        )}
+        {currentPage < totalPages && (
+          <Link
+            href={buildHref(parsed, { page: currentPage + 1 })}
+            className="rounded border px-2 py-1 hover:bg-muted"
+            rel="next"
+          >
+            Next →
+          </Link>
+        )}
       </div>
+    </div>
+  );
 
-      {/* Pagination — bottom of container */}
-      <div className="mt-4 flex items-center justify-between text-sm text-muted-foreground">
-        <div data-testid="images-range">
-          {total === 0
-            ? "0 images"
-            : `Showing ${rangeStart}–${rangeEnd} of ${total}`}
-        </div>
-        <div className="flex items-center gap-2">
-          {currentPage > 1 && (
-            <Link
-              href={buildHref(parsed, { page: currentPage - 1 })}
-              className="rounded border px-2 py-1 hover:bg-muted"
-              rel="prev"
-            >
-              ← Previous
-            </Link>
-          )}
-          {currentPage < totalPages && (
-            <Link
-              href={buildHref(parsed, { page: currentPage + 1 })}
-              className="rounded border px-2 py-1 hover:bg-muted"
-              rel="next"
-            >
-              Next →
-            </Link>
-          )}
-        </div>
-      </div>
-    </>
+  return (
+    <TListWide
+      title="Image library"
+      breadcrumb={breadcrumb}
+      subtitle={subtitle}
+      actions={
+        <Link
+          href={buildHref(parsed, { deleted: !parsed.deleted, page: 1 })}
+          className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        >
+          {parsed.deleted ? "← Active images" : "View archived →"}
+        </Link>
+      }
+      pagination={pagination}
+    >
+      <ImagesTable
+        items={items}
+        backHref={buildHref(parsed, {})}
+        filterState={
+          {
+            query: parsed.query,
+            tags: parsed.tags,
+            source: parsed.source,
+            deleted: parsed.deleted,
+          } satisfies ImagesFilterState
+        }
+      />
+    </TListWide>
   );
 }

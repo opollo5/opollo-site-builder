@@ -7,6 +7,7 @@ import type { BreadcrumbSegment } from "./T-LIST-STANDARD";
 export interface TDashboardFeedProps {
   title: string;
   breadcrumb?: BreadcrumbSegment[];
+  subtitle?: string;
   /** Right-aligned actions in PageHeader. */
   actions?: React.ReactNode;
   /**
@@ -39,6 +40,7 @@ export interface TDashboardFeedProps {
 export function TDashboardFeed({
   title,
   breadcrumb,
+  subtitle,
   actions,
   inlineAlert,
   feed,
@@ -48,6 +50,7 @@ export function TDashboardFeed({
     <PageHeader>
       {breadcrumb && <PageHeader.Breadcrumb segments={breadcrumb} />}
       <PageHeader.Title>{title}</PageHeader.Title>
+      {subtitle && <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>}
       {actions && <PageHeader.Actions>{actions}</PageHeader.Actions>}
     </PageHeader>
   );

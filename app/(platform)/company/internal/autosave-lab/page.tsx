@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 import { AutosaveLabClient } from "./AutosaveLabClient";
-import { PageHeader } from "@/components/ui/page-header";
+import { TDashboardFeed } from "@/templates";
 
 export const metadata: Metadata = {
   title: "Autosave Validation Lab -- Opollo Internal",
@@ -20,15 +20,15 @@ export const metadata: Metadata = {
 
 export default function AutosaveLabPage() {
   return (
-    <main className="mx-auto max-w-4xl p-6">
-      <PageHeader>
-        <PageHeader.Title>Autosave Validation Lab</PageHeader.Title>
-        <PageHeader.Subtitle className="text-sm">
-          Spec 14 PR B — Week 0 item 0.5. Run all 12 scenarios before enabling{" "}
-          <code className="rounded bg-muted px-1 py-0.5 text-xs">FEATURE_AUTOSAVE_ADOPTED</code>.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <AutosaveLabClient />
-    </main>
+    <TDashboardFeed
+      title="Autosave Validation Lab"
+      subtitle="Spec 14 PR B — Week 0 item 0.5. Run all 12 scenarios before enabling FEATURE_AUTOSAVE_ADOPTED."
+      breadcrumb={[
+        { label: "Company", href: "/company" },
+        { label: "Internal" },
+        { label: "Autosave lab" },
+      ]}
+      feed={<AutosaveLabClient />}
+    />
   );
 }
