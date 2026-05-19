@@ -9,7 +9,9 @@ export type EventType =
   | "webhook_auth_failure"
   | "cron_stale"
   | "recovered"
-  | "manual_flag";
+  | "manual_flag"
+  | "cost_cap_exceeded"
+  | "missing_voice_profile";
 
 export type Severity = "info" | "warning" | "critical";
 
