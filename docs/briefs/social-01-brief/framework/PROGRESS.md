@@ -1,4 +1,11 @@
-## Wave 2a in progress 2026-05-19
+## Wave 2b in progress 2026-05-19
+
+- Template updated: TDetailSummarySection.title optional; subtitle widened to ReactNode
+- Routes migrated: 10 (T-DETAIL-SUMMARY: /admin/companies/[id], /admin/companies/[id]/social-profiles/[profileId]/connections, /admin/sites/[id], /admin/sites/[id]/appearance, /admin/batches/[siteId]/[batchId], /admin/images/[id], /optimiser/proposals/[id], /optimiser/pages/[id], /optimiser/imports/[brief_id]; TListStandard: /admin/batches/[siteId])
+- Deviation: /admin/batches/[siteId] used TListStandard (list semantics better fit than T-DETAIL-SUMMARY)
+- Deferred: /admin/sites/[id]/design-system, /admin/sites/[id]/design-system/preview — both "use client" layout-driven; shell from client layout, not PageShell/PageHeader; require layout refactor
+
+## Wave 2a complete 2026-05-19
 
 - Templates added: T-LIST-WIDE, T-DETAIL-SUMMARY, T-FORM, T-SETTINGS-FLAT
 - Routes migrated: 11 (T-LIST-WIDE: /admin/users, /admin/users/audit, /admin/companies, /admin/maintenance/social-connections, /admin/images; T-LIST-STANDARD deferred: /optimiser/proposals, /optimiser/change-log, /company/users; T-DASHBOARD-FEED deferred: /admin/_internal/table-examples, /company/internal/autosave-lab)
