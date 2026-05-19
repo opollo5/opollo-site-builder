@@ -13,7 +13,7 @@ All audit gaps are closed. PRs #919–#923 (five cleanup PRs) merged to main; al
 
 **Closed gaps:**
 - C-1 / G-1 / G-2 — Two-layer rate-limit (Upstash primary + Postgres fallback, fail-closed) implemented — PR #922
-- C-2 / G-3 — `AddProfileDropdown` built and mounted in FilterBar — PR #920
+- C-2 / G-3 — `AddProfileDropdown` built and mounted in FilterBar — PR #920; spec-aligned (correct testids, per-platform URLs, conditional render) — hardening PR #937
 - C-3 / G-4 — ComposerPreview platform-variant bug fixed; COMPONENT_MAP.md updated — PR #919
 - C-4 / G-10 — Framework wave 4 merged — PR #918
 - A-5 — `DraftResponse.created_by` aligned with DB column — PR #921
