@@ -124,8 +124,9 @@ test.describe("composer modal", () => {
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
     // Scope to dialog to avoid matching page-level "Scheduled" filter button.
+    // V2 SchedulingCard renders tabs with role="tab", not role="button".
     const dialog3 = page.getByRole("dialog", { name: /new post/i });
-    await dialog3.getByRole("button", { name: /^schedule$/i }).click();
+    await dialog3.getByRole("tab", { name: /^schedule$/i }).click();
     await expect(page.getByRole("group").or(page.locator("input[type='date']"))).toBeVisible({ timeout: 5_000 });
     await expect(page.locator("input[type='time']").first()).toBeVisible();
   });
@@ -136,7 +137,7 @@ test.describe("composer modal", () => {
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
     const dialog4 = page.getByRole("dialog", { name: /new post/i });
-    await dialog4.getByRole("button", { name: /^schedule$/i }).click();
+    await dialog4.getByRole("tab", { name: /^schedule$/i }).click();
     await expect(page.getByRole("button", { name: /\+ add time/i })).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole("button", { name: /\+ add time/i }).click();
@@ -151,8 +152,8 @@ test.describe("composer modal", () => {
     // In post_now mode (default), approval toggle should NOT be visible.
     await expect(page.getByRole("switch", { name: /post needs approval/i })).not.toBeVisible();
 
-    // Switch to schedule mode.
-    await page.getByRole("button", { name: /^schedule$/i }).click();
+    // Switch to schedule mode. V2 SchedulingCard uses role="tab".
+    await page.getByRole("tab", { name: /^schedule$/i }).click();
     await expect(page.getByRole("switch", { name: /post needs approval/i })).toBeVisible({ timeout: 5_000 });
   });
 
@@ -185,8 +186,13 @@ test.describe("composer modal", () => {
 
     // V2 ToolsRow: "GIF" button by label
     await page.getByRole("button", { name: /^gif$/i }).click();
-    // V2 GifPanel renders a "GIF picker" heading or the "Search GIPHY" input
-    await expect(page.getByPlaceholder(/search giphy/i).or(page.getByText("GIF picker"))).toBeVisible({ timeout: 5_000 });
+    // V2 GifPanel renders "GIF picker" heading + search input when API key is set,
+    // or a "not set" notice when NEXT_PUBLIC_GIPHY_API_KEY is absent (e.g. in CI).
+    await expect(
+      page.getByPlaceholder(/search giphy/i)
+        .or(page.getByText("GIF picker"))
+        .or(page.getByText(/NEXT_PUBLIC_GIPHY_API_KEY is not set/)),
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   test("(8) emoji panel opens and inserts an emoji into the text", async ({ page, context }) => {
