@@ -8,10 +8,10 @@ Generated: 2026-05-20
 |---|---|---|---|
 | WS1 | CAP backlog — objective template, health events, cron skip | #939 | ✅ merged |
 | WS2 | Wireframe audit + HIGH gap fixes | #940, #941 | ✅ merged |
-| WS3 | Smoke test harness + composer + CAP probes | #942, #943, #944 | CI running / stacked |
-| WS4 | Cost monitoring daily report | #945 | CI running |
-| WS5 | Staging environment scaffold + guards | #946 | CI running |
-| WS6 | README + ARCHITECTURE + RUNBOOK | #947 | CI running |
+| WS3 | Smoke test harness + composer + CAP probes | #942, #943, #944 | ✅ #942 #943 merged; #944 (CAP smoke) CI pending |
+| WS4 | Cost monitoring daily report | #945 | ✅ merged |
+| WS5 | Staging environment scaffold + guards | #946 | ✅ merged |
+| WS6 | README + ARCHITECTURE + RUNBOOK | #947 | ✅ merged |
 
 ## What shipped (merged to main)
 
@@ -96,8 +96,10 @@ Generated: 2026-05-20
 
 See `docs/briefs/hardening-pass/STEVEN_ACTIONS.md`:
 
-1. **IDEOGRAM_API_KEY production scope** — confirm `Production` env is checked in Vercel (WS1, image generation in CAP)
-2. **Staging Vercel branch setup** — create `staging` branch, set `APP_ENV=staging`, `STAGING_EMAIL_RECIPIENT` (WS5)
+1. **Staging Vercel env vars** — `staging` branch created 2026-05-20 ✅; add `APP_ENV=staging` and `STAGING_EMAIL_RECIPIENT` for the `staging` branch in Vercel dashboard (WS5)
+
+**Resolved**:
+- ~~**IDEOGRAM_API_KEY production scope**~~ — confirmed Production-scoped in Vercel as of 2026-05-20 ✅
 
 ## Deferred gaps (from wireframe audit)
 

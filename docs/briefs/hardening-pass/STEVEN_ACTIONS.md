@@ -6,21 +6,19 @@ Actions that require Steven's manual intervention. Appended as work surfaces the
 
 ## WS5 — Staging environment setup
 
-**When**: after PR #feat/staging-environment-scaffold merges.
+**Branch**: `staging` branch created and pushed to GitHub on 2026-05-20. ✅
 
-**What to do in Vercel**:
+**Remaining action — Vercel env vars** (dashboard only):
 
-1. In the Vercel dashboard for `opollo-site-builder`, go to **Settings → Git → Preview Branches**.
-2. Create a long-lived branch named `staging` in GitHub: `git checkout main && git checkout -b staging && git push origin staging`.
-3. In Vercel → **Settings → Environment Variables**, add the following for the `staging` branch only (under the "Custom Environment" or "Branch Environment" override):
+In Vercel → **Settings → Environment Variables**, add the following for the `staging` branch only (under the "Custom Environment" or "Branch Environment" override):
 
-   | Variable | Value |
-   |---|---|
-   | `APP_ENV` | `staging` |
-   | `STAGING_EMAIL_RECIPIENT` | `hi@opollo.com` (or a dedicated staging inbox) |
-   | `STAGING_SIDE_EFFECTS_ENABLED` | (leave unset — side effects blocked by default) |
+| Variable | Value |
+|---|---|
+| `APP_ENV` | `staging` |
+| `STAGING_EMAIL_RECIPIENT` | `hi@opollo.com` (or a dedicated staging inbox) |
+| `STAGING_SIDE_EFFECTS_ENABLED` | (leave unset — side effects blocked by default) |
 
-4. Vercel will auto-deploy the `staging` branch as a preview URL (e.g. `opollo-site-builder-git-staging-opollo5.vercel.app`). Share that URL with the team as the staging URL.
+Vercel will auto-deploy the `staging` branch as a preview URL (e.g. `opollo-site-builder-git-staging-opollo5.vercel.app`). Share that URL with the team as the staging URL.
 
 **What this gives you**:
 - `isStaging()` returns `true` on the staging branch.
@@ -30,13 +28,5 @@ Actions that require Steven's manual intervention. Appended as work surfaces the
 
 **Optional: dedicated staging Supabase project**
 If you want full data isolation, provision a new Supabase project and override `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_DB_URL` for the `staging` branch. Then run migrations on it separately.
-
----
-
-## WS1 — IDEOGRAM_API_KEY in production
-
-**When**: immediately (image generation in CAP is silently skipped without it).
-
-**What to do**: confirm `IDEOGRAM_API_KEY` is set for the `Production` environment in Vercel (it was added to Development + Preview on 2026-05-19 but may need Production scope). Check: Vercel → Settings → Environment Variables → IDEOGRAM_API_KEY → ensure `Production` is checked.
 
 ---
