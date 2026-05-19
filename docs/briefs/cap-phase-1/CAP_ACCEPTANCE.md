@@ -24,6 +24,7 @@ No manual SQL step required after that migration has applied.
 - [ ] Amber warning callout disappears after saving
 - [ ] "Add voice profile" form is visible
 - [ ] Create a voice profile: name = `Test Profile`, tone = `Professional & Friendly`, industry = `IT Services`, target audience = `SMB owners`
+- [ ] Optionally add reference posts (one per line) in the "Reference posts" textarea — saved to `cap_voice_profiles.reference_posts`
 - [ ] Profile appears in the list; shows as default
 
 ---
