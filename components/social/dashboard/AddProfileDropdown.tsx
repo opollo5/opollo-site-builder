@@ -7,21 +7,21 @@ import { SocialPlatformIcon, type SocialPlatformIconKey } from "@/components/ui/
 
 // ---------------------------------------------------------------------------
 // AddProfileDropdown — "Add profile" button + platform picker.
-// Brief audit gap G-3 (C-2 in original audit): dashboard FilterBar needs an
-// affordance to connect additional social profiles.
-//
-// Route: each item links to /company/social/connections, which is the
-// canonical profile-connection management page. The brief specifies
-// /company/social/connections/connect/[platform] but that route does not
-// exist; the connections page opens the platform OAuth popup from there.
+// Brief audit gap C-1 (hardening spec) / C-2/G-3 (original audit).
+// Each item links to /company/social/connections/connect/[platform]; that
+// route is a redirect stub back to the connections page where the actual
+// bundle.social OAuth popup is initiated.
 // ---------------------------------------------------------------------------
 
-const PLATFORMS: Array<{ value: SocialPlatformIconKey; label: string }> = [
-  { value: "LINKEDIN", label: "LinkedIn" },
-  { value: "FACEBOOK", label: "Facebook" },
-  { value: "INSTAGRAM", label: "Instagram" },
-  { value: "TWITTER", label: "X (Twitter)" },
-  { value: "GOOGLE_BUSINESS", label: "Google Business" },
+// CLAUDE-ASSUMPTION (PR 1.1): /company/social/connections/connect/[platform] is a
+// redirect stub because the real connect flow is popup-based via POST
+// /api/platform/social/connections/connect. Logged in DECISION_TRAIL.md.
+const PLATFORMS: Array<{ value: string; icon: SocialPlatformIconKey; label: string }> = [
+  { value: "linkedin", icon: "LINKEDIN", label: "LinkedIn" },
+  { value: "facebook", icon: "FACEBOOK", label: "Facebook" },
+  { value: "instagram", icon: "INSTAGRAM", label: "Instagram" },
+  { value: "x", icon: "TWITTER", label: "X (Twitter)" },
+  { value: "google_business_profile", icon: "GOOGLE_BUSINESS", label: "Google Business Profile" },
 ];
 
 interface AddProfileDropdownProps {
@@ -50,7 +50,7 @@ export function AddProfileDropdown({ className }: AddProfileDropdownProps) {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Add profile"
-        data-testid="add-profile-btn"
+        data-testid="add-profile-trigger"
         className="flex items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors"
       >
         <svg
@@ -91,16 +91,16 @@ export function AddProfileDropdown({ className }: AddProfileDropdownProps) {
           className="absolute left-0 top-full z-20 mt-1 w-52 rounded-lg border border-border bg-popover shadow-lg"
         >
           <div className="p-1">
-            {PLATFORMS.map(({ value, label }) => (
+            {PLATFORMS.map(({ value, icon, label }) => (
               <Link
                 key={value}
-                href="/company/social/connections"
+                href={`/company/social/connections/connect/${value}`}
                 role="menuitem"
-                data-testid={`add-profile-${value.toLowerCase()}`}
+                data-testid={`add-profile-${value}`}
                 onClick={() => setOpen(false)}
                 className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-sm text-foreground hover:bg-muted transition-colors"
               >
-                <SocialPlatformIcon platform={value} size={16} className="shrink-0" />
+                <SocialPlatformIcon platform={icon} size={16} className="shrink-0" />
                 {label}
               </Link>
             ))}

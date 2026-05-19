@@ -154,8 +154,8 @@ export function FilterBar({
         )}
       </div>
 
-      {/* Add profile */}
-      <AddProfileDropdown />
+      {/* Add profile — only shown when at least one connection exists; empty state handles zero-connection flow */}
+      {availableConnections.length > 0 && <AddProfileDropdown />}
 
       {/* View mode toggle (Month / Timeline) */}
       <div
