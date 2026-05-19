@@ -645,6 +645,83 @@ read failure does NOT block publishing.
 
 ---
 
+## CAP monthly generation not running
+
+**Symptom:** `cap_campaigns` rows stuck in `draft` state at the end of a month; no `cap_generation_runs` rows for the current month.
+
+**Impact:** CAP subscribers don't receive generated LinkedIn content. No end-user visible error — content just doesn't appear.
+
+**Diagnose:**
+1. Check cron heartbeat: `SELECT * FROM cron_heartbeats WHERE job_name = 'cap-monthly-generation' ORDER BY last_run_at DESC LIMIT 1;`
+2. Check if any subscriptions have `monthly_objective_template IS NULL` — those are skipped silently. Query: `SELECT id, company_id FROM cap_subscriptions WHERE status IN ('active','trial') AND monthly_objective_template IS NULL;`
+3. Check `IDEOGRAM_API_KEY` is set in Vercel production env: `npx vercel env ls production | grep IDEOGRAM`
+4. Check `service_health_events` for `event_type = 'cost_cap_exceeded'` or `missing_objective_template` in the last 24h.
+
+**Mitigate:**
+- To trigger a one-off generation for a specific campaign: `POST /api/platform/cap/campaigns/{id}/generate` (requires `is_cap_operator` session).
+- If the monthly cron missed (e.g. Vercel cron outage): trigger manually via `curl -H "Authorization: Bearer $CRON_SECRET" https://app.opollo.com/api/cron/cap-monthly-generation`.
+
+**Resolve:**
+- Missing template: set `monthly_objective_template` in the CAP admin panel for the affected company.
+- Cost cap exceeded: raise `monthly_cost_cap_usd` in `cap_subscriptions` or wait for next month's reset.
+- IDEOGRAM_API_KEY missing: add it to Vercel production env (see STEVEN_ACTIONS.md).
+
+---
+
+## CAP generation cost spike
+
+**Symptom:** daily cost report email shows CAP subscription above 80% monthly cap; unexpected spend on `cap_generation_runs`.
+
+**Impact:** approaching `monthly_cost_cap_usd` — generation will be blocked for the rest of the month when cap is hit.
+
+**Diagnose:**
+1. Query recent runs: `SELECT operation, model, estimated_cost_usd, created_at FROM cap_generation_runs WHERE created_at > now() - interval '24 hours' ORDER BY created_at DESC;`
+2. Check for duplicate generation runs (idempotency issue): same `cap_campaign_id` + `operation` multiple times in one day.
+
+**Mitigate:**
+- Raise `monthly_cost_cap_usd` on the affected subscription if the spend is legitimate.
+- If duplicate runs are found, investigate the campaign runner for concurrent trigger.
+
+**Resolve:**
+- For excessive Ideogram calls: verify `SMOKE_CAP_SKIP_GENERATION=1` is NOT set in production — that flag is smoke-test-only.
+- For a runaway loop: check cron schedule — CAP monthly generation runs `0 4 1 * *` (first of month only); weekly at `0 4 * * 1`. One trigger per month/week is expected.
+
+---
+
+## Social composer draft not saving
+
+**Symptom:** users report "Save as draft" spinner hangs or draft not appearing in the drafts list.
+
+**Impact:** composer state lost on close; drafts feature degraded.
+
+**Diagnose:**
+1. Check `POST /api/platform/social/drafts` in Vercel function logs for 4xx/5xx.
+2. Confirm `social_posts` table is accessible: `SELECT count(*) FROM social_posts WHERE state = 'draft' AND created_at > now() - interval '5 minutes';`
+3. Check for RLS policy failures in Supabase logs.
+
+**Mitigate:** No kill switch needed — the submit flow (bypasses draft state) still works.
+
+**Resolve:** Usually a Supabase RLS policy or missing company_id in the request. Check the request body in logs for `company_id: null`.
+
+---
+
+## Cost monitoring daily report not sending
+
+**Symptom:** no `[COST]` email after 07:00 UTC; heartbeat for `cost-monitoring-daily-report` shows `last_status = error` or `last_run_at` is stale.
+
+**Impact:** cost overruns go undetected until manual query.
+
+**Diagnose:**
+1. Check heartbeat: `SELECT * FROM cron_heartbeats WHERE job_name = 'cost-monitoring-daily-report';`
+2. Confirm `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL` are set in Vercel production env.
+3. Check `email_log` table for failed sends in the last 24h: `SELECT * FROM email_log WHERE created_at > now() - interval '24 hours' AND status = 'failed';`
+
+**Mitigate:** Trigger manually: `curl -H "Authorization: Bearer $CRON_SECRET" https://app.opollo.com/api/cron/cost-monitoring-daily-report`
+
+**Resolve:** Usually a missing SendGrid env var or no `is_opollo_staff = true` recipients. Add staff flag via: `UPDATE platform_users SET is_opollo_staff = true WHERE email = 'hi@opollo.com';`
+
+---
+
 ## Adding a new runbook entry
 
 When a live incident surfaces a gap, write it up here the same day. Template:
