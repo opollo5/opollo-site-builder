@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { SiteCreateForm } from "@/components/SiteCreateForm";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TForm } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // AUTH-FOUNDATION P2.2 — /admin/sites/new.
@@ -21,25 +20,15 @@ export default async function NewSitePage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: "New site" },
-          ]}
-        />
-        <PageHeader.Title>Add a WordPress site</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Connect a site by providing its URL plus a WordPress Application
-          Password. We&apos;ll verify the connection before storing the
-          credentials.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <div className="mx-auto max-w-2xl">
-        <SiteCreateForm />
-      </div>
-    </PageShell>
+    <TForm
+      title="Add a WordPress site"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: "New site" },
+      ]}
+      subtitle="Connect a site by providing its URL plus a WordPress Application Password. We'll verify the connection before storing the credentials."
+      formSections={[{ content: <SiteCreateForm /> }]}
+    />
   );
 }

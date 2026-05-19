@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { AccountSecurityForm } from "@/components/AccountSecurityForm";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TSettingsFlat } from "@/templates";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -31,20 +30,17 @@ export default async function AccountSecurityPage() {
   }
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Account", href: "/account/security" },
-            { label: "Security" },
-          ]}
-        />
-        <PageHeader.Title>Account security</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Change your password. Minimum 12 characters.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <AccountSecurityForm userEmail={user.email} />
-    </PageShell>
+    <TSettingsFlat
+      title="Account security"
+      breadcrumb={[
+        { label: "Account", href: "/account/security" },
+        { label: "Security" },
+      ]}
+      subtitle="Change your password. Minimum 12 characters."
+      sections={[{
+        title: "Password",
+        content: <AccountSecurityForm userEmail={user.email} />,
+      }]}
+    />
   );
 }

@@ -1,4 +1,11 @@
-## Wave 2b in progress 2026-05-19
+## Wave 2c in progress 2026-05-19
+
+- Templates used: T-FORM (6 routes), T-SETTINGS-FLAT (7 routes)
+- Routes migrated (T-FORM): /admin/sites/new, /admin/sites/[id]/edit, /admin/sites/[id]/posts/new, /admin/companies/new, /admin/posts/[siteId]/new, /admin/email-test
+- Routes migrated (T-SETTINGS-FLAT): /admin/sites/[id]/settings, /admin/settings/design-system, /account/security, /account/devices, /company/settings/brand, /optimiser/clients/[id]/settings, /company/social/sharing
+- Deviations: company/settings/brand and optimiser/clients/[id]/settings retain card wrappers inside section content (layout intentional); CustomerBrandProfileEditor gained hidePageHeader prop to avoid duplicate H1
+
+## Wave 2b complete 2026-05-19
 
 - Template updated: TDetailSummarySection.title optional; subtitle widened to ReactNode
 - Routes migrated: 10 (T-DETAIL-SUMMARY: /admin/companies/[id], /admin/companies/[id]/social-profiles/[profileId]/connections, /admin/sites/[id], /admin/sites/[id]/appearance, /admin/batches/[siteId]/[batchId], /admin/images/[id], /optimiser/proposals/[id], /optimiser/pages/[id], /optimiser/imports/[brief_id]; TListStandard: /admin/batches/[siteId])

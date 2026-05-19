@@ -3,8 +3,7 @@ import { redirect } from "next/navigation";
 
 import { TrustedDevicesList } from "@/components/TrustedDevicesList";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TSettingsFlat } from "@/templates";
 import {
   DEVICE_ID_COOKIE,
   decodeDeviceCookie,
@@ -48,46 +47,47 @@ export default async function AccountDevicesPage() {
     ? await listTrustedDevicesForUser(user.id, currentDeviceId)
     : [];
 
+  const inlineAlerts: React.ReactNode[] = [];
+  if (!flagOn) {
+    inlineAlerts.push(
+      <Alert key="flag-off">
+        Email-2FA is not currently enabled on this environment.
+        Trusted-device tracking starts when{" "}
+        <code className="font-mono text-sm">AUTH_2FA_ENABLED</code>{" "}
+        is flipped to <code>true</code> in env.
+      </Alert>,
+    );
+  } else if (devices.length === 0) {
+    inlineAlerts.push(
+      <Alert key="no-devices">
+        No trusted devices yet. The next time you sign in and tick
+        &quot;Trust this device for 30 days&quot;, it will appear here.
+      </Alert>,
+    );
+  }
+
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Account", href: "/account/security" },
-            { label: "Trusted devices" },
-          ]}
-        />
-        <PageHeader.Title>Trusted devices</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Devices that skip the email-approval step on sign-in. Trust
-          lasts 30 days from last sign-in; sign out any device you
-          don&apos;t recognise.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
-      {!flagOn && (
-        <Alert>
-          Email-2FA is not currently enabled on this environment.
-          Trusted-device tracking starts when{" "}
-          <code className="font-mono text-sm">AUTH_2FA_ENABLED</code>{" "}
-          is flipped to <code>true</code> in env.
-        </Alert>
-      )}
-
-      {flagOn && devices.length === 0 && (
-        <Alert>
-          No trusted devices yet. The next time you sign in and tick
-          &quot;Trust this device for 30 days&quot;, it will appear
-          here.
-        </Alert>
-      )}
-
-      {flagOn && devices.length > 0 && (
-        <TrustedDevicesList
-          devices={devices}
-          hasCurrentDevice={currentDeviceId !== null}
-        />
-      )}
-    </PageShell>
+    <TSettingsFlat
+      title="Trusted devices"
+      breadcrumb={[
+        { label: "Account", href: "/account/security" },
+        { label: "Trusted devices" },
+      ]}
+      subtitle="Devices that skip the email-approval step on sign-in. Trust lasts 30 days from last sign-in; sign out any device you don't recognise."
+      inlineAlerts={inlineAlerts.length > 0 ? inlineAlerts : undefined}
+      sections={
+        flagOn && devices.length > 0
+          ? [{
+              title: "Active devices",
+              content: (
+                <TrustedDevicesList
+                  devices={devices}
+                  hasCurrentDevice={currentDeviceId !== null}
+                />
+              ),
+            }]
+          : []
+      }
+    />
   );
 }

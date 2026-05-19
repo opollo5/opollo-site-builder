@@ -2,9 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
 import { AssistedApprovalToggle } from "@/components/optimiser/AssistedApprovalToggle";
 import { CrossClientConsentToggle } from "@/components/optimiser/CrossClientConsentToggle";
+import { TSettingsFlat } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getClient } from "@/lib/optimiser/clients";
 import { isPatternLibraryEnabled } from "@/lib/optimiser/pattern-library/feature-flag";
@@ -63,104 +63,115 @@ export default async function ClientSettingsPage({
     DEFAULT_CONVERSION_COMPONENTS;
 
   return (
-    <div className="space-y-6">
-      <PageHeader>
-        <PageHeader.Title>{client.name} — score settings</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Phase 1 surface is read-only. Phase 2 wires the manual override
-          via this page.
-        </PageHeader.Subtitle>
-        <PageHeader.Actions>
-          <Button asChild variant="outline">
-            <Link href={`/optimiser/onboarding/${client.id}`}>
-              Connector settings
-            </Link>
-          </Button>
-        </PageHeader.Actions>
-      </PageHeader>
-
-      <section className="space-y-4 rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium">Composite score weights</h2>
-        <p className="text-sm text-muted-foreground">
-          The composite is{" "}
-          <code className="font-mono text-sm">
-            (alignment × {weights.alignment.toFixed(2)}) + (behaviour × {weights.behaviour.toFixed(2)}) + (conversion × {weights.conversion.toFixed(2)}) + (technical × {weights.technical.toFixed(2)})
-          </code>
-          . Defaults are{" "}
-          <code className="font-mono text-sm">0.25 / 0.30 / 0.30 / 0.15</code>.
-        </p>
-        <ul className="space-y-3">
-          {(Object.keys(weights) as Array<keyof ScoreWeights>).map((key) => (
-            <li key={key} className="flex items-start gap-3">
-              <span className="mt-1 inline-block w-16 font-mono text-sm tabular-nums">
-                ×{weights[key].toFixed(2)}
-              </span>
-              <div className="flex-1">
-                <p className="font-medium">{WEIGHT_LABELS[key]}</p>
-                <p className="text-sm text-muted-foreground">
-                  {WEIGHT_DESCRIPTIONS[key]}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium">Conversion components present</h2>
-        <p className="text-sm text-muted-foreground">
-          Drives the §2.3 redistribution: when revenue tracking is missing,
-          its 0.20 weight folds into CR (×0.65) + CPA (×0.35).
-        </p>
-        <ul className="space-y-1 text-sm">
-          <li>
-            <span className="inline-block w-32 text-muted-foreground">Conversion rate</span>
-            <strong>{componentsPresent.cr ? "tracked" : "not tracked"}</strong>
-          </li>
-          <li>
-            <span className="inline-block w-32 text-muted-foreground">Cost per conversion</span>
-            <strong>{componentsPresent.cpa ? "tracked" : "not tracked"}</strong>
-          </li>
-          <li>
-            <span className="inline-block w-32 text-muted-foreground">Revenue per visit</span>
-            <strong>{componentsPresent.revenue ? "tracked" : "not tracked"}</strong>
-          </li>
-        </ul>
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium">Causal-delta measurement window</h2>
-        <p className="text-sm">
-          <span className="font-mono tabular-nums">{client.causal_eval_window_days}</span> days
-        </p>
-        <p className="text-sm text-muted-foreground">
-          After a regenerated page has been live for this many days (or
-          accumulated 300+ sessions on the new version, whichever is sooner),
-          the engine evaluates its actual impact and writes a row to
-          opt_causal_deltas. Lower-traffic B2B clients may extend this; default 14 days.
-        </p>
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium">Assisted approval (Phase 2)</h2>
-        <AssistedApprovalToggle
-          clientId={client.id}
-          enabled={client.assisted_approval_enabled}
-          isAdmin={isAdmin}
-        />
-      </section>
-
-      <section className="space-y-3 rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-medium">
-          Cross-client learning (Phase 3)
-        </h2>
-        <CrossClientConsentToggle
-          clientId={client.id}
-          enabled={client.cross_client_learning_consent}
-          isAdmin={isAdmin}
-          patternLibraryEnabled={isPatternLibraryEnabled()}
-        />
-      </section>
-    </div>
+    <TSettingsFlat
+      title={`${client.name} — score settings`}
+      subtitle="Phase 1 surface is read-only. Phase 2 wires the manual override via this page."
+      actions={
+        <Button asChild variant="outline">
+          <Link href={`/optimiser/onboarding/${client.id}`}>
+            Connector settings
+          </Link>
+        </Button>
+      }
+      width="standard"
+      sections={[
+        {
+          title: "Composite score weights",
+          content: (
+            <div className="space-y-4 rounded-lg border border-border bg-card p-6">
+              <p className="text-sm text-muted-foreground">
+                The composite is{" "}
+                <code className="font-mono text-sm">
+                  (alignment × {weights.alignment.toFixed(2)}) + (behaviour × {weights.behaviour.toFixed(2)}) + (conversion × {weights.conversion.toFixed(2)}) + (technical × {weights.technical.toFixed(2)})
+                </code>
+                . Defaults are{" "}
+                <code className="font-mono text-sm">0.25 / 0.30 / 0.30 / 0.15</code>.
+              </p>
+              <ul className="space-y-3">
+                {(Object.keys(weights) as Array<keyof ScoreWeights>).map((key) => (
+                  <li key={key} className="flex items-start gap-3">
+                    <span className="mt-1 inline-block w-16 font-mono text-sm tabular-nums">
+                      ×{weights[key].toFixed(2)}
+                    </span>
+                    <div className="flex-1">
+                      <p className="font-medium">{WEIGHT_LABELS[key]}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {WEIGHT_DESCRIPTIONS[key]}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ),
+        },
+        {
+          title: "Conversion components present",
+          content: (
+            <div className="space-y-3 rounded-lg border border-border bg-card p-6">
+              <p className="text-sm text-muted-foreground">
+                Drives the §2.3 redistribution: when revenue tracking is missing,
+                its 0.20 weight folds into CR (×0.65) + CPA (×0.35).
+              </p>
+              <ul className="space-y-1 text-sm">
+                <li>
+                  <span className="inline-block w-32 text-muted-foreground">Conversion rate</span>
+                  <strong>{componentsPresent.cr ? "tracked" : "not tracked"}</strong>
+                </li>
+                <li>
+                  <span className="inline-block w-32 text-muted-foreground">Cost per conversion</span>
+                  <strong>{componentsPresent.cpa ? "tracked" : "not tracked"}</strong>
+                </li>
+                <li>
+                  <span className="inline-block w-32 text-muted-foreground">Revenue per visit</span>
+                  <strong>{componentsPresent.revenue ? "tracked" : "not tracked"}</strong>
+                </li>
+              </ul>
+            </div>
+          ),
+        },
+        {
+          title: "Causal-delta measurement window",
+          content: (
+            <div className="space-y-3 rounded-lg border border-border bg-card p-6">
+              <p className="text-sm">
+                <span className="font-mono tabular-nums">{client.causal_eval_window_days}</span> days
+              </p>
+              <p className="text-sm text-muted-foreground">
+                After a regenerated page has been live for this many days (or
+                accumulated 300+ sessions on the new version, whichever is sooner),
+                the engine evaluates its actual impact and writes a row to
+                opt_causal_deltas. Lower-traffic B2B clients may extend this; default 14 days.
+              </p>
+            </div>
+          ),
+        },
+        {
+          title: "Assisted approval (Phase 2)",
+          content: (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <AssistedApprovalToggle
+                clientId={client.id}
+                enabled={client.assisted_approval_enabled}
+                isAdmin={isAdmin}
+              />
+            </div>
+          ),
+        },
+        {
+          title: "Cross-client learning (Phase 3)",
+          content: (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <CrossClientConsentToggle
+                clientId={client.id}
+                enabled={client.cross_client_learning_consent}
+                isAdmin={isAdmin}
+                patternLibraryEnabled={isPatternLibraryEnabled()}
+              />
+            </div>
+          ),
+        },
+      ]}
+    />
   );
 }

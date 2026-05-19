@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { CustomerBrandProfileEditor } from "@/components/CustomerBrandProfileEditor";
+import { Alert } from "@/components/ui/alert";
+import { TSettingsFlat } from "@/templates";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getActiveBrandProfile } from "@/lib/platform/brand";
 import { getPlatformCompany } from "@/lib/platform/companies";
@@ -18,6 +20,11 @@ import { getPlatformCompany } from "@/lib/platform/companies";
 
 export const dynamic = "force-dynamic";
 
+const BREADCRUMB = [
+  { label: "Company", href: "/company" },
+  { label: "Brand" },
+];
+
 export default async function CompanyBrandPage() {
   const session = await getCurrentPlatformSession();
   if (!session) {
@@ -26,13 +33,20 @@ export default async function CompanyBrandPage() {
 
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
-        <p className="font-medium">Account not provisioned to a company.</p>
-        <p className="mt-1 text-muted-foreground">
-          Your account isn&apos;t a member of any company on the platform
-          yet. Ask an admin to invite you, or contact Opollo support.
-        </p>
-      </div>
+      <TSettingsFlat
+        title="Brand profile"
+        breadcrumb={BREADCRUMB}
+        inlineAlerts={[
+          <Alert key="not-provisioned">
+            <p className="font-medium">Account not provisioned to a company.</p>
+            <p className="mt-1 text-muted-foreground">
+              Your account isn&apos;t a member of any company on the platform
+              yet. Ask an admin to invite you, or contact Opollo support.
+            </p>
+          </Alert>,
+        ]}
+        sections={[]}
+      />
     );
   }
 
@@ -40,13 +54,20 @@ export default async function CompanyBrandPage() {
     session.isOpolloStaff || session.company.role === "admin";
   if (!isAdmin) {
     return (
-      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
-        <p className="font-medium">Admins only.</p>
-        <p className="mt-1">
-          Only admins can view and edit the brand profile. Ask an admin
-          in your company to update your role if you need access.
-        </p>
-      </div>
+      <TSettingsFlat
+        title="Brand profile"
+        breadcrumb={BREADCRUMB}
+        inlineAlerts={[
+          <Alert key="admins-only" variant="destructive">
+            <p className="font-medium">Admins only.</p>
+            <p className="mt-1">
+              Only admins can view and edit the brand profile. Ask an admin
+              in your company to update your role if you need access.
+            </p>
+          </Alert>,
+        ]}
+        sections={[]}
+      />
     );
   }
 
@@ -59,19 +80,34 @@ export default async function CompanyBrandPage() {
 
   if (!companyResult.ok) {
     return (
-      <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-        role="alert"
-      >
-        Failed to load company: {companyResult.error.message}
-      </div>
+      <TSettingsFlat
+        title="Brand profile"
+        breadcrumb={BREADCRUMB}
+        inlineAlerts={[
+          <Alert key="load-error" variant="destructive">
+            Failed to load company: {companyResult.error.message}
+          </Alert>,
+        ]}
+        sections={[]}
+      />
     );
   }
 
   return (
-    <CustomerBrandProfileEditor
-      company={companyResult.data.company}
-      brand={brand}
+    <TSettingsFlat
+      title="Brand profile"
+      breadcrumb={BREADCRUMB}
+      subtitle={`How ${companyResult.data.company.name} looks, sounds, and behaves across every Opollo product.`}
+      sections={[{
+        title: "Identity & voice",
+        content: (
+          <CustomerBrandProfileEditor
+            hidePageHeader
+            company={companyResult.data.company}
+            brand={brand}
+          />
+        ),
+      }]}
     />
   );
 }

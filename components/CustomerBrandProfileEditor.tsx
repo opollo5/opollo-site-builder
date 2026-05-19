@@ -42,6 +42,9 @@ import type { PlatformCompany } from "@/lib/platform/companies";
 type Props = {
   company: PlatformCompany;
   brand: BrandProfile | null;
+  /** When true, suppresses the internal <H1> + Lead block.
+   *  Use when the parent page already provides page chrome. */
+  hidePageHeader?: boolean;
 };
 
 function initialState(brand: BrandProfile | null): FormState {
@@ -62,7 +65,7 @@ function initialState(brand: BrandProfile | null): FormState {
   };
 }
 
-export function CustomerBrandProfileEditor({ company, brand }: Props) {
+export function CustomerBrandProfileEditor({ company, brand, hidePageHeader = false }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(() => initialState(brand));
 
@@ -119,13 +122,15 @@ export function CustomerBrandProfileEditor({ company, brand }: Props) {
 
   return (
     <div className="space-y-8">
-      <header>
-        <H1>Brand profile</H1>
-        <Lead className="mt-1">
-          How <strong>{company.name}</strong> looks, sounds, and behaves
-          across every Opollo product.
-        </Lead>
-      </header>
+      {!hidePageHeader && (
+        <header>
+          <H1>Brand profile</H1>
+          <Lead className="mt-1">
+            How <strong>{company.name}</strong> looks, sounds, and behaves
+            across every Opollo product.
+          </Lead>
+        </header>
+      )}
 
       <section
         className="rounded-lg border bg-card p-4"

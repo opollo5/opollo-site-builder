@@ -2,8 +2,7 @@ import { redirect } from "next/navigation";
 
 import { EmailTestForm } from "@/components/EmailTestForm";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TForm } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // AUTH-FOUNDATION P3.4 — /admin/email-test now gated on super_admin.
@@ -23,34 +22,21 @@ export default async function EmailTestPage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Email test" },
-          ]}
-        />
-        <PageHeader.Title>SendGrid wrapper test</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Fire a one-shot test email through{" "}
-          <code className="font-mono text-sm">lib/email/sendgrid.ts</code>.
-          Same code path as the runtime uses — invites, login challenges,
-          every transactional send.
-        </PageHeader.Subtitle>
-      </PageHeader>
-
-      <div className="max-w-2xl">
+    <TForm
+      title="SendGrid wrapper test"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Email test" },
+      ]}
+      subtitle="Fire a one-shot test email through lib/email/sendgrid.ts. Same code path as the runtime uses — invites, login challenges, every transactional send."
+      inlineAlert={
         <Alert>
           Restricted to <strong>super_admin</strong>. Every send is
           captured in <code className="font-mono text-sm">email_log</code>{" "}
           for audit.
         </Alert>
-
-        <div className="mt-6">
-          <EmailTestForm />
-        </div>
-      </div>
-    </PageShell>
+      }
+      formSections={[{ content: <EmailTestForm /> }]}
+    />
   );
 }

@@ -3,9 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { SiteVoiceSettingsForm } from "@/components/SiteVoiceSettingsForm";
 import { UseImageLibraryToggle } from "@/components/UseImageLibraryToggle";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
-import { H2 } from "@/components/ui/typography";
+import { TSettingsFlat } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getSite } from "@/lib/sites";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -69,62 +67,41 @@ export default async function SiteSettingsPage({
   const imagesWithMetadata = metadataCountRow.count ?? 0;
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name, href: `/admin/sites/${site.id}` },
-            { label: "Settings" },
-          ]}
-        />
-        <PageHeader.Title>{site.name} — Settings</PageHeader.Title>
-        <PageHeader.Subtitle>
-          These values pre-populate every new brief. Each brief can still
-          override at commit time without changing the site default.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <div className="mx-auto max-w-3xl">
-
-      <section
-        aria-labelledby="voice-heading"
-        className="rounded-lg border p-4"
-      >
-        <H2 id="voice-heading">Brand voice &amp; design direction</H2>
-        <p className="mt-1 text-base text-muted-foreground">
-          Set once for the site; the brief commit form inherits these as
-          defaults.
-        </p>
-        <div className="mt-4">
-          <SiteVoiceSettingsForm
-            siteId={site.id}
-            initialBrandVoice={site.brand_voice}
-            initialDesignDirection={site.design_direction}
-            initialVersionLock={site.version_lock}
-          />
-        </div>
-      </section>
-
-      <section
-        aria-labelledby="image-library-heading"
-        className="mt-6 rounded-lg border p-4"
-      >
-        <H2 id="image-library-heading">Image library</H2>
-        <p className="mt-1 text-base text-muted-foreground">
-          When enabled, brief generation can suggest images from the shared
-          library where the page topic matches.
-        </p>
-        <div className="mt-4">
-          <UseImageLibraryToggle
-            siteId={site.id}
-            initialEnabled={useImageLibrary}
-            totalImages={totalImages}
-            imagesWithMetadata={imagesWithMetadata}
-          />
-        </div>
-      </section>
-      </div>
-    </PageShell>
+    <TSettingsFlat
+      title={`${site.name} — Settings`}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name, href: `/admin/sites/${site.id}` },
+        { label: "Settings" },
+      ]}
+      subtitle="These values pre-populate every new brief. Each brief can still override at commit time without changing the site default."
+      sections={[
+        {
+          title: "Brand voice & design direction",
+          description: "Set once for the site; the brief commit form inherits these as defaults.",
+          content: (
+            <SiteVoiceSettingsForm
+              siteId={site.id}
+              initialBrandVoice={site.brand_voice}
+              initialDesignDirection={site.design_direction}
+              initialVersionLock={site.version_lock}
+            />
+          ),
+        },
+        {
+          title: "Image library",
+          description: "When enabled, brief generation can suggest images from the shared library where the page topic matches.",
+          content: (
+            <UseImageLibraryToggle
+              siteId={site.id}
+              initialEnabled={useImageLibrary}
+              totalImages={totalImages}
+              imagesWithMetadata={imagesWithMetadata}
+            />
+          ),
+        },
+      ]}
+    />
   );
 }

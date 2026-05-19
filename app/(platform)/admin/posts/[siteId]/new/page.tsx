@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { PageHeader } from "@/components/ui/page-header";
 import { PostsNewClient } from "@/components/PostsNewClient";
+import { TForm } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSites } from "@/lib/sites";
 
@@ -30,23 +30,18 @@ export default async function PostsSiteNewPage({
   }
 
   return (
-    <>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Blog", href: "/admin/posts" },
-            { label: site.name },
-          ]}
-        />
-        <PageHeader.Title>Post a blog</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Paste or drop your post for {site.name}. Metadata pre-fills from
-          front-matter, inline labels, or the first heading — every value is
-          editable before save.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <PostsNewClient siteId={site.id} siteName={site.name} />
-    </>
+    <TForm
+      title="Post a blog"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Blog", href: "/admin/posts" },
+        { label: site.name },
+      ]}
+      subtitle={`Paste or drop your post for ${site.name}. Metadata pre-fills from front-matter, inline labels, or the first heading — every value is editable before save.`}
+      width="standard"
+      formSections={[{
+        content: <PostsNewClient siteId={site.id} siteName={site.name} />,
+      }]}
+    />
   );
 }
