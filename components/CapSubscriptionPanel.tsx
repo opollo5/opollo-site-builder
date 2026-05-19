@@ -58,6 +58,10 @@ export function CapSubscriptionPanel({ companyId, initialSubscription, initialVo
   const [newTier, setNewTier] = useState<CapTier>("starter");
   const [newStatus, setNewStatus] = useState<CapStatus>("trial");
   const [newCap, setNewCap] = useState("200");
+  const [objectiveTemplate, setObjectiveTemplate] = useState(
+    initialSubscription?.monthly_objective_template ?? "",
+  );
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   async function handleActivate(e: React.FormEvent) {
     e.preventDefault();
@@ -81,6 +85,25 @@ export function CapSubscriptionPanel({ companyId, initialSubscription, initialVo
     }
     setSubscription(json.data);
     setShowActivateForm(false);
+  }
+
+  async function handleSaveObjectiveTemplate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!subscription) return;
+    setError(null);
+    setSavingTemplate(true);
+    const res = await fetch(`/api/platform/cap/subscriptions/${subscription.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ monthly_objective_template: objectiveTemplate.trim() || null }),
+    });
+    const json = (await res.json()) as ApiResponse<CapSubscription>;
+    setSavingTemplate(false);
+    if (!res.ok || !json.ok) {
+      setError(!json.ok ? json.error.message : "Failed to save objective template.");
+      return;
+    }
+    setSubscription(json.data);
   }
 
   function startEditProfile(profile: CapVoiceProfile) {
@@ -195,16 +218,44 @@ export function CapSubscriptionPanel({ companyId, initialSubscription, initialVo
         </CardHeader>
         <CardContent>
           {subscription ? (
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
-              <dt className="text-muted-foreground">Tier</dt>
-              <dd className="font-medium">{TIER_LABELS[subscription.tier]}</dd>
-              <dt className="text-muted-foreground">Monthly cap</dt>
-              <dd className="font-medium">${subscription.monthly_cost_cap_usd.toFixed(2)}</dd>
-              <dt className="text-muted-foreground">Approval required</dt>
-              <dd className="font-medium">{subscription.approval_required ? "Yes" : "No"}</dd>
-              <dt className="text-muted-foreground">Subscription ID</dt>
-              <dd className="font-mono text-xs">{subscription.id}</dd>
-            </dl>
+            <div className="space-y-4">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+                <dt className="text-muted-foreground">Tier</dt>
+                <dd className="font-medium">{TIER_LABELS[subscription.tier]}</dd>
+                <dt className="text-muted-foreground">Monthly cap</dt>
+                <dd className="font-medium">${subscription.monthly_cost_cap_usd.toFixed(2)}</dd>
+                <dt className="text-muted-foreground">Approval required</dt>
+                <dd className="font-medium">{subscription.approval_required ? "Yes" : "No"}</dd>
+                <dt className="text-muted-foreground">Subscription ID</dt>
+                <dd className="font-mono text-xs">{subscription.id}</dd>
+              </dl>
+              <form onSubmit={handleSaveObjectiveTemplate} className="space-y-2 border-t pt-4">
+                <div className="space-y-1">
+                  <label htmlFor="cap-objective" className="text-sm font-medium">
+                    Default monthly objective template
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Used when monthly campaigns auto-generate. You can override per-campaign. Be
+                    specific: describe the goal, audience, and tone in one sentence.
+                  </p>
+                </div>
+                <Textarea
+                  id="cap-objective"
+                  placeholder="e.g. Drive LinkedIn engagement and inbound leads for our Managed IT Services team targeting SMB IT managers in the Pacific Northwest."
+                  rows={3}
+                  maxLength={500}
+                  value={objectiveTemplate}
+                  onChange={(e) => setObjectiveTemplate(e.target.value)}
+                  data-testid="cap-objective-template"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">{objectiveTemplate.length}/500</span>
+                  <Button type="submit" size="sm" disabled={savingTemplate}>
+                    {savingTemplate ? "Saving…" : "Save template"}
+                  </Button>
+                </div>
+              </form>
+            </div>
           ) : showActivateForm ? (
             <form onSubmit={handleActivate} className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
@@ -261,6 +312,18 @@ export function CapSubscriptionPanel({ companyId, initialSubscription, initialVo
           )}
         </CardContent>
       </Card>
+
+      {/* Missing template warning */}
+      {subscription && !subscription.monthly_objective_template && (
+        <div
+          className="rounded-md border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-800"
+          role="alert"
+          data-testid="cap-missing-template-warning"
+        >
+          <span className="font-medium">Monthly objective template not set.</span>{" "}
+          Auto-generation will skip this company until a template is saved above.
+        </div>
+      )}
 
       {/* Voice profiles */}
       {subscription && (
