@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -195,7 +196,13 @@ export function CapCampaignDetail({ campaign, initialPosts }: Props) {
 
               {post.social_draft_id && (
                 <p className="text-xs text-muted-foreground">
-                  Draft ID: <span className="font-mono">{post.social_draft_id}</span>
+                  Pushed to composer —{" "}
+                  <Link
+                    href={`/company/social/posts?compose=${post.social_draft_id}`}
+                    className="underline underline-offset-2 hover:text-foreground transition-colors"
+                  >
+                    Open in composer
+                  </Link>
                 </p>
               )}
 
