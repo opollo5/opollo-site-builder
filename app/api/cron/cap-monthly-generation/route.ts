@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { logger } from "@/lib/logger";
-import { authorisedCronRequest, unauthorisedResponse, updateHeartbeat } from "@/lib/platform/cron/cron-shared";
+import { authorisedCronRequest, unauthorisedResponse, updateHeartbeat, guardedCronSkip } from "@/lib/platform/cron/cron-shared";
 import { runMonthlyCapGeneration } from "@/lib/cap/monthly-generation";
 
 export const runtime = "nodejs";
@@ -12,6 +12,8 @@ const JOB_NAME = "cap-monthly-generation";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!authorisedCronRequest(req)) return unauthorisedResponse();
+  const skip = guardedCronSkip(JOB_NAME);
+  if (skip) return skip;
 
   logger.info(`${JOB_NAME}.triggered`);
 
