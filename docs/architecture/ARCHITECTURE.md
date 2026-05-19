@@ -372,6 +372,51 @@ These traps will catch a "dead code" sweep. Don't delete:
 
 ---
 
+## 16b. Platform modules (post-M16 additions)
+
+### Social Composer (BSP)
+
+Multi-tenant social post scheduling via bundle.social. Key surfaces:
+- `lib/platform/social/` — connection management, analytics ingest, post scheduling
+- `app/api/platform/social/` — REST endpoints (drafts, connections, posts)
+- `app/(platform)/company/social/` — company-scoped UI (dashboard, composer, connections)
+- bundle.social SDK wraps OAuth flow; team IDs are per-company in `bsp_connections`
+- Social posts state machine: `draft → scheduled → published | failed`
+- Recurring drafts supported via `recurring_draft_id` FK on `social_posts`
+
+**Critical paths:** `POST /api/platform/social/connections/connect`, `POST /api/platform/social/posts/{id}/publish-attempts`, webhook at `/api/webhooks/bundlesocial`.
+
+### CAP — Content Automation Platform
+
+AI voice-matched LinkedIn content for MSP clients. Key surfaces:
+- `lib/cap/` — generation runner, cost cap, monthly generation orchestration
+- `app/api/platform/cap/` — subscriptions, campaigns, voice profiles, generation endpoint
+- `app/(platform)/company/cap/` — CAP admin UI
+- Tables: `cap_subscriptions`, `cap_voice_profiles`, `cap_campaigns`, `cap_campaign_posts`, `cap_generation_runs`
+- Crons: `cap-monthly-generation` (1st of month), `cap-weekly-generation` (Mondays), `cap-generation-runs-cleanup` (daily)
+- Cost guard: `lib/cap/cost-cap.ts` throws `CostCapExceededError` before any generation call
+- Objective template: `cap_subscriptions.monthly_objective_template` — if NULL, generation cron skips the company
+
+**Write-safety critical:** any changes to `lib/cap/generation/` require Steven merge.
+
+### Cost Monitoring
+
+Daily cost report sent to Opollo staff at 07:00 UTC.
+- `lib/platform/cost-monitoring/queries.ts` — `capCostSummary`, `tenantBudgetSummary`, `buildCostReport`
+- `lib/platform/cost-monitoring/report.ts` — `sendDailyCostReport` (email formatter)
+- Cron: `cost-monitoring-daily-report` at `0 7 * * *`
+- Subject flags: `[COST] ... high-utilisation`, `daily breach`, `monthly breach`
+
+### Runtime environment detection
+
+`lib/runtime-env.ts` — single source of truth for environment tier:
+- `APP_ENV` env var → `VERCEL_ENV` fallback → `"development"`
+- `sideEffectsGuarded()` — true in staging without `STAGING_SIDE_EFFECTS_ENABLED=1`
+- `stagingEmailRecipient()` — redirects email in staging to `STAGING_EMAIL_RECIPIENT`
+- `guardedCronSkip(jobName)` in `cron-shared.ts` — returns skip response in guarded env
+
+---
+
 ## 17. In-flight workstreams (don't undo these)
 
 - **Path B** (PB-1+) — fragments-only generation, inline CSS budget capped at 200 chars, mandatory `data-opollo` wrapper, site-prefixed classes. See `docs/plans/path-b-migration-parent.md`. The model's system prompt enforces this in `lib/brief-runner.ts:574-609`. Don't reintroduce full-document generation paths.
@@ -463,6 +508,11 @@ Today operators see everything. The "viewer" role is a legacy tier with no opera
 | WP REST | `lib/wordpress.ts`, `lib/wordpress-posts.ts`, `lib/site-test-connection.ts` |
 | Cloudflare Images | `lib/cloudflare-images.ts`, `lib/transfer-worker.ts` |
 | Static audit / lint | `scripts/audit.ts`, `npm run audit:static`, `docs/RULES.md` |
+| Social composer | `lib/platform/social/`, `app/api/platform/social/`, `components/social/` |
+| CAP generation | `lib/cap/`, `app/api/platform/cap/`, `app/(platform)/company/cap/` |
+| Cost monitoring | `lib/platform/cost-monitoring/`, `app/api/cron/cost-monitoring-daily-report/` |
+| Runtime environment | `lib/runtime-env.ts` |
+| Smoke tests | `scripts/smoke/` — `client.ts`, `assertions.ts`, `budget.ts`, `*.smoke.ts` |
 | Operator runbook | `docs/RUNBOOK.md` |
 | Data conventions | `docs/DATA_CONVENTIONS.md` |
 | Prompt versioning | `docs/PROMPT_VERSIONING.md`, `lib/prompts/v*` |
