@@ -125,6 +125,11 @@ export function ComposerOverlay({
     onClose();
   }
 
+  async function handleSaveFromDialog() {
+    setShowDiscard(false);
+    await handleSubmit("draft");
+  }
+
   async function handleSubmit(mode: SchedulingMode) {
     // External onSubmit takes precedence if provided.
     if (onSubmit) {
@@ -347,6 +352,7 @@ export function ComposerOverlay({
         open={showDiscard}
         onDiscard={handleDiscard}
         onCancel={() => setShowDiscard(false)}
+        onSave={companyId ? () => void handleSaveFromDialog() : undefined}
       />
     </>
   );
