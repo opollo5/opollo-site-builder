@@ -89,8 +89,12 @@
       "schedule": "*/5 * * * *"
     },
     {
-      "path": "/api/cron/cap-weekly-generation",
-      "schedule": "0 6 * * 1"
+      "path": "/api/cron/cap-monthly-generation",
+      "schedule": "0 4 1 * *"
+    },
+    {
+      "path": "/api/cron/cap-generation-runs-cleanup",
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/social-connections-health",
