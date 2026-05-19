@@ -102,8 +102,6 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
     );
   }
 
-  const composerEnabled = process.env.FEATURE_COMPOSER_V2 !== "false";
-
   return (
     <SocialPostsListClient
       companyId={companyId}
@@ -117,7 +115,7 @@ export default async function CompanySocialPostsPage({ searchParams }: Props) {
       totalCount={postsResult.data.totalCount}
       sortBy={sortBy}
       sortDir={sortDir}
-      composerEnabled={composerEnabled}
+      composerEnabled={true}
     />
   );
 }

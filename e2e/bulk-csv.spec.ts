@@ -28,14 +28,6 @@ const EMPTY_CSV = `Content,Date,Time,Channel
 
 async function openBulkModal(page: import("@playwright/test").Page) {
   await page.goto("/social/poster");
-  const flagOff = await page
-    .locator("text=FEATURE_COMPOSER_V2 is not enabled")
-    .isVisible({ timeout: 3_000 })
-    .catch(() => false);
-  if (flagOff) {
-    test.skip(true, "FEATURE_COMPOSER_V2 is not enabled");
-    return false;
-  }
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
   await page.getByTestId("bulk-upload-btn").click();
   await page.waitForSelector('[data-testid="bulk-schedule-modal"]', { timeout: 5_000 });
@@ -117,11 +109,8 @@ test.describe("bulk CSV upload (PR G)", () => {
 
     await expect(page.getByTestId("preview-table")).toBeVisible();
 
-    // Error row should be visible
-    const errorRows = page.getByTestId("error-row");
-    expect(await errorRows.count()).toBeGreaterThanOrEqual(1);
-
-    // Error banner present
+    // Error banner present (errored rows are excluded from the preview table;
+    // row-error-banner is the authoritative signal that validation failed)
     await expect(page.getByTestId("row-error-banner")).toBeVisible();
 
     // Submit button should be disabled

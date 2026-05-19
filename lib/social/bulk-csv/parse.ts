@@ -102,6 +102,12 @@ export function parseCsv(input: string): ParseResult {
         hasError = true;
       } else {
         normalizedDate = `${yyyy}-${mm}-${dd}`;
+        const todayDate = new Date();
+        const todayNormalized = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, "0")}-${String(todayDate.getDate()).padStart(2, "0")}`;
+        if (normalizedDate < todayNormalized) {
+          errors.push({ row: rowIndex, column: "Date", message: "Date must be today or in the future." });
+          hasError = true;
+        }
       }
     }
 
