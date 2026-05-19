@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { CustomerCompanyUsersView } from "@/components/CustomerCompanyUsersView";
+import { TListStandard } from "@/templates";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getPlatformCompany } from "@/lib/platform/companies";
 
@@ -26,15 +27,22 @@ export default async function CompanyUsersPage() {
     redirect(`/login?next=${encodeURIComponent("/company/users")}`);
   }
 
+  const breadcrumb = [
+    { label: "Company", href: "/company" },
+    { label: "Users" },
+  ];
+
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-base">
-        <p className="font-medium">Account not provisioned to a company.</p>
-        <p className="mt-1 text-muted-foreground">
-          Your account isn&apos;t a member of any company on the platform
-          yet. Ask an admin to invite you, or contact Opollo support.
-        </p>
-      </div>
+      <TListStandard title="Users" breadcrumb={breadcrumb}>
+        <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-base">
+          <p className="font-medium">Account not provisioned to a company.</p>
+          <p className="mt-1 text-muted-foreground">
+            Your account isn&apos;t a member of any company on the platform
+            yet. Ask an admin to invite you, or contact Opollo support.
+          </p>
+        </div>
+      </TListStandard>
     );
   }
 
@@ -42,27 +50,39 @@ export default async function CompanyUsersPage() {
     session.isOpolloStaff || session.company.role === "admin";
   if (!isAdmin) {
     return (
-      <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive">
-        <p className="font-medium">Admins only.</p>
-        <p className="mt-1">
-          Only admins can manage company users. Ask an admin in your
-          company to update your role if you need access.
-        </p>
-      </div>
+      <TListStandard title="Users" breadcrumb={breadcrumb}>
+        <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive">
+          <p className="font-medium">Admins only.</p>
+          <p className="mt-1">
+            Only admins can manage company users. Ask an admin in your
+            company to update your role if you need access.
+          </p>
+        </div>
+      </TListStandard>
     );
   }
 
   const detailResult = await getPlatformCompany(session.company.companyId);
   if (!detailResult.ok) {
     return (
-      <div
-        className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
-        role="alert"
-      >
-        Failed to load company: {detailResult.error.message}
-      </div>
+      <TListStandard title="Users" breadcrumb={breadcrumb}>
+        <div
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-base text-destructive"
+          role="alert"
+        >
+          Failed to load company: {detailResult.error.message}
+        </div>
+      </TListStandard>
     );
   }
 
-  return <CustomerCompanyUsersView detail={detailResult.data} />;
+  return (
+    <TListStandard
+      title="Users"
+      breadcrumb={breadcrumb}
+      subtitle={`Manage users for ${detailResult.data.company.name}.`}
+    >
+      <CustomerCompanyUsersView detail={detailResult.data} />
+    </TListStandard>
+  );
 }

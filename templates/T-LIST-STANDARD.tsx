@@ -26,6 +26,12 @@ export interface TListStandardProps {
   children: React.ReactNode;
   /** Optional pagination bar below the list. */
   pagination?: React.ReactNode;
+  /**
+   * Width mode.
+   * - 'standard' (default): max-w-7xl
+   * - 'wide': max-w-screen-2xl (used by T-LIST-WIDE)
+   */
+  width?: "standard" | "wide";
 }
 
 /**
@@ -46,9 +52,10 @@ export function TListStandard({
   filterBar,
   children,
   pagination,
+  width = "standard",
 }: TListStandardProps) {
   return (
-    <PageShell>
+    <PageShell className={width === "wide" ? "max-w-screen-2xl" : undefined}>
       <PageHeader>
         {breadcrumb && <PageHeader.Breadcrumb segments={breadcrumb} />}
         <PageHeader.Title>{title}</PageHeader.Title>

@@ -1,7 +1,6 @@
 import { AdminSocialConnectionsMaintenance } from "@/components/AdminSocialConnectionsMaintenance";
 import { BundlesocialReconcileSection } from "@/components/BundlesocialReconcileSection";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TListWide } from "@/templates";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 // Cross-tenant identity-leak defence — Layer 4 admin maintenance page.
@@ -48,12 +47,15 @@ export default async function SocialConnectionsMaintenancePage() {
     svc.from("platform_social_profiles").select("id, company_id, name"),
   ]);
 
+  const breadcrumb = [
+    { label: "Admin", href: "/admin/sites" },
+    { label: "Maintenance" },
+    { label: "Social connections" },
+  ];
+
   if (connectionsRead.error || companiesRead.error || profilesRead.error) {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Title>Social connections maintenance</PageHeader.Title>
-        </PageHeader>
+      <TListWide title="Social connections maintenance" breadcrumb={breadcrumb}>
         <div
           className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
           role="alert"
@@ -64,33 +66,22 @@ export default async function SocialConnectionsMaintenancePage() {
             profilesRead.error?.message ??
             "unknown"}
         </div>
-      </PageShell>
+      </TListWide>
     );
   }
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Maintenance" },
-            { label: "Social connections" },
-          ]}
-        />
-        <PageHeader.Title>Social connections maintenance</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Cross-company view of every social_connections row. Identity
-          columns surface cross-tenant collisions; per-row actions
-          disconnect, refresh, or reattribute.
-        </PageHeader.Subtitle>
-      </PageHeader>
+    <TListWide
+      title="Social connections maintenance"
+      breadcrumb={breadcrumb}
+      subtitle="Cross-company view of every social_connections row. Identity columns surface cross-tenant collisions; per-row actions disconnect, refresh, or reattribute."
+    >
       <BundlesocialReconcileSection />
       <AdminSocialConnectionsMaintenance
         connections={(connectionsRead.data ?? []) as ConnectionRow[]}
         companies={(companiesRead.data ?? []) as CompanyRow[]}
         profiles={(profilesRead.data ?? []) as ProfileRow[]}
       />
-    </PageShell>
+    </TListWide>
   );
 }

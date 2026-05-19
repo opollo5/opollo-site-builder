@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
+import { TListStandard } from "@/templates";
 import { listClients } from "@/lib/optimiser/clients";
 import { listPendingProposals } from "@/lib/optimiser/proposals";
 
@@ -27,38 +27,39 @@ export default async function OptimiserProposalsList({
     limit: 100,
   });
 
-  return (
-    <div className="space-y-6">
-      <PageHeader>
-        <PageHeader.Title>Proposals</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Pending optimisation proposals, sorted by priority.
-        </PageHeader.Subtitle>
-        <PageHeader.Actions>
-          {onboarded.length > 1 && (
-            <form method="get" action="/optimiser/proposals" className="flex items-center gap-1">
-              <select
-                name="client"
-                defaultValue={selectedId}
-                className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-              >
-                {onboarded.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <Button size="sm" variant="outline" type="submit">
-                Switch
-              </Button>
-            </form>
-          )}
-          <Button asChild variant="outline">
-            <Link href="/optimiser">Page browser</Link>
+  const actions = (
+    <>
+      {onboarded.length > 1 && (
+        <form method="get" action="/optimiser/proposals" className="flex items-center gap-1">
+          <select
+            name="client"
+            defaultValue={selectedId}
+            className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          >
+            {onboarded.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="outline" type="submit">
+            Switch
           </Button>
-        </PageHeader.Actions>
-      </PageHeader>
+        </form>
+      )}
+      <Button asChild variant="outline">
+        <Link href="/optimiser">Page browser</Link>
+      </Button>
+    </>
+  );
 
+  return (
+    <TListStandard
+      title="Proposals"
+      breadcrumb={[{ label: "Optimiser", href: "/optimiser" }, { label: "Proposals" }]}
+      subtitle="Pending optimisation proposals, sorted by priority."
+      actions={actions}
+    >
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-left">
@@ -121,6 +122,6 @@ export default async function OptimiserProposalsList({
           </tbody>
         </table>
       </div>
-    </div>
+    </TListStandard>
   );
 }

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { ExampleTablesClient } from "@/components/admin/internal/ExampleTablesClient";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TDashboardFeed } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 
 // ---------------------------------------------------------------------------
@@ -30,22 +29,15 @@ export default async function TableExamplesPage() {
   if (access.kind === "redirect") redirect(access.to);
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Internal", href: "/admin/_internal/table-examples" },
-            { label: "Table examples" },
-          ]}
-        />
-        <PageHeader.Title>DataTable examples</PageHeader.Title>
-        <PageHeader.Subtitle>
-          Visual reference for the canonical DataTable primitive (Spec 18).
-          Admin-only.
-        </PageHeader.Subtitle>
-      </PageHeader>
-      <ExampleTablesClient />
-    </PageShell>
+    <TDashboardFeed
+      title="DataTable examples"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Internal", href: "/admin/_internal/table-examples" },
+        { label: "Table examples" },
+      ]}
+      subtitle="Visual reference for the canonical DataTable primitive (Spec 18). Admin-only."
+      feed={<ExampleTablesClient />}
+    />
   );
 }

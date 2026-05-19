@@ -6,7 +6,6 @@ import { DataTable, type ColumnDef } from "@/components/ui/data-table";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { Pill, type PillVariant } from "@/components/ui/pill";
 import { TableCell } from "@/components/ui/table-cell";
-import { H1, Lead } from "@/components/ui/typography";
 import type {
   CompanyDetail,
   CompanyMember,
@@ -121,13 +120,6 @@ export function CustomerCompanyUsersView({
 
   return (
     <div className="space-y-8">
-      <header>
-        <H1>Users</H1>
-        <Lead className="mt-1">
-          Manage users for <strong>{company.name}</strong>.
-        </Lead>
-      </header>
-
       <section
         className="space-y-3"
         aria-labelledby="customer-members"

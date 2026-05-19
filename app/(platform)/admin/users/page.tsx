@@ -4,24 +4,11 @@ import { redirect } from "next/navigation";
 import { InviteUserButton } from "@/components/InviteUserButton";
 import { PendingInvitesTable } from "@/components/PendingInvitesTable";
 import { Alert } from "@/components/ui/alert";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { UsersTable } from "@/components/UsersTable";
+import { TListWide } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { AdminUserRow } from "@/app/api/admin/users/list/route";
-
-// ---------------------------------------------------------------------------
-// /admin/users — M2d-1 + AUTH-FOUNDATION P3.3.
-//
-// P3.3 layered onto the existing M2d page:
-//   - Pending invites section (read from `invites` table) with
-//     per-row revoke action.
-//   - Actor role threaded through to InviteUserButton so the modal
-//     filters role-dropdown options (super_admin → admin/user;
-//     admin → user only).
-//   - Audit-log link (super_admin only) to /admin/users/audit.
-// ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +39,6 @@ export default async function AdminUsersPage() {
     .select("id, email, display_name, role, created_at, revoked_at")
     .order("created_at", { ascending: false });
 
-  // Pending invites + their inviter email (joined via FK).
   const invitesRes = await svc
     .from("invites")
     .select(
@@ -82,31 +68,31 @@ export default async function AdminUsersPage() {
       ? "No users yet."
       : `${userCount} ${userCount === 1 ? "user" : "users"} with access. Change a role inline; the server blocks self-modification, last-admin demotions, and any change to the super_admin row.`;
 
-  return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Users" },
-          ]}
-        />
-        <PageHeader.Title>Users</PageHeader.Title>
-        <PageHeader.Subtitle>{subtitle}</PageHeader.Subtitle>
-        <PageHeader.Actions>
-          {isSuperAdmin && (
-            <Link
-              href="/admin/users/audit"
-              className="rounded-md border px-3 py-2 text-sm transition-smooth hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              data-testid="users-audit-link"
-            >
-              Audit log
-            </Link>
-          )}
-          <InviteUserButton actorRole={actorRole} />
-        </PageHeader.Actions>
-      </PageHeader>
+  const actions = (
+    <>
+      {isSuperAdmin && (
+        <Link
+          href="/admin/users/audit"
+          className="rounded-md border px-3 py-2 text-sm transition-smooth hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          data-testid="users-audit-link"
+        >
+          Audit log
+        </Link>
+      )}
+      <InviteUserButton actorRole={actorRole} />
+    </>
+  );
 
+  return (
+    <TListWide
+      title="Users"
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Users" },
+      ]}
+      subtitle={subtitle}
+      actions={actions}
+    >
       {pendingInvites.length > 0 && (
         <div className="mt-6">
           <h2 className="mb-2 text-sm font-medium text-muted-foreground">
@@ -133,6 +119,6 @@ export default async function AdminUsersPage() {
           </>
         )}
       </div>
-    </PageShell>
+    </TListWide>
   );
 }
