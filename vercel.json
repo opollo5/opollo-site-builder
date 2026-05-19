@@ -97,6 +97,10 @@
       "schedule": "0 2 * * *"
     },
     {
+      "path": "/api/cron/cost-monitoring-daily-report",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/social-connections-health",
       "schedule": "0 3 * * *"
     },
