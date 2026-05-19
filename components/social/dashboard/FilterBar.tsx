@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { Connection } from "@/lib/social/types";
 import { SocialPlatformIcon, type SocialPlatformIconKey } from "@/components/ui/SocialPlatformIcon";
+import { AddProfileDropdown } from "@/components/social/dashboard/AddProfileDropdown";
 
 interface FilterBarProps {
   profileFilter: string[];
@@ -152,6 +153,9 @@ export function FilterBar({
           </div>
         )}
       </div>
+
+      {/* Add profile */}
+      <AddProfileDropdown />
 
       {/* View mode toggle (Month / Timeline) */}
       <div
