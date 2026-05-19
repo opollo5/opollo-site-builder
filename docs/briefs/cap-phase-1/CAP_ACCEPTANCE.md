@@ -70,7 +70,7 @@ UPDATE platform_users SET is_cap_operator = true WHERE email = 'hi@opollo.com';
 # Requires CRON_SECRET env var
 curl -H "Authorization: Bearer $CRON_SECRET" \
   https://app.opollo.com/api/cron/cap-generation-runs-cleanup
-# Expected: { "ok": true, "data": { "deletedRows": 0, ... } }
+# Expected: { "ok": true, "data": { "deletedSuccessRows": 0, "deletedErrorRows": 0, "totalDeleted": 0, ... } }
 ```
 
 ---
