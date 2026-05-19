@@ -57,4 +57,39 @@ test.describe("v2 composer mount — customer-facing routes", () => {
     await expect(page.getByRole("button", { name: /post preview/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("button", { name: /^calendar$/i })).toBeVisible({ timeout: 10_000 });
   });
+
+  test("pre-fills content when ?compose=<id> opens an existing draft", async ({ page, context }) => {
+    const MOCK_DRAFT_ID = "b1e2c3d4-e5f6-7890-abcd-ef1234567890";
+    const MOCK_CONTENT = "Pre-filled content from existing draft";
+
+    // Mock the V1 draft API so the test doesn't need a real DB row.
+    await context.route(`**/api/platform/social/drafts/${MOCK_DRAFT_ID}`, (route) => {
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: true,
+          data: {
+            id: MOCK_DRAFT_ID,
+            draft_data: {
+              master_text: MOCK_CONTENT,
+              media_refs: [],
+              target_connection_ids: [],
+              approval_required: false,
+            },
+          },
+          timestamp: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await page.goto(`/company/social/posts?compose=${MOCK_DRAFT_ID}`);
+
+    // Draft has an id → aria-label is "Edit post"
+    const dialog = page.getByRole("dialog", { name: /edit post/i });
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+
+    // Content textarea is pre-filled from the draft
+    await expect(dialog.locator("textarea").first()).toHaveValue(MOCK_CONTENT, { timeout: 5_000 });
+  });
 });
