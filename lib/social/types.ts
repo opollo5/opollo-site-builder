@@ -7,9 +7,6 @@
 // CLAUDE-ASSUMPTION: Platform type uses brief's social_connections.platform
 // values, not the existing SocialPlatform publishing-layer type.
 //
-// CLAUDE-ASSUMPTION: created_by_user_id in API responses maps to the DB
-// column `created_by` (existing column name from migration 0112).
-
 export type Platform =
   | "linkedin"
   | "facebook"
@@ -70,7 +67,7 @@ export interface RecurrenceRule {
 export interface DraftResponse {
   id: string;
   company_id: string;
-  created_by_user_id: string; // maps to DB column `created_by`
+  created_by: string;
   state: DraftState;
   content: string;
   media_urls: string[];
