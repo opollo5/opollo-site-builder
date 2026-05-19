@@ -29,6 +29,7 @@
     "audit:static": "tsx scripts/audit.ts",
     "smoke:harness": "vitest run --config vitest.unit.config.ts lib/__tests__/smoke-budget.unit.test.ts",
     "smoke:composer": "tsx scripts/smoke/composer.smoke.ts",
+    "smoke:cap": "tsx scripts/smoke/cap.smoke.ts",
     "backfill:image-embeddings": "tsx scripts/backfill-image-embeddings.ts",
     "gen:types": "supabase gen types typescript --local > types/supabase.ts",
     "analyze": "ANALYZE=true next build",
