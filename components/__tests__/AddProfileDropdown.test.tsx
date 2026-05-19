@@ -18,7 +18,7 @@ describe("AddProfileDropdown (audit gap C-1)", () => {
     expect(screen.queryByTestId("add-profile-menu")).toBeNull();
   });
 
-  it("menu opens on trigger click and shows all 5 platforms", () => {
+  it("menu opens on trigger click and shows all 6 platforms including TikTok", () => {
     render(<AddProfileDropdown />);
     fireEvent.click(screen.getByTestId("add-profile-trigger"));
 
@@ -27,7 +27,16 @@ describe("AddProfileDropdown (audit gap C-1)", () => {
     expect(screen.getByTestId("add-profile-facebook")).toBeDefined();
     expect(screen.getByTestId("add-profile-instagram")).toBeDefined();
     expect(screen.getByTestId("add-profile-x")).toBeDefined();
+    expect(screen.getByTestId("add-profile-tiktok")).toBeDefined();
     expect(screen.getByTestId("add-profile-google_business_profile")).toBeDefined();
+  });
+
+  it("TikTok item shows a 'New' badge", () => {
+    render(<AddProfileDropdown />);
+    fireEvent.click(screen.getByTestId("add-profile-trigger"));
+
+    const tiktokItem = screen.getByTestId("add-profile-tiktok");
+    expect(tiktokItem.textContent).toContain("New");
   });
 
   it("each platform item links to per-platform connect URL", () => {
