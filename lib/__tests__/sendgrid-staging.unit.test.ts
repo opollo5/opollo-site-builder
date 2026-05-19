@@ -46,7 +46,7 @@ describe("sendEmail staging redirect", () => {
   it("sends to real recipient in production", async () => {
     delete process.env.APP_ENV;
     await sendEmail({ to: "real@client.com", subject: "Hello", html: "<p>hi</p>", text: "hi" });
-    const [msg] = mockSgSend.mock.calls[0] as [{ to: string; subject: string }][];
+    const msg = (mockSgSend.mock.calls[0] as [{ to: string; subject: string }])[0];
     expect(msg.to).toBe("real@client.com");
     expect(msg.subject).toBe("Hello");
   });
@@ -55,7 +55,7 @@ describe("sendEmail staging redirect", () => {
     process.env.APP_ENV = "staging";
     process.env.STAGING_EMAIL_RECIPIENT = "staging@opollo.com";
     await sendEmail({ to: "real@client.com", subject: "Hello", html: "<p>hi</p>", text: "hi" });
-    const [msg] = mockSgSend.mock.calls[0] as [{ to: string; subject: string }][];
+    const msg = (mockSgSend.mock.calls[0] as [{ to: string; subject: string }])[0];
     expect(msg.to).toBe("staging@opollo.com");
     expect(msg.subject).toContain("[STAGING");
     expect(msg.subject).toContain("real@client.com");
@@ -66,7 +66,7 @@ describe("sendEmail staging redirect", () => {
     process.env.APP_ENV = "staging";
     delete process.env.STAGING_EMAIL_RECIPIENT;
     await sendEmail({ to: "real@client.com", subject: "Hello", html: "<p>hi</p>", text: "hi" });
-    const [msg] = mockSgSend.mock.calls[0] as [{ to: string; subject: string }][];
+    const msg = (mockSgSend.mock.calls[0] as [{ to: string; subject: string }])[0];
     expect(msg.to).toBe("real@client.com");
   });
 });
