@@ -17,9 +17,8 @@ import {
 } from "@/components/ui/status-pill";
 import { H3 } from "@/components/ui/typography";
 import { NavIcon } from "@/components/ui/nav-icon";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
+import { TDetailSummary } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listSiteBriefs } from "@/lib/briefs";
 import { checkBlogStylingCalibrated } from "@/lib/site-preflight";
@@ -195,21 +194,18 @@ export default async function SiteDetailPage({
     ? await checkBlogStylingCalibrated(site.id, "post")
     : null;
 
+  const hasBanner = needsOnboarding || needsSetupReminder || !!blogStyleBlocker;
+
   return (
-    <PageShell>
-      {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
-      {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
-      {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
-      <PageHeader>
-        <PageHeader.Breadcrumb
-          segments={[
-            { label: "Admin", href: "/admin/sites" },
-            { label: "Sites", href: "/admin/sites" },
-            { label: site.name },
-          ]}
-        />
-        <PageHeader.Title>{site.name}</PageHeader.Title>
-        <PageHeader.Meta>
+    <TDetailSummary
+      title={site.name}
+      breadcrumb={[
+        { label: "Admin", href: "/admin/sites" },
+        { label: "Sites", href: "/admin/sites" },
+        { label: site.name },
+      ]}
+      meta={
+        <>
           <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
           <a
             href={site.wp_url}
@@ -217,8 +213,8 @@ export default async function SiteDetailPage({
             rel="noreferrer"
             className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
           >
-              {site.wp_url}
-            </a>
+            {site.wp_url}
+          </a>
           <Link
             href={`/admin/sites/${site.id}/pages`}
             className="transition-smooth hover:text-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
@@ -227,100 +223,108 @@ export default async function SiteDetailPage({
             Pages →
           </Link>
           <span data-screenshot-mask>updated {formatDate(site.updated_at)}</span>
-        </PageHeader.Meta>
-        <PageHeader.Actions>
-          <SiteDetailActions
-            site={{ id: site.id, name: site.name, wp_url: site.wp_url }}
-            templates={batchTemplateOptions}
-          />
-        </PageHeader.Actions>
-      </PageHeader>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
-         <section>
-          <div className="flex items-center justify-between">
-            <H3>Recent batches</H3>
+        </>
+      }
+      actions={
+        <SiteDetailActions
+          site={{ id: site.id, name: site.name, wp_url: site.wp_url }}
+          templates={batchTemplateOptions}
+        />
+      }
+      inlineAlert={
+        hasBanner ? (
+          <>
+            {needsOnboarding && <OnboardingReminderBanner siteId={site.id} />}
+            {needsSetupReminder && <SetupReminderBanner siteId={site.id} />}
+            {blogStyleBlocker && <BlogStyleCalibrationBanner siteId={site.id} />}
+          </>
+        ) : undefined
+      }
+      sections={[
+        {
+          title: "Recent batches",
+          actions: (
             <Link
               href={`/admin/batches/${site.id}`}
               className="text-sm text-muted-foreground transition-smooth hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
             >
               View all →
             </Link>
-          </div>
-          <div className="mt-2 overflow-x-auto rounded-md border">
-            {(batches ?? []).length === 0 ? (
-              <div className="p-3">
-                <EmptyState
-                  density="compact"
-                  icon={<NavIcon name="tree" size={20} />}
-                  iconLabel="No batches"
-                  title="No batches yet"
-                  body={
-                    <>
-                      Run a batch to generate multiple pages from a template
-                      against the active design system.
-                    </>
-                  }
-                />
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-left text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Template</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Progress</th>
-                    <th className="px-3 py-2 font-medium">Cost</th>
-                    <th className="px-3 py-2 font-medium">Created</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(batches ?? []).map((b) => {
-                    const tmpl = b.template as unknown as {
-                      name: string;
-                    } | null;
-                    return (
-                      <tr
-                        key={b.id as string}
-                        className="border-b last:border-b-0"
-                      >
-                        <td className="px-3 py-2">
-                          <Link
-                            href={`/admin/batches/${site.id}/${b.id as string}`}
-                            className="font-medium hover:underline"
-                          >
-                            {tmpl?.name ?? "—"}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-2">
-                          <StatusPill kind={jobStatusKind(b.status as Parameters<typeof jobStatusKind>[0])} />
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {b.succeeded_count as number} ok ·{" "}
-                          {b.failed_count as number} fail ·{" "}
-                          {b.requested_count as number} total
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {formatCostCents(
-                            Number(b.total_cost_usd_cents ?? 0),
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-muted-foreground">
-                          {formatDate(b.created_at as string)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-
-        <section>
-          <div className="flex items-center justify-between">
-            <H3>Briefs</H3>
+          ),
+          content: (
+            <div className="overflow-x-auto rounded-md border">
+              {(batches ?? []).length === 0 ? (
+                <div className="p-3">
+                  <EmptyState
+                    density="compact"
+                    icon={<NavIcon name="tree" size={20} />}
+                    iconLabel="No batches"
+                    title="No batches yet"
+                    body={
+                      <>
+                        Run a batch to generate multiple pages from a template
+                        against the active design system.
+                      </>
+                    }
+                  />
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40 text-left text-muted-foreground">
+                      <th className="px-3 py-2 font-medium">Template</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Progress</th>
+                      <th className="px-3 py-2 font-medium">Cost</th>
+                      <th className="px-3 py-2 font-medium">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(batches ?? []).map((b) => {
+                      const tmpl = b.template as unknown as {
+                        name: string;
+                      } | null;
+                      return (
+                        <tr
+                          key={b.id as string}
+                          className="border-b last:border-b-0"
+                        >
+                          <td className="px-3 py-2">
+                            <Link
+                              href={`/admin/batches/${site.id}/${b.id as string}`}
+                              className="font-medium hover:underline"
+                            >
+                              {tmpl?.name ?? "—"}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2">
+                            <StatusPill kind={jobStatusKind(b.status as Parameters<typeof jobStatusKind>[0])} />
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {b.succeeded_count as number} ok ·{" "}
+                            {b.failed_count as number} fail ·{" "}
+                            {b.requested_count as number} total
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {formatCostCents(
+                              Number(b.total_cost_usd_cents ?? 0),
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {formatDate(b.created_at as string)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ),
+        },
+        {
+          title: "Briefs",
+          actions: (
             <UploadBriefButton
               siteId={site.id}
               binaryParsersEnabled={
@@ -328,64 +332,66 @@ export default async function SiteDetailPage({
                 process.env.OPOLLO_BRIEF_BINARY_PARSERS === "true"
               }
             />
-          </div>
-          <div className="mt-2 overflow-x-auto rounded-md border">
-            {briefs.length === 0 ? (
-              <div className="p-3">
-                <EmptyState
-                  density="compact"
-                  icon={<NavIcon name="file-empty" size={20} />}
-                  iconLabel="No briefs"
-                  title="No briefs yet"
-                  body={
-                    <>
-                      Upload a single markdown / text document and Opollo
-                      parses it into a list of pages, then generates each one.
-                    </>
-                  }
-                />
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-left text-muted-foreground">
-                    <th className="px-3 py-2 font-medium">Title</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Parser</th>
-                    <th className="px-3 py-2 font-medium">Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {briefs.map((b) => (
-                    <tr key={b.id} className="border-b last:border-b-0">
-                      <td className="px-3 py-2">
-                        <Link
-                          href={`/admin/sites/${site.id}/briefs/${b.id}/review`}
-                          className="font-medium hover:underline"
-                          data-testid={`brief-row-${b.id}`}
-                        >
-                          {b.title}
-                        </Link>
-                      </td>
-                      <td className="px-3 py-2">
-                        <StatusPill kind={briefStatusKind(b.status as Parameters<typeof briefStatusKind>[0])} />
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {b.parser_mode ?? "—"}
-                      </td>
-                      <td className="px-3 py-2 text-muted-foreground">
-                        {formatDate(b.updated_at)}
-                      </td>
+          ),
+          content: (
+            <div className="overflow-x-auto rounded-md border">
+              {briefs.length === 0 ? (
+                <div className="p-3">
+                  <EmptyState
+                    density="compact"
+                    icon={<NavIcon name="file-empty" size={20} />}
+                    iconLabel="No briefs"
+                    title="No briefs yet"
+                    body={
+                      <>
+                        Upload a single markdown / text document and Opollo
+                        parses it into a list of pages, then generates each one.
+                      </>
+                    }
+                  />
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40 text-left text-muted-foreground">
+                      <th className="px-3 py-2 font-medium">Title</th>
+                      <th className="px-3 py-2 font-medium">Status</th>
+                      <th className="px-3 py-2 font-medium">Parser</th>
+                      <th className="px-3 py-2 font-medium">Updated</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </section>
-        </div>
-
-        <aside className="space-y-4">
+                  </thead>
+                  <tbody>
+                    {briefs.map((b) => (
+                      <tr key={b.id} className="border-b last:border-b-0">
+                        <td className="px-3 py-2">
+                          <Link
+                            href={`/admin/sites/${site.id}/briefs/${b.id}/review`}
+                            className="font-medium hover:underline"
+                            data-testid={`brief-row-${b.id}`}
+                          >
+                            {b.title}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2">
+                          <StatusPill kind={briefStatusKind(b.status as Parameters<typeof briefStatusKind>[0])} />
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {b.parser_mode ?? "—"}
+                        </td>
+                        <td className="px-3 py-2 text-muted-foreground">
+                          {formatDate(b.updated_at)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          ),
+        },
+      ]}
+      sidebar={
+        <div className="space-y-4">
           <div className="rounded-lg border p-3">
             <div className="flex items-center justify-between">
               <H3>Budget</H3>
@@ -623,8 +629,8 @@ export default async function SiteDetailPage({
               </div>
             </div>
           </div>
-        </aside>
-      </div>
-    </PageShell>
+        </div>
+      }
+    />
   );
 }

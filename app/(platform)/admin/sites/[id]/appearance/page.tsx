@@ -5,8 +5,7 @@ import { AppearancePanelClient } from "@/components/AppearancePanelClient";
 import { ExtractedProfilePanel } from "@/components/ExtractedProfilePanel";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageShell } from "@/components/ui/page-shell";
+import { TDetailSummary } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { listAppearanceEventsForSite } from "@/lib/appearance-events";
 import { getSite } from "@/lib/sites";
@@ -80,7 +79,7 @@ export default async function SiteAppearancePage({
     version_lock: number;
   };
 
-  const headerSegments = [
+  const breadcrumb = [
     { label: "Admin", href: "/admin/sites" },
     { label: "Sites", href: "/admin/sites" },
     { label: site.name, href: `/admin/sites/${site.id}` },
@@ -89,43 +88,47 @@ export default async function SiteAppearancePage({
 
   if (modeRow.site_mode === null) {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb segments={headerSegments} />
-          <PageHeader.Title>{site.name}</PageHeader.Title>
-          <PageHeader.Subtitle>Appearance</PageHeader.Subtitle>
-        </PageHeader>
-        <div className="max-w-2xl">
-          <Alert title="Finish setting up this site first">
-            Pick whether we&apos;re uploading content to an existing WordPress
-            theme or building a fresh design before opening Appearance.
-            Generation styling and the rest of setup follow from this choice.
-          </Alert>
-          <Button asChild className="mt-4">
-            <Link href={`/admin/sites/${site.id}/onboarding`}>
-              Go to onboarding →
-            </Link>
-          </Button>
-        </div>
-      </PageShell>
+      <TDetailSummary
+        title={site.name}
+        subtitle="Appearance"
+        breadcrumb={breadcrumb}
+        sections={[{
+          content: (
+            <div className="max-w-2xl">
+              <Alert title="Finish setting up this site first">
+                Pick whether we&apos;re uploading content to an existing WordPress
+                theme or building a fresh design before opening Appearance.
+                Generation styling and the rest of setup follow from this choice.
+              </Alert>
+              <Button asChild className="mt-4">
+                <Link href={`/admin/sites/${site.id}/onboarding`}>
+                  Go to onboarding →
+                </Link>
+              </Button>
+            </div>
+          ),
+        }]}
+      />
     );
   }
 
   if (modeRow.site_mode === "copy_existing") {
     return (
-      <PageShell>
-        <PageHeader>
-          <PageHeader.Breadcrumb segments={headerSegments} />
-          <PageHeader.Title>Appearance · {site.name}</PageHeader.Title>
-        </PageHeader>
-        <ExtractedProfilePanel
-          siteId={site.id}
-          siteName={site.name}
-          siteUrl={site.wp_url}
-          extractedDesign={modeRow.extracted_design}
-          extractedClasses={modeRow.extracted_css_classes}
-        />
-      </PageShell>
+      <TDetailSummary
+        title={`Appearance · ${site.name}`}
+        breadcrumb={breadcrumb}
+        sections={[{
+          content: (
+            <ExtractedProfilePanel
+              siteId={site.id}
+              siteName={site.name}
+              siteUrl={site.wp_url}
+              extractedDesign={modeRow.extracted_design}
+              extractedClasses={modeRow.extracted_css_classes}
+            />
+          ),
+        }]}
+      />
     );
   }
 
@@ -136,21 +139,23 @@ export default async function SiteAppearancePage({
     process.env.FEATURE_PATH_B_PUBLISH_GATE === "1";
 
   return (
-    <PageShell>
-      <PageHeader>
-        <PageHeader.Breadcrumb segments={headerSegments} />
-        <PageHeader.Title>Appearance · {site.name}</PageHeader.Title>
-      </PageHeader>
-      <AppearancePanelClient
-        siteId={site.id}
-        siteName={site.name}
-        siteWpUrl={site.wp_url}
-        initialKadenceInstalledAt={modeRow.kadence_installed_at}
-        initialKadenceGlobalsSyncedAt={modeRow.kadence_globals_synced_at}
-        initialSiteVersionLock={modeRow.version_lock}
-        initialEvents={events}
-        publishGateEnabled={publishGateEnabled}
-      />
-    </PageShell>
+    <TDetailSummary
+      title={`Appearance · ${site.name}`}
+      breadcrumb={breadcrumb}
+      sections={[{
+        content: (
+          <AppearancePanelClient
+            siteId={site.id}
+            siteName={site.name}
+            siteWpUrl={site.wp_url}
+            initialKadenceInstalledAt={modeRow.kadence_installed_at}
+            initialKadenceGlobalsSyncedAt={modeRow.kadence_globals_synced_at}
+            initialSiteVersionLock={modeRow.version_lock}
+            initialEvents={events}
+            publishGateEnabled={publishGateEnabled}
+          />
+        ),
+      }]}
+    />
   );
 }
