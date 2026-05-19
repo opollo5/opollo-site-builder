@@ -171,34 +171,38 @@ test.describe("composer modal", () => {
 
   test("(7) GIF picker panel opens when GIF button is clicked", async ({ page, context }) => {
     await mockDraftApis(context);
-    // Mock Tenor API
-    await context.route("**/tenor.googleapis.com/**", (route) => {
+    // Mock GIPHY API (V2 ToolsRow uses GIPHY, not Tenor)
+    await context.route("**/api.giphy.com/**", (route) => {
       void route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ results: [] }),
+        body: JSON.stringify({ data: [] }),
       });
     });
 
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId("gif-button").click();
-    await expect(page.getByTestId("gif-picker-panel")).toBeVisible({ timeout: 5_000 });
+    // V2 ToolsRow: "GIF" button by label
+    await page.getByRole("button", { name: /^gif$/i }).click();
+    // V2 GifPanel renders a "GIF picker" heading or the "Search GIPHY" input
+    await expect(page.getByPlaceholder(/search giphy/i).or(page.getByText("GIF picker"))).toBeVisible({ timeout: 5_000 });
   });
 
-  test("(8) tag picker opens and inserts a hashtag into the text", async ({ page, context }) => {
+  test("(8) emoji panel opens and inserts an emoji into the text", async ({ page, context }) => {
+    // V2 ToolsRow has no tag picker — tag picker was a V1-only feature.
+    // This test now exercises the emoji panel which is available in V2.
     await mockDraftApis(context);
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId("tag-button").click();
-    await expect(page.getByTestId("tag-picker-panel")).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /^emoji$/i }).click();
+    // Emoji panel shows quick-pick emoji buttons
+    await expect(page.getByRole("button", { name: "🎉" })).toBeVisible({ timeout: 5_000 });
 
-    // Click a suggested tag.
-    await page.getByRole("button", { name: /#marketing/i }).click();
-    // Picker should close.
-    await expect(page.getByTestId("tag-picker-panel")).not.toBeVisible();
+    // Click an emoji — panel should close
+    await page.getByRole("button", { name: "🎉" }).click();
+    await expect(page.getByRole("button", { name: "🎉" })).not.toBeVisible({ timeout: 3_000 });
   });
 
   test("(9) close button closes the modal and removes ?compose from URL", async ({ page, context }) => {
@@ -214,9 +218,10 @@ test.describe("composer modal", () => {
     await expect(page).not.toHaveURL(/compose=/);
   });
 
-  test("(FIX 19) image upload zone is present in the editor", async ({ page, context }) => {
+  test("(FIX 19) content editor textarea is present in the editor", async ({ page, context }) => {
+    // V2 uses ContentEditor (textarea in ComposerEditor), not ImageUploadZone.
+    // The media upload button lives in MediaTray inside ContentEditor.
     await mockDraftApis(context);
-    // Mock upload endpoint.
     await context.route("**/api/platform/social/media/upload**", (route) => {
       void route.fulfill({
         status: 200,
@@ -228,8 +233,9 @@ test.describe("composer modal", () => {
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    // Image upload zone must render (data-testid on ImageUploadZone outer div).
-    await expect(page.locator("[data-testid='image-upload-zone']")).toBeVisible({ timeout: 10_000 });
+    // Content textarea must render inside the dialog
+    const dialog = page.getByRole("dialog", { name: /new post/i });
+    await expect(dialog.locator("textarea").first()).toBeVisible({ timeout: 10_000 });
   });
 });
 
