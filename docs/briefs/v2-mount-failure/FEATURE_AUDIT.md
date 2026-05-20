@@ -92,6 +92,44 @@ inheritance):
 
 ---
 
+## Live feature verification (CI e2e evidence, 2026-05-19)
+
+**CI run**: [26130155721](https://github.com/opollo5/opollo-site-builder/actions/runs/26130155721/job/76853227578), SHA `9b2a0867`, e2e: PASS (12m21s)
+
+The following features were verified via e2e tests running against the live
+Next.js server (same code as production):
+
+| Feature | e2e test | Result |
+|---|---|---|
+| V2 mount at `/company/social/calendar?compose=new` | `composer-mount.spec.ts:27` | ✓ 2.0s |
+| V2 mount at `/company/social/posts?compose=new` | `composer-mount.spec.ts:27` | ✓ 2.0s |
+| V2 mount at `/company/social/timeline?compose=new` | `composer-mount.spec.ts:27` | ✓ 2.0s |
+| Right-pane preview + calendar tabs | `composer-mount.spec.ts:50` | ✓ 1.7s |
+| Draft pre-fill via `?compose=<id>` | `composer-mount.spec.ts:61` | ✓ 1.8s |
+| Composer opens via `?compose=new` URL | `composer.spec.ts:98` (1) | ✓ 2.6s |
+| Loading spinner then editor pane | `composer.spec.ts:108` (2) | ✓ 1.7s |
+| Schedule mode (date/time inputs) | `composer.spec.ts:121` (3) | ✓ 1.8s |
+| + Add time button | `composer.spec.ts:134` (4) | ✓ 1.9s |
+| Approval toggle in schedule mode | `composer.spec.ts:147` (5) | ✓ 1.8s |
+| Submit disabled when no profiles | `composer.spec.ts:160` (6) | ✓ 1.7s |
+| GIF picker panel | `composer.spec.ts:173` (7) | ✓ 1.9s |
+| Emoji panel + insertion | `composer.spec.ts:198` (8) | ✓ 1.9s |
+| Close removes `?compose` from URL | `composer.spec.ts:214` (9) | ✓ 2.4s |
+| Content editor textarea present | `composer.spec.ts:227` (FIX 19) | ✓ 1.6s |
+| V2 scheduling card — post now tab | `composer.spec.ts:307` (V2-1) | ✓ 1.7s |
+| V2 scheduling card — schedule tab | `composer.spec.ts:320` (V2-2) | ✓ 1.7s |
+| V2 scheduling card — + Add time | `composer.spec.ts:334` (V2-3) | ✓ 1.8s |
+| V2 scheduling card — recurrence | `composer.spec.ts:347` (V2-4) | ✓ 1.7s |
+| V2 scheduling card — save as draft | `composer.spec.ts:361` (V2-5) | ✓ 1.8s |
+| V2 approval toggle + submit payload | `composer.spec.ts:374` (V2-6) | ✓ 1.7s |
+| V2 preview pane reflects typed content | `composer.spec.ts:408` (V2-9) | ✓ 1.6s |
+| V2 recurring children mode | `composer.spec.ts:438` (V2-7) | ✓ 1.8s |
+| V2 rejection reason validation | `composer.spec.ts:477` (V2-8) | ✓ 1.1s |
+
+**Total: 24 passing, 0 failing.**
+
+---
+
 ## Features deferred from social-01 spec (out of scope)
 
 Per `project_social_composer_workstream.md` memory:
