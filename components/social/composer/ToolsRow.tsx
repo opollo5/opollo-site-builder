@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +81,7 @@ function AiPanel({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">AI assistant</p>
         <button type="button" onClick={onClose} aria-label="Close AI panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <textarea
@@ -192,7 +193,7 @@ function GifPanel({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">GIF picker</p>
         <button type="button" onClick={onClose} aria-label="Close GIF panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <input
@@ -242,7 +243,7 @@ function EmojiPanel({
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-semibold">Emoji</p>
         <button type="button" onClick={onClose} aria-label="Close emoji panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={12} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <div className="grid grid-cols-6 gap-0.5">
@@ -297,7 +298,7 @@ function UtmPanel({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">UTM tags</p>
         <button type="button" onClick={onClose} aria-label="Close UTM panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       {[
@@ -334,75 +335,51 @@ function UtmPanel({
 // ---------------------------------------------------------------------------
 
 const TOOLS = [
-  {
-    id: "ai" as const,
-    label: "AI assistant",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" />
-      </svg>
-    ),
-  },
-  {
-    id: "media" as const,
-    label: "Media",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
-    ),
-  },
-  {
-    id: "emoji" as const,
-    label: "Emoji",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle cx="12" cy="12" r="10" />
-        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-        <line x1="9" y1="9" x2="9.01" y2="9" />
-        <line x1="15" y1="9" x2="15.01" y2="9" />
-      </svg>
-    ),
-  },
-  {
-    id: "gif" as const,
-    label: "GIF",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
-    ),
-  },
-  {
-    id: "utm" as const,
-    label: "UTM tags",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-        <line x1="7" y1="7" x2="7.01" y2="7" />
-      </svg>
-    ),
-  },
+  { id: "ai" as const,    label: "AI assistant", icon: <Sparkles  size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "media" as const, label: "Media",         icon: <ImagePlus size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "emoji" as const, label: "Emoji",         icon: <Smile     size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "gif" as const,   label: "GIF",           icon: <Film      size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "utm" as const,   label: "UTM tags",      icon: <Tags      size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
 export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className }: ToolsRowProps) {
   const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
-  function togglePanel(id: ActivePanel) {
+  function togglePanel(id: Exclude<ActivePanel, null>) {
     setActivePanel((prev) => (prev === id ? null : id));
   }
 
+  // Esc closes the active panel.
+  React.useEffect(() => {
+    if (!activePanel) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setActivePanel(null);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [activePanel]);
+
+  // Click outside the ToolsRow container closes the active panel.
+  React.useEffect(() => {
+    if (!activePanel) return;
+    function onPointerDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActivePanel(null);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [activePanel]);
+
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap gap-1">
+    <div ref={containerRef} className={cn("space-y-2", className)}>
+      <div className="flex flex-wrap gap-1" data-testid="composer-tools-toolbar">
         {TOOLS.map((tool) => (
           <button
             key={tool.id}
             type="button"
+            data-testid={`composer-tool-${tool.id}`}
             onClick={() => {
               if (tool.id === "media") {
                 onOpenMediaPicker();
@@ -425,29 +402,37 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className
       </div>
 
       {activePanel === "ai" && (
-        <AiPanel
-          companyId={companyId}
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-ai">
+          <AiPanel
+            companyId={companyId}
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
       {activePanel === "emoji" && (
-        <EmojiPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-emoji">
+          <EmojiPanel
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
       {activePanel === "gif" && (
-        <GifPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-gif">
+          <GifPanel
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
       {activePanel === "utm" && (
-        <UtmPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-utm">
+          <UtmPanel
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
     </div>
   );
