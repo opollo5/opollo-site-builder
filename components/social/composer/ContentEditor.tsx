@@ -168,6 +168,7 @@ export function ContentEditor({
         accept={ACCEPTED}
         multiple
         className="sr-only"
+        data-testid="media-file-input"
         onChange={(e) => {
           if (e.target.files?.length) {
             void handleFiles(e.target.files);
