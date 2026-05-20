@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { logClientError } from "@/lib/errors/logClientError";
 import { MediaTray } from "@/components/social/composer/MediaTray";
 import { ToolsRow } from "@/components/social/composer/ToolsRow";
 import { LinkPreviewCard, LinkPreviewLoader, type LinkPreviewData } from "@/components/social/composer/LinkPreviewCard";
@@ -149,7 +150,9 @@ export function ContentEditor({
       const res = await fetch("/api/platform/social/media/upload", { method: "POST", body: fd });
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        setUploadError((json.error?.message ?? "Upload failed.") + ` [trace: ${traceId}]`);
+        const msg = json.error?.message ?? "Upload failed.";
+        setUploadError(`${msg} [trace: ${traceId}]`);
+        void logClientError({ component: "media-upload", severity: "error", message: msg, traceId, companyId, context: { error_code: "MEDIA_UPLOAD_FAILED", http_status: res.status } });
         setUploading(false);
         return;
       }

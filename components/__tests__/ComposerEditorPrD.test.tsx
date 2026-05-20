@@ -2,6 +2,26 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as React from "react";
 
+// emoji-picker-react requires IntersectionObserver + canvas which are not
+// available in jsdom. Mock it so ToolsRow tests can open the emoji panel.
+vi.mock("emoji-picker-react", () => {
+  const MockEmojiPicker = vi.fn(({ onEmojiClick }: { onEmojiClick: (d: { emoji: string }) => void }) => (
+    React.createElement("div", { "data-testid": "mock-emoji-picker" },
+      React.createElement("button", { type: "button", onClick: () => onEmojiClick({ emoji: "🎉" }) }, "🎉"),
+      React.createElement("button", { type: "button", onClick: () => onEmojiClick({ emoji: "🔥" }) }, "🔥"),
+    )
+  ));
+  return {
+    default: MockEmojiPicker,
+    Categories: { SUGGESTED: "suggested", SMILEYS_PEOPLE: "smileys_people", ANIMALS_NATURE: "animals_nature", FOOD_DRINK: "food_drink", TRAVEL_PLACES: "travel_places", ACTIVITIES: "activities", OBJECTS: "objects", SYMBOLS: "symbols", FLAGS: "flags" },
+    EmojiStyle: { NATIVE: "native" },
+    SkinTonePickerLocation: { PREVIEW: "preview" },
+    SkinTones: { NEUTRAL: "neutral" },
+    SuggestionMode: { FREQUENT: "frequent" },
+    Theme: { LIGHT: "light" },
+  };
+});
+
 import { CustomizeForRow } from "@/components/social/composer/CustomizeForRow";
 import { PlatformActionsList } from "@/components/social/composer/PlatformActionsList";
 import { MediaTray } from "@/components/social/composer/MediaTray";

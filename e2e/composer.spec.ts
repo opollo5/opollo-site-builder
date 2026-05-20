@@ -193,12 +193,17 @@ test.describe("composer modal", () => {
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
     await page.getByRole("button", { name: /^emoji$/i }).click();
-    // Emoji panel shows quick-pick emoji buttons
-    await expect(page.getByRole("button", { name: "🎉" })).toBeVisible({ timeout: 5_000 });
+    // Emoji picker panel opens
+    const emojiPanel = page.getByTestId("emoji-picker-panel");
+    await expect(emojiPanel).toBeVisible({ timeout: 5_000 });
 
-    // Click an emoji — panel should close
-    await page.getByRole("button", { name: "🎉" }).click();
-    await expect(page.getByRole("button", { name: "🎉" })).not.toBeVisible({ timeout: 3_000 });
+    // Click the first emoji in the grid (li buttons; category nav uses .epr-cat-btn)
+    const firstEmoji = emojiPanel.locator("li button").first();
+    await expect(firstEmoji).toBeVisible({ timeout: 5_000 });
+    await firstEmoji.click();
+
+    // Panel should close after emoji selection
+    await expect(emojiPanel).not.toBeVisible({ timeout: 3_000 });
   });
 
   test("(9) close button closes the modal and removes ?compose from URL", async ({ page, context }) => {

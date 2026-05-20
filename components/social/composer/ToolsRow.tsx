@@ -5,6 +5,7 @@ import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } f
 import { cn } from "@/lib/utils";
 import { logClientError } from "@/lib/errors/logClientError";
 import { UtmBuilderPanel } from "@/components/social/composer/UtmBuilderPanel";
+import { EmojiPickerPanel } from "@/components/social/composer/EmojiPickerPanel";
 import type { Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
@@ -31,11 +32,6 @@ export interface ToolsRowProps {
 type ActivePanel = "ai" | "emoji" | "gif" | "shorten" | "utm" | null;
 
 // A small set of frequently-used emoji for the quick picker.
-const QUICK_EMOJI = [
-  "🎉", "🚀", "💡", "✅", "❤️", "👍", "🔥", "💪", "🌟", "🎯",
-  "📈", "💼", "🤝", "🌐", "⚡", "🛠️", "📣", "🙌", "😊", "🏆",
-  "📌", "🔔", "📱", "💬", "📧", "🗓️", "📊", "💰", "🎨", "🌍",
-];
 
 // ---------------------------------------------------------------------------
 // AI assistant panel
@@ -399,7 +395,9 @@ function GifPanel({
         setError(json.error?.message ?? "GIF search unavailable.");
       }
     } catch {
-      setError("GIF search failed. Please try again.");
+      const traceId = crypto.randomUUID();
+      setError(`GIF search failed. Please try again. [trace: ${traceId}]`);
+      void logClientError({ component: "gif-panel", severity: "error", message: "GIF search network failure", traceId, companyId, context: { error_code: "GIF_SEARCH_FAILED" } });
     } finally {
       setLoading(false);
     }
@@ -431,7 +429,9 @@ function GifPanel({
         setError(json.error?.message ?? "Failed to attach GIF.");
       }
     } catch {
-      setError("Failed to attach GIF. Please try again.");
+      const traceId = crypto.randomUUID();
+      setError(`Failed to attach GIF. Please try again. [trace: ${traceId}]`);
+      void logClientError({ component: "gif-panel", severity: "error", message: "GIF attach network failure", traceId, companyId, context: { error_code: "GIF_ATTACH_FAILED" } });
     } finally {
       setAttaching(null);
     }
@@ -509,41 +509,6 @@ function GifPanel({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Emoji panel
-// ---------------------------------------------------------------------------
-
-function EmojiPanel({
-  onInsert,
-  onClose,
-}: {
-  onInsert: (emoji: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="w-56 rounded-xl border border-border bg-background p-3 shadow-md">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-semibold">Emoji</p>
-        <button type="button" onClick={onClose} aria-label="Close emoji panel" className="text-muted-foreground hover:text-foreground">
-          <CloseIcon size={12} strokeWidth={1.75} aria-hidden />
-        </button>
-      </div>
-      <div className="grid grid-cols-6 gap-0.5">
-        {QUICK_EMOJI.map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            aria-label={emoji}
-            onClick={() => { onInsert(emoji); onClose(); }}
-            className="flex h-8 w-8 items-center justify-center rounded text-base hover:bg-muted transition-colors"
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
@@ -628,7 +593,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
       )}
       {activePanel === "emoji" && (
         <div data-testid="composer-panel-emoji">
-          <EmojiPanel
+          <EmojiPickerPanel
             onInsert={onInsertText}
             onClose={() => setActivePanel(null)}
           />
