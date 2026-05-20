@@ -124,3 +124,39 @@ Autonomous decisions logged here per master prompt operating rules.
 **D-024**: aria-label "Add profile" preserved in ProfileSelector
 - `composer-mount.spec.ts` locates the "Add profile" link by `getByRole('link', { name: /add profile/i })`. Changing to "Connect a profile" caused a strict mode violation in CI.
 - Decision: Kept `aria-label="Add profile"` on the `<a>` element. The `data-testid="connections-connect-button"` is the locator used in the new `composer-profile-chip.spec.ts` tests. PR #967 merged 2026-05-20.
+
+---
+
+## Phase 3.2 — LinkedIn + Facebook preview cards (B3) (2026-05-20)
+
+**D-025**: Dedicated preview card components over inline functions
+- `PreviewCard.tsx` had inline `XPreview` and `InstagramPreview` functions. Phase 3.2 extracted LinkedIn and Facebook into `components/social/preview/LinkedInPreviewCard.tsx` and `FacebookPreviewCard.tsx`.
+- Decision: Same extraction pattern applied to Instagram, X, and GBP in Phase 3.3. Inline functions removed from `PreviewCard.tsx` for instagram/x/gbp; Pinterest and TikTok remain on `GenericPreview` (no dedicated card spec'd).
+
+**D-026**: `alt=""` images use `querySelector("img")` in component tests
+- `<img alt="">` is decorative in ARIA (role="none", not role="img"). `getByRole("img")` returns no elements.
+- Decision: Component tests for image assertions use `container.querySelector("img")` with the `data-testid`-wrapped container. Pattern mirrors `PreviewCardsLiFb.test.tsx`.
+
+**D-027**: Vitest `describe`/`it`/`expect` must be explicitly imported
+- `vitest.components.config.ts` does NOT set `globals: true`. Tests must import from `"vitest"` explicitly.
+- Decision: First line of every component test file: `import { describe, it, expect } from "vitest"`. Original Phase 3.3 commit was missing this — caused CI typecheck failure; fixed in follow-up commit `ee5ba67f` on `feat/composer-preview-li-fb`.
+
+---
+
+## Phase 3.3 — Instagram, X, GBP preview cards (B3) (2026-05-20)
+
+**D-028**: Instagram gradient ring as constant, not inline
+- `IG_GRADIENT = "linear-gradient(135deg, #F58529 0%, ...)"` contains literal hex values. The design-tokens audit regex `/(?:className|style)=[^>]*#[0-9a-fA-F]{3,8}/` matches hex in `style=` attributes (including across newlines).
+- Decision: Gradient extracted to `const IG_GRADIENT`. `style={{ background: IG_GRADIENT }}` — variable reference, not inline hex. All platform colour constants (`IG_BG`, `X_BG`, `GBP_BG`) use same pattern.
+
+**D-029**: X char counter truncates display but counter shows real length
+- `XPreviewCard` truncates the displayed body at 280 chars with `"…"` appended. The char counter shows the raw `content.length`, not the truncated length.
+- Decision: Consistent with how X.com works — the counter reflects how many characters you've typed, even if display is capped. `isOverLimit` drives the red state.
+
+**D-030**: GBP `ctaLabel` prop with "Learn more" default
+- Master prompt specifies CTA button on GBP card. The label varies (Learn more / Book now / Sign up / etc.).
+- Decision: `ctaLabel?: string = "Learn more"` prop on `GoogleBusinessPreviewCard`. No dynamic list — composer renders the card with whatever the post's CTA type is. If a future phase adds CTA selection UI, the prop is already wired.
+
+**D-031**: e2e spec helper typed with `import("@playwright/test").Page`
+- Helper function `setupWithConnections` used complex `Parameters<Parameters<typeof test>[1]>[0]` type extraction — TypeScript TS2344 error in CI.
+- Decision: Use `import("@playwright/test").Page` and `.BrowserContext` inline type imports. Pattern from `e2e/composer.spec.ts:44`.
