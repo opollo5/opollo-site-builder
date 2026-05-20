@@ -570,7 +570,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
             }}
             aria-pressed={activePanel === tool.id}
             className={cn(
-              "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]",
               activePanel === tool.id
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground",
@@ -583,7 +583,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
       </div>
 
       {activePanel === "ai" && (
-        <div data-testid="composer-panel-ai">
+        <div data-testid="composer-panel-ai" className="c3-panel-in">
           <AiPanel
             companyId={companyId}
             onInsert={onInsertText}
@@ -592,7 +592,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
         </div>
       )}
       {activePanel === "emoji" && (
-        <div data-testid="composer-panel-emoji">
+        <div data-testid="composer-panel-emoji" className="c3-panel-in">
           <EmojiPickerPanel
             onInsert={onInsertText}
             onClose={() => setActivePanel(null)}
@@ -600,7 +600,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
         </div>
       )}
       {activePanel === "gif" && (
-        <div data-testid="composer-panel-gif">
+        <div data-testid="composer-panel-gif" className="c3-panel-in">
           <GifPanel
             companyId={companyId}
             onAttach={onAttachGif}
@@ -609,7 +609,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
         </div>
       )}
       {activePanel === "utm" && (
-        <div data-testid="composer-panel-utm">
+        <div data-testid="composer-panel-utm" className="c3-panel-in">
           <UtmBuilderPanel
             onInsert={onInsertText}
             onClose={() => setActivePanel(null)}

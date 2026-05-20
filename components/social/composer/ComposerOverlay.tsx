@@ -47,6 +47,18 @@ export interface ComposerOverlayProps {
 
 type PreviewTab = "preview" | "calendar";
 
+const SHORTCUTS = [
+  { keys: "⌘↵",  label: "Submit post" },
+  { keys: "⌘S",  label: "Save as draft" },
+  { keys: "⌘⇧S", label: "Schedule post" },
+  { keys: "⌘K",  label: "Focus editor" },
+  { keys: "⌘E",  label: "Toggle emoji panel" },
+  { keys: "⌘I",  label: "Open media picker" },
+  { keys: "⌘1–5",label: "Switch preview tab" },
+  { keys: "Esc", label: "Close composer" },
+  { keys: "?",   label: "Show shortcuts" },
+] as const;
+
 const DEFAULT_DRAFT: Draft = {
   content: "",
   media_urls: [],
@@ -90,6 +102,10 @@ export function ComposerOverlay({
 
   // Unsaved-changes guard
   const [showDiscard, setShowDiscard] = React.useState(false);
+  // Keyboard shortcuts panel
+  const [showShortcuts, setShowShortcuts] = React.useState(false);
+  // Overlay ref for scoped querySelector
+  const overlayRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (open) {
@@ -189,16 +205,80 @@ export function ComposerOverlay({
     }
   }
 
-  // Close on Escape — respect unsaved-changes guard
+  // Keyboard shortcuts
   React.useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") handleClose();
+      const meta = e.metaKey || e.ctrlKey;
+
+      if (e.key === "Escape") {
+        if (showShortcuts) { setShowShortcuts(false); return; }
+        handleClose();
+        return;
+      }
+
+      // ? key — show shortcuts panel (only when not typing in an input)
+      if (e.key === "?" && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
+        e.preventDefault();
+        setShowShortcuts((s) => !s);
+        return;
+      }
+
+      if (!meta) return;
+
+      switch (e.key) {
+        case "Enter":
+          e.preventDefault();
+          if (e.shiftKey) {
+            void handleSubmit("schedule");
+          } else {
+            void handleSubmit(scheduling.mode);
+          }
+          break;
+        case "s":
+        case "S":
+          e.preventDefault();
+          if (e.shiftKey) {
+            void handleSubmit("schedule");
+          } else {
+            void handleSubmit("draft");
+          }
+          break;
+        case "k":
+        case "K":
+          e.preventDefault();
+          overlayRef.current
+            ?.querySelector<HTMLTextAreaElement>('[data-testid="content-textarea"]')
+            ?.focus();
+          break;
+        case "e":
+        case "E":
+          e.preventDefault();
+          overlayRef.current
+            ?.querySelector<HTMLButtonElement>('[data-testid="composer-tool-emoji"]')
+            ?.click();
+          break;
+        case "i":
+        case "I":
+          e.preventDefault();
+          overlayRef.current
+            ?.querySelector<HTMLButtonElement>('[data-testid="composer-tool-media"]')
+            ?.click();
+          break;
+        case "1": case "2": case "3": case "4": case "5": {
+          e.preventDefault();
+          const idx = parseInt(e.key, 10) - 1;
+          setActivePreviewIndex(idx);
+          break;
+        }
+        default:
+          break;
+      }
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, draft]);
+  }, [open, draft, scheduling, showShortcuts]);
 
   if (!open) return null;
 
@@ -233,7 +313,8 @@ export function ComposerOverlay({
     <>
       <ComposerErrorBoundary companyId={companyId}>
       <div
-        className="fixed inset-0 z-50 flex flex-col bg-background"
+        ref={overlayRef}
+        className="fixed inset-0 z-50 flex flex-col bg-background c3-modal-in"
         role="dialog"
         aria-modal="true"
         aria-label={draft.id ? "Edit post" : "New post"}
@@ -246,18 +327,64 @@ export function ComposerOverlay({
               <h2 className="text-base font-semibold text-foreground">
                 {draft.id ? "Edit post" : "New post"}
               </h2>
-              <button
-                type="button"
-                aria-label="Close composer"
-                onClick={handleClose}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                  <path d="M18 6 6 18" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label="Keyboard shortcuts"
+                  title="Keyboard shortcuts (?)"
+                  onClick={() => setShowShortcuts((s) => !s)}
+                  data-testid="composer-shortcuts-btn"
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M9 7h6" /><path d="M12 17V11" /><rect width="20" height="16" x="2" y="4" rx="2" /><path d="M6 11h2" /><path d="M16 11h2" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Close composer"
+                  onClick={handleClose}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
+
+            {/* Keyboard shortcuts panel */}
+            {showShortcuts && (
+              <div
+                className="absolute left-0 right-0 top-[65px] z-10 border-b border-border bg-background/95 backdrop-blur-sm px-6 py-4 c3-panel-in shadow-md"
+                data-testid="composer-shortcuts-panel"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Keyboard shortcuts</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowShortcuts(false)}
+                    aria-label="Close shortcuts panel"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                      <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 sm:grid-cols-3">
+                  {SHORTCUTS.map(({ keys, label }) => (
+                    <div key={keys} className="flex items-center gap-2">
+                      <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                        {keys}
+                      </kbd>
+                      <span className="text-xs text-muted-foreground">{label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-1 flex-col gap-5 px-6 py-5">
               <ProfileSelector
