@@ -35,8 +35,8 @@ const MOCK_GBP_CONNECTION = {
 
 test.describe("composer preview cards — Instagram, X, GBP (B3)", () => {
   async function setupWithConnections(
-    page: Parameters<Parameters<typeof test>[1]>[0]["page"],
-    context: Parameters<Parameters<typeof test>[1]>[0]["context"],
+    page: import("@playwright/test").Page,
+    context: import("@playwright/test").BrowserContext,
     connections: object[],
   ) {
     await signInAsCompanyAdmin(page);
