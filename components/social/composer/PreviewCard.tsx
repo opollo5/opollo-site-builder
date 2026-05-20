@@ -3,10 +3,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { Connection, Platform } from "@/lib/social/types";
+import { LinkedInPreviewCard } from "@/components/social/preview/LinkedInPreviewCard";
+import { FacebookPreviewCard } from "@/components/social/preview/FacebookPreviewCard";
 
 // ---------------------------------------------------------------------------
 // PreviewCard — renders post content in the visual style of the target platform.
 // Used in the composer right pane and the post analytics modal (PR H).
+//
+// LinkedIn + Facebook delegate to dedicated preview cards (Phase 3.2 / B3).
+// X, Instagram, and GBP/Pinterest/TikTok remain inline until Phase 3.3.
 // ---------------------------------------------------------------------------
 
 export interface PreviewCardProps {
@@ -50,63 +55,6 @@ function AvatarFallback({ name, bg }: { name: string; bg: string }) {
       aria-hidden
     >
       {initials || "?"}
-    </div>
-  );
-}
-
-function LinkedInPreview({ content, mediaUrls, connection }: Omit<PreviewCardProps, "platform" | "className">) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white text-sm shadow-sm">
-      <div className="flex items-start gap-3 p-4">
-        <AvatarFallback name={connection.account_name} bg={PLATFORM_BG.linkedin} />
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-gray-900 leading-tight">{connection.account_name}</p>
-          <p className="text-xs text-gray-500">Just now · 🌐</p>
-        </div>
-      </div>
-      <p className="px-4 pb-3 text-gray-800 leading-relaxed whitespace-pre-wrap break-words">
-        {content || <span className="italic text-gray-400">Your post content will appear here.</span>}
-      </p>
-      {mediaUrls[0] && (
-        <div className="border-t">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mediaUrls[0]} alt="" className="w-full object-cover aspect-[1.91/1]" />
-        </div>
-      )}
-      <div className="flex items-center gap-4 border-t px-4 py-2 text-xs text-gray-500">
-        <span>👍 Like</span>
-        <span>💬 Comment</span>
-        <span>↗ Share</span>
-        <span>✉ Send</span>
-      </div>
-    </div>
-  );
-}
-
-function FacebookPreview({ content, mediaUrls, connection }: Omit<PreviewCardProps, "platform" | "className">) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white text-sm shadow-sm">
-      <div className="flex items-start gap-3 p-4">
-        <AvatarFallback name={connection.account_name} bg={PLATFORM_BG.facebook} />
-        <div>
-          <p className="font-semibold text-gray-900">{connection.account_name}</p>
-          <p className="text-xs text-gray-500">Just now · 🌐</p>
-        </div>
-      </div>
-      <p className="px-4 pb-3 text-gray-800 whitespace-pre-wrap break-words">
-        {content || <span className="italic text-gray-400">Your post content will appear here.</span>}
-      </p>
-      {mediaUrls[0] && (
-        <div className="border-t">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mediaUrls[0]} alt="" className="w-full object-cover aspect-[1.91/1]" />
-        </div>
-      )}
-      <div className="flex items-center gap-4 border-t px-4 py-2 text-xs text-gray-500">
-        <span>👍 Like</span>
-        <span>💬 Comment</span>
-        <span>↗ Share</span>
-      </div>
     </div>
   );
 }
@@ -186,6 +134,8 @@ function GenericPreview({ platform, content, mediaUrls, connection }: PreviewCar
 }
 
 export function PreviewCard({ platform, content, mediaUrls, connection, className }: PreviewCardProps) {
+  const profile = { name: connection.account_name, avatarUrl: connection.account_avatar_url };
+
   return (
     <div className={cn("space-y-2", className)} data-testid="preview-card">
       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -197,10 +147,10 @@ export function PreviewCard({ platform, content, mediaUrls, connection, classNam
         {PLATFORM_NAME[platform]}
       </p>
       {platform === "linkedin" && (
-        <LinkedInPreview content={content} mediaUrls={mediaUrls} connection={connection} />
+        <LinkedInPreviewCard profile={profile} content={content} media={mediaUrls} />
       )}
       {platform === "facebook" && (
-        <FacebookPreview content={content} mediaUrls={mediaUrls} connection={connection} />
+        <FacebookPreviewCard profile={profile} content={content} media={mediaUrls} />
       )}
       {platform === "x" && (
         <XPreview content={content} mediaUrls={mediaUrls} connection={connection} />

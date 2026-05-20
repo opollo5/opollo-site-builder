@@ -103,3 +103,24 @@ Autonomous decisions logged here per master prompt operating rules.
 - Need to display GIF badge on MediaTile for GIFs. Options: (a) change `media_urls: string[]` to `media_items: {url, type}[]`, (b) add a parallel `Set<number>` tracking GIF indices.
 - Decision: Option (b). No schema change. `Draft` type (`lib/social/types.ts`) stays `media_urls: string[]`. `ContentEditor` owns a local `gifIndices: Set<number>` state. On remove, indices shift correctly. Badge is cosmetic — GIFs are valid images; the server accepts them identically.
 
+
+**D-021**: SSRF security fix — parseSafeGiphyUrl with URL constructor
+- CodeQL flagged `fetch(giphy_url)` in `gif-proxy/route.ts` as SSRF: URL taint from user input to fetch.
+- The original fix used a regex on the raw string (`/^https:\/\/media\d*\.giphy\.com\//`). CodeQL doesn't recognize regex as a taint sanitizer for fetch URLs.
+- Decision: `parseSafeGiphyUrl()` uses `new URL(raw)` to parse, then checks `parsed.protocol` and tests `parsed.hostname` against `/^media\d*\.giphy\.com$/`. Reconstructs URL from parsed parts (`https://${parsed.hostname}${parsed.pathname}${parsed.search}`) — the returned URL object's `.href` breaks the taint chain from user input to `fetch()`. PR #966 merged 2026-05-20.
+
+---
+
+## Phase 3.1 — ProfileChip rebuild (B2) (2026-05-20)
+
+**D-022**: ProfileChip uses role="checkbox" not role="button"
+- Chip is a multi-select toggle for selecting posting targets. ARIA spec: multi-select toggles are checkboxes, not buttons. Using `role="checkbox"` with `aria-checked` is semantically correct and makes the accessibility tree match user mental model.
+- Decision: `role="checkbox"`, `aria-checked={selected}`, `aria-label="Post to {name} on {platform}"`. `aria-disabled` for disconnected state.
+
+**D-023**: ProfileChip 56px layout — inset avatar + overlaid badge + checkbox
+- Master prompt specifies "56px circle, avatar inset, checkbox overlay top-left, platform badge bottom-right".
+- Decision: Outer button is 56px (`h-14 w-14`). Avatar inset via `absolute inset-0.5 rounded-full overflow-hidden` (52px). Checkbox overlay: `absolute -left-0.5 -top-0.5 h-5 w-5`. Platform badge: `absolute -bottom-0.5 -right-0.5 p-0.5 bg-white rounded-full`. Colors via Tailwind classes only (no inline hex — design-tokens test requires this).
+
+**D-024**: aria-label "Add profile" preserved in ProfileSelector
+- `composer-mount.spec.ts` locates the "Add profile" link by `getByRole('link', { name: /add profile/i })`. Changing to "Connect a profile" caused a strict mode violation in CI.
+- Decision: Kept `aria-label="Add profile"` on the `<a>` element. The `data-testid="connections-connect-button"` is the locator used in the new `composer-profile-chip.spec.ts` tests. PR #967 merged 2026-05-20.
