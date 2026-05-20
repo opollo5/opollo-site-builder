@@ -54,7 +54,7 @@ const ROOT = path.resolve(__dirname, "../..");
 const SRC_FILES = [
   ...collectFiles(path.join(ROOT, "app"), [".tsx", ".ts"]),
   ...collectFiles(path.join(ROOT, "components"), [".tsx", ".ts"]),
-].filter((f) => !f.includes("email") && !f.includes("seed") && !f.includes("__tests__") && !f.includes(".test."));
+].filter((f) => !f.includes("email") && !f.includes("seed") && !f.includes("__tests__") && !f.includes(".test.") && !f.includes("(dev)"));
 
 const subMinFontRe = /\btext-\[([0-9]|1[0-5])px\]/;
 

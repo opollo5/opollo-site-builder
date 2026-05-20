@@ -37,6 +37,10 @@ const config: Config = {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "ui-sans-serif", "sans-serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "monospace"],
+        /* Composer v3 fonts */
+        'c3-display': ['var(--c3-font-display)'],
+        'c3-body':    ['var(--c3-font-body)'],
+        'c3-mono':    ['var(--c3-font-mono)'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -136,11 +140,36 @@ const config: Config = {
       },
       boxShadow: {
         'pk-glow': '0 4px 24px var(--pk-glow)',
+        /* Composer v3 shadows */
+        'c3-sm':      'var(--c3-shadow-sm)',
+        'c3-md':      'var(--c3-shadow-md)',
+        'c3-lg':      'var(--c3-shadow-lg)',
+        'c3-overlay': 'var(--c3-shadow-overlay)',
+        'c3-focus':   'var(--c3-shadow-focus)',
+        'c3-focus-danger': 'var(--c3-shadow-focus-danger)',
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        /* Composer v3 radii */
+        'c3-sm':   'var(--c3-radius-sm)',
+        'c3-md':   'var(--c3-radius-md)',
+        'c3-lg':   'var(--c3-radius-lg)',
+        'c3-xl':   'var(--c3-radius-xl)',
+        'c3-2xl':  'var(--c3-radius-2xl)',
+        'c3-full': 'var(--c3-radius-full)',
+      },
+      transitionTimingFunction: {
+        'c3-out':    'cubic-bezier(0.16, 1, 0.3, 1)',
+        'c3-snap':   'cubic-bezier(0.22, 1, 0.36, 1)',
+        'c3-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      },
+      transitionDuration: {
+        'c3-instant': '60ms',
+        'c3-fast':    '120ms',
+        'c3-base':    '200ms',
+        'c3-slow':    '320ms',
       },
     },
   },

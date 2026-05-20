@@ -11,6 +11,15 @@ useDefault = true
 [allowlist]
 description = "Known-safe test fixtures and public local-dev secrets"
 
+# Phase 1: design system page used `token:` as a JS property name for motion
+# token data; gitleaks matched it as generic-api-key FP. Fixed in c3eaba2c.
+# D-012: DECISION_TRAIL.md described the above fix using the same pattern.
+# Fixed by rewriting the prose in follow-up commit (property now called cssVar).
+commits = [
+  "63ed054371ac779166df3106b9566f0c0eae6b73",
+  "35d65ad408b4a96618afd706376b9c72229fcc95",
+]
+
 # Paths that contain deterministic test data only.
 paths = [
   '''lib/__tests__/''',
