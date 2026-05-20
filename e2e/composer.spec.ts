@@ -172,12 +172,12 @@ test.describe("composer modal", () => {
 
   test("(7) GIF picker panel opens when GIF button is clicked", async ({ page, context }) => {
     await mockDraftApis(context);
-    // Mock GIPHY API (V2 ToolsRow uses GIPHY, not Tenor)
-    await context.route("**/api.giphy.com/**", (route) => {
+    // Phase 2.3: GIF search is proxied through our server route; mock it to return empty results.
+    await context.route("**/api/platform/social/gif-search**", (route) => {
       void route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ data: [] }),
+        body: JSON.stringify({ ok: true, data: { results: [] } }),
       });
     });
 
@@ -186,13 +186,8 @@ test.describe("composer modal", () => {
 
     // V2 ToolsRow: "GIF" button by label
     await page.getByRole("button", { name: /^gif$/i }).click();
-    // V2 GifPanel renders "GIF picker" heading + search input when API key is set,
-    // or a "not set" notice when NEXT_PUBLIC_GIPHY_API_KEY is absent (e.g. in CI).
-    await expect(
-      page.getByPlaceholder(/search giphy/i)
-        .or(page.getByText("GIF picker"))
-        .or(page.getByText(/NEXT_PUBLIC_GIPHY_API_KEY is not set/)),
-    ).toBeVisible({ timeout: 5_000 });
+    // GifPanel always renders a "GIF picker" heading — check the panel container.
+    await expect(page.getByTestId("composer-panel-gif")).toBeVisible({ timeout: 5_000 });
   });
 
   test("(8) emoji panel opens and inserts an emoji into the text", async ({ page, context }) => {
