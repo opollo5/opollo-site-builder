@@ -45,7 +45,7 @@ export function ProfileSelector({ available, selected, onChange, className }: Pr
       {/* "Add profile" chip — links to connection settings */}
       <a
         href="/company/social/connections"
-        aria-label="Connect a profile"
+        aria-label="Add profile"
         data-testid="connections-connect-button"
         className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
       >

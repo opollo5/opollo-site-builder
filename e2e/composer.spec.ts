@@ -109,13 +109,8 @@ test.describe("composer modal", () => {
     await mockDraftApis(context);
     await page.goto("/company/social/posts?compose=new");
 
-    // Editor pane must render (profile selector visible).
-    await expect(page.getByTestId("connections-connect-button").or(
-      page.locator("[data-testid='profile-selector']")
-    ).or(
-      // Profile selector may not have testid — look for the modal container instead.
-      page.getByRole("dialog", { name: /new post/i }),
-    )).toBeVisible({ timeout: 15_000 });
+    // Editor pane must render — profile-selector container is always present in V2.
+    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 15_000 });
   });
 
   test("(3) schedule mode shows date and time inputs", async ({ page, context }) => {
