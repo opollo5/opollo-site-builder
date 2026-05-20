@@ -6,12 +6,13 @@ import { logClientError } from "@/lib/errors/logClientError";
 import { MediaTray } from "@/components/social/composer/MediaTray";
 import { ToolsRow } from "@/components/social/composer/ToolsRow";
 import { LinkPreviewCard, LinkPreviewLoader, type LinkPreviewData } from "@/components/social/composer/LinkPreviewCard";
+import { MediaPickerModal } from "@/components/social/composer/MediaPickerModal";
 import type { Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // ContentEditor — controlled textarea + char counter + media tray + tools row.
-// Owns the file input so both MediaTray "+" and ToolsRow "Media" share
-// the same upload flow.
+// MediaTray "+" → file input (direct upload).
+// ToolsRow "Media" → MediaPickerModal (Upload / Library / AI tabs).
 // ---------------------------------------------------------------------------
 
 export interface ContentEditorProps {
@@ -44,6 +45,7 @@ export function ContentEditor({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false);
   // Tracks which indices in mediaUrls are GIFs (for MediaTile GIF badge).
   const [gifIndices, setGifIndices] = React.useState<Set<number>>(new Set());
 
@@ -120,8 +122,12 @@ export function ContentEditor({
     el.style.height = `${el.scrollHeight}px`;
   }
 
-  function openPicker() {
+  function openFilePicker() {
     fileInputRef.current?.click();
+  }
+
+  function openMediaModal() {
+    setMediaPickerOpen(true);
   }
 
   async function handleFiles(files: FileList) {
@@ -221,7 +227,7 @@ export function ContentEditor({
                 return next;
               });
             }}
-            onRequestUpload={openPicker}
+            onRequestUpload={openFilePicker}
             gifIndices={gifIndices}
             uploading={uploading}
           />
@@ -253,13 +259,13 @@ export function ContentEditor({
         <ToolsRow
           companyId={companyId}
           onInsertText={insertText}
-          onOpenMediaPicker={openPicker}
+          onOpenMediaPicker={openMediaModal}
           onAttachGif={attachGif}
           platforms={platforms}
         />
       </div>
 
-      {/* Shared file input for both MediaTray "+" and ToolsRow "Media" button */}
+      {/* File input for MediaTray "+" direct upload */}
       <input
         ref={fileInputRef}
         type="file"
@@ -273,6 +279,15 @@ export function ContentEditor({
             e.target.value = "";
           }
         }}
+      />
+
+      <MediaPickerModal
+        open={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        onAttach={(urls) => onMediaChange([...mediaUrls, ...urls])}
+        companyId={companyId}
+        draftBody={value}
+        currentMediaCount={mediaUrls.length}
       />
     </div>
   );
