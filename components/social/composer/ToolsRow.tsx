@@ -4,6 +4,8 @@ import * as React from "react";
 import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logClientError } from "@/lib/errors/logClientError";
+import { UtmBuilderPanel } from "@/components/social/composer/UtmBuilderPanel";
+import type { Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // ToolsRow — composer toolbar: AI assistant, Media, Emoji, GIF, Shorten URL,
@@ -22,6 +24,7 @@ export interface ToolsRowProps {
   onInsertText: (text: string) => void;
   onOpenMediaPicker: () => void;
   onAttachGif: (url: string) => void;
+  platforms?: Platform[];
   className?: string;
 }
 
@@ -543,72 +546,6 @@ function EmojiPanel({
 }
 
 // ---------------------------------------------------------------------------
-// UTM panel
-// ---------------------------------------------------------------------------
-
-function UtmPanel({
-  onInsert,
-  onClose,
-}: {
-  onInsert: (text: string) => void;
-  onClose: () => void;
-}) {
-  const [url, setUrl] = React.useState("");
-  const [source, setSource] = React.useState("");
-  const [medium, setMedium] = React.useState("social");
-  const [campaign, setCampaign] = React.useState("");
-
-  function buildUrl() {
-    if (!url.trim()) return;
-    try {
-      const u = new URL(url.trim());
-      if (source) u.searchParams.set("utm_source", source);
-      if (medium) u.searchParams.set("utm_medium", medium);
-      if (campaign) u.searchParams.set("utm_campaign", campaign);
-      onInsert(u.toString());
-      onClose();
-    } catch {
-      // invalid URL
-    }
-  }
-
-  return (
-    <div className="w-72 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">UTM tags</p>
-        <button type="button" onClick={onClose} aria-label="Close UTM panel" className="text-muted-foreground hover:text-foreground">
-          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
-        </button>
-      </div>
-      {[
-        { label: "URL", value: url, set: setUrl, placeholder: "https://example.com/page" },
-        { label: "Source", value: source, set: setSource, placeholder: "linkedin" },
-        { label: "Medium", value: medium, set: setMedium, placeholder: "social" },
-        { label: "Campaign", value: campaign, set: setCampaign, placeholder: "spring-promo" },
-      ].map(({ label, value, set, placeholder }) => (
-        <div key={label} className="space-y-1">
-          <label className="text-xs text-muted-foreground">{label}</label>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => set(e.target.value)}
-            placeholder={placeholder}
-            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
-          />
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={buildUrl}
-        disabled={!url.trim()}
-        className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-      >
-        Insert URL with UTM tags
-      </button>
-    </div>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // ToolsRow — main export
 // ---------------------------------------------------------------------------
@@ -621,7 +558,7 @@ const TOOLS = [
   { id: "utm" as const,   label: "UTM tags",      icon: <Tags      size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
-export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, className }: ToolsRowProps) {
+export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, platforms, className }: ToolsRowProps) {
   const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -708,9 +645,10 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
       )}
       {activePanel === "utm" && (
         <div data-testid="composer-panel-utm">
-          <UtmPanel
+          <UtmBuilderPanel
             onInsert={onInsertText}
             onClose={() => setActivePanel(null)}
+            platforms={platforms}
           />
         </div>
       )}
