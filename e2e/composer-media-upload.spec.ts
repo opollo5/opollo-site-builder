@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
 
-import { signInAsCompanyAdmin } from "./helpers";
+import { signInAsCompanyAdmin, mockComposerApis, MOCK_MEDIA_URL } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // PR 2.2 — composer media upload render (gap A1)
@@ -8,73 +8,13 @@ import { signInAsCompanyAdmin } from "./helpers";
 // Tests:
 //  M-1  Upload PNG → MediaTile renders with correct src
 //  M-2  Upload exceeds 8 MB → inline client-side error containing "8 MB"
-//  M-3  Uploaded image appears in platform preview cards
+//  M-3  Uploaded image src propagates to media tile (source_url round-trip)
 // ---------------------------------------------------------------------------
-
-const MOCK_DRAFT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-const MOCK_COMPANY_ID = "11111111-1111-1111-1111-111111111111";
-const MOCK_MEDIA_URL = "https://example.com/uploads/test-image.png";
 
 // Minimal valid 1×1 PNG (67 bytes)
 const VALID_PNG_HEX =
   "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c489" +
   "0000000a49444154789c6260000000020001e221bc330000000049454e44ae426082";
-
-function makeDraftResponse(overrides = {}) {
-  return {
-    ok: true,
-    data: {
-      id: MOCK_DRAFT_ID,
-      company_id: MOCK_COMPANY_ID,
-      draft_version: 1,
-      draft_data: {
-        master_text: "",
-        link_url: null,
-        media_refs: [],
-        target_connection_ids: [],
-        schedule: null,
-        approval_required: false,
-        ai_metadata: null,
-        ...overrides,
-      },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      archived_at: null,
-    },
-  };
-}
-
-async function mockComposerApis(context: import("@playwright/test").BrowserContext) {
-  await context.route("**/api/platform/social/drafts", (route) => {
-    if (route.request().method() === "POST") {
-      void route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(makeDraftResponse()) });
-    } else {
-      void route.continue();
-    }
-  });
-  await context.route(`**/api/platform/social/drafts/${MOCK_DRAFT_ID}`, (route) => {
-    if (route.request().method() === "GET") {
-      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(makeDraftResponse()) });
-    } else if (route.request().method() === "PATCH") {
-      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(makeDraftResponse({ draft_version: 2 })) });
-    } else {
-      void route.continue();
-    }
-  });
-  await context.route("**/api/platform/social/connections**", (route) => {
-    void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, data: { connections: [] } }) });
-  });
-  await context.route("**/api/internal/events", (route) => {
-    void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
-  });
-  await context.route("**/api/platform/social/media/upload", (route) => {
-    void route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ ok: true, data: { asset: { source_url: MOCK_MEDIA_URL } } }),
-    });
-  });
-}
 
 test.describe("composer media upload (A1)", () => {
   test.beforeEach(async ({ page, context }) => {
@@ -127,7 +67,6 @@ test.describe("composer media upload (A1)", () => {
     const img = tile.locator("img");
     await expect(img).toBeVisible({ timeout: 5_000 });
     const src = await img.getAttribute("src");
-    expect(src).toBeTruthy();
-    expect(src).toContain("example.com");
+    expect(src).toBe(MOCK_MEDIA_URL);
   });
 });

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import type { Page, TestInfo } from "@playwright/test";
+import type { BrowserContext, Page, TestInfo } from "@playwright/test";
 
 import {
   E2E_ADMIN_EMAIL,
@@ -9,6 +9,78 @@ import {
 } from "./fixtures";
 
 // Shared helpers for the Playwright suite.
+
+// ---------------------------------------------------------------------------
+// Composer mock constants — used by composer-media-upload and composer-gif-attach
+// ---------------------------------------------------------------------------
+
+export const MOCK_DRAFT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+export const MOCK_COMPANY_ID = "11111111-1111-1111-1111-111111111111";
+export const MOCK_MEDIA_URL = "https://example.com/uploads/test-image.png";
+
+function makeDraftResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    ok: true,
+    data: {
+      id: MOCK_DRAFT_ID,
+      company_id: MOCK_COMPANY_ID,
+      draft_version: 1,
+      draft_data: {
+        master_text: "",
+        link_url: null,
+        media_refs: [],
+        target_connection_ids: [],
+        schedule: null,
+        approval_required: false,
+        ai_metadata: null,
+        ...overrides,
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      archived_at: null,
+    },
+  };
+}
+
+/**
+ * Install context-level route mocks for the composer overlay:
+ * drafts POST/GET/PATCH, connections, events, and media/upload.
+ * Override individual routes in the test body as needed (e.g., to
+ * simulate a 413 from media/upload for over-size error tests).
+ */
+export async function mockComposerApis(context: BrowserContext): Promise<void> {
+  await context.route("**/api/platform/social/drafts", (route) => {
+    if (route.request().method() === "POST") {
+      void route.fulfill({ status: 201, contentType: "application/json", body: JSON.stringify(makeDraftResponse()) });
+    } else {
+      void route.continue();
+    }
+  });
+  await context.route(`**/api/platform/social/drafts/${MOCK_DRAFT_ID}`, (route) => {
+    if (route.request().method() === "GET") {
+      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(makeDraftResponse()) });
+    } else if (route.request().method() === "PATCH") {
+      void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(makeDraftResponse({ draft_version: 2 })) });
+    } else {
+      void route.continue();
+    }
+  });
+  await context.route("**/api/platform/social/connections**", (route) => {
+    void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, data: { connections: [] } }) });
+  });
+  await context.route("**/api/internal/events", (route) => {
+    void route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+  });
+  await context.route("**/api/platform/social/media/upload", (route) => {
+    void route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, data: { asset: { source_url: MOCK_MEDIA_URL } } }),
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
 
 /**
  * Sign in as the seeded admin via the real /login form flow. Returns
