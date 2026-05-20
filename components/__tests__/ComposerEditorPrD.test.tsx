@@ -346,6 +346,10 @@ describe("ToolsRow", () => {
       el.getAttribute("placeholder")?.includes("example.com/page"),
     )!;
     fireEvent.change(urlInput, { target: { value: "https://example.com" } });
+    const campaignInput = screen.getAllByRole("textbox").find((el) =>
+      el.getAttribute("placeholder")?.includes("spring-promo"),
+    )!;
+    fireEvent.change(campaignInput, { target: { value: "test-campaign" } });
     const sourceInput = screen.getAllByRole("textbox").find((el) =>
       el.getAttribute("placeholder")?.includes("linkedin"),
     )!;
