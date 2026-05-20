@@ -123,3 +123,23 @@ Autonomous decisions logged here per master prompt operating rules.
 - ToolsRow already has 700+ lines. The picker imports emoji-picker-react (heavy dependency) and would significantly slow the ToolsRow bundle if inlined.
 - Decision: `components/social/composer/EmojiPickerPanel.tsx` as a separate client component. ToolsRow imports it; Next.js code-splits it automatically since it's only rendered when `activePanel === "emoji"`.
 
+
+---
+
+## Phase 5.1 — Media library + AI suggest (C2) (2026-05-21)
+
+**D-036**: Library tab search — text search not implemented (no columns)
+- Master prompt specifies "Search by filename/tags/alt-text" for the library tab.
+- `social_media_assets` has no `filename`, `tags`, or `alt_text` columns — only `storage_path` (UUID-based, not user-readable) and `mime_type`.
+- Per operating rules: "No schema changes beyond `client_errors`".
+- Decision: Implement type filter only (all/image/gif via `mime_type`). Text search deferred to v3.1 when `alt_text` column is provisioned. Noted in component with `// TODO(v3.1): add text search when alt_text column is available`.
+
+**D-037**: ToolsRow "Media" opens MediaPickerModal; MediaTray "+" keeps direct file input
+- Spec says "Replace direct 'Media' tool click with opening this modal."
+- MediaTray "+" is a separate surface — it appears inline next to uploaded thumbnails, contextually for adding more images. Replacing it with a modal would disrupt the flow.
+- Decision: Only ToolsRow `onOpenMediaPicker` callback is replaced with `setMediaPickerOpen(true)`. MediaTray "+" retains direct `fileInputRef.click()` for instant upload.
+
+**D-038**: AI tab calls generate-image 4× in parallel (Promise.allSettled)
+- Spec says "Shows 4 generated variations." The `/api/platform/social/cap/generate-image` endpoint generates 1 image per call.
+- Decision: 4 parallel fetch calls via `Promise.allSettled`. Partial failures are silently dropped (successful ones still shown). If all fail, error message shown.
+- Rejected: single call + loop showing the same image 4 times (confusing UX). Rejected: changing the API to accept `count: 4` (scope creep, no schema change needed, but server-side parallel generation belongs in a future slice).
