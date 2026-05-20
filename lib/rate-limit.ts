@@ -47,7 +47,8 @@ export type LimiterName =
   | "cap_assist"
   | "approval_decision"
   | "ai_prefill"
-  | "error_report";
+  | "error_report"
+  | "client_errors";
 
 type LimiterConfig = {
   requests: number;
@@ -122,6 +123,10 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // reports trigger email sends; protects the SendGrid quota and prevents
   // a single user from spamming the admin inbox.
   error_report: { requests: 5, window: "5 m" },
+  // Client error logging (POST /api/errors). 20 per minute per user —
+  // guard against client-side retry loops; must not block legitimate
+  // error bursts during a bad session.
+  client_errors: { requests: 20, window: "1 m" },
 };
 
 export type RateLimitResult =
