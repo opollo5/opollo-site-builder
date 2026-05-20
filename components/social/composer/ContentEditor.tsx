@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { MediaTray } from "@/components/social/composer/MediaTray";
 import { ToolsRow } from "@/components/social/composer/ToolsRow";
+import { LinkPreviewCard, LinkPreviewLoader, type LinkPreviewData } from "@/components/social/composer/LinkPreviewCard";
 
 // ---------------------------------------------------------------------------
 // ContentEditor — controlled textarea + char counter + media tray + tools row.
@@ -42,9 +43,58 @@ export function ContentEditor({
   // Tracks which indices in mediaUrls are GIFs (for MediaTile GIF badge).
   const [gifIndices, setGifIndices] = React.useState<Set<number>>(new Set());
 
+  // Link preview state
+  const [linkPreview, setLinkPreview] = React.useState<LinkPreviewData | null>(null);
+  const [linkPreviewUrl, setLinkPreviewUrl] = React.useState<string | null>(null);
+  const [linkPreviewLoading, setLinkPreviewLoading] = React.useState(false);
+  const [linkPreviewDismissed, setLinkPreviewDismissed] = React.useState<string | null>(null);
+  const linkDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const charCount = value.length;
   const isOverLimit = charCount > maxLength;
   const isNearLimit = !isOverLimit && charCount > maxLength * 0.9;
+
+  // URL detection: debounce 250ms, fetch OG preview for the first URL found
+  React.useEffect(() => {
+    if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current);
+
+    const urlMatch = /https?:\/\/[^\s]+/i.exec(value);
+    const detectedUrl = urlMatch?.[0] ?? null;
+
+    if (!detectedUrl || detectedUrl === linkPreviewDismissed) {
+      setLinkPreview(null);
+      setLinkPreviewUrl(null);
+      setLinkPreviewLoading(false);
+      return;
+    }
+
+    if (detectedUrl === linkPreviewUrl) return;
+
+    setLinkPreviewLoading(true);
+    linkDebounceRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/platform/social/link-preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ company_id: companyId, url: detectedUrl }),
+          });
+          const json = (await res.json()) as { ok: boolean; data?: LinkPreviewData };
+          if (json.data) {
+            setLinkPreview(json.data);
+            setLinkPreviewUrl(detectedUrl);
+          }
+        } catch {
+          // network failure — no preview shown
+        } finally {
+          setLinkPreviewLoading(false);
+        }
+      })();
+    }, 250);
+
+    return () => { if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, companyId, linkPreviewDismissed]);
 
   function insertText(text: string) {
     const el = textareaRef.current;
@@ -131,6 +181,26 @@ export function ContentEditor({
         style={{ minHeight: "100px" }}
         aria-label="Post content"
       />
+
+      {/* Link preview */}
+      {linkPreviewLoading && (
+        <div className="px-4 pb-3">
+          <LinkPreviewLoader />
+        </div>
+      )}
+      {!linkPreviewLoading && linkPreview && linkPreviewUrl && (
+        <div className="px-4 pb-3">
+          <LinkPreviewCard
+            data={linkPreview}
+            url={linkPreviewUrl}
+            onDismiss={() => {
+              setLinkPreviewDismissed(linkPreviewUrl);
+              setLinkPreview(null);
+              setLinkPreviewUrl(null);
+            }}
+          />
+        </div>
+      )}
 
       {/* Media thumbnails above the toolbar */}
       {(mediaUrls.length > 0 || uploading) && (
