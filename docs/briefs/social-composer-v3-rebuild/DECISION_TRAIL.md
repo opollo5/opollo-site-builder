@@ -54,7 +54,7 @@ Autonomous decisions logged here per master prompt operating rules.
 - `process.env.NODE_ENV === 'production'` was incorrect: Vercel sets NODE_ENV=production for BOTH prod and preview deployments, and Playwright CI uses a production build. Page would 404 in all CI e2e runs.
 - Decision: Gate on `NEXT_PUBLIC_SHOW_DEV_ROUTES !== 'true' && NODE_ENV === 'production'`. Set `NEXT_PUBLIC_SHOW_DEV_ROUTES=true` in Playwright's `webServer.env`. Not set in Vercel production → page returns notFound().
 
-**D-012**: gitleaks false-positive — `token:` JS property
-- Phase 1 commit used `token:` as a JS object key for motion token data (e.g., `{ token: "--c3-duration-slow" }`). The generic-api-key rule matched it as a false positive.
-- Decision: Renamed property to `cssVar:` in follow-up commit. Allowlisted the original commit SHA in `.gitleaks.toml` since gitleaks scans all commits in the PR range.
+**D-012**: gitleaks false-positive — JS property named after a CSS token type
+- Phase 1 commit named a JS object property identically to the CSS property type it represented ("duration token"). The generic-api-key gitleaks rule pattern-matched it as a false positive.
+- Decision: Renamed the JS property to `cssVar` in follow-up commit. Allowlisted the original commit SHA in `.gitleaks.toml` since gitleaks scans all commits in the PR range.
 
