@@ -5,13 +5,17 @@ import { cn } from "@/lib/utils";
 import type { Connection, Platform } from "@/lib/social/types";
 import { LinkedInPreviewCard } from "@/components/social/preview/LinkedInPreviewCard";
 import { FacebookPreviewCard } from "@/components/social/preview/FacebookPreviewCard";
+import { InstagramPreviewCard } from "@/components/social/preview/InstagramPreviewCard";
+import { XPreviewCard } from "@/components/social/preview/XPreviewCard";
+import { GoogleBusinessPreviewCard } from "@/components/social/preview/GoogleBusinessPreviewCard";
 
 // ---------------------------------------------------------------------------
 // PreviewCard — renders post content in the visual style of the target platform.
 // Used in the composer right pane and the post analytics modal (PR H).
 //
-// LinkedIn + Facebook delegate to dedicated preview cards (Phase 3.2 / B3).
-// X, Instagram, and GBP/Pinterest/TikTok remain inline until Phase 3.3.
+// LinkedIn + Facebook: Phase 3.2 / B3
+// Instagram, X, GBP: Phase 3.3 / B3
+// Pinterest, TikTok: GenericPreview (no dedicated card yet)
 // ---------------------------------------------------------------------------
 
 export interface PreviewCardProps {
@@ -59,57 +63,6 @@ function AvatarFallback({ name, bg }: { name: string; bg: string }) {
   );
 }
 
-function XPreview({ content, mediaUrls, connection }: Omit<PreviewCardProps, "platform" | "className">) {
-  const truncated = content.length > 280 ? content.slice(0, 280) + "…" : content;
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white text-sm shadow-sm">
-      <div className="flex gap-3 p-4">
-        <AvatarFallback name={connection.account_name} bg={PLATFORM_BG.x} />
-        <div className="min-w-0 flex-1">
-          <p className="font-bold text-gray-900">{connection.account_name}</p>
-          <p className="mt-1 text-gray-800 whitespace-pre-wrap break-words">
-            {truncated || <span className="italic text-gray-400">Your post content will appear here.</span>}
-          </p>
-          {mediaUrls[0] && (
-            <div className="mt-3 overflow-hidden rounded-xl border">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={mediaUrls[0]} alt="" className="w-full object-cover aspect-[16/9]" />
-            </div>
-          )}
-          <div className="mt-2 flex items-center gap-4 text-xs text-gray-500">
-            <span>💬</span>
-            <span>🔁</span>
-            <span>❤️</span>
-            <span>📤</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function InstagramPreview({ content, mediaUrls, connection }: Omit<PreviewCardProps, "platform" | "className">) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-border bg-white text-sm shadow-sm">
-      <div className="flex items-center gap-2 p-3 border-b">
-        <AvatarFallback name={connection.account_name} bg={PLATFORM_BG.instagram} />
-        <p className="font-semibold text-gray-900">{connection.account_name}</p>
-      </div>
-      {mediaUrls[0] ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={mediaUrls[0]} alt="" className="w-full object-cover aspect-square" />
-      ) : (
-        <div className="aspect-square bg-muted flex items-center justify-center text-muted-foreground text-xs">No image</div>
-      )}
-      <div className="p-3">
-        <p className="text-gray-800 whitespace-pre-wrap break-words">
-          {content || <span className="italic text-gray-400">Caption will appear here.</span>}
-        </p>
-      </div>
-    </div>
-  );
-}
-
 function GenericPreview({ platform, content, mediaUrls, connection }: PreviewCardProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-white text-sm shadow-sm">
@@ -153,12 +106,15 @@ export function PreviewCard({ platform, content, mediaUrls, connection, classNam
         <FacebookPreviewCard profile={profile} content={content} media={mediaUrls} />
       )}
       {platform === "x" && (
-        <XPreview content={content} mediaUrls={mediaUrls} connection={connection} />
+        <XPreviewCard profile={profile} content={content} media={mediaUrls} />
       )}
       {platform === "instagram" && (
-        <InstagramPreview content={content} mediaUrls={mediaUrls} connection={connection} />
+        <InstagramPreviewCard profile={profile} content={content} media={mediaUrls} />
       )}
-      {(platform === "google_business_profile" || platform === "pinterest" || platform === "tiktok") && (
+      {platform === "google_business_profile" && (
+        <GoogleBusinessPreviewCard profile={profile} content={content} media={mediaUrls} />
+      )}
+      {(platform === "pinterest" || platform === "tiktok") && (
         <GenericPreview platform={platform} content={content} mediaUrls={mediaUrls} connection={connection} />
       )}
     </div>
