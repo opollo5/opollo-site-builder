@@ -38,3 +38,23 @@ Autonomous decisions logged here per master prompt operating rules.
 - Master prompt says "slice from `assets/Images/social-icons.gif`". A GIF is not sliceable to SVG — it's a raster sprite.
 - Decision: Use the inline SVG paths already defined in the wireframe HTML file (the `<symbol>` elements with id `b-linkedin`, `b-facebook`, etc.). These are the correct brand-correct SVGs. Logging this as the analog source.
 
+**D-008**: Geist font package
+- `next/font/google` in Next.js 14.2.x does not export `Geist` or `Geist_Mono`. These were added in Next.js 15+.
+- Decision: Use the `geist` npm package (published by Vercel). Import `GeistSans` from `geist/font/sans` and `GeistMono` from `geist/font/mono`. CSS variable names are `--font-geist-sans` and `--font-geist-mono`. Updated `--c3-font-display` and `--c3-font-body` in globals.css to reference `--font-geist-sans`.
+
+**D-009**: lucide-react package
+- `lucide-react` not installed. Specified by the master prompt as the icon library for all composer v3 components.
+- Decision: Install it alongside `geist`. Open-source MIT package; not an external API vendor.
+
+**D-010**: hex-color unit test exclusion for `(dev)/`
+- `lib/__tests__/design-tokens.unit.test.ts` flags hex colors in style/className attributes. The `(dev)/design-system/page.tsx` IS the visual token catalog and legitimately contains hex colors.
+- Decision: Add `!f.includes("(dev)")` to the test filter for the hex-color rule.
+
+**D-011**: Design system page gate
+- `process.env.NODE_ENV === 'production'` was incorrect: Vercel sets NODE_ENV=production for BOTH prod and preview deployments, and Playwright CI uses a production build. Page would 404 in all CI e2e runs.
+- Decision: Gate on `NEXT_PUBLIC_SHOW_DEV_ROUTES !== 'true' && NODE_ENV === 'production'`. Set `NEXT_PUBLIC_SHOW_DEV_ROUTES=true` in Playwright's `webServer.env`. Not set in Vercel production → page returns notFound().
+
+**D-012**: gitleaks false-positive — `token:` JS property
+- Phase 1 commit used `token:` as a JS object key for motion token data (e.g., `{ token: "--c3-duration-slow" }`). The generic-api-key rule matched it as a false positive.
+- Decision: Renamed property to `cssVar:` in follow-up commit. Allowlisted the original commit SHA in `.gitleaks.toml` since gitleaks scans all commits in the PR range.
+
