@@ -143,3 +143,29 @@ Autonomous decisions logged here per master prompt operating rules.
 - Spec says "Shows 4 generated variations." The `/api/platform/social/cap/generate-image` endpoint generates 1 image per call.
 - Decision: 4 parallel fetch calls via `Promise.allSettled`. Partial failures are silently dropped (successful ones still shown). If all fail, error message shown.
 - Rejected: single call + loop showing the same image 4 times (confusing UX). Rejected: changing the API to accept `count: 4` (scope creep, no schema change needed, but server-side parallel generation belongs in a future slice).
+
+---
+
+## Phase 6.1 — Interaction polish (2026-05-21)
+
+**D-039**: c3 animation keyframes added to globals.css
+- `c3-modal-in` (320ms scale 0.96→1 + fade), `c3-modal-out` (200ms scale 1→0.97 + fade), `c3-panel-in` (200ms translateY(-8px)→0 + fade), `c3-save-pulse` (1.2s opacity loop), `c3-toast-in` (200ms translateY(12px)→0 + fade).
+- All added to the `@media (prefers-reduced-motion: reduce)` block: `animation-duration: var(--c3-duration-fast) !important; transform: none !important`.
+- Decision: named keyframes in globals.css (not Tailwind arbitrary) so they can be referenced by name in the Tailwind inline `animate-[...]` syntax for Radix state variants.
+
+**D-040**: Dialog entrance animation uses Tailwind `data-[state=open]:animate-[...]` not CSS class names
+- Radix Dialog applies `data-state="open"` as a DOM attribute at mount. Using Tailwind class names like `.opollo-fade-in` directly in the className doesn't apply when the attribute changes — you need the `data-[state=...]` Tailwind variant to generate the correct CSS selector.
+- Initial decision: `data-[state=open]:animate-[c3-modal-in_320ms_cubic-bezier(0.22,1,0.36,1)_both]` + matching closed variant.
+- Revised (D-043): Reverted `dialog.tsx` to `opollo-fade-in`/`opollo-fade-out` — see D-043.
+
+**D-043**: Radix Dialog animation reverted to `opollo-fade-in`/`opollo-fade-out`
+- The `animate-[c3-modal-in_..._both]` Tailwind syntax on `DialogContent` broke Playwright's click actionability in headless Chromium. Root cause: `fill-mode: both` + scale transform caused Radix's `animationend` lifecycle to not fire correctly in CI, preventing the dialog from unmounting after close. Tests `analytics H-4` and `briefs-review-M12-1` failed consistently across two runs.
+- Decision: Revert `dialog.tsx` to use `data-[state=open]:opollo-fade-in data-[state=closed]:opollo-fade-out` (opacity-only, 150ms). The ComposerOverlay itself is NOT a Radix Dialog — it uses a custom div — so its `c3-modal-in` class is unaffected and the scale animation still plays there.
+
+**D-041**: Keyboard shortcuts implemented via DOM querySelector in ComposerOverlay
+- All shortcuts (⌘↵, ⌘S, ⌘⇧S, ⌘K, ⌘E, ⌘I, ⌘1-5, ?, Esc) handled in a single `document.addEventListener('keydown')` in ComposerOverlay.
+- For ⌘E (emoji) and ⌘I (media): uses `overlayRef.current?.querySelector('[data-testid="..."]')?.click()` to trigger the toolbar button. This avoids threading callbacks through 3 component levels (Overlay → Editor → ContentEditor → ToolsRow).
+- Rejected: React context / useImperativeHandle — too much infrastructure for 2 shortcuts.
+
+**D-042**: `?` keyboard shortcut ignores input/textarea focus
+- The `?` handler checks `!(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)` before toggling the shortcuts panel. This prevents the `?` character from being intercepted while the user is typing.

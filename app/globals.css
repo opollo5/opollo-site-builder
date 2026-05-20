@@ -633,6 +633,58 @@
   --c3-z-tooltip: 1200;
 }
 
+/* ── c3 animation utility classes ────────────────────────────────────────── */
+
+/* Modal entrance: 320ms scale 0.96 → 1 + fade. Applied to full-screen overlay. */
+.c3-modal-in {
+  animation: c3-modal-in var(--c3-duration-slow) var(--c3-ease-snap) both;
+}
+
+/* Modal exit: 200ms scale 1 → 0.97 + fade. */
+.c3-modal-out {
+  animation: c3-modal-out var(--c3-duration-base) var(--c3-ease-out) both;
+}
+
+/* Tool-panel entrance: 200ms slide down 8px + fade. */
+.c3-panel-in {
+  animation: c3-panel-in var(--c3-duration-base) var(--c3-ease-snap) both;
+}
+
+/* Save indicator pulse: 1.2s opacity 1 → 0.6 → 1 loop. */
+.c3-save-pulse {
+  animation: c3-save-pulse 1.2s var(--c3-ease-out) infinite;
+}
+
+/* Toast entrance: 200ms slide up 12px + fade. */
+.c3-toast-in {
+  animation: c3-toast-in var(--c3-duration-base) var(--c3-ease-spring) both;
+}
+
+@keyframes c3-modal-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes c3-modal-out {
+  from { opacity: 1; transform: scale(1);    }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+
+@keyframes c3-panel-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes c3-save-pulse {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes c3-toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
 /* Reduced motion — collapse all c3 transitions to opacity-only at 120ms */
 @media (prefers-reduced-motion: reduce) {
   .c3-motion *,
@@ -640,6 +692,16 @@
   .c3-motion *::after {
     animation-duration: var(--c3-duration-fast) !important;
     transition-duration: var(--c3-duration-fast) !important;
+    animation-iteration-count: 1 !important;
+    transform: none !important;
+  }
+
+  .c3-modal-in,
+  .c3-modal-out,
+  .c3-panel-in,
+  .c3-save-pulse,
+  .c3-toast-in {
+    animation-duration: var(--c3-duration-fast) !important;
     animation-iteration-count: 1 !important;
     transform: none !important;
   }
