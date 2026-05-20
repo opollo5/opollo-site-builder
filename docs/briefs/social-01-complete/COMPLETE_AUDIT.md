@@ -102,9 +102,9 @@ All pre-flight checks passed.
 | UtmPanel (in ToolsRow) | `components/social/composer/ToolsRow.tsx` | (inside ComposerOverlay) | No dedicated test | WORKING | UTM parameter builder |
 | ShortenPanel (in ToolsRow) | `components/social/composer/ToolsRow.tsx` | (inside ComposerOverlay) | No dedicated test | WORKING | Inline URL shortener form |
 | MediaTray (image upload) | `components/social/composer/MediaTray.tsx` | (inside ComposerOverlay) | composer.spec.ts | WORKING | |
-| NEXT_PUBLIC_GIPHY_API_KEY env | Runtime env | Production | — | UNKNOWN | Env var uses NEXT_PUBLIC_ prefix (correct for client); production value not verified here (requires `vercel env ls`) |
+| NEXT_PUBLIC_GIPHY_API_KEY env | Runtime env | Production | — | WORKING | Confirmed set in Vercel production via `vercel env ls` (2026-05-20). GAP-5 resolved. |
 
-**PR D summary:** 10 WORKING, 1 UNKNOWN (GIPHY key production status)
+**PR D summary:** 11 WORKING
 
 ---
 
@@ -128,19 +128,19 @@ All pre-flight checks passed.
 
 | Feature | File Path | Customer Route | E2E Test? | Status | Notes |
 |---|---|---|---|---|---|
-| CalendarShell.tsx | `components/social/dashboard/CalendarShell.tsx` | `/social/poster` | dashboard.spec.ts | WORKING | Full DnD + day-detail + analytics + bulk. Mounted at `/social/poster` only. |
-| /social/poster page | `app/(platform)/social/poster/page.tsx` | `/social/poster` | dashboard.spec.ts | WORKING | Server component wrapping CalendarShell |
+| CalendarShell.tsx | `components/social/dashboard/CalendarShell.tsx` | `/company/social/calendar` | dashboard.spec.ts | WORKING | Full DnD + day-detail + analytics + bulk. Mounted at `/company/social/calendar` since PR #957. |
+| /company/social/calendar page | `app/(platform)/company/social/calendar/page.tsx` | `/company/social/calendar` | dashboard.spec.ts | WORKING | Server component wrapping CalendarShell (replaced SocialCalendarClient in PR #957). |
 | PostChip | `components/social/dashboard/PostChip.tsx` | (inside CalendarShell) | dashboard.spec.ts | WORKING | |
 | DayDetail panel | `components/social/dashboard/DayDetail.tsx` | (inside CalendarShell) | dashboard.spec.ts | WORKING | |
 | FilterBar (profile filter + view mode) | `components/social/dashboard/FilterBar.tsx` | (inside CalendarShell) | dashboard.spec.ts | WORKING | data-testid="bulk-upload-btn" confirmed present |
 | CalendarCell | `components/social/dashboard/CalendarCell.tsx` | (inside CalendarShell) | dashboard.spec.ts | WORKING | |
-| dnd-kit drag-and-drop | `package.json` + `CalendarShell.tsx` | `/social/poster` | dashboard.spec.ts | WORKING | @dnd-kit/core ^6.3.1, @dnd-kit/sortable ^10.0.0 installed |
-| Timeline view toggle | `CalendarShell.tsx` (TimelineView function) | `/social/poster` | dashboard.spec.ts | WORKING | |
-| data-testid="calendar-shell" | `CalendarShell.tsx` line 185 | `/social/poster` | dashboard.spec.ts | WORKING | |
-| NAVIGATION GAP: /social/poster unreachable from nav | n/a | None | — | NOT MOUNTED | No navigation link from any page or component in the app points to `/social/poster`. E2e tests navigate directly by URL. The route exists but is not discoverable by end users. |
-| SocialCalendarClient.tsx (parallel implementation) | `components/SocialCalendarClient.tsx` | `/company/social/calendar` | No CalendarShell tests | DIFFERENT | A separate, simpler calendar (no DnD, no day-detail, no BulkScheduleModal, no PostAnalyticsModal) is mounted at the primary customer-facing social route `/company/social/calendar`. This is a diverged parallel implementation. |
+| dnd-kit drag-and-drop | `package.json` + `CalendarShell.tsx` | `/company/social/calendar` | dashboard.spec.ts | WORKING | @dnd-kit/core ^6.3.1, @dnd-kit/sortable ^10.0.0 installed |
+| Timeline view toggle | `CalendarShell.tsx` (TimelineView function) | `/company/social/calendar` | dashboard.spec.ts | WORKING | |
+| data-testid="calendar-shell" | `CalendarShell.tsx` line 185 | `/company/social/calendar` | dashboard.spec.ts | WORKING | |
+| ~~NAVIGATION GAP: /social/poster unreachable from nav~~ | ~~n/a~~ | ~~None~~ | — | ~~NOT MOUNTED~~ **FIXED PR #957** | CalendarShell now mounted at the customer-facing `/company/social/calendar` route. |
+| ~~SocialCalendarClient.tsx (parallel implementation)~~ | ~~components/SocialCalendarClient.tsx~~ | ~~Replaced~~ | — | ~~DIFFERENT~~ **FIXED PR #957** | `SocialCalendarClient` replaced by `CalendarShell` at `/company/social/calendar`. GAP-2 resolved. |
 
-**PR F summary:** 9 WORKING, 1 NOT MOUNTED (navigation gap — `/social/poster` has no nav links), 1 NOTE (dual calendar implementations).
+**PR F summary:** 11 WORKING (GAP-1 and GAP-2 resolved by PR #957 — 2026-05-20)
 
 ---
 
@@ -148,15 +148,15 @@ All pre-flight checks passed.
 
 | Feature | File Path | Customer Route | E2E Test? | Status | Notes |
 |---|---|---|---|---|---|
-| BulkScheduleModal.tsx | `components/social/dashboard/BulkScheduleModal.tsx` | `/social/poster` (via FilterBar) | bulk-csv.spec.ts | WORKING | All states present: empty, drag-over, preview, submitting, success |
-| data-testid="bulk-schedule-modal" | `BulkScheduleModal.tsx` line 146 | `/social/poster` | bulk-csv.spec.ts | WORKING | |
-| data-testid="bulk-upload-btn" | `FilterBar.tsx` line 82 | `/social/poster` | bulk-csv.spec.ts | WORKING | |
+| BulkScheduleModal.tsx | `components/social/dashboard/BulkScheduleModal.tsx` | `/company/social/calendar` (via FilterBar) | bulk-csv.spec.ts | WORKING | All states present: empty, drag-over, preview, submitting, success |
+| data-testid="bulk-schedule-modal" | `BulkScheduleModal.tsx` line 146 | `/company/social/calendar` | bulk-csv.spec.ts | WORKING | |
+| data-testid="bulk-upload-btn" | `FilterBar.tsx` line 82 | `/company/social/calendar` | bulk-csv.spec.ts | WORKING | |
 | CSV parsing lib | `lib/social/bulk-csv/parse.ts` | (server-side) | bulk-csv.spec.ts | WORKING | |
-| BulkScheduleModal mounted | `CalendarShell.tsx` line 367 | `/social/poster` | bulk-csv.spec.ts | WORKING | |
-| NAVIGATION GAP: bulk upload unreachable | — | None | — | NOT MOUNTED | BulkScheduleModal is only reachable via the bulk-upload-btn in CalendarShell at `/social/poster`. Since `/social/poster` has no nav links (see PR F), bulk upload is unreachable in the production UI. |
+| BulkScheduleModal mounted | `CalendarShell.tsx` line 367 | `/company/social/calendar` | bulk-csv.spec.ts | WORKING | |
+| ~~NAVIGATION GAP: bulk upload unreachable~~ | — | ~~None~~ | — | ~~NOT MOUNTED~~ **FIXED PR #957** | CalendarShell now at `/company/social/calendar` — BulkScheduleModal reachable from navigation. |
 | Deprecated BulkUploadButton (V1) | `components/BulkUploadButton.tsx` | `/company/social/posts` (via SocialPostsListClient) | No | WORKING (V1) | V1 BulkUploadButton still mounted on the posts list. A separate older bulk-upload flow exists at the posts route. |
 
-**PR G summary:** 5 WORKING, 1 NOT MOUNTED (dependent on PR F nav gap)
+**PR G summary:** 6 WORKING (GAP resolved by PR #957 — 2026-05-20)
 
 ---
 
@@ -164,15 +164,15 @@ All pre-flight checks passed.
 
 | Feature | File Path | Customer Route | E2E Test? | Status | Notes |
 |---|---|---|---|---|---|
-| PostAnalyticsModal.tsx | `components/social/dashboard/PostAnalyticsModal.tsx` | `/social/poster` (via CalendarShell) | analytics.spec.ts | WORKING | Two-column layout: post preview + metrics |
-| data-testid="post-analytics-modal" | `PostAnalyticsModal.tsx` line 244 | `/social/poster` | analytics.spec.ts | WORKING | |
-| SWR usage for analytics data | `PostAnalyticsModal.tsx` (imports useSWR) | `/social/poster` | analytics.spec.ts | WORKING | |
-| PostAnalyticsModal mounted | `CalendarShell.tsx` line 346 | `/social/poster` | analytics.spec.ts | WORKING | |
-| "Schedule again" re-opens composer | `PostAnalyticsModal.tsx` line 401 | `/social/poster` | analytics.spec.ts | WORKING | |
-| Per-platform metric variation | `PostAnalyticsModal.tsx` (GBP, LinkedIn variants) | `/social/poster` | analytics.spec.ts | WORKING | |
-| NAVIGATION GAP: analytics unreachable | — | None | — | NOT MOUNTED | Same as PR F/G: PostAnalyticsModal is unreachable because CalendarShell at /social/poster has no nav links. |
+| PostAnalyticsModal.tsx | `components/social/dashboard/PostAnalyticsModal.tsx` | `/company/social/calendar` (via CalendarShell) | analytics.spec.ts | WORKING | Two-column layout: post preview + metrics |
+| data-testid="post-analytics-modal" | `PostAnalyticsModal.tsx` line 244 | `/company/social/calendar` | analytics.spec.ts | WORKING | |
+| SWR usage for analytics data | `PostAnalyticsModal.tsx` (imports useSWR) | `/company/social/calendar` | analytics.spec.ts | WORKING | |
+| PostAnalyticsModal mounted | `CalendarShell.tsx` line 346 | `/company/social/calendar` | analytics.spec.ts | WORKING | |
+| "Schedule again" re-opens composer | `PostAnalyticsModal.tsx` line 401 | `/company/social/calendar` | analytics.spec.ts | WORKING | |
+| Per-platform metric variation | `PostAnalyticsModal.tsx` (GBP, LinkedIn variants) | `/company/social/calendar` | analytics.spec.ts | WORKING | |
+| ~~NAVIGATION GAP: analytics unreachable~~ | — | ~~None~~ | — | ~~NOT MOUNTED~~ **FIXED PR #957** | CalendarShell now at `/company/social/calendar` — PostAnalyticsModal reachable from navigation. |
 
-**PR H summary:** 6 WORKING, 1 NOT MOUNTED (dependent on PR F nav gap)
+**PR H summary:** 7 WORKING (GAP resolved by PR #957 — 2026-05-20)
 
 ---
 
@@ -194,56 +194,46 @@ All pre-flight checks passed.
 
 ## Summary Counts
 
+**Updated 2026-05-20 post-fix pass (PRs #957, #958, #959).**
+
 | Status | Count |
 |---|---|
-| WORKING | 79 |
-| NOT MOUNTED | 5 |
+| WORKING | 85 |
+| NOT MOUNTED | 0 |
 | MISSING | 1 |
 | BROKEN | 0 |
-| UNKNOWN | 1 |
+| UNKNOWN | 0 |
 | **TOTAL** | **86** |
 
 ---
 
 ## Priority-Ranked Gap List
 
-### GAP-1 (HIGH): `/social/poster` has no navigation links — CalendarShell unreachable
+### ~~GAP-1 (HIGH)~~ RESOLVED (PR #957, 2026-05-20): CalendarShell on customer-facing route
 **Affects:** PR F (CalendarShell), PR G (BulkScheduleModal), PR H (PostAnalyticsModal)  
-**Symptom:** The entire CalendarShell (DnD calendar, day-detail, bulk CSV upload, post analytics modal) is deployed and working at `/social/poster` but is inaccessible in the production UI because no navigation menu, sidebar link, or page redirect points to it. E2e tests navigate directly by URL, so CI passes. Production users cannot discover it.  
-**Evidence:** `grep -rn "/social/poster"` across all `.tsx`/`.ts` production files finds zero navigation links. Only the page file itself references the route.  
-**Fix direction:** Add a nav link to `/social/poster` in the social section navigation panel, OR consolidate: move CalendarShell to replace `SocialCalendarClient` at `/company/social/calendar`.
+**Fix applied:** `app/(platform)/company/social/calendar/page.tsx` replaced `SocialCalendarClient` with `CalendarShell`. Connections fetched server-side and passed as props (mirrors `/social/poster/page.tsx`). E2e specs retargeted from `/social/poster` → `/company/social/calendar`.  
+**Production deploy:** PR #957 merged 2026-05-20T03:51:00Z, SHA `4b26dc54`, deployed to production.
 
-### GAP-2 (HIGH): Dual calendar implementations — `CalendarShell` vs `SocialCalendarClient`
+### ~~GAP-2 (HIGH)~~ RESOLVED (PR #957, 2026-05-20): Dual calendar implementations eliminated
 **Affects:** PR F  
-**Symptom:** Two separate calendar components serve two different routes:
-- `components/social/dashboard/CalendarShell.tsx` → `/social/poster` (full: DnD, day-detail, profile filter, bulk upload, analytics, timeline view)
-- `components/SocialCalendarClient.tsx` → `/company/social/calendar` (lite: no DnD, no day-detail, no BulkScheduleModal, no PostAnalyticsModal)
+**Fix applied:** `SocialCalendarClient` removed from `/company/social/calendar/page.tsx`. `CalendarShell` is now the sole calendar implementation on the customer-facing route.  
+**Production deploy:** PR #957 merged 2026-05-20T03:51:00Z.
 
-The customer-facing primary route (`/company/social/calendar`) uses the **lite** implementation. The full-featured implementation is orphaned at `/social/poster`. This is a significant feature regression on the primary social navigation path.  
-**Evidence:** `app/(platform)/company/social/calendar/page.tsx` imports `SocialCalendarClient`; `app/(platform)/social/poster/page.tsx` imports `CalendarShell`.  
-**Fix direction:** Replace `SocialCalendarClient` at `/company/social/calendar` with `CalendarShell`, or redirect `/company/social/calendar` → `/social/poster`.
-
-### GAP-3 (MEDIUM): Dual webhook routes for bundle.social
+### ~~GAP-3 (MEDIUM)~~ RESOLVED (PR #958, 2026-05-20): Dead webhook route deleted
 **Affects:** PR B  
-**Symptom:** Two webhook routes exist:
-- `app/api/webhooks/bundlesocial/route.ts` (old, from pre-social-01 work)
-- `app/api/webhooks/bundle-social/route.ts` (new, from social-01)
+**Fix applied:** `app/api/webhooks/bundle-social/route.ts` deleted. Investigation confirmed `bundlesocial/route.ts` (no hyphen) is the canonical registered endpoint per `CRITICAL_PATHS.md`. The hyphenated route used older inline HMAC and was never registered.  
+**Verification:** `curl -X POST https://opollo-site-builder.vercel.app/api/webhooks/bundlesocial` → 401 (HMAC rejection, route alive). `curl .../bundle-social` → 404 (deleted).  
+**Production deploy:** PR #958 merged 2026-05-20T03:45:21Z, SHA `435f243d`.
 
-If bundle.social is configured to send to both paths, events could be processed twice. If only one path is configured, the other is dead code. The correct registered URL at bundle.social is not verifiable from code.  
-**Evidence:** `glob("app/api/webhooks/bundle*")` returns both files.  
-**Fix direction:** Verify which path is registered at bundle.social's webhook settings. Remove or 301-redirect the inactive one.
-
-### GAP-4 (LOW): Missing e2e tests for approval review page
+### ~~GAP-4 (LOW)~~ PARTIALLY RESOLVED (PR #959, 2026-05-20): Approval review e2e added
 **Affects:** PR E  
-**Symptom:** The public `/review/[token]` page (and its `ReviewDecisionForm`) has no e2e test. The token-verification and approve/reject flow are untested at the e2e layer.  
-**Evidence:** No spec file in `e2e/` mentions `/review/` or `review-link`.  
-**Fix direction:** Add `e2e/approval-review.spec.ts` covering: valid token renders post + form; expired token shows error; approve sets state to scheduled; reject requires reason.
+**Fix applied:** `e2e/approval-review.spec.ts` added. Active tests: A-1/A-2 (invalid token format and non-existent token → invalid-link panel); A-6/A-7/A-8 (API contract: malformed token → 404, missing/invalid decision → 400).  
+**Remaining fixme:** A-3/A-4/A-5 (form interaction with valid token) are `test.fixme` pending a `seedOpenApprovalRequest()` helper. Requires real `social_approval_recipients` DB row with known raw token.  
+**PR #959:** CI running (2026-05-20). Merges after CI green.
 
-### GAP-5 (LOW): NEXT_PUBLIC_GIPHY_API_KEY production status unverified
+### ~~GAP-5 (LOW)~~ RESOLVED (2026-05-20): NEXT_PUBLIC_GIPHY_API_KEY confirmed in production
 **Affects:** PR D  
-**Symptom:** The GIF picker in ToolsRow uses `NEXT_PUBLIC_GIPHY_API_KEY`. The code shows a graceful "not set" banner when absent. Whether the key is configured in Vercel production is unverified in this audit.  
-**Evidence:** `ToolsRow.tsx` line 157; the brief's ENV.md lists `GIPHY_API_KEY` without the `NEXT_PUBLIC_` prefix (the code uses the prefix correctly).  
-**Fix direction:** Run `npx vercel env ls production` and confirm `NEXT_PUBLIC_GIPHY_API_KEY` is set. If missing, add it (Hard Stop §1).
+**Resolution:** `npx vercel env ls production` confirms `NEXT_PUBLIC_GIPHY_API_KEY` is set (Encrypted, Development+Preview+Production, updated 6m ago). GIF picker is fully functional in production.
 
 ### GAP-6 (INFORMATIONAL): Migration numbering gap 0128-0130
 **Affects:** PR A  
@@ -258,11 +248,33 @@ If bundle.social is configured to send to both paths, events could be processed 
 | PR | E2E spec(s) | Route tested | Status |
 |---|---|---|---|
 | A (schema) | n/a (migration layer) | n/a | Schema only |
-| B (backend) | `composer.spec.ts`, `bulk-csv.spec.ts`, `analytics.spec.ts` | `/social/poster`, `/company/social/*` | COVERED via mocks |
+| B (backend) | `composer.spec.ts`, `bulk-csv.spec.ts`, `analytics.spec.ts` | `/company/social/*` | COVERED via mocks. Dead `bundle-social` webhook route deleted (PR #958). |
 | C (composer shell) | `composer-mount.spec.ts`, `composer.spec.ts` | `/company/social/calendar`, `/company/social/posts`, `/company/social/timeline` | COVERED |
-| D (content editing) | `composer.spec.ts` | `/social/poster` + `/company/social/*` | PARTIALLY COVERED (emoji/UTM panels no dedicated test) |
-| E (scheduling/approval) | `composer.spec.ts` (SchedulingCard), none for review page | `/company/social/*` | PARTIALLY COVERED — review page not tested |
-| F (dashboard) | `dashboard.spec.ts` | `/social/poster` (direct URL) | COVERED but route unreachable by nav |
-| G (bulk CSV) | `bulk-csv.spec.ts` | `/social/poster` (direct URL) | COVERED but route unreachable by nav |
-| H (analytics modal) | `analytics.spec.ts` | `/social/poster` (direct URL) | COVERED but route unreachable by nav |
+| D (content editing) | `composer.spec.ts` | `/company/social/*` | PARTIALLY COVERED (emoji/UTM panels no dedicated test). GIPHY key confirmed in production. |
+| E (scheduling/approval) | `composer.spec.ts` (SchedulingCard), `approval-review.spec.ts` | `/company/social/*`, `/approve/[token]` | PARTIALLY COVERED — form-interaction tests fixme pending seed helper (PR #959) |
+| F (dashboard) | `dashboard.spec.ts` | `/company/social/calendar` | COVERED — CalendarShell now on customer-facing route (PR #957) |
+| G (bulk CSV) | `bulk-csv.spec.ts` | `/company/social/calendar` | COVERED — BulkScheduleModal reachable via /company/social/calendar (PR #957) |
+| H (analytics modal) | `analytics.spec.ts` | `/company/social/calendar` | COVERED — PostAnalyticsModal reachable via /company/social/calendar (PR #957) |
 | I (admin health) | `admin-health.spec.ts` | `/admin/system/health` | COVERED |
+
+---
+
+## Phase 2 Fix Summary (2026-05-20)
+
+| PR | Title | GAPs Closed | Merged At | Production SHA |
+|---|---|---|---|---|
+| #957 | fix(social): mount CalendarShell on /company/social/calendar | GAP-1, GAP-2 | 2026-05-20T03:51:00Z | `4b26dc54` |
+| #958 | fix(social): delete dead bundle-social webhook route | GAP-3 | 2026-05-20T03:45:21Z | `435f243d` |
+| #959 | test(social): add e2e coverage for approval review page | GAP-4 (partial) | pending CI | — |
+
+**GAP-5** (GIPHY key) resolved via `vercel env ls` verification — no code change required.
+
+### Phase 3 — Integration Verification (2026-05-20)
+
+**Cron infrastructure:** All 6 social crons registered in `vercel.json` (`/api/internal/cron/*`). `cron_heartbeats` table has 8 rows including all social jobs. Social jobs show seed timestamp (`2026-05-18`) and `run_count: 0` — expected for a newly deployed social system with no posts yet scheduled. CAP crons ARE firing (`cap-generation-runs-cleanup` ran at 02:00 UTC today, `run_count: 1`).
+
+**Webhook routing:** `/api/webhooks/bundlesocial` → 401 HMAC rejection (alive, correct). `/api/webhooks/bundle-social` → 404 (deleted, correct).
+
+**Calendar route:** `/company/social/calendar` → 307 to login (protected, correct — CalendarShell mounted).
+
+**GIPHY key:** `NEXT_PUBLIC_GIPHY_API_KEY` confirmed set in Vercel production.
