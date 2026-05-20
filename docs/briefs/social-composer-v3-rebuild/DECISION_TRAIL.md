@@ -103,3 +103,23 @@ Autonomous decisions logged here per master prompt operating rules.
 - Need to display GIF badge on MediaTile for GIFs. Options: (a) change `media_urls: string[]` to `media_items: {url, type}[]`, (b) add a parallel `Set<number>` tracking GIF indices.
 - Decision: Option (b). No schema change. `Draft` type (`lib/social/types.ts`) stays `media_urls: string[]`. `ContentEditor` owns a local `gifIndices: Set<number>` state. On remove, indices shift correctly. Badge is cosmetic — GIFs are valid images; the server accepts them identically.
 
+---
+
+## Phase 4.1 — Emoji picker rebuild (B1) (2026-05-20)
+
+**D-032**: localStorage instead of user_preferences for emoji prefs
+- Master prompt says persist `frequently_used` and `skin_tone` in `user_preferences`. That table doesn't exist in the DB (no migration found). Operating rules say "No schema changes beyond `client_errors`".
+- Decision: `localStorage` under `composer_emoji_skin_tone`. Frequently-used tracking is handled internally by `emoji-picker-react` (it writes to `epr_suggested` in localStorage). If `user_preferences` is provisioned in a future phase, these keys can be migrated.
+
+**D-033**: emoji-picker-react v4 — CategoryConfig[] required, not Categories[]
+- The `categories` prop type is `CategoryConfig[] = Array<{ category: Categories; name: string; icon?: ReactNode }>`. Passing plain `Categories[]` fails TS2322.
+- Decision: Explicit `CategoryConfig[]` array with `name` strings per category. This also makes category headings readable in the picker UI.
+
+**D-034**: emoji-picker-react mock in component tests
+- The real library requires `ResizeObserver`, canvas measurements, and complex DOM APIs not available in jsdom.
+- Decision: `vi.mock("emoji-picker-react")` with a lightweight fake that renders test-id-bearing buttons. Real picker behaviour is covered by e2e (EP-1 to EP-5). Pattern follows how `GifPanel` tests mock fetch.
+
+**D-035**: EmojiPickerPanel extracted to own file
+- ToolsRow already has 700+ lines. The picker imports emoji-picker-react (heavy dependency) and would significantly slow the ToolsRow bundle if inlined.
+- Decision: `components/social/composer/EmojiPickerPanel.tsx` as a separate client component. ToolsRow imports it; Next.js code-splits it automatically since it's only rendered when `activePanel === "emoji"`.
+
