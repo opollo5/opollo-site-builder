@@ -1,8 +1,9 @@
 /**
  * Component tests for Phase 3.3 preview cards: Instagram, X, GBP
  */
+import { describe, it, expect } from "vitest";
 import * as React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { InstagramPreviewCard } from "@/components/social/preview/InstagramPreviewCard";
 import { XPreviewCard } from "@/components/social/preview/XPreviewCard";
