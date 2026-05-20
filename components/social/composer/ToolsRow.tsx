@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logClientError } from "@/lib/errors/logClientError";
 
 // ---------------------------------------------------------------------------
 // ToolsRow — composer toolbar: AI assistant, Media, Emoji, GIF, Shorten URL,
@@ -35,6 +37,124 @@ const QUICK_EMOJI = [
 // AI assistant panel
 // ---------------------------------------------------------------------------
 
+type AiErrorState = {
+  category: "rate_limit" | "timeout" | "content_rejected" | "network" | "overloaded" | "unknown";
+  message: string;
+  trace_id: string;
+  retry_after?: number;
+  can_retry: boolean;
+};
+
+// Haiku 4.5 pricing: $0.08 / MTok input, $0.40 / MTok output (micro-cents).
+// Rough estimate: system ~250 tokens + prompt tokens → input; max_tokens=512 output.
+function estimateCost(promptChars: number): string {
+  const estimatedInputTokens = 250 + Math.ceil(promptChars / 4);
+  const estimatedOutputTokens = 200;
+  const inputCents = (estimatedInputTokens / 1_000_000) * 0.08;
+  const outputCents = (estimatedOutputTokens / 1_000_000) * 0.40;
+  const totalDollars = (inputCents + outputCents) / 100;
+  return totalDollars < 0.001
+    ? "< $0.001"
+    : `$${totalDollars.toFixed(4)}`;
+}
+
+function TraceIdBadge({ traceId }: { traceId: string }) {
+  const [copied, setCopied] = React.useState(false);
+
+  function copy() {
+    void navigator.clipboard.writeText(traceId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      <span className="font-mono text-xs text-muted-foreground" data-testid="ai-trace-id">
+        trace_id: {traceId}
+      </span>
+      <button
+        type="button"
+        onClick={copy}
+        aria-label="Copy trace ID"
+        className="text-muted-foreground hover:text-foreground transition-colors"
+      >
+        {copied ? <Check size={10} aria-hidden /> : <Copy size={10} aria-hidden />}
+      </button>
+    </div>
+  );
+}
+
+function AiErrorDisplay({
+  err,
+  onRetry,
+  onEdit,
+  retryCount,
+}: {
+  err: AiErrorState;
+  onRetry: () => void;
+  onEdit: () => void;
+  retryCount: number;
+}) {
+  const [countdown, setCountdown] = React.useState(err.retry_after ?? 0);
+
+  React.useEffect(() => {
+    if (!err.retry_after) return;
+    setCountdown(err.retry_after);
+    const id = setInterval(() => {
+      setCountdown((n) => {
+        if (n <= 1) { clearInterval(id); return 0; }
+        return n - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [err.retry_after, err.trace_id]);
+
+  const retryLabel =
+    err.category === "rate_limit" && countdown > 0
+      ? `Retry in ${countdown}s`
+      : err.category === "overloaded"
+      ? `Attempt ${retryCount} of 3 · retrying…`
+      : "Retry";
+
+  const isRetryDisabled = err.category === "rate_limit" && countdown > 0;
+
+  return (
+    <div role="alert" aria-live="assertive" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs" data-testid="ai-error-display">
+      <p className="font-medium text-destructive">{err.category === "rate_limit" ? "Anthropic API rate-limited" : err.category === "overloaded" ? "Anthropic model is busy" : err.category === "timeout" ? "Generation timed out" : err.category === "network" ? "Network error" : err.category === "content_rejected" ? "Content rejected" : "Generation failed"}</p>
+      <p className="mt-1 text-muted-foreground">{err.message}</p>
+      <div className="mt-2 flex gap-2">
+        {err.can_retry && err.category !== "overloaded" && (
+          <button
+            type="button"
+            onClick={onRetry}
+            disabled={isRetryDisabled}
+            className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
+          >
+            {retryLabel}
+          </button>
+        )}
+        {err.category === "content_rejected" && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted transition-colors"
+          >
+            Edit prompt
+          </button>
+        )}
+        {err.category === "timeout" && (
+          <span className="self-center text-xs text-muted-foreground">Shorten your prompt to speed up generation.</span>
+        )}
+        {err.category === "network" && (
+          <span className="self-center text-xs text-muted-foreground">Check your connection.</span>
+        )}
+      </div>
+      <TraceIdBadge traceId={err.trace_id} />
+    </div>
+  );
+}
+
 function AiPanel({
   companyId,
   onInsert,
@@ -47,40 +167,87 @@ function AiPanel({
   const [prompt, setPrompt] = React.useState("");
   const [tone, setTone] = React.useState<"professional" | "casual" | "playful">("professional");
   const [length, setLength] = React.useState<"short" | "medium" | "long">("medium");
+  const [goal, setGoal] = React.useState<"educate" | "promote" | "announce" | "engage">("engage");
   const [loading, setLoading] = React.useState(false);
+  const [retryCount, setRetryCount] = React.useState(0);
   const [result, setResult] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<AiErrorState | null>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
 
-  async function generate() {
+  async function generate(attempt = 1): Promise<void> {
     if (!prompt.trim()) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setRetryCount(attempt);
+
+    abortRef.current = new AbortController();
+
     try {
       const res = await fetch("/api/platform/social/cap/assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId, prompt: prompt.trim(), tone, length }),
+        body: JSON.stringify({ company_id: companyId, prompt: prompt.trim(), tone, length, goal }),
+        signal: abortRef.current.signal,
       });
-      const json = (await res.json()) as { ok: boolean; data?: { text: string }; error?: { message: string } };
+
+      type ApiError = { category: AiErrorState["category"]; message: string; trace_id: string; retry_after?: number; can_retry: boolean };
+      const json = (await res.json()) as { ok: boolean; data?: { text: string }; error?: ApiError };
+
       if (json.ok && json.data) {
         setResult(json.data.text);
-      } else {
-        setError(json.error?.message ?? "Generation failed.");
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError("Network error. Please try again.");
+
+      const apiErr = json.error;
+      if (!apiErr) {
+        setError({ category: "unknown", message: "Generation failed.", trace_id: "unknown", can_retry: true });
+        setLoading(false);
+        return;
+      }
+
+      // Auto-retry for overloaded (529) with exponential backoff 1s→3s→9s, max 3 attempts.
+      if (apiErr.category === "overloaded" && attempt < 3) {
+        const delay = [1000, 3000, 9000][attempt - 1] ?? 9000;
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        return generate(attempt + 1);
+      }
+
+      setError(apiErr);
+      // Fire-and-forget log to client_errors.
+      void logClientError({
+        component: "ai-assistant",
+        severity: apiErr.category === "rate_limit" ? "warning" : "error",
+        message: apiErr.message,
+        traceId: apiErr.trace_id,
+        companyId,
+        context: { category: apiErr.category, http_status: res.status, attempt },
+      });
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") {
+        setLoading(false);
+        return;
+      }
+      const traceId = `ai-gen-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 6)}`;
+      setError({ category: "network", message: "Network error. Please try again.", trace_id: traceId, can_retry: true });
+      void logClientError({ component: "ai-assistant", severity: "error", message: "Network fetch failed", traceId: traceId, companyId });
     } finally {
       setLoading(false);
     }
   }
 
+  function cancel() {
+    abortRef.current?.abort();
+    setLoading(false);
+  }
+
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
+    <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-md" data-testid="ai-panel">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">AI assistant</p>
         <button type="button" onClick={onClose} aria-label="Close AI panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <textarea
@@ -89,12 +256,24 @@ function AiPanel({
         placeholder="Describe your post…"
         rows={2}
         className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        data-testid="ai-prompt-input"
       />
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-2">
+        <select
+          value={goal}
+          onChange={(e) => setGoal(e.target.value as typeof goal)}
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+          aria-label="Goal"
+        >
+          <option value="educate">Educate</option>
+          <option value="promote">Promote</option>
+          <option value="announce">Announce</option>
+          <option value="engage">Engage</option>
+        </select>
         <select
           value={tone}
           onChange={(e) => setTone(e.target.value as typeof tone)}
-          className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
           aria-label="Tone"
         >
           <option value="professional">Professional</option>
@@ -104,7 +283,7 @@ function AiPanel({
         <select
           value={length}
           onChange={(e) => setLength(e.target.value as typeof length)}
-          className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
           aria-label="Length"
         >
           <option value="short">Short</option>
@@ -112,10 +291,17 @@ function AiPanel({
           <option value="long">Long</option>
         </select>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <AiErrorDisplay
+          err={error}
+          retryCount={retryCount}
+          onRetry={() => void generate()}
+          onEdit={() => setError(null)}
+        />
+      )}
       {result && (
         <div className="space-y-2">
-          <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{result}</p>
+          <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm" data-testid="ai-result">{result}</p>
           <button
             type="button"
             onClick={() => { onInsert(result); onClose(); }}
@@ -125,14 +311,33 @@ function AiPanel({
           </button>
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => void generate()}
-        disabled={loading || !prompt.trim()}
-        className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
-      >
-        {loading ? "Generating…" : "Generate"}
-      </button>
+      {loading ? (
+        <button
+          type="button"
+          onClick={cancel}
+          className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
+          data-testid="ai-cancel-button"
+        >
+          Cancel
+        </button>
+      ) : (
+        <div className="space-y-1">
+          {prompt.trim() && (
+            <p className="text-center text-xs text-muted-foreground" data-testid="ai-cost-estimate">
+              Est. cost: {estimateCost(prompt.length)} · ~{250 + Math.ceil(prompt.length / 4) + 200} tokens
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => void generate()}
+            disabled={!prompt.trim()}
+            className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
+            data-testid="ai-generate-button"
+          >
+            Generate
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -192,7 +397,7 @@ function GifPanel({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">GIF picker</p>
         <button type="button" onClick={onClose} aria-label="Close GIF panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <input
@@ -242,7 +447,7 @@ function EmojiPanel({
       <div className="mb-2 flex items-center justify-between">
         <p className="text-xs font-semibold">Emoji</p>
         <button type="button" onClick={onClose} aria-label="Close emoji panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={12} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <div className="grid grid-cols-6 gap-0.5">
@@ -297,7 +502,7 @@ function UtmPanel({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">UTM tags</p>
         <button type="button" onClick={onClose} aria-label="Close UTM panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       {[
@@ -334,75 +539,51 @@ function UtmPanel({
 // ---------------------------------------------------------------------------
 
 const TOOLS = [
-  {
-    id: "ai" as const,
-    label: "AI assistant",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" />
-      </svg>
-    ),
-  },
-  {
-    id: "media" as const,
-    label: "Media",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
-    ),
-  },
-  {
-    id: "emoji" as const,
-    label: "Emoji",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle cx="12" cy="12" r="10" />
-        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-        <line x1="9" y1="9" x2="9.01" y2="9" />
-        <line x1="15" y1="9" x2="15.01" y2="9" />
-      </svg>
-    ),
-  },
-  {
-    id: "gif" as const,
-    label: "GIF",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
-    ),
-  },
-  {
-    id: "utm" as const,
-    label: "UTM tags",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-        <line x1="7" y1="7" x2="7.01" y2="7" />
-      </svg>
-    ),
-  },
+  { id: "ai" as const,    label: "AI assistant", icon: <Sparkles  size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "media" as const, label: "Media",         icon: <ImagePlus size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "emoji" as const, label: "Emoji",         icon: <Smile     size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "gif" as const,   label: "GIF",           icon: <Film      size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "utm" as const,   label: "UTM tags",      icon: <Tags      size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
 export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className }: ToolsRowProps) {
   const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
 
-  function togglePanel(id: ActivePanel) {
+  function togglePanel(id: Exclude<ActivePanel, null>) {
     setActivePanel((prev) => (prev === id ? null : id));
   }
 
+  // Esc closes the active panel.
+  React.useEffect(() => {
+    if (!activePanel) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setActivePanel(null);
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [activePanel]);
+
+  // Click outside the ToolsRow container closes the active panel.
+  React.useEffect(() => {
+    if (!activePanel) return;
+    function onPointerDown(e: PointerEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setActivePanel(null);
+      }
+    }
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [activePanel]);
+
   return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap gap-1">
+    <div ref={containerRef} className={cn("space-y-2", className)}>
+      <div className="flex flex-wrap gap-1" data-testid="composer-tools-toolbar">
         {TOOLS.map((tool) => (
           <button
             key={tool.id}
             type="button"
+            data-testid={`composer-tool-${tool.id}`}
             onClick={() => {
               if (tool.id === "media") {
                 onOpenMediaPicker();
@@ -425,29 +606,37 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className
       </div>
 
       {activePanel === "ai" && (
-        <AiPanel
-          companyId={companyId}
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-ai">
+          <AiPanel
+            companyId={companyId}
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
       {activePanel === "emoji" && (
-        <EmojiPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-emoji">
+          <EmojiPanel
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
       {activePanel === "gif" && (
-        <GifPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-gif">
+          <GifPanel
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
       {activePanel === "utm" && (
-        <UtmPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
+        <div data-testid="composer-panel-utm">
+          <UtmPanel
+            onInsert={onInsertText}
+            onClose={() => setActivePanel(null)}
+          />
+        </div>
       )}
     </div>
   );
