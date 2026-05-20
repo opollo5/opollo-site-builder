@@ -396,7 +396,9 @@ function GifPanel({
         setError(json.error?.message ?? "GIF search unavailable.");
       }
     } catch {
-      setError("GIF search failed. Please try again.");
+      const traceId = crypto.randomUUID();
+      setError(`GIF search failed. Please try again. [trace: ${traceId}]`);
+      void logClientError({ component: "gif-panel", severity: "error", message: "GIF search network failure", traceId, companyId, context: { error_code: "GIF_SEARCH_FAILED" } });
     } finally {
       setLoading(false);
     }
@@ -428,7 +430,9 @@ function GifPanel({
         setError(json.error?.message ?? "Failed to attach GIF.");
       }
     } catch {
-      setError("Failed to attach GIF. Please try again.");
+      const traceId = crypto.randomUUID();
+      setError(`Failed to attach GIF. Please try again. [trace: ${traceId}]`);
+      void logClientError({ component: "gif-panel", severity: "error", message: "GIF attach network failure", traceId, companyId, context: { error_code: "GIF_ATTACH_FAILED" } });
     } finally {
       setAttaching(null);
     }

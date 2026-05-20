@@ -8,6 +8,7 @@ import { PreviewCard } from "@/components/social/composer/PreviewCard";
 import { MiniCalendar } from "@/components/social/composer/MiniCalendar";
 import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } from "@/components/social/composer/SchedulingCard";
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
+import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { Connection, Draft, SchedulingMode } from "@/lib/social/types";
 
@@ -230,6 +231,7 @@ export function ComposerOverlay({
 
   return (
     <>
+      <ComposerErrorBoundary companyId={companyId}>
       <div
         className="fixed inset-0 z-50 flex flex-col bg-background"
         role="dialog"
@@ -348,6 +350,8 @@ export function ComposerOverlay({
           </div>
         </div>
       </div>
+
+      </ComposerErrorBoundary>
 
       <UnsavedChangesDialog
         open={showDiscard}
