@@ -27,7 +27,7 @@ const EMPTY_CSV = `Content,Date,Time,Channel
 `;
 
 async function openBulkModal(page: import("@playwright/test").Page) {
-  await page.goto("/social/poster");
+  await page.goto("/company/social/calendar");
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
   await page.getByTestId("bulk-upload-btn").click();
   await page.waitForSelector('[data-testid="bulk-schedule-modal"]', { timeout: 5_000 });

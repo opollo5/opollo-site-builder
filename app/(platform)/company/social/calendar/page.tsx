@@ -1,41 +1,32 @@
 import { redirect } from "next/navigation";
 
-import { SocialCalendarClient } from "@/components/SocialCalendarClient";
-import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
+import { CalendarShell } from "@/components/social/dashboard/CalendarShell";
+import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
-import { listCompanyScheduleEntries } from "@/lib/platform/social/scheduling";
-import { TDashboardFeed } from "@/templates";
+import type { Connection, Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
-// /company/social/calendar — monthly grid view (default social landing).
+// /company/social/calendar — full social dashboard (DnD, bulk CSV, analytics).
 //
-// Accepts ?month=YYYY-MM (defaults to current month). Fetches schedule
-// entries for the full 6-row grid (Mon before the 1st through Sun after
-// the last day) so the client can render a standard month grid without
-// a second request. The client component handles month navigation and
-// platform filtering.
+// Replaced SocialCalendarClient (lite, no DnD) with CalendarShell (full
+// social-01 implementation: 7-col month grid, DnD reschedule, day-detail
+// panel, bulk CSV upload, post analytics modal, timeline toggle, profile
+// filter). CalendarShell uses its own composer state via useComposerState;
+// the layout-level ComposerMountV2 remains available for ?compose= URL-param
+// deep-links (CAP push-to-composer, direct links).
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 
-type Props = {
-  searchParams: Promise<{ month?: string }>;
-};
-
-function parseMonthParam(raw: string | undefined): { year: number; month: number } {
-  const today = new Date();
-  if (!raw) return { year: today.getFullYear(), month: today.getMonth() + 1 };
-  const match = /^(\d{4})-(\d{2})$/.exec(raw);
-  if (!match) return { year: today.getFullYear(), month: today.getMonth() + 1 };
-  const year = parseInt(match[1], 10);
-  const month = parseInt(match[2], 10);
-  if (month < 1 || month > 12) return { year: today.getFullYear(), month: today.getMonth() + 1 };
-  return { year, month };
+function mapSocialPlatform(p: string): Platform {
+  if (p === "linkedin_personal" || p === "linkedin_company") return "linkedin";
+  if (p === "facebook_page") return "facebook";
+  if (p === "instagram_business") return "instagram";
+  if (p === "gbp") return "google_business_profile";
+  return p as Platform;
 }
 
-export default async function CompanySocialCalendarPage({ searchParams }: Props) {
-  const { month: monthParam } = await searchParams;
-
+export default async function CompanySocialCalendarPage() {
   const session = await getCurrentPlatformSession();
   if (!session) {
     redirect(`/login?next=${encodeURIComponent("/company/social/calendar")}`);
@@ -48,75 +39,25 @@ export default async function CompanySocialCalendarPage({ searchParams }: Props)
     );
   }
 
-  const { year, month } = parseMonthParam(monthParam);
-  const monthIso = `${year}-${String(month).padStart(2, "0")}`;
-
-  // Grid bounds: Monday on/before the 1st → 42 days later (6 rows × 7 cols).
-  const firstOfMonth = new Date(year, month - 1, 1);
-  const startDow = (firstOfMonth.getDay() + 6) % 7; // Mon=0 … Sun=6
-  const gridStart = new Date(firstOfMonth);
-  gridStart.setDate(firstOfMonth.getDate() - startDow);
-  const gridEnd = new Date(gridStart);
-  gridEnd.setDate(gridStart.getDate() + 42);
-
   const companyId = session.company.companyId;
-
-  const [entriesResult, connectionsResult, canCreate] = await Promise.all([
-    listCompanyScheduleEntries({
-      companyId,
-      fromIso: gridStart.toISOString(),
-      toIso: gridEnd.toISOString(),
-    }),
-    listConnections({ companyId }),
-    canDo(companyId, "create_post"),
-  ]);
-
-  const connections =
-    connectionsResult.ok
-      ? connectionsResult.data.connections.map((c) => ({
-          id: c.id,
-          platform: c.platform,
-          display_name: c.display_name,
-        }))
-      : [];
+  const connectionsResult = await listConnections({ companyId });
+  const rawConnections = connectionsResult.ok ? connectionsResult.data.connections : [];
+  const availableConnections: Connection[] = rawConnections
+    .filter((c) => c.status !== "disconnected")
+    .map((c) => ({
+      id: c.id,
+      platform: mapSocialPlatform(c.platform),
+      account_name: c.display_name ?? c.platform,
+      account_avatar_url: c.avatar_url ?? "",
+    }));
 
   return (
-    <TDashboardFeed
-      title="Calendar"
-      breadcrumb={[
-        { label: "Social", href: "/company/social" },
-        { label: "Calendar" },
-      ]}
-      width="full-bleed"
-      inlineAlert={
-        !entriesResult.ok ? (
-          <div
-            className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
-            role="alert"
-          >
-            Failed to load calendar: {entriesResult.error.message}
-          </div>
-        ) : undefined
-      }
-      feed={
-        entriesResult.ok ? (
-          <SocialCalendarClient
-            entries={entriesResult.data.entries.map((e) => ({
-              id: e.id,
-              post_master_id: e.post_master_id,
-              platform: e.platform,
-              scheduled_at: e.scheduled_at,
-              preview: e.preview,
-            }))}
-            monthIso={monthIso}
-            connections={connections}
-            composerEnabled={true}
-            canCreate={canCreate}
-          />
-        ) : (
-          <div />
-        )
-      }
-    />
+    <div className="flex h-full flex-col overflow-hidden">
+      <CalendarShell
+        companyId={companyId}
+        hasConnections={availableConnections.length > 0}
+        availableConnections={availableConnections}
+      />
+    </div>
   );
 }
