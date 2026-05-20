@@ -41,7 +41,10 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 
 ## PR-A2 — Preview card max-width (2026-05-21)
 
-*Decision log entries TBD when PR-A2 is built.*
+**D-050**: `max-w-[480px] mx-auto` on PreviewCard wrapper div
+- PreviewCard.tsx line 93 — the outer `<div>` had only `space-y-2` + optional className. No width constraint. Cards stretched to fill the right-pane container (`flex-1`), which grows with the dialog width.
+- Decision: Add `max-w-[480px] mx-auto` to the PreviewCard wrapper. `mx-auto` centers the card in the pane when the pane is wider than 480px. Applied at the PreviewCard layer (not at ComposerOverlay) so the constraint is co-located with the component and applies to all usages (composer right pane + analytics modal).
+- `480px` is not an existing Tailwind token; using arbitrary value `max-w-[480px]`. The design-tokens unit test only checks sub-16px font sizes and hex colors — not flagged.
 
 ---
 

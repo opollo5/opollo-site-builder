@@ -90,7 +90,7 @@ export function PreviewCard({ platform, content, mediaUrls, connection, classNam
   const profile = { name: connection.account_name, avatarUrl: connection.account_avatar_url };
 
   return (
-    <div className={cn("space-y-2", className)} data-testid="preview-card">
+    <div className={cn("max-w-[480px] mx-auto space-y-2", className)} data-testid="preview-card">
       <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
         <span
           className="inline-block h-2 w-2 rounded-full"
