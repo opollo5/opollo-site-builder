@@ -20,7 +20,8 @@ async function openComposerUtmPanel(page: import("@playwright/test").Page) {
   const utmBtn = dialog.getByTestId("composer-tool-utm");
   await expect(utmBtn).toBeVisible({ timeout: 10_000 });
   await utmBtn.click();
-  await expect(dialog.getByTestId("utm-builder-panel")).toBeVisible({ timeout: 2_000 });
+  // UTM panel portals to document.body via Radix Popover — use page.getByTestId
+  await expect(page.getByTestId("utm-builder-panel")).toBeVisible({ timeout: 2_000 });
   return dialog;
 }
 
@@ -30,20 +31,20 @@ test.describe("UTM builder (Phase 4.3)", () => {
   });
 
   test("UT-1: opens UTM panel with all fields", async ({ page }) => {
-    const dialog = await openComposerUtmPanel(page);
-    expect(await dialog.getByTestId("utm-url-input").isVisible()).toBe(true);
-    expect(await dialog.getByTestId("utm-campaign-input").isVisible()).toBe(true);
-    expect(await dialog.getByTestId("utm-medium-input").isVisible()).toBe(true);
-    expect(await dialog.getByTestId("utm-source-input").isVisible()).toBe(true);
+    await openComposerUtmPanel(page);
+    expect(await page.getByTestId("utm-url-input").isVisible()).toBe(true);
+    expect(await page.getByTestId("utm-campaign-input").isVisible()).toBe(true);
+    expect(await page.getByTestId("utm-medium-input").isVisible()).toBe(true);
+    expect(await page.getByTestId("utm-source-input").isVisible()).toBe(true);
   });
 
   test("UT-2: live preview updates when campaign is set", async ({ page }) => {
-    const dialog = await openComposerUtmPanel(page);
+    await openComposerUtmPanel(page);
 
-    await dialog.getByTestId("utm-url-input").fill("https://example.com");
-    await dialog.getByTestId("utm-campaign-input").fill("test-may26");
+    await page.getByTestId("utm-url-input").fill("https://example.com");
+    await page.getByTestId("utm-campaign-input").fill("test-may26");
 
-    const preview = dialog.getByTestId("utm-preview");
+    const preview = page.getByTestId("utm-preview");
     await expect(preview).toBeVisible({ timeout: 1_000 });
     await expect(preview).toContainText("utm_campaign");
     await expect(preview).toContainText("test-may26");
@@ -52,32 +53,32 @@ test.describe("UTM builder (Phase 4.3)", () => {
   test("UT-3: clicking Insert URL puts UTM URL in textarea", async ({ page }) => {
     const dialog = await openComposerUtmPanel(page);
 
-    await dialog.getByTestId("utm-url-input").fill("https://example.com/page");
-    await dialog.getByTestId("utm-campaign-input").fill("test-may26");
-    await dialog.getByTestId("utm-insert-button").click();
+    await page.getByTestId("utm-url-input").fill("https://example.com/page");
+    await page.getByTestId("utm-campaign-input").fill("test-may26");
+    await page.getByTestId("utm-insert-button").click();
 
     // Panel should close
-    await expect(dialog.getByTestId("utm-builder-panel")).not.toBeVisible({ timeout: 1_000 });
+    await expect(page.getByTestId("utm-builder-panel")).not.toBeVisible({ timeout: 1_000 });
 
-    // Textarea should contain the UTM URL
+    // Textarea stays in the dialog (not portaled)
     const textarea = dialog.getByTestId("content-textarea");
     const textValue = await textarea.inputValue();
     expect(textValue).toContain("utm_campaign=test-may26");
   });
 
   test("UT-4: advanced section toggle shows content + term inputs", async ({ page }) => {
-    const dialog = await openComposerUtmPanel(page);
+    await openComposerUtmPanel(page);
 
-    await expect(dialog.getByTestId("utm-advanced-section")).not.toBeVisible();
-    await dialog.getByTestId("utm-advanced-toggle").click();
-    await expect(dialog.getByTestId("utm-advanced-section")).toBeVisible({ timeout: 1_000 });
-    await expect(dialog.getByTestId("utm-content-input")).toBeVisible();
-    await expect(dialog.getByTestId("utm-term-input")).toBeVisible();
+    await expect(page.getByTestId("utm-advanced-section")).not.toBeVisible();
+    await page.getByTestId("utm-advanced-toggle").click();
+    await expect(page.getByTestId("utm-advanced-section")).toBeVisible({ timeout: 1_000 });
+    await expect(page.getByTestId("utm-content-input")).toBeVisible();
+    await expect(page.getByTestId("utm-term-input")).toBeVisible();
   });
 
   test("UT-5: close button dismisses the UTM panel", async ({ page }) => {
-    const dialog = await openComposerUtmPanel(page);
-    await dialog.getByRole("button", { name: /close utm panel/i }).click();
-    await expect(dialog.getByTestId("utm-builder-panel")).not.toBeVisible({ timeout: 1_000 });
+    await openComposerUtmPanel(page);
+    await page.getByRole("button", { name: /close utm panel/i }).click();
+    await expect(page.getByTestId("utm-builder-panel")).not.toBeVisible({ timeout: 1_000 });
   });
 });
