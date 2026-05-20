@@ -265,13 +265,13 @@ export default function DesignSystemPage() {
         <Section title="Motion Tokens">
           <div data-testid="c3-motion-tokens" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16 }}>
             {[
-              { token: "--c3-duration-instant", value: "60ms", use: "Selection, color swap" },
-              { token: "--c3-duration-fast", value: "120ms", use: "Hover, focus" },
-              { token: "--c3-duration-base", value: "200ms", use: "Default transitions" },
-              { token: "--c3-duration-slow", value: "320ms", use: "Modal reveal, panel slide" },
-            ].map(({ token, value, use }) => (
-              <div key={token} style={{ background: "var(--c3-surface)", border: "1px solid var(--c3-border)", borderRadius: "var(--c3-radius-lg)", padding: 16 }}>
-                <div style={{ fontFamily: "var(--c3-font-mono)", fontSize: 10, color: "var(--c3-ink-3)", marginBottom: 4 }}>{token}</div>
+              { cssVar: "--c3-duration-instant", value: "60ms", use: "Selection, color swap" },
+              { cssVar: "--c3-duration-fast", value: "120ms", use: "Hover, focus" },
+              { cssVar: "--c3-duration-base", value: "200ms", use: "Default transitions" },
+              { cssVar: "--c3-duration-slow", value: "320ms", use: "Modal reveal, panel slide" },
+            ].map(({ cssVar, value, use }) => (
+              <div key={cssVar} style={{ background: "var(--c3-surface)", border: "1px solid var(--c3-border)", borderRadius: "var(--c3-radius-lg)", padding: 16 }}>
+                <div style={{ fontFamily: "var(--c3-font-mono)", fontSize: 10, color: "var(--c3-ink-3)", marginBottom: 4 }}>{cssVar}</div>
                 <div style={{ fontFamily: "var(--c3-font-mono)", fontSize: 16, fontWeight: 600, color: "var(--c3-brand-700)", marginBottom: 4 }}>{value}</div>
                 <div style={{ fontSize: 12, color: "var(--c3-ink-4)" }}>{use}</div>
               </div>
