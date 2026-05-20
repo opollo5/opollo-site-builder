@@ -26,6 +26,15 @@ async function openComposerUtmPanel(page: import("@playwright/test").Page) {
 }
 
 test.describe("UTM builder (Phase 4.3)", () => {
+  // The UTM panel is ~420px tall. On the default 1280x720 CI viewport the
+  // panel extends below the fold when the toolbar trigger is mid-dialog.
+  // Radix Popover (portaled to body) cannot flip because floating-ui's
+  // clippingAncestors picks up the dialog's overflow-y:auto container as
+  // the boundary instead of the viewport, so the panel stays below and
+  // lower elements are outside the viewport. 900px height gives enough
+  // space below the trigger for the full panel to render in-viewport.
+  test.use({ viewport: { width: 1280, height: 900 } });
+
   test.beforeEach(async ({ page }) => {
     await signInAsCompanyAdmin(page);
   });
