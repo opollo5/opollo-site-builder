@@ -36,10 +36,11 @@ test.describe("composer tool panels — mutual exclusion + dismiss (A4)", () => 
     await expect(aiBtn).toBeVisible({ timeout: 10_000 });
 
     await aiBtn.click();
-    await expect(dialog.getByTestId("composer-panel-ai")).toBeVisible();
-    await expect(dialog.getByTestId("composer-panel-emoji")).not.toBeVisible();
-    await expect(dialog.getByTestId("composer-panel-gif")).not.toBeVisible();
-    await expect(dialog.getByTestId("composer-panel-utm")).not.toBeVisible();
+    // Panels portal to document.body — use page.getByTestId, not dialog.getByTestId
+    await expect(page.getByTestId("composer-panel-ai")).toBeVisible();
+    await expect(page.getByTestId("composer-panel-emoji")).not.toBeVisible();
+    await expect(page.getByTestId("composer-panel-gif")).not.toBeVisible();
+    await expect(page.getByTestId("composer-panel-utm")).not.toBeVisible();
   });
 
   test("clicking Emoji closes AI and opens Emoji panel", async ({ page }) => {
@@ -51,12 +52,12 @@ test.describe("composer tool panels — mutual exclusion + dismiss (A4)", () => 
 
     // Open AI first
     await aiBtn.click();
-    await expect(dialog.getByTestId("composer-panel-ai")).toBeVisible();
+    await expect(page.getByTestId("composer-panel-ai")).toBeVisible();
 
     // Switch to Emoji — AI must close, Emoji must open
     await emojiBtn.click();
-    await expect(dialog.getByTestId("composer-panel-emoji")).toBeVisible();
-    await expect(dialog.getByTestId("composer-panel-ai")).not.toBeVisible();
+    await expect(page.getByTestId("composer-panel-emoji")).toBeVisible();
+    await expect(page.getByTestId("composer-panel-ai")).not.toBeVisible();
   });
 
   test("clicking the active tool button again closes the panel (toggle off)", async ({ page }) => {
@@ -66,11 +67,11 @@ test.describe("composer tool panels — mutual exclusion + dismiss (A4)", () => 
     await expect(emojiBtn).toBeVisible({ timeout: 10_000 });
 
     await emojiBtn.click();
-    await expect(dialog.getByTestId("composer-panel-emoji")).toBeVisible();
+    await expect(page.getByTestId("composer-panel-emoji")).toBeVisible();
 
     // Click same button again — panel closes
     await emojiBtn.click();
-    await expect(dialog.getByTestId("composer-panel-emoji")).not.toBeVisible();
+    await expect(page.getByTestId("composer-panel-emoji")).not.toBeVisible();
   });
 
   test("Esc key closes the active panel", async ({ page }) => {
@@ -80,11 +81,11 @@ test.describe("composer tool panels — mutual exclusion + dismiss (A4)", () => 
     await expect(utmBtn).toBeVisible({ timeout: 10_000 });
 
     await utmBtn.click();
-    await expect(dialog.getByTestId("composer-panel-utm")).toBeVisible();
+    await expect(page.getByTestId("composer-panel-utm")).toBeVisible();
 
     // Esc dismisses the panel
     await page.keyboard.press("Escape");
-    await expect(dialog.getByTestId("composer-panel-utm")).not.toBeVisible();
+    await expect(page.getByTestId("composer-panel-utm")).not.toBeVisible();
   });
 
   test("all five tool buttons render in the toolbar", async ({ page }) => {

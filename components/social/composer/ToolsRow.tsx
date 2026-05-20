@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { logClientError } from "@/lib/errors/logClientError";
@@ -515,108 +516,82 @@ function GifPanel({
 // ToolsRow — main export
 // ---------------------------------------------------------------------------
 
-const TOOLS = [
-  { id: "ai" as const,    label: "AI assistant", icon: <Sparkles  size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "media" as const, label: "Media",         icon: <ImagePlus size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "emoji" as const, label: "Emoji",         icon: <Smile     size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "gif" as const,   label: "GIF",           icon: <Film      size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "utm" as const,   label: "UTM tags",      icon: <Tags      size={14} strokeWidth={1.75} aria-hidden /> },
+// Tool buttons with panels. Media opens a modal (no panel), handled separately.
+const PANEL_TOOLS = [
+  { id: "ai" as const,    label: "AI assistant", icon: <Sparkles size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "emoji" as const, label: "Emoji",         icon: <Smile    size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "gif" as const,   label: "GIF",           icon: <Film     size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "utm" as const,   label: "UTM tags",      icon: <Tags     size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
+
+const BUTTON_CLASSES = "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]";
+const ACTIVE_CLASSES = "border-primary bg-primary/10 text-primary";
+const INACTIVE_CLASSES = "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground";
 
 export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, platforms, className }: ToolsRowProps) {
   const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
-  const containerRef = React.useRef<HTMLDivElement>(null);
 
-  function togglePanel(id: Exclude<ActivePanel, null>) {
-    setActivePanel((prev) => (prev === id ? null : id));
-  }
-
-  // Esc closes the active panel.
-  React.useEffect(() => {
-    if (!activePanel) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setActivePanel(null);
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [activePanel]);
-
-  // Click outside the ToolsRow container closes the active panel.
-  React.useEffect(() => {
-    if (!activePanel) return;
-    function onPointerDown(e: PointerEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setActivePanel(null);
-      }
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [activePanel]);
+  // Radix Popover handles Esc + click-outside via DismissableLayer (D-047).
+  // Mutual exclusion via controlled `open` prop (D-048).
 
   return (
-    <div ref={containerRef} className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap gap-1" data-testid="composer-tools-toolbar">
-        {TOOLS.map((tool) => (
-          <button
-            key={tool.id}
-            type="button"
-            data-testid={`composer-tool-${tool.id}`}
-            onClick={() => {
-              if (tool.id === "media") {
-                onOpenMediaPicker();
-              } else {
-                togglePanel(tool.id);
-              }
-            }}
-            aria-pressed={activePanel === tool.id}
-            className={cn(
-              "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]",
-              activePanel === tool.id
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground",
-            )}
-          >
-            {tool.icon}
-            {tool.label}
-          </button>
-        ))}
-      </div>
+    <div className={cn("flex flex-wrap gap-1", className)} data-testid="composer-tools-toolbar">
+      {/* Media — opens modal, no popover */}
+      <button
+        type="button"
+        data-testid="composer-tool-media"
+        onClick={onOpenMediaPicker}
+        className={cn(BUTTON_CLASSES, INACTIVE_CLASSES)}
+      >
+        <ImagePlus size={14} strokeWidth={1.75} aria-hidden />
+        Media
+      </button>
 
-      {activePanel === "ai" && (
-        <div data-testid="composer-panel-ai" className="c3-panel-in">
-          <AiPanel
-            companyId={companyId}
-            onInsert={onInsertText}
-            onClose={() => setActivePanel(null)}
-          />
-        </div>
-      )}
-      {activePanel === "emoji" && (
-        <div data-testid="composer-panel-emoji" className="c3-panel-in">
-          <EmojiPickerPanel
-            onInsert={onInsertText}
-            onClose={() => setActivePanel(null)}
-          />
-        </div>
-      )}
-      {activePanel === "gif" && (
-        <div data-testid="composer-panel-gif" className="c3-panel-in">
-          <GifPanel
-            companyId={companyId}
-            onAttach={onAttachGif}
-            onClose={() => setActivePanel(null)}
-          />
-        </div>
-      )}
-      {activePanel === "utm" && (
-        <div data-testid="composer-panel-utm" className="c3-panel-in">
-          <UtmBuilderPanel
-            onInsert={onInsertText}
-            onClose={() => setActivePanel(null)}
-            platforms={platforms}
-          />
-        </div>
-      )}
+      {/* Panel tools — each anchored to its trigger button via Radix Popover */}
+      {PANEL_TOOLS.map((tool) => (
+        <PopoverPrimitive.Root
+          key={tool.id}
+          open={activePanel === tool.id}
+          onOpenChange={(open) => setActivePanel(open ? tool.id : null)}
+        >
+          <PopoverPrimitive.Trigger asChild>
+            <button
+              type="button"
+              data-testid={`composer-tool-${tool.id}`}
+              className={cn(BUTTON_CLASSES, activePanel === tool.id ? ACTIVE_CLASSES : INACTIVE_CLASSES)}
+            >
+              {tool.icon}
+              {tool.label}
+            </button>
+          </PopoverPrimitive.Trigger>
+
+          {/* Portal to body; z-[200] per --z-popover spec token (D-045) */}
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Content
+              side="bottom"
+              align="start"
+              sideOffset={8}
+              className="z-[200] outline-none"
+            >
+              {/* c3-panel-in: 200ms translateY(-8px)→0 + fade, ease-snap */}
+              <div className="c3-panel-in" data-testid={`composer-panel-${tool.id}`}>
+                {tool.id === "ai" && (
+                  <AiPanel companyId={companyId} onInsert={onInsertText} onClose={() => setActivePanel(null)} />
+                )}
+                {tool.id === "emoji" && (
+                  <EmojiPickerPanel onInsert={onInsertText} onClose={() => setActivePanel(null)} />
+                )}
+                {tool.id === "gif" && (
+                  <GifPanel companyId={companyId} onAttach={onAttachGif} onClose={() => setActivePanel(null)} />
+                )}
+                {tool.id === "utm" && (
+                  <UtmBuilderPanel onInsert={onInsertText} onClose={() => setActivePanel(null)} platforms={platforms} />
+                )}
+              </div>
+            </PopoverPrimitive.Content>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
+      ))}
     </div>
   );
 }
