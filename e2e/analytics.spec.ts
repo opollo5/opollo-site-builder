@@ -114,7 +114,7 @@ async function mockAndOpenAnalyticsModal(
     });
   });
 
-  await page.goto("/social/poster");
+  await page.goto("/company/social/calendar");
 
   const flagOff = await page
     .locator("text=FEATURE_COMPOSER_V2 is not enabled")
@@ -184,7 +184,7 @@ test.describe("post analytics modal (PR H)", () => {
 
     // Can't easily test SWR deduplication in E2E without full open/close/reopen.
     // Verify that the analytics endpoint is called at most once per 60s window.
-    await page.goto("/social/poster");
+    await page.goto("/company/social/calendar");
     const flagOff = await page
       .locator("text=FEATURE_COMPOSER_V2 is not enabled")
       .isVisible({ timeout: 3_000 })

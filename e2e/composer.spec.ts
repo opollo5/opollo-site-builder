@@ -246,7 +246,7 @@ test.describe("composer modal", () => {
 });
 
 // ---------------------------------------------------------------------------
-// V2 Composer E2E — /social/poster (FEATURE_COMPOSER_V2)
+// V2 Composer E2E — /company/social/calendar
 //
 // Tests exercise the SchedulingCard, ApprovalToggle, and RecurrencePicker
 // that were added in PR E. All API calls are mocked.
@@ -288,7 +288,7 @@ async function mockV2DraftApis(context: import("@playwright/test").BrowserContex
 }
 
 async function openV2Composer(page: import("@playwright/test").Page) {
-  await page.goto("/social/poster");
+  await page.goto("/company/social/calendar");
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
 
   // Open the composer via the FilterBar "New post" button
@@ -411,7 +411,7 @@ test.describe("composer V2 — scheduling card (PR E)", () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, data: { posts: [], range: {} }, timestamp: new Date().toISOString() }) });
     });
 
-    await page.goto("/social/poster");
+    await page.goto("/company/social/calendar");
     const flagOff = await page
       .locator("text=FEATURE_COMPOSER_V2 is not enabled")
       .isVisible({ timeout: 3_000 })

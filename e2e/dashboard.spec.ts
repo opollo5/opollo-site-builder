@@ -6,7 +6,7 @@ import { signInAsCompanyAdmin } from "./helpers";
 // PR F — Dashboard (CalendarShell) E2E tests
 //
 // All API routes that hit Supabase are mocked. Tests run against the
-// /social/poster route with NEXT_PUBLIC_FEATURE_COMPOSER_V2=true.
+// /company/social/calendar route (full CalendarShell with DnD, analytics, bulk CSV).
 //
 // Verification gate patterns (BUILD_ORDER.md PR F):
 //   "month view", "day select", "cell add", "drag reschedule",
@@ -78,7 +78,7 @@ async function mockDashboardApis(
 }
 
 async function goToDashboard(page: import("@playwright/test").Page) {
-  await page.goto("/social/poster");
+  await page.goto("/company/social/calendar");
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
   return true;
 }
