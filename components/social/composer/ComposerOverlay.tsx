@@ -235,6 +235,7 @@ export function ComposerOverlay({
         role="dialog"
         aria-modal="true"
         aria-label={draft.id ? "Edit post" : "New post"}
+        data-testid="composer-overlay"
       >
         <div className="flex flex-1 overflow-hidden">
           {/* ── Left pane — editor ─────────────────────────────────────────── */}
