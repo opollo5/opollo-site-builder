@@ -134,11 +134,12 @@ test.describe("composer preview cards — Instagram, X, GBP (B3)", () => {
   test("(PV-7) switching from Instagram to X shows correct card", async ({ page, context }) => {
     await setupWithConnections(page, context, [MOCK_IG_CONNECTION, MOCK_X_CONNECTION]);
 
-    // Select Instagram first
+    // Select both connections so the preview tab row appears.
     await page.getByRole("checkbox", { name: /Post to Acme Instagram/i }).click();
+    await page.getByRole("checkbox", { name: /Post to Acme Corp/i }).click();
     await expect(page.getByTestId("ig-preview-card")).toBeVisible({ timeout: 5_000 });
 
-    // Switch to X
+    // Click the "Acme Corp" preview tab to switch to the X card.
     await page.getByRole("button", { name: "Acme Corp" }).click();
     await expect(page.getByTestId("x-preview-card")).toBeVisible({ timeout: 3_000 });
     await expect(page.getByTestId("ig-preview-card")).not.toBeVisible();
