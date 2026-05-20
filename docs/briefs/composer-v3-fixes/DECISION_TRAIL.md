@@ -41,13 +41,29 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 
 ## PR-A2 — Preview card max-width (2026-05-21)
 
-*Decision log entries TBD when PR-A2 is built.*
+**D-050**: `max-w-[480px] mx-auto` on PreviewCard wrapper div
+- PreviewCard.tsx line 93 — the outer `<div>` had only `space-y-2` + optional className. No width constraint. Cards stretched to fill the right-pane container (`flex-1`), which grows with the dialog width.
+- Decision: Add `max-w-[480px] mx-auto` to the PreviewCard wrapper. `mx-auto` centers the card in the pane when the pane is wider than 480px. Applied at the PreviewCard layer (not at ComposerOverlay) so the constraint is co-located with the component and applies to all usages (composer right pane + analytics modal).
+- `480px` is not an existing Tailwind token; using arbitrary value `max-w-[480px]`. The design-tokens unit test only checks sub-16px font sizes and hex colors — not flagged.
 
 ---
 
 ## PR-A3 — Profile chip sizing (2026-05-21)
 
-*Decision log entries TBD when PR-A3 is built.*
+**D-051**: Investigation — actual-vs-spec delta
+- `h-14 w-14` = 56px outer ✓ (spec: 56px)
+- `absolute inset-0.5` = 52px avatar ✓ (spec: 52px)
+- `h-5 w-5` = 20px checkbox ✓ (spec: 20px)
+- Platform badge: `size={16}` + `p-0.5` (2px) = **20px total** ✗ (spec: 24px with 2.5px white ring)
+- Git blame: `size={16}` present since initial commit `7c74e386` — never matched spec
+- Wireframe (01-composer-states.html): shows a v2 pill-card chip (40px avatar, horizontal layout). Current code is the v3 circular spec. The "24–40px" UAT observation matches the badge rendering visually small (20px badge on 56px chip where spec is 24px).
+- Decision: fix platform badge only. All other dimensions already match spec.
+
+**D-052**: Platform badge fix approach
+- Need total 24px badge with 2.5px white ring between icon and chip edge.
+- Old: `bg-white p-0.5` (2px) + `size={16}` = 20px total
+- New: `bg-white p-[2.5px]` + `size={19}` = 19 + 2×2.5 = 24px total ✓
+- Added `data-testid="platform-badge-{dataid}"` for e2e assertion `clientWidth >= 22`
 
 ---
 
