@@ -62,3 +62,44 @@ Autonomous decisions logged here per master prompt operating rules.
 - Phase 1 commit named a JS object property identically to the CSS property type it represented ("duration token"). The generic-api-key gitleaks rule pattern-matched it as a false positive.
 - Decision: Renamed the JS property to `cssVar` in follow-up commit. Allowlisted the original commit SHA in `.gitleaks.toml` since gitleaks scans all commits in the PR range.
 
+---
+
+## Phase 2.1 — Tool panel dismiss (A4) (2026-05-20)
+
+**D-014**: Esc/click-outside dismiss pattern — useEffect + containerRef
+- ToolsRow already had `activePanel` state for mutual exclusion. The missing A4 gap was keyboard (Esc) and pointer-outside dismiss.
+- Decision: Single `useEffect` registers both `document.addEventListener('keydown')` and `document.addEventListener('pointerdown')` handlers. Both call `setActivePanel(null)`. Cleanup returns remove them. `containerRef` on the toolbar div gives the pointer handler an `el.contains(e.target)` boundary.
+- Rejected: portal-based popover approach — would require refactoring all 4 panel components and is disproportionate for this gap. The `document` listener approach is the existing pattern in the codebase (e.g., site-selector nav).
+
+**D-015**: Lucide icons in ToolsRow — inline SVGs replaced
+- Phase 2.1 coincides with the Lucide install from Phase 1. Master prompt specifies Lucide for v3 components.
+- Decision: Replace 5 toolbar button inline SVGs with `Sparkles`, `ImagePlus`, `Smile`, `Film`, `Tags` from lucide-react. Close buttons use `X`. This also removes the last inline SVGs from the toolbar, making the icon treatment consistent with the MediaTile/MediaTray pattern from Phase 2.2.
+
+---
+
+## Phase 2.2 — Media upload render fix (A1) (2026-05-20)
+
+**D-016**: source_url snake_case vs sourceUrl camelCase
+- `ContentEditor.tsx` read `json.data.asset.sourceUrl` (camelCase) but `CreateMediaAssetResult` returns `source_url` (snake_case). The working analog at `lib/platform/social/media/create.ts:36-41` confirmed the field name.
+- Decision: Fix the read to `source_url`. Also tightened `MAX_BYTES` from 10MB to 8MB to match the API-side limit, and added `crypto.randomUUID()` trace IDs to error messages per existing pattern in the codebase.
+
+**D-017**: MediaTile component — 80×80 tile with hover trash icon
+- `MediaTray` previously used inline divs with hardcoded remove buttons. Master prompt specifies "media tile" vocabulary.
+- Decision: Extract `MediaTile` component at `components/social/composer/MediaTile.tsx`. Uses Lucide `Trash2` on hover (group-hover opacity transition). `isGif?: boolean` prop renders a GIF badge using `text-xs` (NOT arbitrary `text-[9px]` which would fail the design-tokens unit test). `data-testid="media-tile-{index}"` for e2e.
+
+---
+
+## Phase 2.3 — GIF picker → storage proxy (A2) (2026-05-20)
+
+**D-018**: GIF picker uses server-side GIPHY proxy, not client-side key
+- Master prompt says "GIF picker → GIPHY Search API". Original GifPanel read `process.env.NEXT_PUBLIC_GIPHY_API_KEY` directly in the browser.
+- Decision: Route GIF search through `GET /api/platform/social/gif-search` (new server route). Client never sees the API key. Simpler auth boundary: same `requireCanDoForApi` gate as all other social API routes.
+
+**D-019**: GIF storage proxy — download from Giphy CDN, upload to Supabase
+- Giphy CDN URLs are signed and expire. A post scheduled weeks out would have a broken GIF.
+- Decision: `POST /api/platform/social/gif-proxy` downloads the GIF from `media*.giphy.com` (validated by regex to prevent SSRF), uploads to `social-media` Supabase Storage bucket, creates `social_media_assets` row, returns 1-year signed URL. Same pattern as the existing media upload route.
+
+**D-020**: gifIndices Set\<number\> instead of typed media array
+- Need to display GIF badge on MediaTile for GIFs. Options: (a) change `media_urls: string[]` to `media_items: {url, type}[]`, (b) add a parallel `Set<number>` tracking GIF indices.
+- Decision: Option (b). No schema change. `Draft` type (`lib/social/types.ts`) stays `media_urls: string[]`. `ContentEditor` owns a local `gifIndices: Set<number>` state. On remove, indices shift correctly. Badge is cosmetic — GIFs are valid images; the server accepts them identically.
+
