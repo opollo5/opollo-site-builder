@@ -6,6 +6,7 @@ import { logClientError } from "@/lib/errors/logClientError";
 import { MediaTray } from "@/components/social/composer/MediaTray";
 import { ToolsRow } from "@/components/social/composer/ToolsRow";
 import { LinkPreviewCard, LinkPreviewLoader, type LinkPreviewData } from "@/components/social/composer/LinkPreviewCard";
+import type { Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // ContentEditor — controlled textarea + char counter + media tray + tools row.
@@ -20,6 +21,7 @@ export interface ContentEditorProps {
   onMediaChange: (urls: string[]) => void;
   maxLength: number;
   companyId: string;
+  platforms?: Platform[];
   className?: string;
 }
 
@@ -35,6 +37,7 @@ export function ContentEditor({
   onMediaChange,
   maxLength,
   companyId,
+  platforms,
   className,
 }: ContentEditorProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -252,6 +255,7 @@ export function ContentEditor({
           onInsertText={insertText}
           onOpenMediaPicker={openPicker}
           onAttachGif={attachGif}
+          platforms={platforms}
         />
       </div>
 
