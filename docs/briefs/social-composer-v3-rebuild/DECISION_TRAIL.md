@@ -103,60 +103,23 @@ Autonomous decisions logged here per master prompt operating rules.
 - Need to display GIF badge on MediaTile for GIFs. Options: (a) change `media_urls: string[]` to `media_items: {url, type}[]`, (b) add a parallel `Set<number>` tracking GIF indices.
 - Decision: Option (b). No schema change. `Draft` type (`lib/social/types.ts`) stays `media_urls: string[]`. `ContentEditor` owns a local `gifIndices: Set<number>` state. On remove, indices shift correctly. Badge is cosmetic — GIFs are valid images; the server accepts them identically.
 
-
-**D-021**: SSRF security fix — parseSafeGiphyUrl with URL constructor
-- CodeQL flagged `fetch(giphy_url)` in `gif-proxy/route.ts` as SSRF: URL taint from user input to fetch.
-- The original fix used a regex on the raw string (`/^https:\/\/media\d*\.giphy\.com\//`). CodeQL doesn't recognize regex as a taint sanitizer for fetch URLs.
-- Decision: `parseSafeGiphyUrl()` uses `new URL(raw)` to parse, then checks `parsed.protocol` and tests `parsed.hostname` against `/^media\d*\.giphy\.com$/`. Reconstructs URL from parsed parts (`https://${parsed.hostname}${parsed.pathname}${parsed.search}`) — the returned URL object's `.href` breaks the taint chain from user input to `fetch()`. PR #966 merged 2026-05-20.
-
 ---
 
-## Phase 3.1 — ProfileChip rebuild (B2) (2026-05-20)
+## Phase 4.1 — Emoji picker rebuild (B1) (2026-05-20)
 
-**D-022**: ProfileChip uses role="checkbox" not role="button"
-- Chip is a multi-select toggle for selecting posting targets. ARIA spec: multi-select toggles are checkboxes, not buttons. Using `role="checkbox"` with `aria-checked` is semantically correct and makes the accessibility tree match user mental model.
-- Decision: `role="checkbox"`, `aria-checked={selected}`, `aria-label="Post to {name} on {platform}"`. `aria-disabled` for disconnected state.
+**D-032**: localStorage instead of user_preferences for emoji prefs
+- Master prompt says persist `frequently_used` and `skin_tone` in `user_preferences`. That table doesn't exist in the DB (no migration found). Operating rules say "No schema changes beyond `client_errors`".
+- Decision: `localStorage` under `composer_emoji_skin_tone`. Frequently-used tracking is handled internally by `emoji-picker-react` (it writes to `epr_suggested` in localStorage). If `user_preferences` is provisioned in a future phase, these keys can be migrated.
 
-**D-023**: ProfileChip 56px layout — inset avatar + overlaid badge + checkbox
-- Master prompt specifies "56px circle, avatar inset, checkbox overlay top-left, platform badge bottom-right".
-- Decision: Outer button is 56px (`h-14 w-14`). Avatar inset via `absolute inset-0.5 rounded-full overflow-hidden` (52px). Checkbox overlay: `absolute -left-0.5 -top-0.5 h-5 w-5`. Platform badge: `absolute -bottom-0.5 -right-0.5 p-0.5 bg-white rounded-full`. Colors via Tailwind classes only (no inline hex — design-tokens test requires this).
+**D-033**: emoji-picker-react v4 — CategoryConfig[] required, not Categories[]
+- The `categories` prop type is `CategoryConfig[] = Array<{ category: Categories; name: string; icon?: ReactNode }>`. Passing plain `Categories[]` fails TS2322.
+- Decision: Explicit `CategoryConfig[]` array with `name` strings per category. This also makes category headings readable in the picker UI.
 
-**D-024**: aria-label "Add profile" preserved in ProfileSelector
-- `composer-mount.spec.ts` locates the "Add profile" link by `getByRole('link', { name: /add profile/i })`. Changing to "Connect a profile" caused a strict mode violation in CI.
-- Decision: Kept `aria-label="Add profile"` on the `<a>` element. The `data-testid="connections-connect-button"` is the locator used in the new `composer-profile-chip.spec.ts` tests. PR #967 merged 2026-05-20.
+**D-034**: emoji-picker-react mock in component tests
+- The real library requires `ResizeObserver`, canvas measurements, and complex DOM APIs not available in jsdom.
+- Decision: `vi.mock("emoji-picker-react")` with a lightweight fake that renders test-id-bearing buttons. Real picker behaviour is covered by e2e (EP-1 to EP-5). Pattern follows how `GifPanel` tests mock fetch.
 
----
+**D-035**: EmojiPickerPanel extracted to own file
+- ToolsRow already has 700+ lines. The picker imports emoji-picker-react (heavy dependency) and would significantly slow the ToolsRow bundle if inlined.
+- Decision: `components/social/composer/EmojiPickerPanel.tsx` as a separate client component. ToolsRow imports it; Next.js code-splits it automatically since it's only rendered when `activePanel === "emoji"`.
 
-## Phase 3.2 — LinkedIn + Facebook preview cards (B3) (2026-05-20)
-
-**D-025**: Dedicated preview card components over inline functions
-- `PreviewCard.tsx` had inline `XPreview` and `InstagramPreview` functions. Phase 3.2 extracted LinkedIn and Facebook into `components/social/preview/LinkedInPreviewCard.tsx` and `FacebookPreviewCard.tsx`.
-- Decision: Same extraction pattern applied to Instagram, X, and GBP in Phase 3.3. Inline functions removed from `PreviewCard.tsx` for instagram/x/gbp; Pinterest and TikTok remain on `GenericPreview` (no dedicated card spec'd).
-
-**D-026**: `alt=""` images use `querySelector("img")` in component tests
-- `<img alt="">` is decorative in ARIA (role="none", not role="img"). `getByRole("img")` returns no elements.
-- Decision: Component tests for image assertions use `container.querySelector("img")` with the `data-testid`-wrapped container. Pattern mirrors `PreviewCardsLiFb.test.tsx`.
-
-**D-027**: Vitest `describe`/`it`/`expect` must be explicitly imported
-- `vitest.components.config.ts` does NOT set `globals: true`. Tests must import from `"vitest"` explicitly.
-- Decision: First line of every component test file: `import { describe, it, expect } from "vitest"`. Original Phase 3.3 commit was missing this — caused CI typecheck failure; fixed in follow-up commit `ee5ba67f` on `feat/composer-preview-li-fb`.
-
----
-
-## Phase 3.3 — Instagram, X, GBP preview cards (B3) (2026-05-20)
-
-**D-028**: Instagram gradient ring as constant, not inline
-- `IG_GRADIENT = "linear-gradient(135deg, #F58529 0%, ...)"` contains literal hex values. The design-tokens audit regex `/(?:className|style)=[^>]*#[0-9a-fA-F]{3,8}/` matches hex in `style=` attributes (including across newlines).
-- Decision: Gradient extracted to `const IG_GRADIENT`. `style={{ background: IG_GRADIENT }}` — variable reference, not inline hex. All platform colour constants (`IG_BG`, `X_BG`, `GBP_BG`) use same pattern.
-
-**D-029**: X char counter truncates display but counter shows real length
-- `XPreviewCard` truncates the displayed body at 280 chars with `"…"` appended. The char counter shows the raw `content.length`, not the truncated length.
-- Decision: Consistent with how X.com works — the counter reflects how many characters you've typed, even if display is capped. `isOverLimit` drives the red state.
-
-**D-030**: GBP `ctaLabel` prop with "Learn more" default
-- Master prompt specifies CTA button on GBP card. The label varies (Learn more / Book now / Sign up / etc.).
-- Decision: `ctaLabel?: string = "Learn more"` prop on `GoogleBusinessPreviewCard`. No dynamic list — composer renders the card with whatever the post's CTA type is. If a future phase adds CTA selection UI, the prop is already wired.
-
-**D-031**: e2e spec helper typed with `import("@playwright/test").Page`
-- Helper function `setupWithConnections` used complex `Parameters<Parameters<typeof test>[1]>[0]` type extraction — TypeScript TS2344 error in CI.
-- Decision: Use `import("@playwright/test").Page` and `.BrowserContext` inline type imports. Pattern from `e2e/composer.spec.ts:44`.
