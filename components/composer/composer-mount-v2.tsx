@@ -17,9 +17,9 @@ import type { Connection, Draft } from "@/lib/social/types";
 // the V2 Draft props so pushed CAP drafts and any server-side-created drafts
 // open with their content pre-filled.
 //
-// Connections are pre-fetched server-side in the layout and passed in so
-// ComposerOverlay renders the profile selector without a client-side round
-// trip on open.
+// Connections are fetched client-side from GET /api/platform/social/connections
+// when compose is triggered — this allows Playwright route mocks to control
+// which connections appear in the composer during e2e tests.
 // ---------------------------------------------------------------------------
 
 // V1 social_post_drafts shape from GET /api/platform/social/drafts/[id].
@@ -36,6 +36,20 @@ interface V1DraftApiResponse {
   };
 }
 
+// Minimal V1 connection shape returned by the connections API.
+interface V1Connection {
+  id: string;
+  platform: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  status: string;
+}
+
+interface V1ConnectionsApiResponse {
+  ok: boolean;
+  data?: { connections: V1Connection[] };
+}
+
 function mapV1ToV2Draft(d: NonNullable<V1DraftApiResponse["data"]>): Draft {
   return {
     id: d.id,
@@ -47,12 +61,28 @@ function mapV1ToV2Draft(d: NonNullable<V1DraftApiResponse["data"]>): Draft {
   };
 }
 
-interface ComposerMountV2Props {
-  companyId: string;
-  availableConnections: Connection[];
+function mapV1Platform(p: string): Connection["platform"] {
+  if (p === "linkedin_personal" || p === "linkedin_company") return "linkedin";
+  if (p === "facebook_page") return "facebook";
+  if (p === "instagram_business") return "instagram";
+  if (p === "gbp") return "google_business_profile";
+  return p as Connection["platform"];
 }
 
-function ComposerMountV2Inner({ companyId, availableConnections }: ComposerMountV2Props) {
+function mapV1Connection(c: V1Connection): Connection {
+  return {
+    id: c.id,
+    platform: mapV1Platform(c.platform),
+    account_name: c.display_name ?? c.platform,
+    account_avatar_url: c.avatar_url ?? "",
+  };
+}
+
+interface ComposerMountV2Props {
+  companyId: string;
+}
+
+function ComposerMountV2Inner({ companyId }: ComposerMountV2Props) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const router = useRouter();
@@ -60,8 +90,36 @@ function ComposerMountV2Inner({ companyId, availableConnections }: ComposerMount
   const initialDraftId = compose && compose !== "new" ? compose : undefined;
 
   const [loadedDraft, setLoadedDraft] = useState<Draft | null>(null);
-  // fetchComplete: false until we've attempted + resolved the draft fetch.
   const [fetchComplete, setFetchComplete] = useState(false);
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [connectionsReady, setConnectionsReady] = useState(false);
+
+  // Fetch connections client-side so Playwright mocks can intercept.
+  useEffect(() => {
+    if (!compose) {
+      setConnections([]);
+      setConnectionsReady(false);
+      return;
+    }
+    setConnectionsReady(false);
+    void fetch(`/api/platform/social/connections?company_id=${encodeURIComponent(companyId)}`)
+      .then((r) => r.json() as Promise<V1ConnectionsApiResponse>)
+      .then((json) => {
+        if (json.ok && json.data) {
+          setConnections(
+            json.data.connections
+              .filter((c) => c.status !== "disconnected")
+              .map(mapV1Connection),
+          );
+        }
+      })
+      .catch(() => {
+        // Graceful degradation: composer opens with no connection chips if fetch fails.
+      })
+      .finally(() => {
+        setConnectionsReady(true);
+      });
+  }, [compose, companyId]);
 
   useEffect(() => {
     if (!initialDraftId) {
@@ -87,7 +145,7 @@ function ComposerMountV2Inner({ companyId, availableConnections }: ComposerMount
   }, [initialDraftId]);
 
   if (!compose) return null;
-  // Hold rendering until the existing draft is loaded from the API.
+  if (!connectionsReady) return null;
   if (initialDraftId && !fetchComplete) return null;
 
   function handleClose() {
@@ -102,16 +160,16 @@ function ComposerMountV2Inner({ companyId, availableConnections }: ComposerMount
       open={true}
       onClose={handleClose}
       companyId={companyId}
-      availableConnections={availableConnections}
+      availableConnections={connections}
       initialDraft={loadedDraft ?? undefined}
     />
   );
 }
 
-export function ComposerMountV2({ companyId, availableConnections }: ComposerMountV2Props) {
+export function ComposerMountV2({ companyId }: ComposerMountV2Props) {
   return (
     <Suspense fallback={null}>
-      <ComposerMountV2Inner companyId={companyId} availableConnections={availableConnections} />
+      <ComposerMountV2Inner companyId={companyId} />
     </Suspense>
   );
 }

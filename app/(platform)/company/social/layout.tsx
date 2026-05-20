@@ -4,8 +4,6 @@ import type { ReactNode } from "react";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { ComposerMountV2 } from "@/components/composer/composer-mount-v2";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
-import { listConnections } from "@/lib/platform/social/connections";
-import type { Connection, Platform } from "@/lib/social/types";
 
 // /company/social/* — session + company guard.
 //
@@ -43,34 +41,11 @@ export default async function CompanySocialLayout({
   }
 
   const companyId = session.company.companyId;
-  const connectionsResult = await listConnections({ companyId });
-
-  const rawConnections = connectionsResult.ok ? connectionsResult.data.connections : [];
-  const availableConnections: Connection[] = rawConnections
-    .filter((c) => c.status !== "disconnected")
-    .map((c) => ({
-      id: c.id,
-      platform: mapSocialPlatform(c.platform),
-      account_name: c.display_name ?? c.platform,
-      account_avatar_url: c.avatar_url ?? "",
-    }));
 
   return (
     <>
       {children}
-      <ComposerMountV2
-        companyId={companyId}
-        availableConnections={availableConnections}
-      />
+      <ComposerMountV2 companyId={companyId} />
     </>
   );
-}
-
-// Maps V1 SocialPlatform values to V2 Platform values.
-function mapSocialPlatform(p: string): Platform {
-  if (p === "linkedin_personal" || p === "linkedin_company") return "linkedin";
-  if (p === "facebook_page") return "facebook";
-  if (p === "instagram_business") return "instagram";
-  if (p === "gbp") return "google_business_profile";
-  return p as Platform;
 }
