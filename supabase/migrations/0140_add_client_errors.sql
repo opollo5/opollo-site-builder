@@ -9,7 +9,7 @@
 create table if not exists client_errors (
   id          uuid         primary key default gen_random_uuid(),
   trace_id    text         not null,
-  company_id  uuid         references companies(id),
+  company_id  uuid         references platform_companies(id),
   user_id     uuid         references auth.users(id),
   surface     text         not null,
   error_code  text         not null,
