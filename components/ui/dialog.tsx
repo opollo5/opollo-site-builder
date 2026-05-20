@@ -51,8 +51,7 @@ const DialogContent = React.forwardRef<
         "max-h-[calc(100dvh-2rem)] overflow-y-auto",
         "gap-4 border bg-background p-6 shadow-lg",
         "rounded-lg",
-        "data-[state=open]:animate-[c3-modal-in_320ms_cubic-bezier(0.22,1,0.36,1)_both]",
-        "data-[state=closed]:animate-[c3-modal-out_200ms_cubic-bezier(0.16,1,0.3,1)_both]",
+        "data-[state=open]:opollo-fade-in data-[state=closed]:opollo-fade-out",
         "sm:rounded-lg",
         className,
       )}

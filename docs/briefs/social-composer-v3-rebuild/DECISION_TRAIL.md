@@ -158,6 +158,10 @@ Autonomous decisions logged here per master prompt operating rules.
 - Initial decision: `data-[state=open]:animate-[c3-modal-in_320ms_cubic-bezier(0.22,1,0.36,1)_both]` + matching closed variant.
 - Revised (D-043): Reverted `dialog.tsx` to `opollo-fade-in`/`opollo-fade-out` — see D-043.
 
+**D-043**: Radix Dialog animation reverted to `opollo-fade-in`/`opollo-fade-out`
+- The `animate-[c3-modal-in_..._both]` Tailwind syntax on `DialogContent` broke Playwright's click actionability in headless Chromium. Root cause: `fill-mode: both` + scale transform caused Radix's `animationend` lifecycle to not fire correctly in CI, preventing the dialog from unmounting after close. Tests `analytics H-4` and `briefs-review-M12-1` failed consistently across two runs.
+- Decision: Revert `dialog.tsx` to use `data-[state=open]:opollo-fade-in data-[state=closed]:opollo-fade-out` (opacity-only, 150ms). The ComposerOverlay itself is NOT a Radix Dialog — it uses a custom div — so its `c3-modal-in` class is unaffected and the scale animation still plays there.
+
 **D-041**: Keyboard shortcuts implemented via DOM querySelector in ComposerOverlay
 - All shortcuts (⌘↵, ⌘S, ⌘⇧S, ⌘K, ⌘E, ⌘I, ⌘1-5, ?, Esc) handled in a single `document.addEventListener('keydown')` in ComposerOverlay.
 - For ⌘E (emoji) and ⌘I (media): uses `overlayRef.current?.querySelector('[data-testid="..."]')?.click()` to trigger the toolbar button. This avoids threading callbacks through 3 component levels (Overlay → Editor → ContentEditor → ToolsRow).
