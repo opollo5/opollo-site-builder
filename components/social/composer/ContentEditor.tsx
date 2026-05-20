@@ -39,6 +39,8 @@ export function ContentEditor({
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  // Tracks which indices in mediaUrls are GIFs (for MediaTile GIF badge).
+  const [gifIndices, setGifIndices] = React.useState<Set<number>>(new Set());
 
   const charCount = value.length;
   const isOverLimit = charCount > maxLength;
@@ -105,6 +107,16 @@ export function ContentEditor({
     setUploading(false);
   }
 
+  function attachGif(storageUrl: string) {
+    if (mediaUrls.length >= MAX_FILES) {
+      setUploadError(`Maximum ${MAX_FILES} media items.`);
+      return;
+    }
+    const newIndex = mediaUrls.length;
+    onMediaChange([...mediaUrls, storageUrl]);
+    setGifIndices((prev) => new Set([...prev, newIndex]));
+  }
+
   return (
     <div className={cn("rounded-xl border border-border bg-white overflow-hidden", className)}>
       <textarea
@@ -125,8 +137,16 @@ export function ContentEditor({
         <div className="px-4 pb-3">
           <MediaTray
             urls={mediaUrls}
-            onRemove={(i) => onMediaChange(mediaUrls.filter((_, idx) => idx !== i))}
+            onRemove={(i) => {
+              onMediaChange(mediaUrls.filter((_, idx) => idx !== i));
+              setGifIndices((prev) => {
+                const next = new Set<number>();
+                prev.forEach((gi) => { if (gi < i) next.add(gi); else if (gi > i) next.add(gi - 1); });
+                return next;
+              });
+            }}
             onRequestUpload={openPicker}
+            gifIndices={gifIndices}
             uploading={uploading}
           />
         </div>
@@ -158,6 +178,7 @@ export function ContentEditor({
           companyId={companyId}
           onInsertText={insertText}
           onOpenMediaPicker={openPicker}
+          onAttachGif={attachGif}
         />
       </div>
 

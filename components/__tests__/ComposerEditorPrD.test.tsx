@@ -266,7 +266,6 @@ describe("ToolsRow", () => {
       "fetch",
       vi.fn().mockResolvedValue({
         ok: false,
-        status: 503,
         json: () => Promise.resolve({ ok: false, error: { message: "unavailable in test" } }),
       }),
     );
@@ -277,7 +276,7 @@ describe("ToolsRow", () => {
 
   it("renders all tool buttons", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     expect(screen.getByRole("button", { name: /ai assistant/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /media/i })).toBeTruthy();
@@ -289,7 +288,7 @@ describe("ToolsRow", () => {
   it("calls onOpenMediaPicker when Media button is clicked", () => {
     const onOpenMediaPicker = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={onOpenMediaPicker} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={onOpenMediaPicker} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /media/i }));
     expect(onOpenMediaPicker).toHaveBeenCalledTimes(1);
@@ -297,7 +296,7 @@ describe("ToolsRow", () => {
 
   it("opens emoji panel when Emoji button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /emoji/i }));
     // Panel has a close button and an emoji grid — 🎉 is the first emoji
@@ -306,7 +305,7 @@ describe("ToolsRow", () => {
 
   it("closes emoji panel when close button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /emoji/i }));
     fireEvent.click(screen.getByRole("button", { name: /close emoji panel/i }));
@@ -316,7 +315,7 @@ describe("ToolsRow", () => {
   it("inserts emoji and closes panel when emoji is clicked", () => {
     const onInsertText = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /emoji/i }));
     fireEvent.click(screen.getByRole("button", { name: "🎉" }));
@@ -326,7 +325,7 @@ describe("ToolsRow", () => {
 
   it("opens UTM panel when UTM tags button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /utm tags/i }));
     // Panel is open when the URL input is visible
@@ -340,7 +339,7 @@ describe("ToolsRow", () => {
   it("inserts UTM URL and closes panel when Insert URL is clicked", () => {
     const onInsertText = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /utm tags/i }));
     const urlInput = screen.getAllByRole("textbox").find((el) =>
@@ -365,7 +364,7 @@ describe("ToolsRow", () => {
 
   it("toggles active panel off when same button is clicked twice", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     // Use exact name match to avoid matching "Insert URL with UTM tags" button inside the panel
     const utmBtn = screen.getByRole("button", { name: "UTM tags" });
@@ -385,7 +384,7 @@ describe("ToolsRow", () => {
 
   it("shows AI panel when AI assistant button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
     expect(screen.getByRole("button", { name: /close ai panel/i })).toBeTruthy();
@@ -394,7 +393,7 @@ describe("ToolsRow", () => {
 
   it("shows cost estimate when prompt is typed", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
     fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "write a post" } });
@@ -424,7 +423,7 @@ describe("ToolsRow", () => {
     }));
 
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
     fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
@@ -459,7 +458,7 @@ describe("ToolsRow", () => {
     }));
 
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
     fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
@@ -481,7 +480,7 @@ describe("ToolsRow", () => {
 
     const onInsertText = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
     fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
@@ -495,12 +494,14 @@ describe("ToolsRow", () => {
     expect(onInsertText).toHaveBeenCalledWith("Here is your generated post!");
   });
 
-  it("shows not-configured message when GIPHY key absent", () => {
+  it("opens GIF panel when GIF button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /gif/i }));
-    expect(screen.getByText(/NEXT_PUBLIC_GIPHY_API_KEY is not set/)).toBeTruthy();
+    // Panel renders the category tabs and attribution
+    expect(screen.getByRole("tab", { name: /trending/i })).toBeTruthy();
+    expect(screen.getByText(/powered by giphy/i)).toBeTruthy();
   });
 });
 

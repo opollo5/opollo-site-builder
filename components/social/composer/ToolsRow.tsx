@@ -21,6 +21,7 @@ export interface ToolsRowProps {
   companyId: string;
   onInsertText: (text: string) => void;
   onOpenMediaPicker: () => void;
+  onAttachGif: (url: string) => void;
   className?: string;
 }
 
@@ -346,87 +347,161 @@ function AiPanel({
 // GIF picker panel
 // ---------------------------------------------------------------------------
 
-interface GiphyResult {
+const GIF_CATEGORIES = [
+  { id: "trending", label: "Trending" },
+  { id: "reactions", label: "Reactions" },
+  { id: "sports", label: "Sports" },
+  { id: "memes", label: "Memes" },
+  { id: "animation", label: "Animation" },
+  { id: "tech", label: "Tech" },
+  { id: "stickers", label: "Stickers" },
+] as const;
+
+interface GifResult {
   id: string;
-  images: { fixed_width: { url: string }; fixed_width_still: { url: string }; original: { url: string } };
   title: string;
+  preview_url: string;
+  animated_url: string;
+  original_url: string;
 }
 
 function GifPanel({
-  onInsert,
+  companyId,
+  onAttach,
   onClose,
 }: {
-  onInsert: (url: string) => void;
+  companyId: string;
+  onAttach: (storageUrl: string) => void;
   onClose: () => void;
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_GIPHY_API_KEY ?? "";
   const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<GiphyResult[]>([]);
+  const [category, setCategory] = React.useState<string>("trending");
+  const [results, setResults] = React.useState<GifResult[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [attaching, setAttaching] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function search(q: string) {
-    if (!apiKey) return;
+  async function search(q: string, cat: string) {
     setLoading(true);
+    setError(null);
     try {
-      const endpoint = q.trim()
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(q)}&limit=12&rating=g`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${encodeURIComponent(apiKey)}&limit=12&rating=g`;
-      const res = await fetch(endpoint);
-      const json = (await res.json()) as { data: GiphyResult[] };
-      setResults(json.data ?? []);
+      const params = new URLSearchParams({ company_id: companyId, category: cat, limit: "12" });
+      if (q.trim()) params.set("q", q.trim());
+      const res = await fetch(`/api/platform/social/gif-search?${params.toString()}`);
+      const json = (await res.json()) as { ok: boolean; data?: { results: GifResult[] }; error?: { message: string } };
+      if (json.ok && json.data) {
+        setResults(json.data.results);
+      } else {
+        setError(json.error?.message ?? "GIF search unavailable.");
+      }
     } catch {
-      // silently fail — GIF picker is optional
+      setError("GIF search failed. Please try again.");
     } finally {
       setLoading(false);
     }
   }
 
-  React.useEffect(() => { void search(""); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Initial load
+  React.useEffect(() => { void search("", category); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!apiKey) {
-    return (
-      <div className="rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
-        NEXT_PUBLIC_GIPHY_API_KEY is not set.
-        <button type="button" onClick={onClose} className="ml-2 text-xs underline">Close</button>
-      </div>
-    );
+  // Debounced query search (300 ms)
+  React.useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void search(query, category); }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, category]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSelect(gif: GifResult) {
+    setAttaching(gif.id);
+    try {
+      const res = await fetch("/api/platform/social/gif-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, giphy_url: gif.original_url }),
+      });
+      const json = (await res.json()) as { ok: boolean; data?: { asset: { source_url: string } }; error?: { message: string } };
+      if (json.ok && json.data?.asset.source_url) {
+        onAttach(json.data.asset.source_url);
+        onClose();
+      } else {
+        setError(json.error?.message ?? "Failed to attach GIF.");
+      }
+    } catch {
+      setError("Failed to attach GIF. Please try again.");
+    } finally {
+      setAttaching(null);
+    }
   }
 
   return (
-    <div className="w-72 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
+    <div className="w-80 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">GIF picker</p>
         <button type="button" onClick={onClose} aria-label="Close GIF panel" className="text-muted-foreground hover:text-foreground">
           <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
+
+      {/* Category tabs */}
+      <div className="flex flex-wrap gap-1" role="tablist" aria-label="GIF categories">
+        {GIF_CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            role="tab"
+            aria-selected={category === cat.id}
+            onClick={() => setCategory(cat.id)}
+            className={cn(
+              "rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
+              category === cat.id
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80",
+            )}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       <input
         type="search"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") void search(query); }}
         placeholder="Search GIPHY…"
         className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
+        aria-label="Search GIFs"
       />
+
+      {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
       {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
-      <div className="grid grid-cols-3 gap-1 max-h-48 overflow-y-auto">
+
+      <div className="grid grid-cols-3 gap-1 max-h-52 overflow-y-auto" data-testid="gif-grid">
         {results.map((gif) => (
           <button
             key={gif.id}
             type="button"
-            aria-label={gif.title}
-            onClick={() => { onInsert(gif.images.original.url); onClose(); }}
-            className="overflow-hidden rounded"
+            aria-label={gif.title || "GIF"}
+            disabled={!!attaching}
+            onClick={() => void handleSelect(gif)}
+            className={cn(
+              "overflow-hidden rounded transition-opacity",
+              attaching === gif.id ? "opacity-40" : "hover:opacity-80",
+            )}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={gif.images.fixed_width_still.url}
+              src={gif.preview_url}
               alt={gif.title}
-              className="h-16 w-full object-cover hover:opacity-80 transition-opacity"
+              className="h-16 w-full object-cover"
+              loading="lazy"
             />
           </button>
         ))}
       </div>
+
+      {/* Attribution required by GIPHY terms */}
+      <p className="text-center text-xs text-muted-foreground">Powered by GIPHY</p>
     </div>
   );
 }
@@ -546,7 +621,7 @@ const TOOLS = [
   { id: "utm" as const,   label: "UTM tags",      icon: <Tags      size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
-export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className }: ToolsRowProps) {
+export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, className }: ToolsRowProps) {
   const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -625,7 +700,8 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className
       {activePanel === "gif" && (
         <div data-testid="composer-panel-gif">
           <GifPanel
-            onInsert={onInsertText}
+            companyId={companyId}
+            onAttach={onAttachGif}
             onClose={() => setActivePanel(null)}
           />
         </div>
