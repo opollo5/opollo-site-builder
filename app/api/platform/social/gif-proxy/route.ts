@@ -22,10 +22,31 @@ import { getServiceRoleClient } from "@/lib/supabase";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const GIPHY_HOST_RE = /^https:\/\/media\d*\.giphy\.com\//;
 const MAX_GIF_BYTES = 8 * 1024 * 1024; // 8 MB
 const SIGNED_URL_TTL = 365 * 24 * 3600; // 1 year
 const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+// Allowed Giphy CDN hostnames: media.giphy.com, media0.giphy.com, media1.giphy.com, …
+const GIPHY_HOST_RE = /^media\d*\.giphy\.com$/;
+
+/**
+ * Validates that a URL is a safe Giphy CDN URL and returns a reconstructed
+ * URL object (breaking the taint chain from user input to fetch).
+ * Returns null if the URL is not acceptable.
+ */
+function parseSafeGiphyUrl(raw: string): URL | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:") return null;
+  if (!GIPHY_HOST_RE.test(parsed.hostname)) return null;
+  // Reconstruct from parsed parts — hostname is now from a trusted URL object,
+  // not directly from the user-supplied string.
+  return new URL(`https://${parsed.hostname}${parsed.pathname}${parsed.search}`);
+}
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   let body: unknown;
@@ -40,17 +61,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (typeof company_id !== "string" || !UUID_RE.test(company_id)) {
     return validationError("company_id (uuid) is required.");
   }
-  if (typeof giphy_url !== "string" || !GIPHY_HOST_RE.test(giphy_url)) {
-    return validationError("giphy_url must be a media.giphy.com URL.");
+
+  const safeGiphyUrl = typeof giphy_url === "string" ? parseSafeGiphyUrl(giphy_url) : null;
+  if (!safeGiphyUrl) {
+    return validationError("giphy_url must be an https://media*.giphy.com URL.");
   }
 
   const gate = await requireCanDoForApi(company_id, "edit_post");
   if (gate.kind === "deny") return gate.response;
 
-  // Fetch the GIF from Giphy
+  // Fetch the GIF from the validated Giphy URL (safeGiphyUrl is a URL object, not raw user input)
   let gifRes: Response;
   try {
-    gifRes = await fetch(giphy_url);
+    gifRes = await fetch(safeGiphyUrl.href);
   } catch {
     return internalError("Failed to fetch GIF from Giphy.");
   }
