@@ -22,8 +22,9 @@ export interface ContentEditorProps {
 }
 
 const MAX_FILES = 4;
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPTED = "image/jpeg,image/png,image/gif,image/webp";
+const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 export function ContentEditor({
   value,
@@ -76,8 +77,14 @@ export function ContentEditor({
     setUploading(true);
     const newUrls: string[] = [];
     for (const file of Array.from(files)) {
+      const traceId = crypto.randomUUID();
+      if (!ACCEPTED_TYPES.has(file.type)) {
+        setUploadError(`${file.name} is not a supported format (JPEG, PNG, GIF, WebP). [trace: ${traceId}]`);
+        setUploading(false);
+        return;
+      }
       if (file.size > MAX_BYTES) {
-        setUploadError(`${file.name} is over 10 MB.`);
+        setUploadError(`${file.name} exceeds the 8 MB limit. [trace: ${traceId}]`);
         setUploading(false);
         return;
       }
@@ -87,12 +94,12 @@ export function ContentEditor({
       const res = await fetch("/api/platform/social/media/upload", { method: "POST", body: fd });
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        setUploadError(json.error?.message ?? "Upload failed.");
+        setUploadError((json.error?.message ?? "Upload failed.") + ` [trace: ${traceId}]`);
         setUploading(false);
         return;
       }
-      const json = (await res.json()) as { ok: boolean; data: { asset: { sourceUrl: string } } };
-      newUrls.push(json.data.asset.sourceUrl);
+      const json = (await res.json()) as { ok: boolean; data: { asset: { source_url: string } } };
+      newUrls.push(json.data.asset.source_url);
     }
     onMediaChange([...mediaUrls, ...newUrls]);
     setUploading(false);
@@ -161,6 +168,7 @@ export function ContentEditor({
         accept={ACCEPTED}
         multiple
         className="sr-only"
+        data-testid="media-file-input"
         onChange={(e) => {
           if (e.target.files?.length) {
             void handleFiles(e.target.files);

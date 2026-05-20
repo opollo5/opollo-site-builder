@@ -210,7 +210,7 @@ describe("MediaTray", () => {
         onRequestUpload={() => undefined}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /remove image 1/i }));
+    fireEvent.click(screen.getByRole("button", { name: /remove media 1/i }));
     expect(onRemove).toHaveBeenCalledWith(0);
   });
 
@@ -230,15 +230,16 @@ describe("MediaTray", () => {
     const onRequestUpload = vi.fn();
     render(
       <MediaTray
-        urls={[]}
+        urls={["https://example.com/a.jpg"]}
         onRemove={() => undefined}
         onRequestUpload={onRequestUpload}
-        uploading={true}
+        uploading={false}
+        maxFiles={4}
       />,
     );
-    // Add media button is disabled while uploading but still rendered
     const btn = screen.getByRole("button", { name: /add media/i });
-    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onRequestUpload).toHaveBeenCalledTimes(1);
   });
 
   it("does not render Add media button when at max files", () => {
@@ -623,7 +624,7 @@ describe("ContentEditor", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toBeTruthy(),
     );
-    expect(screen.getByText(/over 10 MB/i)).toBeTruthy();
+    expect(screen.getByText(/8 MB/i)).toBeTruthy();
   });
 });
 
