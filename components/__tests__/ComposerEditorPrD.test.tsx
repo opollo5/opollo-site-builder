@@ -260,6 +260,20 @@ describe("MediaTray", () => {
 // ---------------------------------------------------------------------------
 
 describe("ToolsRow", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({ ok: false, error: { message: "unavailable in test" } }),
+      }),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders all tool buttons", () => {
     render(
       <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
@@ -373,8 +387,111 @@ describe("ToolsRow", () => {
       <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
-    // Panel has a textarea for the prompt and a Generate button
     expect(screen.getByRole("button", { name: /close ai panel/i })).toBeTruthy();
+    expect(screen.getByTestId("ai-generate-button")).toBeTruthy();
+  });
+
+  it("shows cost estimate when prompt is typed", () => {
+    render(
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "write a post" } });
+    expect(screen.getByTestId("ai-cost-estimate").textContent).toMatch(/Est\. cost:/);
+  });
+
+  it("shows rate limit error with trace_id on 429 response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/api/errors")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: { trace_id: "ce-abcd-1234" } }) });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({
+          ok: false,
+          error: {
+            category: "rate_limit",
+            code: "RATE_LIMIT",
+            message: "You hit the per-minute token limit. Try again in 60s.",
+            trace_id: "ai-gen-7f3a-c2e1",
+            retry_after: 60,
+            can_retry: true,
+          },
+        }),
+      });
+    }));
+
+    render(
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
+    fireEvent.click(screen.getByTestId("ai-generate-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-error-display")).toBeTruthy();
+    });
+    expect(screen.getByTestId("ai-trace-id").textContent).toContain("ai-gen-7f3a-c2e1");
+    expect(screen.getByTestId("ai-error-display").textContent).toMatch(/rate.limit|token limit/i);
+  });
+
+  it("shows timeout error with trace_id on timeout response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/api/errors")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: { trace_id: "ce-efgh-5678" } }) });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({
+          ok: false,
+          error: {
+            category: "timeout",
+            code: "TIMEOUT",
+            message: "Generation timed out. Try shortening your prompt.",
+            trace_id: "ai-gen-9c1b-a847",
+            can_retry: true,
+          },
+        }),
+      });
+    }));
+
+    render(
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
+    fireEvent.click(screen.getByTestId("ai-generate-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-error-display")).toBeTruthy();
+    });
+    expect(screen.getByTestId("ai-trace-id").textContent).toContain("ai-gen-9c1b-a847");
+    expect(screen.getByTestId("ai-error-display").textContent).toMatch(/timeout|timed out/i);
+  });
+
+  it("shows generated result on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true, data: { text: "Here is your generated post!" } }),
+    }));
+
+    const onInsertText = vi.fn();
+    render(
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
+    fireEvent.click(screen.getByTestId("ai-generate-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-result")).toBeTruthy();
+    });
+    expect(screen.getByTestId("ai-result").textContent).toContain("Here is your generated post!");
+    fireEvent.click(screen.getByRole("button", { name: /use this text/i }));
+    expect(onInsertText).toHaveBeenCalledWith("Here is your generated post!");
   });
 
   it("shows not-configured message when GIPHY key absent", () => {
