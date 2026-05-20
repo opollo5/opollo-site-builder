@@ -571,8 +571,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
               side="bottom"
               align="start"
               sideOffset={8}
-              avoidCollisions={false}
-              className="z-[200] outline-none"
+              className="z-[200] outline-none max-h-[calc(100vh-100px)] overflow-y-auto"
             >
               {/* c3-panel-in: 200ms translateY(-8px)→0 + fade, ease-snap */}
               <div className="c3-panel-in" data-testid={`composer-panel-${tool.id}`}>

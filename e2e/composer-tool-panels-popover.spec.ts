@@ -13,6 +13,9 @@ async function openComposer(page: import("@playwright/test").Page) {
   await page.goto("/company/social/calendar?compose=new");
   const dialog = page.getByRole("dialog", { name: /new post/i });
   await expect(dialog).toBeVisible({ timeout: 20_000 });
+  // c3-modal-in entrance animation is 320ms scale(0.96→1). Wait for it to
+  // finish before any bounding-box measurements so position reads are stable.
+  await page.waitForTimeout(400);
   return dialog;
 }
 
