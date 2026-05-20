@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import { getDesignSystemCssOverride } from "@/lib/design-system/get-override";
 import "@/styles/tokens.css";
 import "./globals.css";
@@ -34,7 +36,7 @@ export default async function RootLayout({
 }) {
   const cssOverride = await getDesignSystemCssOverride();
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}

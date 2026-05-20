@@ -524,3 +524,124 @@
   }
 }
 
+/* ===========================================================================
+   Composer v3 design tokens — prefixed --c3-* to avoid collision with the
+   existing Opollo design system tokens. Used exclusively by composer v3
+   components. Source of truth: docs/briefs/social-composer-v3-rebuild/00-design-tokens.md
+   =========================================================================== */
+:root {
+  /* Neutral scale */
+  --c3-canvas:    #FAFAFA;
+  --c3-surface:   #FFFFFF;
+  --c3-surface-2: #F4F4F5;
+  --c3-surface-3: #E9E9EB;
+  --c3-surface-4: #D4D4D8;
+
+  --c3-border:    #E4E4E7;
+  --c3-border-2:  #D4D4D8;
+  --c3-border-3:  #A1A1AA;
+
+  --c3-ink:       #0A0A0A;
+  --c3-ink-2:     #27272A;
+  --c3-ink-3:     #52525B;
+  --c3-ink-4:     #71717A;
+  --c3-ink-5:     #A1A1AA;
+
+  /* Brand — electric emerald */
+  --c3-brand-50:  #ECFDF5;
+  --c3-brand-100: #D1FAE5;
+  --c3-brand-200: #A7F3D0;
+  --c3-brand-300: #6EE7B7;
+  --c3-brand-400: #34D399;
+  --c3-brand-500: #00BF66;
+  --c3-brand-600: #00A659;
+  --c3-brand-700: #008A4A;
+  --c3-brand-800: #006D3B;
+  --c3-brand-900: #054F2D;
+
+  /* Semantic */
+  --c3-success-bg:   var(--c3-brand-50);
+  --c3-success-fg:   var(--c3-brand-700);
+  --c3-success-line: var(--c3-brand-500);
+  --c3-warning-bg:   #FFFBEB;
+  --c3-warning-fg:   #92400E;
+  --c3-warning-line: #F59E0B;
+  --c3-danger-bg:    #FEF2F2;
+  --c3-danger-fg:    #991B1B;
+  --c3-danger-line:  #DC2626;
+  --c3-danger-strong:#B91C1C;
+  --c3-info-bg:      #EFF6FF;
+  --c3-info-fg:      #1E40AF;
+  --c3-info-line:    #3B82F6;
+
+  /* Platform brand colors */
+  --c3-platform-linkedin:            #0A66C2;
+  --c3-platform-facebook:            #1877F2;
+  --c3-platform-instagram:           #E4405F;
+  --c3-platform-instagram-gradient:  linear-gradient(45deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  --c3-platform-x:                   #000000;
+  --c3-platform-gbp:                 #4285F4;
+
+  /* Fonts — resolved from next/font/google variables */
+  --c3-font-display: var(--font-geist-sans, 'Geist', system-ui, sans-serif);
+  --c3-font-body:    var(--font-geist-sans, 'Geist', system-ui, sans-serif);
+  --c3-font-mono:    var(--font-geist-mono, 'Geist Mono', ui-monospace, monospace);
+
+  /* Radius */
+  --c3-radius-sm:   4px;
+  --c3-radius-md:   6px;
+  --c3-radius-lg:   8px;
+  --c3-radius-xl:   12px;
+  --c3-radius-2xl:  16px;
+  --c3-radius-full: 9999px;
+
+  /* Shadows */
+  --c3-shadow-sm:
+    0 1px 2px rgba(9,9,11,0.04),
+    0 0 0 1px rgba(9,9,11,0.04);
+  --c3-shadow-md:
+    0 2px 4px rgba(9,9,11,0.04),
+    0 4px 12px rgba(9,9,11,0.06),
+    0 0 0 1px rgba(9,9,11,0.04);
+  --c3-shadow-lg:
+    0 4px 8px rgba(9,9,11,0.04),
+    0 12px 24px rgba(9,9,11,0.08),
+    0 0 0 1px rgba(9,9,11,0.04);
+  --c3-shadow-overlay:
+    0 8px 16px rgba(9,9,11,0.06),
+    0 24px 60px rgba(9,9,11,0.12);
+  --c3-shadow-focus:
+    0 0 0 2px var(--c3-surface),
+    0 0 0 4px var(--c3-brand-500);
+  --c3-shadow-focus-danger:
+    0 0 0 2px var(--c3-surface),
+    0 0 0 4px var(--c3-danger-line);
+
+  /* Motion */
+  --c3-duration-instant: 60ms;
+  --c3-duration-fast:    120ms;
+  --c3-duration-base:    200ms;
+  --c3-duration-slow:    320ms;
+  --c3-ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --c3-ease-snap:  cubic-bezier(0.22, 1, 0.36, 1);
+  --c3-ease-spring:cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-index */
+  --c3-z-overlay: 900;
+  --c3-z-modal:   1000;
+  --c3-z-toast:   1100;
+  --c3-z-tooltip: 1200;
+}
+
+/* Reduced motion — collapse all c3 transitions to opacity-only at 120ms */
+@media (prefers-reduced-motion: reduce) {
+  .c3-motion *,
+  .c3-motion *::before,
+  .c3-motion *::after {
+    animation-duration: var(--c3-duration-fast) !important;
+    transition-duration: var(--c3-duration-fast) !important;
+    animation-iteration-count: 1 !important;
+    transform: none !important;
+  }
+}
+
