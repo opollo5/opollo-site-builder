@@ -32,6 +32,11 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 - Each tool button uses `<Popover.Root open={activePanel === tool.id} onOpenChange={(open) => setActivePanel(open ? tool.id : null)}>`.
 - When user clicks tool B while tool A is open: Radix's DismissableLayer fires `onOpenChange(false)` for A (pointerdown capture) before the click handler for B fires `onOpenChange(true)`. React 18 batches both state updates; result is `activePanel = "b"`. ✓
 
+**D-049**: `avoidCollisions={false}` on PopoverContent
+- CI e2e: UT-3 and UT-4 failed with "element is not stable" for 30s. Root cause: the UTM panel is tall (6 inputs + preview + button) and its lower half extends below the viewport when the trigger is positioned mid-dialog. Radix's default collision detection (`avoidCollisions` defaults to `true`) continuously tries to flip the popover from `bottom` to `top`, oscillating because neither side fits. This puts the panel content in a continuous repositioning loop — elements lower in the panel never become stable.
+- Decision: Add `avoidCollisions={false}` to `PopoverPrimitive.Content`. The tool panels live inside a fixed-size dialog; if they overflow the dialog edge the user can scroll within the panel (panels have internal scroll where needed). Eliminating flip-detection stops the repositioning loop.
+- UT-5 (close button at the VERY TOP of the UTM panel) passed even without this fix because it's near the trigger and its absolute position barely changes during the oscillation.
+
 ---
 
 ## PR-A2 — Preview card max-width (2026-05-21)
