@@ -376,7 +376,7 @@ export function ComposerOverlay({
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 sm:grid-cols-3">
                   {SHORTCUTS.map(({ keys, label }) => (
                     <div key={keys} className="flex items-center gap-2">
-                      <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground whitespace-nowrap">
+                      <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground whitespace-nowrap">
                         {keys}
                       </kbd>
                       <span className="text-xs text-muted-foreground">{label}</span>
