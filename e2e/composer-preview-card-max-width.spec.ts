@@ -12,19 +12,27 @@ import { signInAsCompanyAdmin, mockComposerApis } from "./helpers";
 
 const MOCK_LI_CONNECTION = {
   id: "conn-li-001",
-  platform: "linkedin_company",
-  display_name: "Acme LinkedIn",
-  avatar_url: null,
-  status: "healthy",
+  platform: "linkedin",
+  account_name: "Acme LinkedIn",
+  account_avatar_url: null,
 };
 
 test.describe("preview card — max-width cap (A2)", () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, context }) => {
     await signInAsCompanyAdmin(page);
+    await mockComposerApis(context);
+    // page.route() takes priority over context.route() — override connections
+    // to return a single LinkedIn connection so the preview card renders.
+    await page.route("**/api/platform/social/connections**", (route) => {
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, data: { connections: [MOCK_LI_CONNECTION] } }),
+      });
+    });
   });
 
   test("PW-1: preview card is at most 480px wide", async ({ page }) => {
-    await mockComposerApis(page, [MOCK_LI_CONNECTION]);
     await page.goto("/company/social/calendar?compose=new");
 
     const dialog = page.getByRole("dialog", { name: /new post/i });
@@ -44,7 +52,6 @@ test.describe("preview card — max-width cap (A2)", () => {
   });
 
   test("PW-2: preview card is still visible and not zero-width", async ({ page }) => {
-    await mockComposerApis(page, [MOCK_LI_CONNECTION]);
     await page.goto("/company/social/calendar?compose=new");
 
     const dialog = page.getByRole("dialog", { name: /new post/i });
