@@ -13,20 +13,22 @@ import { signInAsCompanyAdmin, mockComposerApis } from "./helpers";
 //   - action row   (data-testid="li-preview-actions" / "fb-preview-actions")
 // ---------------------------------------------------------------------------
 
+// V1-format connections — these match what GET /api/platform/social/connections returns.
+// ComposerMountV2 fetches client-side and maps V1→V2 before passing to ComposerOverlay.
 const MOCK_LI_CONNECTION = {
   id: "conn-li-001",
-  platform: "linkedin",
-  account_name: "Acme LinkedIn",
-  account_avatar_url: null,
+  platform: "linkedin_company",
   display_name: "Acme LinkedIn",
+  avatar_url: null,
+  status: "healthy",
 };
 
 const MOCK_FB_CONNECTION = {
   id: "conn-fb-001",
-  platform: "facebook",
-  account_name: "Acme Facebook",
-  account_avatar_url: null,
+  platform: "facebook_page",
   display_name: "Acme Facebook",
+  avatar_url: null,
+  status: "healthy",
 };
 
 test.describe("composer preview cards — LinkedIn + Facebook (B3)", () => {

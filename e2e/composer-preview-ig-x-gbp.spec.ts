@@ -9,28 +9,30 @@ import { signInAsCompanyAdmin, mockComposerApis } from "./helpers";
 // the appropriate platform preview card with its key elements.
 // ---------------------------------------------------------------------------
 
+// V1-format connections — these match what GET /api/platform/social/connections returns.
+// ComposerMountV2 fetches client-side and maps V1→V2 before passing to ComposerOverlay.
 const MOCK_IG_CONNECTION = {
   id: "conn-ig-001",
-  platform: "instagram",
-  account_name: "Acme Instagram",
-  account_avatar_url: null,
+  platform: "instagram_business",
   display_name: "Acme Instagram",
+  avatar_url: null,
+  status: "healthy",
 };
 
 const MOCK_X_CONNECTION = {
   id: "conn-x-001",
   platform: "x",
-  account_name: "Acme Corp",
-  account_avatar_url: null,
   display_name: "Acme Corp",
+  avatar_url: null,
+  status: "healthy",
 };
 
 const MOCK_GBP_CONNECTION = {
   id: "conn-gbp-001",
-  platform: "google_business_profile",
-  account_name: "Acme Store",
-  account_avatar_url: null,
+  platform: "gbp",
   display_name: "Acme Store",
+  avatar_url: null,
+  status: "healthy",
 };
 
 test.describe("composer preview cards — Instagram, X, GBP (B3)", () => {
