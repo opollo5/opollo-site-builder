@@ -34,9 +34,9 @@ test.describe("composer emoji picker (B1)", () => {
     await expect(searchInput).toBeVisible({ timeout: 3_000 });
     await searchInput.fill("fire");
 
-    // Results container should have at least one emoji button
+    // Results container should have at least one emoji button in the grid
     await expect(
-      page.getByTestId("emoji-picker-panel").locator('button[aria-label]').first(),
+      page.getByTestId("emoji-picker-panel").locator("li button").first(),
     ).toBeVisible({ timeout: 3_000 });
   });
 
@@ -49,11 +49,12 @@ test.describe("composer emoji picker (B1)", () => {
     await page.getByRole("button", { name: /emoji/i }).click();
     await expect(page.getByTestId("emoji-picker-panel")).toBeVisible({ timeout: 5_000 });
 
-    // Click the first emoji in the suggested/frequent row
+    // Click the first emoji in the grid (li buttons are emoji cells; category nav uses .epr-cat-btn)
     const firstEmoji = page
       .getByTestId("emoji-picker-panel")
-      .locator('button[aria-label]')
+      .locator("li button")
       .first();
+    await expect(firstEmoji).toBeVisible({ timeout: 5_000 });
     await firstEmoji.click();
 
     // Panel should close
