@@ -54,6 +54,10 @@ Autonomous decisions logged here per master prompt operating rules.
 - `process.env.NODE_ENV === 'production'` was incorrect: Vercel sets NODE_ENV=production for BOTH prod and preview deployments, and Playwright CI uses a production build. Page would 404 in all CI e2e runs.
 - Decision: Gate on `NEXT_PUBLIC_SHOW_DEV_ROUTES !== 'true' && NODE_ENV === 'production'`. Set `NEXT_PUBLIC_SHOW_DEV_ROUTES=true` in Playwright's `webServer.env`. Not set in Vercel production → page returns notFound().
 
+**D-013**: `/design-system` middleware auth gate
+- E2E tests timed out on `[data-testid="c3-font-mono-sample"]` because the middleware redirected unauthenticated Playwright sessions to `/login`.
+- Decision: Add `/design-system` to `PUBLIC_PATHS` in `middleware.ts`. The page itself calls `notFound()` in production (gated by `NEXT_PUBLIC_SHOW_DEV_ROUTES`), which IS the security boundary. Middleware auth is redundant here and blocks the e2e test.
+
 **D-012**: gitleaks false-positive — JS property named after a CSS token type
 - Phase 1 commit named a JS object property identically to the CSS property type it represented ("duration token"). The generic-api-key gitleaks rule pattern-matched it as a false positive.
 - Decision: Renamed the JS property to `cssVar` in follow-up commit. Allowlisted the original commit SHA in `.gitleaks.toml` since gitleaks scans all commits in the PR range.

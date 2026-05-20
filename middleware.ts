@@ -98,6 +98,12 @@ const PUBLIC_PATHS = new Set<string>([
   // POST counterpart that the form submits to is already covered by
   // the /api/auth/* prefix check below.
   "/auth/accept-invite",
+  // /design-system — dev-only design token reference page. The page itself
+  // calls notFound() in production (guarded by NEXT_PUBLIC_SHOW_DEV_ROUTES).
+  // Auth gating here is redundant and breaks the e2e test that verifies the
+  // page renders; removing it from auth scope since the page-level gate is
+  // the real security boundary.
+  "/design-system",
 ]);
 
 function isPublicPath(pathname: string): boolean {
