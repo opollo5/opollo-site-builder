@@ -40,7 +40,9 @@ import {
 } from "lucide-react";
 
 export default function DesignSystemPage() {
-  if (process.env.NODE_ENV === "production") {
+  // Show in dev mode and in e2e CI (NEXT_PUBLIC_SHOW_DEV_ROUTES=true).
+  // notFound() in production Vercel deployments (env var not set there).
+  if (process.env.NEXT_PUBLIC_SHOW_DEV_ROUTES !== "true" && process.env.NODE_ENV === "production") {
     notFound();
   }
 

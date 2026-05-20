@@ -91,6 +91,9 @@ export default defineConfig({
       // e2e/fixtures.ts::E2E_CRON_SECRET. Matches the 16-char minimum
       // the cron route enforces.
       CRON_SECRET: "e2e-cron-secret-deterministic",
+      // Enables (dev)/ route group pages (design system reference, etc.)
+      // in the production-mode build used for e2e. Not set in Vercel production.
+      NEXT_PUBLIC_SHOW_DEV_ROUTES: "true",
     },
   },
   globalSetup: "./e2e/global-setup.ts",
