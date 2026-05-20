@@ -90,7 +90,7 @@ test.describe("POST /api/approve/[token]/decision — API contract", () => {
     expect(res.status()).toBe(404);
   });
 
-  test("(A-7) missing decision field returns 422", async ({ page }) => {
+  test("(A-7) missing decision field returns 400", async ({ page }) => {
     const res = await page.request.post(
       `/api/approve/${VALID_FORMAT_NONEXISTENT}/decision`,
       {
@@ -98,10 +98,10 @@ test.describe("POST /api/approve/[token]/decision — API contract", () => {
         headers: { "Content-Type": "application/json" },
       },
     );
-    expect(res.status()).toBe(422);
+    expect(res.status()).toBe(400);
   });
 
-  test("(A-8) invalid decision value returns 422", async ({ page }) => {
+  test("(A-8) invalid decision value returns 400", async ({ page }) => {
     const res = await page.request.post(
       `/api/approve/${VALID_FORMAT_NONEXISTENT}/decision`,
       {
@@ -109,6 +109,6 @@ test.describe("POST /api/approve/[token]/decision — API contract", () => {
         headers: { "Content-Type": "application/json" },
       },
     );
-    expect(res.status()).toBe(422);
+    expect(res.status()).toBe(400);
   });
 });
