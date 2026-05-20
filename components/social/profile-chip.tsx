@@ -136,10 +136,11 @@ export function ProfileChip({
 
       {/* Platform icon badge — bottom-right, 24px with 2.5px white ring */}
       <span
-        className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white p-0.5"
+        className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white p-[2.5px]"
+        data-testid={`platform-badge-${dataid}`}
         aria-hidden
       >
-        <PlatformBadge platform={platform} size={16} />
+        <PlatformBadge platform={platform} size={19} />
       </span>
     </button>
   );

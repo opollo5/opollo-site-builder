@@ -50,7 +50,20 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 
 ## PR-A3 — Profile chip sizing (2026-05-21)
 
-*Decision log entries TBD when PR-A3 is built.*
+**D-051**: Investigation — actual-vs-spec delta
+- `h-14 w-14` = 56px outer ✓ (spec: 56px)
+- `absolute inset-0.5` = 52px avatar ✓ (spec: 52px)
+- `h-5 w-5` = 20px checkbox ✓ (spec: 20px)
+- Platform badge: `size={16}` + `p-0.5` (2px) = **20px total** ✗ (spec: 24px with 2.5px white ring)
+- Git blame: `size={16}` present since initial commit `7c74e386` — never matched spec
+- Wireframe (01-composer-states.html): shows a v2 pill-card chip (40px avatar, horizontal layout). Current code is the v3 circular spec. The "24–40px" UAT observation matches the badge rendering visually small (20px badge on 56px chip where spec is 24px).
+- Decision: fix platform badge only. All other dimensions already match spec.
+
+**D-052**: Platform badge fix approach
+- Need total 24px badge with 2.5px white ring between icon and chip edge.
+- Old: `bg-white p-0.5` (2px) + `size={16}` = 20px total
+- New: `bg-white p-[2.5px]` + `size={19}` = 19 + 2×2.5 = 24px total ✓
+- Added `data-testid="platform-badge-{dataid}"` for e2e assertion `clientWidth >= 22`
 
 ---
 
