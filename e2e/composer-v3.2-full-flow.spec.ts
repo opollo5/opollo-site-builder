@@ -176,8 +176,9 @@ test.describe("Item 7 — disabled schedule button tooltip", () => {
     const submitBtn = page.getByTestId("composer-submit");
     await expect(submitBtn).toBeVisible({ timeout: 5_000 });
 
-    // Hover the button area — tooltip appears after delayDuration
-    await submitBtn.hover();
+    // force:true bypasses stability check (c3-modal-in animation keeps element
+    // moving); event bubbles from button → TooltipTrigger span → tooltip shows
+    await submitBtn.hover({ force: true });
     await page.waitForTimeout(400);
 
     const tooltip = page.getByTestId("submit-tooltip");
@@ -349,9 +350,10 @@ test.describe("Item 12 + 14 — Back button + unsaved-changes dialog", () => {
     await backBtn.click();
 
     // Unsaved-changes dialog should appear — Item 14 copy
-    const dialog = page.getByRole("dialog");
+    // ComposerOverlay also has role="dialog", so filter by content to avoid
+    // strict-mode violation when two dialogs are present simultaneously.
+    const dialog = page.getByRole("dialog").filter({ hasText: "Do you want to save your changes?" });
     await expect(dialog).toBeVisible({ timeout: 3_000 });
-    await expect(dialog).toContainText("Do you want to save your changes?");
 
     // Three buttons: Save, Continue editing, Don't save — in spec order
     await expect(dialog.getByRole("button", { name: "Save" })).toBeVisible();
