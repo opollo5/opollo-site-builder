@@ -27,8 +27,8 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 //      different company.
 // ---------------------------------------------------------------------------
 
-const COMPANY_CALV_ID = "caddd000-0000-0000-0000-ca1v00000001";
-const COMPANY_OTHER_ID = "caddd000-0000-0000-0000-ca1v00000002";
+const COMPANY_CALV_ID = "cad00000-0000-0000-0000-ca1e00000001";
+const COMPANY_OTHER_ID = "cad00000-0000-0000-0000-ca1e00000002";
 
 const FROM = "2026-05-01";
 const TO = "2026-05-31";
