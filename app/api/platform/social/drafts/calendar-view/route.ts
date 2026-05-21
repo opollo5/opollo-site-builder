@@ -2,20 +2,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
-import { redisGet, redisSet } from "@/lib/platform/cache/redis-cache";
 import { validationError } from "@/lib/http";
-import { createHash } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const CALENDAR_REDIS_TTL = 30; // seconds
 
 // ---------------------------------------------------------------------------
 // GET /api/platform/social/drafts/calendar-view?company_id=&from=&to=&profile_ids=
 //
 // Returns posts in a date range for the dashboard calendar grid.
-// Cached in Redis (30s TTL). No Postgres cold cache for calendar.
+// No server-side cache: this endpoint is force-dynamic; SWR deduplication
+// (dedupingInterval:30s) on the client provides sufficient coalescing.
+// Redis caching was removed because it served stale data after swrMutate
+// invalidation, permanently hiding newly-scheduled posts (P0 bug).
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -32,23 +31,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (gate.kind === "deny") return gate.response;
 
   const profileIds = profileIdsParam ? profileIdsParam.split(",").filter(Boolean) : [];
-  const profileHash = createHash("md5").update(profileIds.sort().join(",")).digest("hex").slice(0, 8);
-  const cacheKey = `calendar:${companyId}:${from}:${to}:${profileHash}`;
-
-  const cached = await redisGet(cacheKey);
-  if (cached) {
-    try {
-      const payload = typeof cached === "string" ? JSON.parse(cached) : cached;
-      return NextResponse.json({ ok: true, data: payload, timestamp: new Date().toISOString() });
-    } catch {
-      // fall through
-    }
-  }
 
   const svc = getServiceRoleClient();
   let query = svc
     .from("social_post_drafts")
-    .select("id, state, scheduled_at, published_at, content, media_urls, link_url, target_profiles, parent_draft_id")
+    .select("id, state, scheduled_at, published_at, content, media_urls, target_profiles, parent_draft_id")
     .eq("company_id", companyId)
     .is("archived_at", null)
     .or(`scheduled_at.gte.${from},published_at.gte.${from}`)
@@ -78,7 +65,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       published_at: row.published_at as string | null,
       content_excerpt: ((row.content as string | null) ?? "").slice(0, 100),
       primary_media_url: ((row.media_urls as string[] | null) ?? [])[0] ?? null,
-      link_url: (row.link_url as string | null) ?? null,
+      link_url: null, // link_url is not a column on social_post_drafts; always null until migration adds it
       target_profiles: ((row.target_profiles as Array<{ profile_id: string }> | null) ?? []).map(
         (p) => ({ platform: null, account_avatar_url: null, profile_id: p.profile_id }),
       ),
@@ -86,7 +73,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }));
 
   const responseData = { posts, range: { from, to } };
-  void redisSet(cacheKey, responseData, CALENDAR_REDIS_TTL);
 
   return NextResponse.json({ ok: true, data: responseData, timestamp: new Date().toISOString() });
 }

@@ -92,6 +92,18 @@ Picks up at D-065 per master prompt instructions.
 
 ---
 
+## D-081 — P0: Calendar-view Redis cache hides newly scheduled posts
+
+**Bug:** swrMutate triggers a server refetch, but the Redis server cache (30s TTL) returns stale data to the SWR client, permanently hiding new posts until a hard page reload.
+
+**Path:** Cache path (Path 5 of 5 in the diagnostic protocol).
+
+**Fix:** Removed Redis caching from calendar-view/route.ts entirely. The endpoint is force-dynamic; SWR deduplication (dedupingInterval:30s) provides sufficient protection. Real-time calendar views should not be server-cached.
+
+**Merged:** PR #<number>
+
+---
+
 ## Workstream completion (2026-05-21)
 
 **D-080**: Composer v3.2 polish workstream complete — all 15 items (7–21) PASS
