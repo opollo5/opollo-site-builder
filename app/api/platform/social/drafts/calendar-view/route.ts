@@ -2,20 +2,19 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
-import { redisGet, redisSet } from "@/lib/platform/cache/redis-cache";
 import { validationError } from "@/lib/http";
-import { createHash } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const CALENDAR_REDIS_TTL = 30; // seconds
 
 // ---------------------------------------------------------------------------
 // GET /api/platform/social/drafts/calendar-view?company_id=&from=&to=&profile_ids=
 //
 // Returns posts in a date range for the dashboard calendar grid.
-// Cached in Redis (30s TTL). No Postgres cold cache for calendar.
+// No server-side cache: this endpoint is force-dynamic; SWR deduplication
+// (dedupingInterval:30s) on the client provides sufficient coalescing.
+// Redis caching was removed because it served stale data after swrMutate
+// invalidation, permanently hiding newly-scheduled posts (P0 bug).
 // ---------------------------------------------------------------------------
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -32,18 +31,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (gate.kind === "deny") return gate.response;
 
   const profileIds = profileIdsParam ? profileIdsParam.split(",").filter(Boolean) : [];
-  const profileHash = createHash("md5").update(profileIds.sort().join(",")).digest("hex").slice(0, 8);
-  const cacheKey = `calendar:${companyId}:${from}:${to}:${profileHash}`;
-
-  const cached = await redisGet(cacheKey);
-  if (cached) {
-    try {
-      const payload = typeof cached === "string" ? JSON.parse(cached) : cached;
-      return NextResponse.json({ ok: true, data: payload, timestamp: new Date().toISOString() });
-    } catch {
-      // fall through
-    }
-  }
 
   const svc = getServiceRoleClient();
   let query = svc
@@ -86,7 +73,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }));
 
   const responseData = { posts, range: { from, to } };
-  void redisSet(cacheKey, responseData, CALENDAR_REDIS_TTL);
 
   return NextResponse.json({ ok: true, data: responseData, timestamp: new Date().toISOString() });
 }
