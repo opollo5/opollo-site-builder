@@ -366,24 +366,23 @@ export function ComposerOverlay({
       <ComposerErrorBoundary companyId={companyId}>
       <div
         ref={overlayRef}
-        className="fixed inset-0 z-50 flex flex-col bg-background c3-modal-in relative"
+        className="fixed inset-0 z-50 flex flex-col bg-background c3-modal-in"
         role="dialog"
         aria-modal="true"
         aria-label={draft.id ? "Edit post" : "New post"}
         data-testid="composer-overlay"
       >
-        {/* ── Close button — absolute top-right of entire overlay ──────────── */}
-        <button
-          type="button"
-          aria-label="Close composer"
-          onClick={handleClose}
-          data-testid="composer-close-btn"
-          className="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-[120ms] focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
-        >
-          <X size={24} strokeWidth={1.75} aria-hidden />
-        </button>
-
-        <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex flex-1 overflow-hidden">
+          {/* ── Close button — absolute top-right of content area ────────────── */}
+          <button
+            type="button"
+            aria-label="Close composer"
+            onClick={handleClose}
+            data-testid="composer-close-btn"
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-[120ms] focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+          >
+            <X size={24} strokeWidth={1.75} aria-hidden />
+          </button>
           {/* ── Left pane — editor ─────────────────────────────────────────── */}
           <div className="relative flex w-full flex-col overflow-y-auto border-r border-border md:w-[560px] lg:w-[600px]">
             <div className="flex items-center gap-2 border-b border-border px-4 py-4">
