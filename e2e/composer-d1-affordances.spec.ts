@@ -46,9 +46,8 @@ test.describe("PR-D1 composer affordances", () => {
     await trigger.hover();
     await page.waitForTimeout(400);
 
-    const tooltip = page.locator('[role="tooltip"]');
+    const tooltip = page.getByRole("tooltip", { name: /Select at least one account/i });
     await expect(tooltip).toBeVisible({ timeout: 3_000 });
-    await expect(tooltip).toContainText("Select at least one account");
   });
 
   test("(D1-2) chip tooltip content is in DOM when no profiles selected", async ({ page }) => {
