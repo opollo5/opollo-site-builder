@@ -6,7 +6,7 @@ import { signInAsCompanyAdmin, mockComposerApis, MOCK_DRAFT_ID, MOCK_COMPANY_ID 
 // ---------------------------------------------------------------------------
 // Gap-fix verification tests for composer v3.2-polish items 10, 17, 20.
 //
-//  GAP-10  CalendarShell uses MonthCalendar — data-testid="month-calendar"
+//  GAP-10  CalendarShell uses MonthCalendar — data-testid="calendar-grid"
 //          appears on the page calendar view (CalendarShell delegates its
 //          grid to MonthCalendar).
 //
@@ -82,7 +82,7 @@ function makeDraftApiResponse() {
 // GAP-10: CalendarShell delegates grid to MonthCalendar
 // ---------------------------------------------------------------------------
 
-test("(GAP-10) CalendarShell renders via MonthCalendar — month-calendar testid visible on calendar page", async ({
+test("(GAP-10) CalendarShell renders via MonthCalendar — calendar-grid testid visible on calendar page", async ({
   page,
   context,
 }: { page: Page; context: BrowserContext }) => {
@@ -102,7 +102,7 @@ test("(GAP-10) CalendarShell renders via MonthCalendar — month-calendar testid
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 20_000 });
 
   // MonthCalendar must be rendered inside CalendarShell (gap fix: Item 10)
-  await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 10_000 });
 
   // Month label, calendar grid, and a post chip should all be present
   await expect(page.getByTestId("month-label")).toBeVisible();
@@ -200,7 +200,7 @@ test("(GAP-20) Calendar tab highlights the post chip for the draft being edited"
   await expect(calendarTab).toBeVisible({ timeout: 5_000 });
   await calendarTab.click();
 
-  await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
 
   // The chip for MOCK_DRAFT_ID should have the emerald ring (highlightPostId prop wired)
   const chip = page.getByTestId("post-chip").first();

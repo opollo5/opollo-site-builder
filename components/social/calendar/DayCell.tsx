@@ -46,7 +46,7 @@ export function DayCell({
       onClick={() => onClick(date)}
       data-testid={`calendar-day-${date.toISOString().slice(0, 10)}`}
       className={cn(
-        "relative flex min-h-[64px] flex-col gap-0.5 rounded border border-border p-1 cursor-pointer transition-colors",
+        "relative flex min-h-[80px] flex-col gap-0.5 rounded border border-border p-1 cursor-pointer transition-colors",
         isOtherMonth && "bg-muted/30 text-muted-foreground",
         isPast && !isOtherMonth && "bg-muted/20",
         isSelected && "border-primary bg-primary/5 ring-1 ring-primary",

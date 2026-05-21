@@ -266,7 +266,7 @@ test.describe("Item 10 + 19 — MonthCalendar on page + chip indicators", () => 
   }: { page: Page; context: BrowserContext }) => {
     await openCalendarPage(page, context, [makePost("smoke10")]);
 
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("month-label")).toBeVisible();
     await expect(page.getByTestId("calendar-grid")).toBeVisible();
     const cells = page.getByTestId("calendar-cell");
@@ -307,7 +307,7 @@ test.describe("Item 10 + 19 — MonthCalendar on page + chip indicators", () => 
 // ===========================================================================
 
 test.describe("Item 11 — close button", () => {
-  test("(v32-11) close button is 32px hit target (h-8 w-8) with X icon", async ({
+  test("(v32-11) close button is 40px hit target (h-10 w-10) absolute top-right with 24px X icon", async ({
     page, context,
   }: { page: Page; context: BrowserContext }) => {
     await openNewComposer(page, context);
@@ -315,10 +315,11 @@ test.describe("Item 11 — close button", () => {
     const closeBtn = page.getByTestId("composer-close-btn");
     await expect(closeBtn).toBeVisible({ timeout: 5_000 });
 
-    // Tailwind h-8 w-8 = 32px hit target
+    // Tailwind h-10 w-10 = 40px hit target; absolute position on overlay
     const cls = await closeBtn.getAttribute("class");
-    expect(cls).toContain("h-8");
-    expect(cls).toContain("w-8");
+    expect(cls).toContain("h-10");
+    expect(cls).toContain("w-10");
+    expect(cls).toContain("absolute");
 
     // Clicking it should close the composer (no unsaved changes → no dialog)
     await closeBtn.click();
@@ -532,7 +533,7 @@ test.describe("Item 20 — calendar tab cell highlight", () => {
     await expect(calendarTab).toBeVisible({ timeout: 5_000 });
     await calendarTab.click();
 
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
 
     const chip = page.getByTestId("post-chip").first();
     await expect(chip).toBeVisible({ timeout: 10_000 });
@@ -550,7 +551,7 @@ test.describe("Item 20 — calendar tab cell highlight", () => {
     await expect(calendarTab).toBeVisible({ timeout: 5_000 });
     await calendarTab.click();
 
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
     // No chip = no post on calendar, therefore no highlighted chip
     await expect(page.getByTestId("post-chip").first()).not.toBeVisible({ timeout: 3_000 });
   });

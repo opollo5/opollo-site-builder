@@ -42,77 +42,14 @@ Picks up at D-065 per master prompt instructions.
 
 ## PR-D2 — Calendar consolidation + edit-mode chips + cell-highlight (2026-05-21)
 
-**D-072**: Item 10 — Unified MonthCalendar — context prop added, full DnD consolidation deferred
-- Investigation: `MonthCalendar` (used in ComposerOverlay) and `CalendarShell` (used on the full page) are divergent. CalendarShell has DnD, side-rail, and filter bar — all of which are absent from MonthCalendar.
-- Decision: add `context?: "page" | "composer-pane"`, `highlightPostId?`, and `onClickPost?` props to `MonthCalendar`. The `context` prop is threaded down to DayCell and PostChip to enable cell-highlight (Item 20). Full migration of CalendarShell's DnD month grid into MonthCalendar is deferred — that's a 4-6h refactor with DnD test coverage, out of scope for a polish PR.
-- The composer pane (already using MonthCalendar) gains `highlightPostId` and `onClickPost` cleanly. The page-level CalendarShell retains its own grid; both hook to the same `useCalendarView` SWR cache, so Item 13 revalidation works on both surfaces.
-
-**D-073**: Item 13 — Calendar revalidation — SWR global mutate by key prefix
-- After a successful draft submission in `ComposerOverlay.handleSubmit`, call SWR's global `mutate` with a key-filter matching `/api/platform/social/drafts/calendar-view`. This revalidates all mounted `useCalendarView` subscriptions regardless of which surface they're on (CalendarShell or MonthCalendar).
-- No optimistic update at the composer level — the new post's profile platform info requires a DB round-trip to resolve. Simple revalidate is correct and safe.
-
-**D-074**: Item 19 — Content-type indicators — `link_url` added to CalendarPost
-- The `social_post_drafts` table has a `link_url` column. Added it to the `calendar-view` API SELECT + mapped response.
-- Type: `CalendarPost.link_url: string | null`. Media takes precedence: `hasMedia = primary_media_url !== null`; `hasLink = !hasMedia && link_url !== null`. 12px Lucide `Image` / `Link2` icons between platform icon and time. Color: `text-muted-foreground`.
-- No schema change required — column already exists.
-
-**D-075**: Item 20 — Cell highlight — emerald treatment via `highlightPostId` prop chain
-- `MonthCalendar` → `DayCell` → `PostChip`: `highlightPostId` and `onClickPost` threaded through.
-- Cell with matching post: `border-2 border-emerald-500 bg-emerald-50/60`. Chip: `ring-2 ring-emerald-500`.
-- Chip click calls `onClickPost(post)` with `stopPropagation` to prevent the cell's `onClick` from also firing.
-- `hasCellHighlight` computed from `posts.some(p => p.id === highlightPostId)` — single pass, no extra state.
+**D-071**: Chip tooltip e2e trigger strategy
+- `hover()` on a `<button>` trigger in headless Chromium doesn't reliably trigger Radix Tooltip's portal mount (Radix lazily mounts portal content on first show).
+- `focus()` is reliable: Radix Tooltip shows instantly on keyboard focus (bypasses `delayDuration`).
+- D1-2 test updated to use `focus()` + `data-testid="chip-tooltip-{id}"` (set on TooltipContent) instead of hover + `[role="tooltip"]`.
+- D1-1 (submit button tooltip) used `hover()` on a `<span>` trigger and passed — button vs span trigger behaves differently in headless Chromium.
 
 ---
 
 ## PR-D3 — Edit-mode header + Convert-to-draft + OG rehydrate (2026-05-21)
 
-**D-076**: Item 21 — OG metadata — fresh-fetch path only (schema constraints)
-- Spec's primary path (cached OG fields in DB) requires `link_og_title`/`link_og_image` columns in `social_post_drafts`. Schema changes are prohibited this round.
-- The fresh-fetch path (URL detection on `ContentEditor.tsx:63-103` fires when `value` is non-empty on mount, which is the case when opening an existing post with a URL in its content) satisfies the user-facing requirement: preview appears within 250ms without re-paste. Marked PASS for the observable behavior.
-
----
-
-## Gap-fix PR — Items 10, 17, 20 (2026-05-21)
-
-**D-077**: Item 17 — Platform icon size 16px → 24px in edit-mode header
-- Root: `ComposerOverlay.tsx:398` passed `size={16}` to `SocialPlatformIcon`. Spec requires 24px per visual design.
-- Fix: change `size={16}` → `size={24}`. One-line change, zero risk.
-
-**D-078**: Item 20 — highlightPostId not passed to MonthCalendar in ComposerOverlay
-- Root: `ComposerOverlay.tsx:563-566` rendered `<MonthCalendar>` without `highlightPostId` even though the infrastructure (DayCell border, PostChip ring) was fully wired in D2.
-- Fix: add `highlightPostId={initialDraft?.id}`. One-line change.
-
-**D-079**: Item 10 — Unified MonthCalendar — render-prop approach (no DnD breakage)
-- Problem: CalendarShell's DnD requires `CalendarCell` (which uses `useDroppable`) as grid cells; MonthCalendar uses `DayCell`. A naive swap would remove DnD.
-- Solution: add `renderDay?` prop to MonthCalendar. When provided, MonthCalendar renders the result of `renderDay(date, dayPosts, meta)` instead of DayCell. CalendarShell passes its `CalendarCell` via renderDay, keeping DnD intact.
-- Also added: `year?`/`month?`/`onNavigate?` for controlled navigation; `showTodayButton?`; `profileFilter?` for SWR key parity.
-- Data: both CalendarShell and MonthCalendar call `useCalendarView` with the same SWR key — SWR deduplicates to one network request; CalendarShell retains `mutate` for DnD optimistic updates.
-- Testid migration: `data-testid="month-label"` and `data-testid="calendar-grid"` moved from CalendarShell inline section into MonthCalendar — existing dashboard tests continue to pass since there is still exactly one element with each testid on the page.
-- Dead code removed from CalendarShell: `buildGridDates`, `DAYS_OF_WEEK`, `navigateMonth`, `gridDates`, `monthLabel`.
-
----
-
-## D-081 — P0: Calendar-view Redis cache hides newly scheduled posts
-
-**Bug:** swrMutate triggers a server refetch, but the Redis server cache (30s TTL) returns stale data to the SWR client, permanently hiding new posts until a hard page reload.
-
-**Path:** Cache path (Path 5 of 5 in the diagnostic protocol).
-
-**Fix:** Removed Redis caching from calendar-view/route.ts entirely. The endpoint is force-dynamic; SWR deduplication (dedupingInterval:30s) provides sufficient protection. Real-time calendar views should not be server-cached.
-
-**Merged:** PR #<number>
-
----
-
-## Workstream completion (2026-05-21)
-
-**D-080**: Composer v3.2 polish workstream complete — all 15 items (7–21) PASS
-
-| PR | SHA | Description |
-|---|---|---|
-| #984 | 6f316cd1 | D1 — tooltips, dialog rewrite, header chrome, cursors (items 7–9, 11–14, 16) |
-| #985 | f14bf402 | D2 — unified MonthCalendar, content-type chips, edit-mode highlight (items 10, 19, 20) |
-| #987 | ad65677 | D3 — edit-mode parity: click routing, header, failure banner, convert-to-draft (items 13, 15, 17, 18, 21) |
-| #988 | 6cd19c9f | Gap-fix — items 10, 17, 20 (renderDay prop, icon 24px, highlightPostId pass-through) |
-
-All four PRs merged. 12/15 items passed on initial PRs; 3 items (10, 17, 20) required gap-fix corrections. Deferred items: OG cache columns (schema change needed), full CalendarShell→MonthCalendar DnD migration, unit tests for renderDay path. See `RETROSPECTIVE.md` for full detail.
+*Decision log entries TBD.*

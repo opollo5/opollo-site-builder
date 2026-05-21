@@ -174,6 +174,6 @@ test.describe("PR-D2 calendar chips + revalidation", () => {
     await expect(calendarTab).toBeVisible({ timeout: 5_000 });
     await calendarTab.click();
 
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
   });
 });

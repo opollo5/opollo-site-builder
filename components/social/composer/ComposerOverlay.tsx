@@ -372,7 +372,17 @@ export function ComposerOverlay({
         aria-label={draft.id ? "Edit post" : "New post"}
         data-testid="composer-overlay"
       >
-        <div className="flex flex-1 overflow-hidden">
+        <div className="relative flex flex-1 overflow-hidden">
+          {/* ── Close button — absolute top-right of content area ────────────── */}
+          <button
+            type="button"
+            aria-label="Close composer"
+            onClick={handleClose}
+            data-testid="composer-close-btn"
+            className="absolute right-4 top-4 z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-[120ms] focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+          >
+            <X size={24} strokeWidth={1.75} aria-hidden />
+          </button>
           {/* ── Left pane — editor ─────────────────────────────────────────── */}
           <div className="relative flex w-full flex-col overflow-y-auto border-r border-border md:w-[560px] lg:w-[600px]">
             <div className="flex items-center gap-2 border-b border-border px-4 py-4">
@@ -422,17 +432,6 @@ export function ComposerOverlay({
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                   <path d="M9 7h6" /><path d="M12 17V11" /><rect width="20" height="16" x="2" y="4" rx="2" /><path d="M6 11h2" /><path d="M16 11h2" />
                 </svg>
-              </button>
-
-              {/* Close button */}
-              <button
-                type="button"
-                aria-label="Close composer"
-                onClick={handleClose}
-                data-testid="composer-close-btn"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-[120ms] focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
-              >
-                <X size={20} strokeWidth={1.75} aria-hidden />
               </button>
             </div>
 
