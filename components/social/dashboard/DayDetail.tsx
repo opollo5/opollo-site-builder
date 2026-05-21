@@ -8,7 +8,7 @@ import type { CalendarPost } from "@/lib/social/types";
 interface DayDetailProps {
   date: Date | null;
   posts: CalendarPost[];
-  onPostClick: (id: string) => void;
+  onPostClick: (post: CalendarPost) => void;
   onDelete: (id: string) => void;
   onReschedule: (id: string) => void;
   onAddPost: () => void;

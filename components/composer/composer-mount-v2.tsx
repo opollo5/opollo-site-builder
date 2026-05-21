@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { ComposerOverlay } from "@/components/social/composer/ComposerOverlay";
-import type { Connection, Draft } from "@/lib/social/types";
+import type { Connection, Draft, DraftState } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // ComposerMountV2 — replaces ComposerMount in the /company/social/* layout.
@@ -27,6 +27,10 @@ interface V1DraftApiResponse {
   ok: boolean;
   data?: {
     id: string;
+    // V2 drafts store content at the top level; V1 drafts use draft_data.master_text
+    content?: string | null;
+    state?: string | null;
+    last_publish_error?: { message?: string } | null;
     draft_data: {
       master_text: string;
       media_refs: Array<{ url: string }>;
@@ -53,7 +57,8 @@ interface V1ConnectionsApiResponse {
 function mapV1ToV2Draft(d: NonNullable<V1DraftApiResponse["data"]>): Draft {
   return {
     id: d.id,
-    content: d.draft_data.master_text,
+    // V2 drafts write to the top-level content column; fall back to V1 draft_data.master_text
+    content: d.content ?? d.draft_data.master_text,
     media_urls: d.draft_data.media_refs.map((r) => r.url),
     target_profile_ids: d.draft_data.target_connection_ids,
     platform_variants: {},
@@ -91,6 +96,8 @@ function ComposerMountV2Inner({ companyId }: ComposerMountV2Props) {
 
   const [loadedDraft, setLoadedDraft] = useState<Draft | null>(null);
   const [fetchComplete, setFetchComplete] = useState(false);
+  const [editOriginalState, setEditOriginalState] = useState<DraftState | undefined>(undefined);
+  const [failureReason, setFailureReason] = useState<string | undefined>(undefined);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [connectionsReady, setConnectionsReady] = useState(false);
 
@@ -129,11 +136,18 @@ function ComposerMountV2Inner({ companyId }: ComposerMountV2Props) {
     }
     setFetchComplete(false);
     setLoadedDraft(null);
+    setEditOriginalState(undefined);
+    setFailureReason(undefined);
     void fetch(`/api/platform/social/drafts/${initialDraftId}`)
       .then((r) => r.json() as Promise<V1DraftApiResponse>)
       .then((json) => {
         if (json.ok && json.data) {
           setLoadedDraft(mapV1ToV2Draft(json.data));
+          if (json.data.state) {
+            setEditOriginalState(json.data.state as DraftState);
+          }
+          const errMsg = json.data.last_publish_error?.message;
+          if (errMsg) setFailureReason(errMsg);
         }
       })
       .catch(() => {
@@ -162,6 +176,8 @@ function ComposerMountV2Inner({ companyId }: ComposerMountV2Props) {
       companyId={companyId}
       availableConnections={connections}
       initialDraft={loadedDraft ?? undefined}
+      editOriginalState={editOriginalState}
+      failureReason={failureReason}
     />
   );
 }
