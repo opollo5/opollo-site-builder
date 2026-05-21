@@ -172,6 +172,16 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
     }
   }
 
+  function handleClickPost(post: CalendarPost) {
+    if (post.state === "published") {
+      setAnalyticsPostId(post.id);
+    } else {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("compose", post.id);
+      router.push(`${pathname}?${params.toString()}`);
+    }
+  }
+
   function navigateMonth(delta: number) {
     setCurrentMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
   }
@@ -302,6 +312,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
                         setSelectedDate(date);
                         openComposer({ prefilledDate: date });
                       }}
+                      onClickPost={handleClickPost}
                     />
                   );
                 })}
@@ -312,7 +323,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
             <DayDetail
               date={selectedDate}
               posts={selectedDayPosts}
-              onPostClick={(id) => setAnalyticsPostId(id)}
+              onPostClick={handleClickPost}
               onDelete={handleDelete}
               onReschedule={handleReschedule}
               onAddPost={() => openComposer({ prefilledDate: selectedDate })}
@@ -336,7 +347,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
           from={from}
           to={to}
           isLoading={isLoading}
-          onPostClick={(id) => setAnalyticsPostId(id)}
+          onPostClick={handleClickPost}
           onDelete={handleDelete}
           onAddPost={() => openComposer()}
         />
@@ -403,7 +414,7 @@ function TimelineView({
   from: string;
   to: string;
   isLoading: boolean;
-  onPostClick: (id: string) => void;
+  onPostClick: (post: CalendarPost) => void;
   onDelete: (id: string) => void;
   onAddPost: () => void;
 }) {
@@ -446,7 +457,7 @@ function TimelineView({
           <div
             key={post.id}
             className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 hover:shadow-sm transition-shadow cursor-pointer"
-            onClick={() => onPostClick(post.id)}
+            onClick={() => onPostClick(post)}
             data-testid="timeline-post-row"
           >
             <span className="mt-0.5 w-36 shrink-0 text-xs text-muted-foreground">{label}</span>

@@ -12,7 +12,9 @@ import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } 
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
 import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
 import { EmptyState } from "@/components/ui/empty-state";
-import type { Connection, Draft, SchedulingMode } from "@/lib/social/types";
+import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
+import type { Connection, Draft, DraftState, Platform, SchedulingMode } from "@/lib/social/types";
+import type { SocialPlatformIconKey } from "@/components/ui/SocialPlatformIcon";
 
 // ---------------------------------------------------------------------------
 // ComposerOverlay — split-pane shell (PR C + PR D + PR E).
@@ -45,6 +47,10 @@ export interface ComposerOverlayProps {
   onSubmitSuccess?: () => void;
   /** Slot for SchedulingCard + submit row (PR E). Passed through to ComposerEditor. */
   schedulingSlot?: React.ReactNode;
+  /** Original state of the draft being edited (for header copy + convert-to-draft action). */
+  editOriginalState?: DraftState;
+  /** Failure reason shown as an error banner when editOriginalState === 'failed'. */
+  failureReason?: string;
 }
 
 type PreviewTab = "preview" | "calendar";
@@ -69,6 +75,10 @@ const DEFAULT_DRAFT: Draft = {
   approval_required: false,
 };
 
+function platformToIconKey(p: Platform): SocialPlatformIconKey {
+  return p.toUpperCase().replace("GOOGLE_BUSINESS_PROFILE", "GOOGLE_BUSINESS") as SocialPlatformIconKey;
+}
+
 function isDirty(draft: Draft): boolean {
   return (
     draft.content.trim().length > 0 ||
@@ -87,6 +97,8 @@ export function ComposerOverlay({
   onSubmit,
   onSubmitSuccess,
   schedulingSlot,
+  editOriginalState,
+  failureReason,
 }: ComposerOverlayProps) {
   const [draft, setDraft] = React.useState<Draft>(initialDraft ?? DEFAULT_DRAFT);
   const [selectedIds, setSelectedIds] = React.useState<string[]>(
@@ -147,6 +159,22 @@ export function ComposerOverlay({
   async function handleSaveFromDialog() {
     setShowDiscard(false);
     await handleSubmit("draft");
+  }
+
+  async function handleConvertToDraft() {
+    if (!draft.id) return;
+    try {
+      const res = await fetch(`/api/platform/social/drafts/${draft.id}/convert-to-draft`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error(`Convert failed (${res.status})`);
+      void swrMutate(
+        (key) => typeof key === "string" && key.includes("/api/platform/social/drafts/calendar-view"),
+      );
+      onClose();
+    } catch {
+      // ignore — UI shows nothing on failure; user can retry
+    }
   }
 
   async function handleSubmit(mode: SchedulingMode) {
@@ -288,8 +316,11 @@ export function ComposerOverlay({
 
   if (!open) return null;
 
+  const isPublishing = editOriginalState === "publishing";
+
   const isSubmitDisabled =
     submitting ||
+    isPublishing ||
     draft.target_profile_ids.length === 0 ||
     draft.content.trim().length === 0;
 
@@ -317,6 +348,16 @@ export function ComposerOverlay({
             : undefined
         }
       />
+      {editOriginalState === "scheduled" && (
+        <button
+          type="button"
+          onClick={() => void handleConvertToDraft()}
+          data-testid="convert-to-draft-btn"
+          className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+        >
+          Convert to draft
+        </button>
+      )}
     </div>
   );
 
@@ -347,8 +388,26 @@ export function ComposerOverlay({
               </button>
 
               {/* Title */}
-              <h2 className="flex-1 text-base font-semibold text-foreground truncate">
-                {draft.id ? "Edit post" : "New post"}
+              <h2 className="flex-1 text-base font-semibold text-foreground min-w-0">
+                {editOriginalState ? (
+                  <span className="flex items-center gap-1.5 min-w-0 truncate">
+                    <span className="shrink-0">Edit post</span>
+                    {selectedConnections.length > 0 && (
+                      <>
+                        <span className="shrink-0 text-muted-foreground font-normal">for</span>
+                        <SocialPlatformIcon platform={platformToIconKey(selectedConnections[0]!.platform)} size={16} />
+                        <span className="truncate">{selectedConnections[0]!.account_name}</span>
+                        {selectedConnections.length > 1 && <span className="shrink-0">…</span>}
+                      </>
+                    )}
+                    {editOriginalState === "failed" && (
+                      <span className="shrink-0 text-destructive font-medium">· Failed</span>
+                    )}
+                    {isPublishing && (
+                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Publishing…</span>
+                    )}
+                  </span>
+                ) : draft.id ? "Edit post" : "New post"}
               </h2>
 
               {/* Keyboard shortcuts button */}
@@ -409,12 +468,22 @@ export function ComposerOverlay({
               </div>
             )}
 
-            <div className="flex flex-1 flex-col gap-5 px-6 py-5">
+            <div className={cn("flex flex-1 flex-col gap-5 px-6 py-5", isPublishing && "pointer-events-none opacity-60")}>
               <ProfileSelector
                 available={availableConnections}
                 selected={selectedIds}
                 onChange={handleProfileChange}
               />
+
+              {editOriginalState === "failed" && failureReason && (
+                <div
+                  className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm"
+                  data-testid="failure-banner"
+                >
+                  <p className="font-medium text-destructive">Publish failed</p>
+                  <p className="mt-0.5 text-xs text-destructive/80">{failureReason}</p>
+                </div>
+              )}
 
               <ComposerEditor
                 draft={draft}
