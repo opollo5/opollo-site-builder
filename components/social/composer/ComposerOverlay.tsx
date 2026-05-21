@@ -395,7 +395,7 @@ export function ComposerOverlay({
                     {selectedConnections.length > 0 && (
                       <>
                         <span className="shrink-0 text-muted-foreground font-normal">for</span>
-                        <SocialPlatformIcon platform={platformToIconKey(selectedConnections[0]!.platform)} size={16} />
+                        <SocialPlatformIcon platform={platformToIconKey(selectedConnections[0]!.platform)} size={24} />
                         <span className="truncate">{selectedConnections[0]!.account_name}</span>
                         {selectedConnections.length > 1 && <span className="shrink-0">…</span>}
                       </>
@@ -563,6 +563,7 @@ export function ComposerOverlay({
                 <MonthCalendar
                   companyId={companyId}
                   selectedDate={prefilledDate}
+                  highlightPostId={initialDraft?.id}
                 />
               )}
             </div>

@@ -66,4 +66,26 @@ Picks up at D-065 per master prompt instructions.
 
 ## PR-D3 — Edit-mode header + Convert-to-draft + OG rehydrate (2026-05-21)
 
-*Decision log entries TBD.*
+**D-076**: Item 21 — OG metadata — fresh-fetch path only (schema constraints)
+- Spec's primary path (cached OG fields in DB) requires `link_og_title`/`link_og_image` columns in `social_post_drafts`. Schema changes are prohibited this round.
+- The fresh-fetch path (URL detection on `ContentEditor.tsx:63-103` fires when `value` is non-empty on mount, which is the case when opening an existing post with a URL in its content) satisfies the user-facing requirement: preview appears within 250ms without re-paste. Marked PASS for the observable behavior.
+
+---
+
+## Gap-fix PR — Items 10, 17, 20 (2026-05-21)
+
+**D-077**: Item 17 — Platform icon size 16px → 24px in edit-mode header
+- Root: `ComposerOverlay.tsx:398` passed `size={16}` to `SocialPlatformIcon`. Spec requires 24px per visual design.
+- Fix: change `size={16}` → `size={24}`. One-line change, zero risk.
+
+**D-078**: Item 20 — highlightPostId not passed to MonthCalendar in ComposerOverlay
+- Root: `ComposerOverlay.tsx:563-566` rendered `<MonthCalendar>` without `highlightPostId` even though the infrastructure (DayCell border, PostChip ring) was fully wired in D2.
+- Fix: add `highlightPostId={initialDraft?.id}`. One-line change.
+
+**D-079**: Item 10 — Unified MonthCalendar — render-prop approach (no DnD breakage)
+- Problem: CalendarShell's DnD requires `CalendarCell` (which uses `useDroppable`) as grid cells; MonthCalendar uses `DayCell`. A naive swap would remove DnD.
+- Solution: add `renderDay?` prop to MonthCalendar. When provided, MonthCalendar renders the result of `renderDay(date, dayPosts, meta)` instead of DayCell. CalendarShell passes its `CalendarCell` via renderDay, keeping DnD intact.
+- Also added: `year?`/`month?`/`onNavigate?` for controlled navigation; `showTodayButton?`; `profileFilter?` for SWR key parity.
+- Data: both CalendarShell and MonthCalendar call `useCalendarView` with the same SWR key — SWR deduplicates to one network request; CalendarShell retains `mutate` for DnD optimistic updates.
+- Testid migration: `data-testid="month-label"` and `data-testid="calendar-grid"` moved from CalendarShell inline section into MonthCalendar — existing dashboard tests continue to pass since there is still exactly one element with each testid on the page.
+- Dead code removed from CalendarShell: `buildGridDates`, `DAYS_OF_WEEK`, `navigateMonth`, `gridDates`, `monthLabel`.
