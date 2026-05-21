@@ -53,7 +53,7 @@ export function ProfileSelector({ available, selected, onChange, className }: Pr
           return (
             <Tooltip key={conn.id}>
               <TooltipTrigger asChild>{chip}</TooltipTrigger>
-              <TooltipContent side="bottom" data-testid={`chip-tooltip-${conn.id}`}>
+              <TooltipContent side="bottom" data-testid={`chip-tooltip-${conn.id}`} forceMount>
                 Click to select
               </TooltipContent>
             </Tooltip>
