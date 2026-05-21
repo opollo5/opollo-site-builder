@@ -14,6 +14,10 @@ import type { CalendarPost } from "@/lib/social/types";
 //                 caller swap in DnD-aware CalendarCell while keeping grid
 //                 layout, data-fetching, and testids here.
 // Composer-pane : self-contained; all props optional; default DayCell render.
+//
+// Visual presentation is intentionally identical in both contexts. The only
+// structural difference is the outer container class (flex-1 for page vs
+// bordered box for composer-pane).
 // ---------------------------------------------------------------------------
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -66,7 +70,7 @@ export interface MonthCalendarProps {
   month?: number;
   /** Called when Prev / Next / Today navigation is triggered */
   onNavigate?: (year: number, month: number) => void;
-  /** Render a "Today" button in the header (page context) */
+  /** Render a "Today" button in the header */
   showTodayButton?: boolean;
   /** Profile IDs to pass to useCalendarView */
   profileFilter?: string[];
@@ -120,6 +124,8 @@ export function MonthCalendar({
 
   const cells = buildGrid(viewYear, viewMonth);
 
+  const isPage = context === "page";
+
   function navigate(y: number, m: number) {
     if (onNavigate) {
       onNavigate(y, m);
@@ -141,8 +147,6 @@ export function MonthCalendar({
     navigate(y, m);
   }
 
-  const isPage = context === "page";
-
   return (
     <div
       className={cn(
@@ -152,95 +156,52 @@ export function MonthCalendar({
           : "rounded-xl border border-border bg-white p-3",
         className,
       )}
-      data-testid="month-calendar"
     >
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      {isPage ? (
-        <div className="mb-3 flex items-center gap-1" role="toolbar" aria-label="Month navigation">
-          <h2 className="text-base font-semibold text-foreground" data-testid="month-label">
-            {MONTH_NAMES[viewMonth]} {viewYear}
-          </h2>
+      {/* ── Header — unified layout for both contexts ──────────────────────── */}
+      <div className="mb-3 flex items-center gap-1" role="toolbar" aria-label="Month navigation">
+        <h2 className="text-base font-semibold text-foreground" data-testid="month-label">
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </h2>
+        <button
+          type="button"
+          aria-label="Previous month"
+          onClick={prevMonth}
+          className="ml-2 flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m15 18-6-6 6-6" /></svg>
+        </button>
+        <button
+          type="button"
+          aria-label="Next month"
+          onClick={nextMonth}
+          className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m9 18 6-6-6-6" /></svg>
+        </button>
+        {showTodayButton && (
           <button
             type="button"
-            aria-label="Previous month"
-            onClick={prevMonth}
-            className="ml-2 flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted"
+            onClick={() => navigate(today.getFullYear(), today.getMonth())}
+            className="ml-1 rounded px-2 py-0.5 text-sm text-muted-foreground hover:bg-muted"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m15 18-6-6 6-6" /></svg>
+            Today
           </button>
-          <button
-            type="button"
-            aria-label="Next month"
-            onClick={nextMonth}
-            className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="m9 18 6-6-6-6" /></svg>
-          </button>
-          {showTodayButton && (
-            <button
-              type="button"
-              onClick={() => navigate(today.getFullYear(), today.getMonth())}
-              className="ml-1 rounded px-2 py-0.5 text-sm text-muted-foreground hover:bg-muted"
-            >
-              Today
-            </button>
-          )}
-          {isLoading && (
-            <span className="ml-2 text-xs text-muted-foreground animate-pulse">Loading…</span>
-          )}
-        </div>
-      ) : (
-        <div className="mb-3 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={prevMonth}
-            aria-label="Previous month"
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
-
-          <p className="flex items-center gap-2 text-sm font-semibold" data-testid="month-label">
-            {MONTH_NAMES[viewMonth]} {viewYear}
-            {isLoading && (
-              <span
-                className="inline-block h-3 w-3 rounded-full border-2 border-primary border-t-transparent animate-spin"
-                aria-label="Loading"
-              />
-            )}
-          </p>
-
-          <button
-            type="button"
-            onClick={nextMonth}
-            aria-label="Next month"
-            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground hover:bg-muted transition-colors"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        </div>
-      )}
+        )}
+        {isLoading && (
+          <span className="ml-2 text-xs text-muted-foreground animate-pulse">Loading…</span>
+        )}
+      </div>
 
       {/* ── Day-of-week labels ──────────────────────────────────────────────── */}
       <div
-        className={cn(
-          "mb-1 grid grid-cols-7 text-xs font-medium text-muted-foreground",
-          isPage ? "gap-1" : "gap-0.5",
-        )}
+        className="mb-1 grid grid-cols-7 gap-1 text-xs font-medium text-muted-foreground"
         role="row"
         aria-label="Days of the week"
       >
         {DAY_LABELS.map((d) => (
           <div
             key={d}
-            className={cn(
-              "text-center",
-              isPage ? "px-1 py-0.5" : "uppercase tracking-wide",
-            )}
+            className="px-1 py-0.5 text-center"
             role="columnheader"
           >
             {d}
@@ -250,10 +211,7 @@ export function MonthCalendar({
 
       {/* ── Day cells ──────────────────────────────────────────────────────── */}
       <div
-        className={cn(
-          "grid grid-cols-7",
-          isPage ? "flex-1 gap-1" : "gap-0.5",
-        )}
+        className={cn("grid grid-cols-7 gap-1", isPage && "flex-1")}
         role="grid"
         aria-label={`Calendar for ${MONTH_NAMES[viewMonth]} ${viewYear}`}
         data-testid="calendar-grid"

@@ -61,7 +61,7 @@ test.describe("composer calendar month grid (C2)", () => {
     // Switch to Calendar tab
     await page.getByRole("button", { name: "Calendar" }).click();
 
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
   });
 
   test("(CMG-2) scheduled post appears as PostChip on correct date", async ({ page, context }) => {
@@ -91,7 +91,7 @@ test.describe("composer calendar month grid (C2)", () => {
     await page.waitForSelector('[data-testid="composer-overlay"]', { timeout: 15_000 });
 
     await page.getByRole("button", { name: "Calendar" }).click();
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
 
     // Day cell for the 15th should contain a PostChip
     const dayCell = page.getByTestId(`calendar-day-${SCHEDULED_DATE}`);
@@ -123,7 +123,7 @@ test.describe("composer calendar month grid (C2)", () => {
     await page.waitForSelector('[data-testid="composer-overlay"]', { timeout: 15_000 });
 
     await page.getByRole("button", { name: "Calendar" }).click();
-    await expect(page.getByTestId("month-calendar")).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 5_000 });
 
     // Navigate to next month
     await page.getByLabel("Next month").click();
@@ -132,7 +132,7 @@ test.describe("composer calendar month grid (C2)", () => {
     const nextMonthName = nextMonth.toLocaleString("en-AU", { month: "long" });
     const nextMonthYear = nextMonth.getFullYear().toString();
 
-    await expect(page.getByTestId("month-calendar")).toContainText(nextMonthName);
-    await expect(page.getByTestId("month-calendar")).toContainText(nextMonthYear);
+    await expect(page.getByTestId("month-label")).toContainText(nextMonthName);
+    await expect(page.getByTestId("month-label")).toContainText(nextMonthYear);
   });
 });
