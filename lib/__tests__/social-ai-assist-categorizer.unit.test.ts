@@ -92,6 +92,22 @@ describe("AI assist error categorizer", () => {
     if (!result.ok) expect(result.error.category).toBe("invalid_request");
   });
 
+  it("400 billing/credit error → unknown SERVICE_UNAVAILABLE (not invalid_request)", async () => {
+    // Anthropic returns 400 for out-of-credits — err.message is
+    // "${status} ${JSON.stringify(errorBody)}", so the check must be on the
+    // error body (2nd constructor arg), not the 3rd message string.
+    const errorBody = { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." } };
+    const err = new BadRequestError(400, errorBody, "", new Headers());
+    const result = await generateAssistText(VALID_INPUT, throwingCallFn(err));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.category).toBe("unknown");
+      expect(result.error.code).toBe("SERVICE_UNAVAILABLE");
+      expect(result.error.can_retry).toBe(false);
+      expect(result.error.message).toContain("temporarily unavailable");
+    }
+  });
+
   it("429 RateLimitError → rate_limit with retry_after", async () => {
     const headers = new Headers({ "retry-after": "30" });
     const err = new RateLimitError(429, {}, "Rate limit", headers);

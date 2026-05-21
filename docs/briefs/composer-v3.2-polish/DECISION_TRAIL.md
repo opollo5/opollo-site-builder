@@ -53,3 +53,25 @@ Picks up at D-065 per master prompt instructions.
 ## PR-D3 — Edit-mode header + Convert-to-draft + OG rehydrate (2026-05-21)
 
 *Decision log entries TBD.*
+
+---
+
+## P0 — AI assist production failure (2026-05-22)
+
+**D-072**: Root cause diagnosis — Anthropic billing/credit exhaustion
+- Trace_id `ai-gen-bd69-6056` could not be found in `client_errors` (table doesn't exist — migrations 0140/0141 not applied).
+- Direct Anthropic API call with the production API key returned HTTP 400: `"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."`
+- Confirmed: the assist route already uses `defaultAnthropicCall` from `lib/anthropic-call.ts` (canonical client, NOT a parallel implementation). No architecture change needed.
+- Root fix: Steven must add credits at `console.anthropic.com/settings/billing`.
+
+**D-073**: Error categorization improvement (#992)
+- Previous: `BadRequestError` → `invalid_request` / "Something went wrong with your request" — user-blaming for a billing failure.
+- Fix: check `err.message` (SDK formats as `"${status} ${JSON.stringify(errorBody)}"`) for "credit balance" or "billing" keywords → route to `unknown/SERVICE_UNAVAILABLE` / "AI generation is temporarily unavailable."
+- Did NOT use `overloaded` category because ToolsRow auto-retries `category === "overloaded"` 3 times — billing errors are not retryable.
+- Also added `code` and `http_status` to `cap.assist.claude_failed` log so future 400s are diagnosed immediately.
+
+**D-074**: Missing `client_errors` table
+- Migrations `0140_add_client_errors.sql` and `0141_client_errors_resolved_at.sql` exist but were never applied.
+- `POST /api/errors` silently eats the insert error and returns 201 — client never knows logging failed.
+- Cannot apply via Supabase CLI (no login token, Docker not running for diff).
+- Manual step for Steven: apply both migrations in Supabase Dashboard → SQL Editor.
