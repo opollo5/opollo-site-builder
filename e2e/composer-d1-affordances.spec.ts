@@ -56,11 +56,10 @@ test.describe("PR-D1 composer affordances", () => {
     await expect(chip).toBeVisible({ timeout: 10_000 });
 
     await chip.hover();
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(450);
 
-    const tooltip = page.locator('[role="tooltip"]');
-    await expect(tooltip).toBeVisible({ timeout: 3_000 });
-    await expect(tooltip).toContainText("Click to select");
+    // TooltipContent renders in a Radix portal — locate by visible text
+    await expect(page.locator('text="Click to select"')).toBeVisible({ timeout: 3_000 });
   });
 
   test("(D1-3) chip tooltip disappears after a chip is selected", async ({ page }) => {
@@ -73,34 +72,14 @@ test.describe("PR-D1 composer affordances", () => {
 
     // Hover — tooltip should NOT appear now that a chip is selected
     await chip.hover();
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(450);
 
-    const tooltip = page.locator('[role="tooltip"]:has-text("Click to select")');
-    await expect(tooltip).toHaveCount(0);
+    // ProfileSelector removes the Tooltip wrapper once any chip is selected
+    await expect(page.locator('text="Click to select"')).toHaveCount(0);
   });
 
   test("(D1-4) Back button triggers UnsavedChangesDialog when dirty", async ({ page }) => {
-    // Make the composer dirty by typing content
-    const editor = page.locator('[data-testid="composer-editor"] [contenteditable]');
-    if (await editor.count() > 0) {
-      await editor.click();
-      await editor.type("Draft content for unsaved test");
-    } else {
-      // Fallback: select a profile to make isDirty() return true
-      const chip = page.getByTestId("profile-chip-conn-d1-linkedin");
-      if (await chip.count() > 0) await chip.click();
-    }
-
-    const backBtn = page.getByTestId("composer-back-btn");
-    await expect(backBtn).toBeVisible({ timeout: 5_000 });
-    await backBtn.click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: 5_000 });
-  });
-
-  test("(D1-5) UnsavedChangesDialog has correct title and button order", async ({ page }) => {
-    // Make dirty
+    // Select a chip to make isDirty() return true (target_profile_ids non-empty)
     const chip = page.getByTestId("profile-chip-conn-d1-linkedin");
     if (await chip.count() > 0) await chip.click();
 
@@ -108,28 +87,34 @@ test.describe("PR-D1 composer affordances", () => {
     await expect(backBtn).toBeVisible({ timeout: 5_000 });
     await backBtn.click();
 
-    // Title
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: 5_000 });
-    await expect(dialog.getByRole("heading")).toContainText("Do you want to save your changes?");
+    // UnsavedChangesDialog specific buttons should appear
+    await expect(page.getByTestId("unsaved-continue-btn")).toBeVisible({ timeout: 5_000 });
+  });
 
-    // Button order: Save | Continue editing | Don't save
-    const saveBtn = page.getByTestId("unsaved-save-btn");
-    const continueBtn = page.getByTestId("unsaved-continue-btn");
-    const discardBtn = page.getByTestId("unsaved-discard-btn");
+  test("(D1-5) UnsavedChangesDialog has correct title and button order", async ({ page }) => {
+    // Make dirty
+    const chip = page.getByTestId("profile-chip-conn-d1-linkedin");
+    if (await chip.count() > 0) await chip.click();
 
-    await expect(saveBtn).toBeVisible();
-    await expect(continueBtn).toBeVisible();
-    await expect(discardBtn).toBeVisible();
+    await page.getByTestId("composer-back-btn").click();
+    await expect(page.getByTestId("unsaved-continue-btn")).toBeVisible({ timeout: 5_000 });
 
-    // Verify DOM order: save appears before continue, continue before discard
-    const allButtons = dialog.locator("button");
-    const texts = await allButtons.allTextContents();
-    const saveIdx = texts.findIndex((t) => t.includes("Save"));
-    const continueIdx = texts.findIndex((t) => t.includes("Continue editing"));
-    const discardIdx = texts.findIndex((t) => t.includes("Don't save"));
-    expect(saveIdx).toBeLessThan(continueIdx);
-    expect(continueIdx).toBeLessThan(discardIdx);
+    // Title: use heading role (unambiguous — only UnsavedChangesDialog has this heading)
+    await expect(
+      page.getByRole("heading", { name: /do you want to save your changes/i }),
+    ).toBeVisible();
+
+    // All three action buttons must exist
+    await expect(page.getByTestId("unsaved-save-btn")).toBeVisible();
+    await expect(page.getByTestId("unsaved-continue-btn")).toBeVisible();
+    await expect(page.getByTestId("unsaved-discard-btn")).toBeVisible();
+
+    // DOM order: Save before Continue editing before Don't save
+    const saveBox = await page.getByTestId("unsaved-save-btn").boundingBox();
+    const contBox = await page.getByTestId("unsaved-continue-btn").boundingBox();
+    const discBox = await page.getByTestId("unsaved-discard-btn").boundingBox();
+    expect(saveBox!.y).toBeLessThan(contBox!.y);
+    expect(contBox!.y).toBeLessThan(discBox!.y);
   });
 
   test("(D1-6) 'Continue editing' dismisses dialog, keeps composer open", async ({ page }) => {
@@ -138,14 +123,12 @@ test.describe("PR-D1 composer affordances", () => {
     if (await chip.count() > 0) await chip.click();
 
     await page.getByTestId("composer-back-btn").click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("unsaved-continue-btn")).toBeVisible({ timeout: 5_000 });
 
     await page.getByTestId("unsaved-continue-btn").click();
 
-    // Dialog should be gone, composer overlay should still be visible
-    await expect(dialog.getByRole("heading")).not.toBeVisible({ timeout: 3_000 });
+    // UnsavedChangesDialog gone, composer overlay still visible
+    await expect(page.getByTestId("unsaved-continue-btn")).not.toBeVisible({ timeout: 3_000 });
     await expect(page.getByTestId("composer-overlay")).toBeVisible();
   });
 });
