@@ -15,6 +15,7 @@ interface CalendarCellProps {
   isToday: boolean;
   onAdd: () => void;
   onClick: () => void;
+  onClickPost?: (post: CalendarPost) => void;
 }
 
 export function CalendarCell({
@@ -26,6 +27,7 @@ export function CalendarCell({
   isToday,
   onAdd,
   onClick,
+  onClickPost,
 }: CalendarCellProps) {
   const droppableId = date.toISOString().slice(0, 10);
   const canDrop = !isPast && !isOtherMonth;
@@ -81,7 +83,11 @@ export function CalendarCell({
 
       <div className="flex flex-col gap-0.5 overflow-hidden">
         {posts.slice(0, 3).map((post) => (
-          <PostChip key={post.id} post={post} />
+          <PostChip
+            key={post.id}
+            post={post}
+            onClick={onClickPost ? (e) => { e.stopPropagation(); onClickPost(post); } : undefined}
+          />
         ))}
         {posts.length > 3 && (
           <span className="text-xs text-muted-foreground pl-1">+{posts.length - 3} more</span>
