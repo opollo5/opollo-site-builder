@@ -356,12 +356,13 @@ test.describe("Item 12 + 14 — Back button + unsaved-changes dialog", () => {
     await expect(dialog).toBeVisible({ timeout: 3_000 });
 
     // Three buttons: Save, Continue editing, Don't save — in spec order
-    await expect(dialog.getByRole("button", { name: "Save" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Continue editing" })).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "Don't save" })).toBeVisible();
+    // exact:true prevents "Save" from also matching "Don't save" (substring)
+    await expect(dialog.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Continue editing", exact: true })).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Don't save", exact: true })).toBeVisible();
 
     // Continue editing dismisses dialog, composer stays open
-    await dialog.getByRole("button", { name: "Continue editing" }).click();
+    await dialog.getByRole("button", { name: "Continue editing", exact: true }).click();
     await expect(dialog).not.toBeVisible({ timeout: 2_000 });
     await expect(page.getByTestId("composer-overlay")).toBeVisible();
   });
