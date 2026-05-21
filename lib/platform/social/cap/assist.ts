@@ -111,9 +111,21 @@ function categorizeError(err: unknown): Omit<AssistError, "trace_id"> {
   }
 
   if (err instanceof BadRequestError) {
-    // Anthropic 400s are always invalid_request_error (malformed request, bad
-    // model name, etc.) — never a content policy violation. Content refusals
-    // come as stop_reason='refusal' in a 200 response, handled below.
+    // Anthropic 400: usually invalid_request_error (bad model, malformed body).
+    // Special-case: billing/credit exhaustion also arrives as 400 with a
+    // "credit balance" message — show a non-blaming message so users don't
+    // think their prompt caused the failure.
+    const msg = typeof (err as { message?: string }).message === "string"
+      ? (err as { message: string }).message
+      : "";
+    if (msg.includes("credit balance") || msg.includes("billing")) {
+      return {
+        category: "unknown",
+        code: "SERVICE_UNAVAILABLE",
+        message: "AI generation is temporarily unavailable. Please try again later.",
+        can_retry: false,
+      };
+    }
     return {
       category: "invalid_request",
       code: "INVALID_REQUEST",
@@ -203,6 +215,8 @@ export async function generateAssistText(
       companyId,
       traceId,
       category: categorized.category,
+      code: categorized.code,
+      http_status: (err as { status?: number }).status ?? null,
       err: err instanceof Error ? err.message : String(err),
     });
     return { ok: false, error: { ...categorized, trace_id: traceId } };
