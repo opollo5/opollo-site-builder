@@ -1,7 +1,6 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { createRouteAuthClient } from "@/lib/auth";
 import { buildAuthRedirectUrl } from "@/lib/auth-redirect";
@@ -48,7 +47,16 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // last hour, return an error (per the brief §4 rate limit).
 // ---------------------------------------------------------------------------
 
-export type LoginState = { error?: string };
+export type LoginState = {
+  error?: string;
+  // When set, the client should do a hard navigation (window.location.assign)
+  // to this URL. Using a hard redirect instead of next/navigation redirect()
+  // ensures the browser re-reads the Supabase session Set-Cookie headers
+  // before middleware runs — a soft RSC navigation can skip cookie re-reads
+  // and cause middleware to see no session, producing a stuck "Signing in…"
+  // state. Mirrors the window.location.assign pattern in CheckEmailPolling.tsx.
+  redirectTo?: string;
+};
 
 const MAX_CHALLENGES_PER_HOUR = 5;
 
@@ -99,10 +107,11 @@ export async function loginAction(
     return { error: "Sign-in failed. Please try again." };
   }
 
-  // Flag off → existing behaviour. No 2FA cookies are ever set when the
-  // flag is off, so there's nothing stale to clear on this path.
+  // Flag off → return the destination so the client can do a hard
+  // navigation (window.location.assign). No 2FA cookies are ever set
+  // when the flag is off, so there's nothing stale to clear on this path.
   if (!is2faEnabled()) {
-    redirect(next);
+    return { redirectTo: next };
   }
 
   // Flag on — check for a matching trusted device.
@@ -135,10 +144,10 @@ export async function loginAction(
       deviceId: deviceIdFromCookie,
     });
     if (trusted) {
-      // Skip the challenge — bump last_used_at + go.
+      // Skip the challenge — bump last_used_at + go (hard navigation).
       await touchTrustedDevice({ userId, deviceId: deviceIdFromCookie });
       clearStale2faCookies();
-      redirect(next);
+      return { redirectTo: next };
     }
   }
 
@@ -227,7 +236,7 @@ export async function loginAction(
   const checkEmailUrl = `/login/check-email?challenge_id=${encodeURIComponent(
     challenge.challenge_id,
   )}&next=${encodeURIComponent(next)}${sendResult.ok ? "" : "&email_send_failed=1"}`;
-  redirect(checkEmailUrl);
+  return { redirectTo: checkEmailUrl };
 }
 
 // helper for tests + the admin gate to reach the same env-aware

@@ -77,28 +77,19 @@ function buildFormData(
   return fd;
 }
 
-// redirect() throws a NEXT_REDIRECT digest that includes the target
-// path. Returns the path on a redirect, or null if the action returned
-// normally (validation/auth error).
+// The action now returns { redirectTo } on success (instead of calling
+// next/navigation redirect()). This lets the client do window.location.assign
+// for a hard navigation that guarantees session cookies are re-read.
+// runAction surfaces redirectTo as `redirected` to keep all existing
+// test assertions unchanged.
 async function runAction(
   fd: FormData,
 ): Promise<{ redirected: string | null; state: { error?: string } | null }> {
-  try {
-    const state = await loginAction({}, fd);
-    return { redirected: null, state };
-  } catch (err) {
-    // Next's redirect() throws an error whose `digest` starts with
-    // "NEXT_REDIRECT;<type>;<url>;<status>". Parse out the URL so the
-    // test can assert on it.
-    const digest = (err as { digest?: string }).digest;
-    if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) {
-      const parts = digest.split(";");
-      // parts: ["NEXT_REDIRECT", "replace"|"push", "<url>", "<status>"]
-      const url = parts[2] ?? "";
-      return { redirected: url, state: null };
-    }
-    throw err;
+  const state = await loginAction({}, fd);
+  if (state.redirectTo) {
+    return { redirected: state.redirectTo, state: null };
   }
+  return { redirected: null, state };
 }
 
 beforeEach(() => {

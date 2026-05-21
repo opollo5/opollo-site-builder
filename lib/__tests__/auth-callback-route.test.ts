@@ -18,12 +18,17 @@ const mockState = vi.hoisted(() => ({
   exchangeCalls: [] as Array<string>,
   verifyResult: { error: null as { message: string } | null },
   verifyCalls: [] as Array<{ type: string; token_hash: string }>,
+  signOutCalls: 0,
   rateLimitOk: true,
 }));
 
 vi.mock("@/lib/auth", () => ({
   createRouteAuthClient: () => ({
     auth: {
+      signOut: async () => {
+        mockState.signOutCalls++;
+        return { error: null };
+      },
       exchangeCodeForSession: async (code: string) => {
         mockState.exchangeCalls.push(code);
         return mockState.exchangeResult;
@@ -62,6 +67,7 @@ beforeEach(() => {
   mockState.exchangeCalls = [];
   mockState.verifyResult = { error: null };
   mockState.verifyCalls = [];
+  mockState.signOutCalls = 0;
   mockState.rateLimitOk = true;
 });
 
@@ -198,5 +204,38 @@ describe("GET /api/auth/callback: rate limit", () => {
     expect(res.status).toBe(429);
     expect(mockState.exchangeCalls).toEqual([]);
     expect(mockState.verifyCalls).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: sign out any existing session before the code exchange.
+//
+// Root cause: an existing session's cookies polluted the code exchange;
+// the code was consumed (one-use) but the session carried the old user's
+// identity. Subsequent attempts got "expired link" because the code was
+// already spent. Fix: signOut() BEFORE exchangeCodeForSession / verifyOtp.
+//
+// Working analog: loginAction (app/login/actions.ts) calls signOut()
+// before returning an error on the 2FA rate-limit path, as the canonical
+// pattern for "clear existing session before changing auth state".
+// ---------------------------------------------------------------------------
+describe("GET /api/auth/callback: sign out before exchange (regression)", () => {
+  it("calls signOut before exchangeCodeForSession on the PKCE path", async () => {
+    await callbackGET(makeReq("?code=pkce-sign-out-test"));
+    expect(mockState.signOutCalls).toBe(1);
+    expect(mockState.exchangeCalls).toEqual(["pkce-sign-out-test"]);
+  });
+
+  it("calls signOut before verifyOtp on the OTP path", async () => {
+    await callbackGET(makeReq("?token_hash=h-so&type=recovery"));
+    expect(mockState.signOutCalls).toBe(1);
+    expect(mockState.verifyCalls).toEqual([{ type: "recovery", token_hash: "h-so" }]);
+  });
+
+  it("does NOT call signOut when neither code nor token_hash is present", async () => {
+    await callbackGET(makeReq(""));
+    // missing_code path redirects before signOut has any value; the
+    // route bails out before the exchange block so signOut is not called.
+    expect(mockState.signOutCalls).toBe(0);
   });
 });
