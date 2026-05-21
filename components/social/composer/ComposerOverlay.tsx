@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ChevronLeft, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProfileSelector } from "@/components/social/composer/ProfileSelector";
 import { ComposerEditor } from "@/components/social/composer/ComposerEditor";
@@ -305,6 +306,11 @@ export function ComposerOverlay({
         onSubmit={() => handleSubmit(scheduling.mode)}
         submitting={submitting}
         disabled={isSubmitDisabled}
+        disabledTooltip={
+          draft.target_profile_ids.length === 0
+            ? "Select at least one account to post to"
+            : undefined
+        }
       />
     </div>
   );
@@ -323,35 +329,47 @@ export function ComposerOverlay({
         <div className="flex flex-1 overflow-hidden">
           {/* ── Left pane — editor ─────────────────────────────────────────── */}
           <div className="relative flex w-full flex-col overflow-y-auto border-r border-border md:w-[560px] lg:w-[600px]">
-            <div className="flex items-center justify-between border-b border-border px-6 py-4">
-              <h2 className="text-base font-semibold text-foreground">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-4">
+              {/* Back button */}
+              <button
+                type="button"
+                aria-label="Back"
+                onClick={handleClose}
+                data-testid="composer-back-btn"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-[120ms] focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+              >
+                <ChevronLeft size={20} aria-hidden />
+              </button>
+
+              {/* Title */}
+              <h2 className="flex-1 text-base font-semibold text-foreground truncate">
                 {draft.id ? "Edit post" : "New post"}
               </h2>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  aria-label="Keyboard shortcuts"
-                  title="Keyboard shortcuts (?)"
-                  onClick={() => setShowShortcuts((s) => !s)}
-                  data-testid="composer-shortcuts-btn"
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M9 7h6" /><path d="M12 17V11" /><rect width="20" height="16" x="2" y="4" rx="2" /><path d="M6 11h2" /><path d="M16 11h2" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Close composer"
-                  onClick={handleClose}
-                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                  </svg>
-                </button>
-              </div>
+
+              {/* Keyboard shortcuts button */}
+              <button
+                type="button"
+                aria-label="Keyboard shortcuts"
+                title="Keyboard shortcuts (?)"
+                onClick={() => setShowShortcuts((s) => !s)}
+                data-testid="composer-shortcuts-btn"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M9 7h6" /><path d="M12 17V11" /><rect width="20" height="16" x="2" y="4" rx="2" /><path d="M6 11h2" /><path d="M16 11h2" />
+                </svg>
+              </button>
+
+              {/* Close button */}
+              <button
+                type="button"
+                aria-label="Close composer"
+                onClick={handleClose}
+                data-testid="composer-close-btn"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors duration-[120ms] focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]"
+              >
+                <X size={20} strokeWidth={1.75} aria-hidden />
+              </button>
             </div>
 
             {/* Keyboard shortcuts panel */}

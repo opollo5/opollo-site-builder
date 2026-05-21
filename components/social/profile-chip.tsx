@@ -20,8 +20,8 @@ import {
 // Layout:
 //  - 56px outer circle, 2px border (3px + emerald when selected)
 //  - 52px avatar (account_avatar_url or letter fallback)
-//  - 20px checkbox overlay top-left
-//  - 24px platform icon overlay bottom-right with 2.5px white ring
+//  - 24px checkbox overlay top-left  (--chip-overlay-checkmark)
+//  - 32px platform icon overlay bottom-right with 2.5px white ring  (--chip-overlay-brand)
 //
 // States: default | selected | hovered | disconnected
 // ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ const PLATFORM_BG: Record<Platform, string> = {
   tiktok: "#010101",
 };
 
-function PlatformBadge({ platform, size = 24 }: { platform: Platform; size?: number }) {
+function PlatformBadge({ platform, size = 27 }: { platform: Platform; size?: number }) {
   const props = { size, className: "block" };
   switch (platform) {
     case "linkedin":            return <LinkedInIcon {...props} />;
@@ -84,6 +84,12 @@ export function ProfileChip({
       aria-disabled={disconnected}
       data-testid={`profile-chip-${dataid}`}
       onClick={disconnected ? undefined : onClick}
+      style={
+        {
+          "--chip-overlay-checkmark": "24px",
+          "--chip-overlay-brand": "32px",
+        } as React.CSSProperties
+      }
       className={cn(
         // Base 56px circle
         "relative inline-flex h-14 w-14 shrink-0 rounded-full",
@@ -119,28 +125,28 @@ export function ProfileChip({
         )}
       </span>
 
-      {/* Checkbox overlay — top-left, 20px */}
+      {/* Checkbox overlay — top-left, 24px (--chip-overlay-checkmark) */}
       <span
         className={cn(
-          "absolute -left-0.5 -top-0.5 flex h-5 w-5 items-center justify-center rounded-full border-2 border-white transition-colors duration-[60ms]",
+          "absolute -left-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white transition-colors duration-[60ms]",
           selected ? "bg-emerald-500" : "bg-white/90",
         )}
         aria-hidden
       >
         {disconnected ? (
-          <AlertTriangle size={10} strokeWidth={2.5} className="text-amber-500" />
+          <AlertTriangle size={11} strokeWidth={2.5} className="text-amber-500" />
         ) : selected ? (
-          <Check size={10} strokeWidth={3} className="text-white" />
+          <Check size={11} strokeWidth={3} className="text-white" />
         ) : null}
       </span>
 
-      {/* Platform icon badge — bottom-right, 24px with 2.5px white ring */}
+      {/* Platform icon badge — bottom-right, 32px with 2.5px white ring (--chip-overlay-brand) */}
       <span
-        className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white p-[2.5px]"
+        className="absolute -bottom-1.5 -right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-white p-[2.5px]"
         data-testid={`platform-badge-${dataid}`}
         aria-hidden
       >
-        <PlatformBadge platform={platform} size={19} />
+        <PlatformBadge platform={platform} size={27} />
       </span>
     </button>
   );

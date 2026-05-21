@@ -86,7 +86,7 @@ export function DayDetailPostCard({ post, onDelete, onReschedule, onClick }: Day
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative flex items-start gap-3 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-sm",
+        "group relative flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-sm",
         isDragging && "opacity-50 shadow-lg z-50",
       )}
       data-testid="day-detail-post-card"

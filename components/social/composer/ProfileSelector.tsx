@@ -4,6 +4,12 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import type { Connection } from "@/lib/social/types";
 import { ProfileChip } from "@/components/social/profile-chip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 // ---------------------------------------------------------------------------
 // Composer ProfileSelector — chip row + "Add profile" affordance.
@@ -30,17 +36,30 @@ export function ProfileSelector({ available, selected, onChange, className }: Pr
 
   return (
     <div className={cn("flex flex-wrap items-center gap-3", className)} data-testid="profile-selector">
-      {available.map((conn) => (
-        <ProfileChip
-          key={conn.id}
-          id={conn.id}
-          name={conn.account_name}
-          platform={conn.platform}
-          avatarUrl={conn.account_avatar_url}
-          selected={selected.includes(conn.id)}
-          onClick={() => toggle(conn.id)}
-        />
-      ))}
+      <TooltipProvider delayDuration={300}>
+        {available.map((conn) => {
+          const chip = (
+            <ProfileChip
+              key={conn.id}
+              id={conn.id}
+              name={conn.account_name}
+              platform={conn.platform}
+              avatarUrl={conn.account_avatar_url}
+              selected={selected.includes(conn.id)}
+              onClick={() => toggle(conn.id)}
+            />
+          );
+          if (hasSelected) return chip;
+          return (
+            <Tooltip key={conn.id}>
+              <TooltipTrigger asChild>{chip}</TooltipTrigger>
+              <TooltipContent side="bottom" data-testid={`chip-tooltip-${conn.id}`}>
+                Click to select
+              </TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </TooltipProvider>
 
       {/* "Add profile" chip — links to connection settings */}
       <a
