@@ -55,27 +55,28 @@ test.describe("PR-D1 composer affordances", () => {
     const chip = page.getByTestId("profile-chip-conn-d1-linkedin");
     await expect(chip).toBeVisible({ timeout: 10_000 });
 
-    await chip.hover();
-    await page.waitForTimeout(450);
+    // Radix Tooltip shows instantly on keyboard focus (ignores delayDuration).
+    // Using focus() is more reliable than hover() in headless CI for button triggers.
+    await chip.focus();
 
-    // TooltipContent renders in a Radix portal — locate by visible text
-    await expect(page.locator('text="Click to select"')).toBeVisible({ timeout: 3_000 });
+    // TooltipContent data-testid is "chip-tooltip-{id}" — rendered in a Radix portal
+    await expect(page.getByTestId("chip-tooltip-conn-d1-linkedin")).toBeVisible({ timeout: 3_000 });
+    await expect(page.getByTestId("chip-tooltip-conn-d1-linkedin")).toContainText("Click to select");
   });
 
   test("(D1-3) chip tooltip disappears after a chip is selected", async ({ page }) => {
     const chip = page.getByTestId("profile-chip-conn-d1-linkedin");
     await expect(chip).toBeVisible({ timeout: 10_000 });
 
-    // Select the chip
+    // Select the chip — ProfileSelector removes the Tooltip wrapper once any chip is selected
     await chip.click();
     await expect(chip).toHaveAttribute("aria-checked", "true");
 
-    // Hover — tooltip should NOT appear now that a chip is selected
-    await chip.hover();
-    await page.waitForTimeout(450);
+    // Focus the chip again — tooltip should NOT appear now (no Tooltip wrapper)
+    await chip.focus();
+    await page.waitForTimeout(200);
 
-    // ProfileSelector removes the Tooltip wrapper once any chip is selected
-    await expect(page.locator('text="Click to select"')).toHaveCount(0);
+    await expect(page.getByTestId("chip-tooltip-conn-d1-linkedin")).toHaveCount(0);
   });
 
   test("(D1-4) Back button triggers UnsavedChangesDialog when dirty", async ({ page }) => {
