@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { ProfileSelector } from "@/components/social/composer/ProfileSelector";
 import { ComposerEditor } from "@/components/social/composer/ComposerEditor";
 import { PreviewCard } from "@/components/social/composer/PreviewCard";
-import { MiniCalendar } from "@/components/social/composer/MiniCalendar";
+import { MonthCalendar } from "@/components/social/calendar/MonthCalendar";
 import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } from "@/components/social/composer/SchedulingCard";
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
 import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
@@ -468,9 +468,9 @@ export function ComposerOverlay({
                   />
                 )
               ) : (
-                <MiniCalendar
+                <MonthCalendar
+                  companyId={companyId}
                   selectedDate={prefilledDate}
-                  className="mx-auto max-w-xs"
                 />
               )}
             </div>
