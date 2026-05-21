@@ -39,7 +39,7 @@ type ActivePanel = "ai" | "emoji" | "gif" | "shorten" | "utm" | null;
 // ---------------------------------------------------------------------------
 
 type AiErrorState = {
-  category: "rate_limit" | "timeout" | "content_rejected" | "network" | "overloaded" | "unknown";
+  category: "rate_limit" | "timeout" | "content_rejected" | "invalid_request" | "network" | "overloaded" | "unknown";
   message: string;
   trace_id: string;
   retry_after?: number;
@@ -122,7 +122,7 @@ function AiErrorDisplay({
 
   return (
     <div role="alert" aria-live="assertive" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs" data-testid="ai-error-display">
-      <p className="font-medium text-destructive">{err.category === "rate_limit" ? "Anthropic API rate-limited" : err.category === "overloaded" ? "Anthropic model is busy" : err.category === "timeout" ? "Generation timed out" : err.category === "network" ? "Network error" : err.category === "content_rejected" ? "Content rejected" : "Generation failed"}</p>
+      <p className="font-medium text-destructive">{err.category === "rate_limit" ? "Anthropic API rate-limited" : err.category === "overloaded" ? "Anthropic model is busy" : err.category === "timeout" ? "Generation timed out" : err.category === "network" ? "Network error" : err.category === "content_rejected" ? "Content rejected" : err.category === "invalid_request" ? "Request failed" : "Generation failed"}</p>
       <p className="mt-1 text-muted-foreground">{err.message}</p>
       <div className="mt-2 flex gap-2">
         {err.can_retry && err.category !== "overloaded" && (
@@ -135,7 +135,7 @@ function AiErrorDisplay({
             {retryLabel}
           </button>
         )}
-        {err.category === "content_rejected" && (
+        {(err.category === "content_rejected" || err.category === "invalid_request") && (
           <button
             type="button"
             onClick={onEdit}
