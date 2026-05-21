@@ -66,8 +66,9 @@ function mockConnections() {
         {
           id: "conn-d3-linkedin",
           platform: "linkedin",
-          account_name: "D3 LinkedIn",
-          account_avatar_url: null,
+          display_name: "D3 LinkedIn",
+          avatar_url: null,
+          status: "connected",
         },
       ],
     },
