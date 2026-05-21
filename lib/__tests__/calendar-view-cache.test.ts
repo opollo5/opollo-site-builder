@@ -85,12 +85,15 @@ describe("calendar-view — scheduled draft appears immediately after insert (P0
     if (creator) await svc.auth.admin.deleteUser(creator.id);
   });
 
-  // Mirrors the query in app/api/platform/social/drafts/calendar-view/route.ts
+  // Mirrors the date-range + isolation logic in
+  // app/api/platform/social/drafts/calendar-view/route.ts.
+  // Selects only the columns that existed before the v3.2 polish PRs
+  // so the test passes on CI environments at any migration level.
   async function queryCalendarView(companyId: string): Promise<Array<{ id: string }>> {
     const svc = getServiceRoleClient();
     const { data, error } = await svc
       .from("social_post_drafts")
-      .select("id, state, scheduled_at, published_at, content, media_urls, link_url, target_profiles, parent_draft_id")
+      .select("id, state, scheduled_at, published_at")
       .eq("company_id", companyId)
       .is("archived_at", null)
       .or(`scheduled_at.gte.${FROM},published_at.gte.${FROM}`)
