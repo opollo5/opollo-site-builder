@@ -85,7 +85,28 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 
 ## PR-C1 — Media library scope (2026-05-21)
 
-*Decision log entries TBD when PR-C1 is built.*
+**D-055**: `scope` query filter approach — service-role bypass of RLS
+- `listMediaAssets` uses service-role client, which bypasses RLS entirely. Adding RLS `OR scope = 'global'` is correct for anon/authenticated calls but does nothing for service-role queries.
+- Decision: filter at the query layer via PostgREST `.or("company_id.eq.{id},scope.eq.global")` when `includeGlobal: true`. This is self-contained, explicit, and auditable.
+
+**D-056**: Partial index on `scope = 'global'`
+- Global assets are a small minority. A partial index `WHERE scope = 'global'` keeps the index tiny and makes the OR filter's global branch a quick index scan.
+- Decision: `CREATE INDEX IF NOT EXISTS idx_media_assets_scope ON social_media_assets(scope) WHERE scope = 'global'`
+
+**D-057**: Admin promote endpoint — `gate.user?.id` not `gate.userId`
+- `ApiGateResult` (`lib/admin-api-gate.ts`) shape: `{ kind: "allow"; user: SessionUser | null }` — no `userId` field at the top level.
+- Decision: log with `gate.user?.id` (nullable — system-level ops via service tokens have no user context).
+
+**D-058**: Admin media page under `app/(platform)/admin/media/page.tsx`
+- Pattern matches existing admin pages: `checkAdminAccess()` + `redirect("/login")`, service-role query, pass to client component.
+- Working analog: `app/(platform)/admin/companies/page.tsx`.
+
+**D-059**: `scope` field added to `MediaAsset` type in `MediaPickerModal.tsx`
+- API now returns `scope` on every asset. Adding it to the local type keeps the shape consistent and enables future UI differentiation (e.g. staff-pick badge) without a type change.
+
+**D-060**: Library fetch param `include_global=true` always set
+- All authenticated users with `view_calendar` can see global (staff-promoted) assets — that's the intent. No per-user toggle needed.
+- Decision: always pass `include_global=true` in `MediaPickerModal.fetchLibrary`.
 
 ---
 

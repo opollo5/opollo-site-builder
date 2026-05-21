@@ -9,6 +9,8 @@ import type { ApiResponse } from "@/lib/tool-schemas";
 // S1-57 — cursor pagination via created_at; default 50 rows, max 100.
 //          Caller passes `before` (created_at ISO of last asset seen) to
 //          fetch the next page.
+// C1     — `includeGlobal: true` unions company-scoped assets with all
+//          scope='global' assets (promoted by staff) for the picker library.
 // ---------------------------------------------------------------------------
 
 const DEFAULT_LIMIT = 50;
@@ -23,6 +25,7 @@ export type MediaAsset = {
   width: number | null;
   height: number | null;
   bundle_upload_id: string | null;
+  scope: "company" | "global";
   created_at: string;
 };
 
@@ -30,20 +33,31 @@ export async function listMediaAssets(args: {
   companyId: string;
   before?: string;
   limit?: number;
+  /** When true, global (staff-promoted) assets are included alongside company assets. */
+  includeGlobal?: boolean;
 }): Promise<ApiResponse<{ assets: MediaAsset[]; nextCursor: string | null }>> {
   if (!args.companyId) {
     return validation("companyId required.");
   }
   const pageSize = Math.min(args.limit ?? DEFAULT_LIMIT, MAX_LIMIT);
   const svc = getServiceRoleClient();
-  const base = svc
+
+  const selectFields =
+    "id, source_url, storage_path, mime_type, bytes, width, height, bundle_upload_id, scope, created_at";
+
+  let base = svc
     .from("social_media_assets")
-    .select(
-      "id, source_url, storage_path, mime_type, bytes, width, height, bundle_upload_id, created_at",
-    )
-    .eq("company_id", args.companyId)
+    .select(selectFields)
     .order("created_at", { ascending: false })
     .limit(pageSize + 1);
+
+  if (args.includeGlobal) {
+    // company-owned OR globally promoted
+    base = base.or(`company_id.eq.${args.companyId},scope.eq.global`);
+  } else {
+    base = base.eq("company_id", args.companyId);
+  }
+
   const result = await (args.before ? base.lt("created_at", args.before) : base);
   if (result.error) {
     logger.error("social.media.list.failed", {
@@ -64,6 +78,7 @@ export async function listMediaAssets(args: {
     width: (r.width as number | null) ?? null,
     height: (r.height as number | null) ?? null,
     bundle_upload_id: (r.bundle_upload_id as string | null) ?? null,
+    scope: ((r.scope as string) === "global" ? "global" : "company") as "company" | "global",
     created_at: r.created_at as string,
   }));
   const nextCursor = hasMore ? (page[page.length - 1].created_at as string) : null;

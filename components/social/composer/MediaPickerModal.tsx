@@ -25,6 +25,7 @@ type MediaAsset = {
   source_url: string | null;
   mime_type: string;
   bytes: number;
+  scope: "company" | "global";
   created_at: string;
 };
 
@@ -109,7 +110,7 @@ export function MediaPickerModal({
     setLibLoading(true);
     setLibError(null);
     try {
-      const params = new URLSearchParams({ company_id: companyId });
+      const params = new URLSearchParams({ company_id: companyId, include_global: "true" });
       if (cursor) params.set("before", cursor);
       const res = await fetch(`/api/platform/social/media?${params.toString()}`);
       const json = (await res.json()) as {

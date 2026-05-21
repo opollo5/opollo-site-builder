@@ -45,8 +45,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const before = url.searchParams.get("before") ?? undefined;
   const limitRaw = url.searchParams.get("limit");
   const limit = limitRaw ? Number(limitRaw) : undefined;
+  const includeGlobal = url.searchParams.get("include_global") === "true";
 
-  const result = await listMediaAssets({ companyId, before, limit });
+  const result = await listMediaAssets({ companyId, before, limit, includeGlobal });
   if (!result.ok) {
     return internalError(result.error.message);
   }
