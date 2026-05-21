@@ -46,7 +46,7 @@ export function CalendarCell({
         isOver && canDrop && "border-primary/60 bg-primary/10",
         !isOtherMonth && !isPast && !isSelected && "hover:border-primary/40 hover:bg-muted/30",
       )}
-      data-testid="calendar-cell"
+      data-testid={`calendar-day-${droppableId}`}
       data-date={droppableId}
     >
       <div className="flex items-center justify-between">
