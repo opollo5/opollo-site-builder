@@ -112,4 +112,18 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 
 ## PR-C2 — Calendar month grid (2026-05-21)
 
-*Decision log entries TBD when PR-C2 is built.*
+**D-061**: Reuse `PostChip` from `components/social/dashboard/PostChip.tsx`
+- The same chip already exists and works. Creating a new one at `components/social/calendar/PostChip.tsx` would be duplication.
+- Decision: import from `@/components/social/dashboard/PostChip`. No copy.
+
+**D-062**: `DayCell` omits drag-and-drop
+- `CalendarCell` (dashboard) uses `@dnd-kit/core` for drag-to-reschedule. The composer right-pane calendar is read-only — no reschedule UX in this context.
+- Decision: `DayCell` is a plain div, no `useDroppable`. Keeps the composer bundle lighter.
+
+**D-063**: Monday-first grid (mirrors CalendarShell)
+- `CalendarShell` uses `(day.getDay() + 6) % 7` for Monday-first offset. `MiniCalendar` uses Sunday-first (`getDay()` direct). Using Monday-first matches what users see on `/company/social/calendar`.
+- Decision: adopt Monday-first layout from `CalendarShell.buildGridDates`.
+
+**D-064**: `companyId` passed through from `ComposerOverlay`
+- `ComposerOverlay` already receives `companyId` as a prop (defaults to `""`). `useCalendarView` returns empty posts when `companyId` is falsy (null URL). No guard needed.
+- Decision: `MonthCalendar` accepts `companyId: string`; works silently when empty.
