@@ -53,6 +53,7 @@ export interface CalendarPost {
   published_at: string | null;
   content_excerpt: string;
   primary_media_url: string | null;
+  link_url: string | null;
   target_profiles: Array<{ platform: Platform; account_avatar_url: string }>;
   is_recurring_child: boolean;
 }

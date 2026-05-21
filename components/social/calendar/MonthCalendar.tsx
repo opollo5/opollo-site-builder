@@ -4,6 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { DayCell } from "./DayCell";
 import { useCalendarView } from "@/hooks/use-calendar-view";
+import type { CalendarPost } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // MonthCalendar — PR-C2
@@ -62,6 +63,9 @@ export interface MonthCalendarProps {
   companyId: string;
   selectedDate?: Date;
   onDateSelect?: (date: Date) => void;
+  onClickPost?: (post: CalendarPost) => void;
+  highlightPostId?: string;
+  context?: "page" | "composer-pane";
   className?: string;
 }
 
@@ -69,6 +73,9 @@ export function MonthCalendar({
   companyId,
   selectedDate,
   onDateSelect,
+  onClickPost,
+  highlightPostId,
+  context = "composer-pane",
   className,
 }: MonthCalendarProps) {
   const today = new Date();
@@ -200,6 +207,8 @@ export function MonthCalendar({
               isPast={date < today && !isSameDay(date, today)}
               isOtherMonth={!isCurrentMonth}
               onClick={(d) => onDateSelect?.(d)}
+              highlightPostId={highlightPostId}
+              onClickPost={onClickPost}
             />
           );
         })}

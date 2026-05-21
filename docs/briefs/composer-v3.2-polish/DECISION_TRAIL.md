@@ -42,7 +42,25 @@ Picks up at D-065 per master prompt instructions.
 
 ## PR-D2 — Calendar consolidation + edit-mode chips + cell-highlight (2026-05-21)
 
-*Decision log entries TBD.*
+**D-072**: Item 10 — Unified MonthCalendar — context prop added, full DnD consolidation deferred
+- Investigation: `MonthCalendar` (used in ComposerOverlay) and `CalendarShell` (used on the full page) are divergent. CalendarShell has DnD, side-rail, and filter bar — all of which are absent from MonthCalendar.
+- Decision: add `context?: "page" | "composer-pane"`, `highlightPostId?`, and `onClickPost?` props to `MonthCalendar`. The `context` prop is threaded down to DayCell and PostChip to enable cell-highlight (Item 20). Full migration of CalendarShell's DnD month grid into MonthCalendar is deferred — that's a 4-6h refactor with DnD test coverage, out of scope for a polish PR.
+- The composer pane (already using MonthCalendar) gains `highlightPostId` and `onClickPost` cleanly. The page-level CalendarShell retains its own grid; both hook to the same `useCalendarView` SWR cache, so Item 13 revalidation works on both surfaces.
+
+**D-073**: Item 13 — Calendar revalidation — SWR global mutate by key prefix
+- After a successful draft submission in `ComposerOverlay.handleSubmit`, call SWR's global `mutate` with a key-filter matching `/api/platform/social/drafts/calendar-view`. This revalidates all mounted `useCalendarView` subscriptions regardless of which surface they're on (CalendarShell or MonthCalendar).
+- No optimistic update at the composer level — the new post's profile platform info requires a DB round-trip to resolve. Simple revalidate is correct and safe.
+
+**D-074**: Item 19 — Content-type indicators — `link_url` added to CalendarPost
+- The `social_post_drafts` table has a `link_url` column. Added it to the `calendar-view` API SELECT + mapped response.
+- Type: `CalendarPost.link_url: string | null`. Media takes precedence: `hasMedia = primary_media_url !== null`; `hasLink = !hasMedia && link_url !== null`. 12px Lucide `Image` / `Link2` icons between platform icon and time. Color: `text-muted-foreground`.
+- No schema change required — column already exists.
+
+**D-075**: Item 20 — Cell highlight — emerald treatment via `highlightPostId` prop chain
+- `MonthCalendar` → `DayCell` → `PostChip`: `highlightPostId` and `onClickPost` threaded through.
+- Cell with matching post: `border-2 border-emerald-500 bg-emerald-50/60`. Chip: `ring-2 ring-emerald-500`.
+- Chip click calls `onClickPost(post)` with `stopPropagation` to prevent the cell's `onClick` from also firing.
+- `hasCellHighlight` computed from `posts.some(p => p.id === highlightPostId)` — single pass, no extra state.
 
 ---
 

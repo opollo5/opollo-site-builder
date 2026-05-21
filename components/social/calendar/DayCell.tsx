@@ -13,6 +13,8 @@ interface DayCellProps {
   isPast: boolean;
   isOtherMonth: boolean;
   onClick: (date: Date) => void;
+  highlightPostId?: string;
+  onClickPost?: (post: CalendarPost) => void;
 }
 
 const MAX_VISIBLE = 3;
@@ -25,8 +27,11 @@ export function DayCell({
   isPast,
   isOtherMonth,
   onClick,
+  highlightPostId,
+  onClickPost,
 }: DayCellProps) {
   const overflow = posts.length - MAX_VISIBLE;
+  const hasCellHighlight = highlightPostId ? posts.some((p) => p.id === highlightPostId) : false;
 
   return (
     <div
@@ -46,6 +51,7 @@ export function DayCell({
         isPast && !isOtherMonth && "bg-muted/20",
         isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
         !isOtherMonth && !isPast && !isSelected && "hover:border-primary/40 hover:bg-muted/30",
+        hasCellHighlight && !isSelected && "border-2 border-emerald-500 bg-emerald-50/60",
       )}
     >
       <span
@@ -61,7 +67,12 @@ export function DayCell({
 
       <div className="flex flex-col gap-0.5 overflow-hidden">
         {posts.slice(0, MAX_VISIBLE).map((post) => (
-          <PostChip key={post.id} post={post} />
+          <PostChip
+            key={post.id}
+            post={post}
+            highlighted={post.id === highlightPostId}
+            onClick={onClickPost ? (e) => { e.stopPropagation(); onClickPost(post); } : undefined}
+          />
         ))}
         {overflow > 0 && (
           <span className="pl-1 text-xs text-muted-foreground">+{overflow} more</span>

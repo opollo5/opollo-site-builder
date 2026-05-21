@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronLeft, X } from "lucide-react";
+import { mutate as swrMutate } from "swr";
 import { cn } from "@/lib/utils";
 import { ProfileSelector } from "@/components/social/composer/ProfileSelector";
 import { ComposerEditor } from "@/components/social/composer/ComposerEditor";
@@ -197,6 +198,10 @@ export function ComposerOverlay({
         throw new Error(data?.error?.message ?? `Submit failed (${res.status})`);
       }
 
+      // Revalidate any mounted calendar-view SWR subscriptions (CalendarShell + MonthCalendar)
+      void swrMutate(
+        (key) => typeof key === "string" && key.includes("/api/platform/social/drafts/calendar-view"),
+      );
       onSubmitSuccess?.();
       onClose();
     } catch (err) {
