@@ -48,7 +48,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const svc = getServiceRoleClient();
   let query = svc
     .from("social_post_drafts")
-    .select("id, state, scheduled_at, published_at, content, media_urls, target_profiles, parent_draft_id")
+    .select("id, state, scheduled_at, published_at, content, media_urls, link_url, target_profiles, parent_draft_id")
     .eq("company_id", companyId)
     .is("archived_at", null)
     .or(`scheduled_at.gte.${from},published_at.gte.${from}`)
@@ -78,6 +78,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       published_at: row.published_at as string | null,
       content_excerpt: ((row.content as string | null) ?? "").slice(0, 100),
       primary_media_url: ((row.media_urls as string[] | null) ?? [])[0] ?? null,
+      link_url: (row.link_url as string | null) ?? null,
       target_profiles: ((row.target_profiles as Array<{ profile_id: string }> | null) ?? []).map(
         (p) => ({ platform: null, account_avatar_url: null, profile_id: p.profile_id }),
       ),
