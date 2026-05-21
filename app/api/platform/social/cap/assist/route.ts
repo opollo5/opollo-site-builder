@@ -63,7 +63,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (!result.ok) {
     const { category, code, message, trace_id, retry_after, can_retry } = result.error;
-    const httpStatus = category === "rate_limit" ? 429 : category === "content_rejected" ? 422 : 500;
+    const httpStatus = category === "rate_limit" ? 429 : category === "content_rejected" ? 422 : category === "invalid_request" ? 400 : 500;
     const headers: Record<string, string> = {};
     if (retry_after !== undefined) headers["Retry-After"] = String(retry_after);
     return NextResponse.json(

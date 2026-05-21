@@ -27,7 +27,7 @@ import {
 export type AssistTone = "professional" | "casual" | "playful";
 export type AssistLength = "short" | "medium" | "long";
 export type AssistGoal = "educate" | "promote" | "announce" | "engage";
-export type AssistErrorCategory = "rate_limit" | "timeout" | "content_rejected" | "network" | "overloaded" | "unknown";
+export type AssistErrorCategory = "rate_limit" | "timeout" | "content_rejected" | "invalid_request" | "network" | "overloaded" | "unknown";
 
 export interface AssistInput {
   companyId: string;
@@ -111,10 +111,13 @@ function categorizeError(err: unknown): Omit<AssistError, "trace_id"> {
   }
 
   if (err instanceof BadRequestError) {
+    // Anthropic 400s are always invalid_request_error (malformed request, bad
+    // model name, etc.) — never a content policy violation. Content refusals
+    // come as stop_reason='refusal' in a 200 response, handled below.
     return {
-      category: "content_rejected",
-      code: "CONTENT_REJECTED",
-      message: "The prompt was rejected. Please review your content and try again.",
+      category: "invalid_request",
+      code: "INVALID_REQUEST",
+      message: "Something went wrong with your request. Please try again.",
       can_retry: false,
     };
   }
@@ -181,6 +184,18 @@ export async function generateAssistText(
       idempotency_key: randomUUID(),
     });
     rawText = resp.content.map((b) => b.text).join("").trim();
+    if (resp.stop_reason === "refusal") {
+      return {
+        ok: false,
+        error: {
+          category: "content_rejected",
+          code: "CONTENT_REJECTED",
+          message: "This prompt was declined. Please revise your content and try again.",
+          trace_id: generateTraceId(),
+          can_retry: false,
+        },
+      };
+    }
   } catch (err) {
     const traceId = generateTraceId();
     const categorized = categorizeError(err);

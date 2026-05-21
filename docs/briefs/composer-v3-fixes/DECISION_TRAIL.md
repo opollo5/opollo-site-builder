@@ -56,7 +56,17 @@ Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001
 
 ## PR-B1 — AI assistant error categorization (2026-05-21)
 
-*Decision log entries TBD when PR-B1 is built.*
+**D-053**: Investigation — root cause of content_rejected false-positive
+- `client_errors` table not accessible via PostgREST (not in schema cache); trace_id `ai-gen-45b8-fe84` cannot be queried from REST API.
+- Root cause identified from code analysis (case b per brief): `categorizeError` in `lib/platform/social/cap/assist.ts` — `BadRequestError` catch (line 113) routes ALL HTTP 400s to `content_rejected`.
+- Anthropic SDK `ErrorType` (`node_modules/@anthropic-ai/sdk/resources/shared.d.ts`): `'invalid_request_error' | 'authentication_error' | 'permission_error' | ... | 'billing_error'` — NO content policy type. All 400s from Anthropic are `invalid_request_error` (malformed request, bad model name, bad system prompt, etc.).
+- Content refusals in Anthropic API arrive as 200 responses with `stop_reason === 'refusal'`, NOT as 400 errors.
+- Decision: Route `BadRequestError` → `invalid_request`. Add `stop_reason === 'refusal'` check in `generateAssistText` for actual `content_rejected`.
+
+**D-054**: HTTP status for `invalid_request` in route handler
+- `app/api/platform/social/cap/assist/route.ts` line 66 mapped `content_rejected → 422`.
+- `invalid_request` should map to `400` (it mirrors the Anthropic 400 status).
+- Decision: add `category === 'invalid_request' ? 400 :` before the `500` default in the status ternary.
 
 ---
 
