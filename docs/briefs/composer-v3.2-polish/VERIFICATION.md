@@ -46,16 +46,15 @@
 
 ## Item 10 — Unified MonthCalendar in page + composer pane
 
-- PR: #985 (merged SHA f14bf402)
-- Files changed: `components/social/calendar/MonthCalendar.tsx`, `components/social/calendar/DayCell.tsx`
-- Spec compliance: **PARTIAL**
+- PR: #985 (partial), #988 (gap-fix / SHA 67c55789)
+- Files changed: `components/social/calendar/MonthCalendar.tsx`, `components/social/dashboard/CalendarShell.tsx`
+- Spec compliance: **PASS** *(gap-fix applied)*
 - Evidence:
-  - `MonthCalendar.tsx:68` — `context?: "page" | "composer-pane"` prop added ✓
-  - `MonthCalendar.tsx:67` — `highlightPostId?: string` prop added ✓
-  - `MonthCalendar.tsx:66` — `onClickPost?: (post: CalendarPost) => void` prop added ✓
-  - **MISSING**: `CalendarShell.tsx` still uses its own inline grid (CalendarCell, buildGridDates, postsForDate) — D-072 deferred full DnD migration
-  - `ComposerOverlay.tsx:563-566` — ComposerOverlay Calendar tab uses `<MonthCalendar>` ✓
-- Notes: CalendarShell and MonthCalendar both call `useCalendarView` with the same SWR key (shared cache). Item 13 revalidation works on both surfaces. The page's DnD + side-rail prevents a trivial merge. Full unification requires render-prop refactor — implemented in gap-fix PR.
+  - `MonthCalendar.tsx` — `renderDay?`, `year?`, `month?`, `onNavigate?`, `showTodayButton?`, `profileFilter?` props added ✓
+  - `CalendarShell.tsx` — inline grid removed; replaced with `<MonthCalendar context="page" renderDay={...}>` where `renderDay` provides `CalendarCell` (DnD preserved) ✓
+  - `ComposerOverlay.tsx` — Calendar tab uses `<MonthCalendar>` ✓
+  - Both surfaces share same SWR key; `data-testid="month-label"` and `"calendar-grid"` now live in MonthCalendar ✓
+- Decision: D-079 — render-prop approach avoids DnD breakage; SWR deduplication prevents double-fetch
 
 ---
 
@@ -135,15 +134,14 @@
 
 ## Item 17 — Edit-mode header "Edit post for [icon] [name] · Failed"
 
-- PR: #987 (merged SHA ad65677)
+- PR: #987 (partial), #988 (gap-fix / SHA 67c55789)
 - Files changed: `components/social/composer/ComposerOverlay.tsx`
-- Spec compliance: **PARTIAL**
+- Spec compliance: **PASS** *(gap-fix applied)*
 - Evidence:
   - `ComposerOverlay.tsx:393-410` — "Edit post for" + `SocialPlatformIcon` + account_name + "· Failed" ✓
-  - `ComposerOverlay.tsx:398` — `SocialPlatformIcon size={16}` — **spec requires 24px brand icon** ✗
+  - `ComposerOverlay.tsx:398` — `SocialPlatformIcon size={24}` ✓ (was 16px, fixed in #988)
   - `text-destructive` on "· Failed" suffix ✓
   - Multi-profile truncation with "…" ✓
-- Notes: Icon size 16px vs spec's 24px. Fixed in gap-fix PR.
 
 ---
 
@@ -175,16 +173,14 @@
 
 ## Item 20 — Edit-mode cell highlight in composer Calendar tab
 
-- PR: #985 (merged SHA f14bf402)
-- Files changed: `components/social/calendar/DayCell.tsx`, `components/social/calendar/MonthCalendar.tsx`, `components/social/dashboard/PostChip.tsx`
-- Spec compliance: **PARTIAL**
+- PR: #985 (partial), #988 (gap-fix / SHA 67c55789)
+- Files changed: `components/social/calendar/DayCell.tsx`, `components/social/calendar/MonthCalendar.tsx`, `components/social/dashboard/PostChip.tsx`, `components/social/composer/ComposerOverlay.tsx`
+- Spec compliance: **PASS** *(gap-fix applied)*
 - Evidence:
-  - `DayCell.tsx:34` — `hasCellHighlight = highlightPostId ? posts.some(p => p.id === highlightPostId) : false` ✓
-  - `DayCell.tsx:54` — `hasCellHighlight && !isSelected && "border-2 border-emerald-500 bg-emerald-50/60"` ✓
-  - `PostChip.tsx:92` — `highlighted && "ring-2 ring-emerald-500"` ✓
-  - `MonthCalendar.tsx:201-214` — passes `highlightPostId` to `DayCell` ✓
-  - **MISSING**: `ComposerOverlay.tsx:563-566` — MonthCalendar rendered without `highlightPostId` prop ✗
-- Notes: Infrastructure complete; ComposerOverlay needs `highlightPostId={initialDraft?.id}` passed to MonthCalendar. Fixed in gap-fix PR.
+  - `DayCell.tsx` — `hasCellHighlight = highlightPostId ? posts.some(p => p.id === highlightPostId) : false`; cell: `border-2 border-emerald-500 bg-emerald-50/60` ✓
+  - `PostChip.tsx` — `highlighted && "ring-2 ring-emerald-500"` ✓
+  - `MonthCalendar.tsx` — passes `highlightPostId` to `DayCell` ✓
+  - `ComposerOverlay.tsx:565` — `highlightPostId={initialDraft?.id}` ✓ (missing in D2, fixed in #988)
 
 ---
 
@@ -208,17 +204,17 @@
 | 7 | Schedule button disabled tooltip | **PASS** |
 | 8 | Profile chip hover hint | **PASS** |
 | 9 | Chip overlay sizes 24/32px | **PASS** |
-| 10 | Unified MonthCalendar | **PARTIAL** → gap-fix PR |
+| 10 | Unified MonthCalendar | **PASS** (#988 gap-fix) |
 | 11 | Close button 32px/X-20px | **PASS** |
 | 12 | Back button 32px/ChevronLeft | **PASS** |
 | 13 | Calendar revalidation | **PASS** |
 | 14 | Unsaved-changes dialog rewrite | **PASS** |
 | 15 | Click routing by post status | **PASS** |
 | 16 | cursor-pointer on chips/cards | **PASS** |
-| 17 | Edit-mode header icon size | **PARTIAL** → gap-fix PR |
+| 17 | Edit-mode header icon size | **PASS** (#988 gap-fix) |
 | 18 | Convert-to-draft button + endpoint | **PASS** |
 | 19 | Content-type chip indicators | **PASS** |
-| 20 | Edit-mode cell highlight | **PARTIAL** → gap-fix PR |
+| 20 | Edit-mode cell highlight | **PASS** (#988 gap-fix) |
 | 21 | OG metadata rehydrate | **PASS** (fresh-fetch path) |
 
-**12/15 PASS immediately. 3 items need gap fixes (10, 17, 20).**
+**15/15 PASS. D1 (#984) + D2 (#985) + D3 (#987) shipped 12 items; gap-fix (#988) closed items 10, 17, 20.**
