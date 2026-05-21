@@ -89,3 +89,18 @@ Picks up at D-065 per master prompt instructions.
 - Data: both CalendarShell and MonthCalendar call `useCalendarView` with the same SWR key — SWR deduplicates to one network request; CalendarShell retains `mutate` for DnD optimistic updates.
 - Testid migration: `data-testid="month-label"` and `data-testid="calendar-grid"` moved from CalendarShell inline section into MonthCalendar — existing dashboard tests continue to pass since there is still exactly one element with each testid on the page.
 - Dead code removed from CalendarShell: `buildGridDates`, `DAYS_OF_WEEK`, `navigateMonth`, `gridDates`, `monthLabel`.
+
+---
+
+## Workstream completion (2026-05-21)
+
+**D-080**: Composer v3.2 polish workstream complete — all 15 items (7–21) PASS
+
+| PR | SHA | Description |
+|---|---|---|
+| #984 | 6f316cd1 | D1 — tooltips, dialog rewrite, header chrome, cursors (items 7–9, 11–14, 16) |
+| #985 | f14bf402 | D2 — unified MonthCalendar, content-type chips, edit-mode highlight (items 10, 19, 20) |
+| #987 | ad65677 | D3 — edit-mode parity: click routing, header, failure banner, convert-to-draft (items 13, 15, 17, 18, 21) |
+| #988 | 6cd19c9f | Gap-fix — items 10, 17, 20 (renderDay prop, icon 24px, highlightPostId pass-through) |
+
+All four PRs merged. 12/15 items passed on initial PRs; 3 items (10, 17, 20) required gap-fix corrections. Deferred items: OG cache columns (schema change needed), full CalendarShell→MonthCalendar DnD migration, unit tests for renderDay path. See `RETROSPECTIVE.md` for full detail.
