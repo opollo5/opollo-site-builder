@@ -14,8 +14,8 @@ import { signInAsCompanyAdmin } from "./helpers";
 const BULK_API = "**/api/platform/social/drafts/bulk";
 
 const VALID_CSV = `Content,Date,Time,Channel
-"Post one content — great content for the feed.",05/21/2026,09:00,LinkedIn
-"Post two content — another great post for all.",05/22/2026,10:00,LinkedIn|Facebook
+"Post one content — great content for the feed.",06/01/2027,09:00,LinkedIn
+"Post two content — another great post for all.",06/02/2027,10:00,LinkedIn|Facebook
 `;
 
 const INVALID_CSV_PAST = `Content,Date,Time,Channel
