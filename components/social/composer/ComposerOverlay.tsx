@@ -373,7 +373,7 @@ export function ComposerOverlay({
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey;
 
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !e.defaultPrevented) {
         if (showShortcuts) { setShowShortcuts(false); return; }
         handleClose();
         return;
