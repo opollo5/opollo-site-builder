@@ -6,13 +6,13 @@ import {
   type DragEndEvent,
   DragOverlay,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { CalendarCell } from "./CalendarCell";
 import { DayDetail } from "./DayDetail";
-import { MonthCalendar } from "@/components/social/calendar/MonthCalendar";
+import { SocialCalendarGrid } from "@/components/social/calendar/SocialCalendarGrid";
 import { PostChip } from "./PostChip";
 import { FilterBar } from "./FilterBar";
 import { useCalendarView } from "@/hooks/use-calendar-view";
@@ -23,6 +23,82 @@ import { PostAnalyticsModal } from "./PostAnalyticsModal";
 import { useComposerState } from "@/hooks/use-composer-state";
 import type { CalendarPost, Connection } from "@/lib/social/types";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+
+// ---------------------------------------------------------------------------
+// DnDCell — DnD-aware day cell used by CalendarShell's renderDay prop.
+// No cell-add-btn; Issues 3+4 fixes (p-2 padding, bg-primary/5 today tint)
+// are applied in SocialCalendarGrid's DefaultCell and mirrored here.
+// ---------------------------------------------------------------------------
+
+interface DnDCellProps {
+  date: Date;
+  posts: CalendarPost[];
+  isSelected: boolean;
+  isPast: boolean;
+  isOtherMonth: boolean;
+  isToday: boolean;
+  onClick: () => void;
+  onClickPost?: (post: CalendarPost) => void;
+}
+
+function DnDCell({
+  date,
+  posts,
+  isSelected,
+  isPast,
+  isOtherMonth,
+  isToday,
+  onClick,
+  onClickPost,
+}: DnDCellProps) {
+  const droppableId = date.toISOString().slice(0, 10);
+  const canDrop = !isPast && !isOtherMonth;
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId, disabled: !canDrop });
+
+  return (
+    <div
+      ref={setNodeRef}
+      role="gridcell"
+      aria-label={date.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+      aria-selected={isSelected}
+      onClick={onClick}
+      className={cn(
+        "relative flex min-h-[80px] flex-col gap-0.5 rounded border border-border p-2 cursor-pointer transition-colors",
+        isOtherMonth && "bg-muted/30 text-muted-foreground",
+        isPast && !isOtherMonth && "bg-muted/20",
+        isToday && !isOtherMonth && !isSelected && "bg-primary/5",
+        isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
+        isOver && canDrop && "border-primary/60 bg-primary/10",
+        !isOtherMonth && !isPast && !isSelected && "hover:border-primary/40 hover:bg-muted/30",
+      )}
+      data-testid="calendar-dnd-cell"
+      data-date={droppableId}
+    >
+      <span
+        className={cn(
+          "text-xs font-medium leading-none",
+          isToday && "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold",
+          !isToday && isOtherMonth && "text-muted-foreground/60",
+        )}
+      >
+        {date.getDate()}
+      </span>
+
+      <div className="flex flex-col gap-0.5 overflow-hidden">
+        {posts.slice(0, 3).map((post) => (
+          <PostChip
+            key={post.id}
+            post={post}
+            onClick={onClickPost ? (e) => { e.stopPropagation(); onClickPost(post); } : undefined}
+          />
+        ))}
+        {posts.length > 3 && (
+          <span className="text-xs text-muted-foreground pl-1">+{posts.length - 3} more</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -197,9 +273,9 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
           onDragCancel={() => setActiveDragPost(null)}
         >
           <div className="flex flex-1 overflow-hidden">
-            {/* Calendar grid — MonthCalendar owns layout/nav; CalendarCell provides DnD */}
+            {/* Calendar grid — SocialCalendarGrid owns layout/nav; DnDCell provides DnD */}
             <div className="flex flex-1 flex-col overflow-auto p-4">
-              <MonthCalendar
+              <SocialCalendarGrid
                 context="page"
                 companyId={companyId}
                 year={currentMonth.getFullYear()}
@@ -213,7 +289,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
                 onDateSelect={(d) => setSelectedDate(d)}
                 onClickPost={handleClickPost}
                 renderDay={(date, dayPosts, meta) => (
-                  <CalendarCell
+                  <DnDCell
                     date={date}
                     posts={dayPosts}
                     isSelected={meta.isSelected}
@@ -221,10 +297,6 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
                     isOtherMonth={meta.isOtherMonth}
                     isToday={meta.isToday}
                     onClick={() => setSelectedDate(date)}
-                    onAdd={() => {
-                      setSelectedDate(date);
-                      openComposer({ prefilledDate: date });
-                    }}
                     onClickPost={handleClickPost}
                   />
                 )}

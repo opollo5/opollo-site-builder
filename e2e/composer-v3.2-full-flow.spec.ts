@@ -269,7 +269,7 @@ test.describe("Item 10 + 19 — MonthCalendar on page + chip indicators", () => 
     await expect(page.getByTestId("calendar-grid")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("month-label")).toBeVisible();
     await expect(page.getByTestId("calendar-grid")).toBeVisible();
-    const cells = page.getByTestId("calendar-cell");
+    const cells = page.getByTestId("calendar-dnd-cell");
     expect(await cells.count()).toBeGreaterThanOrEqual(28);
   });
 

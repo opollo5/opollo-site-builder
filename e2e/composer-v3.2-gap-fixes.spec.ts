@@ -108,7 +108,7 @@ test("(GAP-10) CalendarShell renders via MonthCalendar — calendar-grid testid 
   await expect(page.getByTestId("month-label")).toBeVisible();
   await expect(page.getByTestId("calendar-grid")).toBeVisible();
 
-  const cells = page.getByTestId("calendar-cell");
+  const cells = page.getByTestId("calendar-dnd-cell");
   const count = await cells.count();
   expect(count).toBeGreaterThanOrEqual(28);
 

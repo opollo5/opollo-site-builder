@@ -2,22 +2,20 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { DayCell } from "./DayCell";
+import { PostChip } from "@/components/social/dashboard/PostChip";
 import { useCalendarView } from "@/hooks/use-calendar-view";
 import type { CalendarPost } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
-// MonthCalendar — unified calendar grid for both page and composer-pane.
+// SocialCalendarGrid — unified calendar grid for both page and composer-pane.
+//
+// Consolidates MonthCalendar + DayCell into a single file.
 //
 // Page context  : controlled navigation via `year`/`month`/`onNavigate`;
 //                 `showTodayButton`; `profileFilter`; `renderDay` lets the
-//                 caller swap in DnD-aware CalendarCell while keeping grid
-//                 layout, data-fetching, and testids here.
-// Composer-pane : self-contained; all props optional; default DayCell render.
-//
-// Visual presentation is intentionally identical in both contexts. The only
-// structural difference is the outer container class (flex-1 for page vs
-// bordered box for composer-pane).
+//                 caller swap in DnD-aware cells while keeping grid layout,
+//                 data-fetching, and testids here.
+// Composer-pane : self-contained; all props optional; default DefaultCell render.
 // ---------------------------------------------------------------------------
 
 const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -31,7 +29,7 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Monday-first 7-column grid (mirrors CalendarShell)
+// Monday-first 7-column grid
 function buildGrid(year: number, month: number): Date[] {
   const first = new Date(year, month, 1);
   const last = new Date(year, month + 1, 0);
@@ -56,7 +54,7 @@ export interface DayCellMeta {
   isOtherMonth: boolean;
 }
 
-export interface MonthCalendarProps {
+export interface SocialCalendarGridProps {
   companyId: string;
   selectedDate?: Date;
   onDateSelect?: (date: Date) => void;
@@ -75,14 +73,102 @@ export interface MonthCalendarProps {
   /** Profile IDs to pass to useCalendarView */
   profileFilter?: string[];
   /**
-   * Custom day-cell renderer. When provided, replaces the default DayCell.
-   * The caller is responsible for DnD wiring; MonthCalendar handles the grid
-   * loop, data fetching, and key reconciliation.
+   * Custom day-cell renderer. When provided, replaces the default cell.
+   * The caller is responsible for DnD wiring; SocialCalendarGrid handles the
+   * grid loop, data fetching, and key reconciliation.
    */
   renderDay?: (date: Date, posts: CalendarPost[], meta: DayCellMeta) => React.ReactNode;
 }
 
-export function MonthCalendar({
+// ---------------------------------------------------------------------------
+// DefaultCell — standard (non-DnD) day cell
+// Issue 3: p-2 padding (was p-1) so today pill has breathing room
+// Issue 4: bg-primary/5 tint on today's cell
+// ---------------------------------------------------------------------------
+
+const MAX_VISIBLE = 3;
+
+interface DefaultCellProps {
+  date: Date;
+  posts: CalendarPost[];
+  isSelected: boolean;
+  isToday: boolean;
+  isPast: boolean;
+  isOtherMonth: boolean;
+  onClick: (date: Date) => void;
+  highlightPostId?: string;
+  onClickPost?: (post: CalendarPost) => void;
+}
+
+function DefaultCell({
+  date,
+  posts,
+  isSelected,
+  isToday,
+  isPast,
+  isOtherMonth,
+  onClick,
+  highlightPostId,
+  onClickPost,
+}: DefaultCellProps) {
+  const overflow = posts.length - MAX_VISIBLE;
+  const hasCellHighlight = highlightPostId ? posts.some((p) => p.id === highlightPostId) : false;
+
+  return (
+    <div
+      role="gridcell"
+      aria-label={date.toLocaleDateString("en-AU", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      })}
+      aria-selected={isSelected}
+      onClick={() => onClick(date)}
+      data-testid={`calendar-day-${date.toISOString().slice(0, 10)}`}
+      className={cn(
+        "relative flex min-h-[80px] flex-col gap-0.5 rounded border border-border p-2 cursor-pointer transition-colors",
+        isOtherMonth && "bg-muted/30 text-muted-foreground",
+        isPast && !isOtherMonth && "bg-muted/20",
+        isToday && !isOtherMonth && !isSelected && "bg-primary/5",
+        isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
+        !isOtherMonth && !isPast && !isSelected && "hover:border-primary/40 hover:bg-muted/30",
+        hasCellHighlight && !isSelected && "border-2 border-emerald-500 bg-emerald-50/60",
+      )}
+    >
+      <span
+        className={cn(
+          "text-xs font-medium leading-none",
+          isToday &&
+            "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold",
+          !isToday && isOtherMonth && "text-muted-foreground/60",
+        )}
+      >
+        {date.getDate()}
+      </span>
+
+      <div className="flex flex-col gap-0.5 overflow-hidden">
+        {posts.slice(0, MAX_VISIBLE).map((post) => (
+          <PostChip
+            key={post.id}
+            post={post}
+            highlighted={post.id === highlightPostId}
+            onClick={onClickPost ? (e) => { e.stopPropagation(); onClickPost(post); } : undefined}
+          />
+        ))}
+        {overflow > 0 && (
+          <span className="pl-1 text-xs text-muted-foreground">+{overflow} more</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SocialCalendarGrid — main export
+// ---------------------------------------------------------------------------
+
+export function SocialCalendarGrid({
   companyId,
   selectedDate,
   onDateSelect,
@@ -96,7 +182,7 @@ export function MonthCalendar({
   showTodayButton,
   profileFilter,
   renderDay,
-}: MonthCalendarProps) {
+}: SocialCalendarGridProps) {
   const today = new Date();
 
   const [localYear, setLocalYear] = React.useState(
@@ -157,7 +243,7 @@ export function MonthCalendar({
         className,
       )}
     >
-      {/* ── Header — unified layout for both contexts ──────────────────────── */}
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="mb-3 flex items-center gap-1" role="toolbar" aria-label="Month navigation">
         <h2 className="text-base font-semibold text-foreground" data-testid="month-label">
           {MONTH_NAMES[viewMonth]} {viewYear}
@@ -199,11 +285,7 @@ export function MonthCalendar({
         aria-label="Days of the week"
       >
         {DAY_LABELS.map((d) => (
-          <div
-            key={d}
-            className="px-1 py-0.5 text-center"
-            role="columnheader"
-          >
+          <div key={d} className="px-1 py-0.5 text-center" role="columnheader">
             {d}
           </div>
         ))}
@@ -242,7 +324,7 @@ export function MonthCalendar({
           }
 
           return (
-            <DayCell
+            <DefaultCell
               key={key}
               date={date}
               posts={dayPosts}
