@@ -145,7 +145,7 @@ const config: Config = {
         'c3-md':      'var(--c3-shadow-md)',
         'c3-lg':      'var(--c3-shadow-lg)',
         'c3-overlay': 'var(--c3-shadow-overlay)',
-        'c3-focus':   'var(--c3-shadow-focus)',
+        'c3-focus':   'var(--shadow-focus)',
         'c3-focus-danger': 'var(--c3-shadow-focus-danger)',
       },
       borderRadius: {

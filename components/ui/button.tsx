@@ -11,8 +11,9 @@ import { cn } from "@/lib/utils";
 // destructive → solid red, white text, for irreversible actions
 // outline     → hairline border (legacy, backwards compat)
 // link        → pink underline (legacy, backwards compat)
+// toolbar     → square-ish composer toolbar tool button; active state via aria-pressed
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium ring-offset-background transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full font-medium transition-smooth focus-visible:outline-none focus-visible:shadow-[var(--shadow-focus)] disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
@@ -27,10 +28,13 @@ const buttonVariants = cva(
         ghost:
           "bg-transparent text-[var(--btn-tertiary-text)] hover:bg-[var(--btn-tertiary-hover)] active:translate-y-px",
         link: "text-pk underline-offset-4 hover:underline",
+        toolbar:
+          "rounded-md gap-1.5 border border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground active:translate-y-px aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary",
       },
       size: {
         default: "py-[10px] px-5 text-sm",
         sm: "py-[6px] px-[14px] text-xs",
+        xs: "py-1 px-2 text-xs",
         lg: "py-[14px] px-7 text-base",
         icon: "h-8 w-8",
       },

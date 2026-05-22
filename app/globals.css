@@ -78,6 +78,11 @@
     --tx-muted:     #6B7280;                /* gray-500 — dates, disabled, helpers */
     --tx-inverse:   #FFFFFF;                /* white on dark backgrounds only */
 
+    /* Focus ring — canonical token promoted from --c3-shadow-focus */
+    --shadow-focus:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--primary));
+
     /* ---- Font stack — defined here so Tailwind fontFamily vars resolve ---- */
     --font-display: "Sora", "Helvetica Neue", "Arial", sans-serif;
     --font-body: "Inter", -apple-system, "Segoe UI", "Helvetica Neue", sans-serif;
