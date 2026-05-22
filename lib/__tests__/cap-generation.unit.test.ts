@@ -15,6 +15,14 @@ vi.mock("@/lib/supabase", () => ({
 }));
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Performance priors mock — stub to empty so generatePost tests stay focused
+// ─────────────────────────────────────────────────────────────────────────────
+vi.mock("@/lib/cap/performance-priors", () => ({
+  fetchPerformancePriors: vi.fn().mockResolvedValue([]),
+  formatPerformancePriorsBlock: vi.fn().mockReturnValue(""),
+}));
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Cost cap mock
 // ─────────────────────────────────────────────────────────────────────────────
 const { mockAssertCostCap } = vi.hoisted(() => ({ mockAssertCostCap: vi.fn() }));
@@ -137,6 +145,7 @@ const SAMPLE_VOICE = {
 const SAMPLE_POST_INPUT = {
   campaignId: "camp-1",
   postId: "post-1",
+  companyId: "company-1",
   weekNumber: 1 as const,
   arcPhase: "awareness" as const,
   monthlyObjective: "Grow LinkedIn awareness",
@@ -301,7 +310,7 @@ function buildCampaignDb() {
       language_patterns: {},
       reference_posts: [],
     },
-    cap_subscriptions: { id: "sub-1" },
+    cap_subscriptions: { id: "sub-1", company_id: "company-1" },
   };
 
   const upsertedPosts = [

@@ -31,7 +31,7 @@ export async function runCampaign(campaignId: string): Promise<RunCampaignResult
          tone, industry, target_audience, banned_words,
          on_brand_phrases, language_patterns, reference_posts
        ),
-       cap_subscriptions:cap_subscription_id ( id )`,
+       cap_subscriptions:cap_subscription_id ( id, company_id )`,
     )
     .eq("id", campaignId)
     .single();
@@ -81,6 +81,12 @@ export async function runCampaign(campaignId: string): Promise<RunCampaignResult
     throw new Error(`Campaign ${campaignId} has no voice profile`);
   }
 
+  const sub = Array.isArray(campaign.cap_subscriptions)
+    ? campaign.cap_subscriptions[0]
+    : campaign.cap_subscriptions;
+  const companyId =
+    (sub as { id: string; company_id: string } | null)?.company_id ?? "";
+
   const voiceProfile = {
     tone: vp.tone as string,
     industry: vp.industry as string,
@@ -98,6 +104,7 @@ export async function runCampaign(campaignId: string): Promise<RunCampaignResult
       const textResult = await generatePost({
         campaignId,
         postId: post.id as string,
+        companyId,
         weekNumber: post.week_number as 1 | 2 | 3 | 4,
         arcPhase: post.arc_phase as "awareness" | "education" | "offer" | "proof",
         monthlyObjective: campaign.monthly_objective as string,
