@@ -118,7 +118,7 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const ready = await goToDashboard(page);
     if (!ready) return;
 
-    const cells = page.getByTestId("calendar-cell");
+    const cells = page.getByTestId("calendar-dnd-cell");
     const firstNonOtherMonth = cells.first();
     await firstNonOtherMonth.click();
 
