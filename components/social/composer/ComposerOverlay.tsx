@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronLeft, X } from "lucide-react";
 import { mutate as swrMutate } from "swr";
+import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { cn } from "@/lib/utils";
 import { ProfileSelector } from "@/components/social/composer/ProfileSelector";
 import { ComposerEditor } from "@/components/social/composer/ComposerEditor";
@@ -39,6 +40,8 @@ export interface ComposerOverlayProps {
   prefilledDate?: Date;
   /** Company ID — required for media upload and AI assist. */
   companyId?: string;
+  /** IANA timezone string for the company (e.g. "Australia/Melbourne"). Used for scheduling. */
+  companyTimezone?: string;
   /** All connections available to select for this company. */
   availableConnections?: Connection[];
   /** Called when user submits. If absent, a basic Post now / Save as draft footer renders. */
@@ -51,6 +54,8 @@ export interface ComposerOverlayProps {
   editOriginalState?: DraftState;
   /** Failure reason shown as an error banner when editOriginalState === 'failed'. */
   failureReason?: string;
+  /** Called when user clicks a post chip in the calendar tab. Caller handles URL navigation. */
+  onNavigateToPost?: (postId: string) => void;
 }
 
 type PreviewTab = "preview" | "calendar";
@@ -75,6 +80,33 @@ const DEFAULT_DRAFT: Draft = {
   approval_required: false,
 };
 
+// Converts a UTC ISO string into a SchedulingCardValue using the company's IANA timezone.
+// Exported for unit testing.
+export function schedulingCardValueFromIso(
+  iso: string | null | undefined,
+  tz: string,
+): SchedulingCardValue {
+  const base = defaultSchedulingCardValue();
+  if (!iso) return base;
+  try {
+    const parsed = new Date(iso);
+    if (isNaN(parsed.getTime())) return base;
+    const local = toZonedTime(parsed, tz);
+    const yyyy = local.getFullYear();
+    const mm = String(local.getMonth() + 1).padStart(2, "0");
+    const dd = String(local.getDate()).padStart(2, "0");
+    const hh = String(local.getHours()).padStart(2, "0");
+    const min = String(local.getMinutes()).padStart(2, "0");
+    return {
+      ...base,
+      mode: "schedule",
+      scheduledTimes: [{ date: `${yyyy}-${mm}-${dd}`, time: `${hh}:${min}` }],
+    };
+  } catch {
+    return base;
+  }
+}
+
 function platformToIconKey(p: Platform): SocialPlatformIconKey {
   return p.toUpperCase().replace("GOOGLE_BUSINESS_PROFILE", "GOOGLE_BUSINESS") as SocialPlatformIconKey;
 }
@@ -93,12 +125,14 @@ export function ComposerOverlay({
   initialDraft,
   prefilledDate,
   companyId = "",
+  companyTimezone = "UTC",
   availableConnections = [],
   onSubmit,
   onSubmitSuccess,
   schedulingSlot,
   editOriginalState,
   failureReason,
+  onNavigateToPost,
 }: ComposerOverlayProps) {
   const [draft, setDraft] = React.useState<Draft>(initialDraft ?? DEFAULT_DRAFT);
   const [selectedIds, setSelectedIds] = React.useState<string[]>(
@@ -121,16 +155,47 @@ export function ComposerOverlay({
   // Overlay ref for scoped querySelector
   const overlayRef = React.useRef<HTMLDivElement>(null);
 
+  // Track the last draft we hydrated from, so we can do a dirty-check before
+  // re-hydrating when the user navigates to a different post via the calendar tab.
+  const lastHydratedDraftRef = React.useRef<Draft | undefined>(undefined);
+  // Keep a ref to the live draft value so the hydration effect can read it without
+  // adding draft to the dep array (which would fire on every keystroke).
+  const draftRef = React.useRef<Draft>(draft);
+  React.useEffect(() => { draftRef.current = draft; });
+
   React.useEffect(() => {
-    if (open) {
-      setDraft(initialDraft ?? DEFAULT_DRAFT);
-      setSelectedIds(initialDraft?.target_profile_ids ?? []);
-      setPreviewTab("preview");
-      setActivePreviewIndex(0);
-      setScheduling(defaultSchedulingCardValue());
-      setSubmitError(null);
+    if (!open) {
+      lastHydratedDraftRef.current = undefined;
+      return;
     }
-  }, [open, initialDraft]);
+
+    const incomingId = initialDraft?.id;
+    const lastHydrated = lastHydratedDraftRef.current;
+
+    // Already hydrated from this exact draft — no-op.
+    if (incomingId !== undefined && incomingId === lastHydrated?.id) return;
+
+    // Mid-session swap guard: if the user has edited the currently-loaded draft,
+    // don't overwrite their work when a different initialDraft arrives.
+    if (lastHydrated !== undefined) {
+      const cur = draftRef.current;
+      const edited =
+        cur.content !== lastHydrated.content ||
+        cur.media_urls.length !== lastHydrated.media_urls.length ||
+        cur.target_profile_ids.length !== lastHydrated.target_profile_ids.length;
+      if (edited) return;
+    }
+
+    const toHydrate = initialDraft ?? DEFAULT_DRAFT;
+    lastHydratedDraftRef.current = toHydrate;
+    setDraft(toHydrate);
+    setSelectedIds(toHydrate.target_profile_ids);
+    setPreviewTab("preview");
+    setActivePreviewIndex(0);
+    setScheduling(schedulingCardValueFromIso(initialDraft?.scheduled_at, companyTimezone));
+    setSubmitError(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialDraft, companyTimezone]);
 
   const selectedConnections = availableConnections.filter((c) =>
     selectedIds.includes(c.id),
@@ -190,36 +255,72 @@ export function ComposerOverlay({
     setSubmitting(true);
 
     try {
-      const body: Record<string, unknown> = {
-        company_id: companyId,
-        content: draft.content,
-        media_urls: draft.media_urls,
-        target_profile_ids: draft.target_profile_ids,
-        platform_variants: draft.platform_variants,
-        mode,
-        approval_required: scheduling.approvalRequired,
-        approver_user_id: draft.approver_user_id,
-      };
+      const isEdit = !!draft.id;
 
-      if (mode === "schedule" && scheduling.scheduledTimes.length > 0) {
-        body.scheduled_at_list = scheduling.scheduledTimes
-          .filter((r) => r.date && r.time)
-          .map((r) => `${r.date}T${r.time}:00.000Z`);
+      // Convert local wall-clock times to UTC using the company's IANA timezone.
+      const scheduledAtList =
+        mode === "schedule" && scheduling.scheduledTimes.length > 0
+          ? scheduling.scheduledTimes
+              .filter((r) => r.date && r.time)
+              .map((r) =>
+                fromZonedTime(`${r.date}T${r.time}:00`, companyTimezone).toISOString(),
+              )
+          : undefined;
+
+      const plannedForAt =
+        mode === "draft" && scheduling.plannedForAt?.date
+          ? fromZonedTime(
+              `${scheduling.plannedForAt.date}T${scheduling.plannedForAt.time ?? "09:00"}:00`,
+              companyTimezone,
+            ).toISOString()
+          : undefined;
+
+      let res: Response;
+
+      if (isEdit) {
+        // PATCH existing draft — updates in place, preserves draft_version for CAS.
+        const patchBody: Record<string, unknown> = {
+          draft_version: draft.draft_version,
+          content: draft.content,
+          media_urls: draft.media_urls,
+          target_profile_ids: draft.target_profile_ids,
+          platform_variants: draft.platform_variants,
+          mode,
+          approval_required: scheduling.approvalRequired,
+          approver_user_id: draft.approver_user_id ?? null,
+        };
+        if (scheduledAtList && scheduledAtList.length > 0) {
+          patchBody.scheduled_at = scheduledAtList[0];
+        }
+        if (plannedForAt) patchBody.planned_for_at = plannedForAt;
+
+        res = await fetch(`/api/platform/social/drafts/${draft.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patchBody),
+        });
+      } else {
+        // POST new draft.
+        const postBody: Record<string, unknown> = {
+          company_id: companyId,
+          content: draft.content,
+          media_urls: draft.media_urls,
+          target_profile_ids: draft.target_profile_ids,
+          platform_variants: draft.platform_variants,
+          mode,
+          approval_required: scheduling.approvalRequired,
+          approver_user_id: draft.approver_user_id,
+        };
+        if (scheduledAtList) postBody.scheduled_at_list = scheduledAtList;
+        if (mode === "recurring") postBody.recurrence = scheduling.recurrence;
+        if (plannedForAt) postBody.planned_for_at = plannedForAt;
+
+        res = await fetch("/api/platform/social/drafts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(postBody),
+        });
       }
-
-      if (mode === "recurring") {
-        body.recurrence = scheduling.recurrence;
-      }
-
-      if (mode === "draft" && scheduling.plannedForAt?.date) {
-        body.planned_for_at = `${scheduling.plannedForAt.date}T${scheduling.plannedForAt.time ?? "09:00"}:00.000Z`;
-      }
-
-      const res = await fetch("/api/platform/social/drafts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
 
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
@@ -563,6 +664,7 @@ export function ComposerOverlay({
                   companyId={companyId}
                   selectedDate={prefilledDate}
                   highlightPostId={initialDraft?.id}
+                  onClickPost={onNavigateToPost ? (post) => onNavigateToPost(post.id) : undefined}
                 />
               )}
             </div>
