@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { BillingIssueDialog } from "./BillingIssueDialog";
+import { Button } from "@/components/ui/button";
 import type { ServiceSummary, ServiceStatus } from "@/lib/platform/service-health/status";
 export { MONITORED_SERVICES } from "@/lib/platform/service-health/status";
 
@@ -66,13 +67,14 @@ export function ServiceStatusGrid({ services }: Props) {
                 <> &middot; {relativeTime(svc.lastIncidentAt)}</>
               )}
             </div>
-            <button
-              type="button"
-              className="mt-auto self-start rounded border border-border bg-background px-2 py-0.5 text-xs hover:bg-muted"
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-auto self-start"
               onClick={() => setDialogService(svc.name)}
             >
               Flag for review
-            </button>
+            </Button>
           </div>
         ))}
       </div>
