@@ -587,6 +587,13 @@ Detail + supply-chain scans (CodeQL, Dependabot, gitleaks, npm audit):
 - shadcn/ui over custom; Tailwind utility classes only
 - Strict TypeScript — no `any`, no `@ts-ignore`
 - One logical change per commit; conventional commit messages
+- **Charts: Apache ECharts only.** No Recharts, no Chart.js, no Plotly,
+  no Nivo, no Visx, no Victory, no hand-rolled SVG charts. Every chart
+  in every product surface — Site Builder, Optimiser, CAP, Insights,
+  admin tooling — renders through `echarts-for-react` against a shared
+  option builder in `lib/charts/`. D3 is permitted for non-chart
+  visualisation (force graphs, custom geometry) only when ECharts has
+  no equivalent. See `docs/architecture/DESIGN_SYSTEM.md` §"Charts".
 
 ## Pointers
 
