@@ -150,6 +150,9 @@ export function ComposerOverlay({
 
   // Unsaved-changes guard
   const [showDiscard, setShowDiscard] = React.useState(false);
+  // When the dialog was triggered by a Calendar chip click, holds the target post ID.
+  // null means the dialog was triggered by the close action.
+  const [pendingNavigateId, setPendingNavigateId] = React.useState<string | null>(null);
   // Keyboard shortcuts panel
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   // Overlay ref for scoped querySelector
@@ -218,12 +221,34 @@ export function ComposerOverlay({
 
   function handleDiscard() {
     setShowDiscard(false);
-    onClose();
+    const navId = pendingNavigateId;
+    setPendingNavigateId(null);
+    if (navId) {
+      onNavigateToPost?.(navId);
+    } else {
+      onClose();
+    }
   }
 
   async function handleSaveFromDialog() {
     setShowDiscard(false);
-    await handleSubmit("draft");
+    const navId = pendingNavigateId;
+    setPendingNavigateId(null);
+    const saved = await handleSubmit("draft");
+    // handleSubmit calls onClose() on success. If triggered by a chip click,
+    // re-open the composer at the intended post after the save completes.
+    if (saved && navId) {
+      onNavigateToPost?.(navId);
+    }
+  }
+
+  function handleChipClick(postId: string) {
+    if (isDirty(draft)) {
+      setPendingNavigateId(postId);
+      setShowDiscard(true);
+    } else {
+      onNavigateToPost?.(postId);
+    }
   }
 
   async function handleConvertToDraft() {
@@ -242,14 +267,14 @@ export function ComposerOverlay({
     }
   }
 
-  async function handleSubmit(mode: SchedulingMode) {
+  async function handleSubmit(mode: SchedulingMode): Promise<boolean> {
     // External onSubmit takes precedence if provided.
     if (onSubmit) {
       await onSubmit(draft, mode);
-      return;
+      return true;
     }
 
-    if (!companyId) return;
+    if (!companyId) return false;
 
     setSubmitError(null);
     setSubmitting(true);
@@ -333,8 +358,10 @@ export function ComposerOverlay({
       );
       onSubmitSuccess?.();
       onClose();
+      return true;
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      return false;
     } finally {
       setSubmitting(false);
     }
@@ -440,7 +467,7 @@ export function ComposerOverlay({
       <SchedulingCard
         value={scheduling}
         onChange={setScheduling}
-        onSubmit={() => handleSubmit(scheduling.mode)}
+        onSubmit={async () => { await handleSubmit(scheduling.mode); }}
         submitting={submitting}
         disabled={isSubmitDisabled}
         disabledTooltip={
@@ -588,7 +615,7 @@ export function ComposerOverlay({
               <ComposerEditor
                 draft={draft}
                 onChange={setDraft}
-                onSubmit={handleSubmit}
+                onSubmit={async (mode) => { await handleSubmit(mode); }}
                 companyId={companyId}
                 selectedConnections={selectedConnections}
                 schedulingSlot={schedulingSlot ?? internalSchedulingSlot}
@@ -664,7 +691,7 @@ export function ComposerOverlay({
                   companyId={companyId}
                   selectedDate={prefilledDate}
                   highlightPostId={initialDraft?.id}
-                  onClickPost={onNavigateToPost ? (post) => onNavigateToPost(post.id) : undefined}
+                  onClickPost={onNavigateToPost ? (post) => handleChipClick(post.id) : undefined}
                 />
               )}
             </div>
@@ -677,7 +704,7 @@ export function ComposerOverlay({
       <UnsavedChangesDialog
         open={showDiscard}
         onDiscard={handleDiscard}
-        onCancel={() => setShowDiscard(false)}
+        onCancel={() => { setShowDiscard(false); setPendingNavigateId(null); }}
         onSave={companyId ? () => void handleSaveFromDialog() : undefined}
       />
     </>

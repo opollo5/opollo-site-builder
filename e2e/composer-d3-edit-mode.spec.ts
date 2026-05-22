@@ -243,4 +243,61 @@ test.describe("PR-D3 edit-mode parity", () => {
       page.locator('[data-testid="composer-overlay"] h2'),
     ).toContainText("Publishing", { timeout: 5_000 });
   });
+
+  test("(D3-7) calendar chip click with dirty draft shows UnsavedChangesDialog", async ({
+    page,
+    context,
+  }) => {
+    await signInAsCompanyAdmin(page);
+    await context.route("**/api/platform/social/connections**", (route) => {
+      void route.fulfill({ status: 200, contentType: "application/json", body: mockConnections() });
+    });
+    await page.route("**/api/platform/social/drafts/calendar-view**", (route) => {
+      void route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: mockCalendarView([makeCalendarPost(MOCK_DRAFT_ID, "scheduled")]),
+      });
+    });
+    await page.route(`**/api/platform/social/drafts/${MOCK_DRAFT_ID}`, (route) => {
+      if (route.request().method() === "GET") {
+        void route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: makeDraftApiResponse("scheduled"),
+        });
+      } else {
+        void route.continue();
+      }
+    });
+
+    await page.goto(`/company/social/posts?compose=${MOCK_DRAFT_ID}`);
+    await page.waitForSelector('[data-testid="composer-overlay"]', { timeout: 20_000 });
+
+    // Make the draft dirty by editing content
+    const textarea = page.getByTestId("content-textarea");
+    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    await textarea.click();
+    await textarea.fill("D3-7 dirty edit — should trigger UnsavedChangesDialog");
+
+    // Switch to Calendar tab in the right pane
+    const calendarTabBtn = page
+      .locator('[data-testid="composer-overlay"]')
+      .getByRole("button", { name: "Calendar" });
+    await expect(calendarTabBtn).toBeVisible({ timeout: 3_000 });
+    await calendarTabBtn.click();
+
+    // Wait for the post chip to appear in the calendar view
+    const chip = page.locator('[data-testid="post-chip"]').first();
+    await expect(chip).toBeVisible({ timeout: 5_000 });
+    await chip.click();
+
+    // UnsavedChangesDialog should appear
+    await expect(page.getByTestId("unsaved-continue-btn")).toBeVisible({ timeout: 3_000 });
+
+    // "Continue editing" closes the dialog and preserves content
+    await page.getByTestId("unsaved-continue-btn").click();
+    await expect(page.getByTestId("unsaved-continue-btn")).not.toBeVisible({ timeout: 2_000 });
+    await expect(textarea).toHaveValue("D3-7 dirty edit — should trigger UnsavedChangesDialog");
+  });
 });
