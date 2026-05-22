@@ -7,6 +7,7 @@ import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { Lead } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import type {
@@ -59,16 +60,16 @@ type Props = {
   composerEnabled?: boolean;
 };
 
-const STATE_PILL: Record<SocialPostState, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending_client_approval: "bg-amber-100 text-amber-900",
-  approved: "bg-emerald-100 text-emerald-900",
-  rejected: "bg-rose-100 text-rose-900",
-  changes_requested: "bg-amber-100 text-amber-900",
-  scheduled: "bg-sky-100 text-sky-900",
-  publishing: "bg-sky-200 text-sky-900",
-  published: "bg-primary/10 text-primary",
-  failed: "bg-rose-100 text-rose-900",
+const STATE_PILL_VARIANT: Record<SocialPostState, PillVariant> = {
+  draft: "neutral",
+  pending_client_approval: "warning",
+  approved: "success",
+  rejected: "danger",
+  changes_requested: "warning",
+  scheduled: "info",
+  publishing: "info",
+  published: "accent",
+  failed: "danger",
 };
 
 const STATE_LABEL: Record<SocialPostState, string> = {
@@ -101,10 +102,10 @@ const SOURCE_LABEL: Partial<Record<SocialPostSource, string>> = {
   api: "API",
 };
 
-const SOURCE_PILL: Partial<Record<SocialPostSource, string>> = {
-  csv: "bg-violet-100 text-violet-900",
-  cap: "bg-teal-100 text-teal-900",
-  api: "bg-slate-100 text-slate-700",
+const SOURCE_PILL_VARIANT: Partial<Record<SocialPostSource, PillVariant>> = {
+  csv: "info",
+  cap: "accent",
+  api: "neutral",
 };
 
 function buildUrl({
@@ -546,12 +547,12 @@ export function SocialPostsListClient({
                         )}
                       </Link>
                       {SOURCE_LABEL[p.source_type] ? (
-                        <span
-                          className={`inline-block w-fit rounded px-1.5 py-0.5 text-xs font-medium ${SOURCE_PILL[p.source_type]}`}
+                        <Pill
+                          variant={SOURCE_PILL_VARIANT[p.source_type] ?? "neutral"}
                           data-testid={`social-post-source-${p.id}`}
                         >
                           {SOURCE_LABEL[p.source_type]}
-                        </span>
+                        </Pill>
                       ) : null}
                     </div>
                   </td>
@@ -559,11 +560,9 @@ export function SocialPostsListClient({
                     {p.link_url ?? "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-sm font-medium ${STATE_PILL[p.state]}`}
-                    >
+                    <Pill variant={STATE_PILL_VARIANT[p.state]}>
                       {STATE_LABEL[p.state]}
-                    </span>
+                    </Pill>
                   </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                     {new Date(p.state_changed_at).toLocaleString("en-AU", {

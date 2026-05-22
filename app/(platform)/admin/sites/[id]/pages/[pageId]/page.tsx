@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { EditPageMetadataButton } from "@/components/EditPageMetadataButton";
 import { Alert } from "@/components/ui/alert";
-import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { H3 } from "@/components/ui/typography";
 import { PageHtmlPreview } from "@/components/PageHtmlPreview";
 import { RegenHistoryPanel } from "@/components/RegenHistoryPanel";
@@ -51,12 +51,18 @@ function resolveBackHref(
   return from;
 }
 
+const POST_PILL_VARIANT: Record<string, PillVariant> = {
+  draft: "neutral",
+  published: "success",
+  scheduled: "info",
+};
+
 function statusBadge(status: string) {
+  const variant = POST_PILL_VARIANT[status] ?? "neutral";
   return (
-    <StatusPill
-      kind={postStatusKind(status as Parameters<typeof postStatusKind>[0])}
-      className="capitalize"
-    />
+    <Pill variant={variant} className="capitalize">
+      {status}
+    </Pill>
   );
 }
 

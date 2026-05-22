@@ -13,6 +13,7 @@ import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } 
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
 import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Pill } from "@/components/ui/pill";
 import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
 import type { Connection, Draft, DraftState, Platform, SchedulingMode } from "@/lib/social/types";
 import type { SocialPlatformIconKey } from "@/components/ui/SocialPlatformIcon";
@@ -542,7 +543,7 @@ export function ComposerOverlay({
                       <span className="shrink-0 text-destructive font-medium">· Failed</span>
                     )}
                     {isPublishing && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">Publishing…</span>
+                      <Pill variant="warning" className="shrink-0 text-xs">Publishing…</Pill>
                     )}
                   </span>
                 ) : draft.id ? "Edit post" : "New post"}

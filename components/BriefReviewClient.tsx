@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  StatusPill as UIStatusPill,
-  briefStatusKind,
-} from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { Textarea } from "@/components/ui/textarea";
 import type { BriefPageRow, BriefRow } from "@/lib/briefs";
 import { DEFAULT_MODEL_ID, MODEL_OPTIONS } from "@/lib/anthropic-models";
@@ -681,12 +678,22 @@ export function BriefReviewClient({
   );
 }
 
+const BRIEF_PILL_VARIANT: Record<string, PillVariant> = {
+  parsing: "accent", parsed: "info", committed: "success", failed_parse: "danger",
+};
+const BRIEF_PILL_LABEL: Record<string, string> = {
+  parsing: "Parsing", parsed: "Parsed", committed: "Committed", failed_parse: "Parse failed",
+};
+
 function StatusPill({ status }: { status: BriefRow["status"] }) {
-  // Folded to the A-4 primitive — kept as a thin local wrapper because
-  // the component file references `<StatusPill status={...} />` in a
-  // dozen places and the pattern reads more naturally than spelling
-  // out briefStatusKind() at every call site.
-  return <UIStatusPill kind={briefStatusKind(status)} />;
+  return (
+    <Pill
+      variant={BRIEF_PILL_VARIANT[status] ?? "neutral"}
+      className={status === "parsing" ? "animate-pulse" : undefined}
+    >
+      {BRIEF_PILL_LABEL[status] ?? status}
+    </Pill>
+  );
 }
 
 function ModePill({

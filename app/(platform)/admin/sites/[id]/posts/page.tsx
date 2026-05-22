@@ -5,7 +5,7 @@ import { BlogStyleCalibrationBanner } from "@/components/BlogStyleCalibrationBan
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { TListStandard } from "@/templates";
 import {
@@ -30,6 +30,12 @@ import { getSite } from "@/lib/sites";
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
+
+const POST_PILL_VARIANT: Record<string, PillVariant> = {
+  draft: "neutral",
+  published: "success",
+  scheduled: "info",
+};
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -366,10 +372,12 @@ export default async function SitePostsList({
                     ) : null}
                   </p>
                 </div>
-                <StatusPill
-                  kind={postStatusKind(post.status)}
+                <Pill
+                  variant={POST_PILL_VARIANT[post.status] ?? "neutral"}
                   className="shrink-0 capitalize"
-                />
+                >
+                  {post.status}
+                </Pill>
               </div>
             </li>
           ))}

@@ -4,11 +4,7 @@ import { redirect } from "next/navigation";
 import { BatchDetailClient } from "@/components/BatchDetailClient";
 import { BatchSuccessMoment } from "@/components/BatchSuccessMoment";
 import { Alert } from "@/components/ui/alert";
-import {
-  StatusPill,
-  jobStatusKind,
-  slotStateKind,
-} from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { TDetailSummary } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -16,6 +12,26 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // /admin/batches/[siteId]/[batchId] — batch detail page.
 
 export const dynamic = "force-dynamic";
+
+const JOB_PILL: Record<string, { variant: PillVariant; pulse?: boolean }> = {
+  queued: { variant: "neutral" },
+  running: { variant: "accent", pulse: true },
+  partial: { variant: "warning" },
+  succeeded: { variant: "success" },
+  failed: { variant: "danger" },
+  cancelled: { variant: "neutral" },
+};
+
+const SLOT_PILL: Record<string, { variant: PillVariant; pulse?: boolean }> = {
+  pending: { variant: "neutral" },
+  leased: { variant: "accent", pulse: true },
+  generating: { variant: "accent", pulse: true },
+  validating: { variant: "accent", pulse: true },
+  publishing: { variant: "accent", pulse: true },
+  succeeded: { variant: "success" },
+  failed: { variant: "danger" },
+  skipped: { variant: "neutral" },
+};
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -123,7 +139,7 @@ export default async function BatchDetailPage({
       ]}
       meta={
         <>
-          <StatusPill kind={jobStatusKind(job.status as Parameters<typeof jobStatusKind>[0])} />
+          {(() => { const p = JOB_PILL[job.status as string] ?? { variant: "neutral" as PillVariant }; return <Pill variant={p.variant} className={p.pulse ? "animate-pulse" : undefined}>{job.status as string}</Pill>; })()}
           <span>
             {job.succeeded_count} ok · {job.failed_count} fail ·{" "}
             {job.requested_count} total
@@ -176,7 +192,7 @@ export default async function BatchDetailPage({
                       <td className="px-3 py-2 text-muted-foreground">{s.slot_index as number}</td>
                       <td className="px-3 py-2 font-mono">{slug}</td>
                       <td className="px-3 py-2">
-                        <StatusPill kind={slotStateKind(s.state as Parameters<typeof slotStateKind>[0])} />
+                        {(() => { const p = SLOT_PILL[s.state as string] ?? { variant: "neutral" as PillVariant }; return <Pill variant={p.variant} className={p.pulse ? "animate-pulse" : undefined}>{s.state as string}</Pill>; })()}
                       </td>
                       <td className="px-3 py-2 text-muted-foreground">{s.attempts as number}</td>
                       <td className="px-3 py-2 text-muted-foreground">
