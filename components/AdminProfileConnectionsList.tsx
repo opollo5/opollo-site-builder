@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Button } from "@/components/ui/button";
+import { MenuItem } from "@/components/ui/menu-item";
 import {
   Popover,
   PopoverContent,
@@ -572,38 +573,24 @@ export function AdminProfileConnectionsList({
               {PLATFORMS.map((p) => {
                 const isBusy = busy === p.value;
                 return (
-                  <button
+                  <MenuItem
                     key={p.value}
-                    role="menuitem"
-                    type="button"
                     onClick={() => {
                       setPickerOpen(false);
                       void handleConnect(p.value);
                     }}
                     disabled={busy !== null}
-                    className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted/60 focus:bg-muted/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                     data-testid={`connect-platform-${p.value}`}
                     aria-label={`Connect ${p.label} to ${profileName}`}
+                    icon={<SocialPlatformIcon platform={p.value} size={16} />}
+                    trailing={
+                      isBusy
+                        ? <span className="text-xs">Opening…</span>
+                        : <span aria-hidden="true">›</span>
+                    }
                   >
-                    <SocialPlatformIcon
-                      platform={p.value}
-                      size={16}
-                      className="flex-shrink-0 text-foreground"
-                    />
-                    <span className="flex-1 font-medium">{p.label}</span>
-                    {isBusy ? (
-                      <span className="text-xs text-muted-foreground">
-                        Opening…
-                      </span>
-                    ) : (
-                      <span
-                        aria-hidden="true"
-                        className="text-muted-foreground"
-                      >
-                        ›
-                      </span>
-                    )}
-                  </button>
+                    {p.label}
+                  </MenuItem>
                 );
               })}
             </div>
