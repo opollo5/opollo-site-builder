@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { logClientError } from "@/lib/errors/logClientError";
 import { UtmBuilderPanel } from "@/components/social/composer/UtmBuilderPanel";
@@ -516,12 +517,12 @@ function GifPanel({
 // ToolsRow — main export
 // ---------------------------------------------------------------------------
 
-// Tool buttons with panels. Media opens a modal (no panel), handled separately.
+// AI uses Dialog (not Popover) to avoid overflowing the composer bounds.
+// Emoji, GIF, UTM remain Popover-anchored.
 const PANEL_TOOLS = [
-  { id: "ai" as const,    label: "AI assistant", icon: <Sparkles size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "emoji" as const, label: "Emoji",         icon: <Smile    size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "gif" as const,   label: "GIF",           icon: <Film     size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "utm" as const,   label: "UTM tags",      icon: <Tags     size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "emoji" as const, label: "Emoji",    icon: <Smile size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "gif" as const,   label: "GIF",      icon: <Film  size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "utm" as const,   label: "UTM tags", icon: <Tags  size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
 const BUTTON_CLASSES = "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]";
@@ -546,6 +547,22 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
         <ImagePlus size={14} strokeWidth={1.75} aria-hidden />
         Media
       </button>
+
+      {/* AI assistant — Dialog prevents overflow outside composer bounds (Issue 6) */}
+      <button
+        type="button"
+        data-testid="composer-tool-ai"
+        onClick={() => setActivePanel(activePanel === "ai" ? null : "ai")}
+        className={cn(BUTTON_CLASSES, activePanel === "ai" ? ACTIVE_CLASSES : INACTIVE_CLASSES)}
+      >
+        <Sparkles size={14} strokeWidth={1.75} aria-hidden />
+        AI assistant
+      </button>
+      <Dialog open={activePanel === "ai"} onOpenChange={(open) => setActivePanel(open ? "ai" : null)}>
+        <DialogContent className="max-w-[600px] p-0" data-testid="composer-panel-ai">
+          <AiPanel companyId={companyId} onInsert={onInsertText} onClose={() => setActivePanel(null)} />
+        </DialogContent>
+      </Dialog>
 
       {/* Panel tools — each anchored to its trigger button via Radix Popover */}
       {PANEL_TOOLS.map((tool) => (
@@ -575,9 +592,6 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
             >
               {/* c3-panel-in: 200ms translateY(-8px)→0 + fade, ease-snap */}
               <div className="c3-panel-in" data-testid={`composer-panel-${tool.id}`}>
-                {tool.id === "ai" && (
-                  <AiPanel companyId={companyId} onInsert={onInsertText} onClose={() => setActivePanel(null)} />
-                )}
                 {tool.id === "emoji" && (
                   <EmojiPickerPanel onInsert={onInsertText} onClose={() => setActivePanel(null)} />
                 )}

@@ -10,10 +10,15 @@ import {
   buildCampaignPostSystemMessage,
   buildCampaignPostUserMessage,
 } from "@/lib/cap/prompts/campaign-post";
+import {
+  fetchPerformancePriors,
+  formatPerformancePriorsBlock,
+} from "@/lib/cap/performance-priors";
 
 export interface GeneratePostInput {
   campaignId: string;
   postId: string;
+  companyId: string;
   weekNumber: 1 | 2 | 3 | 4;
   arcPhase: "awareness" | "education" | "offer" | "proof";
   monthlyObjective: string;
@@ -44,6 +49,7 @@ export async function generatePost(input: GeneratePostInput): Promise<GeneratePo
   const {
     campaignId,
     postId,
+    companyId,
     weekNumber,
     arcPhase,
     monthlyObjective,
@@ -58,7 +64,9 @@ export async function generatePost(input: GeneratePostInput): Promise<GeneratePo
   const sanitizedIndustry = sanitizePromptInput(voiceProfile.industry);
   const sanitizedAudience = sanitizePromptInput(voiceProfile.targetAudience);
 
-  const systemMessage = buildCampaignPostSystemMessage();
+  const priors = await fetchPerformancePriors(companyId);
+  const priorsBlock = formatPerformancePriorsBlock(priors);
+  const systemMessage = buildCampaignPostSystemMessage(priorsBlock || undefined);
   const userMessage = buildCampaignPostUserMessage({
     weekNumber,
     arcPhase,

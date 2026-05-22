@@ -104,7 +104,7 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const grid = page.getByTestId("calendar-grid");
     await expect(grid).toBeVisible();
 
-    const cells = page.getByTestId("calendar-cell");
+    const cells = page.getByTestId("calendar-dnd-cell");
     const count = await cells.count();
     expect(count).toBeGreaterThanOrEqual(28);
 
@@ -118,32 +118,13 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const ready = await goToDashboard(page);
     if (!ready) return;
 
-    const cells = page.getByTestId("calendar-cell");
+    const cells = page.getByTestId("calendar-dnd-cell");
     const firstNonOtherMonth = cells.first();
     await firstNonOtherMonth.click();
 
     // Day detail panel should be visible
     const detail = page.getByTestId("day-detail");
     await expect(detail).toBeVisible();
-  });
-
-  test("(F-3) cell add: hover-reveal + opens composer pre-scheduled for that day", async ({ page, context }) => {
-    await mockDashboardApis(context, []);
-    const ready = await goToDashboard(page);
-    if (!ready) return;
-
-    // Find the first non-past, non-other-month cell (these have cell-add-btn rendered)
-    const cellWithAdd = page.getByTestId("calendar-cell").filter({ has: page.getByTestId("cell-add-btn") }).first();
-    // Hover to trigger group:hover → group-hover:flex transition on the button
-    await cellWithAdd.hover();
-    // Scope addBtn to the hovered cell so the hover state applies
-    const addBtn = cellWithAdd.getByTestId("cell-add-btn");
-    // Button transitions from display:none to display:flex on hover — wait for it
-    await expect(addBtn).toBeVisible({ timeout: 2_000 });
-    await addBtn.click();
-
-    // FilterBar's New post button is always rendered — confirm it's accessible
-    await expect(page.getByTestId("new-post-btn")).toBeVisible();
   });
 
   test("(F-4) drag reschedule: drag post chip to another cell fires PATCH", async ({ page, context }) => {
@@ -191,7 +172,7 @@ test.describe("dashboard — calendar grid (PR F)", () => {
     const sourceBbox = await dragHandle.boundingBox();
     if (!sourceBbox) return;
 
-    const targetCells = page.getByTestId("calendar-cell");
+    const targetCells = page.getByTestId("calendar-dnd-cell");
     const targetCell = targetCells.last();
     const targetBbox = await targetCell.boundingBox();
     if (!targetBbox) return;

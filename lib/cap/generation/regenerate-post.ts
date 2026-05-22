@@ -26,6 +26,7 @@ export async function regeneratePost(
        cap_campaign_id,
        cap_campaigns:cap_campaign_id (
          month, monthly_objective, cap_subscription_id,
+         cap_subscriptions:cap_subscription_id ( id, company_id ),
          cap_voice_profiles:voice_profile_id (
            tone, industry, target_audience, banned_words,
            on_brand_phrases, language_patterns, reference_posts
@@ -61,6 +62,12 @@ export async function regeneratePost(
     throw new Error(`Post ${campaignPostId} campaign has no voice profile`);
   }
 
+  const sub = Array.isArray(campaign.cap_subscriptions)
+    ? campaign.cap_subscriptions[0]
+    : campaign.cap_subscriptions;
+  const companyId =
+    (sub as { id: string; company_id: string } | null)?.company_id ?? "";
+
   const voiceProfile = {
     tone: vp.tone as string,
     industry: vp.industry as string,
@@ -74,6 +81,7 @@ export async function regeneratePost(
   const textResult = await generatePost({
     campaignId: post.cap_campaign_id as string,
     postId: campaignPostId,
+    companyId,
     weekNumber: post.week_number as 1 | 2 | 3 | 4,
     arcPhase: post.arc_phase as "awareness" | "education" | "offer" | "proof",
     monthlyObjective: campaign.monthly_objective as string,

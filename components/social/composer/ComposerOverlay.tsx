@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { ProfileSelector } from "@/components/social/composer/ProfileSelector";
 import { ComposerEditor } from "@/components/social/composer/ComposerEditor";
 import { PreviewCard } from "@/components/social/composer/PreviewCard";
-import { MonthCalendar } from "@/components/social/calendar/MonthCalendar";
+import { SocialCalendarGrid } from "@/components/social/calendar/SocialCalendarGrid";
 import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } from "@/components/social/composer/SchedulingCard";
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
 import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
@@ -373,7 +373,7 @@ export function ComposerOverlay({
     function onKey(e: KeyboardEvent) {
       const meta = e.metaKey || e.ctrlKey;
 
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !e.defaultPrevented) {
         if (showShortcuts) { setShowShortcuts(false); return; }
         handleClose();
         return;
@@ -687,7 +687,7 @@ export function ComposerOverlay({
                   />
                 )
               ) : (
-                <MonthCalendar
+                <SocialCalendarGrid
                   companyId={companyId}
                   selectedDate={prefilledDate}
                   highlightPostId={initialDraft?.id}

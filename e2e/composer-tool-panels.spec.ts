@@ -54,7 +54,12 @@ test.describe("composer tool panels — mutual exclusion + dismiss (A4)", () => 
     await aiBtn.click();
     await expect(page.getByTestId("composer-panel-ai")).toBeVisible();
 
-    // Switch to Emoji — AI must close, Emoji must open
+    // AI uses a Dialog with a backdrop — dismiss it via Esc so the backdrop
+    // no longer blocks pointer events to other tool buttons
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("composer-panel-ai")).not.toBeVisible({ timeout: 3_000 });
+
+    // Now Emoji can be clicked — AI is closed, Emoji must open
     await emojiBtn.click();
     await expect(page.getByTestId("composer-panel-emoji")).toBeVisible();
     await expect(page.getByTestId("composer-panel-ai")).not.toBeVisible();
