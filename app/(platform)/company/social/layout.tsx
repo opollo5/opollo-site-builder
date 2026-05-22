@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { ComposerMountV2 } from "@/components/composer/composer-mount-v2";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // /company/social/* — session + company guard.
 //
@@ -42,10 +43,18 @@ export default async function CompanySocialLayout({
 
   const companyId = session.company.companyId;
 
+  const client = getServiceRoleClient();
+  const { data: company } = await client
+    .from("platform_companies")
+    .select("timezone")
+    .eq("id", companyId)
+    .maybeSingle();
+  const companyTimezone = (company?.timezone as string | undefined) ?? "UTC";
+
   return (
     <>
       {children}
-      <ComposerMountV2 companyId={companyId} />
+      <ComposerMountV2 companyId={companyId} companyTimezone={companyTimezone} />
     </>
   );
 }
