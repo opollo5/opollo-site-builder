@@ -1,6 +1,32 @@
 import { describe, it, expect, afterAll } from 'vitest';
 import { createClient } from '@supabase/supabase-js';
 import { extractDeterministicFeatures } from '@/lib/insights/feature-extractor';
+import type { InsPostFeatures } from '@/lib/insights/types';
+
+// PostgREST requires snake_case column names; TypeScript interfaces use camelCase.
+function toDbRow(f: Omit<InsPostFeatures, 'id' | 'extractedAt' | 'createdAt' | 'updatedAt' | 'sentimentScore' | 'topicTags'>) {
+  return {
+    company_id: f.companyId,
+    profile_id: f.profileId,
+    source: f.source,
+    bundle_post_id: f.bundlePostId,
+    cap_campaign_post_id: f.capCampaignPostId,
+    platform: f.platform,
+    word_count: f.wordCount,
+    sentence_count: f.sentenceCount,
+    has_question: f.hasQuestion,
+    emoji_count: f.emojiCount,
+    hashtag_count: f.hashtagCount,
+    has_link: f.hasLink,
+    has_media: f.hasMedia,
+    media_type: f.mediaType,
+    reading_grade: f.readingGrade,
+    day_of_week: f.dayOfWeek,
+    hour_of_day_utc: f.hourOfDayUtc,
+    hour_of_day_client_tz: f.hourOfDayClientTz,
+    posted_at: f.postedAt,
+  };
+}
 
 const supabaseUrl = process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321';
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
@@ -32,7 +58,8 @@ describe('Insights feature extract — integration', () => {
       clientTimezone: 'Australia/Melbourne',
     });
 
-    const { error } = await client.from('ins_post_features').insert(features);
+    const row = toDbRow(features);
+    const { error } = await client.from('ins_post_features').insert(row);
     expect(error, `Insert should succeed: ${error?.message}`).toBeNull();
   });
 
@@ -52,7 +79,8 @@ describe('Insights feature extract — integration', () => {
       clientTimezone: 'UTC',
     });
 
-    const { error } = await client.from('ins_post_features').insert(features);
+    const row = toDbRow(features);
+    const { error } = await client.from('ins_post_features').insert(row);
     expect(error).not.toBeNull();
     expect(error?.code).toBe('23505');
   });
