@@ -14,7 +14,7 @@
 
 - **PR**: #1023 `fix/ai-assist-modal-cleanup`
 - **Merge SHA**: `9ef730b6aa7fe407a40bd0185bfcd8529fac1a94`
-- **Deploy**: pending (watching)
+- **Deploy**: production, 2026-05-23T23:39:30Z, state: success (deploy id 4796683935)
 - **Root cause 2a**: Generate button used `variant="outline"` — renders as ghost border on white modal background, visually invisible.
 - **Root cause 2b**: `AiPanel` rendered a custom `<IconButton label="Close AI panel">` alongside `DialogContent`'s built-in Radix close button, stacking two X affordances top-right.
 - **Fix 2a**: Removed `variant="outline"` from Generate button; default filled emerald CTA variant used.
