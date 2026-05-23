@@ -249,9 +249,6 @@ function AiPanel({
     <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-md" data-testid="ai-panel">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">AI assistant</p>
-        <IconButton label="Close AI panel" onClick={onClose} className="h-6 w-6 text-muted-foreground hover:text-foreground">
-          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
-        </IconButton>
       </div>
       <textarea
         value={prompt}
@@ -332,7 +329,6 @@ function AiPanel({
             </p>
           )}
           <Button
-            variant="outline"
             size="xs"
             className="w-full"
             onClick={() => void generate()}
