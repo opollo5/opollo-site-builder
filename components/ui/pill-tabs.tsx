@@ -9,8 +9,8 @@ import { cn } from "@/lib/utils";
 // PillTabs — pill-shaped tab group.
 //
 // Spec:
-//   Active:   bg-[var(--tab-active-bg)], white text, rounded-full
-//   Inactive: transparent bg, text-[var(--tab-inactive-text)], rounded-full, hover bg-[var(--icon-control-hover)]
+//   Active:   bg-primary, primary-foreground text, rounded-full
+//   Inactive: transparent bg, muted-foreground text, rounded-full, hover bg-muted
 //   No borders on individual tabs.
 //
 // Each tab renders as a <Link> when `href` is supplied (navigation tabs)
@@ -37,10 +37,10 @@ export interface PillTabsProps {
 const TAB_BASE =
   "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap";
 
-const TAB_ACTIVE = "bg-[var(--tab-active-bg)] text-[var(--tab-active-text)]";
+const TAB_ACTIVE = "bg-primary text-primary-foreground";
 
 const TAB_INACTIVE =
-  "bg-transparent text-[var(--tab-inactive-text)] hover:bg-[var(--icon-control-hover)] hover:text-[var(--tx-primary)]";
+  "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground";
 
 const TAB_DISABLED = "bg-transparent text-[var(--tx-muted)] cursor-not-allowed";
 

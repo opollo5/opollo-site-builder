@@ -1,6 +1,6 @@
 "use client";
 
-import { MenuProvider, SiteActionsMenu } from "@/components/SiteActionsMenu";
+import { SiteActionsMenu } from "@/components/SiteActionsMenu";
 import { NewBatchButton } from "@/components/NewBatchButton";
 import type { BatchTemplateOption } from "@/components/NewBatchModal";
 
@@ -17,13 +17,11 @@ export function SiteDetailActions({
         site={{ id: site.id, name: site.name }}
         templates={templates}
       />
-      <MenuProvider>
-        <SiteActionsMenu
-          siteId={site.id}
-          name={site.name}
-          wpUrl={site.wp_url}
-        />
-      </MenuProvider>
+      <SiteActionsMenu
+        siteId={site.id}
+        name={site.name}
+        wpUrl={site.wp_url}
+      />
     </div>
   );
 }

@@ -170,7 +170,7 @@ export function NavShellClient({
         aria-modal="true"
         aria-label="Navigation"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 flex-col border-r border-border bg-[linear-gradient(180deg,var(--d1)_0%,var(--bg)_100%)] sm:hidden transition-transform duration-200",
+          "fixed inset-y-0 left-0 z-50 w-72 flex-col border-r border-border bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--canvas))_100%)] sm:hidden transition-transform duration-200",
           mobileOpen ? "flex translate-x-0" : "-translate-x-full flex",
         )}
         hidden={!mobileOpen}

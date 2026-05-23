@@ -89,14 +89,14 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        /* Opollo raw tokens — use as text-pk, bg-gr, border-bl, etc. */
-        pk: "var(--pk)",
-        pk2: "var(--pk2)",
-        gr: "var(--gr)",
-        gr2: "var(--gr2)",
-        bl: "var(--bl)",
-        am: "var(--am)",
-        rd: "var(--rd)",
+        /* Opollo raw tokens — semantic aliases to shadcn tokens */
+        pk:  "hsl(var(--primary))",
+        pk2: "#00A86B",
+        gr:  "hsl(var(--success))",
+        gr2: "#00875a",
+        bl:  "hsl(var(--info))",
+        am:  "hsl(var(--warning))",
+        rd:  "hsl(var(--destructive))",
         d1: "var(--d1)",
         d2: "var(--d2)",
         d3: "var(--d3)",
@@ -127,16 +127,19 @@ const config: Config = {
         "tx-secondary": "var(--tx-secondary)",  /* #374151 gray-700 */
         "tx-muted":     "var(--tx-muted)",      /* #6B7280 gray-500 */
         "tx-inverse":   "var(--tx-inverse)",    /* #FFFFFF */
-        /* Button token passthrough — consumed by components/ui/button.tsx */
-        "btn-primary":          "var(--btn-primary-bg)",
-        "btn-secondary-border": "var(--btn-secondary-border)",
-        "btn-tertiary-hover":   "var(--btn-tertiary-hover)",
-        "btn-destructive":      "var(--btn-destructive-bg)",
-        /* Tab + control tokens */
-        "tab-active":           "var(--tab-active-bg)",
-        "tab-inactive-text":    "var(--tab-inactive-text)",
-        "icon-hover":           "var(--icon-control-hover)",
-        "search-border":        "var(--search-input-border)",
+        /* Semantic callout color trios (D9) */
+        "success-bg":     "var(--color-success-bg)",
+        "success-fg":     "var(--color-success-fg)",
+        "success-border": "var(--color-success-border)",
+        "warning-bg":     "var(--color-warning-bg)",
+        "warning-fg":     "var(--color-warning-fg)",
+        "warning-border": "var(--color-warning-border)",
+        "danger-bg":      "var(--color-danger-bg)",
+        "danger-fg":      "var(--color-danger-fg)",
+        "danger-border":  "var(--color-danger-border)",
+        "info-bg":        "var(--color-info-bg)",
+        "info-fg":        "var(--color-info-fg)",
+        "info-border":    "var(--color-info-border)",
       },
       boxShadow: {
         'pk-glow': '0 4px 24px var(--pk-glow)',
@@ -145,8 +148,7 @@ const config: Config = {
         'c3-md':      'var(--c3-shadow-md)',
         'c3-lg':      'var(--c3-shadow-lg)',
         'c3-overlay': 'var(--c3-shadow-overlay)',
-        'c3-focus':   'var(--c3-shadow-focus)',
-        'c3-focus-danger': 'var(--c3-shadow-focus-danger)',
+        'c3-focus':   'var(--shadow-focus)',
       },
       borderRadius: {
         lg: "var(--radius)",

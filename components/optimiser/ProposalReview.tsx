@@ -236,7 +236,7 @@ export function ProposalReview({
               status.tone === "err"
                 ? "border-red-200 bg-red-50 text-red-900"
                 : status.tone === "warn"
-                  ? "border-amber-200 bg-amber-50 text-amber-900"
+                  ? "border-warning-border bg-warning-bg text-warning-fg"
                   : "border-emerald-200 bg-emerald-50 text-emerald-900"
             }`}
           >
@@ -330,10 +330,10 @@ function SubRow({ label, value }: { label: string; value: string }) {
 function RiskPill({ risk }: { risk: string }) {
   const cls =
     risk === "high"
-      ? "bg-red-100 text-red-900 border-red-200"
+      ? "bg-danger-bg text-danger-fg border-danger-border"
       : risk === "medium"
-        ? "bg-amber-100 text-amber-900 border-amber-200"
-        : "bg-emerald-100 text-emerald-900 border-emerald-200";
+        ? "bg-warning-bg text-warning-fg border-warning-border"
+        : "bg-success-bg text-success-fg border-success-border";
   return (
     <span
       className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${cls}`}

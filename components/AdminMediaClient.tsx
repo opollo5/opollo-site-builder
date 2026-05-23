@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
 // AdminMediaClient — C1
@@ -130,15 +131,14 @@ export function AdminMediaClient({ initialAssets }: { initialAssets: AdminMediaA
                 <td className="px-4 py-2 text-muted-foreground">{formatDate(asset.created_at)}</td>
                 <td className="px-4 py-2 text-right">
                   {asset.scope === "company" ? (
-                    <button
-                      type="button"
+                    <Button
+                      size="xs"
                       data-testid={`promote-btn-${asset.id}`}
                       disabled={promoting === asset.id}
                       onClick={() => void promote(asset.id)}
-                      className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
                     >
                       {promoting === asset.id ? "Promoting…" : "Promote to global"}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="text-xs text-muted-foreground">Global</span>
                   )}

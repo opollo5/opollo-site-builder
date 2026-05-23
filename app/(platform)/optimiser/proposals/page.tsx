@@ -9,9 +9,9 @@ export const metadata = { title: "Optimiser · Proposals" };
 export const dynamic = "force-dynamic";
 
 const RISK_PILL: Record<string, string> = {
-  low: "bg-emerald-100 text-emerald-900 border-emerald-200",
-  medium: "bg-amber-100 text-amber-900 border-amber-200",
-  high: "bg-red-100 text-red-900 border-red-200",
+  low: "bg-success-bg text-success-fg border-success-border",
+  medium: "bg-warning-bg text-warning-fg border-warning-border",
+  high: "bg-danger-bg text-danger-fg border-danger-border",
 };
 
 export default async function OptimiserProposalsList({

@@ -21,10 +21,10 @@ import type { ScoreClassification } from "@/lib/optimiser/scoring/types";
 // v1.6 adds the composite-score column + classification badge.
 
 const STATE_PILL: Record<OptPageState, string> = {
-  active: "bg-blue-100 text-blue-900 border-blue-200",
-  healthy: "bg-emerald-100 text-emerald-900 border-emerald-200",
+  active: "bg-info-bg text-info-fg border-info-border",
+  healthy: "bg-success-bg text-success-fg border-success-border",
   insufficient_data: "bg-muted text-muted-foreground border-border",
-  read_only_external: "bg-amber-100 text-amber-900 border-amber-200",
+  read_only_external: "bg-warning-bg text-warning-fg border-warning-border",
 };
 
 const STATE_LABEL: Record<OptPageState, string> = {

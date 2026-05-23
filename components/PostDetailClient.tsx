@@ -10,7 +10,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PostDraftEditor } from "@/components/PostDraftEditor";
-import { StatusPill, postStatusKind } from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { SuccessMoment } from "@/components/ui/success-moment";
 import { H1 } from "@/components/ui/typography";
 import type { PostDetail } from "@/lib/posts";
@@ -201,7 +201,14 @@ export function PostDetailClient({
           <p className="mt-1 text-sm text-muted-foreground">
             <code className="text-sm">/{post.slug}</code>
             {" · "}
-            <StatusPill kind={postStatusKind(post.status)} className="capitalize" />
+            <Pill
+                variant={
+                  ({ draft: "neutral", published: "success", scheduled: "info" } as Record<string, PillVariant>)[post.status] ?? "neutral"
+                }
+                className="capitalize"
+              >
+                {post.status}
+              </Pill>
             {post.wp_post_id && (
               <>
                 {" · "}

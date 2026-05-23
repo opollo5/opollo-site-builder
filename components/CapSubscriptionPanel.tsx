@@ -316,7 +316,7 @@ export function CapSubscriptionPanel({ companyId, initialSubscription, initialVo
       {/* Missing template warning */}
       {subscription && !subscription.monthly_objective_template && (
         <div
-          className="rounded-md border border-amber-400/40 bg-amber-50 p-3 text-sm text-amber-800"
+          className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning-fg"
           role="alert"
           data-testid="cap-missing-template-warning"
         >

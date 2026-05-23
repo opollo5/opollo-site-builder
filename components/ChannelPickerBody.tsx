@@ -194,7 +194,7 @@ export function ChannelPickerBody({
         // Conflict replaces the channel list entirely so the user can't
         // click another channel while the override prompt is visible.
         <div
-          className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
+          className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning-fg"
           role="alert"
           data-testid="channel-picker-conflict-error"
         >
@@ -206,7 +206,7 @@ export function ChannelPickerBody({
               : ""}.
           </p>
           {conflictError.conflictingChannelName ? (
-            <p className="mb-2 text-amber-800">
+            <p className="mb-2 text-warning-fg">
               Channel: {conflictError.conflictingChannelName}
             </p>
           ) : null}
@@ -241,7 +241,7 @@ export function ChannelPickerBody({
               </div>
             </>
           ) : (
-            <p className="text-amber-800">
+            <p className="text-warning-fg">
               Contact support to set up multi-company sharing, or disconnect
               the channel from the other company first.
             </p>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import {
   PLATFORM_LABEL,
   type SocialPlatform,
@@ -47,13 +48,13 @@ type Props = {
   canRetry: boolean;
 };
 
-const STATUS_PILL: Record<string, string> = {
-  pending: "bg-muted text-muted-foreground",
-  in_flight: "bg-amber-100 text-amber-900",
-  unknown: "bg-amber-100 text-amber-900",
-  succeeded: "bg-emerald-100 text-emerald-900",
-  failed: "bg-rose-100 text-rose-900",
-  reconciling: "bg-amber-100 text-amber-900",
+const STATUS_PILL_VARIANT: Record<string, PillVariant> = {
+  pending: "neutral",
+  in_flight: "warning",
+  unknown: "warning",
+  succeeded: "success",
+  failed: "danger",
+  reconciling: "warning",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -75,12 +76,12 @@ const ERROR_LABEL: Record<string, string> = {
   unknown: "Unknown error",
 };
 
-function attemptStatusPill(a: Attempt): string {
+function attemptStatusVariant(a: Attempt): PillVariant {
   if (a.status === "failed") {
-    if (a.dead_lettered_at) return "bg-gray-200 text-gray-700";
-    if (a.next_retry_at) return "bg-amber-100 text-amber-900";
+    if (a.dead_lettered_at) return "neutral";
+    if (a.next_retry_at) return "warning";
   }
-  return STATUS_PILL[a.status] ?? "bg-muted text-muted-foreground";
+  return STATUS_PILL_VARIANT[a.status] ?? "neutral";
 }
 
 function attemptStatusLabel(a: Attempt): string {
@@ -220,11 +221,9 @@ export function PostPublishHistorySection({
                 <span className="font-medium">
                   {PLATFORM_LABEL[a.platform] ?? a.platform}
                 </span>
-                <span
-                  className={`rounded-full px-2 py-0.5 text-sm font-medium ${attemptStatusPill(a)}`}
-                >
+                <Pill variant={attemptStatusVariant(a)}>
                   {attemptStatusLabel(a)}
-                </span>
+                </Pill>
                 {a.retry_count > 0 ? (
                   <span className="text-sm text-muted-foreground">
                     retry #{a.retry_count}

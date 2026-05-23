@@ -87,10 +87,10 @@ export default async function OptimiserProposalReviewPage({
           )}
           <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${
             proposal.risk_level === "high"
-              ? "bg-red-100 text-red-900 border-red-200"
+              ? "bg-danger-bg text-danger-fg border-danger-border"
               : proposal.risk_level === "medium"
-                ? "bg-amber-100 text-amber-900 border-amber-200"
-                : "bg-emerald-100 text-emerald-900 border-emerald-200"
+                ? "bg-warning-bg text-warning-fg border-warning-border"
+                : "bg-success-bg text-success-fg border-success-border"
           }`}>
             {proposal.risk_level} risk
           </span>

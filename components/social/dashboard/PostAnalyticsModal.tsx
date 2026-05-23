@@ -271,7 +271,7 @@ export function PostAnalyticsModal({ open, onClose, draftId, onScheduleAgain, on
           {/* Right: stats + details */}
           <div className="flex flex-col gap-4">
             {analytics?.is_stale && (
-              <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700" data-testid="stale-banner">
+              <div className="rounded-md bg-warning-bg border border-warning-border px-3 py-2 text-xs text-warning-fg" data-testid="stale-banner">
                 Metrics may be outdated — live data temporarily unavailable.
               </div>
             )}

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { resolveClientError } from "@/app/(platform)/admin/errors/_actions";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface ClientErrorRow {
@@ -20,7 +21,7 @@ interface ClientErrorRow {
 const SEVERITY_CLASSES: Record<string, string> = {
   critical: "bg-destructive/10 text-destructive border-destructive/30",
   error:    "bg-orange-50 text-orange-700 border-orange-200",
-  warning:  "bg-amber-50 text-amber-700 border-amber-200",
+  warning:  "bg-warning-bg text-warning-fg border-warning-border",
   info:     "bg-muted text-muted-foreground border-border",
 };
 
@@ -48,15 +49,15 @@ function ResolveButton({ id }: { id: string }) {
   }
 
   return (
-    <button
-      type="button"
+    <Button
+      variant="outline"
+      size="sm"
       disabled={pending}
       onClick={() => void handleClick()}
-      className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
       data-testid={`resolve-error-${id}`}
     >
       {pending ? "Resolving…" : "Mark resolved"}
-    </button>
+    </Button>
   );
 }
 

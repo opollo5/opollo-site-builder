@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { StatusPill } from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { ImageMetadataJobTrigger } from "@/components/admin/ImageMetadataJobTrigger";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -358,14 +358,14 @@ export default async function SystemJobsPage() {
                 className="border-b align-top last:border-b-0 hover:bg-muted/30"
               >
                 <td className="px-3 py-2 text-muted-foreground">
-                  <StatusPill
-                    kind={
-                      c.schedule === "* * * * *"
-                        ? "run_running"
-                        : "brief_committed"
+                  <Pill
+                    variant={
+                      (c.schedule === "* * * * *" ? "accent" : "success") as PillVariant
                     }
-                    label={c.cadence}
-                  />
+                    className={c.schedule === "* * * * *" ? "animate-pulse" : undefined}
+                  >
+                    {c.cadence}
+                  </Pill>
                 </td>
                 <td className="px-3 py-2">
                   <code className="text-xs">{c.path}</code>

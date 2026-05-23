@@ -4,6 +4,9 @@ import * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Tabs, TabTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { logClientError } from "@/lib/errors/logClientError";
 import { UtmBuilderPanel } from "@/components/social/composer/UtmBuilderPanel";
@@ -75,14 +78,13 @@ function TraceIdBadge({ traceId }: { traceId: string }) {
       <span className="font-mono text-xs text-muted-foreground" data-testid="ai-trace-id">
         trace_id: {traceId}
       </span>
-      <button
-        type="button"
+      <IconButton
+        label="Copy trace ID"
         onClick={copy}
-        aria-label="Copy trace ID"
-        className="text-muted-foreground hover:text-foreground transition-colors"
+        className="h-5 w-5 text-muted-foreground hover:text-foreground"
       >
         {copied ? <Check size={10} aria-hidden /> : <Copy size={10} aria-hidden />}
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -127,23 +129,22 @@ function AiErrorDisplay({
       <p className="mt-1 text-muted-foreground">{err.message}</p>
       <div className="mt-2 flex gap-2">
         {err.can_retry && err.category !== "overloaded" && (
-          <button
-            type="button"
-            onClick={onRetry}
+          <Button
+            size="xs"
             disabled={isRetryDisabled}
-            className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40 hover:bg-primary/90 transition-colors"
+            onClick={onRetry}
           >
             {retryLabel}
-          </button>
+          </Button>
         )}
         {(err.category === "content_rejected" || err.category === "invalid_request") && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="xs"
             onClick={onEdit}
-            className="rounded-md border border-border px-2.5 py-1 text-xs font-medium hover:bg-muted transition-colors"
           >
             Edit prompt
-          </button>
+          </Button>
         )}
         {err.category === "timeout" && (
           <span className="self-center text-xs text-muted-foreground">Shorten your prompt to speed up generation.</span>
@@ -248,9 +249,9 @@ function AiPanel({
     <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-md" data-testid="ai-panel">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">AI assistant</p>
-        <button type="button" onClick={onClose} aria-label="Close AI panel" className="text-muted-foreground hover:text-foreground">
+        <IconButton label="Close AI panel" onClick={onClose} className="h-6 w-6 text-muted-foreground hover:text-foreground">
           <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
-        </button>
+        </IconButton>
       </div>
       <textarea
         value={prompt}
@@ -304,24 +305,25 @@ function AiPanel({
       {result && (
         <div className="space-y-2">
           <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm" data-testid="ai-result">{result}</p>
-          <button
-            type="button"
+          <Button
+            size="xs"
+            className="w-full"
             onClick={() => { onInsert(result); onClose(); }}
-            className="w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
             Use this text
-          </button>
+          </Button>
         </div>
       )}
       {loading ? (
-        <button
-          type="button"
+        <Button
+          variant="outline"
+          size="xs"
+          className="w-full"
           onClick={cancel}
-          className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors"
           data-testid="ai-cancel-button"
         >
           Cancel
-        </button>
+        </Button>
       ) : (
         <div className="space-y-1">
           {prompt.trim() && (
@@ -329,15 +331,16 @@ function AiPanel({
               Est. cost: {estimateCost(prompt.length)} · ~{250 + Math.ceil(prompt.length / 4) + 200} tokens
             </p>
           )}
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="xs"
+            className="w-full"
             onClick={() => void generate()}
             disabled={!prompt.trim()}
-            className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
             data-testid="ai-generate-button"
           >
             Generate
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -443,31 +446,19 @@ function GifPanel({
     <div className="w-80 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">GIF picker</p>
-        <button type="button" onClick={onClose} aria-label="Close GIF panel" className="text-muted-foreground hover:text-foreground">
+        <IconButton label="Close GIF panel" onClick={onClose} className="h-6 w-6 text-muted-foreground hover:text-foreground">
           <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
-        </button>
+        </IconButton>
       </div>
 
       {/* Category tabs */}
-      <div className="flex flex-wrap gap-1" role="tablist" aria-label="GIF categories">
+      <Tabs value={category} onValueChange={setCategory} label="GIF categories">
         {GIF_CATEGORIES.map((cat) => (
-          <button
-            key={cat.id}
-            type="button"
-            role="tab"
-            aria-selected={category === cat.id}
-            onClick={() => setCategory(cat.id)}
-            className={cn(
-              "rounded-full px-2 py-0.5 text-xs font-medium transition-colors",
-              category === cat.id
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80",
-            )}
-          >
+          <TabTrigger key={cat.id} value={cat.id}>
             {cat.label}
-          </button>
+          </TabTrigger>
         ))}
-      </div>
+      </Tabs>
 
       <input
         type="search"
@@ -525,10 +516,6 @@ const PANEL_TOOLS = [
   { id: "utm" as const,   label: "UTM tags", icon: <Tags  size={14} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
-const BUTTON_CLASSES = "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:shadow-[var(--c3-shadow-focus)]";
-const ACTIVE_CLASSES = "border-primary bg-primary/10 text-primary";
-const INACTIVE_CLASSES = "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground";
-
 export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, platforms, className }: ToolsRowProps) {
   const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
 
@@ -538,26 +525,27 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
   return (
     <div className={cn("flex flex-wrap gap-1", className)} data-testid="composer-tools-toolbar">
       {/* Media — opens modal, no popover */}
-      <button
-        type="button"
+      <Button
+        variant="toolbar"
+        size="xs"
         data-testid="composer-tool-media"
         onClick={onOpenMediaPicker}
-        className={cn(BUTTON_CLASSES, INACTIVE_CLASSES)}
       >
         <ImagePlus size={14} strokeWidth={1.75} aria-hidden />
         Media
-      </button>
+      </Button>
 
       {/* AI assistant — Dialog prevents overflow outside composer bounds (Issue 6) */}
-      <button
-        type="button"
+      <Button
+        variant="toolbar"
+        size="xs"
         data-testid="composer-tool-ai"
+        aria-pressed={activePanel === "ai"}
         onClick={() => setActivePanel(activePanel === "ai" ? null : "ai")}
-        className={cn(BUTTON_CLASSES, activePanel === "ai" ? ACTIVE_CLASSES : INACTIVE_CLASSES)}
       >
         <Sparkles size={14} strokeWidth={1.75} aria-hidden />
         AI assistant
-      </button>
+      </Button>
       <Dialog open={activePanel === "ai"} onOpenChange={(open) => setActivePanel(open ? "ai" : null)}>
         <DialogContent className="max-w-[600px] p-0" data-testid="composer-panel-ai">
           <AiPanel companyId={companyId} onInsert={onInsertText} onClose={() => setActivePanel(null)} />
@@ -572,14 +560,15 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
           onOpenChange={(open) => setActivePanel(open ? tool.id : null)}
         >
           <PopoverPrimitive.Trigger asChild>
-            <button
-              type="button"
+            <Button
+              variant="toolbar"
+              size="xs"
               data-testid={`composer-tool-${tool.id}`}
-              className={cn(BUTTON_CLASSES, activePanel === tool.id ? ACTIVE_CLASSES : INACTIVE_CLASSES)}
+              aria-pressed={activePanel === tool.id}
             >
               {tool.icon}
               {tool.label}
-            </button>
+            </Button>
           </PopoverPrimitive.Trigger>
 
           {/* Portal to body; z-[200] per --z-popover spec token (D-045) */}

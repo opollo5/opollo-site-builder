@@ -1749,9 +1749,9 @@ function DraftRestoreBanner({
     <div
       data-testid="draft-restore-banner"
       role="alert"
-      className="flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
+      className="flex items-center justify-between gap-3 rounded-md border border-warning-border bg-warning-bg px-4 py-3 text-sm"
     >
-      <span className="text-amber-900">
+      <span className="text-warning-fg">
         You have an unsaved draft from{" "}
         {formatRelativeTime(new Date(savedAt).toISOString())}.
       </span>
@@ -1760,18 +1760,18 @@ function DraftRestoreBanner({
           type="button"
           data-testid="draft-restore-button"
           onClick={onRestore}
-          className="font-medium text-amber-900 underline underline-offset-2 hover:text-amber-700"
+          className="font-medium text-warning-fg underline underline-offset-2 hover:text-warning-fg"
         >
           Restore
         </button>
-        <span aria-hidden className="text-amber-400">
+        <span aria-hidden className="text-warning-fg">
           ·
         </span>
         <button
           type="button"
           data-testid="draft-discard-button"
           onClick={onDiscard}
-          className="text-amber-700 underline underline-offset-2 hover:text-amber-900"
+          className="text-warning-fg underline underline-offset-2 hover:text-warning-fg"
         >
           Discard
         </button>

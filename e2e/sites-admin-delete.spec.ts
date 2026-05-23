@@ -56,7 +56,7 @@ test.describe("Spec 01 — sites admin: Delete (purge) happy path", () => {
     await expect(row).toBeVisible();
 
     await row.getByTestId("site-actions-summary").click();
-    await row.getByTestId("site-delete-action").click();
+    await page.getByTestId("site-delete-action").click();
 
     const confirmDialog = page.getByRole("dialog", {
       name: /delete site permanently/i,

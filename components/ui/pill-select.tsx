@@ -33,7 +33,7 @@ export interface PillSelectProps {
 }
 
 const TRIGGER_BASE =
-  "inline-flex items-center justify-between gap-1.5 rounded-full border border-[var(--btn-secondary-border)] bg-[var(--btn-secondary-bg)] font-medium text-[var(--btn-secondary-text)] transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex items-center justify-between gap-1.5 rounded-full border border-gray-800 bg-background font-medium text-gray-800 transition-colors hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50";
 
 const SIZE_CLASSES = {
   sm: "px-[14px] py-[6px] text-xs",

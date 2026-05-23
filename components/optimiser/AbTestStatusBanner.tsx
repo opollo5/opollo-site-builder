@@ -27,8 +27,8 @@ export function AbTestStatusBanner({ test }: { test: TestRow | null }) {
     tone === "ok"
       ? "border-emerald-200 bg-emerald-50 text-emerald-900"
       : tone === "warn"
-        ? "border-amber-200 bg-amber-50 text-amber-900"
-        : "border-blue-200 bg-blue-50 text-blue-900";
+        ? "border-warning-border bg-warning-bg text-warning-fg"
+        : "border-info-border bg-info-bg text-info-fg";
 
   return (
     <section className={`rounded-lg border p-4 ${colours}`}>
