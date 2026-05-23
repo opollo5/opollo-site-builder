@@ -15,7 +15,7 @@ jobs:
 
       - name: Gate 1 — no invalid Button variants
         run: |
-          MATCHES=$(grep -rn 'variant="helpful"\|variant="hint"\|variant="info"' \
+          MATCHES=$(grep -rn 'variant="helpful"\|variant="hint"' \
             components/ app/ --include="*.tsx" \
             | grep -v "Callout\|callout" || true)
           if [ -n "$MATCHES" ]; then

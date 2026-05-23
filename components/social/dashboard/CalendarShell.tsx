@@ -248,7 +248,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
       {!hasConnections && !calloutDismissed && (
         <div className="px-4 pt-3" data-testid="empty-state-callout">
           <Callout
-            variant="helpful"
+            variant="warning"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26A7 7 0 0 0 12 2z" />
