@@ -110,9 +110,9 @@ export function MediaPickerModal({
     setLibLoading(true);
     setLibError(null);
     try {
-      const params = new URLSearchParams({ company_id: companyId, include_global: "true" });
+      const params = new URLSearchParams({ company_id: companyId });
       if (cursor) params.set("before", cursor);
-      const res = await fetch(`/api/platform/social/media?${params.toString()}`);
+      const res = await fetch(`/api/platform/social/media/image-library?${params.toString()}`);
       const json = (await res.json()) as {
         ok: boolean;
         data?: { assets: MediaAsset[]; next_cursor: string | null };
@@ -411,7 +411,7 @@ export function MediaPickerModal({
                 >
                   <ImageIcon size={32} className="text-muted-foreground mb-2" aria-hidden />
                   <p className="text-sm text-muted-foreground">
-                    No media yet. Upload some images first.
+                    No images in the library yet.
                   </p>
                 </div>
               )}
