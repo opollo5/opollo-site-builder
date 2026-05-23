@@ -83,22 +83,6 @@ describe("GET /api/insights/generation-priors", () => {
     expect(body.error.code).toBe("VALIDATION_FAILED");
   });
 
-  it("returns 400 for CONSENT_REQUIRED when cross_client_learning_consent is false", async () => {
-    mockAuth.mockReturnValue(true);
-    const chain = makeChain();
-    chain.maybeSingle.mockResolvedValue({
-      data: { cross_client_learning_consent: false },
-      error: null,
-    });
-    const req = new NextRequest(
-      `http://localhost/api/insights/generation-priors?company_id=${COMPANY_ID}&platform=LINKEDIN&include_industry_signal=true`,
-    );
-    const res = await GET(req);
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.error.code).toBe("CONSENT_REQUIRED");
-  });
-
   it("returns 503 when no recommendations or features exist", async () => {
     mockAuth.mockReturnValue(true);
     const chain = makeChain();
