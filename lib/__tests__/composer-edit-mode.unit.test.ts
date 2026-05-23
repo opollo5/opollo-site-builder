@@ -89,6 +89,43 @@ describe("mapV1ToV2Draft", () => {
     const result = mapV1ToV2Draft(d);
     expect(result.scheduled_at).toBe("2026-06-01T10:00:00Z");
   });
+
+  // Regression: V2 rows created before draft_data mirroring have draft_data: {}
+  // with data in top-level columns. Previously threw "Cannot read properties of
+  // undefined (reading 'map')" on draft_data.media_refs — bug fix: #fix/composer-load-scheduled-post
+  it("V2 row with empty draft_data falls back to top-level media_urls and target_profiles", () => {
+    const v2Row = {
+      id: "75701de0-4c4b-4146-831d-4f98069478ef",
+      draft_version: 1,
+      content: "this is a social media post",
+      scheduled_at: "2026-05-26T09:00:00+00:00",
+      state: "scheduled",
+      draft_data: {},
+      media_urls: ["https://example.com/img.gif"],
+      target_profiles: [{ profile_id: "1320da0c-a582-41dd-b158-fdf0bd542659" }],
+    };
+    // Must not throw
+    const result = mapV1ToV2Draft(v2Row);
+    expect(result.content).toBe("this is a social media post");
+    expect(result.media_urls).toEqual(["https://example.com/img.gif"]);
+    expect(result.target_profile_ids).toEqual(["1320da0c-a582-41dd-b158-fdf0bd542659"]);
+    expect(result.scheduled_at).toBe("2026-05-26T09:00:00+00:00");
+    expect(result.approval_required).toBe(false);
+  });
+
+  it("V2 row with empty draft_data and no top-level media returns empty arrays", () => {
+    const v2Row = {
+      id: "abc",
+      draft_version: 1,
+      content: "text only",
+      draft_data: {},
+    };
+    const result = mapV1ToV2Draft(v2Row);
+    expect(result.media_urls).toEqual([]);
+    expect(result.target_profile_ids).toEqual([]);
+    expect(result.approval_required).toBe(false);
+    expect(result.content).toBe("text only");
+  });
 });
 
 // ---------------------------------------------------------------------------
