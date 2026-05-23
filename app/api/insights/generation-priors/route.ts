@@ -7,6 +7,7 @@ import {
   fetchPerformancePriors,
   formatPerformancePriorsBlock,
 } from "@/lib/cap/performance-priors";
+import { getIndustrySignal } from "@/lib/insights/pattern-application";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -73,23 +74,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const svc = getServiceRoleClient();
-
-  // Check industry signal consent
-  if (includeIndustrySignal) {
-    const { data: consent } = await svc
-      .from("ins_consent")
-      .select("cross_client_learning_consent")
-      .eq("company_id", companyId)
-      .maybeSingle();
-
-    if (!consent?.cross_client_learning_consent) {
-      return errorJson(
-        "CONSENT_REQUIRED",
-        "Company has not consented to cross-client learning.",
-        400,
-      );
-    }
-  }
 
   // Parallel queries
   const [recsResult, memoryResult, featuresResult, priorsResult] = await Promise.all([
@@ -239,12 +223,20 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     clientEditingPreferences,
   });
 
+  // Industry signal — populated only when requested and consent is on
+  const industrySignal =
+    includeIndustrySignal
+      ? await getIndustrySignal(companyId, platform).catch(() => null)
+      : null;
+
   logger.info("ins.generation-priors.served", {
     companyId,
     platform,
     arcPhase,
     recCount: recs.length,
     featureCount: features.length,
+    includeIndustrySignal,
+    industrySignalPatterns: industrySignal?.patterns.length ?? 0,
   });
 
   return NextResponse.json({
@@ -270,7 +262,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     dismissed_recommendation_types: dismissedTypes,
     tone_or_formatting_flags: [],
 
-    industry_signal: null,
+    industry_signal: industrySignal,
 
     priors_text: priorsText,
 
