@@ -26,7 +26,7 @@ vi.mock("@/components/ui/pill-select", () => ({
         <button
           key={o.value}
           data-testid={`option-${o.value}`}
-          aria-selected={o.value === value}
+          data-selected={o.value === value ? "true" : "false"}
           onClick={() => onValueChange(o.value)}
         >
           {o.label}
@@ -49,8 +49,8 @@ describe("PeriodSelector", () => {
   it("marks the value prop as selected", () => {
     render(<PeriodSelector value="7d" />);
     expect(screen.getByTestId("pill-select")).toHaveAttribute("data-value", "7d");
-    expect(screen.getByTestId("option-7d")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("option-30d")).toHaveAttribute("aria-selected", "false");
+    expect(screen.getByTestId("option-7d")).toHaveAttribute("data-selected", "true");
+    expect(screen.getByTestId("option-30d")).toHaveAttribute("data-selected", "false");
   });
 
   it("defaults to 30d when no value prop supplied", () => {
