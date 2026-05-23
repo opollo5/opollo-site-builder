@@ -4,6 +4,7 @@ import { getServiceRoleClient } from '@/lib/supabase';
 import { logger } from '@/lib/logger';
 import { extractDeterministicFeatures } from '@/lib/insights/feature-extractor';
 import { resolvePostSource } from '@/lib/insights/source-attribution';
+import { extractLLMFeatures } from '@/lib/insights/llm-feature-extractor';
 import { recordHealthEvent } from '@/lib/platform/service-health/record';
 
 export const runtime = 'nodejs';
@@ -49,6 +50,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
         if (insertError && insertError.code !== '23505') {
           throw insertError;
+        }
+
+        // LLM features: best-effort, non-blocking
+        try {
+          const llmFeatures = await extractLLMFeatures(post.content, post.company_id);
+          if (llmFeatures.sentimentScore !== null || llmFeatures.topicTags !== null) {
+            await svc
+              .from('ins_post_features')
+              .update({
+                sentiment_score: llmFeatures.sentimentScore,
+                topic_tags: llmFeatures.topicTags,
+              })
+              .eq('bundle_post_id', post.bundle_post_id);
+          }
+        } catch {
+          // LLM failure does not block deterministic feature extraction
         }
 
         postsProcessed++;
