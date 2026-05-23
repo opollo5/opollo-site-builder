@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 
 interface AdminBannerProps {
   clientName: string;
+  companyId: string;
 }
 
-export function AdminBanner({ clientName }: AdminBannerProps) {
+export function AdminBanner({ clientName, companyId }: AdminBannerProps) {
   const router = useRouter();
 
   return (
@@ -25,9 +26,18 @@ export function AdminBanner({ clientName }: AdminBannerProps) {
           </span>
           <span className="text-tx-secondary">· All actions logged</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => router.push("/admin/insights")}>
-          ← Back to roster
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push(`/admin/insights/clients/${companyId}/competitors`)}
+          >
+            Manage competitors
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => router.push("/admin/insights")}>
+            ← Back to roster
+          </Button>
+        </div>
       </div>
     </div>
   );

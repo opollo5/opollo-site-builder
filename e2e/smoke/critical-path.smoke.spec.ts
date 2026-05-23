@@ -80,6 +80,7 @@ test.describe("smoke — critical path read-only sweep", () => {
       { name: "users", path: "/admin/users" },
       { name: "companies", path: "/admin/companies" },
       { name: "optimiser", path: "/optimiser" },
+      { name: "insights-admin", path: "/admin/insights" },
     ];
 
     for (const { name, path } of pages) {
