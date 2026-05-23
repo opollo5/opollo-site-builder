@@ -1,38 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
 import { Button } from "@/components/ui/button";
 import { H3 } from "@/components/ui/typography";
+import { AreaChart } from "@/components/charts/AreaChart";
+import { BarChart } from "@/components/charts/BarChart";
+import { DonutChart } from "@/components/charts/DonutChart";
 import type { SocialAnalytics } from "@/lib/platform/social/analytics";
 
 // ---------------------------------------------------------------------------
 // /company/social/analytics — client shell for charts + recent lists.
 //
 // All data is fetched server-side and passed as props. This component
-// is "use client" only for recharts (needs DOM / window). No client-side
+// is "use client" only for ECharts (needs DOM / window). No client-side
 // data fetching here.
 // ---------------------------------------------------------------------------
-
-// Colors stay in hsl(var(...)) so they inherit the active CSS theme.
-// The multi-series palette uses semantically distinct hues expressed
-// as CSS hsl() strings (not hex) to satisfy the no-hardcoded-hex rule.
-const PRIMARY = "hsl(var(--primary))";
-const MUTED = "hsl(var(--muted-foreground))";
 
 const PALETTE = [
   "hsl(211 100% 56%)",
@@ -44,29 +27,6 @@ const PALETTE = [
 
 function platformColor(index: number): string {
   return PALETTE[index % PALETTE.length];
-}
-
-// ---- Shared tooltip style ------------------------------------------------
-function ChartTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ value: number; name?: string; fill?: string }>;
-  label?: string;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  return (
-    <div className="rounded-md border bg-popover px-3 py-2 text-sm shadow-md">
-      {label && <p className="mb-1 font-medium text-foreground">{label}</p>}
-      {payload.map((p, i) => (
-        <p key={i} className="text-muted-foreground">
-          {p.name ? `${p.name}: ` : ""}{p.value}
-        </p>
-      ))}
-    </div>
-  );
 }
 
 // ---- KPI card ------------------------------------------------------------
@@ -84,7 +44,7 @@ function KpiCard({
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-1 text-3xl font-bold tabular-nums">{value}</p>
       {sublabel && (
-        <p className="mt-0.5 text-xs text-muted-foreground">{sublabel}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">{sublabel}</p>
       )}
     </div>
   );
@@ -181,46 +141,18 @@ export function SocialAnalyticsClient({
           <ChartEmpty message="No posts published in the last 30 days." />
         ) : (
           <div className="rounded-lg border bg-card p-4">
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart
-                data={data.publishedByDay}
-                margin={{ top: 4, right: 8, bottom: 0, left: -20 }}
-              >
-                <defs>
-                  <linearGradient id="publishedGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={PRIMARY} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={PRIMARY} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11, fill: MUTED }}
-                  tickFormatter={(d: string) =>
-                    new Date(d + "T00:00:00Z").toLocaleDateString("en-AU", {
-                      day: "numeric",
-                      month: "short",
-                      timeZone: "UTC",
-                    })
-                  }
-                  interval={6}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: MUTED }}
-                  allowDecimals={false}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  name="Published"
-                  stroke={PRIMARY}
-                  strokeWidth={2}
-                  fill="url(#publishedGrad)"
-                  dot={false}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <AreaChart
+              data={data.publishedByDay.map(d => ({ x: d.date, y: d.count }))}
+              xAxisFormatter={(d) =>
+                new Date(d + "T00:00:00Z").toLocaleDateString("en-AU", {
+                  day: "numeric",
+                  month: "short",
+                  timeZone: "UTC",
+                })
+              }
+              height={200}
+              ariaLabel="Published posts trend over last 30 days"
+            />
           </div>
         )}
       </Section>
@@ -231,32 +163,15 @@ export function SocialAnalyticsClient({
           <ChartEmpty message="No platform variants found. Add platforms to your posts to see this chart." />
         ) : (
           <div className="rounded-lg border bg-card p-4">
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart
-                data={data.postsByPlatform}
-                margin={{ top: 4, right: 8, bottom: 40, left: -20 }}
-                barCategoryGap="35%"
-              >
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis
-                  dataKey="platform"
-                  tick={{ fontSize: 11, fill: MUTED }}
-                  angle={-30}
-                  textAnchor="end"
-                  interval={0}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: MUTED }}
-                  allowDecimals={false}
-                />
-                <Tooltip content={<ChartTooltip />} />
-                <Bar dataKey="count" name="Posts" radius={[3, 3, 0, 0]}>
-                  {data.postsByPlatform.map((_, i) => (
-                    <Cell key={i} fill={platformColor(i)} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChart
+              data={data.postsByPlatform.map((d, i) => ({
+                label: d.platform,
+                value: d.count,
+                color: platformColor(i),
+              }))}
+              height={220}
+              ariaLabel="Posts by platform"
+            />
           </div>
         )}
       </Section>
@@ -268,33 +183,16 @@ export function SocialAnalyticsClient({
             <ChartEmpty message="No post data yet." />
           ) : (
             <div className="rounded-lg border bg-card p-4">
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart
-                  data={data.postsByState}
-                  layout="vertical"
-                  margin={{ top: 4, right: 16, bottom: 4, left: 120 }}
-                  barCategoryGap="30%"
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="hsl(var(--border))"
-                    horizontal={false}
-                  />
-                  <XAxis
-                    type="number"
-                    tick={{ fontSize: 11, fill: MUTED }}
-                    allowDecimals={false}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="state"
-                    tick={{ fontSize: 11, fill: MUTED }}
-                    width={115}
-                  />
-                  <Tooltip content={<ChartTooltip />} />
-                  <Bar dataKey="count" name="Posts" fill={PRIMARY} radius={[0, 3, 3, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <BarChart
+                data={data.postsByState.map((d, i) => ({
+                  label: d.state,
+                  value: d.count,
+                  color: platformColor(i),
+                }))}
+                layout="horizontal"
+                height={220}
+                ariaLabel="Posts by status"
+              />
             </div>
           )}
         </Section>
@@ -305,25 +203,17 @@ export function SocialAnalyticsClient({
           ) : (
             <div className="rounded-lg border bg-card p-4">
               <div className="flex items-center gap-6">
-                <ResponsiveContainer width="60%" height={180}>
-                  <PieChart>
-                    <Pie
-                      data={data.postsBySource}
-                      dataKey="count"
-                      nameKey="source"
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={45}
-                      outerRadius={80}
-                      paddingAngle={2}
-                    >
-                      {data.postsBySource.map((_, i) => (
-                        <Cell key={i} fill={platformColor(i)} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<ChartTooltip />} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <div className="flex-none" style={{ width: "60%" }}>
+                  <DonutChart
+                    data={data.postsBySource.map((d, i) => ({
+                      name: d.source,
+                      value: d.count,
+                      color: platformColor(i),
+                    }))}
+                    height={180}
+                    ariaLabel="Post source breakdown"
+                  />
+                </div>
                 <ul className="flex-1 space-y-2 text-sm" aria-label="Source breakdown">
                   {data.postsBySource.map((s, i) => (
                     <li key={s.source} className="flex items-center gap-2">
@@ -385,7 +275,7 @@ export function SocialAnalyticsClient({
                           {post.platforms.map((p) => (
                             <span
                               key={p}
-                              className="inline-block rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                              className="inline-block rounded-full bg-muted px-2 py-0.5 text-sm text-muted-foreground"
                             >
                               {p}
                             </span>

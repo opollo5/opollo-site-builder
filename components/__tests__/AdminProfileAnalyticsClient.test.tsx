@@ -12,20 +12,10 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// Mock Recharts to a no-op component — its ResponsiveContainer breaks
-// in jsdom because it depends on element measurements.
-vi.mock("recharts", () => ({
-  LineChart: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="line-chart">{children}</div>
-  ),
-  Line: () => null,
-  CartesianGrid: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  Tooltip: () => null,
-  Legend: () => null,
-  ResponsiveContainer: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
+// Mock echarts-for-react — depends on canvas which jsdom doesn't support.
+vi.mock("echarts-for-react", () => ({
+  default: ({ style }: { style?: React.CSSProperties }) => (
+    <div data-testid="echart" style={style} />
   ),
 }));
 

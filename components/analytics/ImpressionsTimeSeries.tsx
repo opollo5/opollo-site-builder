@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  CartesianGrid,
-  Legend,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import ReactECharts from 'echarts-for-react';
 
 import { PLATFORM_LABEL } from "@/lib/platform/social/variants/types";
 import type { AnalyticsDashboard } from "@/lib/platform/social/analytics-ingest";
@@ -22,74 +13,62 @@ export function ImpressionsTimeSeries({
 }: {
   dashboard: AnalyticsDashboard;
 }) {
-  // Recharts wants a flat row per x-tick. Flatten by_platform → top-level
-  // platform keys so each platform gets its own <Line dataKey>.
-  const data = dashboard.time_series.map((point) => {
-    const row: Record<string, string | number> = {
-      date: point.date,
-      total: point.total,
-    };
-    for (const [platform, value] of Object.entries(point.by_platform)) {
-      row[platform] = value;
-    }
-    return row;
-  });
-
   const platforms = dashboard.platforms.map((p) => p.platform);
+  const dates = dashboard.time_series.map((point) => String(point.date).slice(5));
+
+  const series = platforms.map((platform) => ({
+    name: PLATFORM_LABEL[platform],
+    type: 'line' as const,
+    data: dashboard.time_series.map((point) => point.by_platform[platform] ?? 0),
+    smooth: false,
+    showSymbol: false,
+    lineStyle: { width: 2, color: PLATFORM_COLOR[platform] },
+    itemStyle: { color: PLATFORM_COLOR[platform] },
+  }));
+
+  const option = {
+    grid: { left: 60, right: 20, top: 30, bottom: 30 },
+    xAxis: {
+      type: 'category' as const,
+      data: dates,
+      axisLabel: { color: '#6b7280', fontSize: 11 },
+      splitLine: { show: false },
+      boundaryGap: false,
+    },
+    yAxis: {
+      type: 'value' as const,
+      axisLabel: {
+        color: '#6b7280',
+        fontSize: 11,
+        formatter: (v: number) => formatNumber(v),
+      },
+      splitLine: { lineStyle: { color: '#e5e7eb', type: 'dashed' as const } },
+    },
+    tooltip: {
+      trigger: 'axis' as const,
+      formatter: (params: Array<{ seriesName: string; value: number }>) =>
+        params.map(p => `${p.seriesName}: ${formatNumber(p.value)}`).join('<br/>'),
+    },
+    legend: {
+      top: 5,
+      right: 20,
+      itemWidth: 14,
+      textStyle: { fontSize: 12 },
+      icon: 'circle',
+    },
+    series,
+  };
 
   return (
     <div className="rounded-lg border bg-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="text-sm font-semibold">Impressions over time</div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-sm text-muted-foreground">
           Last {dashboard.range_days} days · per platform
         </div>
       </div>
-      <div style={{ width: "100%", height: 280 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 8, right: 20, left: 0, bottom: 0 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis
-              dataKey="date"
-              tick={{ fontSize: 11, fill: "#6b7280" }}
-              tickFormatter={(d) => String(d).slice(5)}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              tick={{ fontSize: 11, fill: "#6b7280" }}
-              tickFormatter={(v) => formatNumber(Number(v))}
-              width={48}
-            />
-            <Tooltip
-              contentStyle={{
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid #e5e7eb",
-              }}
-              formatter={(value) => formatNumber(Number(value))}
-              labelFormatter={(label) => String(label)}
-            />
-            <Legend
-              wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
-              iconType="circle"
-            />
-            {platforms.map((platform) => (
-              <Line
-                key={platform}
-                type="monotone"
-                dataKey={platform}
-                stroke={PLATFORM_COLOR[platform]}
-                strokeWidth={2}
-                dot={false}
-                name={PLATFORM_LABEL[platform]}
-                isAnimationActive={false}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
+      <div style={{ width: "100%", height: 280 }} role="img" aria-label="Impressions over time per platform">
+        <ReactECharts option={option} style={{ height: '100%', width: '100%' }} notMerge lazyUpdate />
       </div>
     </div>
   );
