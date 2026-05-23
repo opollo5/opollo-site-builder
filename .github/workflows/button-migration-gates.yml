@@ -38,7 +38,7 @@ jobs:
 
       - name: Gate 3 — no hardcoded Tailwind status colours
         run: |
-          MATCHES=$(grep -rn "bg-emerald-50\|bg-amber-50\|bg-rose-50\|bg-orange-50" \
+          MATCHES=$(grep -rPn "bg-emerald-50(?![0-9])|bg-amber-50(?![0-9])|bg-rose-50(?![0-9])|bg-orange-50(?![0-9])" \
             components/ app/ --include="*.tsx" \
             | grep -v "design-system-dev\|DesignSystemSettings" || true)
           if [ -n "$MATCHES" ]; then
