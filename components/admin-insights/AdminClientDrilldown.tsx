@@ -17,7 +17,7 @@ export function AdminClientDrilldown({
 }: AdminClientDrilldownProps) {
   return (
     <div>
-      <AdminBanner clientName={clientName} />
+      <AdminBanner clientName={clientName} companyId={companyId} />
       <div className="px-6 py-8">
         <InsightsDashboardClient data={data} companyId={companyId} isAdminView />
       </div>

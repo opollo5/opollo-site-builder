@@ -10,14 +10,14 @@ import { AdminBanner } from "@/components/admin-insights/AdminBanner";
 
 describe("AdminBanner", () => {
   it("shows client name", () => {
-    render(<AdminBanner clientName="Acme MSP" />);
+    render(<AdminBanner clientName="Acme MSP" companyId="test-id" />);
     expect(screen.getByTestId("admin-banner")).toBeInTheDocument();
     expect(screen.getByText(/Acme MSP/)).toBeInTheDocument();
     expect(screen.getByText(/All actions logged/)).toBeInTheDocument();
   });
 
   it("back button navigates to roster", () => {
-    render(<AdminBanner clientName="Acme MSP" />);
+    render(<AdminBanner clientName="Acme MSP" companyId="test-id" />);
     fireEvent.click(screen.getByRole("button", { name: /back to roster/i }));
     expect(mockPush).toHaveBeenCalledWith("/admin/insights");
   });

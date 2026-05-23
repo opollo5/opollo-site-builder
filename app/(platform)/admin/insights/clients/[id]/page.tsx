@@ -1,6 +1,8 @@
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 
 import { AdminClientDrilldown } from "@/components/admin-insights/AdminClientDrilldown";
+import { CompetitorGapAnalysis } from "@/components/insights/CompetitorGapAnalysis";
 import { createRouteAuthClient } from "@/lib/auth";
 import { getAdminClientSnapshot } from "@/lib/insights/admin-dashboard";
 import { writeAdminAudit } from "@/lib/insights/admin-audit";
@@ -42,10 +44,17 @@ export default async function AdminClientInsightsPage({
   }
 
   return (
-    <AdminClientDrilldown
-      clientName={snapshot.name}
-      companyId={params.id}
-      data={dashboardData}
-    />
+    <>
+      <AdminClientDrilldown
+        clientName={snapshot.name}
+        companyId={params.id}
+        data={dashboardData}
+      />
+      <div className="px-6 pb-8">
+        <Suspense fallback={null}>
+          <CompetitorGapAnalysis companyId={params.id} />
+        </Suspense>
+      </div>
+    </>
   );
 }

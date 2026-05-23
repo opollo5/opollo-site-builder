@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { PageHeader } from "@/components/ui/page-header";
@@ -6,6 +7,7 @@ import { StatusPill } from "@/components/ui/status-pill";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getInsightsDashboardData } from "@/lib/insights/dashboard";
 import { InsightsDashboardClient } from "@/components/insights/InsightsDashboardClient";
+import { CompetitorGapAnalysis } from "@/components/insights/CompetitorGapAnalysis";
 import { PeriodSelector } from "@/components/insights/common/PeriodSelector";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +68,9 @@ export default async function InsightsPage() {
 
       <PageShell.Content>
         <InsightsDashboardClient data={data} companyId={companyId} />
+        <Suspense fallback={null}>
+          <CompetitorGapAnalysis companyId={companyId} />
+        </Suspense>
       </PageShell.Content>
     </PageShell>
   );
