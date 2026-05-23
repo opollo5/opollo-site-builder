@@ -21,7 +21,7 @@ interface ClientErrorRow {
 const SEVERITY_CLASSES: Record<string, string> = {
   critical: "bg-destructive/10 text-destructive border-destructive/30",
   error:    "bg-orange-50 text-orange-700 border-orange-200",
-  warning:  "bg-amber-50 text-amber-700 border-amber-200",
+  warning:  "bg-warning-bg text-warning-fg border-warning-border",
   info:     "bg-muted text-muted-foreground border-border",
 };
 

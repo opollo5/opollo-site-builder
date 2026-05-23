@@ -7,8 +7,8 @@ import { cn } from "@/lib/utils";
 // (kind, severity, action) triple from connector-status.ts.
 
 const SEVERITY_STYLES: Record<ConnectorBanner["severity"], string> = {
-  info: "bg-blue-50 border-blue-200 text-blue-900",
-  warning: "bg-amber-50 border-amber-200 text-amber-900",
+  info: "bg-info-bg border-info-border text-info-fg",
+  warning: "bg-warning-bg border-warning-border text-warning-fg",
   error: "bg-red-50 border-red-200 text-red-900",
 };
 

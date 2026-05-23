@@ -118,7 +118,7 @@ export function PrimaryNav({
       aria-label="Primary navigation"
       data-collapsed={!mobile && collapsed ? "true" : "false"}
       className={cn(
-        "flex flex-col border-r border-border bg-[linear-gradient(180deg,var(--d1)_0%,var(--bg)_100%)]",
+        "flex flex-col border-r border-border bg-[linear-gradient(180deg,hsl(var(--background))_0%,hsl(var(--canvas))_100%)]",
         !mobile && "transition-[width] duration-150 ease-out",
         railWidthClass,
       )}

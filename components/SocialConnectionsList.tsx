@@ -753,7 +753,7 @@ export function SocialConnectionsList({
 
       {noopdConnection ? (
         <div
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-3 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="alert"
           data-testid="connections-already-connected-banner"
         >
@@ -769,7 +769,7 @@ export function SocialConnectionsList({
               year: "numeric",
             })}.
           </p>
-          <p className="mt-1 text-amber-900/80">
+          <p className="mt-1 text-warning-fg/80">
             Disconnect the existing connection below to connect a different
             account, or ask an admin to create a new profile.
           </p>
@@ -778,7 +778,7 @@ export function SocialConnectionsList({
 
       {overdueConnections.length > 0 ? (
         <div
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-3 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="alert"
           data-testid="connections-overdue-banner"
         >
@@ -787,7 +787,7 @@ export function SocialConnectionsList({
             {overdueConnections.length === 1 ? "connection needs" : "connections need"}{" "}
             a channel.
           </p>
-          <p className="mt-1 text-amber-900/80">
+          <p className="mt-1 text-warning-fg/80">
             Pick a channel below to start publishing. Connections without a
             channel can&apos;t post.
           </p>
@@ -1012,7 +1012,7 @@ export function SocialConnectionsList({
 
       {popupBlockedUrl ? (
         <p
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-3 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="alert"
           data-testid="connections-popup-blocked"
         >

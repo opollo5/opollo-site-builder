@@ -254,7 +254,7 @@ export function UploadBriefModal({
             {draftRestored && (
               <div
                 role="status"
-                className="flex items-start justify-between gap-3 rounded-md border border-blue-500/40 bg-blue-500/5 p-3 text-sm text-blue-900"
+                className="flex items-start justify-between gap-3 rounded-md border border-info-border bg-info-bg p-3 text-sm text-info-fg"
               >
                 <span>
                   We restored what you were working on. Pick up where you left

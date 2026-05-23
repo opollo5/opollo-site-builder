@@ -18,16 +18,16 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-[var(--btn-primary-bg)] text-[var(--btn-primary-text)] font-semibold hover:brightness-110 hover:-translate-y-px hover:shadow-pk-glow active:translate-y-0 active:shadow-none",
+          "bg-primary text-primary-foreground font-semibold hover:brightness-110 hover:-translate-y-px hover:shadow-pk-glow active:translate-y-0 active:shadow-none",
         destructive:
-          "bg-[var(--btn-destructive-bg)] text-[var(--btn-destructive-text)] hover:bg-rd hover:-translate-y-px active:translate-y-0",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90 hover:-translate-y-px active:translate-y-0",
         outline:
-          "border border-white/20 bg-transparent text-foreground hover:border-gr hover:text-gr active:translate-y-px",
+          "border border-white/20 bg-transparent text-foreground hover:border-success hover:text-success active:translate-y-px",
         secondary:
-          "bg-[var(--btn-secondary-bg)] border border-[var(--btn-secondary-border)] text-[var(--btn-secondary-text)] hover:bg-gray-50 hover:-translate-y-px active:translate-y-0",
+          "bg-background border border-gray-800 text-gray-800 hover:bg-gray-50 hover:-translate-y-px active:translate-y-0",
         ghost:
-          "bg-transparent text-[var(--btn-tertiary-text)] hover:bg-[var(--btn-tertiary-hover)] active:translate-y-px",
-        link: "text-pk underline-offset-4 hover:underline",
+          "bg-transparent text-foreground hover:bg-gray-100 active:translate-y-px",
+        link: "text-primary underline-offset-4 hover:underline",
         toolbar:
           "rounded-md gap-1.5 border border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground active:translate-y-px aria-pressed:border-primary aria-pressed:bg-primary/10 aria-pressed:text-primary",
       },

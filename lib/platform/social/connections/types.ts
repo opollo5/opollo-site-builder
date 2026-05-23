@@ -67,11 +67,11 @@ export const STATUS_LABEL: Record<SocialConnectionStatus, string> = {
 };
 
 export const STATUS_PILL: Record<SocialConnectionStatus, string> = {
-  healthy: "bg-emerald-100 text-emerald-900",
-  degraded: "bg-amber-100 text-amber-900",
-  auth_required: "bg-rose-100 text-rose-900",
+  healthy: "bg-success-bg text-success-fg",
+  degraded: "bg-warning-bg text-warning-fg",
+  auth_required: "bg-danger-bg text-danger-fg",
   disconnected: "bg-muted text-muted-foreground",
-  pending_identity: "bg-amber-100 text-amber-900",
+  pending_identity: "bg-warning-bg text-warning-fg",
 };
 
 // Re-export so consumers don't need to dive into variants/types just

@@ -15,19 +15,16 @@
  * ------------------------------------------------------------------------- */
 @layer base {
   :root {
-    /* ---- Opollo raw hex tokens — ds.css v5 palette -------------------- */
+    /* ---- Opollo raw tokens — now semantic aliases to shadcn tokens ---- */
     /* Brand accent: green replaces pink as the primary action color */
-    --pk: #00e5a0;                          /* brand green — Opollo accent (spec: #00e5a0) */
-    --pk2: #00A86B;                         /* green-deep — hover, gradient end */
-    --pk-soft: rgba(0, 229, 160, 0.10);
-    --gr: #00B07C;                          /* mint — secondary green accent */
-    --gr2: #00875a;
-    --gr-soft: rgba(0, 176, 124, 0.12);
-    --bl: #1E6FFF;                          /* action blue */
+    --pk: hsl(var(--primary));              /* → primary */
+    --pk2: #00A86B;                         /* green-deep — hover, gradient end (no shadcn equiv) */
+    --gr: hsl(var(--success));              /* → success */
+    --gr2: #00875a;                         /* darker green (no shadcn equiv) */
+    --bl: hsl(var(--info));                 /* → info */
     --serp-blue: #1a0dab;                   /* Google SERP link blue — blog post preview only */
-    --bl-soft: rgba(30, 111, 255, 0.10);
-    --am: #FFB547;                          /* warning */
-    --rd: #FF5F5A;                          /* danger */
+    --am: hsl(var(--warning));              /* → warning */
+    --rd: hsl(var(--destructive));          /* → destructive */
     --bg: #F9FAFB;                          /* page canvas — soft-light theme */
     --d1: #FFFFFF;                          /* card / sidebar surface */
     --d2: #F9FAFB;                          /* off-white */
@@ -49,29 +46,6 @@
     --topbar-bg:  rgba(255, 255, 255, 0.92);/* white at 92%: mobile topbar      */
     --pk-glow:    rgba(0, 229, 160, 0.20);  /* green glow — button hover shadow */
 
-    /* ---- UI consistency token layer (2026-05-08) ----------------------- */
-    /* Button system — used by components/ui/button.tsx */
-    --btn-primary-bg:       #00e5a0;        /* = var(--pk); explicit for clarity */
-    --btn-primary-text:     #FFFFFF;
-    --btn-secondary-bg:     #FFFFFF;
-    --btn-secondary-border: #1F2937;        /* gray-800 */
-    --btn-secondary-text:   #1F2937;
-    --btn-tertiary-text:    #1F2937;
-    --btn-tertiary-hover:   #F3F4F6;        /* gray-100 */
-    --btn-destructive-bg:   #DC2626;        /* red-600 — WCAG AA on white */
-    --btn-destructive-text: #FFFFFF;
-
-    /* Icon-only controls — 32×32 circular hit area */
-    --icon-control-hover:   #F3F4F6;        /* gray-100 */
-
-    /* Tab states */
-    --tab-active-bg:        #00e5a0;        /* = var(--pk) */
-    --tab-active-text:      #FFFFFF;
-    --tab-inactive-text:    #4B5563;        /* gray-600 */
-
-    /* Search inputs */
-    --search-input-border:  #E5E7EB;        /* gray-200 */
-
     /* Text semantic tokens — WCAG AA on #F9FAFB / white canvas */
     --tx-primary:   #111827;                /* gray-900 — headings, active labels */
     --tx-secondary: #374151;                /* gray-700 — body, inactive tabs */
@@ -82,6 +56,21 @@
     --shadow-focus:
       0 0 0 2px hsl(var(--background)),
       0 0 0 4px hsl(var(--primary));
+
+    /* ---- Semantic callout color trios (D9) --------------------------------- */
+    /* Use as: bg-warning-bg text-warning-fg border-warning-border             */
+    --color-success-bg:     #ECFDF5;  /* emerald-50 */
+    --color-success-fg:     #065F46;  /* emerald-900 — WCAG AA on success-bg */
+    --color-success-border: #6EE7B7;  /* emerald-300 */
+    --color-warning-bg:     #FFFBEB;  /* amber-50 */
+    --color-warning-fg:     #92400E;  /* amber-800 — WCAG AA on warning-bg */
+    --color-warning-border: #FCD34D;  /* amber-300 */
+    --color-danger-bg:      #FEF2F2;  /* red-50 */
+    --color-danger-fg:      #991B1B;  /* red-800 — WCAG AA on danger-bg */
+    --color-danger-border:  #FCA5A5;  /* red-300 */
+    --color-info-bg:        #EFF6FF;  /* blue-50 */
+    --color-info-fg:        #1E40AF;  /* blue-800 — WCAG AA on info-bg */
+    --color-info-border:    #93C5FD;  /* blue-300 */
 
     /* ---- Font stack — defined here so Tailwind fontFamily vars resolve ---- */
     --font-display: "Sora", "Helvetica Neue", "Arial", sans-serif;
@@ -615,9 +604,7 @@
   --c3-shadow-overlay:
     0 8px 16px rgba(9,9,11,0.06),
     0 24px 60px rgba(9,9,11,0.12);
-  --c3-shadow-focus:
-    0 0 0 2px var(--c3-surface),
-    0 0 0 4px var(--c3-brand-500);
+  /* --c3-shadow-focus deleted — use var(--shadow-focus) in globals.css :root */
   --c3-shadow-focus-danger:
     0 0 0 2px var(--c3-surface),
     0 0 0 4px var(--c3-danger-line);

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export interface ReviewDecisionFormProps {
@@ -127,21 +128,20 @@ export function ReviewDecisionForm({ draftId, disabled = false }: ReviewDecision
       )}
 
       {decision && (
-        <button
+        <Button
           type="submit"
           disabled={
             disabled ||
             submitting ||
             (decision === "rejected" && reasonTooShort)
           }
-          className="rounded-md bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:pointer-events-none disabled:opacity-50"
         >
           {submitting
             ? "Submitting…"
             : decision === "approved"
             ? "Confirm approval"
             : "Confirm rejection"}
-        </button>
+        </Button>
       )}
     </form>
   );

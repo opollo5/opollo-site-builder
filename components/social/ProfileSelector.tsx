@@ -122,7 +122,7 @@ export function ProfileSelector({ companyId, selected, onChange, error }: Props)
 
   if (connections.length === 0) {
     return (
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+      <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning-fg">
         No social accounts connected yet.{" "}
         <a href="/company/social/connections" className="font-medium underline hover:no-underline">
           Connect an account

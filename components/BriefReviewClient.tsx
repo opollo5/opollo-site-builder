@@ -356,7 +356,7 @@ export function BriefReviewClient({
                     : "These guide every page the generator produces."}
               </p>
               {!hasSiteDefault && !isReadOnly && (
-                <div className="mt-2 rounded-md border border-blue-500/40 bg-blue-500/5 p-2 text-xs text-blue-900">
+                <div className="mt-2 rounded-md border border-info-border bg-info-bg p-2 text-xs text-info-fg">
                   <strong>Tip:</strong> brand voice is a property of the
                   whole site — set it once on{" "}
                   <a
@@ -564,7 +564,7 @@ export function BriefReviewClient({
 
                     <div className="flex items-center gap-4">
                       {p.mode === "import" ? (
-                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-900">
+                        <span className="inline-flex items-center rounded-full border border-info-border bg-info-bg px-2.5 py-0.5 text-sm font-medium text-info-fg">
                           Import (mode locked)
                         </span>
                       ) : (

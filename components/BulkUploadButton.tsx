@@ -156,15 +156,15 @@ export function BulkUploadButton({ companyId, onSuccess }: Props) {
       {/* Row-level errors after partial/full success */}
       {result && result.errorCount > 0 ? (
         <details
-          className="mt-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm"
+          className="mt-2 rounded-md border border-warning-border bg-warning-bg p-2 text-sm"
           data-testid="bulk-upload-row-errors"
         >
-          <summary className="cursor-pointer font-medium text-amber-900">
+          <summary className="cursor-pointer font-medium text-warning-fg">
             {result.errorCount} row{result.errorCount !== 1 ? "s" : ""} had errors
           </summary>
           <ul className="mt-1 space-y-0.5 pl-4">
             {result.errors.map((err) => (
-              <li key={err.row} className="text-amber-800">
+              <li key={err.row} className="text-warning-fg">
                 Row {err.row}: {err.message}
               </li>
             ))}

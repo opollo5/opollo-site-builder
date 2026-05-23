@@ -88,7 +88,7 @@ export function CrossClientConsentToggle({
         shapes (e.g. <em>cta_position above-fold vs below-fold</em>), not
         copy, URLs, testimonials, or pricing.
       </p>
-      <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+      <div className="rounded-md border border-warning-border bg-warning-bg p-3 text-sm text-warning-fg">
         <p className="font-medium">Legal precondition (spec §11.2.4)</p>
         <p className="mt-1">
           An MSA cross-client-learning clause must be signed before flipping

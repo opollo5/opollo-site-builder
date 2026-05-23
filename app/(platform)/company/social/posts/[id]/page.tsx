@@ -59,7 +59,7 @@ export default async function CompanySocialPostDetailPage({
 
   if (!session.company) {
     return (
-      <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm">
+      <div className="rounded-md border border-warning-border bg-warning-bg p-4 text-sm">
         <p className="font-medium">Account not provisioned to a company.</p>
         <p className="mt-1 text-muted-foreground">
           Your account isn&apos;t a member of any company on the platform

@@ -15,6 +15,7 @@ import type {
   SocialPostSource,
   SocialPostState,
 } from "@/lib/platform/social/posts";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { SocialModuleShell } from "@/components/social/social-module-shell";
 
 // ---------------------------------------------------------------------------
@@ -183,11 +184,6 @@ export function SocialPostsListClient({
   function clearSearch() {
     setSearchInput("");
     router.push(buildUrl({ page: 1, q: "", state: filter, sort: sortBy, dir: sortDir }));
-  }
-
-  function handleTabClick(key: FilterKey) {
-    setFilter(key);
-    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: key, sort: sortBy, dir: sortDir }));
   }
 
   function handleSortClick(col: SortCol) {
@@ -461,26 +457,15 @@ export function SocialPostsListClient({
         </form>
       ) : null}
 
-      <nav
-        className="mt-6 flex flex-wrap gap-2"
-        aria-label="Filter posts by state"
-      >
-        {FILTER_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => handleTabClick(t.key)}
-            className={`rounded-full border px-3 py-1 text-sm transition ${
-              filter === t.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-muted-foreground/20 hover:bg-muted/40"
-            }`}
-            data-testid={`posts-filter-${t.key}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <PillTabs
+        className="mt-6"
+        tabs={FILTER_TABS.map((t) => ({
+          label: t.label,
+          value: t.key,
+          href: buildUrl({ page: 1, q: searchInput.trim(), state: t.key, sort: sortBy, dir: sortDir }),
+        }))}
+        activeValue={filter}
+      />
 
       <div
         className="mt-4 overflow-hidden rounded-lg border bg-card"
@@ -584,33 +569,32 @@ export function SocialPostsListClient({
                     <td className="px-4 py-3">
                       {p.state === "pending_client_approval" ? (
                         <div className="flex items-center gap-1">
-                          <button
-                            type="button"
+                          <Button
+                            size="xs"
                             onClick={() => handleRowAction(p.id, "approving")}
                             disabled={rowActions.has(p.id)}
-                            className="rounded border border-emerald-600 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 transition"
                             data-testid={`approve-row-${p.id}`}
                           >
                             {rowActions.get(p.id) === "approving" ? "…" : "Approve"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="secondary"
                             onClick={() => handleRowAction(p.id, "requesting")}
                             disabled={rowActions.has(p.id)}
-                            className="rounded border border-amber-500 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition"
                             data-testid={`request-changes-row-${p.id}`}
                           >
                             {rowActions.get(p.id) === "requesting" ? "…" : "Changes"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="destructive"
                             onClick={() => handleRowAction(p.id, "rejecting")}
                             disabled={rowActions.has(p.id)}
-                            className="rounded border border-rose-500 px-2 py-0.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 transition"
                             data-testid={`reject-row-${p.id}`}
                           >
                             {rowActions.get(p.id) === "rejecting" ? "…" : "Reject"}
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </td>
