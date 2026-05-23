@@ -83,6 +83,7 @@ export function SiteActionsMenu({
     {
       label: "Archive",
       variant: "destructive",
+      testId: "site-archive-action",
       onClick: () => setArchiveOpen(true),
     },
     ...(canDelete
@@ -90,6 +91,7 @@ export function SiteActionsMenu({
           label: "Delete",
           icon: <NavIcon name="trash2" size={14} />,
           variant: "destructive" as const,
+          testId: "site-delete-action",
           onClick: () => setDeleteOpen(true),
         }]
       : []),
