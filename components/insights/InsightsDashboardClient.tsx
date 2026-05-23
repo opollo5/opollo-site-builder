@@ -7,7 +7,7 @@ import { BarChart3Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { InsightsDashboardData } from "@/lib/insights/dashboard";
 import { KPIRow } from "./KPIRow";
-import { RecommendationsPanelPlaceholder } from "./RecommendationsPanelPlaceholder";
+import { RecommendationsPanel } from "./RecommendationsPanel";
 import { BestContentSection } from "./BestContentSection";
 import { TrendChartSection } from "./TrendChartSection";
 import { DashboardFooterTabs } from "./DashboardFooterTabs";
@@ -54,7 +54,7 @@ export function InsightsDashboardClient({
       {data.kpis && (
         <KPIRow kpis={data.kpis} availableMetrics={data.availableMetrics} />
       )}
-      <RecommendationsPanelPlaceholder
+      <RecommendationsPanel
         companyId={companyId}
         platform={activePlatform}
         postCount={data.postCount90d}
