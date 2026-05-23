@@ -24,7 +24,9 @@ export type PermissionAction =
   | "reject_post"
   | "schedule_post"
   | "view_calendar"
-  | "receive_connection_alerts";
+  | "receive_connection_alerts"
+  | "view_insights"
+  | "manage_insights";
 
 export type CompanyMembership = {
   companyId: string;
