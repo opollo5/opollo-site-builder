@@ -42,7 +42,8 @@ test.describe("/admin/theming", () => {
     await bgInput.fill("#ABCDEF");
 
     await page.getByRole("button", { name: /save theme/i }).click();
-    await expect(page.locator("text=Theme saved")).toBeVisible({ timeout: 10_000 });
+    // Toast message is "Theme saved." — use period to avoid matching button labels.
+    await expect(page.locator("text=Theme saved.")).toBeVisible({ timeout: 10_000 });
 
     // Reload to verify persistence. Session cookie survives a reload — no second sign-in needed.
     await page.reload();
@@ -51,7 +52,8 @@ test.describe("/admin/theming", () => {
 
     // Clean up: reset to defaults.
     await page.getByRole("button", { name: /reset to defaults/i }).click();
-    await expect(page.locator("text=Reset to defaults")).toBeVisible({ timeout: 10_000 });
+    // Toast message is "Reset to defaults." — period disambiguates from the button label.
+    await expect(page.locator("text=Reset to defaults.")).toBeVisible({ timeout: 10_000 });
   });
 
   test("WCAG contrast warning shown when bg/fg contrast is below 4.5:1", async ({ page }) => {
