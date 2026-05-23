@@ -2,6 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { authorisedCronRequest, unauthorisedResponse } from "@/lib/platform/cron/cron-shared";
 import { aggregateEditPatterns } from "@/lib/insights/memory-aggregator";
+import { generateBestLengthBand } from "@/lib/insights/recommenders/best-length-band";
+import { generateBestPostingWindow } from "@/lib/insights/recommenders/best-posting-window";
+import { generateHashtagDiminishingReturns } from "@/lib/insights/recommenders/hashtag-diminishing-returns";
+import { generateMediaTypeLift } from "@/lib/insights/recommenders/media-type-lift";
+import { generateQuestionPatternLift } from "@/lib/insights/recommenders/question-pattern-lift";
+import { generateTopicPerformance } from "@/lib/insights/recommenders/topic-performance";
+import type { GeneratorFn } from "@/lib/insights/recommenders/types";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
@@ -9,22 +16,14 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 600;
 
-// Generators imported in PR-07 — empty harness for now
-const RECOMMENDATION_GENERATORS: Array<
-  (
-    companyId: string,
-    platform: string,
-    opts: { days: number },
-  ) => Promise<{
-    type: string;
-    headline: string;
-    body: string;
-    successMetric: string;
-    confidenceScore: number;
-    confidenceBand: "strong" | "moderate" | "below_floor";
-    evidence?: Array<{ sourceTable: string; sourceRowRef: string; summary: string }>;
-  } | null>
-> = [];
+const RECOMMENDATION_GENERATORS: GeneratorFn[] = [
+  generateBestLengthBand,
+  generateBestPostingWindow,
+  generateQuestionPatternLift,
+  generateMediaTypeLift,
+  generateHashtagDiminishingReturns,
+  generateTopicPerformance,
+];
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   if (!authorisedCronRequest(req)) return unauthorisedResponse();
@@ -51,7 +50,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       await aggregateEditPatterns(company.company_id);
 
       for (const generator of RECOMMENDATION_GENERATORS) {
-        for (const platform of ["LINKEDIN", "FACEBOOK"]) {
+        for (const platform of ["LINKEDIN", "FACEBOOK"] as const) {
           const candidate = await generator(company.company_id, platform, { days: 90 });
           if (candidate && candidate.confidenceBand !== "below_floor") {
             const expiresAt = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
