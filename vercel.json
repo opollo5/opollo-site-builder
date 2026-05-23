@@ -113,6 +113,10 @@
       "schedule": "*/15 * * * *"
     },
     {
+      "path": "/api/cron/insights-recompute",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/cron/render-pages",
       "schedule": "*/5 * * * *"
     },
