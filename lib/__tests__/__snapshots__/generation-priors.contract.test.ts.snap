@@ -1,0 +1,45 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Generation-priors API — contract snapshot > response shape matches v1 contract 1`] = `
+{
+  "arc_phase": "awareness",
+  "best_posting_window": {
+    "confidence": 0.78,
+    "day_of_week": 0,
+    "hour": 9,
+    "timezone": "UTC",
+  },
+  "client_editing_preferences": [],
+  "company_id": "aaaaaaaa-0000-0000-0000-000000000001",
+  "confidence_overall": 0.65,
+  "content_type": "post",
+  "dismissed_recommendation_types": [],
+  "industry_signal": null,
+  "media_type_ranking": [],
+  "platform": "LINKEDIN",
+  "preferred_cta_style": null,
+  "preferred_hook_patterns": [],
+  "preferred_length_band": {
+    "evidence_n": 1,
+    "max": 200,
+    "min": 50,
+  },
+  "priors_text": "## Performance priors (LINKEDIN, last 90 days)
+Based on 1 published posts.
+
+- **Length**: 50–200 words performs best (1 posts analysed).
+- **Best window**: Sunday 9am UTC gets highest engagement.
+- **Questions**: posts ending in questions get 1.8× the comment rate.
+
+Top-performing recent posts:
+
+PERFORMANCE PRIORS — TOP-PERFORMING POSTS FOR THIS CLIENT (last 90 days)
+
+1. [12.4%] — When ransomware hits an MSP client...",
+  "question_usage_lift": 1.775,
+  "tone_or_formatting_flags": [],
+  "version": "1",
+  "weak_topics": [],
+  "winning_topics": [],
+}
+`;
