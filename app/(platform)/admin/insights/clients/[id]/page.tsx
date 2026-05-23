@@ -1,5 +1,3 @@
-"use server";
-
 import { notFound, redirect } from "next/navigation";
 
 import { AdminClientDrilldown } from "@/components/admin-insights/AdminClientDrilldown";
