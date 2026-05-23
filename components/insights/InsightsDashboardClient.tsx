@@ -16,11 +16,13 @@ import { EmptyState } from "./common/EmptyState";
 interface InsightsDashboardClientProps {
   data: InsightsDashboardData;
   companyId: string;
+  isAdminView?: boolean;
 }
 
 export function InsightsDashboardClient({
   data,
   companyId,
+  isAdminView = false,
 }: InsightsDashboardClientProps) {
   const [activePlatform, setActivePlatform] = useState<string>(
     data.activePlatform,
