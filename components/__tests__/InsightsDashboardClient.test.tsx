@@ -80,7 +80,8 @@ function makeData(overrides: Partial<InsightsDashboardData> = {}): InsightsDashb
     },
     xConnected: false,
     xMetrics: null,
-    postCount90d: 47,
+    postCount: 47,
+    period: "30d" as const,
     ...overrides,
   };
 }
@@ -99,7 +100,7 @@ describe("InsightsDashboardClient", () => {
   it("renders empty state when no posts", () => {
     render(
       <InsightsDashboardClient
-        data={makeData({ postCount90d: 0 })}
+        data={makeData({ postCount: 0 })}
         companyId="c-1"
       />,
     );
@@ -113,7 +114,7 @@ describe("InsightsDashboardClient", () => {
   it("shows 'need more posts' empty state in recommendations when < 20 posts", () => {
     render(
       <InsightsDashboardClient
-        data={makeData({ postCount90d: 12 })}
+        data={makeData({ postCount: 12 })}
         companyId="c-1"
       />,
     );

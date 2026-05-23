@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageShell } from "@/components/ui/page-shell";
 import { StatusPill } from "@/components/ui/status-pill";
 import { canDo, getCurrentPlatformSession } from "@/lib/platform/auth";
-import { getInsightsDashboardData } from "@/lib/insights/dashboard";
+import { getInsightsDashboardData, type InsightsPeriod } from "@/lib/insights/dashboard";
 import { InsightsDashboardClient } from "@/components/insights/InsightsDashboardClient";
 import { CompetitorGapAnalysis } from "@/components/insights/CompetitorGapAnalysis";
 import { PeriodSelector } from "@/components/insights/common/PeriodSelector";
@@ -21,7 +21,13 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export default async function InsightsPage() {
+const VALID_PERIODS: InsightsPeriod[] = ["7d", "30d", "90d"];
+
+export default async function InsightsPage({
+  searchParams,
+}: {
+  searchParams?: { period?: string };
+}) {
   const session = await getCurrentPlatformSession();
   if (!session) {
     redirect(`/login?next=${encodeURIComponent("/company/social/insights")}`);
@@ -36,7 +42,12 @@ export default async function InsightsPage() {
     redirect("/company/social");
   }
 
-  const data = await getInsightsDashboardData(companyId);
+  const rawPeriod = searchParams?.period;
+  const period: InsightsPeriod = VALID_PERIODS.includes(rawPeriod as InsightsPeriod)
+    ? (rawPeriod as InsightsPeriod)
+    : "30d";
+
+  const data = await getInsightsDashboardData(companyId, period);
 
   return (
     <PageShell>
@@ -62,7 +73,7 @@ export default async function InsightsPage() {
           )}
         </PageHeader.Meta>
         <PageHeader.Actions>
-          <PeriodSelector defaultValue="30d" />
+          <PeriodSelector value={period} />
         </PageHeader.Actions>
       </PageHeader>
 
