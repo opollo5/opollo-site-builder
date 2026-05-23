@@ -109,6 +109,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/insights-feature-extract",
+      "schedule": "*/15 * * * *"
+    },
+    {
       "path": "/api/cron/render-pages",
       "schedule": "*/5 * * * *"
     },
