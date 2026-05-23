@@ -15,6 +15,40 @@ import {
   formatPerformancePriorsBlock,
 } from "@/lib/cap/performance-priors";
 
+function isInsightsPriorsViaApiEnabled(): boolean {
+  return process.env.INSIGHTS_PRIORS_VIA_API === "true";
+}
+
+async function getPerformancePriorsBlock(
+  companyId: string,
+  platform: string,
+  arcPhase: string,
+): Promise<string> {
+  if (isInsightsPriorsViaApiEnabled()) {
+    try {
+      const base = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000";
+      const url = `${base}/api/insights/generation-priors?company_id=${encodeURIComponent(companyId)}&platform=${encodeURIComponent(platform)}&arc_phase=${encodeURIComponent(arcPhase)}`;
+      const response = await fetch(url, {
+        headers: { "X-Cron-Secret": process.env.CRON_SECRET ?? "" },
+        signal: AbortSignal.timeout(250),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const data = await response.json();
+      return data.priors_text ?? "";
+    } catch (err) {
+      logger.warn("cap.priors.api_fallback", {
+        companyId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Fall through to direct DB query
+    }
+  }
+  const priors = await fetchPerformancePriors(companyId);
+  return formatPerformancePriorsBlock(priors);
+}
+
 export interface GeneratePostInput {
   campaignId: string;
   postId: string;
@@ -64,8 +98,7 @@ export async function generatePost(input: GeneratePostInput): Promise<GeneratePo
   const sanitizedIndustry = sanitizePromptInput(voiceProfile.industry);
   const sanitizedAudience = sanitizePromptInput(voiceProfile.targetAudience);
 
-  const priors = await fetchPerformancePriors(companyId);
-  const priorsBlock = formatPerformancePriorsBlock(priors);
+  const priorsBlock = await getPerformancePriorsBlock(companyId, "LINKEDIN", arcPhase);
   const systemMessage = buildCampaignPostSystemMessage(priorsBlock || undefined);
   const userMessage = buildCampaignPostUserMessage({
     weekNumber,
