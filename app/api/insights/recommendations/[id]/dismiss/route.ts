@@ -85,3 +85,30 @@ export async function POST(
 
   return NextResponse.json({ ok: true, suppressedAllOfType });
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } },
+): Promise<NextResponse> {
+  const { searchParams } = new URL(req.url);
+  const companyId = searchParams.get("company_id");
+  if (!companyId) return validationError("company_id is required");
+
+  const gate = await requireCanDoForApi(companyId, "manage_insights");
+  if (gate.kind === "deny") return gate.response;
+
+  const svc = getServiceRoleClient();
+
+  const { data: rec, error: recErr } = await svc
+    .from("ins_recommendations")
+    .select("id, company_id")
+    .eq("id", params.id)
+    .single();
+
+  if (recErr || !rec) return notFound("Recommendation not found");
+  if (rec.company_id !== companyId) return notFound("Recommendation not found");
+
+  await svc.from("ins_recommendations").update({ suppressed: false }).eq("id", params.id);
+
+  return NextResponse.json({ ok: true });
+}
