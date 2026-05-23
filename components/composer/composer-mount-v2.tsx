@@ -23,6 +23,14 @@ import type { Connection, Draft, DraftState } from "@/lib/social/types";
 // ---------------------------------------------------------------------------
 
 // V1 social_post_drafts shape from GET /api/platform/social/drafts/[id].
+//
+// Two column layouts exist in production:
+//   V1 rows: content in draft_data.master_text, media in draft_data.media_refs,
+//            targets in draft_data.target_connection_ids.
+//   V2 rows: content/media/targets in top-level columns; draft_data may be {}.
+//
+// Rows created before the draft_data mirroring patch (PR #993 V2 write-path)
+// have draft_data: {} with populated top-level columns. The mapper handles both.
 interface V1DraftApiResponse {
   ok: boolean;
   data?: {
@@ -34,11 +42,15 @@ interface V1DraftApiResponse {
     // V2 drafts write scheduled_at at the top level; V1 drafts use draft_data.schedule
     scheduled_at?: string | null;
     last_publish_error?: { message?: string } | null;
+    // Top-level V2 columns — present on rows where draft_data is empty
+    media_urls?: string[] | null;
+    target_profiles?: Array<{ profile_id: string }> | null;
+    // draft_data fields are optional: V2 rows may have draft_data: {}
     draft_data: {
-      master_text: string;
-      media_refs: Array<{ url: string }>;
-      target_connection_ids: string[];
-      approval_required: boolean;
+      master_text?: string;
+      media_refs?: Array<{ url: string }>;
+      target_connection_ids?: string[];
+      approval_required?: boolean;
       schedule?: { date: string; times: string[] } | null;
     };
   };
@@ -70,15 +82,26 @@ export function mapV1ToV2Draft(d: NonNullable<V1DraftApiResponse["data"]>): Draf
     scheduled_at = `${s.date}T${time}:00Z`;
   }
 
+  // V2 rows created before the draft_data mirroring patch have draft_data: {} but
+  // populated top-level columns. Fall back in order: V1 draft_data → V2 top-level → empty.
+  const mediaUrls =
+    d.draft_data.media_refs?.map((r) => r.url) ??
+    d.media_urls ??
+    [];
+  const targetProfileIds =
+    d.draft_data.target_connection_ids ??
+    d.target_profiles?.map((p) => p.profile_id) ??
+    [];
+
   return {
     id: d.id,
     draft_version: d.draft_version,
     // V2 drafts write to the top-level content column; fall back to V1 draft_data.master_text
-    content: d.content ?? d.draft_data.master_text,
-    media_urls: d.draft_data.media_refs.map((r) => r.url),
-    target_profile_ids: d.draft_data.target_connection_ids,
+    content: d.content ?? d.draft_data.master_text ?? "",
+    media_urls: mediaUrls,
+    target_profile_ids: targetProfileIds,
     platform_variants: {},
-    approval_required: d.draft_data.approval_required,
+    approval_required: d.draft_data.approval_required ?? false,
     scheduled_at,
   };
 }
