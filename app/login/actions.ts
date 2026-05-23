@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 
 import { createRouteAuthClient } from "@/lib/auth";
@@ -236,7 +237,15 @@ export async function loginAction(
   const checkEmailUrl = `/login/check-email?challenge_id=${encodeURIComponent(
     challenge.challenge_id,
   )}&next=${encodeURIComponent(next)}${sendResult.ok ? "" : "&email_send_failed=1"}`;
-  return { redirectTo: checkEmailUrl };
+
+  // MUST use redirect() here, not return { redirectTo }.
+  // Returning data causes Next.js to re-render /login/page.tsx server-side;
+  // that re-render fires the Incident 20.4 stale-cookie guard on the
+  // opollo_2fa_pending cookie we just set above, which calls redirect("/logout")
+  // and wipes the session before the browser ever reaches /login/check-email.
+  // redirect() throws NEXT_REDIRECT, bypassing the page re-render entirely.
+  // See auth-decisions.md §20.6 for the full incident analysis.
+  redirect(checkEmailUrl);
 }
 
 // helper for tests + the admin gate to reach the same env-aware
