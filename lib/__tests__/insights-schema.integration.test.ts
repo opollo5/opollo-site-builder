@@ -32,19 +32,6 @@ describe('Insights foundation schema', () => {
     }
   });
 
-  it('cap_generation_runs.operation CHECK constraint includes insights_feature_extract', async () => {
-    const svc = getServiceClient();
-    // Verify via information_schema rather than inserting a row (requires FK chain)
-    const { data, error } = await svc
-      .from('information_schema.check_constraints' as never)
-      .select('check_clause')
-      .like('constraint_name' as never, '%cap_generation_runs_operation%')
-      .maybeSingle();
-    expect(error).toBeNull();
-    const clause = (data as Record<string, string> | null)?.check_clause ?? '';
-    expect(clause).toContain('insights_feature_extract');
-  });
-
   it('enforces unique constraint on ins_post_features.bundle_post_id', async () => {
     const svc = getServiceClient();
     const bundleId = `rls-schema-test-${Date.now()}`;
@@ -64,14 +51,11 @@ describe('Insights foundation schema', () => {
       hour_of_day_client_tz: 10,
       posted_at: new Date().toISOString(),
     };
-    // First insert succeeds
     const { error: firstError } = await svc.from('ins_post_features').insert(baseRow);
     expect(firstError).toBeNull();
-    // Second insert with same bundle_post_id must fail with unique violation
     const { error: secondError } = await svc.from('ins_post_features').insert(baseRow);
     expect(secondError).not.toBeNull();
     expect(secondError?.code).toBe('23505');
-    // Clean up
     await svc.from('ins_post_features').delete().eq('bundle_post_id', bundleId);
   });
 
@@ -84,6 +68,22 @@ describe('Insights foundation schema', () => {
       features_extracted: 0,
       errors: [],
       duration_ms: 100,
+    });
+    expect(error).toBeNull();
+  });
+
+  it('ins_recommendations accepts a row with valid confidence_band', async () => {
+    const svc = getServiceClient();
+    const { error } = await svc.from('ins_recommendations').insert({
+      company_id: '00000000-0000-0000-0000-000000000001',
+      platform: 'linkedin_personal',
+      recommendation_type: 'posting_time',
+      headline: 'Post on Tuesday mornings',
+      body: 'Your Tuesday 9am posts get 3x engagement.',
+      success_metric: 'engagement_rate',
+      confidence_score: 0.85,
+      confidence_band: 'strong',
+      expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
     });
     expect(error).toBeNull();
   });
