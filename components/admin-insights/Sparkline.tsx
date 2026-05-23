@@ -32,7 +32,7 @@ export function Sparkline({ data, width = 80, height = 24 }: SparklineProps) {
       <polyline
         points={points.join(" ")}
         fill="none"
-        stroke="var(--pk)"
+        className="stroke-pk"
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
