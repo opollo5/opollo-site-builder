@@ -117,6 +117,10 @@
       "schedule": "30 4 * * *"
     },
     {
+      "path": "/api/cron/insights-pattern-mine",
+      "schedule": "0 6 * * 0"
+    },
+    {
       "path": "/api/cron/render-pages",
       "schedule": "*/5 * * * *"
     },
