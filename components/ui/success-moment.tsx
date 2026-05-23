@@ -64,7 +64,7 @@ export function SuccessMoment({
   return (
     <section
       className={cn(
-        "rounded-xl border border-emerald-200 bg-emerald-50/60 p-5",
+        "rounded-xl border border-[--color-success-border] bg-[--color-success-bg] p-5",
         "dark:border-emerald-900/60 dark:bg-emerald-950/30",
         isCelebrating &&
           "animate-in fade-in slide-in-from-top-1 duration-300 ease-out",

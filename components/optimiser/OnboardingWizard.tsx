@@ -95,7 +95,7 @@ export function OnboardingWizard({
                 : status.tone === "warn"
                   ? "border-warning-border bg-warning-bg text-warning-fg"
                   : status.tone === "ok"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                    ? "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]"
                     : "border-info-border bg-info-bg text-info-fg"
             }`}
           >

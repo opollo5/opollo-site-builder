@@ -44,7 +44,7 @@ export function ApprovalDecisionForm({ token, alreadyDecided }: Props) {
   if (alreadyDecided) {
     return (
       <div
-        className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
+        className="rounded-md border border-[--color-success-border] bg-[--color-success-bg] p-4 text-sm text-[--color-success-fg]"
         data-testid="approval-already-decided"
       >
         <p className="font-medium">This request has already been resolved.</p>
@@ -58,7 +58,7 @@ export function ApprovalDecisionForm({ token, alreadyDecided }: Props) {
   if (done) {
     return (
       <div
-        className="rounded-md border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
+        className="rounded-md border border-[--color-success-border] bg-[--color-success-bg] p-4 text-sm text-[--color-success-fg]"
         data-testid="approval-decision-done"
       >
         <p className="font-medium">Decision recorded — thank you.</p>

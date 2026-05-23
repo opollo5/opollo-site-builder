@@ -80,7 +80,7 @@ function ConnectBanner({ params }: { params: SearchParams }) {
     const n = Number(params.count ?? "1");
     return (
       <div
-        className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+        className="mb-4 rounded-md border border-[--color-success-border] bg-[--color-success-bg] px-3 py-2 text-sm text-[--color-success-fg]"
         role="status"
         data-testid="connect-banner-success"
       >

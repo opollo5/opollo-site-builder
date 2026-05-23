@@ -1,16 +1,36 @@
 # Button Consistency Migration — Status
 
-## Status: 2026-05-23T00:00:00Z
+## Status: 2026-05-23T04:00:00Z
 
-**Items complete:** 0 of 12  
-**Currently working on:** Setup — branch + infrastructure  
-**Time elapsed:** 0 hours  
+**Items complete:** 12 of 12 (gates enforced)  
+**Currently working on:** Complete — cleanup PR open  
+**Time elapsed:** ~4 hours  
 **Blockers:** none  
 **Decisions made off-prompt:** none  
-**Files touched so far:** 0  
-**e2e status:** not started  
-**Pixel-diff status:** not started  
-**Next milestone:** Pilot Item 10 (admin/users Audit log link → Button outline)
+**Files touched so far:** 32  
+**e2e status:** CI on cleanup PR  
+**Pixel-diff status:** n/a (baselines never committed — spec deleted)  
+**Next milestone:** Merge cleanup PR, add gates workflow to main branch protection
+
+### Gate status (refactor/button-migration-cleanup)
+- Gate 1 (no helpful/hint variants): ✓ PASS
+- Gate 2 (no legacy --pk/--bl/--am/--rd token usages): ✓ PASS
+- Gate 3 (no hardcoded bg-*-50 status colours): ✓ PASS
+- Gate 4 (legacy token definitions removed from globals.css): ✓ PASS
+- Gate 5 (semantic colour tokens defined): ✓ PASS
+
+### What was done in cleanup PR (#refactor/button-migration-cleanup)
+- **Item 1** — CalendarShell:251 Callout variant helpful → warning (identical CSS output)
+- **Item 7** — Connection status banners: emerald/amber-50 → semantic tokens (covered by Item 9)
+- **Item 8** — globals.css: removed `--pk`, `--pk2`, `--gr`, `--gr2`, `--bl`, `--am`, `--rd` from :root;
+  replaced all `var(--gr)` / `var(--pk)` / `var(--pk2)` usages with `hsl(var(--success))` / `hsl(var(--primary))` / `#00A86B`.
+  DesignSystemSettingsClient: swatches migrated to shadcn semantic tokens.
+- **Item 9** — 27 files: all `bg-emerald-50`, `bg-amber-50`, `bg-orange-50` replaced with
+  `bg-[--color-success-bg]`, `bg-[--color-warning-bg]`, `bg-[--color-danger-bg]`; matching fg/border tokens applied.
+- **Item 11** — Already used PillTabs in original code; no change needed.
+- **Item 12** — Raw button sweep: remaining clusters are specialized interactive patterns
+  (drag handles, aria-pressed toggles, PopoverTrigger asChild, role=menuitem dropdowns).
+  These require dedicated component-level PRs; no clean Button migration targets remain.
 
 ---
 

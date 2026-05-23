@@ -145,7 +145,7 @@ export function TryAutoImportPanel({
         </Button>
       </div>
       {result?.tone === "ok" && (
-        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+        <div className="rounded-md border border-[--color-success-border] bg-[--color-success-bg] px-3 py-2 text-sm text-[--color-success-fg]">
           Import filed.{" "}
           <a
             href={`/optimiser/imports/${result.brief_id}`}

@@ -25,7 +25,7 @@ export function AbTestStatusBanner({ test }: { test: TestRow | null }) {
         : "info";
   const colours =
     tone === "ok"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      ? "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]"
       : tone === "warn"
         ? "border-warning-border bg-warning-bg text-warning-fg"
         : "border-info-border bg-info-bg text-info-fg";
@@ -98,7 +98,7 @@ function VariantPanel({
     <div
       className={`rounded-md border p-3 ${
         isWinner
-          ? "border-emerald-300 bg-emerald-50/60"
+          ? "border-[--color-success-border] bg-[--color-success-bg]"
           : "border-border bg-background/60"
       }`}
     >

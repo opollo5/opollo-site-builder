@@ -15,16 +15,7 @@
  * ------------------------------------------------------------------------- */
 @layer base {
   :root {
-    /* ---- Opollo raw tokens — now semantic aliases to shadcn tokens ---- */
-    /* Brand accent: green replaces pink as the primary action color */
-    --pk: hsl(var(--primary));              /* → primary */
-    --pk2: #00A86B;                         /* green-deep — hover, gradient end (no shadcn equiv) */
-    --gr: hsl(var(--success));              /* → success */
-    --gr2: #00875a;                         /* darker green (no shadcn equiv) */
-    --bl: hsl(var(--info));                 /* → info */
     --serp-blue: #1a0dab;                   /* Google SERP link blue — blog post preview only */
-    --am: hsl(var(--warning));              /* → warning */
-    --rd: hsl(var(--destructive));          /* → destructive */
     --bg: #F9FAFB;                          /* page canvas — soft-light theme */
     --d1: #FFFFFF;                          /* card / sidebar surface */
     --d2: #F9FAFB;                          /* off-white */
@@ -130,7 +121,7 @@
 
   /* Green focus ring — replaces default */
   *:focus-visible {
-    outline: 2px solid var(--gr);
+    outline: 2px solid hsl(var(--success));
     outline-offset: 2px;
   }
 }
@@ -150,11 +141,11 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.20em;
-  color: var(--gr);
+  color: hsl(var(--success));
 }
 .lbl::before {
   content: '—';
-  color: var(--gr);
+  color: hsl(var(--success));
   font-weight: 700;
 }
 .lbl.lbl-live::before {
@@ -163,13 +154,13 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--gr);
+  background: hsl(var(--success));
   animation: lbl-pulse 2s ease-in-out infinite;
 }
 
 /* Single pink word-highlight per heading */
 .pk {
-  color: var(--pk);
+  color: hsl(var(--primary));
 }
 
 /* Stat unit span — sits after the big number */
@@ -185,7 +176,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--pk), var(--pk2));
+  background: linear-gradient(135deg, hsl(var(--primary)), #00A86B);
   color: #fff;
   border: none;
   border-radius: 100px;
@@ -226,8 +217,8 @@
   transition: border-color 150ms ease-out, color 150ms ease-out;
 }
 .btn-ghost:hover {
-  border-color: var(--gr);
-  color: var(--gr);
+  border-color: hsl(var(--success));
+  color: hsl(var(--success));
 }
 
 /* Mesh gradient — atmospheric hero background */

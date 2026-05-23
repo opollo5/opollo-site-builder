@@ -1,0 +1,69 @@
+name: Button Migration Gates
+
+on:
+  push:
+    branches: [refactor/button-migration-cleanup]
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  gates:
+    name: Button migration completeness gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Gate 1 — no invalid Button variants
+        run: |
+          MATCHES=$(grep -rn 'variant="helpful"\|variant="hint"' \
+            components/ app/ --include="*.tsx" \
+            | grep -v "Callout\|callout" || true)
+          if [ -n "$MATCHES" ]; then
+            echo "❌ FAIL: invalid Button variants found"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "✓ no invalid Button variants"
+
+      - name: Gate 2 — no legacy --pk/--bl/--gr/--am/--rd tokens
+        run: |
+          MATCHES=$(grep -rn 'var(--pk)\|var(--bl)\|var(--gr-soft)\|var(--am)\|var(--rd)' \
+            components/ app/ --include="*.css" --include="*.tsx" --include="*.ts" || true)
+          if [ -n "$MATCHES" ]; then
+            echo "❌ FAIL: legacy tokens still referenced"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "✓ no legacy tokens"
+
+      - name: Gate 3 — no hardcoded Tailwind status colours
+        run: |
+          MATCHES=$(grep -rPn "bg-emerald-50(?![0-9])|bg-amber-50(?![0-9])|bg-rose-50(?![0-9])|bg-orange-50(?![0-9])" \
+            components/ app/ --include="*.tsx" \
+            | grep -v "design-system-dev\|DesignSystemSettings" || true)
+          if [ -n "$MATCHES" ]; then
+            echo "❌ FAIL: hardcoded status colours found"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "✓ no hardcoded status colours"
+
+      - name: Gate 4 — legacy token definitions removed from globals.css
+        run: |
+          MATCHES=$(grep -n '^\s*--\(pk\|bl\|gr\|am\|rd\):' app/globals.css || true)
+          if [ -n "$MATCHES" ]; then
+            echo "❌ FAIL: legacy token definitions still present in globals.css"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "✓ legacy token definitions removed"
+
+      - name: Gate 5 — semantic colour tokens defined
+        run: |
+          for TOKEN in "color-success-bg" "color-warning-bg" "color-danger-bg"; do
+            if ! grep -q "\-\-$TOKEN" app/globals.css; then
+              echo "❌ FAIL: --$TOKEN not defined in globals.css"
+              exit 1
+            fi
+          done
+          echo "✓ semantic colour tokens defined"
