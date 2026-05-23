@@ -1,3 +1,20 @@
 {
-  "extends": "next/core-web-vitals"
+  "extends": "next/core-web-vitals",
+  "rules": {
+    "no-restricted-imports": ["error", {
+      "paths": [
+        { "name": "recharts", "message": "Use components/charts/* (ECharts-based) instead of Recharts. See CLAUDE.md §Charts." },
+        { "name": "chart.js", "message": "Use components/charts/* (ECharts-based) instead." },
+        { "name": "react-chartjs-2", "message": "Use components/charts/* (ECharts-based) instead." },
+        { "name": "plotly.js", "message": "Use components/charts/* (ECharts-based) instead." },
+        { "name": "react-plotly.js", "message": "Use components/charts/* (ECharts-based) instead." },
+        { "name": "@nivo/core", "message": "Use components/charts/* (ECharts-based) instead." },
+        { "name": "@visx/visx", "message": "Use components/charts/* (ECharts-based) instead." },
+        { "name": "victory", "message": "Use components/charts/* (ECharts-based) instead." }
+      ],
+      "patterns": [
+        { "group": ["recharts/*", "chart.js/*", "@nivo/*", "@visx/*", "victory/*"], "message": "Use components/charts/* (ECharts-based) instead." }
+      ]
+    }]
+  }
 }
