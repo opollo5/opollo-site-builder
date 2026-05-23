@@ -121,6 +121,10 @@
       "schedule": "0 6 * * 0"
     },
     {
+      "path": "/api/cron/insights-competitor-scrape",
+      "schedule": "0 7 * * *"
+    },
+    {
       "path": "/api/cron/render-pages",
       "schedule": "*/5 * * * *"
     },

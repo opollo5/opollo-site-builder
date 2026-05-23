@@ -58,6 +58,7 @@
     "@upstash/qstash": "^2.10.1",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
+    "apify-client": "^2.23.3",
     "bundlesocial": "^2.47.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.0",
