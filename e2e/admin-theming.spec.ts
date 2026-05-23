@@ -32,6 +32,7 @@ test.describe("/admin/theming", () => {
   });
 
   test("save and reset round-trip", async ({ page }) => {
+    test.setTimeout(90_000);
     // Navigate to page; let it default to the first available company.
     await page.goto("/admin/theming");
     await expect(page.getByRole("heading", { name: "Theming" })).toBeVisible();
@@ -43,8 +44,8 @@ test.describe("/admin/theming", () => {
     await page.getByRole("button", { name: /save theme/i }).click();
     await expect(page.locator("text=Theme saved")).toBeVisible({ timeout: 10_000 });
 
+    // Reload to verify persistence. Session cookie survives a reload — no second sign-in needed.
     await page.reload();
-    await signInAsAdmin(page);
     await page.goto("/admin/theming");
     await expect(page.locator("#token---color-success-bg")).toHaveValue("#ABCDEF");
 

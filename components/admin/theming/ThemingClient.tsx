@@ -330,12 +330,12 @@ export function ThemingClient({
         </CardHeader>
         <CardContent>
           <div className="space-y-1.5">
-            <label className="text-sm font-medium" htmlFor="token-radius">
+            <label className="text-sm font-medium" htmlFor="token---radius">
               Radius
               <span className="ml-2 font-mono text-xs text-muted-foreground">--radius</span>
             </label>
             <Input
-              id="token-radius"
+              id="token---radius"
               value={overrides["--radius"] ?? ""}
               onChange={(e) => handleTokenChange("--radius", e.target.value)}
               placeholder="0.5rem"
