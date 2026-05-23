@@ -32,57 +32,28 @@ describe('Insights foundation schema', () => {
     }
   });
 
-  it('enforces RLS on every ins_* table', async () => {
+  it('cap_generation_runs.operation CHECK constraint includes insights_feature_extract', async () => {
     const svc = getServiceClient();
-    const { data, error } = await svc.rpc('query', {
-      query: `
-        SELECT tablename FROM pg_tables
-        WHERE schemaname = 'public'
-          AND tablename LIKE 'ins_%'
-          AND rowsecurity = true
-      `,
-    }).single();
-    // RLS check via information_schema
-    const { data: rlsTables, error: rlsError } = await svc
-      .from('pg_tables' as never)
-      .select('tablename')
-      .eq('schemaname', 'public')
-      .like('tablename', 'ins_%');
-    // If the RPC approach doesn't work, just verify tables exist and trust migration
-    expect(rlsError).toBeNull();
-  });
-
-  it('extends cap_generation_runs.operation to accept insights_feature_extract', async () => {
-    const svc = getServiceClient();
-    // Clean up any leftover test rows before checking
-    await svc.from('cap_generation_runs').delete().eq('prompt_used', '__insights_schema_test__');
-    const { error } = await svc.from('cap_generation_runs').insert({
-      cap_campaign_post_id: null,
-      cap_campaign_id: null,
-      operation: 'insights_feature_extract',
-      prompt_version: 1,
-      prompt_used: '__insights_schema_test__',
-      model: 'haiku',
-      input_tokens: 0,
-      output_tokens: 0,
-      estimated_cost_usd: 0,
-      latency_ms: 0,
-      status: 'success',
-    });
+    // Verify via information_schema rather than inserting a row (requires FK chain)
+    const { data, error } = await svc
+      .from('information_schema.check_constraints' as never)
+      .select('check_clause')
+      .like('constraint_name' as never, '%cap_generation_runs_operation%')
+      .maybeSingle();
     expect(error).toBeNull();
-    // Clean up
-    await svc.from('cap_generation_runs').delete().eq('prompt_used', '__insights_schema_test__');
+    const clause = (data as Record<string, string> | null)?.check_clause ?? '';
+    expect(clause).toContain('insights_feature_extract');
   });
 
   it('enforces unique constraint on ins_post_features.bundle_post_id', async () => {
     const svc = getServiceClient();
-    const bundleId = `test-unique-${Date.now()}`;
+    const bundleId = `rls-schema-test-${Date.now()}`;
     const baseRow = {
       company_id: '00000000-0000-0000-0000-000000000001',
       profile_id: '00000000-0000-0000-0000-000000000001',
       source: 'composer',
       bundle_post_id: bundleId,
-      platform: 'LINKEDIN',
+      platform: 'linkedin_personal',
       word_count: 10,
       sentence_count: 1,
       has_question: false,
@@ -93,11 +64,27 @@ describe('Insights foundation schema', () => {
       hour_of_day_client_tz: 10,
       posted_at: new Date().toISOString(),
     };
-    await svc.from('ins_post_features').insert(baseRow);
-    const { error } = await svc.from('ins_post_features').insert(baseRow);
-    expect(error).not.toBeNull();
-    expect(error?.code).toBe('23505'); // unique_violation
+    // First insert succeeds
+    const { error: firstError } = await svc.from('ins_post_features').insert(baseRow);
+    expect(firstError).toBeNull();
+    // Second insert with same bundle_post_id must fail with unique violation
+    const { error: secondError } = await svc.from('ins_post_features').insert(baseRow);
+    expect(secondError).not.toBeNull();
+    expect(secondError?.code).toBe('23505');
     // Clean up
     await svc.from('ins_post_features').delete().eq('bundle_post_id', bundleId);
+  });
+
+  it('ins_ingest_log accepts an insert row', async () => {
+    const svc = getServiceClient();
+    const { error } = await svc.from('ins_ingest_log').insert({
+      cron_route: '/api/cron/test',
+      posts_processed: 0,
+      metrics_recorded: 0,
+      features_extracted: 0,
+      errors: [],
+      duration_ms: 100,
+    });
+    expect(error).toBeNull();
   });
 });

@@ -28,7 +28,7 @@ describe('Insights RLS — cross-tenant isolation', () => {
       profile_id: '00000000-0000-0000-0000-000000000001',
       source: 'composer',
       bundle_post_id: bundleId,
-      platform: 'LINKEDIN',
+      platform: 'linkedin_personal',
       word_count: 10,
       sentence_count: 1,
       has_question: false,
