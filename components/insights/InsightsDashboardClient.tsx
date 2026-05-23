@@ -28,7 +28,7 @@ export function InsightsDashboardClient({
     data.activePlatform,
   );
 
-  if (data.postCount90d === 0) {
+  if (data.postCount === 0) {
     return (
       <EmptyState
         icon={<BarChart3Icon size={48} />}
@@ -57,7 +57,7 @@ export function InsightsDashboardClient({
       <RecommendationsPanel
         companyId={companyId}
         platform={activePlatform}
-        postCount={data.postCount90d}
+        postCount={data.postCount}
       />
       <BestContentSection
         bestPosts={data.bestPosts}

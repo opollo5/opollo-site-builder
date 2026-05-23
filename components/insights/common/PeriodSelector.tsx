@@ -1,5 +1,7 @@
 "use client";
 
+import { useRouter, usePathname } from "next/navigation";
+
 import { PillSelect, type PillSelectOption } from "@/components/ui/pill-select";
 
 const PERIOD_OPTIONS: PillSelectOption[] = [
@@ -9,16 +11,18 @@ const PERIOD_OPTIONS: PillSelectOption[] = [
 ];
 
 interface PeriodSelectorProps {
-  defaultValue?: string;
-  onChange?: (value: string) => void;
+  value?: string;
 }
 
-export function PeriodSelector({ defaultValue = "30d", onChange }: PeriodSelectorProps) {
+export function PeriodSelector({ value = "30d" }: PeriodSelectorProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   return (
     <PillSelect
       options={PERIOD_OPTIONS}
-      value={defaultValue}
-      onValueChange={onChange ?? (() => {})}
+      value={value}
+      onValueChange={(v) => router.push(`${pathname}?period=${v}`)}
     />
   );
 }

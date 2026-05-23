@@ -14,8 +14,17 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // here because this runs server-side after auth has been verified.
 // ---------------------------------------------------------------------------
 
+export type InsightsPeriod = "7d" | "30d" | "90d";
+
+export const PERIOD_DAYS: Record<InsightsPeriod, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+};
+
 export interface InsightsDashboardData {
   companyId: string;
+  period: InsightsPeriod;
   dataFreshness: {
     lastIngestIso: string | null;
     isStale: boolean;
@@ -56,7 +65,7 @@ export interface InsightsDashboardData {
   } | null;
   xConnected: boolean;
   xMetrics: { published30d: number; scheduled: number } | null;
-  postCount90d: number;
+  postCount: number;
 }
 
 export interface BestPost {
@@ -75,16 +84,18 @@ export interface BestPost {
 
 export async function getInsightsDashboardData(
   companyId: string,
+  period: InsightsPeriod = "30d",
 ): Promise<InsightsDashboardData> {
   const svc = getServiceRoleClient();
 
   const now = new Date();
+  const periodDays = PERIOD_DAYS[period];
   const ago30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const ago90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const agoPeriod = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
   const ago48h = new Date(now.getTime() - 48 * 60 * 60 * 1000);
 
   const ago30str = ago30.toISOString().slice(0, 10);
-  const ago90str = ago90.toISOString().slice(0, 10);
+  const agoPeriodStr = agoPeriod.toISOString().slice(0, 10);
 
   // Step 1: get profile IDs for this company
   const { data: profiles } = await svc
@@ -95,7 +106,7 @@ export async function getInsightsDashboardData(
   const profileIds: string[] = (profiles ?? []).map((p: { id: string }) => p.id);
 
   if (profileIds.length === 0) {
-    return emptyDashboard(companyId);
+    return emptyDashboard(companyId, period);
   }
 
   // Step 2: parallel queries
@@ -107,14 +118,14 @@ export async function getInsightsDashboardData(
     postMasterR,
     ingestLogR,
   ] = await Promise.all([
-    // All snapshots last 90 days for trend + best posts
+    // All snapshots within the selected period for trend + best posts
     svc
       .from("social_post_analytics_snapshots")
       .select(
         "id, bundle_post_id, profile_id, platform, posted_at, content, impressions, likes, comments, shares, engagement_rate, snapshot_date",
       )
       .in("profile_id", profileIds)
-      .gte("snapshot_date", ago90str)
+      .gte("snapshot_date", agoPeriodStr)
       .gte("impressions", 50)
       .order("snapshot_date", { ascending: false }),
 
@@ -130,7 +141,7 @@ export async function getInsightsDashboardData(
       .from("ins_post_features")
       .select("day_of_week, hour_of_day_utc, platform")
       .eq("company_id", companyId)
-      .gte("posted_at", ago90.toISOString()),
+      .gte("posted_at", agoPeriod.toISOString()),
 
     // Connection health
     svc
@@ -172,8 +183,8 @@ export async function getInsightsDashboardData(
     ? new Date(lastIngestIso) < ago48h
     : true;
 
-  // postCount90d: unique bundle_post_ids with a snapshot
-  const postCount90d = new Set(snapshots.map((s: { bundle_post_id: string }) => s.bundle_post_id)).size;
+  // postCount: unique bundle_post_ids with a snapshot in the selected period
+  const postCount = new Set(snapshots.map((s: { bundle_post_id: string }) => s.bundle_post_id)).size;
 
   // availableMetrics: check if columns are non-null in any snapshot
   const hasLikes = snapshots30d.some((s: { likes: number | null }) => s.likes !== null);
@@ -351,6 +362,7 @@ export async function getInsightsDashboardData(
 
   return {
     companyId,
+    period,
     dataFreshness: { lastIngestIso, isStale },
     kpis,
     availableMetrics,
@@ -363,7 +375,7 @@ export async function getInsightsDashboardData(
     sourceComparison,
     xConnected,
     xMetrics,
-    postCount90d,
+    postCount,
   };
 }
 
@@ -414,9 +426,10 @@ function snapshotToPost(s: SnapshotRow, source: "cap" | "composer"): BestPost {
   };
 }
 
-function emptyDashboard(companyId: string): InsightsDashboardData {
+function emptyDashboard(companyId: string, period: InsightsPeriod): InsightsDashboardData {
   return {
     companyId,
+    period,
     dataFreshness: { lastIngestIso: null, isStale: false },
     kpis: null,
     availableMetrics: {
@@ -435,6 +448,6 @@ function emptyDashboard(companyId: string): InsightsDashboardData {
     sourceComparison: null,
     xConnected: false,
     xMetrics: null,
-    postCount90d: 0,
+    postCount: 0,
   };
 }
