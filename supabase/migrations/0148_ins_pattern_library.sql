@@ -25,8 +25,7 @@ CREATE TABLE ins_pattern_library (
 );
 
 CREATE INDEX idx_ins_pattern_library_type_platform
-  ON ins_pattern_library (pattern_type, mined_at DESC)
-  WHERE expires_at > NOW();
+  ON ins_pattern_library (pattern_type, expires_at, mined_at DESC);
 
 ALTER TABLE ins_pattern_library ENABLE ROW LEVEL SECURITY;
 
