@@ -41,7 +41,7 @@ export function PastCausalDeltasPanel({
           ? "moderate confidence"
           : "low confidence";
   return (
-    <div className="rounded-md border border-emerald-200 bg-emerald-50/40 p-3 text-sm text-emerald-900">
+    <div className="rounded-md border border-[--color-success-border] bg-[--color-success-bg] p-3 text-sm text-[--color-success-fg]">
       <p>
         <span className="font-medium">What happened last time:</span>{" "}
         past {summary.count} {friendly} proposal{summary.count === 1 ? "" : "s"} for this client averaged{" "}

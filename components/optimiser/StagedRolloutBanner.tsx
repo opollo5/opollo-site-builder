@@ -11,8 +11,8 @@ import type { RolloutRow } from "@/lib/optimiser/staged-rollout/read";
 
 const STATE_TONE: Record<string, string> = {
   live: "border-info-border bg-info-bg text-info-fg",
-  promoted: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  manually_promoted: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  promoted: "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]",
+  manually_promoted: "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]",
   auto_reverted: "border-red-200 bg-red-50 text-red-900",
   failed: "border-warning-border bg-warning-bg text-warning-fg",
 };

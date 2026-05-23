@@ -303,7 +303,7 @@ export function CustomerBrandProfileEditor({ company, brand, hidePageHeader = fa
 
         {form.success ? (
           <div
-            className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900"
+            className="rounded-md border border-[--color-success-border] bg-[--color-success-bg] p-3 text-sm text-[--color-success-fg]"
             role="status"
             data-testid="brand-editor-success"
           >

@@ -60,7 +60,7 @@ export function ScoreHistoryTable({
               <tr
                 key={row.id}
                 className={`border-t border-border ${
-                  isCurrent ? "bg-emerald-50/40" : ""
+                  isCurrent ? "bg-[--color-success-bg]" : ""
                 }`}
               >
                 <td className="px-3 py-2 whitespace-nowrap text-sm text-muted-foreground">

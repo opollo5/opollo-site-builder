@@ -237,7 +237,7 @@ export function ProposalReview({
                 ? "border-red-200 bg-red-50 text-red-900"
                 : status.tone === "warn"
                   ? "border-warning-border bg-warning-bg text-warning-fg"
-                  : "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  : "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]"
             }`}
           >
             {status.message}

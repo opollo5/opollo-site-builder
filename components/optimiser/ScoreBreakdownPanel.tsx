@@ -120,7 +120,7 @@ export function ScoreBreakdownPanel({
         </p>
       )}
       {!draggingSubscore && result.classification === "high_performer" && (
-        <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-900">
+        <p className="rounded-md bg-[--color-success-bg] p-3 text-sm text-[--color-success-fg]">
           Performing within expected range across all sub-scores. No
           action needed unless a playbook trigger fires.
         </p>

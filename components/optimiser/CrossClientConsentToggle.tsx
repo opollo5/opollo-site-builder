@@ -125,7 +125,7 @@ export function CrossClientConsentToggle({
           className={`rounded-md border px-3 py-2 text-sm ${
             status.tone === "err"
               ? "border-red-200 bg-red-50 text-red-900"
-              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]"
           }`}
         >
           {status.message}

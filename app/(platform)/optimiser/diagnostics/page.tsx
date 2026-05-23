@@ -164,7 +164,7 @@ export default async function OptimiserDiagnosticsPage() {
             <span
               className={`inline-flex items-center rounded-full border px-2 py-0.5 text-sm font-medium ${
                 s.env.configured
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                  ? "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]"
                   : "border-red-200 bg-red-50 text-red-900"
               }`}
             >

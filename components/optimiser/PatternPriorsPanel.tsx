@@ -20,7 +20,7 @@ const CONFIDENCE_LABEL: Record<string, string> = {
 };
 
 const CONFIDENCE_COLOUR: Record<string, string> = {
-  high: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  high: "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]",
   moderate: "border-info-border bg-info-bg text-info-fg",
   low: "border-muted-foreground/20 bg-muted text-muted-foreground",
 };

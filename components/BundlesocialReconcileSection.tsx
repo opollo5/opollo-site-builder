@@ -280,7 +280,7 @@ export function BundlesocialReconcileSection() {
           </p>
           {last.divergences.length === 0 ? (
             <div
-              className="rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+              className="rounded-md border border-[--color-success-border] bg-[--color-success-bg] px-3 py-2 text-sm text-[--color-success-fg]"
               data-testid="reconcile-clean"
             >
               ✓ bundle.social and the DB are in sync. No ghosts, phantoms,

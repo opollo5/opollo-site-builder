@@ -133,7 +133,7 @@ function DefaultCell({
         isToday && !isOtherMonth && !isSelected && "bg-primary/5",
         isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
         !isOtherMonth && !isPast && !isSelected && "hover:border-primary/40 hover:bg-muted/30",
-        hasCellHighlight && !isSelected && "border-2 border-emerald-500 bg-emerald-50/60",
+        hasCellHighlight && !isSelected && "border-2 border-emerald-500 bg-[--color-success-bg]",
       )}
     >
       <span

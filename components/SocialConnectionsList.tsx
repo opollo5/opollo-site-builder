@@ -1062,7 +1062,7 @@ export function SocialConnectionsList({
                     reconnectConnectionId === c.id
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-200"
                       : noopdConnection?.id === c.id
-                        ? "bg-amber-50"
+                        ? "bg-[--color-warning-bg]"
                         : "hover:bg-muted/20"
                   }`}
                   data-testid={`connection-row-${c.id}`}
