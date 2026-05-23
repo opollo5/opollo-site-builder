@@ -67,3 +67,25 @@ jobs:
             fi
           done
           echo "✓ semantic colour tokens defined"
+
+      - name: Gate 6 — AI Generate button uses filled (default) variant
+        run: |
+          MATCHES=$(grep -n 'data-testid="ai-generate-button"' \
+            components/social/composer/ToolsRow.tsx || true)
+          if echo "$MATCHES" | grep -q 'variant='; then
+            echo "❌ FAIL: ai-generate-button has an explicit variant (should use default filled)"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "✓ ai-generate-button uses default filled variant"
+
+      - name: Gate 7 — AI assist Dialog has exactly one close affordance (DialogContent built-in)
+        run: |
+          # AiPanel must NOT render its own close button alongside DialogContent's built-in one.
+          PANEL_BLOCK=$(awk '/function AiPanel/,/^}/' components/social/composer/ToolsRow.tsx)
+          COUNT=$(echo "$PANEL_BLOCK" | grep -c 'label="Close AI panel"\|data-testid="ai-close"' || true)
+          if [ "$COUNT" -gt 0 ]; then
+            echo "❌ FAIL: AiPanel renders $COUNT custom close button(s) — DialogContent already provides one"
+            exit 1
+          fi
+          echo "✓ AiPanel has no duplicate close button"

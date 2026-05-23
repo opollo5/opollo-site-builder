@@ -411,7 +411,7 @@ describe("ToolsRow", () => {
       <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
-    expect(screen.getByRole("button", { name: /close ai panel/i })).toBeTruthy();
+    expect(screen.getByTestId("ai-panel")).toBeTruthy();
     expect(screen.getByTestId("ai-generate-button")).toBeTruthy();
   });
 
