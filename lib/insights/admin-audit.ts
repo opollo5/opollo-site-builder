@@ -5,7 +5,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 export interface AuditEntry {
   operatorUserId: string;
   clientCompanyId: string;
-  action: "view" | "dismiss" | "annotate" | "export" | "override" | "unsuppress";
+  action: "view" | "dismiss" | "annotate" | "export" | "override" | "unsuppress" | "add_competitor" | "remove_competitor";
   actionDetails: Record<string, unknown>;
   clientIp?: string;
   userAgent?: string;
