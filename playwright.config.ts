@@ -36,7 +36,7 @@ export default defineConfig({
   // URL via playwright.smoke.config.ts. They MUST NOT run in the
   // default config — they assert against env-provisioned production
   // credentials that aren't set during regular CI.
-  testIgnore: ["**/smoke/**"],
+  testIgnore: ["**/smoke/**", "**/uat/**"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
