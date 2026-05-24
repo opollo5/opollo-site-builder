@@ -197,7 +197,9 @@ jobs:
         run: |
           echo "Waiting for staging deployment to be ready..."
           for i in $(seq 1 18); do
-            STATUS=$(curl -s "$UAT_BASE_URL/api/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+            BYPASS_ARGS=()
+            [ -n "$VERCEL_BYPASS_SECRET" ] && BYPASS_ARGS=(-H "x-vercel-protection-bypass: $VERCEL_BYPASS_SECRET")
+            STATUS=$(curl -s "${BYPASS_ARGS[@]}" "$UAT_BASE_URL/api/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "✓ Staging is responding (HTTP $STATUS)"
               exit 0
