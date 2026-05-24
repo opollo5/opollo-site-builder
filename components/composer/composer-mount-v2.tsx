@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, usePathname, useRouter } from "next/navigation";
 import { ComposerOverlay } from "@/components/social/composer/ComposerOverlay";
+import { RecommendationsSidebar } from "@/components/insights/RecommendationsSidebar";
 import type { Connection, Draft, DraftState } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
@@ -284,6 +285,7 @@ function ComposerMountV2Inner({ companyId, companyTimezone = "UTC" }: ComposerMo
       editOriginalState={editOriginalState}
       failureReason={failureReason}
       onNavigateToPost={handleNavigateToPost}
+      insightsSidebar={<RecommendationsSidebar companyId={companyId} />}
     />
   );
 }
