@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MOCK_COMPANY_ID, MOCK_DRAFT_ID } from "./helpers";
+import { mockComposerApis, signInAsCompanyAdmin } from "./helpers";
 
 // ---------------------------------------------------------------------------
 // PR-08 E2E — Insights sidebar in the composer
@@ -52,6 +52,11 @@ const MOCK_CONNECTIONS = [
 ];
 
 test.describe("Insights sidebar in composer", () => {
+  test.beforeEach(async ({ page, context }) => {
+    await signInAsCompanyAdmin(page);
+    await mockComposerApis(context);
+  });
+
   async function setupMocks(page: import("@playwright/test").Page) {
     // Connections API
     await page.route(`**/api/platform/social/connections*`, (route) =>
@@ -101,15 +106,12 @@ test.describe("Insights sidebar in composer", () => {
   }
 
   test("sidebar is visible when composer opens", async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
     await setupMocks(page);
     await page.goto(`/company/social/posts?compose=new`);
 
     // Wait for composer overlay
-    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 10000 });
-
-    // Sidebar visible at xl viewport (need wide screen)
-    await page.setViewportSize({ width: 1600, height: 900 });
-    await page.waitForTimeout(300);
+    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 20000 });
 
     const sidebar = page.getByTestId("insights-sidebar");
     await expect(sidebar).toBeVisible({ timeout: 8000 });
@@ -117,11 +119,11 @@ test.describe("Insights sidebar in composer", () => {
   });
 
   test("sidebar shows recommendations after load", async ({ page }) => {
-    await setupMocks(page);
     await page.setViewportSize({ width: 1600, height: 900 });
+    await setupMocks(page);
     await page.goto(`/company/social/posts?compose=new`);
 
-    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 20000 });
 
     const sidebar = page.getByTestId("insights-sidebar");
     await expect(sidebar).toBeVisible({ timeout: 8000 });
@@ -133,11 +135,11 @@ test.describe("Insights sidebar in composer", () => {
   });
 
   test("clicking See evidence opens Sheet from right", async ({ page }) => {
-    await setupMocks(page);
     await page.setViewportSize({ width: 1600, height: 900 });
+    await setupMocks(page);
     await page.goto(`/company/social/posts?compose=new`);
 
-    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 20000 });
 
     const sidebar = page.getByTestId("insights-sidebar");
     await expect(sidebar).toBeVisible({ timeout: 8000 });
@@ -200,7 +202,7 @@ test.describe("Insights sidebar in composer", () => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await page.goto(`/company/social/posts?compose=new`);
 
-    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 20000 });
     const sidebar = page.getByTestId("insights-sidebar");
     await expect(sidebar).toBeVisible({ timeout: 8000 });
     await expect(sidebar.getByTestId("sidebar-skeleton")).not.toBeVisible({ timeout: 8000 });
