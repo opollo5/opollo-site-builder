@@ -31,6 +31,7 @@
     "smoke:composer": "tsx scripts/smoke/composer.smoke.ts",
     "smoke:cap": "tsx scripts/smoke/cap.smoke.ts",
     "backfill:image-embeddings": "tsx scripts/backfill-image-embeddings.ts",
+    "seed:staging": "tsx scripts/seed-uat-staging.ts",
     "gen:types": "supabase gen types typescript --local > types/supabase.ts",
     "analyze": "ANALYZE=true next build",
     "prepare": "husky"
