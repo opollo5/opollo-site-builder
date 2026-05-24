@@ -373,3 +373,27 @@ jobs:
       - name: Stop Supabase local stack
         if: always()
         run: supabase stop --no-backup || true
+
+  # Static guard: verifies the production-guard in the env-check endpoint
+  # is present in source. Guards against accidentally removing the 404 gate.
+  env-check-production-guard:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert production guard present in env-check route
+        run: |
+          FILE="app/api/debug/env-check/route.ts"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::$FILE not found"
+            exit 1
+          fi
+          if ! grep -q 'VERCEL_ENV.*production.*404\|404.*VERCEL_ENV.*production\|status.*404.*production\|production.*status.*404' "$FILE"; then
+            # More flexible check: look for the guard pattern in any form
+            if ! grep -q "VERCEL_ENV.*production" "$FILE" || ! grep -q "status: 404\|status.*404\|404" "$FILE"; then
+              echo "::error::Production guard missing from $FILE — the endpoint must return 404 when VERCEL_ENV === 'production'"
+              exit 1
+            fi
+          fi
+          echo "✓ production guard present in env-check route"
