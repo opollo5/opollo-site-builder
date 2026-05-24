@@ -137,6 +137,11 @@ function isPublicPath(pathname: string): boolean {
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
+  // /api/uat/* — UAT harness routes (staging/dev only). The routes
+  // themselves enforce the env guard + bearer token; they must be
+  // reachable without a Supabase session because their whole purpose is
+  // to MINT one for the ghost user.
+  if (pathname.startsWith("/api/uat/")) return true;
   // /api/cron/* carries its own CRON_SECRET check; Supabase Auth isn't
   // involved. Required so the Vercel cron tick can reach the worker
   // endpoint without a session.

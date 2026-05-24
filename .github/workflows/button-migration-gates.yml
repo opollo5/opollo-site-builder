@@ -79,6 +79,20 @@ jobs:
           fi
           echo "✓ ai-generate-button uses default filled variant"
 
+      - name: Gate 8 — UAT sign-in route is staging-guarded
+        run: |
+          ROUTE=app/api/uat/sign-in/route.ts
+          if [ ! -f "$ROUTE" ]; then
+            echo "❌ FAIL: UAT route missing at $ROUTE"; exit 1
+          fi
+          if ! grep -q "VERCEL_ENV\|NEXT_PUBLIC_APP_ENV" "$ROUTE"; then
+            echo "❌ FAIL: UAT route missing env guard (VERCEL_ENV or NEXT_PUBLIC_APP_ENV)"; exit 1
+          fi
+          if ! grep -q "STAGING_UAT_SECRET\|UAT_SECRET" "$ROUTE"; then
+            echo "❌ FAIL: UAT route missing bearer secret check (STAGING_UAT_SECRET)"; exit 1
+          fi
+          echo "✓ UAT sign-in route guarded"
+
       - name: Gate 7 — AI assist Dialog has exactly one close affordance (DialogContent built-in)
         run: |
           # AiPanel must NOT render its own close button alongside DialogContent's built-in one.
