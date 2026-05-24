@@ -20,3 +20,11 @@
 - **Fix 2a**: Removed `variant="outline"` from Generate button; default filled emerald CTA variant used.
 - **Fix 2b**: Removed custom `IconButton` from `AiPanel`; Radix's single built-in close button remains (correct ARIA, Escape key handling).
 - **Gate 6 + Gate 7** added to `button-migration-gates.yml` to prevent regression.
+
+## Bug 3 — composer-central-image-library
+
+- **PR**: #1024 `fix/composer-central-image-library`
+- **Merge SHA**: `6d93f290f1bcb1ee64676d740d7b041381b16946`
+- **Deploy**: production, 2026-05-24T03:27:25Z, state: success (deploy id 4797638976)
+- **Root cause**: `MediaPickerModal` Library tab fetched `/api/platform/social/media?include_global=true` which queries `social_media_assets` (~7 rows, company-scoped). The central `image_library` table (1,777+ rows, global) had no read endpoint in the social API surface.
+- **Fix**: New route `app/api/platform/social/media/image-library/route.ts` reads `image_library` directly via service role, builds Cloudflare image delivery URLs from `cloudflare_id`, returns paginated `MediaAsset[]`. `MediaPickerModal.fetchLibrary` updated to call `/api/platform/social/media/image-library` instead.
