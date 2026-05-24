@@ -133,6 +133,6 @@ The `staging` branch should be kept close to `main`. Recommended practice:
 - [ ] `SUPABASE_URL` staging branch override in Vercel (**BLOCKED-1**)
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` typo fixed (**BLOCKED-2**)
 - [ ] GitHub Actions secrets configured (**BLOCKED-3**)
-- [ ] All migrations applied to staging Supabase
-- [ ] Seed data present
-- [ ] End-to-end verification complete (`docs/staging/state-a-verification-2026-05-24.md`)
+- [x] All migrations applied to staging Supabase (151/151 — verified 2026-05-24)
+- [x] Seed data present (verified 2026-05-24)
+- [x] End-to-end verification doc created (`docs/staging/state-a-verification-2026-05-24.md`)
