@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createRouteAuthClient } from "@/lib/auth";
+import { createServerClient, type CookieMethodsServer } from "@supabase/ssr";
+import { cookies as nextCookies } from "next/headers";
 import {
   checkRateLimit,
   getClientIp,
@@ -108,9 +109,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // Option A: password auth via SSR route client (sets session cookies on
-  // the response so Playwright captures them from Set-Cookie headers)
+  // the response so Playwright captures them from Set-Cookie headers).
+  // Build the SSR client inline using NEXT_PUBLIC_SUPABASE_URL — same
+  // reasoning as the admin client above (staging Vercel env may have
+  // SUPABASE_URL pointing to production).
   const password = process.env.STAGING_UAT_PASSWORD;
-  const supabase = createRouteAuthClient();
+  const anonKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_ANON_KEY ??
+    "";
+  if (!anonKey) {
+    return NextResponse.json(
+      { error: "Supabase anon key not configured" },
+      { status: 500 },
+    );
+  }
+  const cookieStore = nextCookies();
+  const cookieAdapter: CookieMethodsServer = {
+    getAll() {
+      return cookieStore
+        .getAll()
+        .map((c) => ({ name: c.name, value: c.value }));
+    },
+    setAll(cookiesToSet) {
+      try {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set({ name, value, ...options });
+        });
+      } catch {
+        // Server component — cookie mutation not allowed there
+      }
+    },
+  };
+  const supabase = createServerClient(supabaseUrl, anonKey, {
+    cookies: cookieAdapter,
+  });
 
   if (password) {
     const { data: signInData, error: signInError } =
