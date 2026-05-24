@@ -1,0 +1,373 @@
+name: UAT Harness
+
+# Runs the UAT ghost-user spec suite against the staging Vercel deployment.
+#
+# Required repository secrets:
+#   STAGING_UAT_SECRET       — bearer token for /api/uat/sign-in
+#   STAGING_UAT_EMAIL        — ghost user email (uat-bot@staging.opollo.com)
+#   STAGING_SUPABASE_URL     — https://bjiiqnetaxoibhcaukqm.supabase.co
+#   STAGING_SUPABASE_SERVICE_KEY — staging service-role key
+#   STAGING_UAT_PASSWORD     — ghost user password
+#   VERCEL_BYPASS_SECRET     — Vercel Protection Bypass for Automation token
+#                              (if staging branch has Preview Protection on)
+#   SLACK_WEBHOOK_URL        — (optional) nightly summary webhook
+
+on:
+  push:
+    branches: [staging, main]
+    paths:
+      - "e2e/uat/**"
+      - ".github/workflows/uat-harness.yml"
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Override staging URL (default: branch alias)"
+        required: false
+        default: ""
+      spec_filter:
+        description: "Spec filter: P0 | P1 | P2 | all"
+        required: false
+        default: "all"
+      retain_days:
+        description: "Artifact retention days"
+        required: false
+        default: "14"
+  schedule:
+    - cron: "0 3 * * *"  # 03:00 UTC nightly
+
+concurrency:
+  group: uat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # P0 gate — runs on every PR against the staging deployment.
+  # Non-blocking on PRs targeting non-staging branches (P1+P2 won't run).
+  # ---------------------------------------------------------------------------
+  uat-p0:
+    name: UAT P0 — staging gate
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      UAT_BASE_URL: >-
+        ${{ inputs.target_url != '' && inputs.target_url
+            || 'https://opollo-site-builder-git-staging-opollo5.vercel.app' }}
+      STAGING_UAT_SECRET: ${{ secrets.STAGING_UAT_SECRET }}
+      STAGING_UAT_EMAIL: ${{ secrets.STAGING_UAT_EMAIL || 'uat-bot@staging.opollo.com' }}
+      VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright deps
+        run: npx playwright install-deps chromium
+      - name: Install Playwright Chromium
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Run P0 UAT specs
+        run: |
+          npx playwright test e2e/uat/ \
+            --config playwright.uat.config.ts \
+            --grep "P0" \
+            --reporter=github,list
+        continue-on-error: true
+        id: p0-run
+
+      - name: Upload P0 artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: uat-p0-${{ github.run_id }}
+          path: |
+            playwright-report-uat
+            test-results/uat
+          retention-days: ${{ inputs.retain_days || '14' }}
+
+      - name: Post P0 summary to PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const conclusion = '${{ steps.p0-run.outcome }}' === 'success' ? '✅' : '⚠️';
+            const body = [
+              `## UAT P0 Gate ${conclusion}`,
+              '',
+              '| Item | Value |',
+              '|---|---|',
+              `| Staging URL | ${{ env.UAT_BASE_URL }} |`,
+              `| Run | [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |`,
+              `| Status | ${{ steps.p0-run.outcome }} |`,
+              '',
+              conclusion === '⚠️'
+                ? '**P0 specs failed or are blocked.** Check the [artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) for failure reports.\n\nCommon blockers: `STAGING_UAT_SECRET` not set, Vercel Preview Protection. See `docs/uat-harness/known-failures.md`.'
+                : 'All P0 specs passed against staging.',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
+
+      - name: Fail if P0 failed (staging branch only)
+        if: steps.p0-run.outcome == 'failure' && github.base_ref == 'staging'
+        run: exit 1
+
+  # ---------------------------------------------------------------------------
+  # Full suite — runs on push to main/staging + nightly + manual dispatch.
+  # Seeds UAT data first, then runs P0+P1+P2.
+  # ---------------------------------------------------------------------------
+  uat-full:
+    name: UAT full suite
+    if: |
+      github.event_name == 'push' ||
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      UAT_BASE_URL: >-
+        ${{ inputs.target_url != '' && inputs.target_url
+            || 'https://opollo-site-builder-git-staging-opollo5.vercel.app' }}
+      STAGING_UAT_SECRET: ${{ secrets.STAGING_UAT_SECRET }}
+      STAGING_UAT_EMAIL: ${{ secrets.STAGING_UAT_EMAIL || 'uat-bot@staging.opollo.com' }}
+      VERCEL_BYPASS_SECRET: ${{ secrets.VERCEL_BYPASS_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: cache-playwright
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright deps
+        run: npx playwright install-deps chromium
+      - name: Install Playwright Chromium
+        if: steps.cache-playwright.outputs.cache-hit != 'true'
+        run: npx playwright install chromium
+
+      - name: Wait for Vercel staging deploy (up to 3 min)
+        run: |
+          echo "Waiting for staging deployment to be ready..."
+          for i in $(seq 1 18); do
+            STATUS=$(curl -sf "$UAT_BASE_URL/api/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "✓ Staging is responding (HTTP $STATUS)"
+              exit 0
+            fi
+            echo "[attempt $i/18] HTTP $STATUS — waiting 10s..."
+            sleep 10
+          done
+          echo "::warning::Staging did not respond with HTTP 200 after 3 minutes. Running tests anyway."
+        continue-on-error: true
+
+      - name: Seed UAT staging data (idempotent)
+        env:
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_KEY }}
+          STAGING_UAT_EMAIL: ${{ secrets.STAGING_UAT_EMAIL || 'uat-bot@staging.opollo.com' }}
+          STAGING_UAT_PASSWORD: ${{ secrets.STAGING_UAT_PASSWORD }}
+        run: npx tsx scripts/seed-uat-staging.ts
+        continue-on-error: true
+
+      - name: Determine spec filter
+        id: filter
+        run: |
+          FILTER="${{ inputs.spec_filter || 'all' }}"
+          if [ "$FILTER" = "all" ]; then
+            echo "grep=" >> "$GITHUB_OUTPUT"
+          else
+            echo "grep=P${FILTER#P}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check for regen-baselines commit message
+        id: baselines
+        run: |
+          if git log -1 --format="%s" | grep -q "regen-baselines"; then
+            echo "update=--update-snapshots" >> "$GITHUB_OUTPUT"
+          else
+            echo "update=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run UAT spec suite
+        id: uat-run
+        run: |
+          GREP="${{ steps.filter.outputs.grep }}"
+          UPDATE="${{ steps.baselines.outputs.update }}"
+          GREP_ARG=""
+          [ -n "$GREP" ] && GREP_ARG="--grep $GREP"
+          npx playwright test e2e/uat/ \
+            --config playwright.uat.config.ts \
+            $GREP_ARG $UPDATE \
+            --reporter=github,list,html,json
+        continue-on-error: true
+
+      - name: Commit updated baselines (regen-baselines only)
+        if: steps.baselines.outputs.update != '' && steps.uat-run.outcome != 'cancelled'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add e2e/uat/__screenshots__/ || true
+          if git diff --cached --quiet; then
+            echo "No baseline changes to commit."
+          else
+            git commit -m "chore(uat): update visual regression baselines [skip ci]"
+            git push origin HEAD
+          fi
+
+      - name: Generate static HTML report
+        if: always()
+        run: |
+          # Copy playwright HTML report to docs/uat-harness/latest-report.html
+          if [ -f "playwright-report-uat/index.html" ]; then
+            mkdir -p docs/uat-harness
+            cp playwright-report-uat/index.html docs/uat-harness/latest-report.html
+            echo "✓ latest-report.html updated"
+          else
+            echo "::warning::playwright-report-uat/index.html not found — skipping report update"
+          fi
+
+      - name: Commit latest-report.html
+        if: always() && (github.ref == 'refs/heads/staging' || github.event_name == 'schedule')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/uat-harness/latest-report.html || true
+          if git diff --cached --quiet; then
+            echo "No report changes."
+          else
+            git commit -m "chore(uat): update latest-report.html [skip ci]"
+            git push origin HEAD || true
+          fi
+
+      - name: Upload UAT artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: uat-full-${{ github.run_id }}
+          path: |
+            playwright-report-uat
+            test-results/uat
+          retention-days: ${{ inputs.retain_days || '14' }}
+
+      - name: Post summary to Actions step summary
+        if: always()
+        run: |
+          OUTCOME="${{ steps.uat-run.outcome }}"
+          EMOJI=$( [ "$OUTCOME" = "success" ] && echo "✅" || echo "❌" )
+          {
+            echo "## UAT Harness Result $EMOJI"
+            echo ""
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| Target | $UAT_BASE_URL |"
+            echo "| Status | $OUTCOME |"
+            echo "| Filter | ${{ inputs.spec_filter || 'all' }} |"
+            echo "| Trigger | ${{ github.event_name }} |"
+            echo "| Run | [${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Open GitHub issue on failure (push/nightly only)
+        if: |
+          steps.uat-run.outcome == 'failure' &&
+          (github.event_name == 'schedule' || github.event_name == 'push')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `UAT regression: ${context.eventName === 'schedule' ? 'nightly' : 'push'} run failed (${new Date().toISOString().slice(0,10)})`;
+            const body = [
+              '## UAT Harness Regression',
+              '',
+              `A UAT harness run failed on **${context.eventName === 'schedule' ? 'nightly schedule' : 'push to ' + context.ref}**.`,
+              '',
+              `**Run:** [#${context.runNumber}](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})`,
+              `**Branch:** ${context.ref}`,
+              `**Date:** ${new Date().toISOString()}`,
+              '',
+              'See the run artifacts for failure reports and screenshots.',
+              '',
+              '**Triage steps:**',
+              '1. Check `docs/uat-harness/known-failures.md` — is this a known failure?',
+              '2. Download the artifact and inspect `failure.md` + `dom.html` per failing test',
+              '3. If new regression: create a fix PR targeting `staging`',
+              '',
+              '/label uat-regression',
+            ].join('\n');
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['uat-regression'],
+            }).catch((e) => console.warn('Could not create issue (label may not exist):', e.message));
+
+      - name: Notify Slack on nightly failure
+        if: |
+          steps.uat-run.outcome == 'failure' &&
+          github.event_name == 'schedule' &&
+          env.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -sf -X POST "$SLACK_WEBHOOK_URL" \
+            -H 'Content-type: application/json' \
+            --data '{
+              "text": "❌ UAT nightly run failed",
+              "attachments": [{
+                "color": "danger",
+                "fields": [
+                  {"title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|#${{ github.run_number }}>", "short": true},
+                  {"title": "Branch", "value": "${{ github.ref_name }}", "short": true}
+                ]
+              }]
+            }' || echo "::warning::Slack notification failed (non-fatal)"
+
+      - name: Archive screenshot bundle on merge to main/staging success
+        if: |
+          steps.uat-run.outcome == 'success' &&
+          (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+        uses: actions/upload-artifact@v7
+        with:
+          name: uat-screenshots-${{ github.sha }}
+          path: test-results/uat
+          retention-days: 30
