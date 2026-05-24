@@ -806,6 +806,7 @@ function check7_unauthenticatedApi(): Issue[] {
     /recordApprovalDecision/, // S1-7 magic-link token-is-auth (SHA-256 hash compare in the lib)
     /createHash/,
     /\bauth\.getUser\b/,
+    /STAGING_UAT_SECRET|UAT_SECRET/, // UAT harness bearer-token auth
   ];
 
   for (const file of walkFiles(apiDir, [".ts"])) {
