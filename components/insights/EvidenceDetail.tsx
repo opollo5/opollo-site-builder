@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { ExternalLinkIcon } from "lucide-react";
 
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { StatusPill } from "@/components/ui/status-pill";
 
 interface EvidenceRow {
@@ -51,13 +51,14 @@ export function EvidenceDetail({
   }, [open, recommendationId, companyId]);
 
   return (
-    <Dialog open={open} onOpenChange={(open: boolean) => !open && onClose()}>
-      <DialogContent className="max-w-md" data-testid="evidence-sheet">
-        <DialogHeader>
-          <DialogTitle className="text-tx-primary pr-6">{headline}</DialogTitle>
-        </DialogHeader>
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent data-testid="evidence-sheet">
+        <SheetHeader>
+          <SheetTitle className="text-tx-primary pr-6">{headline}</SheetTitle>
+          <p className="text-sm text-tx-muted">How we figured this out</p>
+        </SheetHeader>
 
-        <div className="mt-2 space-y-3">
+        <div className="p-6 space-y-3">
           {loading ? (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
@@ -94,7 +95,7 @@ export function EvidenceDetail({
             ))
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

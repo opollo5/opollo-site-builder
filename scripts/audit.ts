@@ -785,6 +785,7 @@ function check7_unauthenticatedApi(): Issue[] {
   const ALLOWLIST_PUBLIC_API_PATHS = new Set<string>([
     "/api/platform/invitations/accept", // P2-3 magic-link redemption (token-is-auth)
     "/api/optimiser/health",            // module liveness probe (middleware-gated, no user data)
+    "/api/debug/env-check",             // staging/dev diagnostic; returns 404 in production (VERCEL_ENV guard)
   ]);
 
   // Auth markers — any of these in the file body indicates the route gates itself.

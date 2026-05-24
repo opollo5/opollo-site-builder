@@ -1,0 +1,94 @@
+name: Apply Supabase migrations to staging
+
+# Applies pending supabase/migrations/*.sql to the staging Supabase project,
+# then re-seeds UAT test data via scripts/seed-uat-staging.ts.
+# Triggered automatically on pushes to the `staging` branch that touch the
+# migrations directory, and on-demand via workflow_dispatch.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   STAGING_SUPABASE_PROJECT_REF  — project ref (bjiiqnetaxoibhcaukqm)
+#   SUPABASE_ACCESS_TOKEN         — personal access token (shared with prod)
+#   STAGING_SUPABASE_DB_PASSWORD  — Postgres password for staging project
+#   STAGING_SUPABASE_URL          — https://bjiiqnetaxoibhcaukqm.supabase.co
+#   STAGING_SUPABASE_SERVICE_KEY  — staging service-role key
+#   STAGING_UAT_PASSWORD          — password for uat-bot@staging.opollo.com
+#
+# See docs/staging/BLOCKED.md if these secrets are not yet configured.
+
+on:
+  push:
+    branches: [staging]
+    paths:
+      - "supabase/migrations/**"
+      - ".github/workflows/staging-migrations.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: staging-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    name: supabase db push (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify required secrets are set
+        run: |
+          missing=0
+          for var in STAGING_SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN STAGING_SUPABASE_DB_PASSWORD; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Required secret $var is not set."
+              missing=1
+            fi
+          done
+          if [ "$missing" = "1" ]; then
+            echo "See docs/staging/BLOCKED.md for setup instructions."
+            exit 1
+          fi
+        env:
+          STAGING_SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
+          STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+
+      - name: Link to staging project
+        run: supabase link --project-ref "${{ secrets.STAGING_SUPABASE_PROJECT_REF }}"
+
+      - name: Show pending migrations (diagnostic)
+        run: supabase migration list --linked || true
+
+      - name: Push all pending migrations
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked --include-all
+
+      - name: Summarise on success
+        if: success()
+        run: |
+          {
+            echo '## Staging migrations pushed'
+            echo
+            supabase migration list --linked 2>&1 | sed -e 's/\x1b\[[0-9;]*m//g'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      - name: Seed UAT staging data
+        env:
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_KEY }}
+          STAGING_UAT_EMAIL: uat-bot@staging.opollo.com
+          STAGING_UAT_PASSWORD: ${{ secrets.STAGING_UAT_PASSWORD }}
+        run: npx tsx scripts/seed-uat-staging.ts

@@ -306,6 +306,14 @@
     animation: opollo-pop-in 250ms cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
+  .opollo-sheet-in {
+    animation: opollo-sheet-in 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .opollo-sheet-out {
+    animation: opollo-sheet-out 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
   .opollo-stagger-in-1 { animation-delay: 50ms; }
   .opollo-stagger-in-2 { animation-delay: 100ms; }
   .opollo-stagger-in-3 { animation-delay: 150ms; }
@@ -329,6 +337,16 @@
 @keyframes opollo-slide-up {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes opollo-sheet-in {
+  from { opacity: 0.5; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes opollo-sheet-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(100%); }
 }
 
 @keyframes opollo-shimmer {
@@ -363,6 +381,8 @@
   .opollo-fade-in,
   .opollo-fade-out,
   .opollo-slide-up,
+  .opollo-sheet-in,
+  .opollo-sheet-out,
   .opollo-shimmer,
   .opollo-pulse-soft,
   .opollo-pop-in,

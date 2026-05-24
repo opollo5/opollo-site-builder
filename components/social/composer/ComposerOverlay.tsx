@@ -51,6 +51,8 @@ export interface ComposerOverlayProps {
   onSubmitSuccess?: () => void;
   /** Slot for SchedulingCard + submit row (PR E). Passed through to ComposerEditor. */
   schedulingSlot?: React.ReactNode;
+  /** Optional insights sidebar panel rendered to the right of the preview pane at xl+ screens. */
+  insightsSidebar?: React.ReactNode;
   /** Original state of the draft being edited (for header copy + convert-to-draft action). */
   editOriginalState?: DraftState;
   /** Failure reason shown as an error banner when editOriginalState === 'failed'. */
@@ -131,6 +133,7 @@ export function ComposerOverlay({
   onSubmit,
   onSubmitSuccess,
   schedulingSlot,
+  insightsSidebar,
   editOriginalState,
   failureReason,
   onNavigateToPost,
@@ -697,6 +700,9 @@ export function ComposerOverlay({
               )}
             </div>
           </div>
+
+          {/* ── Insights sidebar — xl+ only ─────────────────────────────────── */}
+          {insightsSidebar}
         </div>
       </div>
 

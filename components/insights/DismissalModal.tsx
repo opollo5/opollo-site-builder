@@ -76,6 +76,13 @@ export function DismissalModal({ open, onClose, onConfirm, headline }: Dismissal
           </div>
         </div>
 
+        <div className="rounded-lg border border-am/40 bg-am/10 px-3 py-2.5" data-testid="three-strike-warning">
+          <p className="text-sm text-tx-secondary">
+            <span className="font-medium text-tx-primary">⚠ 3 dismissals with the same reason will suppress this recommendation type.</span>{" "}
+            Reversible from settings.
+          </p>
+        </div>
+
         <div className="space-y-2">
           <label htmlFor="dismiss-notes" className="text-sm text-tx-secondary">
             Optional notes
