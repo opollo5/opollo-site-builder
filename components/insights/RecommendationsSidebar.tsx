@@ -188,10 +188,10 @@ export function RecommendationsSidebar({
       data-testid="insights-sidebar"
     >
       <header className="flex items-center justify-between border-b border-b1 px-4 py-3">
-        <h2 className="text-base font-semibold text-tx-primary flex items-center gap-2">
+        <p className="text-base font-semibold text-tx-primary flex items-center gap-2">
           <LightbulbIcon className="h-4 w-4 text-pk" aria-hidden />
           Suggestions for this post
-        </h2>
+        </p>
       </header>
 
       <div className="flex-1 p-4 space-y-3">
