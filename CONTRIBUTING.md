@@ -117,7 +117,7 @@ three repository secrets:
 | ---------------------- | -------------------------------------------------------------------------------------------------------- |
 | `SUPABASE_PROJECT_REF` | Project Settings → General → Reference ID.                                                               |
 | `SUPABASE_ACCESS_TOKEN`| [Account → Access Tokens](https://supabase.com/dashboard/account/tokens). Scope: link + API access.      |
-| `SUPABASE_DB_PASSWORD` | Project Settings → Database → Connection string (the `password` component of the direct-connection URI). |
+| `STAGING_SUPABASE_DB_PASSWORD` | Project Settings → Database → Connection string (the `password` component of the direct-connection URI). |
 
 Without these secrets the workflow fails at the "Verify required
 secrets" step. The production Environment (Settings → Environments →
