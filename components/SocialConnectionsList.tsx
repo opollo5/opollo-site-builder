@@ -7,6 +7,7 @@ import { toastSuccess } from "@/lib/toast-success";
 import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { MenuItem } from "@/components/ui/menu-item";
 import {
   Popover,
   PopoverContent,
@@ -752,7 +753,7 @@ export function SocialConnectionsList({
 
       {noopdConnection ? (
         <div
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-3 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="alert"
           data-testid="connections-already-connected-banner"
         >
@@ -768,7 +769,7 @@ export function SocialConnectionsList({
               year: "numeric",
             })}.
           </p>
-          <p className="mt-1 text-amber-900/80">
+          <p className="mt-1 text-warning-fg/80">
             Disconnect the existing connection below to connect a different
             account, or ask an admin to create a new profile.
           </p>
@@ -777,7 +778,7 @@ export function SocialConnectionsList({
 
       {overdueConnections.length > 0 ? (
         <div
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-3 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="alert"
           data-testid="connections-overdue-banner"
         >
@@ -786,7 +787,7 @@ export function SocialConnectionsList({
             {overdueConnections.length === 1 ? "connection needs" : "connections need"}{" "}
             a channel.
           </p>
-          <p className="mt-1 text-amber-900/80">
+          <p className="mt-1 text-warning-fg/80">
             Pick a channel below to start publishing. Connections without a
             channel can&apos;t post.
           </p>
@@ -971,38 +972,24 @@ export function SocialConnectionsList({
                   {PLATFORMS.map((p) => {
                     const isBusy = busyPlatform === p.value;
                     return (
-                      <button
+                      <MenuItem
                         key={p.value}
-                        role="menuitem"
-                        type="button"
                         onClick={() => {
                           setPickerOpen(false);
                           void handleConnect(p.value);
                         }}
                         disabled={connectBusy}
-                        className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition hover:bg-muted/60 focus:bg-muted/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                         data-testid={`connect-platform-${p.value}`}
                         aria-label={`Connect ${p.label}`}
+                        icon={<SocialPlatformIcon platform={p.value} size={16} />}
+                        trailing={
+                          isBusy
+                            ? <span className="text-xs">Opening…</span>
+                            : <span aria-hidden="true">›</span>
+                        }
                       >
-                        <SocialPlatformIcon
-                          platform={p.value}
-                          size={16}
-                          className="flex-shrink-0 text-foreground"
-                        />
-                        <span className="flex-1 font-medium">{p.label}</span>
-                        {isBusy ? (
-                          <span className="text-xs text-muted-foreground">
-                            Opening…
-                          </span>
-                        ) : (
-                          <span
-                            aria-hidden="true"
-                            className="text-muted-foreground"
-                          >
-                            ›
-                          </span>
-                        )}
-                      </button>
+                        {p.label}
+                      </MenuItem>
                     );
                   })}
                 </div>
@@ -1025,7 +1012,7 @@ export function SocialConnectionsList({
 
       {popupBlockedUrl ? (
         <p
-          className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mb-3 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="alert"
           data-testid="connections-popup-blocked"
         >
@@ -1075,7 +1062,7 @@ export function SocialConnectionsList({
                     reconnectConnectionId === c.id
                       ? "bg-blue-50 ring-1 ring-inset ring-blue-200"
                       : noopdConnection?.id === c.id
-                        ? "bg-amber-50"
+                        ? "bg-[--color-warning-bg]"
                         : "hover:bg-muted/20"
                   }`}
                   data-testid={`connection-row-${c.id}`}

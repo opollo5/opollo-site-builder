@@ -140,7 +140,7 @@ export function ViewerLinksManager({ companyId, initialLinks }: Props) {
 
       {justCreatedUrl ? (
         <div
-          className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900"
+          className="mt-4 rounded-md border border-[--color-success-border] bg-[--color-success-bg] p-4 text-sm text-[--color-success-fg]"
           data-testid="viewer-links-just-created"
         >
           <p className="font-medium">Link created. Copy it now — we won&apos;t show the URL again.</p>

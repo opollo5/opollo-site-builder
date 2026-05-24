@@ -68,23 +68,30 @@ export function AuthCallbackClient({ supabaseUrl, supabaseAnonKey }: Props) {
 
     // plan.kind === "set_session"
     const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
-    supabase.auth
-      .setSession({
-        access_token: plan.access_token,
-        refresh_token: plan.refresh_token,
-      })
-      .then(({ error }) => {
-        setStatus("redirecting");
-        if (error) {
+    // Sign out any existing session before setting the new one.
+    // Without this, a previously signed-in user's in-memory session
+    // state persists after setSession, so the wrong user name is
+    // displayed and subsequent auth checks may return the old user.
+    // Best-effort: if signOut fails we still attempt setSession.
+    supabase.auth.signOut().catch(() => {}).then(() =>
+      supabase.auth
+        .setSession({
+          access_token: plan.access_token,
+          refresh_token: plan.refresh_token,
+        })
+        .then(({ error }) => {
+          setStatus("redirecting");
+          if (error) {
+            window.location.replace("/auth-error?reason=set_session_failed");
+            return;
+          }
+          window.location.replace(plan.destination);
+        })
+        .catch(() => {
+          setStatus("redirecting");
           window.location.replace("/auth-error?reason=set_session_failed");
-          return;
-        }
-        window.location.replace(plan.destination);
-      })
-      .catch(() => {
-        setStatus("redirecting");
-        window.location.replace("/auth-error?reason=set_session_failed");
-      });
+        })
+    );
   }, [supabaseUrl, supabaseAnonKey]);
 
   return (

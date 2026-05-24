@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 920" font-family="ui-sans-serif, system-ui, sans-serif">
+  <!-- ====================================================== -->
+  <!-- Calendar chip content-type indicator variants           -->
+  <!-- Reference for PR-D2 / item 19                           -->
+  <!-- Source of truth for chip composition + indicator usage  -->
+  <!-- ====================================================== -->
+
+  <defs>
+    <style>
+      .label { fill: #0A0A0A; font-size: 15px; font-weight: 600; }
+      .sub { fill: #6B6B6B; font-size: 12px; }
+      .heading { fill: #0A0A0A; font-size: 20px; font-weight: 700; }
+      .subheading { fill: #6B6B6B; font-size: 13px; }
+      .section { fill: #0A0A0A; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+      .chip-bg { fill: #4B5563; }
+      .chip-text { fill: #FFFFFF; font-family: ui-monospace, 'Geist Mono', monospace; font-weight: 500; }
+      .spec { fill: #00BF66; font-size: 11px; font-family: ui-monospace, 'Geist Mono', monospace; }
+      .note { fill: #6B6B6B; font-size: 12px; }
+      .rule { stroke: #E5E7EB; stroke-width: 1; }
+      .ann-line { stroke: #00BF66; stroke-width: 1; fill: none; }
+      .day-cell-bg { fill: #FFFFFF; stroke: #E5E7EB; stroke-width: 1; }
+      .day-num { fill: #0A0A0A; font-size: 13px; font-weight: 500; }
+    </style>
+
+    <symbol id="brand-linkedin" viewBox="0 0 14 14">
+      <rect width="14" height="14" rx="2" fill="#0A66C2"/>
+      <path d="M3.2 5.4h1.7v5.2H3.2zM4.05 4.6a1 1 0 110-2 1 1 0 010 2zM6 5.4h1.6v.7c.3-.5.9-.8 1.6-.8 1.5 0 1.8 1 1.8 2.3v2.9H9.3V8c0-.7-.1-1.2-.8-1.2-.6 0-.9.4-.9 1.2v2.6H6V5.4z" fill="#fff"/>
+    </symbol>
+
+    <symbol id="icon-image" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+      <circle cx="9" cy="9" r="2"/>
+      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+    </symbol>
+
+    <symbol id="icon-link" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none">
+      <path d="M9 17H7A5 5 0 0 1 7 7h2"/>
+      <path d="M15 7h2a5 5 0 1 1 0 10h-2"/>
+      <line x1="8" y1="12" x2="16" y2="12"/>
+    </symbol>
+  </defs>
+
+  <!-- Title -->
+  <text x="32" y="40" class="heading">Calendar chip · content-type indicator variants</text>
+  <text x="32" y="62" class="subheading">Four chip types based on post content. Reference for PR-D2 / backlog item 19.</text>
+
+  <line x1="32" y1="82" x2="848" y2="82" class="rule"/>
+
+  <!-- ============================================== -->
+  <!-- COMMON SPECS -->
+  <!-- ============================================== -->
+  <text x="32" y="115" class="section">Common chip specs</text>
+  <text x="32" y="142" class="note">• Outer chip:  24px tall · 6px corner radius · 8px horizontal padding · full cell-width minus 16px</text>
+  <text x="32" y="162" class="note">• Background by status:  scheduled = --ink-2 grey · publishing = --warning-bg · published = emerald-200 · failed = --danger-bg</text>
+  <text x="32" y="182" class="note">• Brand platform icon:  14px (LinkedIn / Facebook / Instagram / X / Google Business Profile)</text>
+  <text x="32" y="202" class="note">• Indicator icon (when present):  12px Lucide stroke 1.75 · color --ink-2 on dark chips, --ink-3 on light chips</text>
+  <text x="32" y="222" class="note">• Time:  HH:MM (24-hour, user’s timezone) · 11px Geist Mono · white on dark chips</text>
+  <text x="32" y="242" class="note">• Internal gap:  4px between brand icon, indicator icon, and time</text>
+
+  <line x1="32" y1="270" x2="848" y2="270" class="rule"/>
+
+  <!-- ============================================== -->
+  <!-- 4× ENLARGED VARIANTS -->
+  <!-- ============================================== -->
+  <text x="32" y="304" class="section">4× enlarged for clarity</text>
+
+  <!-- VARIANT 1 -->
+  <text x="32" y="340" class="label">1 · Text-only post</text>
+  <text x="32" y="358" class="sub">No media. No link. Brand icon + time.</text>
+  <g transform="translate(32, 372)">
+    <rect width="280" height="96" rx="24" class="chip-bg"/>
+    <use href="#brand-linkedin" x="32" y="20" width="56" height="56"/>
+    <text x="104" y="60" class="chip-text" font-size="32">09:30</text>
+  </g>
+
+  <!-- VARIANT 2 -->
+  <text x="450" y="340" class="label">2 · Post with media</text>
+  <text x="450" y="358" class="sub">Image, GIF, or video attached. Image icon prefix.</text>
+  <g transform="translate(450, 372)">
+    <rect width="340" height="96" rx="24" class="chip-bg"/>
+    <use href="#brand-linkedin" x="32" y="20" width="56" height="56"/>
+    <use href="#icon-image" x="104" y="24" width="48" height="48" color="#D1D5DB"/>
+    <text x="172" y="60" class="chip-text" font-size="32">14:15</text>
+  </g>
+
+  <!-- VARIANT 3 -->
+  <text x="32" y="510" class="label">3 · Post with link only</text>
+  <text x="32" y="528" class="sub">URL with OG preview. No media. Link icon prefix.</text>
+  <g transform="translate(32, 542)">
+    <rect width="340" height="96" rx="24" class="chip-bg"/>
+    <use href="#brand-linkedin" x="32" y="20" width="56" height="56"/>
+    <use href="#icon-link" x="104" y="24" width="48" height="48" color="#D1D5DB"/>
+    <text x="172" y="60" class="chip-text" font-size="32">17:00</text>
+  </g>
+
+  <!-- VARIANT 4 -->
+  <text x="450" y="510" class="label">4 · Post with media AND link</text>
+  <text x="450" y="528" class="sub">Both present. Show Image icon (media takes precedence).</text>
+  <g transform="translate(450, 542)">
+    <rect width="340" height="96" rx="24" class="chip-bg"/>
+    <use href="#brand-linkedin" x="32" y="20" width="56" height="56"/>
+    <use href="#icon-image" x="104" y="24" width="48" height="48" color="#D1D5DB"/>
+    <text x="172" y="60" class="chip-text" font-size="32">22:00</text>
+  </g>
+
+  <line x1="32" y1="680" x2="848" y2="680" class="rule"/>
+
+  <!-- ============================================== -->
+  <!-- ACTUAL SIZE PREVIEW IN DAY CELL -->
+  <!-- ============================================== -->
+  <text x="32" y="714" class="section">Actual size in a 120×100 day cell</text>
+  <text x="32" y="732" class="note">All four variants stacked inside a single day cell at 1× — what the user actually sees.</text>
+
+  <!-- Day cell -->
+  <g transform="translate(32, 750)">
+    <rect width="240" height="140" class="day-cell-bg"/>
+    <text x="10" y="22" class="day-num">22</text>
+
+    <!-- Variant 1 chip at 1× -->
+    <g transform="translate(8, 32)">
+      <rect width="224" height="24" rx="6" class="chip-bg"/>
+      <use href="#brand-linkedin" x="8" y="5" width="14" height="14"/>
+      <text x="26" y="16" class="chip-text" font-size="11">09:30</text>
+    </g>
+
+    <!-- Variant 2 chip at 1× -->
+    <g transform="translate(8, 60)">
+      <rect width="224" height="24" rx="6" class="chip-bg"/>
+      <use href="#brand-linkedin" x="8" y="5" width="14" height="14"/>
+      <use href="#icon-image" x="26" y="6" width="12" height="12" color="#D1D5DB"/>
+      <text x="42" y="16" class="chip-text" font-size="11">14:15</text>
+    </g>
+
+    <!-- Variant 3 chip at 1× -->
+    <g transform="translate(8, 88)">
+      <rect width="224" height="24" rx="6" class="chip-bg"/>
+      <use href="#brand-linkedin" x="8" y="5" width="14" height="14"/>
+      <use href="#icon-link" x="26" y="6" width="12" height="12" color="#D1D5DB"/>
+      <text x="42" y="16" class="chip-text" font-size="11">17:00</text>
+    </g>
+
+    <!-- Variant 4 chip at 1× -->
+    <g transform="translate(8, 116)">
+      <rect width="224" height="24" rx="6" class="chip-bg"/>
+      <use href="#brand-linkedin" x="8" y="5" width="14" height="14"/>
+      <use href="#icon-image" x="26" y="6" width="12" height="12" color="#D1D5DB"/>
+      <text x="42" y="16" class="chip-text" font-size="11">22:00</text>
+    </g>
+  </g>
+
+  <!-- Annotation alongside the cell -->
+  <text x="304" y="772" class="label">Reading order, left to right:</text>
+  <text x="304" y="794" class="note">[ Brand platform icon ]  →  [ Optional content-type indicator ]  →  [ HH:MM time ]</text>
+  <text x="304" y="822" class="label">Decision logic:</text>
+  <text x="304" y="844" class="note">if (post.media_urls?.length &gt; 0)       → Image icon</text>
+  <text x="304" y="862" class="note">else if (post.link_url || post.has_link) → Link2 icon</text>
+  <text x="304" y="880" class="note">else                                       → no indicator (variant 1)</text>
+</svg>

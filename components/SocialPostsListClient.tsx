@@ -7,6 +7,7 @@ import { BulkUploadButton } from "@/components/BulkUploadButton";
 import { CAPGenerateModal } from "@/components/CAPGenerateModal";
 import { ProfileSelector } from "@/components/social/ProfileSelector";
 import { Button } from "@/components/ui/button";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { Lead } from "@/components/ui/typography";
 import { cn } from "@/lib/utils";
 import type {
@@ -14,6 +15,7 @@ import type {
   SocialPostSource,
   SocialPostState,
 } from "@/lib/platform/social/posts";
+import { PillTabs } from "@/components/ui/pill-tabs";
 import { SocialModuleShell } from "@/components/social/social-module-shell";
 
 // ---------------------------------------------------------------------------
@@ -59,16 +61,16 @@ type Props = {
   composerEnabled?: boolean;
 };
 
-const STATE_PILL: Record<SocialPostState, string> = {
-  draft: "bg-muted text-muted-foreground",
-  pending_client_approval: "bg-amber-100 text-amber-900",
-  approved: "bg-emerald-100 text-emerald-900",
-  rejected: "bg-rose-100 text-rose-900",
-  changes_requested: "bg-amber-100 text-amber-900",
-  scheduled: "bg-sky-100 text-sky-900",
-  publishing: "bg-sky-200 text-sky-900",
-  published: "bg-primary/10 text-primary",
-  failed: "bg-rose-100 text-rose-900",
+const STATE_PILL_VARIANT: Record<SocialPostState, PillVariant> = {
+  draft: "neutral",
+  pending_client_approval: "warning",
+  approved: "success",
+  rejected: "danger",
+  changes_requested: "warning",
+  scheduled: "info",
+  publishing: "info",
+  published: "accent",
+  failed: "danger",
 };
 
 const STATE_LABEL: Record<SocialPostState, string> = {
@@ -101,10 +103,10 @@ const SOURCE_LABEL: Partial<Record<SocialPostSource, string>> = {
   api: "API",
 };
 
-const SOURCE_PILL: Partial<Record<SocialPostSource, string>> = {
-  csv: "bg-violet-100 text-violet-900",
-  cap: "bg-teal-100 text-teal-900",
-  api: "bg-slate-100 text-slate-700",
+const SOURCE_PILL_VARIANT: Partial<Record<SocialPostSource, PillVariant>> = {
+  csv: "info",
+  cap: "accent",
+  api: "neutral",
 };
 
 function buildUrl({
@@ -182,11 +184,6 @@ export function SocialPostsListClient({
   function clearSearch() {
     setSearchInput("");
     router.push(buildUrl({ page: 1, q: "", state: filter, sort: sortBy, dir: sortDir }));
-  }
-
-  function handleTabClick(key: FilterKey) {
-    setFilter(key);
-    router.push(buildUrl({ page: 1, q: searchInput.trim(), state: key, sort: sortBy, dir: sortDir }));
   }
 
   function handleSortClick(col: SortCol) {
@@ -460,26 +457,15 @@ export function SocialPostsListClient({
         </form>
       ) : null}
 
-      <nav
-        className="mt-6 flex flex-wrap gap-2"
-        aria-label="Filter posts by state"
-      >
-        {FILTER_TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => handleTabClick(t.key)}
-            className={`rounded-full border px-3 py-1 text-sm transition ${
-              filter === t.key
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-muted-foreground/20 hover:bg-muted/40"
-            }`}
-            data-testid={`posts-filter-${t.key}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
+      <PillTabs
+        className="mt-6"
+        tabs={FILTER_TABS.map((t) => ({
+          label: t.label,
+          value: t.key,
+          href: buildUrl({ page: 1, q: searchInput.trim(), state: t.key, sort: sortBy, dir: sortDir }),
+        }))}
+        activeValue={filter}
+      />
 
       <div
         className="mt-4 overflow-hidden rounded-lg border bg-card"
@@ -546,12 +532,12 @@ export function SocialPostsListClient({
                         )}
                       </Link>
                       {SOURCE_LABEL[p.source_type] ? (
-                        <span
-                          className={`inline-block w-fit rounded px-1.5 py-0.5 text-xs font-medium ${SOURCE_PILL[p.source_type]}`}
+                        <Pill
+                          variant={SOURCE_PILL_VARIANT[p.source_type] ?? "neutral"}
                           data-testid={`social-post-source-${p.id}`}
                         >
                           {SOURCE_LABEL[p.source_type]}
-                        </span>
+                        </Pill>
                       ) : null}
                     </div>
                   </td>
@@ -559,11 +545,9 @@ export function SocialPostsListClient({
                     {p.link_url ?? "—"}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-sm font-medium ${STATE_PILL[p.state]}`}
-                    >
+                    <Pill variant={STATE_PILL_VARIANT[p.state]}>
                       {STATE_LABEL[p.state]}
-                    </span>
+                    </Pill>
                   </td>
                   <td className="px-4 py-3 text-sm text-muted-foreground tabular-nums">
                     {new Date(p.state_changed_at).toLocaleString("en-AU", {
@@ -585,33 +569,32 @@ export function SocialPostsListClient({
                     <td className="px-4 py-3">
                       {p.state === "pending_client_approval" ? (
                         <div className="flex items-center gap-1">
-                          <button
-                            type="button"
+                          <Button
+                            size="xs"
                             onClick={() => handleRowAction(p.id, "approving")}
                             disabled={rowActions.has(p.id)}
-                            className="rounded border border-emerald-600 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-50 transition"
                             data-testid={`approve-row-${p.id}`}
                           >
                             {rowActions.get(p.id) === "approving" ? "…" : "Approve"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="secondary"
                             onClick={() => handleRowAction(p.id, "requesting")}
                             disabled={rowActions.has(p.id)}
-                            className="rounded border border-amber-500 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition"
                             data-testid={`request-changes-row-${p.id}`}
                           >
                             {rowActions.get(p.id) === "requesting" ? "…" : "Changes"}
-                          </button>
-                          <button
-                            type="button"
+                          </Button>
+                          <Button
+                            size="xs"
+                            variant="destructive"
                             onClick={() => handleRowAction(p.id, "rejecting")}
                             disabled={rowActions.has(p.id)}
-                            className="rounded border border-rose-500 px-2 py-0.5 text-xs font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50 transition"
                             data-testid={`reject-row-${p.id}`}
                           >
                             {rowActions.get(p.id) === "rejecting" ? "…" : "Reject"}
-                          </button>
+                          </Button>
                         </div>
                       ) : null}
                     </td>

@@ -35,7 +35,7 @@ describe("ComposerOverlay — platform-variant preview (audit gap C-2)", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Test LinkedIn" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test LinkedIn/i }));
 
     const textarea = screen.getByTestId("content-textarea");
     fireEvent.change(textarea, { target: { value: "base content" } });
@@ -54,8 +54,8 @@ describe("ComposerOverlay — platform-variant preview (audit gap C-2)", () => {
     );
 
     // Select both connections (so CustomizeForRow appears)
-    fireEvent.click(screen.getByRole("button", { name: "Test LinkedIn" }));
-    fireEvent.click(screen.getByRole("button", { name: "Test Facebook" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test LinkedIn/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test Facebook/i }));
 
     // Type base content
     const textarea = screen.getByTestId("content-textarea");
@@ -85,8 +85,8 @@ describe("ComposerOverlay — platform-variant preview (audit gap C-2)", () => {
     );
 
     // Select both connections
-    fireEvent.click(screen.getByRole("button", { name: "Test LinkedIn" }));
-    fireEvent.click(screen.getByRole("button", { name: "Test Facebook" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test LinkedIn/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test Facebook/i }));
 
     // Type base content
     const textarea = screen.getByTestId("content-textarea");
@@ -118,8 +118,8 @@ describe("ComposerOverlay — platform-variant preview (audit gap C-2)", () => {
     );
 
     // Select both connections
-    fireEvent.click(screen.getByRole("button", { name: "Test LinkedIn" }));
-    fireEvent.click(screen.getByRole("button", { name: "Test Facebook" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test LinkedIn/i }));
+    fireEvent.click(screen.getByRole("checkbox", { name: /Post to Test Facebook/i }));
 
     // Type base content
     const textarea = screen.getByTestId("content-textarea");

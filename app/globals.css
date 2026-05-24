@@ -15,19 +15,7 @@
  * ------------------------------------------------------------------------- */
 @layer base {
   :root {
-    /* ---- Opollo raw hex tokens — ds.css v5 palette -------------------- */
-    /* Brand accent: green replaces pink as the primary action color */
-    --pk: #00e5a0;                          /* brand green — Opollo accent (spec: #00e5a0) */
-    --pk2: #00A86B;                         /* green-deep — hover, gradient end */
-    --pk-soft: rgba(0, 229, 160, 0.10);
-    --gr: #00B07C;                          /* mint — secondary green accent */
-    --gr2: #00875a;
-    --gr-soft: rgba(0, 176, 124, 0.12);
-    --bl: #1E6FFF;                          /* action blue */
     --serp-blue: #1a0dab;                   /* Google SERP link blue — blog post preview only */
-    --bl-soft: rgba(30, 111, 255, 0.10);
-    --am: #FFB547;                          /* warning */
-    --rd: #FF5F5A;                          /* danger */
     --bg: #F9FAFB;                          /* page canvas — soft-light theme */
     --d1: #FFFFFF;                          /* card / sidebar surface */
     --d2: #F9FAFB;                          /* off-white */
@@ -49,34 +37,31 @@
     --topbar-bg:  rgba(255, 255, 255, 0.92);/* white at 92%: mobile topbar      */
     --pk-glow:    rgba(0, 229, 160, 0.20);  /* green glow — button hover shadow */
 
-    /* ---- UI consistency token layer (2026-05-08) ----------------------- */
-    /* Button system — used by components/ui/button.tsx */
-    --btn-primary-bg:       #00e5a0;        /* = var(--pk); explicit for clarity */
-    --btn-primary-text:     #FFFFFF;
-    --btn-secondary-bg:     #FFFFFF;
-    --btn-secondary-border: #1F2937;        /* gray-800 */
-    --btn-secondary-text:   #1F2937;
-    --btn-tertiary-text:    #1F2937;
-    --btn-tertiary-hover:   #F3F4F6;        /* gray-100 */
-    --btn-destructive-bg:   #DC2626;        /* red-600 — WCAG AA on white */
-    --btn-destructive-text: #FFFFFF;
-
-    /* Icon-only controls — 32×32 circular hit area */
-    --icon-control-hover:   #F3F4F6;        /* gray-100 */
-
-    /* Tab states */
-    --tab-active-bg:        #00e5a0;        /* = var(--pk) */
-    --tab-active-text:      #FFFFFF;
-    --tab-inactive-text:    #4B5563;        /* gray-600 */
-
-    /* Search inputs */
-    --search-input-border:  #E5E7EB;        /* gray-200 */
-
     /* Text semantic tokens — WCAG AA on #F9FAFB / white canvas */
     --tx-primary:   #111827;                /* gray-900 — headings, active labels */
     --tx-secondary: #374151;                /* gray-700 — body, inactive tabs */
     --tx-muted:     #6B7280;                /* gray-500 — dates, disabled, helpers */
     --tx-inverse:   #FFFFFF;                /* white on dark backgrounds only */
+
+    /* Focus ring — canonical token promoted from --c3-shadow-focus */
+    --shadow-focus:
+      0 0 0 2px hsl(var(--background)),
+      0 0 0 4px hsl(var(--primary));
+
+    /* ---- Semantic callout color trios (D9) --------------------------------- */
+    /* Use as: bg-warning-bg text-warning-fg border-warning-border             */
+    --color-success-bg:     #ECFDF5;  /* emerald-50 */
+    --color-success-fg:     #065F46;  /* emerald-900 — WCAG AA on success-bg */
+    --color-success-border: #6EE7B7;  /* emerald-300 */
+    --color-warning-bg:     #FFFBEB;  /* amber-50 */
+    --color-warning-fg:     #92400E;  /* amber-800 — WCAG AA on warning-bg */
+    --color-warning-border: #FCD34D;  /* amber-300 */
+    --color-danger-bg:      #FEF2F2;  /* red-50 */
+    --color-danger-fg:      #991B1B;  /* red-800 — WCAG AA on danger-bg */
+    --color-danger-border:  #FCA5A5;  /* red-300 */
+    --color-info-bg:        #EFF6FF;  /* blue-50 */
+    --color-info-fg:        #1E40AF;  /* blue-800 — WCAG AA on info-bg */
+    --color-info-border:    #93C5FD;  /* blue-300 */
 
     /* ---- Font stack — defined here so Tailwind fontFamily vars resolve ---- */
     --font-display: "Sora", "Helvetica Neue", "Arial", sans-serif;
@@ -136,7 +121,7 @@
 
   /* Green focus ring — replaces default */
   *:focus-visible {
-    outline: 2px solid var(--gr);
+    outline: 2px solid hsl(var(--success));
     outline-offset: 2px;
   }
 }
@@ -156,11 +141,11 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.20em;
-  color: var(--gr);
+  color: hsl(var(--success));
 }
 .lbl::before {
   content: '—';
-  color: var(--gr);
+  color: hsl(var(--success));
   font-weight: 700;
 }
 .lbl.lbl-live::before {
@@ -169,13 +154,13 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--gr);
+  background: hsl(var(--success));
   animation: lbl-pulse 2s ease-in-out infinite;
 }
 
 /* Single pink word-highlight per heading */
 .pk {
-  color: var(--pk);
+  color: hsl(var(--primary));
 }
 
 /* Stat unit span — sits after the big number */
@@ -191,7 +176,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  background: linear-gradient(135deg, var(--pk), var(--pk2));
+  background: linear-gradient(135deg, hsl(var(--primary)), #00A86B);
   color: #fff;
   border: none;
   border-radius: 100px;
@@ -232,8 +217,8 @@
   transition: border-color 150ms ease-out, color 150ms ease-out;
 }
 .btn-ghost:hover {
-  border-color: var(--gr);
-  color: var(--gr);
+  border-color: hsl(var(--success));
+  color: hsl(var(--success));
 }
 
 /* Mesh gradient — atmospheric hero background */
@@ -521,6 +506,187 @@
 @media (min-width: 1024px) {
   .composer-title-input {
     font-size: 40px;
+  }
+}
+
+/* ===========================================================================
+   Composer v3 design tokens — prefixed --c3-* to avoid collision with the
+   existing Opollo design system tokens. Used exclusively by composer v3
+   components. Source of truth: docs/briefs/social-composer-v3-rebuild/00-design-tokens.md
+   =========================================================================== */
+:root {
+  /* Neutral scale */
+  --c3-canvas:    #FAFAFA;
+  --c3-surface:   #FFFFFF;
+  --c3-surface-2: #F4F4F5;
+  --c3-surface-3: #E9E9EB;
+  --c3-surface-4: #D4D4D8;
+
+  --c3-border:    #E4E4E7;
+  --c3-border-2:  #D4D4D8;
+  --c3-border-3:  #A1A1AA;
+
+  --c3-ink:       #0A0A0A;
+  --c3-ink-2:     #27272A;
+  --c3-ink-3:     #52525B;
+  --c3-ink-4:     #71717A;
+  --c3-ink-5:     #A1A1AA;
+
+  /* Brand — electric emerald */
+  --c3-brand-50:  #ECFDF5;
+  --c3-brand-100: #D1FAE5;
+  --c3-brand-200: #A7F3D0;
+  --c3-brand-300: #6EE7B7;
+  --c3-brand-400: #34D399;
+  --c3-brand-500: #00BF66;
+  --c3-brand-600: #00A659;
+  --c3-brand-700: #008A4A;
+  --c3-brand-800: #006D3B;
+  --c3-brand-900: #054F2D;
+
+  /* Semantic */
+  --c3-success-bg:   var(--c3-brand-50);
+  --c3-success-fg:   var(--c3-brand-700);
+  --c3-success-line: var(--c3-brand-500);
+  --c3-warning-bg:   #FFFBEB;
+  --c3-warning-fg:   #92400E;
+  --c3-warning-line: #F59E0B;
+  --c3-danger-bg:    #FEF2F2;
+  --c3-danger-fg:    #991B1B;
+  --c3-danger-line:  #DC2626;
+  --c3-danger-strong:#B91C1C;
+  --c3-info-bg:      #EFF6FF;
+  --c3-info-fg:      #1E40AF;
+  --c3-info-line:    #3B82F6;
+
+  /* Platform brand colors */
+  --c3-platform-linkedin:            #0A66C2;
+  --c3-platform-facebook:            #1877F2;
+  --c3-platform-instagram:           #E4405F;
+  --c3-platform-instagram-gradient:  linear-gradient(45deg, #F58529 0%, #DD2A7B 50%, #8134AF 100%);
+  --c3-platform-x:                   #000000;
+  --c3-platform-gbp:                 #4285F4;
+
+  /* Fonts — resolved from next/font/google variables */
+  --c3-font-display: var(--font-geist-sans, 'Geist', system-ui, sans-serif);
+  --c3-font-body:    var(--font-geist-sans, 'Geist', system-ui, sans-serif);
+  --c3-font-mono:    var(--font-geist-mono, 'Geist Mono', ui-monospace, monospace);
+
+  /* Radius */
+  --c3-radius-sm:   4px;
+  --c3-radius-md:   6px;
+  --c3-radius-lg:   8px;
+  --c3-radius-xl:   12px;
+  --c3-radius-2xl:  16px;
+  --c3-radius-full: 9999px;
+
+  /* Shadows */
+  --c3-shadow-sm:
+    0 1px 2px rgba(9,9,11,0.04),
+    0 0 0 1px rgba(9,9,11,0.04);
+  --c3-shadow-md:
+    0 2px 4px rgba(9,9,11,0.04),
+    0 4px 12px rgba(9,9,11,0.06),
+    0 0 0 1px rgba(9,9,11,0.04);
+  --c3-shadow-lg:
+    0 4px 8px rgba(9,9,11,0.04),
+    0 12px 24px rgba(9,9,11,0.08),
+    0 0 0 1px rgba(9,9,11,0.04);
+  --c3-shadow-overlay:
+    0 8px 16px rgba(9,9,11,0.06),
+    0 24px 60px rgba(9,9,11,0.12);
+  /* --c3-shadow-focus deleted — use var(--shadow-focus) in globals.css :root */
+  --c3-shadow-focus-danger:
+    0 0 0 2px var(--c3-surface),
+    0 0 0 4px var(--c3-danger-line);
+
+  /* Motion */
+  --c3-duration-instant: 60ms;
+  --c3-duration-fast:    120ms;
+  --c3-duration-base:    200ms;
+  --c3-duration-slow:    320ms;
+  --c3-ease-out:   cubic-bezier(0.16, 1, 0.3, 1);
+  --c3-ease-snap:  cubic-bezier(0.22, 1, 0.36, 1);
+  --c3-ease-spring:cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Z-index */
+  --c3-z-overlay: 900;
+  --c3-z-modal:   1000;
+  --c3-z-toast:   1100;
+  --c3-z-tooltip: 1200;
+}
+
+/* ── c3 animation utility classes ────────────────────────────────────────── */
+
+/* Modal entrance: 320ms scale 0.96 → 1 + fade. Applied to full-screen overlay. */
+.c3-modal-in {
+  animation: c3-modal-in var(--c3-duration-slow) var(--c3-ease-snap) both;
+}
+
+/* Modal exit: 200ms scale 1 → 0.97 + fade. */
+.c3-modal-out {
+  animation: c3-modal-out var(--c3-duration-base) var(--c3-ease-out) both;
+}
+
+/* Tool-panel entrance: 200ms slide down 8px + fade. */
+.c3-panel-in {
+  animation: c3-panel-in var(--c3-duration-base) var(--c3-ease-snap) both;
+}
+
+/* Save indicator pulse: 1.2s opacity 1 → 0.6 → 1 loop. */
+.c3-save-pulse {
+  animation: c3-save-pulse 1.2s var(--c3-ease-out) infinite;
+}
+
+/* Toast entrance: 200ms slide up 12px + fade. */
+.c3-toast-in {
+  animation: c3-toast-in var(--c3-duration-base) var(--c3-ease-spring) both;
+}
+
+@keyframes c3-modal-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes c3-modal-out {
+  from { opacity: 1; transform: scale(1);    }
+  to   { opacity: 0; transform: scale(0.97); }
+}
+
+@keyframes c3-panel-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+@keyframes c3-save-pulse {
+  0%, 100% { opacity: 1;   }
+  50%       { opacity: 0.5; }
+}
+
+@keyframes c3-toast-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* Reduced motion — collapse all c3 transitions to opacity-only at 120ms */
+@media (prefers-reduced-motion: reduce) {
+  .c3-motion *,
+  .c3-motion *::before,
+  .c3-motion *::after {
+    animation-duration: var(--c3-duration-fast) !important;
+    transition-duration: var(--c3-duration-fast) !important;
+    animation-iteration-count: 1 !important;
+    transform: none !important;
+  }
+
+  .c3-modal-in,
+  .c3-modal-out,
+  .c3-panel-in,
+  .c3-save-pulse,
+  .c3-toast-in {
+    animation-duration: var(--c3-duration-fast) !important;
+    animation-iteration-count: 1 !important;
+    transform: none !important;
   }
 }
 

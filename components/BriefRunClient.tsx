@@ -4,11 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
-import {
-  StatusPill,
-  pageStatusKind,
-  runStatusKind,
-} from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { Textarea } from "@/components/ui/textarea";
 import { RunCostTicker } from "@/components/RunCostTicker";
 import { SuccessMoment } from "@/components/ui/success-moment";
@@ -368,8 +364,8 @@ export function BriefRunClient({
               {activeRun.status === "paused" &&
               firstAwaitingReview &&
               sortedPages.length > 1 ? (
-                <StatusPill
-                  kind="run_paused"
+                <Pill
+                  variant="warning"
                   role="button"
                   tabIndex={0}
                   onClick={() => scrollToPageCard(firstAwaitingReview.id)}
@@ -381,13 +377,10 @@ export function BriefRunClient({
                   }}
                   className="cursor-pointer hover:bg-warning/20 focus:outline-none focus:ring-2 focus:ring-ring"
                   aria-label={`Page ${firstAwaitingReview.ordinal + 1} (${firstAwaitingReview.title}) awaiting your review — jump to card`}
-                  label={
-                    <>
-                      Page {firstAwaitingReview.ordinal + 1} awaiting your
-                      review →
-                    </>
-                  }
-                />
+                >
+                  Page {firstAwaitingReview.ordinal + 1} awaiting your
+                  review →
+                </Pill>
               ) : (
                 <RunStatusPill status={activeRun.status} />
               )}
@@ -405,7 +398,7 @@ export function BriefRunClient({
           ) : (
             <span
               role="status"
-              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-emerald-50 px-2 py-0.5 font-medium text-sm text-emerald-700"
+              className="inline-flex items-center gap-1 whitespace-nowrap rounded bg-[--color-success-bg] px-2 py-0.5 font-medium text-sm text-[--color-success-fg]"
               title="This page auto-updates as the runner makes progress"
             >
               <span
@@ -594,30 +587,58 @@ export function BriefRunClient({
   );
 }
 
+const RUN_PILL: Record<
+  BriefRunSnapshot["status"],
+  { variant: PillVariant; label: string; pulse?: boolean }
+> = {
+  queued: { variant: "accent", label: "Queued — waiting for runner", pulse: true },
+  running: { variant: "accent", label: "Running", pulse: true },
+  paused: { variant: "warning", label: "Awaiting your review" },
+  succeeded: { variant: "success", label: "Complete" },
+  failed: { variant: "danger", label: "Failed" },
+  cancelled: { variant: "neutral", label: "Cancelled" },
+};
+
+const PAGE_PILL: Record<
+  BriefPageStatus,
+  { variant: PillVariant; label: string; pulse?: boolean }
+> = {
+  pending: { variant: "neutral", label: "Pending" },
+  generating: { variant: "accent", label: "Generating", pulse: true },
+  awaiting_review: { variant: "warning", label: "Awaiting review" },
+  approved: { variant: "success", label: "Approved" },
+  failed: { variant: "danger", label: "Failed" },
+  skipped: { variant: "neutral", label: "Skipped" },
+};
+
 function RunStatusPill({
   status,
 }: {
   status: BriefRunSnapshot["status"];
 }) {
-  return <StatusPill kind={runStatusKind(status)} />;
+  const p = RUN_PILL[status];
+  return (
+    <Pill variant={p.variant} className={p.pulse ? "animate-pulse" : undefined}>
+      {p.label}
+    </Pill>
+  );
 }
 
 function PageStatusPill({ status }: { status: BriefPageStatus }) {
-  return <StatusPill kind={pageStatusKind(status)} />;
+  const p = PAGE_PILL[status];
+  return (
+    <Pill variant={p.variant} className={p.pulse ? "animate-pulse" : undefined}>
+      {p.label}
+    </Pill>
+  );
 }
 
 function QualityFlagBadge({ flag }: { flag: BriefPageQualityFlag }) {
   return (
-    <StatusPill
-      kind={QUALITY_FLAG_KIND[flag]}
-      title={QUALITY_FLAG_HINT[flag]}
-      label={
-        <>
-          <NavIcon name="warning" size={12} />
-          {flag === "cost_ceiling" ? "Cost ceiling hit" : "Capped with issues"}
-        </>
-      }
-    />
+    <Pill variant="warning" title={QUALITY_FLAG_HINT[flag]}>
+      <NavIcon name="warning" size={12} />
+      {flag === "cost_ceiling" ? "Cost ceiling hit" : "Capped with issues"}
+    </Pill>
   );
 }
 

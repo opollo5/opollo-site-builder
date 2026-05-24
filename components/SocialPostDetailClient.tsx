@@ -540,7 +540,7 @@ export function SocialPostDetailClient({ post, canEdit, canSubmit, canCreate, ca
 
       {(post.state === "changes_requested" || post.state === "rejected") && post.reviewer_comment ? (
         <div
-          className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          className="mt-4 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-fg"
           role="note"
           data-testid="reviewer-comment-banner"
         >

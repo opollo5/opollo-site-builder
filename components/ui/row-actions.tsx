@@ -30,6 +30,8 @@ export interface RowAction {
   disabled?: boolean;
   /** When set, renders an external link instead of a button. */
   href?: string;
+  /** Optional data-testid on the menu item button/anchor. */
+  testId?: string;
 }
 
 export interface RowActionsProps {
@@ -106,6 +108,7 @@ export function RowActions({
                     role="menuitem"
                     href={action.href}
                     aria-disabled={action.disabled || undefined}
+                    data-testid={action.testId}
                     onClick={(e) => {
                       if (action.disabled) {
                         e.preventDefault();
@@ -122,6 +125,7 @@ export function RowActions({
                     type="button"
                     role="menuitem"
                     disabled={action.disabled}
+                    data-testid={action.testId}
                     onClick={() => {
                       if (action.disabled) return;
                       setOpen(false);

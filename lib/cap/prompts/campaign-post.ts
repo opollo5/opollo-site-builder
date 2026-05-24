@@ -17,13 +17,17 @@ const ARC_PHASE_GUIDANCE: Record<string, string> = {
     "Reinforce trust and close with a clear, confident CTA.",
 };
 
-export function buildCampaignPostSystemMessage(): string {
-  return (
+export function buildCampaignPostSystemMessage(
+  performancePriorsBlock?: string,
+): string {
+  const base =
     "You are a LinkedIn content strategist for Managed Service Provider (MSP) companies. " +
     "You write high-performing, authentic LinkedIn posts that sound human, on-brand, and strategically timed " +
     "within a 4-week campaign arc. Your posts avoid generic platitudes and corporate jargon. " +
-    "You always respond with ONLY a JSON object in the exact format requested — no markdown fences, no extra commentary."
-  );
+    "You always respond with ONLY a JSON object in the exact format requested — no markdown fences, no extra commentary.";
+
+  if (!performancePriorsBlock) return base;
+  return base + "\n\n" + performancePriorsBlock;
 }
 
 interface BuildCampaignPostUserMessageInput {

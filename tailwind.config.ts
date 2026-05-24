@@ -37,6 +37,10 @@ const config: Config = {
         body: ["var(--font-body)", "ui-sans-serif", "system-ui", "sans-serif"],
         display: ["var(--font-display)", "ui-sans-serif", "sans-serif"],
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "monospace"],
+        /* Composer v3 fonts */
+        'c3-display': ['var(--c3-font-display)'],
+        'c3-body':    ['var(--c3-font-body)'],
+        'c3-mono':    ['var(--c3-font-mono)'],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -85,14 +89,14 @@ const config: Config = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        /* Opollo raw tokens — use as text-pk, bg-gr, border-bl, etc. */
-        pk: "var(--pk)",
-        pk2: "var(--pk2)",
-        gr: "var(--gr)",
-        gr2: "var(--gr2)",
-        bl: "var(--bl)",
-        am: "var(--am)",
-        rd: "var(--rd)",
+        /* Opollo raw tokens — semantic aliases to shadcn tokens */
+        pk:  "hsl(var(--primary))",
+        pk2: "#00A86B",
+        gr:  "hsl(var(--success))",
+        gr2: "#00875a",
+        bl:  "hsl(var(--info))",
+        am:  "hsl(var(--warning))",
+        rd:  "hsl(var(--destructive))",
         d1: "var(--d1)",
         d2: "var(--d2)",
         d3: "var(--d3)",
@@ -123,24 +127,51 @@ const config: Config = {
         "tx-secondary": "var(--tx-secondary)",  /* #374151 gray-700 */
         "tx-muted":     "var(--tx-muted)",      /* #6B7280 gray-500 */
         "tx-inverse":   "var(--tx-inverse)",    /* #FFFFFF */
-        /* Button token passthrough — consumed by components/ui/button.tsx */
-        "btn-primary":          "var(--btn-primary-bg)",
-        "btn-secondary-border": "var(--btn-secondary-border)",
-        "btn-tertiary-hover":   "var(--btn-tertiary-hover)",
-        "btn-destructive":      "var(--btn-destructive-bg)",
-        /* Tab + control tokens */
-        "tab-active":           "var(--tab-active-bg)",
-        "tab-inactive-text":    "var(--tab-inactive-text)",
-        "icon-hover":           "var(--icon-control-hover)",
-        "search-border":        "var(--search-input-border)",
+        /* Semantic callout color trios (D9) */
+        "success-bg":     "var(--color-success-bg)",
+        "success-fg":     "var(--color-success-fg)",
+        "success-border": "var(--color-success-border)",
+        "warning-bg":     "var(--color-warning-bg)",
+        "warning-fg":     "var(--color-warning-fg)",
+        "warning-border": "var(--color-warning-border)",
+        "danger-bg":      "var(--color-danger-bg)",
+        "danger-fg":      "var(--color-danger-fg)",
+        "danger-border":  "var(--color-danger-border)",
+        "info-bg":        "var(--color-info-bg)",
+        "info-fg":        "var(--color-info-fg)",
+        "info-border":    "var(--color-info-border)",
       },
       boxShadow: {
         'pk-glow': '0 4px 24px var(--pk-glow)',
+        /* Composer v3 shadows */
+        'c3-sm':      'var(--c3-shadow-sm)',
+        'c3-md':      'var(--c3-shadow-md)',
+        'c3-lg':      'var(--c3-shadow-lg)',
+        'c3-overlay': 'var(--c3-shadow-overlay)',
+        'c3-focus':   'var(--shadow-focus)',
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        /* Composer v3 radii */
+        'c3-sm':   'var(--c3-radius-sm)',
+        'c3-md':   'var(--c3-radius-md)',
+        'c3-lg':   'var(--c3-radius-lg)',
+        'c3-xl':   'var(--c3-radius-xl)',
+        'c3-2xl':  'var(--c3-radius-2xl)',
+        'c3-full': 'var(--c3-radius-full)',
+      },
+      transitionTimingFunction: {
+        'c3-out':    'cubic-bezier(0.16, 1, 0.3, 1)',
+        'c3-snap':   'cubic-bezier(0.22, 1, 0.36, 1)',
+        'c3-spring': 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      },
+      transitionDuration: {
+        'c3-instant': '60ms',
+        'c3-fast':    '120ms',
+        'c3-base':    '200ms',
+        'c3-slow':    '320ms',
       },
     },
   },

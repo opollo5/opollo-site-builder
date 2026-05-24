@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 
 import { loginAction, type LoginState } from "@/app/login/actions";
@@ -8,11 +9,11 @@ import { Input } from "@/components/ui/input";
 
 const INITIAL_STATE: LoginState = {};
 
-function SubmitButton() {
+function SubmitButton({ isRedirecting }: { isRedirecting: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" disabled={pending}>
-      {pending ? "Signing in…" : "Sign in"}
+    <Button type="submit" disabled={pending || isRedirecting}>
+      {pending || isRedirecting ? "Signing in…" : "Sign in"}
     </Button>
   );
 }
@@ -32,6 +33,21 @@ export function LoginForm({ next }: { next: string }) {
   // React's later updates clean — the form still works without this,
   // but the console stays readable.
   const [state, formAction] = useFormState(loginAction, INITIAL_STATE);
+
+  // Hard navigation on successful login. The server action returns
+  // { redirectTo } instead of calling next/navigation redirect() so the
+  // browser performs a full document load (window.location.assign).
+  // This guarantees middleware re-reads the Supabase session cookies
+  // set by signInWithPassword before evaluating the destination route.
+  // A soft RSC navigation (router.push or redirect()) can skip the
+  // Set-Cookie re-read, leaving middleware seeing no session and
+  // causing a loop back to /login — the "Signing in…" hang.
+  // Mirrors the window.location.assign pattern in CheckEmailPolling.tsx.
+  useEffect(() => {
+    if (state.redirectTo) {
+      window.location.assign(state.redirectTo);
+    }
+  }, [state.redirectTo]);
 
   return (
     <form action={formAction} className="flex w-full flex-col gap-4">
@@ -72,7 +88,7 @@ export function LoginForm({ next }: { next: string }) {
         </p>
       )}
 
-      <SubmitButton />
+      <SubmitButton isRedirecting={Boolean(state.redirectTo)} />
 
       <p className="text-center text-sm text-muted-foreground">
         <a

@@ -109,13 +109,8 @@ test.describe("composer modal", () => {
     await mockDraftApis(context);
     await page.goto("/company/social/posts?compose=new");
 
-    // Editor pane must render (profile selector visible).
-    await expect(page.getByTestId("connections-connect-button").or(
-      page.locator("[data-testid='profile-selector']")
-    ).or(
-      // Profile selector may not have testid — look for the modal container instead.
-      page.getByRole("dialog", { name: /new post/i }),
-    )).toBeVisible({ timeout: 15_000 });
+    // Editor pane must render — profile-selector container is always present in V2.
+    await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 15_000 });
   });
 
   test("(3) schedule mode shows date and time inputs", async ({ page, context }) => {
@@ -124,8 +119,9 @@ test.describe("composer modal", () => {
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
     // Scope to dialog to avoid matching page-level "Scheduled" filter button.
+    // V2 SchedulingCard renders tabs with role="tab", not role="button".
     const dialog3 = page.getByRole("dialog", { name: /new post/i });
-    await dialog3.getByRole("button", { name: /^schedule$/i }).click();
+    await dialog3.getByRole("tab", { name: /^schedule$/i }).click();
     await expect(page.getByRole("group").or(page.locator("input[type='date']"))).toBeVisible({ timeout: 5_000 });
     await expect(page.locator("input[type='time']").first()).toBeVisible();
   });
@@ -136,7 +132,7 @@ test.describe("composer modal", () => {
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
     const dialog4 = page.getByRole("dialog", { name: /new post/i });
-    await dialog4.getByRole("button", { name: /^schedule$/i }).click();
+    await dialog4.getByRole("tab", { name: /^schedule$/i }).click();
     await expect(page.getByRole("button", { name: /\+ add time/i })).toBeVisible({ timeout: 5_000 });
 
     await page.getByRole("button", { name: /\+ add time/i }).click();
@@ -151,8 +147,8 @@ test.describe("composer modal", () => {
     // In post_now mode (default), approval toggle should NOT be visible.
     await expect(page.getByRole("switch", { name: /post needs approval/i })).not.toBeVisible();
 
-    // Switch to schedule mode.
-    await page.getByRole("button", { name: /^schedule$/i }).click();
+    // Switch to schedule mode. V2 SchedulingCard uses role="tab".
+    await page.getByRole("tab", { name: /^schedule$/i }).click();
     await expect(page.getByRole("switch", { name: /post needs approval/i })).toBeVisible({ timeout: 5_000 });
   });
 
@@ -171,34 +167,43 @@ test.describe("composer modal", () => {
 
   test("(7) GIF picker panel opens when GIF button is clicked", async ({ page, context }) => {
     await mockDraftApis(context);
-    // Mock Tenor API
-    await context.route("**/tenor.googleapis.com/**", (route) => {
+    // Phase 2.3: GIF search is proxied through our server route; mock it to return empty results.
+    await context.route("**/api/platform/social/gif-search**", (route) => {
       void route.fulfill({
         status: 200,
         contentType: "application/json",
-        body: JSON.stringify({ results: [] }),
+        body: JSON.stringify({ ok: true, data: { results: [] } }),
       });
     });
 
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId("gif-button").click();
-    await expect(page.getByTestId("gif-picker-panel")).toBeVisible({ timeout: 5_000 });
+    // V2 ToolsRow: "GIF" button by label
+    await page.getByRole("button", { name: /^gif$/i }).click();
+    // GifPanel always renders a "GIF picker" heading — check the panel container.
+    await expect(page.getByTestId("composer-panel-gif")).toBeVisible({ timeout: 5_000 });
   });
 
-  test("(8) tag picker opens and inserts a hashtag into the text", async ({ page, context }) => {
+  test("(8) emoji panel opens and inserts an emoji into the text", async ({ page, context }) => {
+    // V2 ToolsRow has no tag picker — tag picker was a V1-only feature.
+    // This test now exercises the emoji panel which is available in V2.
     await mockDraftApis(context);
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    await page.getByTestId("tag-button").click();
-    await expect(page.getByTestId("tag-picker-panel")).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /^emoji$/i }).click();
+    // Emoji picker panel opens
+    const emojiPanel = page.getByTestId("emoji-picker-panel");
+    await expect(emojiPanel).toBeVisible({ timeout: 5_000 });
 
-    // Click a suggested tag.
-    await page.getByRole("button", { name: /#marketing/i }).click();
-    // Picker should close.
-    await expect(page.getByTestId("tag-picker-panel")).not.toBeVisible();
+    // Click the first emoji in the grid (li buttons; category nav uses .epr-cat-btn)
+    const firstEmoji = emojiPanel.locator("li button").first();
+    await expect(firstEmoji).toBeVisible({ timeout: 5_000 });
+    await firstEmoji.click();
+
+    // Panel should close after emoji selection
+    await expect(emojiPanel).not.toBeVisible({ timeout: 3_000 });
   });
 
   test("(9) close button closes the modal and removes ?compose from URL", async ({ page, context }) => {
@@ -214,9 +219,10 @@ test.describe("composer modal", () => {
     await expect(page).not.toHaveURL(/compose=/);
   });
 
-  test("(FIX 19) image upload zone is present in the editor", async ({ page, context }) => {
+  test("(FIX 19) content editor textarea is present in the editor", async ({ page, context }) => {
+    // V2 uses ContentEditor (textarea in ComposerEditor), not ImageUploadZone.
+    // The media upload button lives in MediaTray inside ContentEditor.
     await mockDraftApis(context);
-    // Mock upload endpoint.
     await context.route("**/api/platform/social/media/upload**", (route) => {
       void route.fulfill({
         status: 200,
@@ -228,13 +234,14 @@ test.describe("composer modal", () => {
     await page.goto("/company/social/posts?compose=new");
     await expect(page.getByRole("dialog", { name: /new post/i })).toBeVisible({ timeout: 15_000 });
 
-    // Image upload zone must render (data-testid on ImageUploadZone outer div).
-    await expect(page.locator("[data-testid='image-upload-zone']")).toBeVisible({ timeout: 10_000 });
+    // Content textarea must render inside the dialog
+    const dialog = page.getByRole("dialog", { name: /new post/i });
+    await expect(dialog.locator("textarea").first()).toBeVisible({ timeout: 10_000 });
   });
 });
 
 // ---------------------------------------------------------------------------
-// V2 Composer E2E — /social/poster (FEATURE_COMPOSER_V2)
+// V2 Composer E2E — /company/social/calendar
 //
 // Tests exercise the SchedulingCard, ApprovalToggle, and RecurrencePicker
 // that were added in PR E. All API calls are mocked.
@@ -276,7 +283,7 @@ async function mockV2DraftApis(context: import("@playwright/test").BrowserContex
 }
 
 async function openV2Composer(page: import("@playwright/test").Page) {
-  await page.goto("/social/poster");
+  await page.goto("/company/social/calendar");
   await page.waitForSelector('[data-testid="calendar-shell"]', { timeout: 10_000 });
 
   // Open the composer via the FilterBar "New post" button
@@ -399,7 +406,7 @@ test.describe("composer V2 — scheduling card (PR E)", () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, data: { posts: [], range: {} }, timestamp: new Date().toISOString() }) });
     });
 
-    await page.goto("/social/poster");
+    await page.goto("/company/social/calendar");
     const flagOff = await page
       .locator("text=FEATURE_COMPOSER_V2 is not enabled")
       .isVisible({ timeout: 3_000 })

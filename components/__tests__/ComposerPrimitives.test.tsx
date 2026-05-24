@@ -46,17 +46,17 @@ describe("Callout", () => {
 
   it("applies info variant classes", () => {
     const { container } = render(<Callout title="T" variant="info" />);
-    expect((container.firstChild as HTMLElement).className).toContain("bg-blue-50");
+    expect((container.firstChild as HTMLElement).className).toContain("bg-info-bg");
   });
 
   it("applies warning variant classes", () => {
     const { container } = render(<Callout title="T" variant="warning" />);
-    expect((container.firstChild as HTMLElement).className).toContain("bg-amber-50");
+    expect((container.firstChild as HTMLElement).className).toContain("bg-warning-bg");
   });
 
   it("applies helpful variant classes", () => {
     const { container } = render(<Callout title="T" variant="helpful" />);
-    expect((container.firstChild as HTMLElement).className).toContain("bg-yellow-50");
+    expect((container.firstChild as HTMLElement).className).toContain("bg-warning-bg");
   });
 });
 

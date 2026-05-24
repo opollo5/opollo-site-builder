@@ -114,7 +114,7 @@ async function mockAndOpenAnalyticsModal(
     });
   });
 
-  await page.goto("/social/poster");
+  await page.goto("/company/social/calendar");
 
   const flagOff = await page
     .locator("text=FEATURE_COMPOSER_V2 is not enabled")
@@ -130,9 +130,11 @@ async function mockAndOpenAnalyticsModal(
   // Click on the post chip to select the day, then click the day-detail post card
   const postChip = page.getByTestId("post-chip").first();
   if (await postChip.isVisible({ timeout: 3_000 }).catch(() => false)) {
-    // Click the chip's parent cell to select it
     await postChip.click();
-    // Then click the post card in the day detail
+    // D3: clicking a published post chip now opens the analytics modal directly
+    const modalOpenedDirect = await page.getByTestId("post-analytics-modal").isVisible({ timeout: 3_000 }).catch(() => false);
+    if (modalOpenedDirect) return true;
+    // Fallback: chip selects day, then click day-detail-post-card
     const postCard = page.getByTestId("day-detail-post-card").first();
     if (await postCard.isVisible({ timeout: 3_000 }).catch(() => false)) {
       await postCard.click();
@@ -184,7 +186,7 @@ test.describe("post analytics modal (PR H)", () => {
 
     // Can't easily test SWR deduplication in E2E without full open/close/reopen.
     // Verify that the analytics endpoint is called at most once per 60s window.
-    await page.goto("/social/poster");
+    await page.goto("/company/social/calendar");
     const flagOff = await page
       .locator("text=FEATURE_COMPOSER_V2 is not enabled")
       .isVisible({ timeout: 3_000 })

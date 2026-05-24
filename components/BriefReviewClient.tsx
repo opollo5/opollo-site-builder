@@ -6,10 +6,7 @@ import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  StatusPill as UIStatusPill,
-  briefStatusKind,
-} from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { Textarea } from "@/components/ui/textarea";
 import type { BriefPageRow, BriefRow } from "@/lib/briefs";
 import { DEFAULT_MODEL_ID, MODEL_OPTIONS } from "@/lib/anthropic-models";
@@ -359,7 +356,7 @@ export function BriefReviewClient({
                     : "These guide every page the generator produces."}
               </p>
               {!hasSiteDefault && !isReadOnly && (
-                <div className="mt-2 rounded-md border border-blue-500/40 bg-blue-500/5 p-2 text-xs text-blue-900">
+                <div className="mt-2 rounded-md border border-info-border bg-info-bg p-2 text-xs text-info-fg">
                   <strong>Tip:</strong> brand voice is a property of the
                   whole site — set it once on{" "}
                   <a
@@ -567,7 +564,7 @@ export function BriefReviewClient({
 
                     <div className="flex items-center gap-4">
                       {p.mode === "import" ? (
-                        <span className="inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-sm font-medium text-blue-900">
+                        <span className="inline-flex items-center rounded-full border border-info-border bg-info-bg px-2.5 py-0.5 text-sm font-medium text-info-fg">
                           Import (mode locked)
                         </span>
                       ) : (
@@ -681,12 +678,22 @@ export function BriefReviewClient({
   );
 }
 
+const BRIEF_PILL_VARIANT: Record<string, PillVariant> = {
+  parsing: "accent", parsed: "info", committed: "success", failed_parse: "danger",
+};
+const BRIEF_PILL_LABEL: Record<string, string> = {
+  parsing: "Parsing", parsed: "Parsed", committed: "Committed", failed_parse: "Parse failed",
+};
+
 function StatusPill({ status }: { status: BriefRow["status"] }) {
-  // Folded to the A-4 primitive — kept as a thin local wrapper because
-  // the component file references `<StatusPill status={...} />` in a
-  // dozen places and the pattern reads more naturally than spelling
-  // out briefStatusKind() at every call site.
-  return <UIStatusPill kind={briefStatusKind(status)} />;
+  return (
+    <Pill
+      variant={BRIEF_PILL_VARIANT[status] ?? "neutral"}
+      className={status === "parsing" ? "animate-pulse" : undefined}
+    >
+      {BRIEF_PILL_LABEL[status] ?? status}
+    </Pill>
+  );
 }
 
 function ModePill({

@@ -8,13 +8,7 @@ import { SetupReminderBanner } from "@/components/SetupReminderBanner";
 import { SiteDetailActions } from "@/components/SiteDetailActions";
 import { TenantBudgetBadge } from "@/components/TenantBudgetBadge";
 import { EmptyState } from "@/components/ui/empty-state";
-import {
-  StatusPill,
-  briefStatusKind,
-  dsStatusKind,
-  jobStatusKind,
-  siteStatusKind,
-} from "@/components/ui/status-pill";
+import { Pill, type PillVariant } from "@/components/ui/pill";
 import { H3 } from "@/components/ui/typography";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { UploadBriefButton } from "@/components/UploadBriefButton";
@@ -37,6 +31,42 @@ import type { BatchTemplateOption } from "@/components/NewBatchModal";
 // menu inherited from the row (here rendered standalone).
 
 export const dynamic = "force-dynamic";
+
+const SITE_PILL: Record<string, { variant: PillVariant }> = {
+  active: { variant: "success" },
+  pending_pairing: { variant: "neutral" },
+  paused: { variant: "warning" },
+  removed: { variant: "danger" },
+};
+
+const SITE_LABEL: Record<string, string> = {
+  active: "Connected",
+  pending_pairing: "Not Connected",
+  paused: "Paused",
+  removed: "Removed",
+};
+
+const JOB_PILL: Record<string, { variant: PillVariant; pulse?: boolean }> = {
+  queued: { variant: "neutral" },
+  running: { variant: "accent", pulse: true },
+  partial: { variant: "warning" },
+  succeeded: { variant: "success" },
+  failed: { variant: "danger" },
+  cancelled: { variant: "neutral" },
+};
+
+const BRIEF_PILL: Record<string, { variant: PillVariant; label: string; pulse?: boolean }> = {
+  parsing: { variant: "accent", label: "Parsing", pulse: true },
+  parsed: { variant: "info", label: "Parsed" },
+  committed: { variant: "success", label: "Committed" },
+  failed_parse: { variant: "danger", label: "Parse failed" },
+};
+
+const DS_PILL: Record<string, { variant: PillVariant; label: string }> = {
+  draft: { variant: "neutral", label: "draft" },
+  active: { variant: "success", label: "active" },
+  archived: { variant: "neutral", label: "archived" },
+};
 
 type TemplateRow = {
   id: string;
@@ -206,7 +236,7 @@ export default async function SiteDetailPage({
       ]}
       meta={
         <>
-          <StatusPill kind={siteStatusKind(site.status as Parameters<typeof siteStatusKind>[0])} />
+          {(() => { const p = SITE_PILL[site.status as string] ?? { variant: "neutral" as PillVariant }; return <Pill variant={p.variant}>{SITE_LABEL[site.status as string] ?? (site.status as string)}</Pill>; })()}
           <a
             href={site.wp_url}
             target="_blank"
@@ -298,7 +328,7 @@ export default async function SiteDetailPage({
                             </Link>
                           </td>
                           <td className="px-3 py-2">
-                            <StatusPill kind={jobStatusKind(b.status as Parameters<typeof jobStatusKind>[0])} />
+                            {(() => { const p = JOB_PILL[b.status as string] ?? { variant: "neutral" as PillVariant }; return <Pill variant={p.variant} className={p.pulse ? "animate-pulse" : undefined}>{b.status as string}</Pill>; })()}
                           </td>
                           <td className="px-3 py-2 text-muted-foreground">
                             {b.succeeded_count as number} ok ·{" "}
@@ -373,7 +403,7 @@ export default async function SiteDetailPage({
                           </Link>
                         </td>
                         <td className="px-3 py-2">
-                          <StatusPill kind={briefStatusKind(b.status as Parameters<typeof briefStatusKind>[0])} />
+                          {(() => { const p = BRIEF_PILL[b.status as string] ?? { variant: "neutral" as PillVariant, label: b.status as string }; return <Pill variant={p.variant} className={p.pulse ? "animate-pulse" : undefined}>{p.label}</Pill>; })()}
                         </td>
                         <td className="px-3 py-2 text-muted-foreground">
                           {b.parser_mode ?? "—"}
@@ -501,7 +531,7 @@ export default async function SiteDetailPage({
                 <>
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Version {String(ds.version)}</span>
-                    <StatusPill kind={dsStatusKind(ds.status as Parameters<typeof dsStatusKind>[0])} />
+                    {(() => { const p = DS_PILL[ds.status as string] ?? { variant: "neutral" as PillVariant, label: ds.status as string }; return <Pill variant={p.variant}>{p.label}</Pill>; })()}
                   </div>
                   <p className="mt-1 text-muted-foreground" data-screenshot-mask>
                     Activated {formatDate(ds.activated_at as string | null)}
@@ -611,9 +641,9 @@ export default async function SiteDetailPage({
                 <div className="flex items-center justify-between gap-2">
                   <H3>Settings</H3>
                   {(site.brand_voice || site.design_direction) ? (
-                    <StatusPill kind="brief_committed" label="Configured" />
+                    <Pill variant="success">Configured</Pill>
                   ) : (
-                    <StatusPill kind="brief_parsing" label="Not set" />
+                    <Pill variant="accent" className="animate-pulse">Not set</Pill>
                   )}
                 </div>
                 <p className="mt-1 text-base text-muted-foreground">

@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { Sparkles, ImagePlus, Smile, Film, Tags, X as CloseIcon, Copy, Check } from "lucide-react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { Tabs, TabTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
+import { logClientError } from "@/lib/errors/logClientError";
+import { UtmBuilderPanel } from "@/components/social/composer/UtmBuilderPanel";
+import { EmojiPickerPanel } from "@/components/social/composer/EmojiPickerPanel";
+import type { Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // ToolsRow — composer toolbar: AI assistant, Media, Emoji, GIF, Shorten URL,
@@ -19,21 +29,134 @@ export interface ToolsRowProps {
   companyId: string;
   onInsertText: (text: string) => void;
   onOpenMediaPicker: () => void;
+  onAttachGif: (url: string) => void;
+  platforms?: Platform[];
   className?: string;
 }
 
 type ActivePanel = "ai" | "emoji" | "gif" | "shorten" | "utm" | null;
 
 // A small set of frequently-used emoji for the quick picker.
-const QUICK_EMOJI = [
-  "🎉", "🚀", "💡", "✅", "❤️", "👍", "🔥", "💪", "🌟", "🎯",
-  "📈", "💼", "🤝", "🌐", "⚡", "🛠️", "📣", "🙌", "😊", "🏆",
-  "📌", "🔔", "📱", "💬", "📧", "🗓️", "📊", "💰", "🎨", "🌍",
-];
 
 // ---------------------------------------------------------------------------
 // AI assistant panel
 // ---------------------------------------------------------------------------
+
+type AiErrorState = {
+  category: "rate_limit" | "timeout" | "content_rejected" | "invalid_request" | "network" | "overloaded" | "unknown";
+  message: string;
+  trace_id: string;
+  retry_after?: number;
+  can_retry: boolean;
+};
+
+// Haiku 4.5 pricing: $0.08 / MTok input, $0.40 / MTok output (micro-cents).
+// Rough estimate: system ~250 tokens + prompt tokens → input; max_tokens=512 output.
+function estimateCost(promptChars: number): string {
+  const estimatedInputTokens = 250 + Math.ceil(promptChars / 4);
+  const estimatedOutputTokens = 200;
+  const inputCents = (estimatedInputTokens / 1_000_000) * 0.08;
+  const outputCents = (estimatedOutputTokens / 1_000_000) * 0.40;
+  const totalDollars = (inputCents + outputCents) / 100;
+  return totalDollars < 0.001
+    ? "< $0.001"
+    : `$${totalDollars.toFixed(4)}`;
+}
+
+function TraceIdBadge({ traceId }: { traceId: string }) {
+  const [copied, setCopied] = React.useState(false);
+
+  function copy() {
+    void navigator.clipboard.writeText(traceId).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
+
+  return (
+    <div className="mt-1 flex items-center gap-1.5">
+      <span className="font-mono text-xs text-muted-foreground" data-testid="ai-trace-id">
+        trace_id: {traceId}
+      </span>
+      <IconButton
+        label="Copy trace ID"
+        onClick={copy}
+        className="h-5 w-5 text-muted-foreground hover:text-foreground"
+      >
+        {copied ? <Check size={10} aria-hidden /> : <Copy size={10} aria-hidden />}
+      </IconButton>
+    </div>
+  );
+}
+
+function AiErrorDisplay({
+  err,
+  onRetry,
+  onEdit,
+  retryCount,
+}: {
+  err: AiErrorState;
+  onRetry: () => void;
+  onEdit: () => void;
+  retryCount: number;
+}) {
+  const [countdown, setCountdown] = React.useState(err.retry_after ?? 0);
+
+  React.useEffect(() => {
+    if (!err.retry_after) return;
+    setCountdown(err.retry_after);
+    const id = setInterval(() => {
+      setCountdown((n) => {
+        if (n <= 1) { clearInterval(id); return 0; }
+        return n - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [err.retry_after, err.trace_id]);
+
+  const retryLabel =
+    err.category === "rate_limit" && countdown > 0
+      ? `Retry in ${countdown}s`
+      : err.category === "overloaded"
+      ? `Attempt ${retryCount} of 3 · retrying…`
+      : "Retry";
+
+  const isRetryDisabled = err.category === "rate_limit" && countdown > 0;
+
+  return (
+    <div role="alert" aria-live="assertive" className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-xs" data-testid="ai-error-display">
+      <p className="font-medium text-destructive">{err.category === "rate_limit" ? "Anthropic API rate-limited" : err.category === "overloaded" ? "Anthropic model is busy" : err.category === "timeout" ? "Generation timed out" : err.category === "network" ? "Network error" : err.category === "content_rejected" ? "Content rejected" : err.category === "invalid_request" ? "Request failed" : "Generation failed"}</p>
+      <p className="mt-1 text-muted-foreground">{err.message}</p>
+      <div className="mt-2 flex gap-2">
+        {err.can_retry && err.category !== "overloaded" && (
+          <Button
+            size="xs"
+            disabled={isRetryDisabled}
+            onClick={onRetry}
+          >
+            {retryLabel}
+          </Button>
+        )}
+        {(err.category === "content_rejected" || err.category === "invalid_request") && (
+          <Button
+            variant="outline"
+            size="xs"
+            onClick={onEdit}
+          >
+            Edit prompt
+          </Button>
+        )}
+        {err.category === "timeout" && (
+          <span className="self-center text-xs text-muted-foreground">Shorten your prompt to speed up generation.</span>
+        )}
+        {err.category === "network" && (
+          <span className="self-center text-xs text-muted-foreground">Check your connection.</span>
+        )}
+      </div>
+      <TraceIdBadge traceId={err.trace_id} />
+    </div>
+  );
+}
 
 function AiPanel({
   companyId,
@@ -47,41 +170,85 @@ function AiPanel({
   const [prompt, setPrompt] = React.useState("");
   const [tone, setTone] = React.useState<"professional" | "casual" | "playful">("professional");
   const [length, setLength] = React.useState<"short" | "medium" | "long">("medium");
+  const [goal, setGoal] = React.useState<"educate" | "promote" | "announce" | "engage">("engage");
   const [loading, setLoading] = React.useState(false);
+  const [retryCount, setRetryCount] = React.useState(0);
   const [result, setResult] = React.useState<string | null>(null);
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<AiErrorState | null>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
 
-  async function generate() {
+  async function generate(attempt = 1): Promise<void> {
     if (!prompt.trim()) return;
     setLoading(true);
     setError(null);
     setResult(null);
+    setRetryCount(attempt);
+
+    abortRef.current = new AbortController();
+
     try {
       const res = await fetch("/api/platform/social/cap/assist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId, prompt: prompt.trim(), tone, length }),
+        body: JSON.stringify({ company_id: companyId, prompt: prompt.trim(), tone, length, goal }),
+        signal: abortRef.current.signal,
       });
-      const json = (await res.json()) as { ok: boolean; data?: { text: string }; error?: { message: string } };
+
+      type ApiError = { category: AiErrorState["category"]; message: string; trace_id: string; retry_after?: number; can_retry: boolean };
+      const json = (await res.json()) as { ok: boolean; data?: { text: string }; error?: ApiError };
+
       if (json.ok && json.data) {
         setResult(json.data.text);
-      } else {
-        setError(json.error?.message ?? "Generation failed.");
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError("Network error. Please try again.");
+
+      const apiErr = json.error;
+      if (!apiErr) {
+        setError({ category: "unknown", message: "Generation failed.", trace_id: "unknown", can_retry: true });
+        setLoading(false);
+        return;
+      }
+
+      // Auto-retry for overloaded (529) with exponential backoff 1s→3s→9s, max 3 attempts.
+      if (apiErr.category === "overloaded" && attempt < 3) {
+        const delay = [1000, 3000, 9000][attempt - 1] ?? 9000;
+        await new Promise<void>((resolve) => setTimeout(resolve, delay));
+        return generate(attempt + 1);
+      }
+
+      setError(apiErr);
+      // Fire-and-forget log to client_errors.
+      void logClientError({
+        component: "ai-assistant",
+        severity: apiErr.category === "rate_limit" ? "warning" : "error",
+        message: apiErr.message,
+        traceId: apiErr.trace_id,
+        companyId,
+        context: { category: apiErr.category, http_status: res.status, attempt },
+      });
+    } catch (err) {
+      if ((err as { name?: string }).name === "AbortError") {
+        setLoading(false);
+        return;
+      }
+      const traceId = `ai-gen-${Math.random().toString(16).slice(2, 6)}-${Math.random().toString(16).slice(2, 6)}`;
+      setError({ category: "network", message: "Network error. Please try again.", trace_id: traceId, can_retry: true });
+      void logClientError({ component: "ai-assistant", severity: "error", message: "Network fetch failed", traceId: traceId, companyId });
     } finally {
       setLoading(false);
     }
   }
 
+  function cancel() {
+    abortRef.current?.abort();
+    setLoading(false);
+  }
+
   return (
-    <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
+    <div className="space-y-3 rounded-xl border border-border bg-background p-4 shadow-md" data-testid="ai-panel">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">AI assistant</p>
-        <button type="button" onClick={onClose} aria-label="Close AI panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
       </div>
       <textarea
         value={prompt}
@@ -89,12 +256,24 @@ function AiPanel({
         placeholder="Describe your post…"
         rows={2}
         className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+        data-testid="ai-prompt-input"
       />
-      <div className="flex gap-2">
+      <div className="grid grid-cols-3 gap-2">
+        <select
+          value={goal}
+          onChange={(e) => setGoal(e.target.value as typeof goal)}
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+          aria-label="Goal"
+        >
+          <option value="educate">Educate</option>
+          <option value="promote">Promote</option>
+          <option value="announce">Announce</option>
+          <option value="engage">Engage</option>
+        </select>
         <select
           value={tone}
           onChange={(e) => setTone(e.target.value as typeof tone)}
-          className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
           aria-label="Tone"
         >
           <option value="professional">Professional</option>
@@ -104,7 +283,7 @@ function AiPanel({
         <select
           value={length}
           onChange={(e) => setLength(e.target.value as typeof length)}
-          className="flex-1 rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
           aria-label="Length"
         >
           <option value="short">Short</option>
@@ -112,27 +291,54 @@ function AiPanel({
           <option value="long">Long</option>
         </select>
       </div>
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && (
+        <AiErrorDisplay
+          err={error}
+          retryCount={retryCount}
+          onRetry={() => void generate()}
+          onEdit={() => setError(null)}
+        />
+      )}
       {result && (
         <div className="space-y-2">
-          <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{result}</p>
-          <button
-            type="button"
+          <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm" data-testid="ai-result">{result}</p>
+          <Button
+            size="xs"
+            className="w-full"
             onClick={() => { onInsert(result); onClose(); }}
-            className="w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
             Use this text
-          </button>
+          </Button>
         </div>
       )}
-      <button
-        type="button"
-        onClick={() => void generate()}
-        disabled={loading || !prompt.trim()}
-        className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50 transition-colors"
-      >
-        {loading ? "Generating…" : "Generate"}
-      </button>
+      {loading ? (
+        <Button
+          variant="outline"
+          size="xs"
+          className="w-full"
+          onClick={cancel}
+          data-testid="ai-cancel-button"
+        >
+          Cancel
+        </Button>
+      ) : (
+        <div className="space-y-1">
+          {prompt.trim() && (
+            <p className="text-center text-xs text-muted-foreground" data-testid="ai-cost-estimate">
+              Est. cost: {estimateCost(prompt.length)} · ~{250 + Math.ceil(prompt.length / 4) + 200} tokens
+            </p>
+          )}
+          <Button
+            size="xs"
+            className="w-full"
+            onClick={() => void generate()}
+            disabled={!prompt.trim()}
+            data-testid="ai-generate-button"
+          >
+            Generate
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -141,314 +347,250 @@ function AiPanel({
 // GIF picker panel
 // ---------------------------------------------------------------------------
 
-interface GiphyResult {
+const GIF_CATEGORIES = [
+  { id: "trending", label: "Trending" },
+  { id: "reactions", label: "Reactions" },
+  { id: "sports", label: "Sports" },
+  { id: "memes", label: "Memes" },
+  { id: "animation", label: "Animation" },
+  { id: "tech", label: "Tech" },
+  { id: "stickers", label: "Stickers" },
+] as const;
+
+interface GifResult {
   id: string;
-  images: { fixed_width: { url: string }; fixed_width_still: { url: string }; original: { url: string } };
   title: string;
+  preview_url: string;
+  animated_url: string;
+  original_url: string;
 }
 
 function GifPanel({
-  onInsert,
+  companyId,
+  onAttach,
   onClose,
 }: {
-  onInsert: (url: string) => void;
+  companyId: string;
+  onAttach: (storageUrl: string) => void;
   onClose: () => void;
 }) {
-  const apiKey = process.env.NEXT_PUBLIC_GIPHY_API_KEY ?? "";
   const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<GiphyResult[]>([]);
+  const [category, setCategory] = React.useState<string>("trending");
+  const [results, setResults] = React.useState<GifResult[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [attaching, setAttaching] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function search(q: string) {
-    if (!apiKey) return;
+  async function search(q: string, cat: string) {
     setLoading(true);
+    setError(null);
     try {
-      const endpoint = q.trim()
-        ? `https://api.giphy.com/v1/gifs/search?api_key=${encodeURIComponent(apiKey)}&q=${encodeURIComponent(q)}&limit=12&rating=g`
-        : `https://api.giphy.com/v1/gifs/trending?api_key=${encodeURIComponent(apiKey)}&limit=12&rating=g`;
-      const res = await fetch(endpoint);
-      const json = (await res.json()) as { data: GiphyResult[] };
-      setResults(json.data ?? []);
+      const params = new URLSearchParams({ company_id: companyId, category: cat, limit: "12" });
+      if (q.trim()) params.set("q", q.trim());
+      const res = await fetch(`/api/platform/social/gif-search?${params.toString()}`);
+      const json = (await res.json()) as { ok: boolean; data?: { results: GifResult[] }; error?: { message: string } };
+      if (json.ok && json.data) {
+        setResults(json.data.results);
+      } else {
+        setError(json.error?.message ?? "GIF search unavailable.");
+      }
     } catch {
-      // silently fail — GIF picker is optional
+      const traceId = crypto.randomUUID();
+      setError(`GIF search failed. Please try again. [trace: ${traceId}]`);
+      void logClientError({ component: "gif-panel", severity: "error", message: "GIF search network failure", traceId, companyId, context: { error_code: "GIF_SEARCH_FAILED" } });
     } finally {
       setLoading(false);
     }
   }
 
-  React.useEffect(() => { void search(""); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Initial load
+  React.useEffect(() => { void search("", category); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!apiKey) {
-    return (
-      <div className="rounded-xl border border-border bg-background p-4 text-sm text-muted-foreground">
-        NEXT_PUBLIC_GIPHY_API_KEY is not set.
-        <button type="button" onClick={onClose} className="ml-2 text-xs underline">Close</button>
-      </div>
-    );
-  }
+  // Debounced query search (300 ms)
+  React.useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void search(query, category); }, 300);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [query, category]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
-    <div className="w-72 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">GIF picker</p>
-        <button type="button" onClick={onClose} aria-label="Close GIF panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
-      </div>
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter") void search(query); }}
-        placeholder="Search GIPHY…"
-        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
-      />
-      {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
-      <div className="grid grid-cols-3 gap-1 max-h-48 overflow-y-auto">
-        {results.map((gif) => (
-          <button
-            key={gif.id}
-            type="button"
-            aria-label={gif.title}
-            onClick={() => { onInsert(gif.images.original.url); onClose(); }}
-            className="overflow-hidden rounded"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={gif.images.fixed_width_still.url}
-              alt={gif.title}
-              className="h-16 w-full object-cover hover:opacity-80 transition-opacity"
-            />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Emoji panel
-// ---------------------------------------------------------------------------
-
-function EmojiPanel({
-  onInsert,
-  onClose,
-}: {
-  onInsert: (emoji: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <div className="w-56 rounded-xl border border-border bg-background p-3 shadow-md">
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-semibold">Emoji</p>
-        <button type="button" onClick={onClose} aria-label="Close emoji panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
-      </div>
-      <div className="grid grid-cols-6 gap-0.5">
-        {QUICK_EMOJI.map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            aria-label={emoji}
-            onClick={() => { onInsert(emoji); onClose(); }}
-            className="flex h-8 w-8 items-center justify-center rounded text-base hover:bg-muted transition-colors"
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// UTM panel
-// ---------------------------------------------------------------------------
-
-function UtmPanel({
-  onInsert,
-  onClose,
-}: {
-  onInsert: (text: string) => void;
-  onClose: () => void;
-}) {
-  const [url, setUrl] = React.useState("");
-  const [source, setSource] = React.useState("");
-  const [medium, setMedium] = React.useState("social");
-  const [campaign, setCampaign] = React.useState("");
-
-  function buildUrl() {
-    if (!url.trim()) return;
+  async function handleSelect(gif: GifResult) {
+    setAttaching(gif.id);
     try {
-      const u = new URL(url.trim());
-      if (source) u.searchParams.set("utm_source", source);
-      if (medium) u.searchParams.set("utm_medium", medium);
-      if (campaign) u.searchParams.set("utm_campaign", campaign);
-      onInsert(u.toString());
-      onClose();
+      const res = await fetch("/api/platform/social/gif-proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_id: companyId, giphy_url: gif.original_url }),
+      });
+      const json = (await res.json()) as { ok: boolean; data?: { asset: { source_url: string } }; error?: { message: string } };
+      if (json.ok && json.data?.asset.source_url) {
+        onAttach(json.data.asset.source_url);
+        onClose();
+      } else {
+        setError(json.error?.message ?? "Failed to attach GIF.");
+      }
     } catch {
-      // invalid URL
+      const traceId = crypto.randomUUID();
+      setError(`Failed to attach GIF. Please try again. [trace: ${traceId}]`);
+      void logClientError({ component: "gif-panel", severity: "error", message: "GIF attach network failure", traceId, companyId, context: { error_code: "GIF_ATTACH_FAILED" } });
+    } finally {
+      setAttaching(null);
     }
   }
 
   return (
-    <div className="w-72 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
+    <div className="w-80 space-y-3 rounded-xl border border-border bg-background p-4 shadow-md">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold">UTM tags</p>
-        <button type="button" onClick={onClose} aria-label="Close UTM panel" className="text-muted-foreground hover:text-foreground">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-        </button>
+        <p className="text-sm font-semibold">GIF picker</p>
+        <IconButton label="Close GIF panel" onClick={onClose} className="h-6 w-6 text-muted-foreground hover:text-foreground">
+          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
+        </IconButton>
       </div>
-      {[
-        { label: "URL", value: url, set: setUrl, placeholder: "https://example.com/page" },
-        { label: "Source", value: source, set: setSource, placeholder: "linkedin" },
-        { label: "Medium", value: medium, set: setMedium, placeholder: "social" },
-        { label: "Campaign", value: campaign, set: setCampaign, placeholder: "spring-promo" },
-      ].map(({ label, value, set, placeholder }) => (
-        <div key={label} className="space-y-1">
-          <label className="text-xs text-muted-foreground">{label}</label>
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => set(e.target.value)}
-            placeholder={placeholder}
-            className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
-          />
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={buildUrl}
-        disabled={!url.trim()}
-        className="w-full rounded-md border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-      >
-        Insert URL with UTM tags
-      </button>
-    </div>
-  );
-}
 
-// ---------------------------------------------------------------------------
-// ToolsRow — main export
-// ---------------------------------------------------------------------------
+      {/* Category tabs */}
+      <Tabs value={category} onValueChange={setCategory} label="GIF categories">
+        {GIF_CATEGORIES.map((cat) => (
+          <TabTrigger key={cat.id} value={cat.id}>
+            {cat.label}
+          </TabTrigger>
+        ))}
+      </Tabs>
 
-const TOOLS = [
-  {
-    id: "ai" as const,
-    label: "AI assistant",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3z" />
-      </svg>
-    ),
-  },
-  {
-    id: "media" as const,
-    label: "Media",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
-    ),
-  },
-  {
-    id: "emoji" as const,
-    label: "Emoji",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <circle cx="12" cy="12" r="10" />
-        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
-        <line x1="9" y1="9" x2="9.01" y2="9" />
-        <line x1="15" y1="9" x2="15.01" y2="9" />
-      </svg>
-    ),
-  },
-  {
-    id: "gif" as const,
-    label: "GIF",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <rect width="18" height="18" x="3" y="3" rx="2" />
-        <circle cx="9" cy="9" r="2" />
-        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-      </svg>
-    ),
-  },
-  {
-    id: "utm" as const,
-    label: "UTM tags",
-    icon: (
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-        <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-        <line x1="7" y1="7" x2="7.01" y2="7" />
-      </svg>
-    ),
-  },
-] as const;
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search GIPHY…"
+        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
+        aria-label="Search GIFs"
+      />
 
-export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, className }: ToolsRowProps) {
-  const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
+      {error && <p className="text-xs text-destructive" role="alert">{error}</p>}
+      {loading && <p className="text-xs text-muted-foreground">Loading…</p>}
 
-  function togglePanel(id: ActivePanel) {
-    setActivePanel((prev) => (prev === id ? null : id));
-  }
-
-  return (
-    <div className={cn("space-y-2", className)}>
-      <div className="flex flex-wrap gap-1">
-        {TOOLS.map((tool) => (
+      <div className="grid grid-cols-3 gap-1 max-h-52 overflow-y-auto" data-testid="gif-grid">
+        {results.map((gif) => (
           <button
-            key={tool.id}
+            key={gif.id}
             type="button"
-            onClick={() => {
-              if (tool.id === "media") {
-                onOpenMediaPicker();
-              } else {
-                togglePanel(tool.id);
-              }
-            }}
-            aria-pressed={activePanel === tool.id}
+            aria-label={gif.title || "GIF"}
+            disabled={!!attaching}
+            onClick={() => void handleSelect(gif)}
             className={cn(
-              "flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs font-medium transition-colors",
-              activePanel === tool.id
-                ? "border-primary bg-primary/10 text-primary"
-                : "border-border bg-background text-muted-foreground hover:border-muted-foreground hover:text-foreground",
+              "overflow-hidden rounded transition-opacity",
+              attaching === gif.id ? "opacity-40" : "hover:opacity-80",
             )}
           >
-            {tool.icon}
-            {tool.label}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={gif.preview_url}
+              alt={gif.title}
+              className="h-16 w-full object-cover"
+              loading="lazy"
+            />
           </button>
         ))}
       </div>
 
-      {activePanel === "ai" && (
-        <AiPanel
-          companyId={companyId}
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
-      )}
-      {activePanel === "emoji" && (
-        <EmojiPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
-      )}
-      {activePanel === "gif" && (
-        <GifPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
-      )}
-      {activePanel === "utm" && (
-        <UtmPanel
-          onInsert={onInsertText}
-          onClose={() => setActivePanel(null)}
-        />
-      )}
+      {/* Attribution required by GIPHY terms */}
+      <p className="text-center text-xs text-muted-foreground">Powered by GIPHY</p>
+    </div>
+  );
+}
+
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// ToolsRow — main export
+// ---------------------------------------------------------------------------
+
+// AI uses Dialog (not Popover) to avoid overflowing the composer bounds.
+// Emoji, GIF, UTM remain Popover-anchored.
+const PANEL_TOOLS = [
+  { id: "emoji" as const, label: "Emoji",    icon: <Smile size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "gif" as const,   label: "GIF",      icon: <Film  size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "utm" as const,   label: "UTM tags", icon: <Tags  size={14} strokeWidth={1.75} aria-hidden /> },
+] as const;
+
+export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, platforms, className }: ToolsRowProps) {
+  const [activePanel, setActivePanel] = React.useState<ActivePanel>(null);
+
+  // Radix Popover handles Esc + click-outside via DismissableLayer (D-047).
+  // Mutual exclusion via controlled `open` prop (D-048).
+
+  return (
+    <div className={cn("flex flex-wrap gap-1", className)} data-testid="composer-tools-toolbar">
+      {/* Media — opens modal, no popover */}
+      <Button
+        variant="toolbar"
+        size="xs"
+        data-testid="composer-tool-media"
+        onClick={onOpenMediaPicker}
+      >
+        <ImagePlus size={14} strokeWidth={1.75} aria-hidden />
+        Media
+      </Button>
+
+      {/* AI assistant — Dialog prevents overflow outside composer bounds (Issue 6) */}
+      <Button
+        variant="toolbar"
+        size="xs"
+        data-testid="composer-tool-ai"
+        aria-pressed={activePanel === "ai"}
+        onClick={() => setActivePanel(activePanel === "ai" ? null : "ai")}
+      >
+        <Sparkles size={14} strokeWidth={1.75} aria-hidden />
+        AI assistant
+      </Button>
+      <Dialog open={activePanel === "ai"} onOpenChange={(open) => setActivePanel(open ? "ai" : null)}>
+        <DialogContent className="max-w-[600px] p-0" data-testid="composer-panel-ai">
+          <AiPanel companyId={companyId} onInsert={onInsertText} onClose={() => setActivePanel(null)} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Panel tools — each anchored to its trigger button via Radix Popover */}
+      {PANEL_TOOLS.map((tool) => (
+        <PopoverPrimitive.Root
+          key={tool.id}
+          open={activePanel === tool.id}
+          onOpenChange={(open) => setActivePanel(open ? tool.id : null)}
+        >
+          <PopoverPrimitive.Trigger asChild>
+            <Button
+              variant="toolbar"
+              size="xs"
+              data-testid={`composer-tool-${tool.id}`}
+              aria-pressed={activePanel === tool.id}
+            >
+              {tool.icon}
+              {tool.label}
+            </Button>
+          </PopoverPrimitive.Trigger>
+
+          {/* Portal to body; z-[200] per --z-popover spec token (D-045) */}
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Content
+              side="bottom"
+              align="start"
+              sideOffset={8}
+              className="z-[200] outline-none max-h-[calc(100vh-100px)] overflow-y-auto"
+            >
+              {/* c3-panel-in: 200ms translateY(-8px)→0 + fade, ease-snap */}
+              <div className="c3-panel-in" data-testid={`composer-panel-${tool.id}`}>
+                {tool.id === "emoji" && (
+                  <EmojiPickerPanel onInsert={onInsertText} onClose={() => setActivePanel(null)} />
+                )}
+                {tool.id === "gif" && (
+                  <GifPanel companyId={companyId} onAttach={onAttachGif} onClose={() => setActivePanel(null)} />
+                )}
+                {tool.id === "utm" && (
+                  <UtmBuilderPanel onInsert={onInsertText} onClose={() => setActivePanel(null)} platforms={platforms} />
+                )}
+              </div>
+            </PopoverPrimitive.Content>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
+      ))}
     </div>
   );
 }

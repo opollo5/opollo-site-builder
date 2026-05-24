@@ -2,6 +2,26 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as React from "react";
 
+// emoji-picker-react requires IntersectionObserver + canvas which are not
+// available in jsdom. Mock it so ToolsRow tests can open the emoji panel.
+vi.mock("emoji-picker-react", () => {
+  const MockEmojiPicker = vi.fn(({ onEmojiClick }: { onEmojiClick: (d: { emoji: string }) => void }) => (
+    React.createElement("div", { "data-testid": "mock-emoji-picker" },
+      React.createElement("button", { type: "button", onClick: () => onEmojiClick({ emoji: "🎉" }) }, "🎉"),
+      React.createElement("button", { type: "button", onClick: () => onEmojiClick({ emoji: "🔥" }) }, "🔥"),
+    )
+  ));
+  return {
+    default: MockEmojiPicker,
+    Categories: { SUGGESTED: "suggested", SMILEYS_PEOPLE: "smileys_people", ANIMALS_NATURE: "animals_nature", FOOD_DRINK: "food_drink", TRAVEL_PLACES: "travel_places", ACTIVITIES: "activities", OBJECTS: "objects", SYMBOLS: "symbols", FLAGS: "flags" },
+    EmojiStyle: { NATIVE: "native" },
+    SkinTonePickerLocation: { PREVIEW: "preview" },
+    SkinTones: { NEUTRAL: "neutral" },
+    SuggestionMode: { FREQUENT: "frequent" },
+    Theme: { LIGHT: "light" },
+  };
+});
+
 import { CustomizeForRow } from "@/components/social/composer/CustomizeForRow";
 import { PlatformActionsList } from "@/components/social/composer/PlatformActionsList";
 import { MediaTray } from "@/components/social/composer/MediaTray";
@@ -210,7 +230,7 @@ describe("MediaTray", () => {
         onRequestUpload={() => undefined}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /remove image 1/i }));
+    fireEvent.click(screen.getByRole("button", { name: /remove media 1/i }));
     expect(onRemove).toHaveBeenCalledWith(0);
   });
 
@@ -230,15 +250,16 @@ describe("MediaTray", () => {
     const onRequestUpload = vi.fn();
     render(
       <MediaTray
-        urls={[]}
+        urls={["https://example.com/a.jpg"]}
         onRemove={() => undefined}
         onRequestUpload={onRequestUpload}
-        uploading={true}
+        uploading={false}
+        maxFiles={4}
       />,
     );
-    // Add media button is disabled while uploading but still rendered
     const btn = screen.getByRole("button", { name: /add media/i });
-    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(onRequestUpload).toHaveBeenCalledTimes(1);
   });
 
   it("does not render Add media button when at max files", () => {
@@ -260,9 +281,22 @@ describe("MediaTray", () => {
 // ---------------------------------------------------------------------------
 
 describe("ToolsRow", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        json: () => Promise.resolve({ ok: false, error: { message: "unavailable in test" } }),
+      }),
+    );
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders all tool buttons", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     expect(screen.getByRole("button", { name: /ai assistant/i })).toBeTruthy();
     expect(screen.getByRole("button", { name: /media/i })).toBeTruthy();
@@ -274,7 +308,7 @@ describe("ToolsRow", () => {
   it("calls onOpenMediaPicker when Media button is clicked", () => {
     const onOpenMediaPicker = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={onOpenMediaPicker} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={onOpenMediaPicker} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /media/i }));
     expect(onOpenMediaPicker).toHaveBeenCalledTimes(1);
@@ -282,7 +316,7 @@ describe("ToolsRow", () => {
 
   it("opens emoji panel when Emoji button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /emoji/i }));
     // Panel has a close button and an emoji grid — 🎉 is the first emoji
@@ -291,7 +325,7 @@ describe("ToolsRow", () => {
 
   it("closes emoji panel when close button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /emoji/i }));
     fireEvent.click(screen.getByRole("button", { name: /close emoji panel/i }));
@@ -301,7 +335,7 @@ describe("ToolsRow", () => {
   it("inserts emoji and closes panel when emoji is clicked", () => {
     const onInsertText = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /emoji/i }));
     fireEvent.click(screen.getByRole("button", { name: "🎉" }));
@@ -311,7 +345,7 @@ describe("ToolsRow", () => {
 
   it("opens UTM panel when UTM tags button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /utm tags/i }));
     // Panel is open when the URL input is visible
@@ -325,13 +359,17 @@ describe("ToolsRow", () => {
   it("inserts UTM URL and closes panel when Insert URL is clicked", () => {
     const onInsertText = vi.fn();
     render(
-      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /utm tags/i }));
     const urlInput = screen.getAllByRole("textbox").find((el) =>
       el.getAttribute("placeholder")?.includes("example.com/page"),
     )!;
     fireEvent.change(urlInput, { target: { value: "https://example.com" } });
+    const campaignInput = screen.getAllByRole("textbox").find((el) =>
+      el.getAttribute("placeholder")?.includes("spring-promo"),
+    )!;
+    fireEvent.change(campaignInput, { target: { value: "test-campaign" } });
     const sourceInput = screen.getAllByRole("textbox").find((el) =>
       el.getAttribute("placeholder")?.includes("linkedin"),
     )!;
@@ -350,7 +388,7 @@ describe("ToolsRow", () => {
 
   it("toggles active panel off when same button is clicked twice", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     // Use exact name match to avoid matching "Insert URL with UTM tags" button inside the panel
     const utmBtn = screen.getByRole("button", { name: "UTM tags" });
@@ -370,19 +408,124 @@ describe("ToolsRow", () => {
 
   it("shows AI panel when AI assistant button clicked", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
-    // Panel has a textarea for the prompt and a Generate button
-    expect(screen.getByRole("button", { name: /close ai panel/i })).toBeTruthy();
+    expect(screen.getByTestId("ai-panel")).toBeTruthy();
+    expect(screen.getByTestId("ai-generate-button")).toBeTruthy();
   });
 
-  it("shows not-configured message when GIPHY key absent", () => {
+  it("shows cost estimate when prompt is typed", () => {
     render(
-      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} />,
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "write a post" } });
+    expect(screen.getByTestId("ai-cost-estimate").textContent).toMatch(/Est\. cost:/);
+  });
+
+  it("shows rate limit error with trace_id on 429 response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/api/errors")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: { trace_id: "ce-abcd-1234" } }) });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 429,
+        json: () => Promise.resolve({
+          ok: false,
+          error: {
+            category: "rate_limit",
+            code: "RATE_LIMIT",
+            message: "You hit the per-minute token limit. Try again in 60s.",
+            trace_id: "ai-gen-7f3a-c2e1",
+            retry_after: 60,
+            can_retry: true,
+          },
+        }),
+      });
+    }));
+
+    render(
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
+    fireEvent.click(screen.getByTestId("ai-generate-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-error-display")).toBeTruthy();
+    });
+    expect(screen.getByTestId("ai-trace-id").textContent).toContain("ai-gen-7f3a-c2e1");
+    expect(screen.getByTestId("ai-error-display").textContent).toMatch(/rate.limit|token limit/i);
+  });
+
+  it("shows timeout error with trace_id on timeout response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (String(url).includes("/api/errors")) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, data: { trace_id: "ce-efgh-5678" } }) });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({
+          ok: false,
+          error: {
+            category: "timeout",
+            code: "TIMEOUT",
+            message: "Generation timed out. Try shortening your prompt.",
+            trace_id: "ai-gen-9c1b-a847",
+            can_retry: true,
+          },
+        }),
+      });
+    }));
+
+    render(
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
+    fireEvent.click(screen.getByTestId("ai-generate-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-error-display")).toBeTruthy();
+    });
+    expect(screen.getByTestId("ai-trace-id").textContent).toContain("ai-gen-9c1b-a847");
+    expect(screen.getByTestId("ai-error-display").textContent).toMatch(/timeout|timed out/i);
+  });
+
+  it("shows generated result on success", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ ok: true, data: { text: "Here is your generated post!" } }),
+    }));
+
+    const onInsertText = vi.fn();
+    render(
+      <ToolsRow companyId="co_1" onInsertText={onInsertText} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /ai assistant/i }));
+    fireEvent.change(screen.getByTestId("ai-prompt-input"), { target: { value: "test prompt" } });
+    fireEvent.click(screen.getByTestId("ai-generate-button"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("ai-result")).toBeTruthy();
+    });
+    expect(screen.getByTestId("ai-result").textContent).toContain("Here is your generated post!");
+    fireEvent.click(screen.getByRole("button", { name: /use this text/i }));
+    expect(onInsertText).toHaveBeenCalledWith("Here is your generated post!");
+  });
+
+  it("opens GIF panel when GIF button clicked", () => {
+    render(
+      <ToolsRow companyId="co_1" onInsertText={() => undefined} onOpenMediaPicker={() => undefined} onAttachGif={() => undefined} />,
     );
     fireEvent.click(screen.getByRole("button", { name: /gif/i }));
-    expect(screen.getByText(/NEXT_PUBLIC_GIPHY_API_KEY is not set/)).toBeTruthy();
+    // Panel renders the category tabs and attribution
+    expect(screen.getByRole("tab", { name: /trending/i })).toBeTruthy();
+    expect(screen.getByText(/powered by giphy/i)).toBeTruthy();
   });
 });
 
@@ -506,7 +649,7 @@ describe("ContentEditor", () => {
     await waitFor(() =>
       expect(screen.getByRole("alert")).toBeTruthy(),
     );
-    expect(screen.getByText(/over 10 MB/i)).toBeTruthy();
+    expect(screen.getByText(/8 MB/i)).toBeTruthy();
   });
 });
 

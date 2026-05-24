@@ -137,6 +137,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
             { label: "Media", href: "/company/social/media", testId: "cnav-media" },
             { label: "Sharing", href: "/company/social/sharing", testId: "cnav-sharing", requiresCompanyAdmin: true },
             { label: "Analytics", href: "/company/social/analytics", testId: "cnav-analytics" },
+            { label: "Insights", href: "/company/social/insights", testId: "cnav-insights" },
           ],
         },
         {
@@ -204,6 +205,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
       "/admin/email-test",
       "/admin/settings",
       "/admin/maintenance",
+      "/admin/insights",
     ],
     testId: "nav-admin-tools",
     sectionNav: {
@@ -212,6 +214,7 @@ export const primaryNavItems: PrimaryNavItem[] = [
         {
           label: null,
           items: [
+            { label: "Insights", href: "/admin/insights", testId: "nav-admin-insights" },
             { label: "Audit log", href: "/admin/users/audit", testId: "nav-audit-log" },
             { label: "System jobs", href: "/admin/system/jobs", testId: "nav-system-jobs" },
             { label: "Maintenance", href: "/admin/maintenance", testId: "nav-maintenance" },

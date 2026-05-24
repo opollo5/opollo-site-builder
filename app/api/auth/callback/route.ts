@@ -91,6 +91,19 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const supabase = createRouteAuthClient();
 
+  // Sign out any existing session before exchanging the incoming code.
+  // Without this, a previously signed-in user's cookies stay in play
+  // during the exchange: the new code is consumed (one-use), but the
+  // session that lands is polluted by the old user's cookie state.
+  // That produces two symptoms: the wrong user name is displayed (the
+  // old session persists), and any subsequent attempt gets "expired
+  // link" because the code was already consumed without a clean login.
+  // The sign-out is best-effort — if it fails we still attempt the
+  // exchange; the worst case is the same broken state as before the fix.
+  await supabase.auth.signOut().catch(() => {
+    logger.warn("auth callback pre-exchange sign-out failed (non-fatal)");
+  });
+
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {

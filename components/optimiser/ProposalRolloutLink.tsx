@@ -8,11 +8,11 @@ import type { RolloutRow } from "@/lib/optimiser/staged-rollout/read";
 // breakdown). Only shows when a rollout exists for the proposal.
 
 const STATE_TONE: Record<string, string> = {
-  live: "border-blue-200 bg-blue-50 text-blue-900",
-  promoted: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  manually_promoted: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  live: "border-info-border bg-info-bg text-info-fg",
+  promoted: "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]",
+  manually_promoted: "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]",
   auto_reverted: "border-red-200 bg-red-50 text-red-900",
-  failed: "border-amber-200 bg-amber-50 text-amber-900",
+  failed: "border-warning-border bg-warning-bg text-warning-fg",
 };
 
 const STATE_LABEL: Record<string, string> = {

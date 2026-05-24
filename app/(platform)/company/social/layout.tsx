@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { NavIcon } from "@/components/ui/nav-icon";
-import { ComposerMount } from "@/components/composer/composer-mount";
+import { ComposerMountV2 } from "@/components/composer/composer-mount-v2";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -13,8 +13,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // staff who haven't yet selected a company via the Social section nav
 // selector, we render an inline prompt rather than redirecting.
 //
-// Mounts PostComposerModal here so it is available on every social
-// sub-route via ?compose=new or ?compose=<id>.
+// Mounts ComposerOverlay (V2) via ComposerMountV2 so it is available on
+// every social sub-route via ?compose=new or ?compose=<id>.
 
 export default async function CompanySocialLayout({
   children,
@@ -41,23 +41,20 @@ export default async function CompanySocialLayout({
     redirect("/company");
   }
 
-  let companyTimezone = "UTC";
-  const svc = getServiceRoleClient();
-  const { data: tzRow } = await svc
+  const companyId = session.company.companyId;
+
+  const client = getServiceRoleClient();
+  const { data: company } = await client
     .from("platform_companies")
     .select("timezone")
-    .eq("id", session.company.companyId)
+    .eq("id", companyId)
     .maybeSingle();
-  companyTimezone = (tzRow?.timezone as string | null) ?? "UTC";
+  const companyTimezone = (company?.timezone as string | undefined) ?? "UTC";
 
   return (
     <>
       {children}
-      <ComposerMount
-        companyId={session.company.companyId}
-        userId={session.userId}
-        companyTimezone={companyTimezone}
-      />
+      <ComposerMountV2 companyId={companyId} companyTimezone={companyTimezone} />
     </>
   );
 }

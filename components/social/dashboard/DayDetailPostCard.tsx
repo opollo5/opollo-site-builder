@@ -11,7 +11,7 @@ interface DayDetailPostCardProps {
   post: CalendarPost;
   onDelete: (id: string) => void;
   onReschedule: (id: string) => void;
-  onClick: (id: string) => void;
+  onClick: (post: CalendarPost) => void;
 }
 
 function formatTime(iso: string | null): string {
@@ -86,7 +86,7 @@ export function DayDetailPostCard({ post, onDelete, onReschedule, onClick }: Day
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative flex items-start gap-3 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-sm",
+        "group relative flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-sm",
         isDragging && "opacity-50 shadow-lg z-50",
       )}
       data-testid="day-detail-post-card"
@@ -112,7 +112,7 @@ export function DayDetailPostCard({ post, onDelete, onReschedule, onClick }: Day
       </button>
 
       {/* Platform + time header */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5" onClick={() => onClick(post.id)}>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5" onClick={() => onClick(post)}>
         <div className="flex items-center gap-1.5">
           {iconKey && <SocialPlatformIcon platform={iconKey} size={16} className="shrink-0" />}
           {time && <span className="text-xs font-medium text-muted-foreground">{time}</span>}

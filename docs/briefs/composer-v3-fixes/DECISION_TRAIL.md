@@ -1,0 +1,129 @@
+# Decision Trail — Composer v3 Fixes
+
+Autonomous decisions logged here. D-044+ per master prompt operating rules.
+Continues from `docs/briefs/social-composer-v3-rebuild/DECISION_TRAIL.md` (D-001–D-043).
+
+---
+
+## PR-A1 — Tool panels as Popovers (2026-05-21)
+
+**D-044**: Radix Popover dependency already installed
+- `grep '"@radix-ui/react-popover"' package.json` → `"@radix-ui/react-popover": "^1.1.15"` ✓
+- Decision: Use `@radix-ui/react-popover` directly. No new dependency needed.
+
+**D-045**: `--c3-z-popover` token not defined
+- `globals.css` defines `--c3-z-overlay: 900` and `--c3-z-modal: 1000`, but not `--c3-z-popover`.
+- Design spec (`00-design-tokens.md §11`) specifies `--z-popover: 200`.
+- Decision: Use Tailwind arbitrary `z-[200]` on `PopoverContent` per spec. Log here per brief instructions. No new token added (existing `--c3-z-*` tokens set was not updated mid-PR).
+
+**D-046**: Popover Portal → body; existing tests updated to use `page.getByTestId`
+- `<Popover.Portal>` portals content to `document.body`.
+- `dialog.getByTestId("composer-panel-{id}")` in `composer-tool-panels.spec.ts` would miss portaled elements.
+- Decision: Update the 8 `toBeVisible()` / `not.toBeVisible()` assertions in that spec from `dialog.getByTestId` → `page.getByTestId`. The `not.toBeVisible()` assertions already pass either way (element absent from dialog subtree), but `toBeVisible()` assertions would fail without this change.
+- `composer.spec.ts` line 185 and `composer-keyboard-shortcuts.spec.ts` already use `page.getByTestId` — no change needed.
+
+**D-047**: Existing `useEffect` document listeners removed
+- ToolsRow had two `useEffect` hooks: one for `document.addEventListener("keydown")` (Esc) and one for `document.addEventListener("pointerdown")` (click-outside).
+- Radix's `DismissableLayer` (used inside `<Popover.Root>`) handles both Esc and pointer-outside automatically, calling `onOpenChange(false)`.
+- Decision: Remove both `useEffect` hooks. Radix's behavior covers all cases.
+- Removed `containerRef` too — no longer needed since click-outside is handled by Radix.
+
+**D-048**: Mutual exclusion via controlled `open` + `onOpenChange`
+- Each tool button uses `<Popover.Root open={activePanel === tool.id} onOpenChange={(open) => setActivePanel(open ? tool.id : null)}>`.
+- When user clicks tool B while tool A is open: Radix's DismissableLayer fires `onOpenChange(false)` for A (pointerdown capture) before the click handler for B fires `onOpenChange(true)`. React 18 batches both state updates; result is `activePanel = "b"`. ✓
+
+**D-049**: `max-h-[calc(100vh-100px)] overflow-y-auto` on PopoverContent
+- CI e2e run 1 failure: UT-3 and UT-4 failed with "element is not stable" (30s timeout). First fix attempt: `avoidCollisions={false}`. That stopped the oscillation but exposed the underlying cause — the full error log from run 2 showed "element is outside of the viewport". The UTM panel is ~350px tall. When the trigger is at Y≈450px in a 720px viewport, the panel bottom lands at ~808px — outside the viewport. `position: fixed` portaled elements cannot be scrolled into view by Playwright.
+- Decision: Remove `avoidCollisions={false}` (restore Radix flip behavior) and add `max-h-[calc(100vh-100px)] overflow-y-auto` to PopoverContent. The bounded max-height prevents both side from overflowing simultaneously — Radix can always find a valid side (above or below) that fits, eliminating the oscillation. When flipped to `side=top`, the panel bottom is at Y≈442px and top at Y≈92px — all elements within viewport.
+- UT-5 (close button at top of panel) passed even without the fix because it's positioned just below the trigger — within the viewport — while the toggle and insert button at the panel's lower half were outside the viewport.
+
+---
+
+## PR-A2 — Preview card max-width (2026-05-21)
+
+**D-050**: `max-w-[480px] mx-auto` on PreviewCard wrapper div
+- PreviewCard.tsx line 93 — the outer `<div>` had only `space-y-2` + optional className. No width constraint. Cards stretched to fill the right-pane container (`flex-1`), which grows with the dialog width.
+- Decision: Add `max-w-[480px] mx-auto` to the PreviewCard wrapper. `mx-auto` centers the card in the pane when the pane is wider than 480px. Applied at the PreviewCard layer (not at ComposerOverlay) so the constraint is co-located with the component and applies to all usages (composer right pane + analytics modal).
+- `480px` is not an existing Tailwind token; using arbitrary value `max-w-[480px]`. The design-tokens unit test only checks sub-16px font sizes and hex colors — not flagged.
+
+---
+
+## PR-A3 — Profile chip sizing (2026-05-21)
+
+**D-051**: Investigation — actual-vs-spec delta
+- `h-14 w-14` = 56px outer ✓ (spec: 56px)
+- `absolute inset-0.5` = 52px avatar ✓ (spec: 52px)
+- `h-5 w-5` = 20px checkbox ✓ (spec: 20px)
+- Platform badge: `size={16}` + `p-0.5` (2px) = **20px total** ✗ (spec: 24px with 2.5px white ring)
+- Git blame: `size={16}` present since initial commit `7c74e386` — never matched spec
+- Wireframe (01-composer-states.html): shows a v2 pill-card chip (40px avatar, horizontal layout). Current code is the v3 circular spec. The "24–40px" UAT observation matches the badge rendering visually small (20px badge on 56px chip where spec is 24px).
+- Decision: fix platform badge only. All other dimensions already match spec.
+
+**D-052**: Platform badge fix approach
+- Need total 24px badge with 2.5px white ring between icon and chip edge.
+- Old: `bg-white p-0.5` (2px) + `size={16}` = 20px total
+- New: `bg-white p-[2.5px]` + `size={19}` = 19 + 2×2.5 = 24px total ✓
+- Added `data-testid="platform-badge-{dataid}"` for e2e assertion `clientWidth >= 22`
+
+---
+
+## PR-B1 — AI assistant error categorization (2026-05-21)
+
+**D-053**: Investigation — root cause of content_rejected false-positive
+- `client_errors` table not accessible via PostgREST (not in schema cache); trace_id `ai-gen-45b8-fe84` cannot be queried from REST API.
+- Root cause identified from code analysis (case b per brief): `categorizeError` in `lib/platform/social/cap/assist.ts` — `BadRequestError` catch (line 113) routes ALL HTTP 400s to `content_rejected`.
+- Anthropic SDK `ErrorType` (`node_modules/@anthropic-ai/sdk/resources/shared.d.ts`): `'invalid_request_error' | 'authentication_error' | 'permission_error' | ... | 'billing_error'` — NO content policy type. All 400s from Anthropic are `invalid_request_error` (malformed request, bad model name, bad system prompt, etc.).
+- Content refusals in Anthropic API arrive as 200 responses with `stop_reason === 'refusal'`, NOT as 400 errors.
+- Decision: Route `BadRequestError` → `invalid_request`. Add `stop_reason === 'refusal'` check in `generateAssistText` for actual `content_rejected`.
+
+**D-054**: HTTP status for `invalid_request` in route handler
+- `app/api/platform/social/cap/assist/route.ts` line 66 mapped `content_rejected → 422`.
+- `invalid_request` should map to `400` (it mirrors the Anthropic 400 status).
+- Decision: add `category === 'invalid_request' ? 400 :` before the `500` default in the status ternary.
+
+---
+
+## PR-C1 — Media library scope (2026-05-21)
+
+**D-055**: `scope` query filter approach — service-role bypass of RLS
+- `listMediaAssets` uses service-role client, which bypasses RLS entirely. Adding RLS `OR scope = 'global'` is correct for anon/authenticated calls but does nothing for service-role queries.
+- Decision: filter at the query layer via PostgREST `.or("company_id.eq.{id},scope.eq.global")` when `includeGlobal: true`. This is self-contained, explicit, and auditable.
+
+**D-056**: Partial index on `scope = 'global'`
+- Global assets are a small minority. A partial index `WHERE scope = 'global'` keeps the index tiny and makes the OR filter's global branch a quick index scan.
+- Decision: `CREATE INDEX IF NOT EXISTS idx_media_assets_scope ON social_media_assets(scope) WHERE scope = 'global'`
+
+**D-057**: Admin promote endpoint — `gate.user?.id` not `gate.userId`
+- `ApiGateResult` (`lib/admin-api-gate.ts`) shape: `{ kind: "allow"; user: SessionUser | null }` — no `userId` field at the top level.
+- Decision: log with `gate.user?.id` (nullable — system-level ops via service tokens have no user context).
+
+**D-058**: Admin media page under `app/(platform)/admin/media/page.tsx`
+- Pattern matches existing admin pages: `checkAdminAccess()` + `redirect("/login")`, service-role query, pass to client component.
+- Working analog: `app/(platform)/admin/companies/page.tsx`.
+
+**D-059**: `scope` field added to `MediaAsset` type in `MediaPickerModal.tsx`
+- API now returns `scope` on every asset. Adding it to the local type keeps the shape consistent and enables future UI differentiation (e.g. staff-pick badge) without a type change.
+
+**D-060**: Library fetch param `include_global=true` always set
+- All authenticated users with `view_calendar` can see global (staff-promoted) assets — that's the intent. No per-user toggle needed.
+- Decision: always pass `include_global=true` in `MediaPickerModal.fetchLibrary`.
+
+---
+
+## PR-C2 — Calendar month grid (2026-05-21)
+
+**D-061**: Reuse `PostChip` from `components/social/dashboard/PostChip.tsx`
+- The same chip already exists and works. Creating a new one at `components/social/calendar/PostChip.tsx` would be duplication.
+- Decision: import from `@/components/social/dashboard/PostChip`. No copy.
+
+**D-062**: `DayCell` omits drag-and-drop
+- `CalendarCell` (dashboard) uses `@dnd-kit/core` for drag-to-reschedule. The composer right-pane calendar is read-only — no reschedule UX in this context.
+- Decision: `DayCell` is a plain div, no `useDroppable`. Keeps the composer bundle lighter.
+
+**D-063**: Monday-first grid (mirrors CalendarShell)
+- `CalendarShell` uses `(day.getDay() + 6) % 7` for Monday-first offset. `MiniCalendar` uses Sunday-first (`getDay()` direct). Using Monday-first matches what users see on `/company/social/calendar`.
+- Decision: adopt Monday-first layout from `CalendarShell.buildGridDates`.
+
+**D-064**: `companyId` passed through from `ComposerOverlay`
+- `ComposerOverlay` already receives `companyId` as a prop (defaults to `""`). `useCalendarView` returns empty posts when `companyId` is falsy (null URL). No guard needed.
+- Decision: `MonthCalendar` accepts `companyId: string`; works silently when empty.

@@ -6,12 +6,13 @@ import {
   type DragEndEvent,
   DragOverlay,
   PointerSensor,
+  useDroppable,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
-import { CalendarCell } from "./CalendarCell";
 import { DayDetail } from "./DayDetail";
+import { SocialCalendarGrid } from "@/components/social/calendar/SocialCalendarGrid";
 import { PostChip } from "./PostChip";
 import { FilterBar } from "./FilterBar";
 import { useCalendarView } from "@/hooks/use-calendar-view";
@@ -23,7 +24,81 @@ import { useComposerState } from "@/hooks/use-composer-state";
 import type { CalendarPost, Connection } from "@/lib/social/types";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
-const DAYS_OF_WEEK = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+// ---------------------------------------------------------------------------
+// DnDCell — DnD-aware day cell used by CalendarShell's renderDay prop.
+// No cell-add-btn; Issues 3+4 fixes (p-2 padding, bg-primary/5 today tint)
+// are applied in SocialCalendarGrid's DefaultCell and mirrored here.
+// ---------------------------------------------------------------------------
+
+interface DnDCellProps {
+  date: Date;
+  posts: CalendarPost[];
+  isSelected: boolean;
+  isPast: boolean;
+  isOtherMonth: boolean;
+  isToday: boolean;
+  onClick: () => void;
+  onClickPost?: (post: CalendarPost) => void;
+}
+
+function DnDCell({
+  date,
+  posts,
+  isSelected,
+  isPast,
+  isOtherMonth,
+  isToday,
+  onClick,
+  onClickPost,
+}: DnDCellProps) {
+  const droppableId = date.toISOString().slice(0, 10);
+  const canDrop = !isPast && !isOtherMonth;
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId, disabled: !canDrop });
+
+  return (
+    <div
+      ref={setNodeRef}
+      role="gridcell"
+      aria-label={date.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+      aria-selected={isSelected}
+      onClick={onClick}
+      className={cn(
+        "relative flex min-h-[80px] flex-col gap-0.5 rounded border border-border p-2 cursor-pointer transition-colors",
+        isOtherMonth && "bg-muted/30 text-muted-foreground",
+        isPast && !isOtherMonth && "bg-muted/20",
+        isToday && !isOtherMonth && !isSelected && "bg-primary/5",
+        isSelected && "border-primary bg-primary/5 ring-1 ring-primary",
+        isOver && canDrop && "border-primary/60 bg-primary/10",
+        !isOtherMonth && !isPast && !isSelected && "hover:border-primary/40 hover:bg-muted/30",
+      )}
+      data-testid="calendar-dnd-cell"
+      data-date={droppableId}
+    >
+      <span
+        className={cn(
+          "text-xs font-medium leading-none",
+          isToday && "flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-semibold",
+          !isToday && isOtherMonth && "text-muted-foreground/60",
+        )}
+      >
+        {date.getDate()}
+      </span>
+
+      <div className="flex flex-col gap-0.5 overflow-hidden">
+        {posts.slice(0, 3).map((post) => (
+          <PostChip
+            key={post.id}
+            post={post}
+            onClick={onClickPost ? (e) => { e.stopPropagation(); onClickPost(post); } : undefined}
+          />
+        ))}
+        {posts.length > 3 && (
+          <span className="text-xs text-muted-foreground pl-1">+{posts.length - 3} more</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -35,34 +110,6 @@ function startOfMonth(d: Date): Date {
 
 function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
-}
-
-// Monday-first 7-column grid cells for the given month
-function buildGridDates(year: number, month: number): Date[] {
-  const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
-
-  // Day-of-week offset so grid starts on Monday (0=Mon…6=Sun)
-  const firstDow = (first.getDay() + 6) % 7;
-  const lastDow = (last.getDay() + 6) % 7;
-
-  const cells: Date[] = [];
-
-  // Fill leading days from previous month
-  for (let i = firstDow - 1; i >= 0; i--) {
-    cells.push(new Date(year, month, -i));
-  }
-  // Current month
-  for (let d = 1; d <= last.getDate(); d++) {
-    cells.push(new Date(year, month, d));
-  }
-  // Fill trailing days to complete the last row (up to 6 rows = 42 cells max)
-  const trailingCount = lastDow < 6 ? 6 - lastDow : 0;
-  for (let d = 1; d <= trailingCount; d++) {
-    cells.push(new Date(year, month + 1, d));
-  }
-
-  return cells;
 }
 
 function postsForDate(posts: CalendarPost[], date: Date): CalendarPost[] {
@@ -172,14 +219,17 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
     }
   }
 
-  function navigateMonth(delta: number) {
-    setCurrentMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
+  function handleClickPost(post: CalendarPost) {
+    if (post.state === "published") {
+      setAnalyticsPostId(post.id);
+    } else {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("compose", post.id);
+      router.push(`${pathname}?${params.toString()}`);
+    }
   }
 
-  const gridDates = buildGridDates(currentMonth.getFullYear(), currentMonth.getMonth());
   const selectedDayPosts = postsForDate(posts, selectedDate);
-
-  const monthLabel = currentMonth.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden" data-testid="calendar-shell">
@@ -198,7 +248,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
       {!hasConnections && !calloutDismissed && (
         <div className="px-4 pt-3" data-testid="empty-state-callout">
           <Callout
-            variant="helpful"
+            variant="warning"
             icon={
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M9 21h6v-1H9v1zm3-19a7 7 0 0 0-4 12.74V17a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2v-2.26A7 7 0 0 0 12 2z" />
@@ -223,96 +273,41 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
           onDragCancel={() => setActiveDragPost(null)}
         >
           <div className="flex flex-1 overflow-hidden">
-            {/* Calendar grid */}
+            {/* Calendar grid — SocialCalendarGrid owns layout/nav; DnDCell provides DnD */}
             <div className="flex flex-1 flex-col overflow-auto p-4">
-              {/* Month navigation */}
-              <div className="mb-3 flex items-center gap-1" role="toolbar" aria-label="Month navigation">
-                <h2 className="text-base font-semibold text-foreground" data-testid="month-label">
-                  {monthLabel}
-                </h2>
-                <button
-                  type="button"
-                  aria-label="Previous month"
-                  onClick={() => navigateMonth(-1)}
-                  className="ml-2 flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6" /></svg>
-                </button>
-                <button
-                  type="button"
-                  aria-label="Next month"
-                  onClick={() => navigateMonth(1)}
-                  className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6" /></svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
-                    setSelectedDate(today);
-                  }}
-                  className="ml-1 rounded px-2 py-0.5 text-sm text-muted-foreground hover:bg-muted"
-                >
-                  Today
-                </button>
-                {isLoading && (
-                  <span className="ml-2 text-xs text-muted-foreground animate-pulse">Loading…</span>
+              <SocialCalendarGrid
+                context="page"
+                companyId={companyId}
+                year={currentMonth.getFullYear()}
+                month={currentMonth.getMonth()}
+                onNavigate={(y, m) => {
+                  setCurrentMonth(new Date(y, m, 1));
+                }}
+                showTodayButton
+                profileFilter={profileFilter}
+                selectedDate={selectedDate}
+                onDateSelect={(d) => setSelectedDate(d)}
+                onClickPost={handleClickPost}
+                renderDay={(date, dayPosts, meta) => (
+                  <DnDCell
+                    date={date}
+                    posts={dayPosts}
+                    isSelected={meta.isSelected}
+                    isPast={meta.isPast}
+                    isOtherMonth={meta.isOtherMonth}
+                    isToday={meta.isToday}
+                    onClick={() => setSelectedDate(date)}
+                    onClickPost={handleClickPost}
+                  />
                 )}
-              </div>
-
-              {/* Day-of-week headers (only on first row) */}
-              <div
-                className="mb-1 grid grid-cols-7 gap-1 text-xs font-medium text-muted-foreground"
-                role="row"
-              >
-                {DAYS_OF_WEEK.map((d) => (
-                  <div key={d} className="px-1 py-0.5 text-center" role="columnheader">
-                    {d}
-                  </div>
-                ))}
-              </div>
-
-              {/* Grid */}
-              <div
-                className="grid flex-1 grid-cols-7 gap-1"
-                role="grid"
-                aria-label={`Calendar for ${monthLabel}`}
-                data-testid="calendar-grid"
-              >
-                {gridDates.map((date) => {
-                  const key = isoDate(date);
-                  const isOtherMonth = date.getMonth() !== currentMonth.getMonth();
-                  const isPast = date < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                  const isToday = isoDate(date) === isoDate(today);
-                  const isSelected = isoDate(date) === isoDate(selectedDate);
-                  const dayPosts = postsForDate(posts, date);
-
-                  return (
-                    <CalendarCell
-                      key={key}
-                      date={date}
-                      posts={dayPosts}
-                      isSelected={isSelected}
-                      isPast={isPast}
-                      isOtherMonth={isOtherMonth}
-                      isToday={isToday}
-                      onClick={() => setSelectedDate(date)}
-                      onAdd={() => {
-                        setSelectedDate(date);
-                        openComposer({ prefilledDate: date });
-                      }}
-                    />
-                  );
-                })}
-              </div>
+              />
             </div>
 
             {/* Day detail panel */}
             <DayDetail
               date={selectedDate}
               posts={selectedDayPosts}
-              onPostClick={(id) => setAnalyticsPostId(id)}
+              onPostClick={handleClickPost}
               onDelete={handleDelete}
               onReschedule={handleReschedule}
               onAddPost={() => openComposer({ prefilledDate: selectedDate })}
@@ -336,7 +331,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
           from={from}
           to={to}
           isLoading={isLoading}
-          onPostClick={(id) => setAnalyticsPostId(id)}
+          onPostClick={handleClickPost}
           onDelete={handleDelete}
           onAddPost={() => openComposer()}
         />
@@ -403,7 +398,7 @@ function TimelineView({
   from: string;
   to: string;
   isLoading: boolean;
-  onPostClick: (id: string) => void;
+  onPostClick: (post: CalendarPost) => void;
   onDelete: (id: string) => void;
   onAddPost: () => void;
 }) {
@@ -446,7 +441,7 @@ function TimelineView({
           <div
             key={post.id}
             className="flex items-start gap-3 rounded-lg border border-border bg-card p-3 hover:shadow-sm transition-shadow cursor-pointer"
-            onClick={() => onPostClick(post.id)}
+            onClick={() => onPostClick(post)}
             data-testid="timeline-post-row"
           >
             <span className="mt-0.5 w-36 shrink-0 text-xs text-muted-foreground">{label}</span>

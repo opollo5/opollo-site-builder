@@ -28,6 +28,7 @@ const BodySchema = z.object({
   prompt: z.string().min(1).max(500),
   tone: z.enum(["professional", "casual", "playful"]),
   length: z.enum(["short", "medium", "long"]),
+  goal: z.enum(["educate", "promote", "announce", "engage"]).optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const { company_id: companyId, prompt, tone, length } = parsed.data;
+  const { company_id: companyId, prompt, tone, length, goal } = parsed.data;
 
   const gate = await requireCanDoForApi(companyId, "create_post");
   if (gate.kind === "deny") return gate.response;
@@ -56,11 +57,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     prompt,
     tone,
     length,
+    goal: goal ?? undefined,
     requestedBy: gate.userId,
   });
 
   if (!result.ok) {
-    return internalError(result.error.message);
+    const { category, code, message, trace_id, retry_after, can_retry } = result.error;
+    const httpStatus = category === "rate_limit" ? 429 : category === "content_rejected" ? 422 : category === "invalid_request" ? 400 : 500;
+    const headers: Record<string, string> = {};
+    if (retry_after !== undefined) headers["Retry-After"] = String(retry_after);
+    return NextResponse.json(
+      { ok: false, error: { category, code, message, trace_id, retry_after, can_retry } },
+      { status: httpStatus, headers },
+    );
   }
 
   return NextResponse.json(

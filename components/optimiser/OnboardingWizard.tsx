@@ -93,10 +93,10 @@ export function OnboardingWizard({
               status.tone === "err"
                 ? "border-red-200 bg-red-50 text-red-900"
                 : status.tone === "warn"
-                  ? "border-amber-200 bg-amber-50 text-amber-900"
+                  ? "border-warning-border bg-warning-bg text-warning-fg"
                   : status.tone === "ok"
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                    : "border-blue-200 bg-blue-50 text-blue-900"
+                    ? "border-[--color-success-border] bg-[--color-success-bg] text-[--color-success-fg]"
+                    : "border-info-border bg-info-bg text-info-fg"
             }`}
           >
             {status.message}

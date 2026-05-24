@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 
-import { MenuProvider } from "@/components/SiteActionsMenu";
 import { SitesFilterChips } from "@/components/SitesFilterChips";
 import { SitesTable } from "@/components/SitesTable";
 import type { SiteSortColumn, SiteSortDir, ListSitesOptions } from "@/lib/sites";
@@ -33,16 +32,14 @@ export function SitesListClient({
       <SitesFilterChips activeFilter={filter} sort={sort} dir={dir} />
 
       <div className="mt-4">
-        <MenuProvider>
-          <SitesTable
-            sites={sites}
-            sort={sort}
-            dir={dir}
-            filter={filter}
-            isSuperAdmin={isSuperAdmin}
-            onCreateClick={() => router.push("/admin/sites/new")}
-          />
-        </MenuProvider>
+        <SitesTable
+          sites={sites}
+          sort={sort}
+          dir={dir}
+          filter={filter}
+          isSuperAdmin={isSuperAdmin}
+          onCreateClick={() => router.push("/admin/sites/new")}
+        />
       </div>
     </>
   );

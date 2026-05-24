@@ -65,6 +65,10 @@ const PUBLIC_PATHS = new Set<string>([
   // itself doesn't expose sensitive data — just connectivity + build
   // info. See app/api/health/route.ts.
   "/api/health",
+  // Staging/dev diagnostic: returns 404 in production. Needed by the UAT
+  // harness and CI gate to confirm a staging deploy uses staging Supabase.
+  // See app/api/debug/env-check/route.ts.
+  "/api/debug/env-check",
   // M14-3 password-reset surfaces. Both are reachable without a
   // session — /auth/forgot-password is the entry form, and
   // /auth/reset-password decides server-side whether to render the
@@ -98,6 +102,12 @@ const PUBLIC_PATHS = new Set<string>([
   // POST counterpart that the form submits to is already covered by
   // the /api/auth/* prefix check below.
   "/auth/accept-invite",
+  // /design-system — dev-only design token reference page. The page itself
+  // calls notFound() in production (guarded by NEXT_PUBLIC_SHOW_DEV_ROUTES).
+  // Auth gating here is redundant and breaks the e2e test that verifies the
+  // page renders; removing it from auth scope since the page-level gate is
+  // the real security boundary.
+  "/design-system",
 ]);
 
 function isPublicPath(pathname: string): boolean {

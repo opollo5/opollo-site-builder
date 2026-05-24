@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { InviteUserButton } from "@/components/InviteUserButton";
 import { PendingInvitesTable } from "@/components/PendingInvitesTable";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { UsersTable } from "@/components/UsersTable";
 import { TListWide } from "@/templates";
 import { checkAdminAccess } from "@/lib/admin-gate";
@@ -71,13 +72,11 @@ export default async function AdminUsersPage() {
   const actions = (
     <>
       {isSuperAdmin && (
-        <Link
-          href="/admin/users/audit"
-          className="rounded-md border px-3 py-2 text-sm transition-smooth hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          data-testid="users-audit-link"
-        >
-          Audit log
-        </Link>
+        <Button variant="outline" asChild>
+          <Link href="/admin/users/audit" data-testid="users-audit-link">
+            Audit log
+          </Link>
+        </Button>
       )}
       <InviteUserButton actorRole={actorRole} />
     </>

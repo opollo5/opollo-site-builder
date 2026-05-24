@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockConstantTimeEqual = vi.hoisted(() => vi.fn());
 const mockRefreshAll = vi.hoisted(() => vi.fn());
+const mockInsert = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
+const mockRecordHealthEvent = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 
 vi.mock("@/lib/crypto-compare", () => ({
   constantTimeEqual: mockConstantTimeEqual,
@@ -16,6 +18,16 @@ vi.mock("@/lib/platform/social/analytics-ingest", () => ({
 
 vi.mock("@/lib/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock("@/lib/supabase", () => ({
+  getServiceRoleClient: () => ({
+    from: () => ({ insert: mockInsert }),
+  }),
+}));
+
+vi.mock("@/lib/platform/service-health/record", () => ({
+  recordHealthEvent: mockRecordHealthEvent,
 }));
 
 import { GET, POST } from "@/app/api/cron/social-analytics-refresh/route";

@@ -115,6 +115,7 @@ export function ComposerEditor({
         onMediaChange={(urls) => onChange({ ...draft, media_urls: urls })}
         maxLength={charLimit}
         companyId={companyId}
+        platforms={platforms}
       />
 
       {platforms.length >= 2 && (

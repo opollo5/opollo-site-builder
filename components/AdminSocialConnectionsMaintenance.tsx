@@ -291,7 +291,7 @@ export function AdminSocialConnectionsMaintenance({
     <div data-testid="admin-social-connections-maintenance">
       {conflicts.total === 0 ? (
         <div
-          className="mb-4 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-900"
+          className="mb-4 rounded-md border border-[--color-success-border] bg-[--color-success-bg] px-3 py-2 text-sm text-[--color-success-fg]"
           role="status"
           data-testid="maintenance-banner-clean"
         >

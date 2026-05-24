@@ -2,13 +2,17 @@
 
 import * as React from "react";
 import { cn } from "@/lib/utils";
+import { logClientError } from "@/lib/errors/logClientError";
 import { MediaTray } from "@/components/social/composer/MediaTray";
 import { ToolsRow } from "@/components/social/composer/ToolsRow";
+import { LinkPreviewCard, LinkPreviewLoader, type LinkPreviewData } from "@/components/social/composer/LinkPreviewCard";
+import { MediaPickerModal } from "@/components/social/composer/MediaPickerModal";
+import type { Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // ContentEditor — controlled textarea + char counter + media tray + tools row.
-// Owns the file input so both MediaTray "+" and ToolsRow "Media" share
-// the same upload flow.
+// MediaTray "+" → file input (direct upload).
+// ToolsRow "Media" → MediaPickerModal (Upload / Library / AI tabs).
 // ---------------------------------------------------------------------------
 
 export interface ContentEditorProps {
@@ -18,12 +22,14 @@ export interface ContentEditorProps {
   onMediaChange: (urls: string[]) => void;
   maxLength: number;
   companyId: string;
+  platforms?: Platform[];
   className?: string;
 }
 
 const MAX_FILES = 4;
-const MAX_BYTES = 10 * 1024 * 1024;
+const MAX_BYTES = 8 * 1024 * 1024;
 const ACCEPTED = "image/jpeg,image/png,image/gif,image/webp";
+const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 
 export function ContentEditor({
   value,
@@ -32,16 +38,69 @@ export function ContentEditor({
   onMediaChange,
   maxLength,
   companyId,
+  platforms,
   className,
 }: ContentEditorProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false);
+  // Tracks which indices in mediaUrls are GIFs (for MediaTile GIF badge).
+  const [gifIndices, setGifIndices] = React.useState<Set<number>>(new Set());
+
+  // Link preview state
+  const [linkPreview, setLinkPreview] = React.useState<LinkPreviewData | null>(null);
+  const [linkPreviewUrl, setLinkPreviewUrl] = React.useState<string | null>(null);
+  const [linkPreviewLoading, setLinkPreviewLoading] = React.useState(false);
+  const [linkPreviewDismissed, setLinkPreviewDismissed] = React.useState<string | null>(null);
+  const linkDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const charCount = value.length;
   const isOverLimit = charCount > maxLength;
   const isNearLimit = !isOverLimit && charCount > maxLength * 0.9;
+
+  // URL detection: debounce 250ms, fetch OG preview for the first URL found
+  React.useEffect(() => {
+    if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current);
+
+    const urlMatch = /https?:\/\/[^\s]+/i.exec(value);
+    const detectedUrl = urlMatch?.[0] ?? null;
+
+    if (!detectedUrl || detectedUrl === linkPreviewDismissed) {
+      setLinkPreview(null);
+      setLinkPreviewUrl(null);
+      setLinkPreviewLoading(false);
+      return;
+    }
+
+    if (detectedUrl === linkPreviewUrl) return;
+
+    setLinkPreviewLoading(true);
+    linkDebounceRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const res = await fetch("/api/platform/social/link-preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ company_id: companyId, url: detectedUrl }),
+          });
+          const json = (await res.json()) as { ok: boolean; data?: LinkPreviewData };
+          if (json.data) {
+            setLinkPreview(json.data);
+            setLinkPreviewUrl(detectedUrl);
+          }
+        } catch {
+          // network failure — no preview shown
+        } finally {
+          setLinkPreviewLoading(false);
+        }
+      })();
+    }, 250);
+
+    return () => { if (linkDebounceRef.current) clearTimeout(linkDebounceRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, companyId, linkPreviewDismissed]);
 
   function insertText(text: string) {
     const el = textareaRef.current;
@@ -63,8 +122,12 @@ export function ContentEditor({
     el.style.height = `${el.scrollHeight}px`;
   }
 
-  function openPicker() {
+  function openFilePicker() {
     fileInputRef.current?.click();
+  }
+
+  function openMediaModal() {
+    setMediaPickerOpen(true);
   }
 
   async function handleFiles(files: FileList) {
@@ -76,8 +139,14 @@ export function ContentEditor({
     setUploading(true);
     const newUrls: string[] = [];
     for (const file of Array.from(files)) {
+      const traceId = crypto.randomUUID();
+      if (!ACCEPTED_TYPES.has(file.type)) {
+        setUploadError(`${file.name} is not a supported format (JPEG, PNG, GIF, WebP). [trace: ${traceId}]`);
+        setUploading(false);
+        return;
+      }
       if (file.size > MAX_BYTES) {
-        setUploadError(`${file.name} is over 10 MB.`);
+        setUploadError(`${file.name} exceeds the 8 MB limit. [trace: ${traceId}]`);
         setUploading(false);
         return;
       }
@@ -87,15 +156,27 @@ export function ContentEditor({
       const res = await fetch("/api/platform/social/media/upload", { method: "POST", body: fd });
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        setUploadError(json.error?.message ?? "Upload failed.");
+        const msg = json.error?.message ?? "Upload failed.";
+        setUploadError(`${msg} [trace: ${traceId}]`);
+        void logClientError({ component: "media-upload", severity: "error", message: msg, traceId, companyId, context: { error_code: "MEDIA_UPLOAD_FAILED", http_status: res.status } });
         setUploading(false);
         return;
       }
-      const json = (await res.json()) as { ok: boolean; data: { asset: { sourceUrl: string } } };
-      newUrls.push(json.data.asset.sourceUrl);
+      const json = (await res.json()) as { ok: boolean; data: { asset: { source_url: string } } };
+      newUrls.push(json.data.asset.source_url);
     }
     onMediaChange([...mediaUrls, ...newUrls]);
     setUploading(false);
+  }
+
+  function attachGif(storageUrl: string) {
+    if (mediaUrls.length >= MAX_FILES) {
+      setUploadError(`Maximum ${MAX_FILES} media items.`);
+      return;
+    }
+    const newIndex = mediaUrls.length;
+    onMediaChange([...mediaUrls, storageUrl]);
+    setGifIndices((prev) => new Set([...prev, newIndex]));
   }
 
   return (
@@ -113,13 +194,41 @@ export function ContentEditor({
         aria-label="Post content"
       />
 
+      {/* Link preview */}
+      {linkPreviewLoading && (
+        <div className="px-4 pb-3">
+          <LinkPreviewLoader />
+        </div>
+      )}
+      {!linkPreviewLoading && linkPreview && linkPreviewUrl && (
+        <div className="px-4 pb-3">
+          <LinkPreviewCard
+            data={linkPreview}
+            url={linkPreviewUrl}
+            onDismiss={() => {
+              setLinkPreviewDismissed(linkPreviewUrl);
+              setLinkPreview(null);
+              setLinkPreviewUrl(null);
+            }}
+          />
+        </div>
+      )}
+
       {/* Media thumbnails above the toolbar */}
       {(mediaUrls.length > 0 || uploading) && (
         <div className="px-4 pb-3">
           <MediaTray
             urls={mediaUrls}
-            onRemove={(i) => onMediaChange(mediaUrls.filter((_, idx) => idx !== i))}
-            onRequestUpload={openPicker}
+            onRemove={(i) => {
+              onMediaChange(mediaUrls.filter((_, idx) => idx !== i));
+              setGifIndices((prev) => {
+                const next = new Set<number>();
+                prev.forEach((gi) => { if (gi < i) next.add(gi); else if (gi > i) next.add(gi - 1); });
+                return next;
+              });
+            }}
+            onRequestUpload={openFilePicker}
+            gifIndices={gifIndices}
             uploading={uploading}
           />
         </div>
@@ -150,23 +259,35 @@ export function ContentEditor({
         <ToolsRow
           companyId={companyId}
           onInsertText={insertText}
-          onOpenMediaPicker={openPicker}
+          onOpenMediaPicker={openMediaModal}
+          onAttachGif={attachGif}
+          platforms={platforms}
         />
       </div>
 
-      {/* Shared file input for both MediaTray "+" and ToolsRow "Media" button */}
+      {/* File input for MediaTray "+" direct upload */}
       <input
         ref={fileInputRef}
         type="file"
         accept={ACCEPTED}
         multiple
         className="sr-only"
+        data-testid="media-file-input"
         onChange={(e) => {
           if (e.target.files?.length) {
             void handleFiles(e.target.files);
             e.target.value = "";
           }
         }}
+      />
+
+      <MediaPickerModal
+        open={mediaPickerOpen}
+        onClose={() => setMediaPickerOpen(false)}
+        onAttach={(urls) => onMediaChange([...mediaUrls, ...urls])}
+        companyId={companyId}
+        draftBody={value}
+        currentMediaCount={mediaUrls.length}
       />
     </div>
   );

@@ -38,12 +38,14 @@ export interface Connection {
 
 export interface Draft {
   id?: string; // undefined for new (unsaved) drafts
+  draft_version?: number; // for CAS in PATCH — populated when editing an existing draft
   content: string;
   media_urls: string[];
   target_profile_ids: string[];
   platform_variants: Record<string, { content?: string; link?: string; cta?: string }>;
   approval_required: boolean;
   approver_user_id?: string;
+  scheduled_at?: string | null; // ISO 8601 UTC — populated when editing a scheduled draft
 }
 
 export interface CalendarPost {
@@ -53,6 +55,7 @@ export interface CalendarPost {
   published_at: string | null;
   content_excerpt: string;
   primary_media_url: string | null;
+  link_url: string | null;
   target_profiles: Array<{ platform: Platform; account_avatar_url: string }>;
   is_recurring_child: boolean;
 }

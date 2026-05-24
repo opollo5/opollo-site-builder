@@ -189,7 +189,7 @@ test.describe("sites CRUD", () => {
     await expect(row).toBeVisible();
 
     await row.getByTestId("site-actions-summary").click();
-    await row.getByTestId("site-archive-action").click();
+    await page.getByTestId("site-archive-action").click();
     const confirmDialog = page.getByRole("dialog", { name: /archive/i });
     await expect(confirmDialog).toBeVisible();
     await confirmDialog.getByRole("button", { name: /^archive$/i }).click();

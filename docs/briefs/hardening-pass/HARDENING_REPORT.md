@@ -8,10 +8,10 @@ Generated: 2026-05-20
 |---|---|---|---|
 | WS1 | CAP backlog — objective template, health events, cron skip | #939 | ✅ merged |
 | WS2 | Wireframe audit + HIGH gap fixes | #940, #941 | ✅ merged |
-| WS3 | Smoke test harness + composer + CAP probes | #942, #943, #944 | CI running / stacked |
-| WS4 | Cost monitoring daily report | #945 | CI running |
-| WS5 | Staging environment scaffold + guards | #946 | CI running |
-| WS6 | README + ARCHITECTURE + RUNBOOK | #947 | CI running |
+| WS3 | Smoke test harness + composer + CAP probes | #942, #943, #944 | ✅ merged |
+| WS4 | Cost monitoring daily report | #945 | ✅ merged |
+| WS5 | Staging environment scaffold + guards | #946 | ✅ merged |
+| WS6 | README + ARCHITECTURE + RUNBOOK | #947 | ✅ merged |
 
 ## What shipped (merged to main)
 
@@ -30,11 +30,11 @@ Generated: 2026-05-20
 - **Wireframe 11 fix**: `AddProfileDropdown` — added TikTok with "New" badge, `isNew` prop
 - 5 + 3 component tests updated/added
 
-## What's in CI (pending merge)
+## What shipped (continued)
 
-### WS3 — Smoke harness (#942, #943, #944, stacked)
+### WS3 — Smoke harness (#942, #943, #944)
 
-**#942** (base: main): `scripts/smoke/` scaffold
+**#942**: `scripts/smoke/` scaffold
 - `client.ts`: typed fetch wrapper (`smokeGet`, `smokePost`, `smokePatch`, `smokeDelete`)
 - `assertions.ts`: `assertStatus`, `assertShape`, `assertTruthy`
 - `budget.ts`: $5 cumulative cap with `budget.json` persistence
@@ -42,11 +42,11 @@ Generated: 2026-05-20
 - 9 unit tests for budget guard
 - npm scripts: `smoke:harness`, `smoke:composer`, `smoke:cap`
 
-**#943** (stacked on #942 → main after merge): `scripts/smoke/composer.smoke.ts`
+**#943**: `scripts/smoke/composer.smoke.ts`
 - 3-step: POST draft (201) → GET draft (200) → DELETE draft (204)
 - Output: `scripts/smoke/output/composer-smoke-{timestamp}.json`
 
-**#944** (stacked on #943 → main after merge): `scripts/smoke/cap.smoke.ts`
+**#944**: `scripts/smoke/cap.smoke.ts`
 - Step 1: GET subscription check
 - Step 2: Budget guard ($0.50)
 - Step 3: POST generate → assert `postsGenerated=4`
@@ -94,10 +94,13 @@ Generated: 2026-05-20
 
 ## Steven actions required
 
-See `docs/briefs/hardening-pass/STEVEN_ACTIONS.md`:
+**All actions closed as of 2026-05-20.** ✅
 
-1. **IDEOGRAM_API_KEY production scope** — confirm `Production` env is checked in Vercel (WS1, image generation in CAP)
-2. **Staging Vercel branch setup** — create `staging` branch, set `APP_ENV=staging`, `STAGING_EMAIL_RECIPIENT` (WS5)
+| Item | Resolved |
+|---|---|
+| IDEOGRAM_API_KEY production scope | confirmed Production-scoped in Vercel |
+| `staging` branch creation | branch created and pushed to GitHub |
+| Vercel env vars for staging | `APP_ENV=staging`, `STAGING_EMAIL_RECIPIENT=hi@opollo.com` set; staging banner confirmed live |
 
 ## Deferred gaps (from wireframe audit)
 

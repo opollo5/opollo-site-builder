@@ -398,7 +398,7 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing:
   margin-bottom: 16px;
 }
 .btn-pk {
-  background: linear-gradient(135deg, var(--pk), var(--pk2));
+  background: linear-gradient(135deg, hsl(var(--primary)), #00A86B);
   color: #fff;
   border: none;
   border-radius: var(--radius-full);
@@ -428,19 +428,19 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing:
 .lbl {
   display: inline-flex; align-items: center; gap: 8px;
   font-size: 0.875rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: 0.20em; color: var(--gr);
+  letter-spacing: 0.20em; color: hsl(var(--success));
 }
-.lbl::before { content: '\\2014'; color: var(--gr); font-weight: 700; }
-.pk { color: var(--pk); }
-.badge-success { background: rgba(0,229,160,0.12); color: var(--gr); border-radius: 4px; padding: 2px 8px; font-size: 0.875rem; }
-.badge-warn { background: rgba(255,179,0,0.12); color: var(--am); border-radius: 4px; padding: 2px 8px; font-size: 0.875rem; }
-.badge-error { background: rgba(255,77,109,0.12); color: var(--rd); border-radius: 4px; padding: 2px 8px; font-size: 0.875rem; }
+.lbl::before { content: '\\2014'; color: hsl(var(--success)); font-weight: 700; }
+.pk { color: hsl(var(--primary)); }
+.badge-success { background: rgba(0,229,160,0.12); color: hsl(var(--success)); border-radius: 4px; padding: 2px 8px; font-size: 0.875rem; }
+.badge-warn { background: rgba(255,179,0,0.12); color: hsl(var(--warning)); border-radius: 4px; padding: 2px 8px; font-size: 0.875rem; }
+.badge-error { background: rgba(255,77,109,0.12); color: hsl(var(--destructive)); border-radius: 4px; padding: 2px 8px; font-size: 0.875rem; }
 .input-field {
   background: var(--d2); border: 1px solid var(--b2); border-radius: var(--radius);
   color: var(--m1); font-family: inherit; font-size: var(--font-size-base);
   padding: 8px 12px; width: 100%; outline: none;
 }
-.input-field:focus { border-color: var(--gr); }
+.input-field:focus { border-color: hsl(var(--success)); }
 .swatch-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 .swatch { width: 32px; height: 32px; border-radius: var(--radius); border: 1px solid var(--b2); }
 </style>
@@ -470,12 +470,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 600; letter-spacing:
 <div class="preview-card">
   <h2 style="font-size:var(--font-size-base);margin:0 0 4px 0;">Colour palette</h2>
   <div class="swatch-row">
-    <div class="swatch" style="background:var(--pk)" title="--pk"></div>
-    <div class="swatch" style="background:var(--pk2)" title="--pk2"></div>
-    <div class="swatch" style="background:var(--gr)" title="--gr"></div>
-    <div class="swatch" style="background:var(--bl)" title="--bl"></div>
-    <div class="swatch" style="background:var(--am)" title="--am"></div>
-    <div class="swatch" style="background:var(--rd)" title="--rd"></div>
+    <div class="swatch" style="background:hsl(var(--primary))" title="primary"></div>
+    <div class="swatch" style="background:hsl(var(--success))" title="success"></div>
+    <div class="swatch" style="background:hsl(var(--info))" title="info"></div>
+    <div class="swatch" style="background:hsl(var(--warning))" title="warning"></div>
+    <div class="swatch" style="background:hsl(var(--destructive))" title="destructive"></div>
     <div class="swatch" style="background:var(--d1);border-color:var(--b3)" title="--d1"></div>
     <div class="swatch" style="background:var(--d2);border-color:var(--b3)" title="--d2"></div>
     <div class="swatch" style="background:var(--d3);border-color:var(--b3)" title="--d3"></div>

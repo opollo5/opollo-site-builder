@@ -5,6 +5,12 @@ import { cn } from "@/lib/utils";
 import { ScheduleRow, type ScheduleRowValue } from "@/components/social/composer/ScheduleRow";
 import { RecurrencePicker } from "@/components/social/composer/RecurrencePicker";
 import { ApprovalToggle } from "@/components/social/composer/ApprovalToggle";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { SchedulingMode, RecurrenceRule } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
@@ -30,6 +36,8 @@ export interface SchedulingCardProps {
   submitting?: boolean;
   /** Disable submit — e.g. no profiles selected or content empty. */
   disabled?: boolean;
+  /** Tooltip text shown when button is disabled. Only shown when disabled=true and this is set. */
+  disabledTooltip?: string;
 }
 
 type Tab = { mode: SchedulingMode; label: string; submitLabel: string };
@@ -72,6 +80,7 @@ export function SchedulingCard({
   onSubmit,
   submitting = false,
   disabled = false,
+  disabledTooltip,
 }: SchedulingCardProps) {
   const activeTab = TABS.find((t) => t.mode === value.mode) ?? TABS[0]!;
 
@@ -118,7 +127,7 @@ export function SchedulingCard({
               className={cn(
                 "whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-[var(--tab-active-bg)] text-[var(--tab-active-text)]"
+                  ? "bg-primary text-primary-foreground"
                   : "bg-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
@@ -225,15 +234,37 @@ export function SchedulingCard({
             ? "6 upcoming posts will be scheduled"
             : null}
         </p>
-        <button
-          type="button"
-          data-testid="composer-submit"
-          disabled={disabled || submitting}
-          onClick={onSubmit}
-          className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:pointer-events-none disabled:opacity-50"
-        >
-          {submitting ? "Saving…" : activeTab.submitLabel}
-        </button>
+        {disabledTooltip && (disabled || submitting) ? (
+          <TooltipProvider delayDuration={300}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0} className="inline-flex">
+                  <button
+                    type="button"
+                    data-testid="composer-submit"
+                    disabled
+                    className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground opacity-50 pointer-events-none"
+                  >
+                    {submitting ? "Saving…" : activeTab.submitLabel}
+                  </button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" data-testid="submit-tooltip">
+                {disabledTooltip}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <button
+            type="button"
+            data-testid="composer-submit"
+            disabled={disabled || submitting}
+            onClick={onSubmit}
+            className="rounded-md bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {submitting ? "Saving…" : activeTab.submitLabel}
+          </button>
+        )}
       </div>
     </div>
   );

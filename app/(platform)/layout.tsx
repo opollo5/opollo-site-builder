@@ -7,6 +7,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { NavShell, type NavUserContext } from "@/components/nav/nav-shell";
 import { Toaster } from "@/components/ui/toaster";
 import { BreadcrumbProvider } from "@/components/error-reporting/BreadcrumbProvider";
+import { getCompanyTheme, buildThemeStyleBlock } from "@/lib/platform/theming";
 
 // ---------------------------------------------------------------------------
 // PlatformLayout — single shared authenticated layout that renders NavShell
@@ -50,15 +51,16 @@ export default async function PlatformLayout({
 
   let companyId: string | null = null;
   let companyName: string | null = null;
+  let themeStyleBlock = "";
   if (isCompanyRoute && platformSession?.company?.companyId) {
     companyId = platformSession.company.companyId;
     const svc = getServiceRoleClient();
-    const { data } = await svc
-      .from("platform_companies")
-      .select("name")
-      .eq("id", companyId)
-      .maybeSingle();
-    companyName = (data as { name: string } | null)?.name ?? null;
+    const [nameResult, themeRow] = await Promise.all([
+      svc.from("platform_companies").select("name").eq("id", companyId).maybeSingle(),
+      getCompanyTheme(companyId),
+    ]);
+    companyName = (nameResult.data as { name: string } | null)?.name ?? null;
+    if (themeRow) themeStyleBlock = buildThemeStyleBlock(themeRow.overrides);
   }
 
   const navContext: NavUserContext = {
@@ -78,6 +80,11 @@ export default async function PlatformLayout({
 
   return (
     <NavShell navContext={navContext}>
+      {themeStyleBlock && (
+        // Injects per-company CSS variable overrides. Only present when a
+        // company has saved custom tokens — empty string skips the element.
+        <style dangerouslySetInnerHTML={{ __html: themeStyleBlock }} />
+      )}
       <BreadcrumbProvider />
       {children}
       <Toaster />

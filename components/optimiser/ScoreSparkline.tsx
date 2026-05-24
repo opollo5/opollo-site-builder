@@ -11,9 +11,9 @@ export type SparklinePoint = {
 };
 
 const STROKE_BY_CLASS: Record<ScoreClassification, string> = {
-  high_performer: "var(--gr)",
-  optimisable: "var(--am)",
-  needs_attention: "var(--rd)",
+  high_performer: "hsl(var(--success))",
+  optimisable: "hsl(var(--warning))",
+  needs_attention: "hsl(var(--destructive))",
 };
 
 export function ScoreSparkline({

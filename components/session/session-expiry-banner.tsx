@@ -44,7 +44,7 @@ export function SessionExpiryBanner({
     return (
       <div
         role="alert"
-        className="sticky top-0 z-50 flex w-full items-center justify-center gap-3 border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-sm dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
+        className="sticky top-0 z-50 flex w-full items-center justify-center gap-3 border-b border-[--color-warning-border] bg-[--color-warning-bg] px-4 py-2 text-sm text-[--color-warning-fg] shadow-sm dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-200"
         data-testid="session-grace-banner"
       >
         <span className="font-medium">
