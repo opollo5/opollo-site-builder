@@ -197,7 +197,7 @@ jobs:
         run: |
           echo "Waiting for staging deployment to be ready..."
           for i in $(seq 1 18); do
-            STATUS=$(curl -sf "$UAT_BASE_URL/api/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
+            STATUS=$(curl -s "$UAT_BASE_URL/api/health" -o /dev/null -w "%{http_code}" 2>/dev/null || echo "000")
             if [ "$STATUS" = "200" ]; then
               echo "✓ Staging is responding (HTTP $STATUS)"
               exit 0
