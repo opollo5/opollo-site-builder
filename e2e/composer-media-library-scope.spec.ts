@@ -5,8 +5,8 @@ import { signInAsCompanyAdmin, mockComposerApis } from "./helpers";
 // ---------------------------------------------------------------------------
 // PR-C1 — Media library global scope
 //
-// (MLS-1) Library fetch sends include_global=true so staff-promoted assets
-//         are returned alongside company assets.
+// (MLS-1) Library fetch hits /api/platform/social/media/image-library
+//         (central image_library, not the company-scoped social_media_assets).
 // (MLS-2) A global-scoped asset returned by the API appears in the grid
 //         alongside a company-scoped asset.
 // ---------------------------------------------------------------------------
@@ -30,7 +30,7 @@ const GLOBAL_ASSET = {
 };
 
 test.describe("composer media library scope (C1)", () => {
-  test("(MLS-1) library fetch includes include_global=true", async ({ page, context }) => {
+  test("(MLS-1) library fetch hits the central image-library endpoint", async ({ page, context }) => {
     await signInAsCompanyAdmin(page);
     await mockComposerApis(context);
 
@@ -64,7 +64,8 @@ test.describe("composer media library scope (C1)", () => {
     await page.getByTestId("media-picker-tab-library").click();
     await expect(page.getByTestId("media-library-grid")).toBeVisible({ timeout: 5_000 });
 
-    expect(capturedUrl).toContain("include_global=true");
+    // Library tab now calls the central image_library endpoint (not social_media_assets).
+    expect(capturedUrl).toContain("/image-library");
   });
 
   test("(MLS-2) global-scoped asset appears in grid alongside company asset", async ({
