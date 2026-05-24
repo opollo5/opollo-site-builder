@@ -50,6 +50,7 @@ The route returns HTTP 500 until `STAGING_UAT_SECRET` is set in Vercel. The Play
 - `e2e/uat/admin.spec.ts` — P1: sites/users/companies/health/theming
 - `e2e/uat/insights.spec.ts` — P2: analytics, insights, period selectors
 - `docs/uat-harness/known-failures.md` — KF-0A through KF-6
+- `playwright.config.ts` — `**/uat/**` added to `testIgnore` (main e2e suite targets localhost; UAT specs target live staging and must not run there)
 
 ### Required action from Steven before running full suite
 
