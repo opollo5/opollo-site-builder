@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { getServiceRoleClient } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { createRouteAuthClient } from "@/lib/auth";
 import {
   checkRateLimit,
@@ -75,8 +75,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Confirm the user exists via admin client
-  const adminClient = getServiceRoleClient();
+  // Confirm the user exists via admin client.
+  // Use NEXT_PUBLIC_SUPABASE_URL because staging Vercel env may have
+  // SUPABASE_URL pointing to production while NEXT_PUBLIC_SUPABASE_URL
+  // correctly targets the staging project.
+  const supabaseUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? "";
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!supabaseUrl || !serviceRoleKey) {
+    return NextResponse.json(
+      { error: "Supabase admin credentials not configured" },
+      { status: 500 },
+    );
+  }
+  const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
   const { data: usersData, error: listError } =
     await adminClient.auth.admin.listUsers({ perPage: 1000 });
   if (listError) {
