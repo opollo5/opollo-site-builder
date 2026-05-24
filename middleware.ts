@@ -65,6 +65,10 @@ const PUBLIC_PATHS = new Set<string>([
   // itself doesn't expose sensitive data — just connectivity + build
   // info. See app/api/health/route.ts.
   "/api/health",
+  // Staging/dev diagnostic: returns 404 in production. Needed by the UAT
+  // harness and CI gate to confirm a staging deploy uses staging Supabase.
+  // See app/api/debug/env-check/route.ts.
+  "/api/debug/env-check",
   // M14-3 password-reset surfaces. Both are reachable without a
   // session — /auth/forgot-password is the entry form, and
   // /auth/reset-password decides server-side whether to render the
