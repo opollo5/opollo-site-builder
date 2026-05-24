@@ -23,7 +23,7 @@
 
 ## PR-E: docs(staging): state-a-verification + uat-harness prerequisites
 
-- URL: (pending)
+- URL: https://github.com/opollo5/opollo-site-builder/pull/1028
 - Merge SHA: (pending — stacked on PR-D)
 - Deploy: (pending)
 - Summary: Adds verification checklist (`docs/staging/state-a-verification-2026-05-24.md`), UAT harness prerequisites (`docs/uat-harness/PREREQUISITES.md`), RESOLVED section in investigation doc, and this STATUS.md update.
