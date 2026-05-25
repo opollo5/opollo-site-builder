@@ -303,8 +303,24 @@ async function supabaseAuthGate(req: NextRequest): Promise<NextResponse> {
   // page/API consumers. Middleware just checks presence + redirects —
   // a forged cookie still blocks the attacker, just at a different
   // page (the check-email page would 404 the lookup).
+  //
+  // Guard: if AUTH_2FA_ENABLED is off, any cookie is stale from a
+  // prior session. Clear it and continue — do NOT bounce. Middleware
+  // runs on Edge and cannot import lib/2fa/flag.ts (server-only), so
+  // the check is inlined here with the same condition as is2faEnabled().
   const pending2faCookie = req.cookies.get("opollo_2fa_pending")?.value;
   if (pending2faCookie) {
+    const flagOn =
+      process.env.AUTH_2FA_ENABLED === "true" ||
+      process.env.AUTH_2FA_ENABLED === "1";
+    if (!flagOn) {
+      response.cookies.set("opollo_2fa_pending", "", { maxAge: 0, path: "/" });
+      response.cookies.set("opollo_pending_device_id", "", {
+        maxAge: 0,
+        path: "/",
+      });
+      return response;
+    }
     const path = req.nextUrl.pathname;
     const allowedDuringPending =
       path === "/login/check-email" ||
