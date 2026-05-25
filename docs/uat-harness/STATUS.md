@@ -129,3 +129,22 @@ cleaned up the noise so every remaining red spec represents a real platform bug.
   - save-as-draft spec: added a target-profile-chip click step (`composer-submit` is gated on `target_profile_ids.length > 0 && content.trim().length > 0` per `ComposerOverlay.tsx:450`)
 - Specs newly passing (expected): 2 (no more timeouts)
 
+
+## #1049 fix — 2026-05-25 session
+
+### PR 1 (Part B): test(uat): migrate UAT specs off waitForLoadState('networkidle')
+
+- URL: #1050
+- Merge SHA: `c3a95728`
+- Pass count delta: 13 → ~30+ (full final run pending)
+- Root cause: `waitForLoadState('networkidle')` is documented anti-pattern; never settles when ANY long-lived background connection exists (the admin nav surfaced one after PR #1044 granted admin role).
+- Fix: removed all 28 occurrences (most deleted outright; 5 sites replaced with explicit `toBeVisible` waits). Added Gate 9 in `button-migration-gates.yml` to prevent re-introduction. Bumped UAT spec timeout to 60s for headroom.
+
+### PR 2 (Part A): test(uat): admin-nav network diagnostic + #1049 investigation doc
+
+- URL: #1051
+- Merge SHA: `aeb92dde`
+- Pass count delta: 0 (no behavioural change; documentation + diagnostic only)
+- Root cause: Vercel Live (vercel.live) preview-deployment feedback widget opens a long-lived WebSocket that Playwright's resource-snapshot trace doesn't capture. Suspects 1-5 from the brief ruled out via static analysis + env inspection.
+- Fix: deferred. PR #1050 unblocks the harness without a platform change. The diagnostic spec at `e2e/diagnostics/admin-nav-requests.spec.ts` lets a future session confirm the WebSocket source and apply Option A (block `vercel.live` in UAT config) or Option B (disable Vercel Toolbar on staging). Full evidence in `docs/investigations/admin-nav-hanging-2026-05-25.md`.
+
