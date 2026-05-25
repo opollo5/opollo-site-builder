@@ -7,6 +7,7 @@ import { toastSuccess } from "@/lib/toast-success";
 import { ChannelPickerModal } from "@/components/ChannelPickerModal";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { MenuItem } from "@/components/ui/menu-item";
 import {
   Popover,
@@ -169,6 +170,8 @@ export function SocialConnectionsList({
   const [popupBlockedUrl, setPopupBlockedUrl] = useState<string | null>(null);
   // Track per-row disconnect spinner state.
   const [disconnectBusy, setDisconnectBusy] = useState<string | null>(null);
+  // Pending disconnect confirmation — set to the connection id to open the dialog.
+  const [disconnectPendingId, setDisconnectPendingId] = useState<string | null>(null);
   // Bug-fix 2026-05-12: "already connected" banner — set from prop (non-
   // popup redirect) or from the popup postMessage when noop+updated fires.
   // Lowercase bundle.social platform string, e.g. "linkedin".
@@ -606,13 +609,6 @@ export function SocialConnectionsList({
   }
 
   async function handleDisconnect(connectionId: string) {
-    if (
-      !window.confirm(
-        "Disconnect this account? Drafts that reference it will be released back to drafts.",
-      )
-    ) {
-      return;
-    }
     setDisconnectBusy(connectionId);
     setError(null);
     const res = await fetch(
@@ -1155,7 +1151,7 @@ export function SocialConnectionsList({
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => handleDisconnect(c.id)}
+                          onClick={() => setDisconnectPendingId(c.id)}
                           disabled={
                             disconnectBusy === c.id ||
                             busySync ||
@@ -1177,6 +1173,18 @@ export function SocialConnectionsList({
           </table>
         </div>
       )}
+      <ConfirmDialog
+        open={disconnectPendingId !== null}
+        onOpenChange={(o) => { if (!o) setDisconnectPendingId(null); }}
+        title="Disconnect this account?"
+        description="Drafts that reference it will be released back to drafts."
+        confirmLabel="Disconnect"
+        confirmVariant="destructive"
+        onConfirm={() => {
+          if (disconnectPendingId) void handleDisconnect(disconnectPendingId);
+          setDisconnectPendingId(null);
+        }}
+      />
     </div>
   );
 }
