@@ -65,8 +65,10 @@ test.describe("P0 — Connections", () => {
     await disconnectBtns.first().click();
     await page.screenshot({ path: "test-results/uat/connections/disconnect-dialog.png" });
 
-    // A confirmation dialog should appear
-    const dialog = page.locator('[role="dialog"], [role="alertdialog"]');
+    // A confirmation dialog should appear.
+    // Use [data-state="open"] to exclude the mobile-nav sidebar which also
+    // carries role="dialog" but is always hidden (no data-state attribute).
+    const dialog = page.locator('[role="dialog"][data-state="open"], [role="alertdialog"]');
     await expect(dialog).toBeVisible({ timeout: 5_000 });
     // Cancel to avoid actually disconnecting the seed account
     const cancelBtn = dialog.locator('button:has-text("Cancel"), button:has-text("No")');
