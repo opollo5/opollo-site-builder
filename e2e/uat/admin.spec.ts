@@ -23,7 +23,6 @@ test.describe("P1 — Admin", () => {
 
   test("/admin/sites loads", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/sites`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/admin/sites.png" });
     // May redirect to /login if UAT user doesn't have admin role
     const url = page.url();
@@ -37,7 +36,6 @@ test.describe("P1 — Admin", () => {
 
   test("/admin/users loads", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/users`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/admin/users.png" });
     const url = page.url();
     const reachable = url.includes("/admin/users") || url.includes("/login");
@@ -46,7 +44,6 @@ test.describe("P1 — Admin", () => {
 
   test("/admin/companies loads", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/companies`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/admin/companies.png" });
     const url = page.url();
     const reachable = url.includes("/admin/companies") || url.includes("/login");
@@ -55,7 +52,6 @@ test.describe("P1 — Admin", () => {
 
   test("/admin/health renders", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/health`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/admin/health.png" });
     // Health page is readable by admins — should not crash
     const errorBoundary = page.locator("text=Something went wrong");
@@ -66,7 +62,6 @@ test.describe("P1 — Admin", () => {
     page,
   }) => {
     await page.goto(`${UAT_BASE_URL}/admin/theming`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/admin/theming-loaded.png" });
 
     const url = page.url();
@@ -98,7 +93,6 @@ test.describe("P1 — Admin", () => {
 
     // Reload and verify page still works
     await page.reload();
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/admin/theming-reloaded.png" });
 
     const errorBoundaryAfter = page.locator("text=Something went wrong");

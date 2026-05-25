@@ -103,3 +103,21 @@ jobs:
             exit 1
           fi
           echo "✓ AiPanel has no duplicate close button"
+
+      - name: Gate 9 — UAT specs do not use waitForLoadState('networkidle')
+        # See issue #1049. networkidle is a Playwright anti-pattern that
+        # never settles against real pages (telemetry, websockets, realtime
+        # channels). Use explicit web assertions (toBeVisible etc.) instead.
+        # Ref: https://playwright.dev/docs/api/class-page#page-wait-for-load-state
+        run: |
+          MATCHES=$(grep -rn "waitForLoadState.*networkidle" e2e/uat/ --include="*.ts" || true)
+          if [ -n "$MATCHES" ]; then
+            echo "❌ FAIL: UAT specs must not use waitForLoadState('networkidle')"
+            echo "$MATCHES"
+            echo ""
+            echo "Use explicit web assertions instead:"
+            echo "  await expect(locator).toBeVisible({ timeout: 10_000 });"
+            echo "See: https://playwright.dev/docs/api/class-page#page-wait-for-load-state"
+            exit 1
+          fi
+          echo "✓ no networkidle in UAT specs"

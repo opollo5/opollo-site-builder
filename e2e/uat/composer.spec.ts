@@ -24,7 +24,9 @@ test.describe("P0 — Social composer", () => {
     consoleMessages = collectConsole(page);
     await signInAsUatBot(page);
     await page.goto(`${UAT_BASE_URL}/company/social/calendar`);
-    await page.waitForLoadState("networkidle");
+    await expect(page.locator('[data-testid="calendar-shell"]')).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test.afterEach(async ({ page }, testInfo) => {

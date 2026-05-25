@@ -20,7 +20,6 @@ test.describe("P2 — Insights & analytics", () => {
 
   test("/company/social/analytics loads without error", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/analytics`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/insights/analytics-loaded.png" });
 
     await expect(page).toHaveURL(/\/company\/social\/analytics/);
@@ -30,7 +29,6 @@ test.describe("P2 — Insights & analytics", () => {
 
   test("/company/social/insights loads without error", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/insights`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/insights/insights-loaded.png" });
 
     await expect(page).toHaveURL(/\/company\/social\/insights/);
@@ -40,7 +38,6 @@ test.describe("P2 — Insights & analytics", () => {
 
   test("7d period selector filters data", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/insights?period=7d`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/insights/period-7d.png" });
     await expect(page).toHaveURL(/period=7d/);
     const errorBoundary = page.locator("text=Something went wrong");
@@ -49,7 +46,6 @@ test.describe("P2 — Insights & analytics", () => {
 
   test("30d period selector filters data", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/insights?period=30d`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/insights/period-30d.png" });
     await expect(page).toHaveURL(/period=30d/);
     const errorBoundary = page.locator("text=Something went wrong");
@@ -58,7 +54,6 @@ test.describe("P2 — Insights & analytics", () => {
 
   test("90d period selector filters data", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/insights?period=90d`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/insights/period-90d.png" });
     await expect(page).toHaveURL(/period=90d/);
     const errorBoundary = page.locator("text=Something went wrong");

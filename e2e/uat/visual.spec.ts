@@ -23,7 +23,6 @@ test.describe("P1 — Visual regression", () => {
 
   test("calendar grid — current month render", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/calendar`);
-    await page.waitForLoadState("networkidle");
 
     const grid = page.locator('[data-testid="calendar-grid"], [data-testid="calendar-shell"]');
     await expect(grid).toBeVisible({ timeout: 10_000 });
@@ -46,7 +45,10 @@ test.describe("P1 — Visual regression", () => {
 
   test("composer overlay — open populated (chip click)", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/calendar`);
-    await page.waitForLoadState("networkidle");
+    // Wait for calendar to render before counting chips
+    await expect(page.locator('[data-testid="calendar-shell"]')).toBeVisible({
+      timeout: 15_000,
+    });
 
     const chips = page.locator('[data-testid="post-chip"]');
     if ((await chips.count()) === 0) {
@@ -100,7 +102,6 @@ test.describe("P1 — Visual regression", () => {
 
   test("admin theming dashboard", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/theming`);
-    await page.waitForLoadState("networkidle");
 
     const url = page.url();
     if (!url.includes("/admin/theming")) {
@@ -119,7 +120,6 @@ test.describe("P1 — Visual regression", () => {
 
   test("/admin/images library grid", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/images`);
-    await page.waitForLoadState("networkidle");
 
     const url = page.url();
     if (!url.includes("/admin/images")) {

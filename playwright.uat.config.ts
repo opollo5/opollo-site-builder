@@ -10,6 +10,16 @@ import { defineConfig, devices } from "@playwright/test";
 //   STAGING_UAT_EMAIL     — ghost user email (default: uat-bot@staging.opollo.com)
 //   VERCEL_BYPASS_SECRET  — Vercel Protection Bypass for Automation token
 //                           (needed if staging branch has Preview Protection on)
+//
+// DO NOT use `page.waitForLoadState('networkidle')` in this suite.
+// Playwright documents it as discouraged because real pages keep
+// background requests open indefinitely (telemetry, websockets,
+// realtime channels). Issue #1049 traced 25+ UAT failures to this
+// anti-pattern. Use explicit web assertions instead:
+//   await expect(locator).toBeVisible({ timeout: 10_000 });
+// Ref: https://playwright.dev/docs/api/class-page#page-wait-for-load-state
+// A CI gate in .github/workflows/button-migration-gates.yml fails any
+// PR that reintroduces it.
 // ---------------------------------------------------------------------------
 
 const UAT_BASE_URL =
@@ -28,8 +38,8 @@ export default defineConfig({
     ["html", { outputFolder: "playwright-report-uat", open: "never" }],
     ["json", { outputFile: "test-results/uat/results.json" }],
   ],
-  timeout: 45_000,
-  expect: { timeout: 15_000 },
+  timeout: 60_000,
+  expect: { timeout: 10_000 },
   outputDir: "test-results/uat",
   use: {
     baseURL: UAT_BASE_URL,

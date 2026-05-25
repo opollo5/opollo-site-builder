@@ -22,7 +22,6 @@ test.describe("P1 — Posts list", () => {
 
   test("/company/social/posts loads with post rows", async ({ page }) => {
     await expect(page).toHaveURL(/\/company\/social\/posts/);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/posts/list-loaded.png" });
 
     // Page should render without an error state — look for at least one post row
@@ -35,7 +34,6 @@ test.describe("P1 — Posts list", () => {
 
   test("Draft state filter shows only draft posts", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/posts?state=draft`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/posts/filter-draft.png" });
     await expect(page).toHaveURL(/state=draft/);
     // Page should load without crash
@@ -47,7 +45,6 @@ test.describe("P1 — Posts list", () => {
     page,
   }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/posts?state=scheduled`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/posts/filter-scheduled.png" });
     await expect(page).toHaveURL(/state=scheduled/);
     const errorBoundary = page.locator("text=Something went wrong");
@@ -58,7 +55,6 @@ test.describe("P1 — Posts list", () => {
     page,
   }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/posts?state=published`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/posts/filter-published.png" });
     await expect(page).toHaveURL(/state=published/);
     const errorBoundary = page.locator("text=Something went wrong");
@@ -68,7 +64,6 @@ test.describe("P1 — Posts list", () => {
   test("clicking a post row opens composer in the correct state", async ({
     page,
   }) => {
-    await page.waitForLoadState("networkidle");
 
     // Find any clickable post row or card
     const postLinks = page.locator('a[href*="compose="], [role="row"] a, [data-testid^="post-row"]');
