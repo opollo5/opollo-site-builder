@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -84,7 +85,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       { status: 500 },
     );
   }
-  if (secret !== expectedSecret) {
+  // Timing-safe comparison — prevents oracle attacks on the secret length.
+  const secretOk = (() => {
+    if (!secret) return false;
+    const a = createHash("sha256").update(secret).digest();
+    const b = createHash("sha256").update(expectedSecret).digest();
+    return timingSafeEqual(a, b);
+  })();
+  if (!secretOk) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
