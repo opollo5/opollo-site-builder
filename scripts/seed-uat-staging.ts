@@ -303,75 +303,59 @@ async function main() {
   // "old published post" surface the bug used to reproduce on.
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
+  // PostgREST batch insert sends NULL for keys not present on every row —
+  // spell out every column on every row, including ones with table defaults.
+  // See memory: postgrest-batch-insert-union-of-keys. The previous version
+  // omitted publish_attempts on 5/6 rows, which made PostgREST emit NULL
+  // and the social_post_drafts NOT NULL constraint reject the whole batch.
+  const draftRow = (overrides: Record<string, unknown>) => ({
+    company_id: uatCompanyId,
+    created_by: uatUserId,
+    updated_by: uatUserId,
+    state: "draft" as string,
+    content: "",
+    media_urls: [] as string[],
+    target_profiles: [] as unknown[],
+    platform_variants: {} as unknown,
+    scheduled_at: null as string | null,
+    planned_for_at: null as string | null,
+    published_at: null as string | null,
+    published_url: null as string | null,
+    last_publish_error: null as unknown,
+    publish_attempts: 0,
+    approval_required: false,
+    approver_user_id: null as string | null,
+    draft_data: {} as unknown,
+    ...overrides,
+  });
+
   const drafts = [
-    {
-      company_id: uatCompanyId,
-      created_by: uatUserId,
-      updated_by: uatUserId,
-      state: "draft",
-      content: "UAT draft post — not yet scheduled.",
-      media_urls: [] as string[],
-      target_profiles: [] as unknown[],
-      platform_variants: {} as unknown,
-      draft_data: {},
-    },
-    {
-      company_id: uatCompanyId,
-      created_by: uatUserId,
-      updated_by: uatUserId,
+    draftRow({ content: "UAT draft post — not yet scheduled." }),
+    draftRow({
       state: "scheduled",
       content: "UAT scheduled post #1 — going out in 3 days.",
-      media_urls: ["https://placehold.co/600x400.jpg"] as string[],
-      target_profiles: [] as unknown[],
-      platform_variants: {} as unknown,
+      media_urls: ["https://placehold.co/600x400.jpg"],
       scheduled_at: inThreeDays,
-      draft_data: {},
-    },
-    {
-      company_id: uatCompanyId,
-      created_by: uatUserId,
-      updated_by: uatUserId,
+    }),
+    draftRow({
       state: "scheduled",
       content: "UAT scheduled post #2 — going out in 7 days. #uat #staging",
-      media_urls: ["https://placehold.co/800x600.jpg"] as string[],
-      target_profiles: [] as unknown[],
-      platform_variants: {} as unknown,
+      media_urls: ["https://placehold.co/800x600.jpg"],
       scheduled_at: inSevenDays,
-      draft_data: {},
-    },
-    {
-      company_id: uatCompanyId,
-      created_by: uatUserId,
-      updated_by: uatUserId,
+    }),
+    draftRow({
       state: "publishing",
       content: "UAT post currently being published...",
-      media_urls: [] as string[],
-      target_profiles: [] as unknown[],
-      platform_variants: {} as unknown,
-      draft_data: {},
-    },
-    {
-      company_id: uatCompanyId,
-      created_by: uatUserId,
-      updated_by: uatUserId,
+    }),
+    draftRow({
       state: "published",
       content: "UAT published post — already live on LinkedIn (14 days ago).",
-      media_urls: [] as string[],
-      target_profiles: [] as unknown[],
-      platform_variants: {} as unknown,
       published_at: fourteenDaysAgo,
       published_url: "https://www.linkedin.com/posts/uat-stub-post-001",
-      draft_data: {},
-    },
-    {
-      company_id: uatCompanyId,
-      created_by: uatUserId,
-      updated_by: uatUserId,
+    }),
+    draftRow({
       state: "failed",
       content: "UAT failed post — bundle.social rejected the publish attempt.",
-      media_urls: [] as string[],
-      target_profiles: [] as unknown[],
-      platform_variants: {} as unknown,
       last_publish_error: {
         code: "BUNDLE_RATE_LIMIT",
         message: "bundle.social rate limit exceeded",
@@ -379,8 +363,7 @@ async function main() {
         attempt_number: 1,
       },
       publish_attempts: 1,
-      draft_data: {},
-    },
+    }),
   ];
 
   const { data: insertedDrafts, error: draftsError } = await supabase
