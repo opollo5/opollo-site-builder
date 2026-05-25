@@ -138,6 +138,11 @@ test.describe("P1 — Visual regression", () => {
     // page only.
     const grid = page.locator('[data-testid="image-library-grid"]');
     await expect(grid).toBeVisible({ timeout: 10_000 });
-    await expect(grid).toHaveScreenshot("admin-image-library-grid.png");
+    // Mask transient overlays (e.g., SessionExpiryWatcher modal that
+    // surfaces ~5 min before the 48h session boundary) so baselines stay
+    // stable regardless of when in the session window the run lands.
+    await expect(grid).toHaveScreenshot("admin-image-library-grid.png", {
+      mask: [page.locator('[role="dialog"], [role="alertdialog"]')],
+    });
   });
 });
