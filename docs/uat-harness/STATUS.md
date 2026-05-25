@@ -86,3 +86,46 @@ Without `VERCEL_BYPASS_SECRET`, all page navigation returns HTTP 401 from Vercel
 3. PR 3: `git rebase feat/uat-critical-paths feat/uat-harness-ci` → force-push → CI re-runs
 
 ---
+
+## Cleanup PRs — 2026-05-25 session
+
+After the harness reached 22 pass / 26 fail / 2 skip on run #26375514633, this session
+cleaned up the noise so every remaining red spec represents a real platform bug.
+
+### PR 1: fix(seed): grant admin role to UAT user in opollo_users
+
+- URL: #1044
+- Merge SHA: `75cae25a`
+- What it fixed: UAT ghost user now has `opollo_users.role = 'admin'` (was missing entirely). Unblocks the 6 admin-spec failures from `ERR_TOO_MANY_REDIRECTS`.
+- Specs newly passing (expected): 6 (admin sites/users/companies/theming + 2 visual admin)
+- Closes: #1040
+- Side finding: connections seed was always correct — the issue was a test-code bug (handled in PR 2).
+
+### PR 2: fix(uat): test-code cleanup — calendar, connections, sign-out testid
+
+- URL: #1045
+- Merge SHA: `31a31295`
+- What it fixed:
+  - `calendar.spec.ts:24` — removed `toHaveCount(expect.any(Number))` (a no-op cast that fails at runtime); the range check on the next two lines already covers it
+  - `connections.spec.ts` — replaced strict-mode-violating OR-selector with the single outer wrapper testid
+  - `nav-shell-client.tsx:369` — renamed the duplicate mobile-drawer sign-out testid to `nav-sign-out-mobile` so the desktop variant is uniquely addressable
+- Specs newly passing (expected): 5 (1 calendar + 3 connections + 1 sign-out)
+- Closes: #1042
+
+### PR 3: test(uat): regen-baselines — capture initial visual regression baselines
+
+- URL: #1046
+- Merge SHA: `10516267`
+- What it fixed: added the `regen-baselines` trigger word to the squash-merge subject so the `uat-harness.yml` workflow detected it and ran Playwright with `--update-snapshots`. The auto-commit-back step on the same workflow then committed the new PNG baselines to staging as `[skip ci]`.
+- Specs newly passing (expected): 4 visual regression specs (composer-empty, composer-populated, AI-assist-dialog, date-picker)
+- Also added `docs/uat-harness/visual-baselines.md` documenting the regen process for future intentional UI changes.
+
+### PR 4: test(uat): fix Media Library + save-as-draft selectors
+
+- URL: #1047
+- Merge SHA: `fd608fed`
+- What it fixed:
+  - Media Library spec: dropped the loose `[aria-label*="media"]` fallback that matched a decorative "has media" SVG inside a post chip (the dedicated `composer-tool-media` testid was always available)
+  - save-as-draft spec: added a target-profile-chip click step (`composer-submit` is gated on `target_profile_ids.length > 0 && content.trim().length > 0` per `ComposerOverlay.tsx:450`)
+- Specs newly passing (expected): 2 (no more timeouts)
+
