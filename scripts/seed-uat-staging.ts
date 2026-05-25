@@ -137,7 +137,32 @@ async function main() {
   }
 
   // -------------------------------------------------------------------------
-  // 2. platform_users row (extended profile)
+  // 2. opollo_users row (platform admin gate)
+  //
+  // The /admin/* layout gates on opollo_users.role being 'super_admin' or
+  // 'admin' (lib/auth.ts:214 + lib/admin-gate.ts:55). Without an
+  // opollo_users row, the UAT ghost user gets a redirect-loop trying to
+  // visit /admin/sites etc. The admin specs cover this surface, so the
+  // ghost user must hold 'admin' (we deliberately stop short of
+  // 'super_admin' — the UAT ghost should not unlock the DebugFooter).
+  // -------------------------------------------------------------------------
+
+  log("Upserting opollo_users row (admin role)...");
+
+  const { error: ouError } = await supabase.from("opollo_users").upsert(
+    {
+      id: uatUserId,
+      email: uatEmail,
+      display_name: "UAT Bot",
+      role: "admin",
+    },
+    { onConflict: "id" },
+  );
+  if (ouError) fail(`Failed to upsert opollo_users: ${ouError.message}`);
+  log("  opollo_users OK (role: admin)");
+
+  // -------------------------------------------------------------------------
+  // 3. platform_users row (extended profile)
   // -------------------------------------------------------------------------
 
   log("Upserting platform_users row...");
@@ -442,7 +467,8 @@ async function main() {
   log("=== Seed complete ===");
   log(`  Auth user:    ${uatEmail} (${uatUserId})`);
   log(`  Company:      ${UAT_COMPANY_NAME} (${uatCompanyId})`);
-  log(`  Role:         company_admin`);
+  log(`  Platform role: admin (opollo_users)`);
+  log(`  Company role:  admin (platform_company_users)`);
   log(`  Connections:  ${connections.length} (LinkedIn healthy, Facebook auth_required, X healthy)`);
   log(`  Drafts:       ${insertedDrafts?.length ?? 0} (1 draft, 2 scheduled, 1 publishing, 1 published)`);
   log(`  Images:       ${insertedImages?.length ?? 0}`);
