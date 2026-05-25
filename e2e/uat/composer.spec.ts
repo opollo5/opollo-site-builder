@@ -118,17 +118,12 @@ test.describe("P0 — Social composer", () => {
     const overlay = page.locator('[data-testid="composer-overlay"]');
     await expect(overlay).toBeVisible({ timeout: 10_000 });
 
-    // Open media picker — look for an attach/media button in the toolbar
-    const mediaBtn = page.locator('[data-testid="composer-tool-media"], [aria-label*="media"], [aria-label*="image"]').first();
-    if ((await mediaBtn.count()) === 0) {
-      // Try the attach button
-      const attachBtn = page.locator('[data-testid="composer-attach"]').first();
-      await expect(attachBtn).toBeVisible({ timeout: 5_000 });
-      await attachBtn.click();
-    } else {
-      await expect(mediaBtn).toBeVisible();
-      await mediaBtn.click();
-    }
+    // Open media picker via the dedicated toolbar button.
+    // (Previous loose selector `[aria-label*="media"]` matched a
+    // decorative "has media" indicator SVG on post chips.)
+    const mediaBtn = page.locator('[data-testid="composer-tool-media"]');
+    await expect(mediaBtn).toBeVisible({ timeout: 5_000 });
+    await mediaBtn.click();
 
     await page.screenshot({ path: "test-results/uat/composer/media-picker-opened.png" });
 
@@ -229,6 +224,13 @@ test.describe("P0 — Social composer", () => {
     const textarea = overlay.locator("textarea, [contenteditable]").first();
     await textarea.fill(draftText);
 
+    // Select at least one target profile — the submit button stays
+    // disabled until both content AND target_profile_ids.length > 0
+    // (see ComposerOverlay.tsx isSubmitDisabled).
+    const firstProfileChip = page.locator('[data-testid^="profile-chip-"]').first();
+    await expect(firstProfileChip).toBeVisible({ timeout: 5_000 });
+    await firstProfileChip.click();
+
     // Click Save as draft (look for draft tab/button in scheduling card)
     const draftTab = page.locator('[role="tablist"] [role="tab"]').filter({ hasText: /draft/i });
     if ((await draftTab.count()) > 0) {
@@ -236,7 +238,7 @@ test.describe("P0 — Social composer", () => {
     }
 
     const submitBtn = page.locator('[data-testid="composer-submit"]');
-    await expect(submitBtn).toBeVisible();
+    await expect(submitBtn).toBeEnabled({ timeout: 5_000 });
     await submitBtn.click();
 
     await page.screenshot({ path: "test-results/uat/composer/draft-saved.png" });
