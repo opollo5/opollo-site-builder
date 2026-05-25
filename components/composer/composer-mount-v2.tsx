@@ -41,6 +41,9 @@ interface V1DraftApiResponse {
     state?: string | null;
     // V2 drafts write scheduled_at at the top level; V1 drafts use draft_data.schedule
     scheduled_at?: string | null;
+    // Published-post metadata for the read-only Post Info card (migration 0133).
+    published_at?: string | null;
+    published_url?: string | null;
     last_publish_error?: { message?: string } | null;
     // Top-level V2 columns — present on rows where draft_data is empty
     media_urls?: string[] | null;
@@ -103,6 +106,8 @@ export function mapV1ToV2Draft(d: NonNullable<V1DraftApiResponse["data"]>): Draf
     platform_variants: {},
     approval_required: d.draft_data.approval_required ?? false,
     scheduled_at,
+    published_url: d.published_url ?? null,
+    published_at: d.published_at ?? null,
   };
 }
 

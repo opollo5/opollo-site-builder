@@ -24,6 +24,13 @@ export interface ContentEditorProps {
   companyId: string;
   platforms?: Platform[];
   className?: string;
+  /**
+   * When true, renders the textarea as readOnly and hides edit-only
+   * affordances (tools row, media upload "+", link-preview dismiss).
+   * Used for state='published' / 'publishing' / other read-only states
+   * — see lib/social/post-state-actions.ts.
+   */
+  readOnly?: boolean;
 }
 
 const MAX_FILES = 4;
@@ -40,6 +47,7 @@ export function ContentEditor({
   companyId,
   platforms,
   className,
+  readOnly = false,
 }: ContentEditorProps) {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -192,6 +200,7 @@ export function ContentEditor({
         className="block w-full resize-none bg-transparent px-4 pt-4 pb-2 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none"
         style={{ minHeight: "100px" }}
         aria-label="Post content"
+        readOnly={readOnly}
       />
 
       {/* Link preview */}
@@ -230,6 +239,7 @@ export function ContentEditor({
             onRequestUpload={openFilePicker}
             gifIndices={gifIndices}
             uploading={uploading}
+            readOnly={readOnly}
           />
         </div>
       )}
@@ -256,13 +266,15 @@ export function ContentEditor({
           <p className="text-xs text-destructive" role="alert">{uploadError}</p>
         )}
 
-        <ToolsRow
-          companyId={companyId}
-          onInsertText={insertText}
-          onOpenMediaPicker={openMediaModal}
-          onAttachGif={attachGif}
-          platforms={platforms}
-        />
+        {!readOnly && (
+          <ToolsRow
+            companyId={companyId}
+            onInsertText={insertText}
+            onOpenMediaPicker={openMediaModal}
+            onAttachGif={attachGif}
+            platforms={platforms}
+          />
+        )}
       </div>
 
       {/* File input for MediaTray "+" direct upload */}

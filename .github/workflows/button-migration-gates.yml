@@ -104,6 +104,38 @@ jobs:
           fi
           echo "✓ AiPanel has no duplicate close button"
 
+      - name: Gate 10 — Composer enforces post-state actions matrix
+        # Pins the state→action contract from
+        # docs/investigations/composer-state-model-2026-05-25.md.
+        # The matrix file must exist, the composer must consume it,
+        # and the drafts PATCH endpoint must guard terminal states.
+        run: |
+          # 1. The matrix file must exist.
+          if [ ! -f lib/social/post-state-actions.ts ]; then
+            echo "❌ FAIL: lib/social/post-state-actions.ts missing — the canonical state→action matrix has been removed"
+            exit 1
+          fi
+
+          # 2. canPerform / ALLOWED_ACTIONS must be referenced from the composer.
+          if ! grep -rqE "canPerform|ALLOWED_ACTIONS" \
+            components/social/composer/ --include="*.tsx"; then
+            echo "❌ FAIL: composer/*.tsx does not import canPerform or ALLOWED_ACTIONS — the matrix is not enforced in the UI"
+            exit 1
+          fi
+
+          # 3. The drafts/[id] PATCH endpoint must guard against terminal states.
+          DRAFT_ROUTE="app/api/platform/social/drafts/[id]/route.ts"
+          if [ ! -f "$DRAFT_ROUTE" ]; then
+            echo "⚠ WARN: drafts/[id] route file not found at $DRAFT_ROUTE — skipping guard check"
+          else
+            if ! grep -qE "published|publishing" "$DRAFT_ROUTE"; then
+              echo "❌ FAIL: drafts PATCH endpoint at $DRAFT_ROUTE does not guard terminal states (no 'published'/'publishing' reference)"
+              exit 1
+            fi
+          fi
+
+          echo "✓ post-state contract enforced"
+
       - name: Gate 9 — UAT specs do not use waitForLoadState('networkidle')
         # See issue #1049. networkidle is a Playwright anti-pattern that
         # never settles against real pages (telemetry, websockets, realtime

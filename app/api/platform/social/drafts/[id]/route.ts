@@ -16,6 +16,10 @@ import {
   validateUuidParam,
   conflict,
 } from "@/lib/http";
+import {
+  isTerminalForMutation,
+  type PostState,
+} from "@/lib/social/post-state-actions";
 
 // ---------------------------------------------------------------------------
 // GET /api/platform/social/drafts/[id]
@@ -126,7 +130,7 @@ export async function PATCH(
   const client = getServiceRoleClient();
   const { data: row } = await client
     .from("social_post_drafts")
-    .select("company_id, draft_data, draft_version")
+    .select("company_id, draft_data, draft_version, state")
     .eq("id", idCheck.value)
     .is("archived_at", null)
     .maybeSingle();
@@ -135,6 +139,33 @@ export async function PATCH(
 
   const gate = await requireCanDoForApi(row.company_id as string, "edit_post");
   if (gate.kind === "deny") return gate.response;
+
+  // State guard: published + publishing rows are not mutable via PATCH.
+  // Published posts are already live on the social platform; mutating
+  // them via composer would silently flip state back to scheduled
+  // (see MODE_TO_STATE below). Publishing rows are owned by the
+  // publish job. The matrix in lib/social/post-state-actions.ts is
+  // the single source of truth — keep this guard aligned with
+  // isTerminalForMutation.
+  const currentState = row.state as PostState;
+  if (isTerminalForMutation(currentState)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "INVALID_STATE",
+          message: `Cannot modify post in state '${currentState}'.`,
+          retryable: false,
+          suggested_action:
+            currentState === "published"
+              ? "Use repost-as-new to clone this post into a new draft."
+              : "Wait for the publish job to finish, then retry if needed.",
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 422 },
+    );
+  }
 
   if (isV2) {
     const parsed = parseBodyWith(V2SaveBodySchema, body);

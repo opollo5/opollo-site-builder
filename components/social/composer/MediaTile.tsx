@@ -11,7 +11,8 @@ import { cn } from "@/lib/utils";
 export interface MediaTileProps {
   url: string;
   index: number;
-  onRemove: (index: number) => void;
+  /** Undefined → no remove affordance is rendered (read-only mode). */
+  onRemove?: (index: number) => void;
   isGif?: boolean;
   className?: string;
 }
@@ -43,15 +44,17 @@ export function MediaTile({ url, index, onRemove, isGif = false, className }: Me
         </span>
       )}
 
-      {/* Hover-reveal trash */}
-      <button
-        type="button"
-        aria-label={`Remove media ${index + 1}`}
-        onClick={() => onRemove(index)}
-        className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <Trash2 size={16} strokeWidth={1.75} className="text-white" aria-hidden />
-      </button>
+      {/* Hover-reveal trash — omitted in read-only mode */}
+      {onRemove && (
+        <button
+          type="button"
+          aria-label={`Remove media ${index + 1}`}
+          onClick={() => onRemove(index)}
+          className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <Trash2 size={16} strokeWidth={1.75} className="text-white" aria-hidden />
+        </button>
+      )}
     </div>
   );
 }

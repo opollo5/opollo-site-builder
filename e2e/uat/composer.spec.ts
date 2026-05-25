@@ -367,3 +367,212 @@ test.describe("P0 — Social composer", () => {
     await page.screenshot({ path: "test-results/uat/composer/post-still-on-calendar-after-discard.png" });
   });
 });
+
+// ---------------------------------------------------------------------------
+// P0 — Composer state-aware behaviour (PR feat/composer-state-aware).
+//
+// Regression cover for the bug where every post — including posts already
+// published to LinkedIn — opened in fully-editable mode with a "Schedule
+// post" CTA. The matrix lives at lib/social/post-state-actions.ts and is
+// also pinned by a permanent CI gate in button-migration-gates.yml.
+//
+// Each spec opens the composer at /company/social/calendar?compose=<id>
+// where <id> is looked up at runtime from the calendar-view endpoint
+// rather than hard-coded — the staging seed assigns fresh UUIDs each run.
+// ---------------------------------------------------------------------------
+
+test.describe("P0 — Composer state-aware behaviour", () => {
+  let consoleMessages: string[];
+
+  test.beforeEach(async ({ page }) => {
+    consoleMessages = collectConsole(page);
+    await signInAsUatBot(page);
+  });
+
+  test.afterEach(async ({ page }, testInfo) => {
+    await saveFailureReport(page, testInfo, { consoleMessages });
+  });
+
+  // Resolve a seeded post id for the requested state via the same
+  // endpoint the calendar uses, so the spec doesn't need to know the
+  // UUIDs minted by scripts/seed-uat-staging.ts.
+  async function findSeededDraftIdByContent(
+    page: import("@playwright/test").Page,
+    needle: string,
+  ): Promise<string | null> {
+    const res = await page.request.get(
+      `${UAT_BASE_URL}/api/platform/social/drafts/calendar-view`,
+    );
+    if (!res.ok()) return null;
+    const json = (await res.json()) as {
+      data?: { posts?: Array<{ id: string; content_excerpt?: string }> };
+    };
+    const posts = json.data?.posts ?? [];
+    const hit = posts.find((p) =>
+      (p.content_excerpt ?? "").toLowerCase().includes(needle.toLowerCase()),
+    );
+    return hit?.id ?? null;
+  }
+
+  async function openComposerForState(
+    page: import("@playwright/test").Page,
+    contentNeedle: string,
+  ): Promise<{ overlay: import("@playwright/test").Locator; draftId: string } | null> {
+    const id = await findSeededDraftIdByContent(page, contentNeedle);
+    if (!id) {
+      test.fixme(true, `No seeded draft matching "${contentNeedle}" found — re-seed staging.`);
+      return null;
+    }
+    await page.goto(`${UAT_BASE_URL}/company/social/calendar?compose=${id}`);
+    const overlay = page.locator('[data-testid="composer-overlay"]');
+    await expect(overlay).toBeVisible({ timeout: 15_000 });
+    return { overlay, draftId: id };
+  }
+
+  test("published post opens read-only — textarea is readOnly", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+
+    const textarea = overlay.locator('[data-testid="content-textarea"]');
+    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    // The textarea must carry the readOnly attribute. Brief explicitly
+    // forbids the published post from being edited.
+    await expect(textarea).toHaveAttribute("readonly", "");
+    await page.screenshot({
+      path: "test-results/uat/composer/state-published-readonly.png",
+    });
+  });
+
+  test("published post shows the read-only banner with post-state metadata", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+
+    const banner = overlay.locator('[data-testid="composer-readonly-banner"]');
+    await expect(banner).toBeVisible({ timeout: 5_000 });
+    await expect(banner).toHaveAttribute("data-post-state", "published");
+  });
+
+  test("published post shows View on platform link", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+
+    const link = overlay.locator('[data-testid="view-on-platform-link"]');
+    await expect(link).toBeVisible({ timeout: 5_000 });
+    await expect(link).toHaveAttribute("href", /linkedin\.com|facebook\.com|x\.com/);
+    await expect(link).toHaveAttribute("target", "_blank");
+  });
+
+  test("published post shows Repost as new button", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+    await expect(
+      overlay.locator('[data-testid="repost-as-new-button"]'),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("published post shows analytics link", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+    await expect(
+      overlay.locator('[data-testid="view-analytics-link"]'),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("published post does NOT show Schedule/Save submit", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+
+    // SchedulingCard's primary submit button is `composer-submit`. In
+    // read-only mode SchedulingCard is replaced by PostInfoCard, so the
+    // submit button must not be in the DOM at all.
+    await expect(
+      overlay.locator('[data-testid="composer-submit"]'),
+    ).toHaveCount(0);
+  });
+
+  test("published post Delete from records uses confirmation copy that the post stays live", async ({ page }) => {
+    const opened = await openComposerForState(page, "already live on LinkedIn");
+    if (!opened) return;
+    const { overlay } = opened;
+
+    await overlay.locator('[data-testid="delete-from-records-button"]').click();
+    const confirm = overlay.locator('[data-testid="delete-from-records-confirm"]');
+    await expect(confirm).toBeVisible({ timeout: 3_000 });
+    // The copy must spell out that the social-platform post stays up.
+    // We never call any bundle.social unpublish API.
+    await expect(confirm).toContainText(/remain visible on the social platform/i);
+  });
+
+  test("publishing post opens read-only — no edit affordances", async ({ page }) => {
+    const opened = await openComposerForState(page, "currently being published");
+    if (!opened) return;
+    const { overlay } = opened;
+
+    const textarea = overlay.locator('[data-testid="content-textarea"]');
+    await expect(textarea).toHaveAttribute("readonly", "");
+    await expect(
+      overlay.locator('[data-testid="composer-readonly-banner"]'),
+    ).toHaveAttribute("data-post-state", "publishing");
+    await expect(
+      overlay.locator('[data-testid="composer-submit"]'),
+    ).toHaveCount(0);
+  });
+
+  test("failed post shows Retry publish button", async ({ page }) => {
+    const opened = await openComposerForState(page, "bundle.social rejected");
+    if (!opened) return;
+    const { overlay } = opened;
+    await expect(
+      overlay.locator('[data-testid="retry-publish-button"]'),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+
+  test("failed post is editable — textarea is NOT readOnly", async ({ page }) => {
+    const opened = await openComposerForState(page, "bundle.social rejected");
+    if (!opened) return;
+    const { overlay } = opened;
+    const textarea = overlay.locator('[data-testid="content-textarea"]');
+    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    // The matrix allows `edit` for state='failed'; readOnly attr must be absent.
+    await expect(textarea).not.toHaveAttribute("readonly", "");
+  });
+
+  test("draft post is fully editable (regression)", async ({ page }) => {
+    const opened = await openComposerForState(page, "not yet scheduled");
+    if (!opened) return;
+    const { overlay } = opened;
+    const textarea = overlay.locator('[data-testid="content-textarea"]');
+    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    await expect(textarea).not.toHaveAttribute("readonly", "");
+    // SchedulingCard must render — composer-submit is the primary CTA.
+    await expect(
+      overlay.locator('[data-testid="composer-submit"]'),
+    ).toBeVisible({ timeout: 5_000 });
+    // PostInfoCard must NOT render in editable mode.
+    await expect(
+      overlay.locator('[data-testid="composer-readonly-banner"]'),
+    ).toHaveCount(0);
+  });
+
+  test("scheduled post is fully editable (regression)", async ({ page }) => {
+    const opened = await openComposerForState(page, "going out in 3 days");
+    if (!opened) return;
+    const { overlay } = opened;
+    const textarea = overlay.locator('[data-testid="content-textarea"]');
+    await expect(textarea).toBeVisible({ timeout: 5_000 });
+    await expect(textarea).not.toHaveAttribute("readonly", "");
+    await expect(
+      overlay.locator('[data-testid="composer-submit"]'),
+    ).toBeVisible({ timeout: 5_000 });
+    // Convert-to-draft is the scheduled-state affordance.
+    await expect(
+      overlay.locator('[data-testid="convert-to-draft-btn"]'),
+    ).toBeVisible({ timeout: 5_000 });
+  });
+});
