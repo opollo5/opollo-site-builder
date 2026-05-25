@@ -92,8 +92,10 @@ test.describe("P0 — Social composer", () => {
     const generateBtn = page.locator('[data-testid="ai-generate-button"]');
     await expect(generateBtn).toBeVisible({ timeout: 5_000 });
     const generateBtnClass = await generateBtn.getAttribute("class");
-    // Filled variant should NOT be "outline" or "ghost" or "secondary"
-    expect(generateBtnClass).not.toContain("outline");
+    // Positive assertion: default (filled) variant always has bg-primary.
+    // Note: NOT.toContain("outline") is a false positive — the cva base
+    // class includes `focus-visible:outline-none` on every button variant.
+    expect(generateBtnClass).toContain("bg-primary");
     expect(generateBtnClass).not.toContain("ghost");
     await page.screenshot({ path: "test-results/uat/composer/ai-generate-button.png" });
 
