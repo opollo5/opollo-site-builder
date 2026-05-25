@@ -118,6 +118,26 @@ Status unchanged. Tests do not appear in run output (likely passing or filtered)
 
 ---
 
+## Cleanup-session findings — 2026-05-25
+
+After the 4 cleanup PRs (#1044–#1047) landed, harness run [#26378861696](https://github.com/opollo5/opollo-site-builder/actions/runs/26378861696) returned 13 pass / 36 fail / 1 skip — worse than the prior run. Root cause documented separately:
+
+### KF-14 — networkidle never settles on admin user 🆕
+
+**Specs:** all 25+ specs using `await page.waitForLoadState("networkidle")`. Maps 1:1 to the failure pattern in the final cleanup run.
+**Root cause:** Granting `opollo_users.role = 'admin'` (PR #1044) unlocked admin nav items that trigger in-flight requests which never resolve on staging. `networkidle` is never reached, so all specs that wait for it hit the 45s timeout regardless of what the page actually rendered.
+**Fix scope (next session):** Two parts — (1) identify and fix the never-settling request server-side, (2) migrate UAT specs off the `networkidle` anti-pattern per Playwright's own guidance ([docs](https://playwright.dev/docs/api/class-page#page-wait-for-load-state)).
+**GitHub issue:** [#1049](https://github.com/opollo5/opollo-site-builder/issues/1049)
+
+### KF-15 — AI assist dialog text-check still failing (visual passes) 🆕
+
+**Spec:** `e2e/uat/composer.spec.ts:74:7`
+**Assertion:** `expect(received).not.toContain(expected)` — still failing per #1041, even though the visual baseline (`visual.spec.ts:68`) **passes**, showing exactly one close button + one filled Generate button.
+**Conclusion:** Either the test text-check is using a stale assertion that doesn't match the current DOM, or the dialog text-content has changed since #1023 landed. Investigate next session.
+**GitHub issue:** [#1041](https://github.com/opollo5/opollo-site-builder/issues/1041)
+
+---
+
 ## Maintenance notes
 
 - Issues are opened per failure with label `uat-finding`
