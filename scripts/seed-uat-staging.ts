@@ -221,6 +221,13 @@ async function main() {
       .from("image_library")
       .delete()
       .like("source_ref", "uat-%"),
+    // login_challenges: the UAT user is synthetic and must never be rate-limited.
+    // The login action caps at 5 challenges/hour (lib/2fa/challenges.ts +
+    // app/login/actions.ts:157). Clear all rows so every seed run resets the count.
+    supabase
+      .from("login_challenges")
+      .delete()
+      .eq("user_id", uatUserId),
   ]);
 
   for (const { error } of wipeResults) {

@@ -48,7 +48,8 @@ export type LimiterName =
   | "approval_decision"
   | "ai_prefill"
   | "error_report"
-  | "client_errors";
+  | "client_errors"
+  | "uat_sign_in";
 
 type LimiterConfig = {
   requests: number;
@@ -127,6 +128,9 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // guard against client-side retry loops; must not block legitimate
   // error bursts during a bad session.
   client_errors: { requests: 20, window: "1 m" },
+  // UAT sign-in bypass routes (staging/dev only). 100 per 5 min per IP —
+  // cosmetic; the bearer token / secret query param is the real gate.
+  uat_sign_in: { requests: 100, window: "5 m" },
 };
 
 export type RateLimitResult =
