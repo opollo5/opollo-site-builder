@@ -50,7 +50,9 @@ test.describe("P0 — Connections", () => {
   test("disconnect button opens confirmation (does not execute)", async ({
     page,
   }) => {
-    await page.waitForLoadState("networkidle");
+    await expect(
+      page.locator('[data-testid="connections-list-wrapper"]'),
+    ).toBeVisible({ timeout: 15_000 });
 
     // Find the first disconnect button
     const disconnectBtns = page.locator('[data-testid^="connection-disconnect-"]');
@@ -79,7 +81,9 @@ test.describe("P0 — Connections", () => {
   test("reconnect button opens OAuth redirect (does not complete OAuth)", async ({
     page,
   }) => {
-    await page.waitForLoadState("networkidle");
+    await expect(
+      page.locator('[data-testid="connections-list-wrapper"]'),
+    ).toBeVisible({ timeout: 15_000 });
 
     // Find a reconnect button (expected on the expired Facebook connection)
     const reconnectBtns = page.locator('[data-testid^="connection-reconnect-"]');

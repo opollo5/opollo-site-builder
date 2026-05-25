@@ -21,7 +21,6 @@ test.describe("P1 — Media library", () => {
 
   test("/admin/images loads with image grid", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/images`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/media/admin-images-loaded.png" });
 
     await expect(page).toHaveURL(/\/admin\/images/);
@@ -35,7 +34,6 @@ test.describe("P1 — Media library", () => {
 
   test("search by caption works", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/images`);
-    await page.waitForLoadState("networkidle");
 
     const searchInput = page.locator(
       'input[placeholder*="search"], input[placeholder*="Search"], input[type="search"]',
@@ -46,7 +44,6 @@ test.describe("P1 — Media library", () => {
     }
 
     await searchInput.fill("uat");
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/media/search-result.png" });
 
     // Results should update without crash
@@ -56,7 +53,6 @@ test.describe("P1 — Media library", () => {
 
   test("filter by source works", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/admin/images?source=upload`);
-    await page.waitForLoadState("networkidle");
     await page.screenshot({ path: "test-results/uat/media/filter-by-source.png" });
 
     await expect(page).toHaveURL(/source=upload/);
@@ -69,7 +65,6 @@ test.describe("P1 — Media library", () => {
   }) => {
     // Get count from admin/images
     await page.goto(`${UAT_BASE_URL}/admin/images`);
-    await page.waitForLoadState("networkidle");
 
     // Count visible image items on admin page (first page)
     const adminItems = page.locator('[data-testid^="image-item-"], [data-testid="image-grid"] img, .image-card').first();
