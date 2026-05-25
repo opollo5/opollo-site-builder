@@ -132,9 +132,11 @@ test.describe("P1 — Visual regression", () => {
       return;
     }
 
-    const grid = page.locator(
-      '[data-testid="image-library-grid"], [data-testid="media-library-grid"]',
-    );
+    // image-library-grid is on the /admin/images grid view
+    // (ImagesTable.tsx → ImageGrid); media-library-grid is the composer's
+    // MediaPickerModal (a different surface). The spec targets the admin
+    // page only.
+    const grid = page.locator('[data-testid="image-library-grid"]');
     await expect(grid).toBeVisible({ timeout: 10_000 });
     await expect(grid).toHaveScreenshot("admin-image-library-grid.png");
   });

@@ -264,6 +264,7 @@ function ImageGrid({
   return (
     <div
       className="mt-3"
+      data-testid="image-library-grid"
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fill, minmax(149px, 1fr))",
