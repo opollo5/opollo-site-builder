@@ -28,7 +28,8 @@ const UAT_BASE_URL =
 
 export default defineConfig({
   testDir: "./e2e/uat",
-  testIgnore: [],
+  // Diagnostic specs live under e2e/diagnostics/ and run on demand only.
+  testIgnore: ["**/diagnostics/**"],
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
