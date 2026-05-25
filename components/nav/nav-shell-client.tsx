@@ -366,7 +366,7 @@ function MobileNavContent({
           <form action="/logout" method="POST">
             <button
               type="submit"
-              data-testid="nav-sign-out"
+              data-testid="nav-sign-out-mobile"
               className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm text-destructive hover:bg-destructive/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gr"
             >
               Sign out

@@ -24,9 +24,7 @@ test.describe("P0 — Connections", () => {
     page,
   }) => {
     // Wait for connections to load
-    const table = page.locator(
-      '[data-testid="connections-table"], [data-testid="connections-list-wrapper"]',
-    );
+    const table = page.locator('[data-testid="connections-list-wrapper"]');
     await expect(table).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: "test-results/uat/connections/list-loaded.png" });
 
@@ -38,9 +36,7 @@ test.describe("P0 — Connections", () => {
   });
 
   test("status pills render per connection state", async ({ page }) => {
-    const table = page.locator(
-      '[data-testid="connections-table"], [data-testid="connections-list-wrapper"]',
-    );
+    const table = page.locator('[data-testid="connections-list-wrapper"]');
     await expect(table).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: "test-results/uat/connections/status-pills.png" });
 

@@ -26,9 +26,8 @@ test.describe("P0 — Calendar", () => {
     await expect(calendarShell).toBeVisible({ timeout: 15_000 });
     await page.screenshot({ path: "test-results/uat/calendar/grid-loaded.png" });
 
-    // Should have 7 columns (Mon–Sun) worth of cells
+    // Calendar renders 4-6 weeks of cells depending on month layout.
     const cells = page.locator('[data-testid="calendar-dnd-cell"]');
-    await expect(cells).toHaveCount(expect.any(Number) as never);
     const count = await cells.count();
     expect(count).toBeGreaterThanOrEqual(28); // at least 4 weeks
     expect(count).toBeLessThanOrEqual(42);   // at most 6 weeks
