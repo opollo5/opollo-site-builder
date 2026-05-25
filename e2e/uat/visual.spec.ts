@@ -24,7 +24,9 @@ test.describe("P1 — Visual regression", () => {
   test("calendar grid — current month render", async ({ page }) => {
     await page.goto(`${UAT_BASE_URL}/company/social/calendar`);
 
-    const grid = page.locator('[data-testid="calendar-grid"], [data-testid="calendar-shell"]');
+    // calendar-grid is the inner role="grid" (SocialCalendarGrid.tsx:299);
+    // calendar-shell is the outer wrapper. Visual diff targets the grid only.
+    const grid = page.locator('[data-testid="calendar-grid"]');
     await expect(grid).toBeVisible({ timeout: 10_000 });
 
     // Mask dynamic date cells so today highlight doesn't break baselines
@@ -130,9 +132,11 @@ test.describe("P1 — Visual regression", () => {
       return;
     }
 
-    const grid = page.locator(
-      '[data-testid="image-library-grid"], [data-testid="media-library-grid"]',
-    );
+    // image-library-grid is on the /admin/images grid view
+    // (ImagesTable.tsx → ImageGrid); media-library-grid is the composer's
+    // MediaPickerModal (a different surface). The spec targets the admin
+    // page only.
+    const grid = page.locator('[data-testid="image-library-grid"]');
     await expect(grid).toBeVisible({ timeout: 10_000 });
     await expect(grid).toHaveScreenshot("admin-image-library-grid.png");
   });

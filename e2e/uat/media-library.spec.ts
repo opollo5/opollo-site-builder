@@ -75,14 +75,13 @@ test.describe("P1 — Media library", () => {
     const overlay = page.locator('[data-testid="composer-overlay"]');
     await expect(overlay).toBeVisible({ timeout: 10_000 });
 
-    // Open media picker
-    const mediaBtn = page.locator('[data-testid="composer-tool-media"], [aria-label*="media"], [aria-label*="image"]').first();
-    if ((await mediaBtn.count()) > 0) {
-      await mediaBtn.click();
-    } else {
-      test.fixme(true, "Media picker button not found in composer toolbar");
-      return;
-    }
+    // Open media picker via the dedicated toolbar button.
+    // (Previous loose selector `[aria-label*="media"]` matched a decorative
+    // "has media" indicator SVG on post chips — same fix as
+    // composer.spec.ts:114.)
+    const mediaBtn = page.locator('[data-testid="composer-tool-media"]');
+    await expect(mediaBtn).toBeVisible({ timeout: 5_000 });
+    await mediaBtn.click();
 
     const libraryTab = page.locator('[data-testid="media-picker-tab-library"]');
     await expect(libraryTab).toBeVisible({ timeout: 5_000 });
