@@ -148,3 +148,21 @@ cleaned up the noise so every remaining red spec represents a real platform bug.
 - Root cause: Vercel Live (vercel.live) preview-deployment feedback widget opens a long-lived WebSocket that Playwright's resource-snapshot trace doesn't capture. Suspects 1-5 from the brief ruled out via static analysis + env inspection.
 - Fix: deferred. PR #1050 unblocks the harness without a platform change. The diagnostic spec at `e2e/diagnostics/admin-nav-requests.spec.ts` lets a future session confirm the WebSocket source and apply Option A (block `vercel.live` in UAT config) or Option B (disable Vercel Toolbar on staging). Full evidence in `docs/investigations/admin-nav-hanging-2026-05-25.md`.
 
+## State-aware composer
+
+- PR: #1061 (main fix) + #1064 (seed-fix follow-up)
+- Merge SHA: `eb4de48e` (#1061) + `18de4cb7` (#1064)
+- Specs added: 12 (P0 — Composer state-aware behaviour describe block)
+- Pass count delta: 42 → 54 (pending UAT harness run after staging seed re-ran)
+- Root cause: composer had no state→action mapping; PATCH route had no current-state guard. Every state — including `published` — fell through to the default editable layout.
+- Fix:
+  - `lib/social/post-state-actions.ts` — canonical state→action matrix (read-only states: published, publishing, recurring, paused, pending_approval).
+  - PATCH `/api/platform/social/drafts/[id]` returns 422 INVALID_STATE for terminal states (published, publishing). Mirrors the existing DELETE guard.
+  - Composer renders `PostInfoCard` for read-only states with View on platform · Repost as new · Delete from records (explicit copy: "post remains visible on the social platform — Opollo never calls bundle.social unpublish") · View analytics. Failed gets Retry publish while staying editable per matrix.
+  - 156 new unit tests pin every (state, action) cell + 2 422 PATCH assertions.
+  - Permanent CI gate (`Gate 10 — Composer enforces post-state actions matrix` in `button-migration-gates.yml`) asserts matrix file exists, composer references `canPerform`/`ALLOWED_ACTIONS`, and PATCH route literally guards published/publishing.
+  - 12 new UAT specs cover: published readOnly textarea, View on platform link, Repost as new button, analytics link, Schedule/Save submit absence, Delete confirmation copy, publishing read-only, failed Retry button, failed-still-editable, draft fully editable, scheduled fully editable, plus banner state-attribute assertion.
+  - Seed adds a 14-days-ago published row + a failed row with bundle.social rate-limit error.
+- Backlog: 9 follow-up state-machine gaps logged in `docs/investigations/composer-state-gaps-backlog-2026-05-25.md` (G1–G9: posts-list filter, calendar chip visuals, bulk action state preview, recurring/paused UI, approver inline actions, dedicated retry endpoint, etc.).
+- Investigation: `docs/investigations/composer-state-model-2026-05-25.md` — current state model + failure list + matrix.
+
