@@ -50,6 +50,7 @@ vi.mock("@/lib/auth", async () => {
 // rate-limit.test.ts).
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
+  cookies: () => ({ get: () => undefined, set: () => {} }),
 }));
 
 const { loginAction } = await import("@/app/login/actions");
