@@ -12,10 +12,16 @@ import { SocialCalendarGrid } from "@/components/social/calendar/SocialCalendarG
 import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } from "@/components/social/composer/SchedulingCard";
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
 import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
+import { PostInfoCard } from "@/components/social/composer/PostInfoCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pill } from "@/components/ui/pill";
 import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
 import type { Connection, Draft, DraftState, Platform, SchedulingMode } from "@/lib/social/types";
+import {
+  canPerform,
+  isReadOnlyState,
+  type PostState,
+} from "@/lib/social/post-state-actions";
 import type { SocialPlatformIconKey } from "@/components/ui/SocialPlatformIcon";
 
 // ---------------------------------------------------------------------------
@@ -141,6 +147,11 @@ export function ComposerOverlay({
   );
   const [previewTab, setPreviewTab] = React.useState<PreviewTab>("preview");
   const [activePreviewIndex, setActivePreviewIndex] = React.useState(0);
+  // Local override for editOriginalState so Repost-as-new can downgrade
+  // a published-post overlay into a fresh-draft overlay without needing
+  // a parent navigation. Initialised from the incoming prop and reset
+  // whenever the hydration effect re-fires.
+  const [localEditState, setLocalEditState] = React.useState<DraftState | undefined>(editOriginalState);
 
   // Scheduling state (internal slot — used when schedulingSlot prop is absent)
   const [scheduling, setScheduling] = React.useState<SchedulingCardValue>(
@@ -198,8 +209,9 @@ export function ComposerOverlay({
     setActivePreviewIndex(0);
     setScheduling(schedulingCardValueFromIso(initialDraft?.scheduled_at, companyTimezone));
     setSubmitError(null);
+    setLocalEditState(editOriginalState);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialDraft, companyTimezone]);
+  }, [open, initialDraft, companyTimezone, editOriginalState]);
 
   const selectedConnections = availableConnections.filter((c) =>
     selectedIds.includes(c.id),
@@ -266,6 +278,61 @@ export function ComposerOverlay({
     } catch {
       // ignore — UI shows nothing on failure; user can retry
     }
+  }
+
+  // ---------------------------------------------------------------------
+  // PostInfoCard handlers — published / publishing / recurring / paused /
+  // pending_approval flows. See lib/social/post-state-actions.ts.
+  // ---------------------------------------------------------------------
+
+  async function handleDeleteFromRecords() {
+    if (!draft.id) return;
+    try {
+      // NEVER calls bundle.social — this only soft-deletes the Opollo row.
+      // The post stays live on the social platform. The PostInfoCard
+      // confirmation copy spells this out.
+      const res = await fetch(`/api/platform/social/drafts/${draft.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error(`Delete failed (${res.status})`);
+      }
+      void swrMutate(
+        (key) => typeof key === "string" && key.includes("/api/platform/social/drafts/calendar-view"),
+      );
+      onClose();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Delete failed.");
+    }
+  }
+
+  function handleRepostAsNew() {
+    // In-place reset to "new draft" mode. The Repost button is only
+    // visible when state='published' (matrix). Clearing id + version
+    // means the next Submit POSTs a fresh draft instead of PATCHing
+    // the published row (which the server would reject as 422).
+    setDraft((d) => ({
+      content: d.content,
+      media_urls: d.media_urls,
+      target_profile_ids: d.target_profile_ids,
+      platform_variants: d.platform_variants,
+      approval_required: false,
+    }));
+    setLocalEditState(undefined);
+    setScheduling(defaultSchedulingCardValue());
+    setSubmitError(null);
+  }
+
+  async function handleRetryPublish() {
+    // For failed posts the retry is a re-schedule. We POST mode=schedule
+    // with the existing scheduled_at (or now+2min if unset) so the
+    // publish-due cron picks it up on the next sweep.
+    if (!draft.id) return;
+    const targetIso =
+      draft.scheduled_at ??
+      new Date(Date.now() + 2 * 60 * 1000).toISOString();
+    setScheduling(schedulingCardValueFromIso(targetIso, companyTimezone));
+    await handleSubmit("schedule");
   }
 
   async function handleSubmit(mode: SchedulingMode): Promise<boolean> {
@@ -445,7 +512,13 @@ export function ComposerOverlay({
 
   if (!open) return null;
 
-  const isPublishing = editOriginalState === "publishing";
+  // State-aware affordances. localEditState lets Repost-as-new
+  // downgrade a 'published' overlay to a fresh-draft overlay in-place
+  // (handleRepostAsNew sets it to undefined).
+  const effectiveState = localEditState;
+  const postState = (effectiveState ?? "draft") as PostState;
+  const composerReadOnly = effectiveState ? isReadOnlyState(postState) : false;
+  const isPublishing = effectiveState === "publishing";
 
   const isSubmitDisabled =
     submitting ||
@@ -453,42 +526,83 @@ export function ComposerOverlay({
     draft.target_profile_ids.length === 0 ||
     draft.content.trim().length === 0;
 
-  const internalSchedulingSlot = (
-    <div className="flex flex-col gap-2">
-      {submitError && (
-        <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {submitError}
-        </p>
-      )}
-      {draft.target_profile_ids.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          Select at least one account to post to.
-        </p>
-      )}
-      <SchedulingCard
-        value={scheduling}
-        onChange={setScheduling}
-        onSubmit={async () => { await handleSubmit(scheduling.mode); }}
-        submitting={submitting}
-        disabled={isSubmitDisabled}
-        disabledTooltip={
-          draft.target_profile_ids.length === 0
-            ? "Select at least one account to post to"
+  // The internal slot has three shapes depending on state:
+  //   1. Read-only states (published, publishing, recurring, paused,
+  //      pending_approval) → PostInfoCard replaces SchedulingCard.
+  //   2. failed → PostInfoCard above SchedulingCard so the user can
+  //      Retry publish OR edit + reschedule.
+  //   3. Everything else (draft, scheduled, rejected) → default
+  //      SchedulingCard + optional Convert-to-draft for 'scheduled'.
+  let internalSchedulingSlot: React.ReactNode;
+  if (composerReadOnly) {
+    internalSchedulingSlot = (
+      <PostInfoCard
+        state={postState}
+        publishedAt={draft.published_at ?? null}
+        publishedUrl={draft.published_url ?? null}
+        onDeleteFromRecords={() => void handleDeleteFromRecords()}
+        onRepostAsNew={handleRepostAsNew}
+        onViewAnalytics={
+          canPerform(postState, "view_analytics")
+            ? () => {
+                // Best-effort destination — opens the dashboard-level
+                // analytics surface. Per-post analytics is a future PR
+                // (see docs/investigations/composer-state-gaps-backlog-2026-05-25.md).
+                window.location.assign("/company/social/analytics");
+              }
             : undefined
         }
       />
-      {editOriginalState === "scheduled" && (
-        <button
-          type="button"
-          onClick={() => void handleConvertToDraft()}
-          data-testid="convert-to-draft-btn"
-          className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
-        >
-          Convert to draft
-        </button>
-      )}
-    </div>
-  );
+    );
+  } else {
+    internalSchedulingSlot = (
+      <div className="flex flex-col gap-2">
+        {submitError && (
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {submitError}
+          </p>
+        )}
+        {effectiveState === "failed" && (
+          <PostInfoCard
+            state="failed"
+            publishedAt={null}
+            publishedUrl={null}
+            failureReason={failureReason}
+            onDeleteFromRecords={() => void handleDeleteFromRecords()}
+            onRepostAsNew={handleRepostAsNew}
+            onRetryPublish={() => void handleRetryPublish()}
+          />
+        )}
+        {draft.target_profile_ids.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Select at least one account to post to.
+          </p>
+        )}
+        <SchedulingCard
+          value={scheduling}
+          onChange={setScheduling}
+          onSubmit={async () => { await handleSubmit(scheduling.mode); }}
+          submitting={submitting}
+          disabled={isSubmitDisabled}
+          disabledTooltip={
+            draft.target_profile_ids.length === 0
+              ? "Select at least one account to post to"
+              : undefined
+          }
+        />
+        {effectiveState === "scheduled" && (
+          <button
+            type="button"
+            onClick={() => void handleConvertToDraft()}
+            data-testid="convert-to-draft-btn"
+            className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
+          >
+            Convert to draft
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
@@ -526,11 +640,13 @@ export function ComposerOverlay({
                 <ChevronLeft size={20} aria-hidden />
               </button>
 
-              {/* Title */}
+              {/* Title — "Post info" for read-only states, "Edit post" for editable. */}
               <h2 className="flex-1 text-base font-semibold text-foreground min-w-0">
-                {editOriginalState ? (
+                {effectiveState ? (
                   <span className="flex items-center gap-1.5 min-w-0 truncate">
-                    <span className="shrink-0">Edit post</span>
+                    <span className="shrink-0">
+                      {composerReadOnly ? "Post info" : "Edit post"}
+                    </span>
                     {selectedConnections.length > 0 && (
                       <>
                         <span className="shrink-0 text-muted-foreground font-normal">for</span>
@@ -539,11 +655,14 @@ export function ComposerOverlay({
                         {selectedConnections.length > 1 && <span className="shrink-0">…</span>}
                       </>
                     )}
-                    {editOriginalState === "failed" && (
+                    {effectiveState === "failed" && (
                       <span className="shrink-0 text-destructive font-medium">· Failed</span>
                     )}
                     {isPublishing && (
                       <Pill variant="warning" className="shrink-0 text-xs">Publishing…</Pill>
+                    )}
+                    {effectiveState === "published" && (
+                      <Pill variant="success" className="shrink-0 text-xs">Published</Pill>
                     )}
                   </span>
                 ) : draft.id ? "Edit post" : "New post"}
@@ -601,9 +720,10 @@ export function ComposerOverlay({
                 available={availableConnections}
                 selected={selectedIds}
                 onChange={handleProfileChange}
+                readOnly={composerReadOnly}
               />
 
-              {editOriginalState === "failed" && failureReason && (
+              {effectiveState === "failed" && failureReason && (
                 <div
                   className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm"
                   data-testid="failure-banner"
@@ -620,6 +740,7 @@ export function ComposerOverlay({
                 companyId={companyId}
                 selectedConnections={selectedConnections}
                 schedulingSlot={schedulingSlot ?? internalSchedulingSlot}
+                readOnly={composerReadOnly}
               />
             </div>
           </div>

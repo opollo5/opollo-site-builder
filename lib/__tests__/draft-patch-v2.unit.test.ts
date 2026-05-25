@@ -39,6 +39,7 @@ const CONN_ID   = "ffffffff-0000-0000-0000-000000000003";
 const BASE_ROW = {
   company_id: COMPANY_ID,
   draft_version: 3,
+  state: "draft",
   draft_data: {
     master_text: "old content",
     media_refs: [],
@@ -256,6 +257,56 @@ describe("PATCH /api/platform/social/drafts/[id] — V2 body", () => {
     );
 
     expect(res.status).toBe(404);
+  });
+
+  it("returns 422 INVALID_STATE when the draft is already published (state guard)", async () => {
+    // The composer must never silently flip a published post back to
+    // scheduled / draft. See lib/social/post-state-actions.ts.
+    mockFrom.mockReturnValueOnce(
+      makeQueryChain({ ...BASE_ROW, state: "published" }),
+    );
+
+    const res = await PATCH(
+      makeRequest({
+        draft_version: 3,
+        content: "trying to edit a live post",
+        media_urls: [],
+        target_profile_ids: [],
+        platform_variants: {},
+        mode: "schedule",
+        scheduled_at: "2026-06-01T23:00:00.000Z",
+        approval_required: false,
+      }),
+      makeParams(),
+    );
+
+    expect(res.status).toBe(422);
+    const json = (await res.json()) as { error: { code: string; message: string } };
+    expect(json.error.code).toBe("INVALID_STATE");
+    expect(json.error.message).toContain("published");
+  });
+
+  it("returns 422 INVALID_STATE when the draft is currently publishing", async () => {
+    mockFrom.mockReturnValueOnce(
+      makeQueryChain({ ...BASE_ROW, state: "publishing" }),
+    );
+
+    const res = await PATCH(
+      makeRequest({
+        draft_version: 3,
+        content: "trying to edit during publish",
+        media_urls: [],
+        target_profile_ids: [],
+        platform_variants: {},
+        mode: "draft",
+        approval_required: false,
+      }),
+      makeParams(),
+    );
+
+    expect(res.status).toBe(422);
+    const json = (await res.json()) as { error: { code: string } };
+    expect(json.error.code).toBe("INVALID_STATE");
   });
 
   it("returns 400 (VALIDATION_FAILED) on invalid V2 body (mode field missing)", async () => {

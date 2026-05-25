@@ -46,6 +46,10 @@ export interface Draft {
   approval_required: boolean;
   approver_user_id?: string;
   scheduled_at?: string | null; // ISO 8601 UTC — populated when editing a scheduled draft
+  // Populated for state='published' rows so the read-only Post Info card
+  // can render a "View on platform" link without an extra fetch.
+  published_url?: string | null;
+  published_at?: string | null;
 }
 
 export interface CalendarPost {

@@ -299,7 +299,9 @@ async function main() {
   const now = new Date();
   const inThreeDays = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString();
   const inSevenDays = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  // Published 14 days ago per state-aware composer brief — the
+  // "old published post" surface the bug used to reproduce on.
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
 
   const drafts = [
     {
@@ -353,12 +355,30 @@ async function main() {
       created_by: uatUserId,
       updated_by: uatUserId,
       state: "published",
-      content: "UAT published post — already live.",
+      content: "UAT published post — already live on LinkedIn (14 days ago).",
       media_urls: [] as string[],
       target_profiles: [] as unknown[],
       platform_variants: {} as unknown,
-      published_at: twoDaysAgo,
+      published_at: fourteenDaysAgo,
       published_url: "https://www.linkedin.com/posts/uat-stub-post-001",
+      draft_data: {},
+    },
+    {
+      company_id: uatCompanyId,
+      created_by: uatUserId,
+      updated_by: uatUserId,
+      state: "failed",
+      content: "UAT failed post — bundle.social rejected the publish attempt.",
+      media_urls: [] as string[],
+      target_profiles: [] as unknown[],
+      platform_variants: {} as unknown,
+      last_publish_error: {
+        code: "BUNDLE_RATE_LIMIT",
+        message: "bundle.social rate limit exceeded",
+        attempted_at: now.toISOString(),
+        attempt_number: 1,
+      },
+      publish_attempts: 1,
       draft_data: {},
     },
   ];
@@ -422,6 +442,7 @@ async function main() {
   log("Seeding analytics snapshot...");
 
   const publishedDraft = insertedDrafts?.find((d) => d.state === "published");
+  const fourteenDaysAgoIso = fourteenDaysAgo;
   if (publishedDraft) {
     // Analytics snapshots require a profile_id; look up or skip gracefully
     const { data: profiles } = await supabase
@@ -439,8 +460,8 @@ async function main() {
           bundle_post_id: "uat-stub-bundle-post-001",
           platform: "linkedin_company",
           bundle_social_account_id: "uat-stub-linkedin-001",
-          snapshot_date: new Date(twoDaysAgo).toISOString().slice(0, 10),
-          posted_at: twoDaysAgo,
+          snapshot_date: new Date(fourteenDaysAgoIso).toISOString().slice(0, 10),
+          posted_at: fourteenDaysAgoIso,
           post_url: "https://www.linkedin.com/posts/uat-stub-post-001",
           content: "UAT published post — already live.",
           impressions: 142,
@@ -470,7 +491,7 @@ async function main() {
   log(`  Platform role: admin (opollo_users)`);
   log(`  Company role:  admin (platform_company_users)`);
   log(`  Connections:  ${connections.length} (LinkedIn healthy, Facebook auth_required, X healthy)`);
-  log(`  Drafts:       ${insertedDrafts?.length ?? 0} (1 draft, 2 scheduled, 1 publishing, 1 published)`);
+  log(`  Drafts:       ${insertedDrafts?.length ?? 0} (1 draft, 2 scheduled, 1 publishing, 1 published, 1 failed)`);
   log(`  Images:       ${insertedImages?.length ?? 0}`);
   log("");
 

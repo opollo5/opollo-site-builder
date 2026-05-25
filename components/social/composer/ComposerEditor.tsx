@@ -26,6 +26,13 @@ export interface ComposerEditorProps {
   /** Slot for SchedulingCard + submit row (PR E). */
   schedulingSlot?: React.ReactNode;
   className?: string;
+  /**
+   * Read-only mode: textarea + media tray render but the tools row, link
+   * editors, customize-per-platform row, and per-tile remove buttons
+   * are hidden. Used for state='published' etc. See
+   * lib/social/post-state-actions.ts.
+   */
+  readOnly?: boolean;
 }
 
 export function ComposerEditor({
@@ -36,6 +43,7 @@ export function ComposerEditor({
   selectedConnections,
   schedulingSlot,
   className,
+  readOnly = false,
 }: ComposerEditorProps) {
   const [activePlatform, setActivePlatform] = React.useState<Platform | null>(null);
 
@@ -116,9 +124,10 @@ export function ComposerEditor({
         maxLength={charLimit}
         companyId={companyId}
         platforms={platforms}
+        readOnly={readOnly}
       />
 
-      {platforms.length >= 2 && (
+      {!readOnly && platforms.length >= 2 && (
         <CustomizeForRow
           platforms={platforms}
           activePlatform={activePlatform}
@@ -126,7 +135,7 @@ export function ComposerEditor({
         />
       )}
 
-      {platforms.length > 0 && (
+      {!readOnly && platforms.length > 0 && (
         <PlatformActionsList
           platforms={activePlatform ? [activePlatform] : platforms}
           links={links}
@@ -136,24 +145,28 @@ export function ComposerEditor({
         />
       )}
 
-      {/* SchedulingCard + ApprovalToggle + submit row (PR E) */}
+      {/* SchedulingCard + ApprovalToggle + submit row (PR E).
+          In read-only mode, the caller passes a PostInfoCard via
+          schedulingSlot instead of the default Save/Post now row. */}
       {schedulingSlot ?? (
-        <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
-          <button
-            type="button"
-            className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
-            onClick={() => _onSubmit("draft")}
-          >
-            Save as draft
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-            onClick={() => _onSubmit("post_now")}
-          >
-            Post now
-          </button>
-        </div>
+        !readOnly && (
+          <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+            <button
+              type="button"
+              className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+              onClick={() => _onSubmit("draft")}
+            >
+              Save as draft
+            </button>
+            <button
+              type="button"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              onClick={() => _onSubmit("post_now")}
+            >
+              Post now
+            </button>
+          </div>
+        )
       )}
     </div>
   );

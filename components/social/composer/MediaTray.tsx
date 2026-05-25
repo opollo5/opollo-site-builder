@@ -17,6 +17,8 @@ export interface MediaTrayProps {
   uploading?: boolean;
   maxFiles?: number;
   className?: string;
+  /** Hide the "Add more" tile and the per-tile remove affordance. */
+  readOnly?: boolean;
 }
 
 export function MediaTray({
@@ -27,6 +29,7 @@ export function MediaTray({
   uploading = false,
   maxFiles = 4,
   className,
+  readOnly = false,
 }: MediaTrayProps) {
   if (urls.length === 0 && !uploading) return null;
 
@@ -40,7 +43,7 @@ export function MediaTray({
           key={url}
           url={url}
           index={i}
-          onRemove={onRemove}
+          onRemove={readOnly ? undefined : onRemove}
           isGif={gifIndices?.has(i)}
         />
       ))}
@@ -53,7 +56,7 @@ export function MediaTray({
       )}
 
       {/* Add more tile */}
-      {urls.length < maxFiles && !uploading && (
+      {!readOnly && urls.length < maxFiles && !uploading && (
         <button
           type="button"
           aria-label="Add media"

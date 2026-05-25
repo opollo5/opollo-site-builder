@@ -21,10 +21,16 @@ export interface ProfileSelectorProps {
   selected: string[];
   onChange: (ids: string[]) => void;
   className?: string;
+  /**
+   * Hide the "Add profile" affordance and disable chip toggling.
+   * Used in read-only composer states (state='published' etc.).
+   */
+  readOnly?: boolean;
 }
 
-export function ProfileSelector({ available, selected, onChange, className }: ProfileSelectorProps) {
+export function ProfileSelector({ available, selected, onChange, className, readOnly = false }: ProfileSelectorProps) {
   function toggle(id: string) {
+    if (readOnly) return;
     if (selected.includes(id)) {
       onChange(selected.filter((x) => x !== id));
     } else {
@@ -61,20 +67,22 @@ export function ProfileSelector({ available, selected, onChange, className }: Pr
         })}
       </TooltipProvider>
 
-      {/* "Add profile" chip — links to connection settings */}
-      <a
-        href="/company/social/connections"
-        aria-label="Add profile"
-        data-testid="connections-connect-button"
-        className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M12 5v14" />
-          <path d="M5 12h14" />
-        </svg>
-      </a>
+      {/* "Add profile" chip — links to connection settings (edit-mode only) */}
+      {!readOnly && (
+        <a
+          href="/company/social/connections"
+          aria-label="Add profile"
+          data-testid="connections-connect-button"
+          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-2 border-dashed border-muted-foreground/40 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 5v14" />
+            <path d="M5 12h14" />
+          </svg>
+        </a>
+      )}
 
-      {hasSelected && (
+      {!readOnly && hasSelected && (
         <button
           type="button"
           onClick={() => onChange([])}
