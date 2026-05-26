@@ -112,6 +112,18 @@ const PUBLIC_PATHS = new Set<string>([
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  // Static assets served from the /public directory (not the Next.js
+  // /_next/ pipeline). Auth-gating these causes middleware to return HTML
+  // in response to CSS/font requests, which browsers refuse to apply
+  // (MIME mismatch), rendering the login page blank.
+  if (pathname.startsWith("/styles/")) return true;
+  if (pathname.startsWith("/fonts/")) return true;
+  // Belt-and-suspenders extension check: any path that looks like a
+  // static asset (by extension) should never be auth-gated regardless of
+  // directory prefix.
+  if (/\.(?:css|js|mjs|png|jpe?g|gif|svg|woff2?|ttf|otf|ico|webp)(?:[?#]|$)/i.test(pathname)) return true;
+  // UAT harness endpoints carry their own STAGING_UAT_SECRET auth.
+  if (pathname.startsWith("/api/uat/")) return true;
   // /invite/<token> — platform-layer invitation accept page. Token IS
   // the auth (server-component validates SHA-256 against
   // platform_invitations.token_hash). Recipients have no Supabase
@@ -396,6 +408,10 @@ export const config = {
   // without regressing the static-asset exclusions.
   matcher: [
     "/",
-    "/((?!_next/static|_next/image|favicon.ico).+)",
+    // Exclude Next.js internals, public static directories, and any path
+    // that ends in a static-asset extension. The isPublicPath() early-return
+    // is the belt; this pattern is the suspenders — so middleware doesn't
+    // even initialise the Supabase client for CSS/font/image requests.
+    "/((?!_next/static|_next/image|favicon\\.ico|styles/|fonts/)(?!.*\\.(?:css|js|mjs|png|jpe?g|gif|svg|woff2?|ttf|otf|ico|webp)(?:[?#]|$)).+)",
   ],
 };
