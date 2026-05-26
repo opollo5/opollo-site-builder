@@ -1,6 +1,6 @@
 # Overnight Work Status — 2026-05-27
 
-Three parallel tracks completed. All P0 fixes are on staging. No product
+Four parallel tracks completed. All P0 fixes are on staging. No product
 decisions were made.
 
 ---
@@ -111,6 +111,73 @@ Key observations surfaced during enrichment:
 
 ---
 
+## Track 4 — Infrastructure Gap Audit (Read-Only)
+
+**Branch:** `docs/feature-inventory-phase-1` (PR #1063 updated)
+**Commit:** `d27ed749`
+**Doc:** `docs/inventory/infrastructure-gaps.md`
+
+Read-only audit across 11 categories. No code was changed. All findings are
+cited with file:line.
+
+### Summary
+
+| Category | Top Risk | Severity |
+|---|---|---|
+| A. RLS / Cross-tenant | Service-role lookup before gate — TOCTOU but unexploitable | P2 |
+| B. Webhook Security | No timestamp replay window on `verifyBundlesocialSignature` | P1 |
+| C. Idempotency | `publish-due` cron: non-atomic SELECT+UPDATE → dual publish | **P0** |
+| D. Background Jobs | `cap-weekly-generation` + `check-webhook-health` absent from vercel.json — never fire | P1 |
+| E. Race Conditions | Same root as C — concurrent cron ticks, no claim lock | **P0** |
+| F. Migration Safety | No rollback scripts for migrations 0035–0151 | P1 |
+| G. PII / Logs | Unredacted email addresses in forgot-password logs | P1 |
+| H. Session / Token | Known 2FA stale-cookie bug (tracked in project memory) | P1 |
+| I. Rate Limiting | Auth routes gated; most platform social routes unprotected | P2 |
+| J. Backup / DR | No documented PITR plan | P2 |
+| K. Third-Party Deps | 77 bundle.social refs; contract snapshots cover ~40% of SDK surface | P2 |
+
+**P0: 2 findings (same root — `publish-due` TOCTOU dual-publish race)**
+**P1: 5 findings**
+**P2: 8 findings**
+
+### P0 — Requires a fix PR before the next high-traffic period
+
+**`app/api/internal/cron/publish-due/route.ts:41–68`** — The cron does a
+two-step SELECT then UPDATE without atomicity. Two concurrent Vercel invocations
+can both SELECT the same `state='scheduled'` rows before either UPDATE completes,
+resulting in both calling `publishPost` for the same post.
+
+The QStash path is protected by `claim_publish_job` RPC with a UNIQUE DB index.
+The publish-due cron path has no equivalent. The cron runs every minute with
+`concurrency=5`.
+
+**Fix sketch:** Replace the two-step SELECT+UPDATE with a single
+`UPDATE social_post_drafts SET state='publishing' WHERE state='scheduled'
+AND scheduled_at <= NOW() AND publish_attempts < 3 RETURNING id, ...` — or
+add a Postgres function mirroring `claim_publish_job`. Both patterns exist
+in the codebase (the QStash path is the working analog).
+
+**This fix touches the publish hot path.** Steven to confirm before a fix PR
+is opened (per CLAUDE.md write-safety rules).
+
+### P1 Quick Wins (no product decision required)
+
+1. **Add vercel.json entries** for `/api/cron/cap-weekly-generation` and
+   `/api/cron/check-webhook-health` — both routes are implemented and auth-guarded
+   but will never fire automatically without a schedule entry.
+
+2. **Timestamp replay window** on `verifyBundlesocialSignature` (`lib/bundlesocial.ts:68–92`) —
+   add ±5-minute `x-timestamp` header check matching QStash pattern. Check bundle.social
+   spec first; if no timestamp is sent, document as accepted risk.
+
+3. **Redact email in forgot-password logs** (`app/api/auth/forgot-password/route.ts:69,95,102`) —
+   replace `email` with `email.split('@')[0] + '@...'` or a `redactEmail()` helper.
+
+4. **Rollback scripts** for migrations 0035–0151 — 84 migrations have no rollback.
+   At minimum, add rollback stubs for the 10 most recent.
+
+---
+
 ## Decisions Needed
 
 Before any of these tracks can produce more fixes, Steven must answer:
@@ -150,7 +217,9 @@ Full context in `docs/inventory/decisions-needed.md`.
 
 1. **Review PR #1083** (schedule-target guard) — small, focused, needs UAT
 2. **Review PR #1084** (bulk CSV permission) — small, focused, needs UAT
-3. **Answer DECISION-005** (external approvers) — P1 security gap, unblocks DI-009 fix
-4. **Answer DECISION-002** (bulk CSV for editors) — determines if #1084 goes far enough
-5. **Work through `docs/inventory/INVENTORY_README.md`** — fill EXPECTED BEHAVIOUR checkboxes in Phase 2 order (auth routes first)
-6. **Merge PR #1072** (seed fix) once CI passes — already auto-merge armed
+3. **Confirm the publish-due TOCTOU fix** (Track 4 P0) — say "go" to open PR;
+   touches publish hot path so write-safety gate requires Steven's confirmation
+4. **Answer DECISION-005** (external approvers) — P1 security gap, unblocks DI-009 fix
+5. **Answer DECISION-002** (bulk CSV for editors) — determines if #1084 goes far enough
+6. **Work through `docs/inventory/INVENTORY_README.md`** — fill EXPECTED BEHAVIOUR checkboxes in Phase 2 order (auth routes first)
+7. **Merge PR #1072** (seed fix) once CI passes — already auto-merge armed
