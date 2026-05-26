@@ -96,6 +96,29 @@ async function handleV2Post(req: Request, bodyObj: Record<string, unknown>): Pro
   if (!parsed.ok) return parsed.response;
 
   const input = parsed.data;
+
+  // Guard: cannot create a scheduled post with zero target channels.
+  // A scheduled post with no targets is stuck — the publish cron has nothing to send to.
+  // Mirrors the PATCH guard in app/api/platform/social/drafts/[id]/route.ts.
+  if (
+    (input.mode === "schedule" || input.mode === "post_now") &&
+    input.target_profile_ids.length === 0
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "MISSING_TARGET_PROFILES",
+          message: "Cannot schedule a post with no target channels. Add at least one account.",
+          retryable: false,
+          suggested_action: "Select at least one account to post to before scheduling.",
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 422 },
+    );
+  }
+
   const svc = getServiceRoleClient();
 
   const batchId =
