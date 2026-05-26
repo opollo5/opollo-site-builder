@@ -127,6 +127,23 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Vercel preview toolbar suppression.
+ *
+ * Vercel injects <vercel-live-feedback> into every preview deployment.
+ * In real Chrome (Incognito/Guest — no Vercel auth cookies) the widget
+ * expands into a full-screen iframe (z-index: 2147483647, top: 0, left: 0)
+ * that covers the entire page, including the login form. Headless Playwright
+ * never triggers this because the script's auth check never fires.
+ *
+ * Suppressing the element entirely: it's a non-functional preview helper
+ * that blocks access to the app. The element is only injected on preview
+ * deployments (never production), so this rule is a no-op in production.
+ * ---------------------------------------------------------------------------*/
+vercel-live-feedback {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
  * Opollo component classes
  * Used directly in JSX alongside Tailwind utilities.
  * ------------------------------------------------------------------------- */
