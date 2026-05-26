@@ -108,24 +108,9 @@ export async function loginAction(
     return { error: "Sign-in failed. Please try again." };
   }
 
-  // Flag off → clear any stale 2FA cookies, then return the destination.
-  // A lingering opollo_2fa_pending cookie from a prior session (when the
-  // flag was on) causes middleware to redirect every admin navigation back
-  // to /login/check-email even though no challenge is active. Clearing
-  // here is the authoritative fix; middleware also clears on the flag-off
-  // path as a belt-and-suspenders guard for direct navigations that don't
-  // go through a fresh login.
+  // Flag off → return the destination directly. Stale opollo_2fa_pending
+  // cookies are cleared by middleware on the first post-login navigation.
   if (!is2faEnabled()) {
-    const cookieJar = cookies();
-    for (const name of [PENDING_2FA_COOKIE, "opollo_pending_device_id"]) {
-      cookieJar.set(name, "", {
-        httpOnly: true,
-        secure: true,
-        sameSite: "lax",
-        path: "/",
-        maxAge: 0,
-      });
-    }
     return { redirectTo: next };
   }
 

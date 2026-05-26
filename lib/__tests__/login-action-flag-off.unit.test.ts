@@ -1,33 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // ---------------------------------------------------------------------------
-// loginAction — flag-off cookie-clearing behaviour.
+// loginAction — flag-off behaviour.
 //
 // When AUTH_2FA_ENABLED is off (the default) and a user signs in
-// successfully, the action must:
-//   1. Return { redirectTo } (no challenge).
-//   2. Expire any stale opollo_2fa_pending + opollo_pending_device_id
-//      cookies from a prior session when the flag was on.
-//
-// Without step 2, middleware sees the leftover opollo_2fa_pending cookie
-// and redirects every admin navigation back to /login/check-email even
-// though no challenge is pending. This test pins the fix.
+// successfully, the action must return { redirectTo } without triggering
+// a 2FA challenge. Stale opollo_2fa_pending cookies from a prior session
+// are handled by middleware on the first post-login navigation — not by
+// loginAction itself.
 // ---------------------------------------------------------------------------
-
-// Capture cookies().set() calls without a real request scope.
-const cookieSets = vi.hoisted(
-  () => [] as Array<{ name: string; value: string; opts: Record<string, unknown> }>,
-);
 
 vi.mock("next/headers", () => ({
   headers: () => new Headers(),
   cookies: () => ({
     get: vi.fn().mockReturnValue(undefined),
-    set: vi.fn(
-      (name: string, value: string, opts: Record<string, unknown>) => {
-        cookieSets.push({ name, value, opts });
-      },
-    ),
+    set: vi.fn(),
   }),
 }));
 
@@ -47,8 +34,6 @@ vi.mock("@/lib/auth", async () => {
   };
 });
 
-// Mock 2FA modules so they don't require a real DB even though the flag is
-// off and these code paths are never reached.
 vi.mock("@/lib/2fa/challenges", () => ({
   createLoginChallenge: vi.fn(),
   recentChallengeCountForUser: vi.fn(),
@@ -93,7 +78,6 @@ function buildFd(fields: Record<string, string>): FormData {
 const ORIG_2FA = process.env.AUTH_2FA_ENABLED;
 
 beforeEach(() => {
-  cookieSets.length = 0;
   delete process.env.AUTH_2FA_ENABLED;
 });
 
@@ -114,41 +98,5 @@ describe("loginAction — AUTH_2FA_ENABLED off", () => {
     );
     expect(result.redirectTo).toBeDefined();
     expect(result.error).toBeUndefined();
-  });
-
-  it("expires opollo_2fa_pending cookie on the flag-off path", async () => {
-    await loginAction(
-      {},
-      buildFd({ email: "user@test.com", password: "correct-pw" }),
-    );
-    const pendingClear = cookieSets.find((c) => c.name === "opollo_2fa_pending");
-    expect(pendingClear).toBeDefined();
-    expect(pendingClear?.value).toBe("");
-    expect(pendingClear?.opts.maxAge).toBe(0);
-  });
-
-  it("expires opollo_pending_device_id cookie on the flag-off path", async () => {
-    await loginAction(
-      {},
-      buildFd({ email: "user@test.com", password: "correct-pw" }),
-    );
-    const deviceClear = cookieSets.find(
-      (c) => c.name === "opollo_pending_device_id",
-    );
-    expect(deviceClear).toBeDefined();
-    expect(deviceClear?.value).toBe("");
-    expect(deviceClear?.opts.maxAge).toBe(0);
-  });
-
-  it("does NOT clear cookies when sign-in fails (wrong password)", async () => {
-    mockSignIn.mockResolvedValueOnce({
-      data: { user: null, session: null },
-      error: { message: "Invalid login credentials" },
-    });
-    await loginAction(
-      {},
-      buildFd({ email: "user@test.com", password: "wrong-pw" }),
-    );
-    expect(cookieSets).toHaveLength(0);
   });
 });
