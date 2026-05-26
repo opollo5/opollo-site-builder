@@ -162,6 +162,28 @@ Trivial change once G4 (UI for paused / recurring) lands.
 
 ---
 
+## G10 — `PATCH mode=schedule` does not enforce non-empty target_profiles — P0
+
+**Surface**: `app/api/platform/social/drafts/[id]/route.ts` (mode=schedule
+branch) + `components/social/dashboard/CalendarShell.tsx`.
+
+**Current**: the API sets `state='scheduled'` without validating that
+`target_profile_ids` is non-empty. The composer's Schedule button is gated
+by UI, but any client (stale cache, direct API call) can produce a
+`scheduled` row with zero target profiles. Such posts sit permanently in
+the publish queue and never fire.
+
+**Expected**: return 422 with `{ error: "target_profiles must have at least
+one entry to schedule" }` when `target_profile_ids.length === 0`. Calendar
+chip should render an amber warning variant for zero-target scheduled rows.
+Backfill needed: flip existing zero-target `scheduled` rows → `draft`.
+
+**GitHub**: #1071 (`state-machine-gap`)
+
+**Related**: G8 (same gap in bulk CSV upload path).
+
+---
+
 ## How to use this list
 
 Pick one ID per follow-up PR. Lead the PR description with

@@ -332,13 +332,17 @@ async function main() {
   const drafts = [
     draftRow({ content: "UAT draft post — not yet scheduled." }),
     draftRow({
-      state: "scheduled",
+      // state="draft" not "scheduled": seed has no target_profiles populated,
+      // so "scheduled" would produce invalid state (G10 / issue #1071).
+      // Keeps scheduled_at to exercise date-picker UI in UAT without
+      // creating a stuck-publish row.
+      state: "draft",
       content: "UAT scheduled post #1 — going out in 3 days.",
       media_urls: ["https://placehold.co/600x400.jpg"],
       scheduled_at: inThreeDays,
     }),
     draftRow({
-      state: "scheduled",
+      state: "draft",
       content: "UAT scheduled post #2 — going out in 7 days. #uat #staging",
       media_urls: ["https://placehold.co/800x600.jpg"],
       scheduled_at: inSevenDays,
