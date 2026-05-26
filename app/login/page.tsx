@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/LoginForm";
 import { TAuthChrome } from "@/templates";
 import { PENDING_2FA_COOKIE } from "@/lib/2fa/cookies";
+import { is2faEnabled } from "@/lib/2fa/flag";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
 
@@ -49,7 +50,13 @@ export default async function LoginPage({
   // and the loop never terminates. /logout clears both the Supabase
   // session and the 2FA cookies and redirects back here, so a clean
   // form is shown on the next request.
-  if (cookies().has(PENDING_2FA_COOKIE)) {
+  // Only redirect to /logout when 2FA is enabled. When the flag is off,
+  // the server action and middleware clear any stale cookie — redirecting
+  // to /logout here would wipe the Supabase session that signInWithPassword
+  // just set (the RSC re-render runs in the same server-side request context
+  // as the action, so cookies().has() reads the incoming cookie, not the
+  // cleared outgoing one). See tests/regressions/login-rsc-rerender-logout.test.ts.
+  if (is2faEnabled() && cookies().has(PENDING_2FA_COOKIE)) {
     redirect("/logout");
   }
 
