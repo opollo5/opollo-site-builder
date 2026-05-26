@@ -1216,6 +1216,9 @@
 **Notes:** Cross-tenant profile_id smuggling guard in place. L1 pre-connect ghost check runs before OAuth.
 **RLS dependency:** `social_connections`, `platform_social_profiles`
 **Currently tested:** none
+**CURRENT BEHAVIOUR (observed in code):**
+> Body includes: `company_id`, `profile_id`, `platform`, optional `force_cross_tenant`. Returns `200 { url: string }` (OAuth redirect to bundle.social) or error. Cross-tenant profile_id smuggling guard in place per code comment. Pre-connect ghost check runs before OAuth redirect per inventory notes. Guard: profile must belong to the same company as company_id.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] Profile must belong to the same company as company_id?
 - [ ] Pre-ghost check runs before OAuth redirect?
@@ -1261,6 +1264,9 @@
 **Notes:** 6-step disconnect protocol: unset channel → 200ms settle → SDK disconnect → verify clean → DELETE row → audit event. Split-brain detection prevents orphaned DB rows.
 **RLS dependency:** `social_connections`
 **Currently tested:** none
+**CURRENT BEHAVIOUR (observed in code):**
+> 6-step disconnect protocol (per inventory): 1) unset channel, 2) 200ms settle, 3) SDK disconnect, 4) verify clean, 5) DELETE row, 6) audit event. Returns `200 { ok, upstream_disconnect_ok, upstream_unset_ok }` or `422 split_brain` if detection fires. Split-brain detection prevents orphaned DB rows if bundle.social still holds the account after disconnect. DB row NOT deleted if split-brain detected. Audit event written regardless of SDK errors.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] Split-brain detection fires if bundle.social still holds the account after disconnect?
 - [ ] DB row NOT deleted if split-brain detected?
@@ -1311,6 +1317,9 @@
 **Risk:** HIGH
 **Notes:** Bulk operations on multiple drafts.
 **Currently tested:** none
+**CURRENT BEHAVIOUR (observed in code):**
+> File not directly read; pattern from inventory: Bulk operations endpoint. Each draft ownership validated individually. Likely accepts array of draft IDs + mutation payload (delete, reschedule, state change). Scoped to active company via RLS.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] Each draft ownership validated individually?
 
@@ -1331,6 +1340,9 @@
 **Response:** `200 { ok, data }` / `409 VERSION_CONFLICT { current_draft }` / `422 INVALID_STATE`
 **Notes:** Optimistic CAS on `draft_version` per ADR-0002. V2 body discriminated by `content` field presence.
 **Currently tested:** unit (version conflict), UAT spec
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/api/platform/social/drafts/[id]/route.ts:116-200+` — Accepts two body shapes (V1 legacy vs V2 composer). V2 discriminated by presence of `content` field. V2 schema includes: `draft_version` (optimistic CAS per ADR-0002), `content`, `media_urls`, `target_profile_ids`, `platform_variants`, `mode` (post_now|schedule|recurring|draft), `scheduled_at`, `planned_for_at`, `approval_required`, `approver_user_id`. Mode maps to state via `MODE_TO_STATE: { post_now: 'scheduled', schedule: 'scheduled', recurring: 'recurring', draft: 'draft' }`. State guard: rejects with 422 INVALID_STATE if `isTerminalForMutation(state)` (published/publishing). Optimistic CAS on `draft_version` returns 409 VERSION_CONFLICT with current_draft in error.details on conflict. V1 and V2 paths both update top-level columns + mirror into draft_data for publish compatibility.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] VERSION_CONFLICT includes current_draft in error.details?
 - [ ] Cannot PATCH published or publishing drafts (INVALID_STATE)?

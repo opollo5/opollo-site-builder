@@ -39,6 +39,9 @@ Grouped by feature area. UI primitives use a condensed table. Feature/composite 
 **Sub-components used:** `Button`, `Input`
 **Currently tested:** component test, e2e
 
+**CURRENT BEHAVIOUR (observed in code):**
+> `components/LoginForm.tsx:21-100+` — "use client" component. Uses `useFormState(loginAction)` pattern with server action `loginAction` from `app/login/actions`. Renders form with email + password inputs (suppressHydrationWarning for Grammarly compatibility). SubmitButton component shows "Signing in…" when pending or redirecting. On successful login, checks `state.redirectTo` and calls `window.location.assign()` (hard navigation, not soft RSC) to guarantee middleware re-reads Supabase session cookies before evaluating destination (prevents redirect loop). Error message shown if `state.error` is present. "Forgot password?" link points to `/auth/forgot-password`. Form action backed by real URL so submission works if JS fails.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What should happen when the email does not exist vs wrong password — same error message or different?
 - [ ] What is the error state for a network failure (no response)?
@@ -753,6 +756,9 @@ Grouped by feature area. UI primitives use a condensed table. Feature/composite 
 **Sub-components used:** `ProfileSelector`, `ComposerEditor`, `PreviewCard`, `SocialCalendarGrid`, `SchedulingCard`, `UnsavedChangesDialog`, `ComposerErrorBoundary`, `PostInfoCard`, `EmptyState`, `Pill`, `SocialPlatformIcon`
 **Currently tested:** e2e, component test
 
+**CURRENT BEHAVIOUR (observed in code):**
+> `components/social/composer/ComposerOverlay.tsx:42-80+` — "use client" component. Split-pane shell with editor (left) and preview (right). Props: `open`, `onClose`, `initialDraft`, `prefilledDate`, `companyId`, `companyTimezone`, `availableConnections`, `onSubmit`, `onSubmitSuccess`, `schedulingSlot`, `editOriginalState`, `failureReason`, `onNavigateToPost`. Internally builds SchedulingCard when `schedulingSlot` prop absent (avoids forcing consumers to wire it). Key sub-components: `ProfileSelector`, `ComposerEditor`, `PreviewCard`, `SchedulingCard`, `PostInfoCard`, `UnsavedChangesDialog`. Renders ComposerErrorBoundary wrapper. Keyboard shortcuts shown: Cmd+Enter (submit), Cmd+S (save draft), Cmd+Shift+S (schedule), Cmd+K (focus editor), Cmd+E (emoji), Cmd+I (media), Cmd+1-5 (preview tab), Esc (close), ? (shortcuts).
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What is the empty state when no connections are available?
 - [ ] What is the error banner copy when `editOriginalState === 'failed'`?
@@ -1049,6 +1055,9 @@ Grouped by feature area. UI primitives use a condensed table. Feature/composite 
 **Sub-components used:** `SocialCalendarGrid`, `DayDetail`, `PostChip`, `FilterBar`, `ComposerOverlay`, `BulkScheduleModal`, `PostAnalyticsModal`, `Callout`
 **Currently tested:** e2e
 
+**CURRENT BEHAVIOUR (observed in code):**
+> `components/social/dashboard/CalendarShell.tsx:1-80+` — "use client" component. Full social dashboard implementation: 7-column month grid (M-Su), drag-and-drop reschedule (DnDContext from @dnd-kit), day-detail panel, bulk CSV upload, post analytics modal, timeline toggle, profile filter. DnDCell subcomponent renders droppable calendar cells (disabled for past dates/other-month days). Each cell shows posts as PostChip components. FilterBar manages profile + timeline/calendar view toggle. ComposerOverlay mounts for `?compose=new`. BulkScheduleModal for CSV import. PostAnalyticsModal for per-post metrics. Integration with `useCalendarView()` and `useComposerState()` hooks.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What is the empty state for a month with no posts?
 - [ ] What is the error state if the posts fetch fails?
@@ -1070,6 +1079,9 @@ Grouped by feature area. UI primitives use a condensed table. Feature/composite 
 **Variants/states:** published (emerald checkmark), scheduled/recurring (amber clock), failed (red X), draft (no icon), has-media (image icon), has-link (link icon)
 **Sub-components used:** `SocialPlatformIcon`
 **Currently tested:** component test
+
+**CURRENT BEHAVIOUR (observed in code):**
+> `components/social/dashboard/PostChip.tsx:78-97+` — Renders a compact post summary chip (px-1, py-0.5, text-xs). Shows: primary platform icon, state icon (published = green checkmark, scheduled/recurring = amber clock, failed = red X), time (formatted from scheduled_at or published_at as HH:MM), optionally media thumbnail (Image icon) or link icon. State icons have aria-labels. Highlighted state renders ring-2 ring-emerald-500. onClick handler for post selection/navigation. Extracts primary profile platform from `target_profiles[0]` and maps to SocialPlatformIcon key.
 
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What is the tooltip copy for each state icon?

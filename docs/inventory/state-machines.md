@@ -71,6 +71,28 @@ a TypeScript source-of-truth file.
 - Server-side PATCH endpoint checks `isTerminalForMutation` before applying any field update (`app/api/platform/social/drafts/[id]/route.ts`)
 - `delete_from_records` removes only the Opollo DB row — it does NOT unpublish from the external platform (note in `lib/social/post-state-actions.ts:11-14`)
 
+### CURRENT BEHAVIOUR (observed in code):**
+
+State transition diagram (derived from `lib/social/post-state-actions.ts` + API files):
+
+```
+draft → scheduled        PATCH mode=schedule         app/api/platform/social/drafts/[id]/route.ts:116-200
+draft → pending_approval POST /submit-for-approval   (not found in provided files)
+pending_approval → scheduled (via approve) approvePost endpoint (not found in provided files)
+scheduled → draft        POST /convert-to-draft      app/api/platform/social/drafts/[id]/convert-to-draft/route.ts:21-67
+scheduled → publishing   Cron selects due posts      app/api/internal/cron/publish-due/route.ts:39-69
+publishing → published   Publish succeeds            app/api/internal/cron/publish-due/route.ts:90-98
+publishing → failed      Publish fails 3x            app/api/internal/cron/publish-due/route.ts:102-118
+failed → scheduled       Retry (PATCH mode=schedule) app/api/platform/social/drafts/[id]/route.ts:116
+```
+
+Current guards & observations:
+- `isTerminalForMutation(state)` in `lib/social/post-state-actions.ts:81-83` returns true for `published` and `publishing`
+- PATCH endpoint at `app/api/platform/social/drafts/[id]/route.ts:143-150` checks this guard and returns 422 INVALID_STATE for terminal states
+- ComposerOverlay.tsx renders textarea as read-only when `isReadOnlyState(state)` is true (states where `edit` action is not in ALLOWED_ACTIONS)
+- State column constraints: `CHECK (state IN ('draft','pending_approval','rejected','scheduled','recurring','paused','publishing','published','failed'))` per migration 0132
+- Cron publishes 10 posts at a time (BATCH_SIZE) with 5 concurrent bundle.social calls (CONCURRENCY), max 3 publish attempts per post (MAX_PUBLISH_ATTEMPTS)
+
 ### EXPECTED BEHAVIOUR (Steven to fill)
 
 - [ ] For each state, what actions are allowed in the UI?

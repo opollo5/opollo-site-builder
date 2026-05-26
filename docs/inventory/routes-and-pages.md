@@ -32,6 +32,9 @@
 - Enter email and password, submit to sign in
 - Navigate to forgot-password (from `LoginForm` internals)
 
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/login/page.tsx:22-67` — `export const dynamic = "force-dynamic"` prevents caching. Page reads `PENDING_2FA_COOKIE` and redirects to `/logout` if present (recovery path for stale 2FA state). Calls `getCurrentUser()` if `FEATURE_SUPABASE_AUTH` is on and auth kill-switch is off; if user exists, redirects to `?next` (sanitised via `safeNext()` to reject `//` and external URLs, defaulting to `/admin/sites`). `LoginForm` receives `next` prop and performs the sign-in via server action `loginAction` from `app/login/actions`.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What happens on successful sign-in when `?next` is set?
 - [ ] What happens on successful sign-in with no `?next`?
@@ -276,6 +279,9 @@
 **User actions on this page:**
 - Approve or reject a post via tokenised link
 
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/approve/[token]/page.tsx:26-208` — Token is a 64-char hex SHA-256 hash. Pre-filters with regex `/^[0-9a-f]{64}$/i` before querying. Calls `resolveRecipientByToken()` to lookup request + recipient + company from `social_approval_requests` and related tables. Returns `<InvalidLink />` if token doesn't match, is revoked, or expired. Reads `postState` and checks if `pending_client_approval`; if finalised (revoked/approved/rejected/state changed), shows status panel. Renders `SnapshotReadOnly` with master text + per-platform variants (marked as custom if divergent from master). `ApprovalDecisionForm` renders approve/reject buttons (disabled if finalised). Shows company name in header.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] Is this a duplicate of `/auth/approve` or a distinct flow?
 - [ ] What resource is being approved?
@@ -352,6 +358,9 @@
 - Filter by social profile
 - Open composer via `?compose=new` URL param
 
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/(platform)/company/social/calendar/page.tsx:19-62` — `force-dynamic` export. Calls `getCurrentPlatformSession()` and redirects to `/login?next=...` if no session. Returns "No company context" error if `session.company` is null. Fetches active connections via `listConnections()` and filters out `status==="disconnected"` entries before passing to `CalendarShell`. Maps platform strings to canonical Platform types (e.g. `linkedin_personal` → `linkedin`, `facebook_page` → `facebook`). Passes `companyId`, `hasConnections`, and `availableConnections` to CalendarShell component.
+
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What states are shown on calendar tiles (draft, scheduled, published, etc.)?
 - [ ] What happens when a post is dragged to a date in the past?
@@ -411,6 +420,9 @@
 - Paginate (25 per page)
 - Click a post row to open detail page
 - Click "New post" (editor+) to open composer
+
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/(platform)/company/social/posts/page.tsx:23-124` — `force-dynamic`. Redirects unauthenticated users to `/login?next=...`. Returns "Account not provisioned" warning if no company membership. Page size: 25 posts per page. Validates search params: `q` (search term), `page` (1-indexed, min 1), `state` (must be in VALID_STATES set), `sort` (state_changed_at or created_at), `dir` (asc/desc). Calls `listPostMasters()` with offset/limit pagination + state filter + search term. Checks permissions `create_post` and `approve_post` in parallel. Passes results to `SocialPostsListClient` with totalCount for pagination, sort state, and composer enabled flag.
 
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What columns does the posts table show?
@@ -557,6 +569,9 @@
 - View connection status per platform
 - Pick a channel after OAuth (auto-opens if `?connect=needs_channel`)
 - (Admin+) Manage or remove connections
+
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/(platform)/company/social/connections/page.tsx:129-253` — `force-dynamic`. Redirects unauthenticated users to `/login?next=...`. Returns "Account not provisioned" warning if `session.company` is null. Fetches connections list + permission gates (`manage_connections`, `reconnect_connection`) + all profiles for the company in parallel. Renders a `ConnectBanner` with contextual messages for query params (`?connect=success|error|noop|sync-failed|needs_channel`) + error reason labels. Groups connections by `profile_id` (unattributed rows fall into default profile). Calls `emitOverdueEventsIfNeeded()` to emit 24h+ overdue channel-selection events. Renders one `SocialConnectionsList` section per profile; multi-profile companies get per-profile headers with "Default" badge.
 
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What platforms are shown (LinkedIn, Facebook, Instagram, Google Business, Twitter/X, etc.)?
@@ -2200,6 +2215,9 @@ _Social profile admin pages are grouped under §8 Admin — Companies & CAP abov
 **User actions on this page:**
 - Read the post content and media
 - Click Approve or Reject (once only while `pending_approval`)
+
+**CURRENT BEHAVIOUR (observed in code):**
+> `app/(public)/review/[token]/page.tsx:15-120` — `force-dynamic`. Token is a JWT signed with `NEXTAUTH_SECRET` or `AUTH_SECRET`. Claims verified: `{ sub: draftId, purpose: 'review', exp: now+14d }`. Service-role client fetches draft state/content/media/variants. Returns `<InvalidLink />` (generic error page) if token invalid/expired or draft not found. If draft state is not `pending_approval`, shows "Already decided" banner but still renders decision form (disabled). Displays post content (plaintext + media thumbnails). `ReviewDecisionForm` handles approve/reject buttons.
 
 **EXPECTED BEHAVIOUR (Steven to fill):**
 - [ ] What happens on Approve — does the post auto-schedule?
