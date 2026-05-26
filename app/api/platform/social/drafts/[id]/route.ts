@@ -184,6 +184,25 @@ export async function PATCH(
       approver_user_id,
     } = parsed.data;
 
+    // Guard: cannot schedule a post with zero target channels.
+    // A scheduled post with no targets is stuck — the publish cron has nothing to send to.
+    // This mirrors the UI-level guard in the composer's Schedule button.
+    if ((mode === "schedule" || mode === "post_now") && target_profile_ids.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "MISSING_TARGET_PROFILES",
+            message: "Cannot schedule a post with no target channels. Add at least one account.",
+            retryable: false,
+            suggested_action: "Select at least one account to post to before scheduling.",
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 422 },
+      );
+    }
+
     // Fetch company timezone to populate draft_data.schedule for V1 publish-path compatibility.
     const { data: company } = await client
       .from("platform_companies")

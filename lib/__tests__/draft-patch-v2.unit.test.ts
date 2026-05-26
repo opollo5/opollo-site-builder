@@ -35,6 +35,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 const DRAFT_ID = "dddddddd-0000-0000-0000-000000000001";
 const COMPANY_ID = "eeeeeeee-0000-0000-0000-000000000002";
 const CONN_ID   = "ffffffff-0000-0000-0000-000000000003";
+// RFC 4122 v4-compatible UUID for target_profile_ids (Zod v4's .uuid() validates version/variant bits).
+const VALID_PROFILE_ID = "00000000-0000-4000-8000-000000000099";
 
 const BASE_ROW = {
   company_id: COMPANY_ID,
@@ -126,7 +128,8 @@ describe("PATCH /api/platform/social/drafts/[id] — V2 body", () => {
       draft_version: 3,
       content: "new content",
       media_urls: [],
-      target_profile_ids: [],  // empty is valid per schema; UUID format varies by Zod version
+      // mode='schedule' requires at least one target (MISSING_TARGET_PROFILES guard).
+      target_profile_ids: [VALID_PROFILE_ID],
       platform_variants: {},
       mode: "schedule",
       scheduled_at: "2026-05-23T23:00:00.000Z",
@@ -151,7 +154,8 @@ describe("PATCH /api/platform/social/drafts/[id] — V2 body", () => {
         draft_version: 3,
         content: "scheduled post",
         media_urls: [],
-        target_profile_ids: [],
+        // mode='schedule' requires at least one target (MISSING_TARGET_PROFILES guard).
+        target_profile_ids: [VALID_PROFILE_ID],
         platform_variants: {},
         mode: "schedule",
         scheduled_at: "2026-06-01T23:00:00.000Z",
