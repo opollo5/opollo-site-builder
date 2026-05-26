@@ -5,6 +5,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { requireDbConfig } from "@/lib/db-direct";
 import { authorisedCronRequest, unauthorisedResponse, updateHeartbeat } from "@/lib/platform/cron/cron-shared";
 import { publishPost } from "@/lib/social/publishing/bundle-social-client";
+import { claimDueDrafts, type ClaimedDraft } from "@/lib/social/publishing/claim-due-drafts";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -25,21 +26,12 @@ const BATCH_SIZE = 10;
 // with concurrency=5.
 //
 // Concurrency safety: the SELECT FOR UPDATE SKIP LOCKED + UPDATE happens in
-// a single SQL statement (CTE form). Two cron ticks that overlap (when a
-// tick exceeds 60s, or when a manual trigger races the schedule) see
-// disjoint row sets — duplicate billed publishes to bundle.social are
-// impossible. Pattern matches lib/brief-runner.ts:286-318.
+// a single SQL statement (CTE form, see lib/social/publishing/claim-due-drafts).
+// Two cron ticks that overlap (when a tick exceeds 60s, or when a manual
+// trigger races the schedule) see disjoint row sets — duplicate billed
+// publishes to bundle.social are impossible.
+// Pattern matches lib/brief-runner.ts:286-318.
 // ---------------------------------------------------------------------------
-
-interface ClaimedDraft {
-  id: string;
-  company_id: string;
-  content: string;
-  media_urls: string[] | null;
-  target_profiles: Array<{ profile_id: string }> | null;
-  platform_variants: Record<string, { content?: string; link?: string; cta?: string }> | null;
-  publish_attempts: number | null;
-}
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   return handleCron(req);
@@ -59,7 +51,10 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   const pg = new Client(requireDbConfig());
   try {
     await pg.connect();
-    candidates = await claimDueDrafts(pg, workerId);
+    candidates = await claimDueDrafts(pg, workerId, {
+      maxAttempts: MAX_PUBLISH_ATTEMPTS,
+      batchSize: BATCH_SIZE,
+    });
   } catch (err) {
     logger.error("publish_due.claim_failed", {
       err: err instanceof Error ? err.message : String(err),
@@ -156,45 +151,3 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
   });
 }
 
-// ---------------------------------------------------------------------------
-// claimDueDrafts — atomic claim of up to BATCH_SIZE due drafts.
-//
-// Single SQL statement: CTE locks candidates with FOR UPDATE SKIP LOCKED,
-// outer UPDATE transitions them to 'publishing' and stamps claim metadata.
-// The lock is held until the implicit transaction commits at statement
-// end — concurrent ticks see disjoint row sets.
-//
-// MAX_PUBLISH_ATTEMPTS gates retry exhaustion: drafts at the cap are NOT
-// re-claimed (matches the prior SELECT's .lt("publish_attempts", MAX) filter).
-// ---------------------------------------------------------------------------
-export async function claimDueDrafts(
-  client: Client,
-  workerId: string,
-): Promise<ClaimedDraft[]> {
-  const res = await client.query<ClaimedDraft>(
-    `
-    WITH claimed AS (
-      SELECT id
-        FROM social_post_drafts
-       WHERE state = 'scheduled'
-         AND scheduled_at <= now()
-         AND publish_attempts < $1
-         AND archived_at IS NULL
-       ORDER BY scheduled_at ASC
-       LIMIT $2
-       FOR UPDATE SKIP LOCKED
-    )
-    UPDATE social_post_drafts d
-       SET state = 'publishing',
-           publish_claimed_at = now(),
-           publish_worker_id = $3,
-           updated_at = now()
-      FROM claimed
-     WHERE d.id = claimed.id
-    RETURNING d.id, d.company_id, d.content, d.media_urls,
-              d.target_profiles, d.platform_variants, d.publish_attempts
-    `,
-    [MAX_PUBLISH_ATTEMPTS, BATCH_SIZE, workerId],
-  );
-  return res.rows;
-}

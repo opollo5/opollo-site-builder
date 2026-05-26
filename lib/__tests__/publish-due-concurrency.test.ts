@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
-import { claimDueDrafts } from "@/app/api/internal/cron/publish-due/route";
+import { claimDueDrafts } from "@/lib/social/publishing/claim-due-drafts";
 import { requireDbConfig } from "@/lib/db-direct";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
@@ -107,8 +107,8 @@ describe("publish-due — concurrent ticks claim disjoint draft sets (TOCTOU reg
       // SKIP LOCKED + UPDATE statement; whichever connection's lock
       // request hits the row first wins it; the other SKIPs it.
       const [claimedA, claimedB] = await Promise.all([
-        claimDueDrafts(clientA, "test-worker-a"),
-        claimDueDrafts(clientB, "test-worker-b"),
+        claimDueDrafts(clientA, "test-worker-a", { maxAttempts: 3, batchSize: 10 }),
+        claimDueDrafts(clientB, "test-worker-b", { maxAttempts: 3, batchSize: 10 }),
       ]);
 
       const idsA = new Set(claimedA.map((d) => d.id));
@@ -161,7 +161,7 @@ describe("publish-due — concurrent ticks claim disjoint draft sets (TOCTOU reg
     const client = new Client(requireDbConfig());
     await client.connect();
     try {
-      const claimed = await claimDueDrafts(client, "test-worker-c");
+      const claimed = await claimDueDrafts(client, "test-worker-c", { maxAttempts: 3, batchSize: 10 });
       const claimedFromSeed = claimed
         .map((d) => d.id)
         .filter((id) => draftIds.includes(id));
@@ -187,7 +187,7 @@ describe("publish-due — concurrent ticks claim disjoint draft sets (TOCTOU reg
     const client = new Client(requireDbConfig());
     await client.connect();
     try {
-      const claimed = await claimDueDrafts(client, "test-worker-d");
+      const claimed = await claimDueDrafts(client, "test-worker-d", { maxAttempts: 3, batchSize: 10 });
       const claimedFromSeed = claimed
         .map((d) => d.id)
         .filter((id) => draftIds.includes(id));
