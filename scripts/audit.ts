@@ -1475,11 +1475,49 @@ function check15_docsIndexUpToDate(): Issue[] {
 }
 
 // ============================================================================
+// Check 16 — publish-due cron claims atomically (HIGH)
+// ============================================================================
+//
+// app/api/internal/cron/publish-due/route.ts must use FOR UPDATE SKIP LOCKED
+// to claim due drafts. The prior SELECT-then-UPDATE pattern allowed
+// concurrent cron ticks to claim the same row → duplicate bundle.social
+// publishes. If this gate goes red, the TOCTOU race is back.
+// ============================================================================
+
+function check16_publishDueAtomicClaim(): Issue[] {
+  const issues: Issue[] = [];
+  const routePath = "app/api/internal/cron/publish-due/route.ts";
+  if (!existsSync(routePath)) {
+    issues.push({
+      category: "publish-due-atomic-claim",
+      severity: "HIGH",
+      file: routePath,
+      line: 0,
+      message:
+        "publish-due route file missing — cron entrypoint is required for scheduled-post delivery.",
+    });
+    return issues;
+  }
+  const content = readSafe(routePath);
+  if (!/FOR\s+UPDATE\s+SKIP\s+LOCKED/i.test(content)) {
+    issues.push({
+      category: "publish-due-atomic-claim",
+      severity: "HIGH",
+      file: routePath,
+      line: 0,
+      message:
+        "publish-due/route.ts must use FOR UPDATE SKIP LOCKED to atomically claim due drafts. Two concurrent cron ticks would otherwise double-publish via bundle.social. See lib/brief-runner.ts:286-318 for the working analog.",
+    });
+  }
+  return issues;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
 function main(): void {
-  console.log("scripts/audit.ts — running 15 static checks...\n");
+  console.log("scripts/audit.ts — running 16 static checks...\n");
 
   const all: Issue[] = [
     ...check1_middlewarePublicPaths(),
@@ -1498,6 +1536,7 @@ function main(): void {
     ...check14_milestonesRegistryCurrent(),
     ...check15_docsIndexUpToDate(),
     ...check_tablesUseDataTable(),
+    ...check16_publishDueAtomicClaim(),
   ];
 
   const failed = printResults(all);
