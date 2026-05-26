@@ -108,9 +108,8 @@ export async function loginAction(
     return { error: "Sign-in failed. Please try again." };
   }
 
-  // Flag off → return the destination so the client can do a hard
-  // navigation (window.location.assign). No 2FA cookies are ever set
-  // when the flag is off, so there's nothing stale to clear on this path.
+  // Flag off → return the destination directly. Stale opollo_2fa_pending
+  // cookies are cleared by middleware on the first post-login navigation.
   if (!is2faEnabled()) {
     return { redirectTo: next };
   }
