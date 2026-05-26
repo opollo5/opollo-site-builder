@@ -1,8 +1,16 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import nextDynamic from "next/dynamic";
 
-import { LoginForm } from "@/components/LoginForm";
 import { TAuthChrome } from "@/templates";
+
+const LoginForm = nextDynamic(
+  () => import("@/components/LoginForm").then((m) => ({ default: m.LoginForm })),
+  {
+    ssr: false,
+    loading: () => <div className="h-64 animate-pulse rounded-lg bg-muted" />,
+  },
+);
 import { PENDING_2FA_COOKIE } from "@/lib/2fa/cookies";
 import { createRouteAuthClient, getCurrentUser } from "@/lib/auth";
 import { isAuthKillSwitchOn } from "@/lib/auth-kill-switch";
