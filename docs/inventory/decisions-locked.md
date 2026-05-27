@@ -77,27 +77,33 @@ Explicitly excluded:
 - Approver identity captured from the email the link was originally
   sent to.
 
-## D6 — V1→V2 state enum mapping (backfill)
+## D6 — V1/V2 state enum migration mapping
 
-Conservative mapping for the V1→V2 social post backfill script. V1 states
-with no direct V2 equivalent default to the closest safe V2 state so that
-migrated posts require an explicit re-review rather than being silently
-auto-promoted.
+**Resolved 2026-05-27 (conservative path — lowest risk, fully reversible).**
+
+V1 uses a Postgres ENUM (`social_post_state`). V2 uses constrained TEXT.
+State mapping applied by the backfill script (PR-04) and any V1→V2 route
+cutover:
 
 | V1 state | V2 state | Rationale |
-|---|---|---|
-| `draft` | `draft` | Direct equivalent |
-| `pending_client_approval` | `pending_approval` | Direct equivalent |
-| `approved` | `scheduled` | Approved but may lack scheduled_at; held for manual scheduling in V2 |
-| `changes_requested` | `pending_approval` | Conservative: requires re-review in V2 |
-| `pending_msp_release` | `pending_approval` | Conservative: requires explicit re-approval in V2 |
-| `rejected` | `rejected` | Direct equivalent |
+|----------|----------|-----------|
+| `draft` | `draft` | Identical concept |
+| `pending_client_approval` | `pending_approval` | Direct equivalent; renamed |
+| `approved` | `scheduled` (with `scheduled_at = NULL`) | V2 skips the approved-not-yet-scheduled intermediate; editor must set schedule |
+| `changes_requested` | `pending_approval` | Conservative: requires re-review rather than silently advancing |
+| `pending_msp_release` | `pending_approval` | Conservative: requires explicit re-approval before going live |
+| `rejected` | `rejected` | Terminal in both models |
 | `scheduled` | `scheduled` | Direct equivalent |
 | `publishing` | `publishing` | Direct equivalent |
 | `published` | `published` | Direct equivalent |
-| `failed` | `failed` | Direct equivalent |
 
-Null or unrecognised V1 states default to `"draft"`.
-
-Implemented in `scripts/migrate-v1-to-v2.ts` and tested in
-`lib/__tests__/migrate-v1-to-v2.test.ts`.
+**Consequences:**
+- Posts previously in `changes_requested` or `pending_msp_release` will appear
+  in the approver's queue again after migration. This is intentional — they were
+  mid-review and re-approval is safer than silent state advancement.
+- `pending_msp_release` is not being rebuilt in V2 (see PLAN.md Out of Scope
+  §6). If MSP batch-release gating is needed in V2, that is a future workstream.
+- V2 `recurring` and `paused` states are V2-only; no V1 equivalent exists.
+  The backfill script never writes these states.
+- V2 `failed` and `cancelled` are V2-only cleanup states; not produced by
+  backfill.
