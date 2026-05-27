@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser } from "./_auth-helpers";
 
@@ -55,9 +55,16 @@ async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>, userId: 
   if (masterErr) throw new Error(`seed master: ${masterErr.message}`);
 }
 
+// Company + V1 post seed is called in beforeEach (not beforeAll) because _setup.ts's
+// global beforeEach runs truncateAll() which wipes platform_companies before
+// each test. The auth user lives in auth.users which is NOT truncated by
+// truncateAll(), so it only needs to be created once in beforeAll.
 beforeAll(async () => {
   const user = await seedAuthUser({ persistent: true });
   seededUserId = user.id;
+});
+
+beforeEach(async () => {
   await seedV1Post(getServiceRoleClient(), seededUserId);
 });
 
