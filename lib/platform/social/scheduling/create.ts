@@ -52,6 +52,47 @@ export async function createScheduleEntry(
 
   const svc = getServiceRoleClient();
 
+  // V2 dispatch: if the post is in social_post_drafts, set scheduled_at on the draft.
+  const v2draft = await svc
+    .from("social_post_drafts")
+    .select("id, state")
+    .eq("id", input.postMasterId)
+    .eq("company_id", input.companyId)
+    .maybeSingle();
+
+  if (v2draft.data) {
+    if ((v2draft.data.state as string) !== "scheduled") {
+      return invalidState(
+        `Draft is in state '${v2draft.data.state as string}', not 'scheduled'. Only approved drafts can be scheduled.`,
+      );
+    }
+    const { error } = await svc
+      .from("social_post_drafts")
+      .update({ scheduled_at: input.scheduledAt, updated_at: new Date().toISOString() })
+      .eq("id", input.postMasterId)
+      .eq("company_id", input.companyId)
+      .eq("state", "scheduled");
+    if (error) {
+      return internal(`Failed to set scheduled_at on draft: ${error.message}`);
+    }
+    const now = new Date().toISOString();
+    return {
+      ok: true,
+      data: {
+        id: input.postMasterId,
+        post_variant_id: input.postMasterId,
+        scheduled_at: input.scheduledAt,
+        qstash_message_id: null,
+        scheduled_by: input.scheduledBy,
+        cancelled_at: null,
+        created_at: now,
+        platform: input.platform,
+      },
+      timestamp: now,
+    };
+  }
+
+  // V1 fallback.
   // 1. Parent post must exist + be approved.
   const post = await svc
     .from("social_post_master")

@@ -28,6 +28,39 @@ export async function listScheduleEntries(
 
   const svc = getServiceRoleClient();
 
+  // V2 dispatch: if the post is in social_post_drafts, return a synthetic entry.
+  const v2draft = await svc
+    .from("social_post_drafts")
+    .select("id, scheduled_at, target_profiles")
+    .eq("id", input.postMasterId)
+    .eq("company_id", input.companyId)
+    .maybeSingle();
+
+  if (v2draft.data) {
+    const scheduledAt = v2draft.data.scheduled_at as string | null;
+    if (!scheduledAt || (input.includeCancelled === false)) {
+      // No scheduled_at means not yet scheduled; return empty like V1 would.
+      if (!scheduledAt) {
+        return { ok: true, data: { entries: [] }, timestamp: new Date().toISOString() };
+      }
+    }
+    const profiles = (v2draft.data.target_profiles as Array<{ profile_id: string; platform: string }> | null) ?? [];
+    const platform = (profiles[0]?.platform ?? "unknown") as ScheduleEntryWithPlatform["platform"];
+    const now = new Date().toISOString();
+    const entry: ScheduleEntryWithPlatform = {
+      id: input.postMasterId,
+      post_variant_id: input.postMasterId,
+      scheduled_at: scheduledAt ?? now,
+      qstash_message_id: null,
+      scheduled_by: null,
+      cancelled_at: null,
+      created_at: now,
+      platform,
+    };
+    return { ok: true, data: { entries: [entry] }, timestamp: now };
+  }
+
+  // V1 fallback.
   // Verify post belongs to this company; saves a leak across companies
   // even though the entries themselves don't carry company_id.
   const post = await svc
