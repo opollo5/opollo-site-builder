@@ -29,11 +29,28 @@ export async function GET(
   const svc = getServiceRoleClient();
   const { data: draft } = await svc
     .from("social_post_drafts")
-    .select("company_id, state")
+    .select("company_id, state, archived_at")
     .eq("id", idCheck.value)
+    .is("archived_at", null)
     .maybeSingle();
 
   if (!draft) return notFound(`Draft ${id} not found.`);
+
+  // DI-005: review links for non-pending drafts confuse external reviewers and
+  // expose stale post content after the post lifecycle has ended.
+  if ((draft.state as string) !== "pending_approval") {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "WRONG_STATE",
+          message: `Review links can only be generated for drafts in pending_approval state (current: ${draft.state as string}).`,
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 409 },
+    );
+  }
 
   const gate = await requireCanDoForApi(draft.company_id as string, "edit_post");
   if (gate.kind === "deny") return gate.response;

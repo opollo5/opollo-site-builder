@@ -71,14 +71,26 @@ export async function POST(
 
   const newState = decision === "approved" ? "scheduled" : "rejected";
 
-  const { error: updateErr } = await svc
+  // DI-004: optimistic concurrency guard — .eq("state", "pending_approval")
+  // prevents a TOCTOU race where two concurrent approvers both read
+  // pending_approval, both pass the check above, and the last write wins.
+  // Matches the pattern in app/api/review/[token]/decision/route.ts:115.
+  const { data: updateData, error: updateErr } = await svc
     .from("social_post_drafts")
     .update({ state: newState, updated_at: new Date().toISOString() })
-    .eq("id", idCheck.value);
+    .eq("id", idCheck.value)
+    .eq("state", "pending_approval")
+    .select("id");
 
   if (updateErr) {
     logger.error("approve.update_failed", { draftId: id, err: updateErr.message });
     return internalError("Failed to update draft state.");
+  }
+  if (!updateData?.length) {
+    return NextResponse.json(
+      { ok: false, error: { code: "ALREADY_DECIDED", message: "This draft has already been decided." }, timestamp: new Date().toISOString() },
+      { status: 409 },
+    );
   }
 
   const { data: decisionRow, error: decisionErr } = await svc
