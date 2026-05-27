@@ -135,7 +135,8 @@ describe("Migration 0157 — V1 social post soft-delete", () => {
       .eq("id", inserted!.id)
       .single();
     // deleted_at should still equal the original value, not be updated
-    expect(after?.deleted_at).toBe(existingDeletedAt);
+    // Compare as timestamps — Postgres may return +00:00 instead of Z suffix
+    expect(new Date(after?.deleted_at as string).getTime()).toBe(new Date(existingDeletedAt).getTime());
   });
 
   it("soft-deletes social_post_variant rows that have deleted_at IS NULL", async () => {
