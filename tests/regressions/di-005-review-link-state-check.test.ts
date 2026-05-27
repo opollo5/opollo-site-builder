@@ -17,7 +17,12 @@ const DRAFT_ID = "dddddddd-0000-4000-8000-000000000011";
 const COMPANY_ID = "cccccccc-0000-4000-8000-000000000002";
 
 vi.mock("@/lib/logger", () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn(async () => ({ ok: true })),
+  rateLimitExceeded: vi.fn(),
 }));
 
 vi.mock("@/lib/platform/auth/api-gate", () => ({
