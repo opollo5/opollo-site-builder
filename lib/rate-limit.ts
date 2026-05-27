@@ -48,7 +48,9 @@ export type LimiterName =
   | "approval_decision"
   | "ai_prefill"
   | "error_report"
-  | "client_errors";
+  | "client_errors"
+  | "review_link"
+  | "social_publish";
 
 type LimiterConfig = {
   requests: number;
@@ -127,6 +129,16 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // guard against client-side retry loops; must not block legitimate
   // error bursts during a bad session.
   client_errors: { requests: 20, window: "1 m" },
+  // INFRA-003: review-link JWT generation. 10/hour/IP — long-lived 14d
+  // tokens should not be issued in bulk. Normal use is one link per draft
+  // per approval cycle. Keyed by IP (caller is authenticated but we want
+  // to bound token-farming independent of which account is used).
+  review_link: { requests: 10, window: "1 h" },
+  // INFRA-004: direct-publish from composer. 30/hour/user — each call
+  // creates a post + schedule entry and may trigger a bundle.social API
+  // call. 30/hour covers rapid editorial use without opening cost-amplification
+  // paths. Keyed by user ID; service actors (CAP) bypass this limiter.
+  social_publish: { requests: 30, window: "1 h" },
 };
 
 export type RateLimitResult =
