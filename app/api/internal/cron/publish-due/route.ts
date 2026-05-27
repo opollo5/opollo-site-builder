@@ -100,6 +100,7 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
               state: "published",
               published_at: new Date().toISOString(),
               published_url: result.publishedUrl ?? null,
+              bundle_post_id: result.externalId,
               updated_at: new Date().toISOString(),
             })
             .eq("id", draft.id);
