@@ -31,6 +31,8 @@ const STATE_MAP: Record<string, string> = {
 };
 
 async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>) {
+  // Clean stale drafts first so the company delete doesn't hit FK constraints.
+  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
   const { error: companyErr } = await svc.from("platform_companies").insert({
     id: COMPANY_ID, name: "Backfill Test Co", slug: "backfill-test-co",
@@ -57,6 +59,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
+  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("social_post_master").delete().eq("id", MASTER_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 });
