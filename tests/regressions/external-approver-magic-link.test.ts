@@ -182,7 +182,8 @@ describe("ReviewDecisionForm — URL routing (D5)", () => {
   });
 
   it("calls /api/review/[token]/decision when reviewToken is provided", async () => {
-    const reviewToken = "eyJhbGciOiJIUzI1NiJ9.test";
+    // Deliberately not a real JWT — just a URL-safe string.
+    const reviewToken = "test-review-token-abc.xyz-not-a-real-jwt";
 
     // Simulate the URL-routing logic from ReviewDecisionForm.handleSubmit.
     const body: Record<string, unknown> = { decision: "approved" };
