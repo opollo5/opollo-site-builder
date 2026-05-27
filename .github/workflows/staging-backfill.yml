@@ -1,0 +1,147 @@
+name: V1→V2 staging backfill
+
+# Applies schema migrations 0155/0156 to the staging DB, then backfills
+# social_post_master rows into social_post_drafts (idempotent, safe to re-run).
+#
+# Trigger: workflow_dispatch only.
+#
+# Required repository secrets (staging environment):
+#   STAGING_SUPABASE_PROJECT_REF  — staging project ref
+#   SUPABASE_ACCESS_TOKEN         — personal access token
+#   STAGING_SUPABASE_DB_PASSWORD  — Postgres password
+#
+# This workflow checks out `main` so it uses the up-to-date migration files
+# (0155, 0156) and the backfill script, regardless of the staging branch state.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        type: boolean
+        default: true
+        description: "Show counts only — do NOT write rows"
+
+jobs:
+  backfill:
+    name: Apply migrations + backfill (staging)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: staging
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Verify required secrets
+        run: |
+          missing=0
+          for var in STAGING_SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN STAGING_SUPABASE_DB_PASSWORD; do
+            if [ -z "${!var:-}" ]; then
+              echo "::error::Required secret $var is not set."
+              missing=1
+            fi
+          done
+          [ "$missing" = "1" ] && exit 1 || true
+        env:
+          STAGING_SUPABASE_PROJECT_REF: ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
+          STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+
+      - name: Link to staging project
+        run: supabase link --project-ref "${{ secrets.STAGING_SUPABASE_PROJECT_REF }}"
+
+      - name: Show pending migrations
+        run: supabase migration list --linked || true
+
+      - name: Apply pending SQL migrations (0155, 0156)
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked --include-all
+
+      - name: Pre-backfill counts
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "=== Pre-backfill row counts ==="
+          supabase db execute --linked -- "
+            SELECT 'v1_posts_active'    AS metric, COUNT(*) AS cnt
+              FROM social_post_master WHERE deleted_at IS NULL
+            UNION ALL
+            SELECT 'v2_drafts_total',    COUNT(*) FROM social_post_drafts
+            UNION ALL
+            SELECT 'v2_migrated_from_v1', COUNT(*)
+              FROM social_post_drafts WHERE idempotency_key LIKE 'v1-migration-%';
+          "
+
+      - name: Run V1→V2 backfill SQL (skipped when dry_run=true)
+        if: ${{ inputs.dry_run == false }}
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "Running backfill SQL..."
+          supabase db execute --linked -- "
+            INSERT INTO social_post_drafts (
+              company_id, created_by, updated_by, state, content, link_url,
+              source_type, media_urls, target_profiles, platform_variants,
+              scheduled_at, idempotency_key, created_at, updated_at
+            )
+            SELECT
+              m.company_id,
+              m.created_by,
+              m.created_by,
+              CASE m.state
+                WHEN 'draft'                   THEN 'draft'
+                WHEN 'pending_client_approval' THEN 'pending_approval'
+                WHEN 'approved'                THEN 'scheduled'
+                WHEN 'changes_requested'       THEN 'pending_approval'
+                WHEN 'pending_msp_release'     THEN 'pending_approval'
+                WHEN 'rejected'                THEN 'rejected'
+                WHEN 'scheduled'               THEN 'scheduled'
+                WHEN 'publishing'              THEN 'publishing'
+                WHEN 'published'               THEN 'published'
+                WHEN 'failed'                  THEN 'failed'
+                ELSE                                'draft'
+              END,
+              COALESCE(m.master_text, ''),
+              m.link_url,
+              m.source_type::text,
+              '{}',
+              '[]'::jsonb,
+              '{}'::jsonb,
+              NULL,
+              'v1-migration-' || m.id::text,
+              m.created_at,
+              m.updated_at
+            FROM social_post_master m
+            WHERE m.created_by IS NOT NULL
+              AND m.deleted_at IS NULL
+            ON CONFLICT (company_id, idempotency_key) DO NOTHING;
+          "
+          echo "Backfill SQL complete."
+
+      - name: Post-backfill counts + verification
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: |
+          echo "=== Post-backfill row counts ==="
+          supabase db execute --linked -- "
+            SELECT 'v1_posts_active'    AS metric, COUNT(*) AS cnt
+              FROM social_post_master WHERE deleted_at IS NULL
+            UNION ALL
+            SELECT 'v2_drafts_total',    COUNT(*) FROM social_post_drafts
+            UNION ALL
+            SELECT 'v2_migrated_from_v1', COUNT(*)
+              FROM social_post_drafts WHERE idempotency_key LIKE 'v1-migration-%';
+          "
+
+      - name: Write step summary
+        if: always()
+        run: |
+          echo "## V1→V2 staging backfill" >> "$GITHUB_STEP_SUMMARY"
+          echo "dry_run: ${{ inputs.dry_run }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "See logs above for row counts." >> "$GITHUB_STEP_SUMMARY"
