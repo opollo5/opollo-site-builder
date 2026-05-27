@@ -4,6 +4,7 @@ import { SignJWT } from "jose";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { notFound, validateUuidParam, internalError } from "@/lib/http";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 const REVIEW_LINK_TTL_SECS = 14 * 24 * 60 * 60; // 14 days
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   const { id } = await params;
@@ -54,6 +55,9 @@ export async function GET(
 
   const gate = await requireCanDoForApi(draft.company_id as string, "edit_post");
   if (gate.kind === "deny") return gate.response;
+
+  const rl = await checkRateLimit("review_link", `ip:${new Headers(req.headers).get("x-forwarded-for") ?? "unknown"}`);
+  if (!rl.ok) return rateLimitExceeded(rl);
 
   const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
   if (!secret) {

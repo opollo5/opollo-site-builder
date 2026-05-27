@@ -49,7 +49,9 @@ export type LimiterName =
   | "ai_prefill"
   | "error_report"
   | "client_errors"
-  | "uat_sign_in";
+  | "uat_sign_in"
+  | "review_link"
+  | "social_publish";
 
 type LimiterConfig = {
   requests: number;
@@ -131,6 +133,16 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // UAT sign-in bypass route (staging/dev only). 100 per 5 min per IP —
   // cosmetic; the bearer token is the real security gate.
   uat_sign_in: { requests: 100, window: "5 m" },
+  // INFRA-003: review-link JWT generation. 10/hour/IP — long-lived 14d
+  // tokens should not be issued in bulk. Normal use is one link per draft
+  // per approval cycle. Keyed by IP (caller is authenticated but we want
+  // to bound token-farming independent of which account is used).
+  review_link: { requests: 10, window: "1 h" },
+  // INFRA-004: direct-publish from composer. 30/hour/user — each call
+  // creates a post + schedule entry and may trigger a bundle.social API
+  // call. 30/hour covers rapid editorial use without opening cost-amplification
+  // paths. Keyed by user ID; service actors (CAP) bypass this limiter.
+  social_publish: { requests: 30, window: "1 h" },
 };
 
 export type RateLimitResult =
