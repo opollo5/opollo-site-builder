@@ -66,28 +66,33 @@ export async function sendInvitation(
     return internal(`User lookup failed: ${userCheck.error.message}`);
   }
   if (userCheck.data) {
-    const membershipCheck = await svc
-      .from("platform_company_users")
-      .select("company_id")
-      .eq("user_id", userCheck.data.id)
-      .limit(1);
-    if (membershipCheck.error) {
-      logger.error("invitations.send.membership_lookup_failed", {
-        err: membershipCheck.error.message,
-      });
-      return internal(
-        `Membership lookup failed: ${membershipCheck.error.message}`,
-      );
-    }
-    if ((membershipCheck.data?.length ?? 0) > 0) {
-      return {
-        ok: false,
-        error: {
-          code: "ACTIVE_MEMBERSHIP_EXISTS",
-          message:
-            "This email is already a member of a company on the platform.",
-        },
-      };
+    // Opollo staff (@opollo.com) have platform-wide access via is_opollo_staff
+    // and may belong to multiple companies. Skip the cross-tenant check for
+    // them. Non-staff are limited to one company per account (D1).
+    if (!email.endsWith("@opollo.com")) {
+      const membershipCheck = await svc
+        .from("platform_company_users")
+        .select("company_id")
+        .eq("user_id", userCheck.data.id)
+        .limit(1);
+      if (membershipCheck.error) {
+        logger.error("invitations.send.membership_lookup_failed", {
+          err: membershipCheck.error.message,
+        });
+        return internal(
+          `Membership lookup failed: ${membershipCheck.error.message}`,
+        );
+      }
+      if ((membershipCheck.data?.length ?? 0) > 0) {
+        return {
+          ok: false,
+          error: {
+            code: "ACTIVE_MEMBERSHIP_EXISTS",
+            message:
+              "This email is already a member of a company on the platform.",
+          },
+        };
+      }
     }
   }
 
