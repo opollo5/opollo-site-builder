@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { seedAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // V1→V2 backfill integration test.
@@ -13,7 +14,6 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // ---------------------------------------------------------------------------
 
 const COMPANY_ID = "0000b400-0000-0000-0000-000000000001";
-const USER_ID    = "0000b400-0000-0000-0000-000000000002";
 const MASTER_ID  = "0000b400-0000-0000-0000-000000000003";
 
 // D6 state map
@@ -30,7 +30,9 @@ const STATE_MAP: Record<string, string> = {
   failed:                  "failed",
 };
 
-async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>) {
+let seededUserId: string;
+
+async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>, userId: string) {
   // Clean stale drafts first so the company delete doesn't hit FK constraints.
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
@@ -44,7 +46,7 @@ async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>) {
   const { error: masterErr } = await svc.from("social_post_master").insert({
     id: MASTER_ID,
     company_id: COMPANY_ID,
-    created_by: USER_ID,
+    created_by: userId,
     state: "scheduled",
     master_text: "Test post content",
     link_url: "https://example.com/blog",
@@ -54,7 +56,9 @@ async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>) {
 }
 
 beforeAll(async () => {
-  await seedV1Post(getServiceRoleClient());
+  const user = await seedAuthUser({ email: "migrate-v1-test@opollo.test", persistent: true });
+  seededUserId = user.id;
+  await seedV1Post(getServiceRoleClient(), seededUserId);
 });
 
 afterAll(async () => {
@@ -62,6 +66,9 @@ afterAll(async () => {
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("social_post_master").delete().eq("id", MASTER_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
+  if (seededUserId) {
+    await svc.auth.admin.deleteUser(seededUserId);
+  }
 });
 
 describe("V1→V2 migration — state mapping (D6)", () => {
@@ -95,8 +102,8 @@ describe("V1→V2 migration — V2 draft insertion", () => {
       .from("social_post_drafts")
       .insert({
         company_id:        COMPANY_ID,
-        created_by:        USER_ID,
-        updated_by:        USER_ID,
+        created_by:        seededUserId,
+        updated_by:        seededUserId,
         state:             STATE_MAP["scheduled"],  // "scheduled"
         content:           "Test post content",
         link_url:          "https://example.com/blog",
@@ -129,7 +136,7 @@ describe("V1→V2 migration — V2 draft insertion", () => {
     const { data: first } = await svc
       .from("social_post_drafts")
       .insert({
-        company_id: COMPANY_ID, created_by: USER_ID, updated_by: USER_ID,
+        company_id: COMPANY_ID, created_by: seededUserId, updated_by: seededUserId,
         idempotency_key: idempotencyKey, content: "original",
       })
       .select("id")
@@ -139,7 +146,7 @@ describe("V1→V2 migration — V2 draft insertion", () => {
     const { error: conflictError } = await svc
       .from("social_post_drafts")
       .upsert({
-        company_id: COMPANY_ID, created_by: USER_ID, updated_by: USER_ID,
+        company_id: COMPANY_ID, created_by: seededUserId, updated_by: seededUserId,
         idempotency_key: idempotencyKey, content: "duplicate",
       }, { onConflict: "company_id,idempotency_key", ignoreDuplicates: true });
 
