@@ -56,7 +56,7 @@ async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>, userId: 
 }
 
 beforeAll(async () => {
-  const user = await seedAuthUser({ email: "migrate-v1-test@opollo.test", persistent: true });
+  const user = await seedAuthUser({ persistent: true });
   seededUserId = user.id;
   await seedV1Post(getServiceRoleClient(), seededUserId);
 });
