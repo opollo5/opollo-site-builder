@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
+import { logStaffAction } from "@/lib/platform/staff-audit";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 import { hashToken } from "./tokens";
@@ -165,13 +166,15 @@ export async function acceptInvitation(
   // with a valid password, just not yet in platform_users). Logged
   // explicitly so an operator can clean up if needed.
 
+  const isOpolloStaff = trimmedEmail.endsWith("@opollo.com");
+
   const userInsert = await svc
     .from("platform_users")
     .insert({
       id: userId,
       email: trimmedEmail,
       full_name: input.fullName.trim(),
-      is_opollo_staff: false,
+      is_opollo_staff: isOpolloStaff,
     })
     .select("id")
     .single();
@@ -208,6 +211,17 @@ export async function acceptInvitation(
     return internal(
       `platform_company_users insert failed: ${membershipInsert.error.message}`,
     );
+  }
+
+  // Audit: log the implicit staff grant for @opollo.com accounts (D1 + D4).
+  if (isOpolloStaff) {
+    await logStaffAction({
+      staffUserId: userId,
+      staffEmail: trimmedEmail,
+      companyId: invitation.company_id,
+      action: "staff_grant.auto",
+      resourceId: userId,
+    });
   }
 
   const acceptUpdate = await svc
