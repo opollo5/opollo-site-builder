@@ -84,31 +84,53 @@ export async function POST(
   if (result.data.finalised) {
     try {
       const svc = getServiceRoleClient();
-      const post = await svc
-        .from("social_post_master")
+
+      // V2-first lookup: after backfill, active posts live in social_post_drafts.
+      // Fall back to social_post_master for tokens issued before backfill ran.
+      let companyId: string | null = null;
+      let createdBy: string | null = null;
+
+      const v2 = await svc
+        .from("social_post_drafts")
         .select("company_id, created_by")
         .eq("id", result.data.postId)
         .maybeSingle();
-      if (post.error || !post.data) {
-        logger.warn("social.approvals.decisions.notify.post_lookup_failed", {
-          err: post.error?.message,
-          post_id: result.data.postId,
-        });
-      } else if (post.data.created_by) {
+
+      if (v2.data) {
+        companyId = v2.data.company_id as string;
+        createdBy = v2.data.created_by as string | null;
+      } else {
+        const v1 = await svc
+          .from("social_post_master")
+          .select("company_id, created_by")
+          .eq("id", result.data.postId)
+          .maybeSingle();
+        if (v1.error || !v1.data) {
+          logger.warn("social.approvals.decisions.notify.post_lookup_failed", {
+            err: v1.error?.message,
+            post_id: result.data.postId,
+          });
+        } else {
+          companyId = v1.data.company_id as string;
+          createdBy = v1.data.created_by as string | null;
+        }
+      }
+
+      if (companyId && createdBy) {
         if (parsed.data.decision === "changes_requested") {
           await dispatch({
             event: "changes_requested",
-            companyId: post.data.company_id as string,
+            companyId,
             postMasterId: result.data.postId,
-            submitterUserId: post.data.created_by as string,
+            submitterUserId: createdBy,
             comment: parsed.data.comment ?? "",
           });
         } else {
           await dispatch({
             event: "approval_decided",
-            companyId: post.data.company_id as string,
+            companyId,
             postMasterId: result.data.postId,
-            submitterUserId: post.data.created_by as string,
+            submitterUserId: createdBy,
             decision: parsed.data.decision,
           });
         }
