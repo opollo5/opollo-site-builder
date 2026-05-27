@@ -69,7 +69,7 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
         run: |
           echo "=== Pre-backfill row counts ==="
-          supabase db execute --linked -- "
+          supabase db query --linked "
             SELECT 'v1_posts_active'    AS metric, COUNT(*) AS cnt
               FROM social_post_master WHERE deleted_at IS NULL
             UNION ALL
@@ -85,7 +85,7 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
         run: |
           echo "Running backfill SQL..."
-          supabase db execute --linked -- "
+          supabase db query --linked "
             INSERT INTO social_post_drafts (
               company_id, created_by, updated_by, state, content, link_url,
               source_type, media_urls, target_profiles, platform_variants,
@@ -130,7 +130,7 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
         run: |
           echo "=== Post-backfill row counts ==="
-          supabase db execute --linked -- "
+          supabase db query --linked "
             SELECT 'v1_posts_active'    AS metric, COUNT(*) AS cnt
               FROM social_post_master WHERE deleted_at IS NULL
             UNION ALL
