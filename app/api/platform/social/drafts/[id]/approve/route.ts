@@ -45,7 +45,9 @@ export async function POST(
     return validationError(`Draft is in state '${draft.state as string}', not pending_approval.`);
   }
 
-  const gate = await requireCanDoForApi(draft.company_id as string, "edit_post");
+  // DI-010: gate on approve_post (approver/admin), not edit_post (editor+).
+  // Editors cannot approve drafts even if named as approver_user_id.
+  const gate = await requireCanDoForApi(draft.company_id as string, "approve_post");
   if (gate.kind === "deny") return gate.response;
 
   // Must be the named approver or a company admin.
