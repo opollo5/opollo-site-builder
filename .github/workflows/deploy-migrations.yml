@@ -11,7 +11,7 @@ name: Deploy Supabase migrations
 #   SUPABASE_ACCESS_TOKEN — personal access token from
 #                           https://supabase.com/dashboard/account/tokens
 #                           (scope: "Link a project" + "Access the API").
-#   STAGING_SUPABASE_DB_PASSWORD  — direct-connection Postgres password from
+#   PRODUCTION_SUPABASE_DB_PASSWORD  — direct-connection Postgres password from
 #                                   Project Settings → Database → Connection
 #                                   string. Required by `supabase db push` to
 #                                   open the management tunnel.
@@ -83,7 +83,7 @@ jobs:
       - name: Verify required secrets are set
         run: |
           missing=0
-          for var in SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN STAGING_SUPABASE_DB_PASSWORD; do
+          for var in SUPABASE_PROJECT_REF SUPABASE_ACCESS_TOKEN PRODUCTION_SUPABASE_DB_PASSWORD; do
             if [ -z "${!var:-}" ]; then
               echo "::error::Required secret $var is not set."
               missing=1
@@ -95,7 +95,7 @@ jobs:
           fi
         env:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-          STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+          PRODUCTION_SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
 
       - name: Link to production project
         run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
@@ -106,7 +106,7 @@ jobs:
       - name: Repair flagged versions (mark reverted — clear tracking row)
         if: github.event_name == 'workflow_dispatch' && inputs.repair_versions_reverted != ''
         env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           for v in ${{ inputs.repair_versions_reverted }}; do
@@ -117,7 +117,7 @@ jobs:
       - name: Repair flagged versions (mark applied without re-running SQL)
         if: github.event_name == 'workflow_dispatch' && inputs.repair_versions_applied != ''
         env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           for v in ${{ inputs.repair_versions_applied }}; do
@@ -127,7 +127,7 @@ jobs:
 
       - name: Push pending migrations
         env:
-          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
         # --include-all ensures no migrations are skipped when the
         # production schema has drifted from the linked state (e.g. a
         # row was manually inserted but the migration files themselves
