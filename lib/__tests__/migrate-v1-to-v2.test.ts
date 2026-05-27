@@ -163,15 +163,17 @@ describe("V1→V2 migration — V2 draft insertion", () => {
       .select("id")
       .single();
 
-    // Second insert (same idempotency_key) — should not error, should not create new row
+    // Second insert (same idempotency_key) — the partial unique index prevents the row.
+    // PostgREST cannot use partial indexes for onConflict inference (42P10), so we
+    // verify idempotency by asserting the constraint fires (23505 unique_violation).
     const { error: conflictError } = await svc
       .from("social_post_drafts")
-      .upsert({
+      .insert({
         company_id: COMPANY_ID, created_by: seededUser.id, updated_by: seededUser.id,
         idempotency_key: idempotencyKey, content: "duplicate",
-      }, { onConflict: "company_id,idempotency_key", ignoreDuplicates: true });
+      });
 
-    expect(conflictError).toBeNull();
+    expect(conflictError?.code).toBe("23505");
 
     // Verify only one row with this idempotency_key
     const { data: rows } = await svc
