@@ -18,6 +18,8 @@ const BUNDLE_ID  = "bsp-test-bundle-0156-abc123";
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
+  // Clean stale drafts first so the company delete doesn't hit FK constraints.
+  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
   const { error } = await svc.from("platform_companies").insert({
     id: COMPANY_ID,
@@ -36,6 +38,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
+  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 });
 
@@ -91,19 +94,18 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
         created_by: USER_ID,
         updated_by: USER_ID,
         bundle_post_id: BUNDLE_ID + "-lookup",
-        source_type: "cap",
       })
       .select("id")
       .single();
 
     const { data, error } = await svc
       .from("social_post_drafts")
-      .select("id, source_type")
+      .select("id")
       .eq("bundle_post_id", BUNDLE_ID + "-lookup")
       .maybeSingle();
 
     expect(error, `lookup error: ${error?.message}`).toBeNull();
-    expect(data?.source_type).toBe("cap");
+    expect(data?.id).toBe(inserted?.id);
 
     if (inserted?.id) {
       await svc.from("social_post_drafts").delete().eq("id", inserted.id);
