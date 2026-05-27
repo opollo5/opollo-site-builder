@@ -26,6 +26,14 @@ vi.mock("@/lib/redis", () => ({
   getRedisClient: () => ({ get: mockRedisGet, set: mockRedisSet }),
 }));
 
+// assertSafeUrl does a live DNS lookup; mock it as pass-through here so
+// unit tests don't require network access. SSRF blocking is covered by
+// tests/regressions/di-006-link-preview-ssrf.test.ts.
+vi.mock("@/lib/ssrf-guard", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("@/lib/ssrf-guard")>();
+  return { ...orig, assertSafeUrl: vi.fn().mockResolvedValue({ resolvedIp: "93.184.216.34", family: 4 }) };
+});
+
 import { POST } from "@/app/api/platform/social/link-preview/route";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 
