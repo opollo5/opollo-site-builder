@@ -135,17 +135,20 @@ describe("backfillScheduledPublishes — row selection", () => {
     process.env.QSTASH_TOKEN = "test-token";
   });
 
-  it("enqueues future-dated, NULL-message rows and stamps message_id", async () => {
+  it("noop for future-dated NULL-message rows (V1 enqueue retired)", async () => {
+    // enqueueScheduledPublish is a logged noop after pr-13 retirement.
+    // Rows are examined but no QStash message is created (messageId: null
+    // → counted as failed in the backfill loop).
     const futureIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     const entryId = await seedScheduleEntry({ scheduledAt: futureIso });
-    mockClient.publishJSON.mockResolvedValueOnce({ messageId: "msg_abc" });
 
     const result = await backfillScheduledPublishes({ origin: ORIGIN });
     expect(result.ok).toBe(true);
     if (!result.ok || result.data.status !== "ok") return;
     expect(result.data.examined).toBe(1);
-    expect(result.data.enqueued).toBe(1);
-    expect(result.data.failed).toBe(0);
+    expect(result.data.enqueued).toBe(0);
+    expect(result.data.failed).toBe(1);
+    expect(mockClient.publishJSON).not.toHaveBeenCalled();
 
     const svc = getServiceRoleClient();
     const row = await svc
@@ -153,7 +156,8 @@ describe("backfillScheduledPublishes — row selection", () => {
       .select("qstash_message_id")
       .eq("id", entryId)
       .single();
-    expect(row.data?.qstash_message_id).toBe("msg_abc");
+    // Entry stays with NULL qstash_message_id — no QStash message was created.
+    expect(row.data?.qstash_message_id).toBeNull();
   });
 
   it("skips rows that already have a message_id", async () => {
@@ -193,20 +197,19 @@ describe("backfillScheduledPublishes — row selection", () => {
     expect(result.data.examined).toBe(0);
   });
 
-  it("counts per-row enqueue failures without aborting", async () => {
+  it("counts all rows as noop (V1 enqueue retired)", async () => {
+    // Both rows are examined; enqueueScheduledPublish returns messageId: null
+    // for each → both counted as failed, no QStash calls made.
     const futureIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     await seedScheduleEntry({ scheduledAt: futureIso });
     await seedScheduleEntry({ scheduledAt: futureIso });
-
-    mockClient.publishJSON
-      .mockResolvedValueOnce({ messageId: "msg_ok" })
-      .mockRejectedValueOnce(new Error("HTTP 500"));
 
     const result = await backfillScheduledPublishes({ origin: ORIGIN });
     expect(result.ok).toBe(true);
     if (!result.ok || result.data.status !== "ok") return;
     expect(result.data.examined).toBe(2);
-    expect(result.data.enqueued).toBe(1);
-    expect(result.data.failed).toBe(1);
+    expect(result.data.enqueued).toBe(0);
+    expect(result.data.failed).toBe(2);
+    expect(mockClient.publishJSON).not.toHaveBeenCalled();
   });
 });

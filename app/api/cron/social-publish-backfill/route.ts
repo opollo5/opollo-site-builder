@@ -5,7 +5,6 @@ import {
   authorisedCronRequest,
   unauthorisedResponse,
 } from "@/lib/optimiser/sync/cron-shared";
-import { backfillScheduledPublishes } from "@/lib/platform/social/publishing";
 
 // ---------------------------------------------------------------------------
 // S1-19 — GET /api/cron/social-publish-backfill
@@ -30,42 +29,16 @@ export const maxDuration = 120;
 async function handle(req: NextRequest): Promise<NextResponse> {
   if (!authorisedCronRequest(req)) return unauthorisedResponse();
 
-  const origin =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ??
-    new URL(req.url).origin;
-
-  const result = await backfillScheduledPublishes({ origin });
-  if (!result.ok) {
-    logger.error("social.publish.backfill.cron_failed", {
-      err: result.error.message,
-    });
-    return NextResponse.json(
-      {
-        ok: false,
-        error: result.error,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    );
-  }
-
-  logger.info("social.publish.backfill.cron_ok", {
-    status: result.data.status,
-    ...(result.data.status === "ok"
-      ? {
-          examined: result.data.examined,
-          enqueued: result.data.enqueued,
-          failed: result.data.failed,
-          retries_attempted: result.data.retries_attempted,
-          retries_failed: result.data.retries_failed,
-        }
-      : { reason: result.data.reason }),
+  // V1 backfill cron retired (pr-12 removed vercel.json schedule entry;
+  // pr-13 retired the V1 QStash pipeline). Route kept alive to avoid 404s
+  // from any in-flight triggers. Returns 200 noop.
+  logger.warn("social.publish.backfill.v1_retired", {
+    note: "V1 backfill cron retired — route is a noop; vercel.json entry removed in pr-12",
   });
-
   return NextResponse.json(
     {
       ok: true,
-      data: result.data,
+      data: { status: "retired", reason: "V1 QStash pipeline retired (pr-13)" },
       timestamp: new Date().toISOString(),
     },
     { status: 200 },
