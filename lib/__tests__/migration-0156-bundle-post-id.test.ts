@@ -35,7 +35,7 @@ async function seedCompany() {
 }
 
 beforeAll(async () => {
-  const user = await seedAuthUser({ email: "m0156-test@opollo.test", persistent: true });
+  const user = await seedAuthUser({ persistent: true });
   seededUserId = user.id;
   await seedCompany();
 });
