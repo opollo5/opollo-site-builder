@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll, afterAll } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser } from "./_auth-helpers";
 
@@ -16,9 +16,12 @@ const COMPANY_ID = "00001550-0000-0000-0000-000000000001";
 
 let seededUserId: string;
 
+// Company seed is called in beforeEach (not beforeAll) because _setup.ts's
+// global beforeEach runs truncateAll() which wipes platform_companies before
+// each test. The auth user lives in auth.users which is NOT truncated by
+// truncateAll(), so it only needs to be created once in beforeAll.
 async function seedCompany() {
   const svc = getServiceRoleClient();
-  // Clean stale drafts first so the company delete doesn't hit FK constraints.
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
   const { error } = await svc.from("platform_companies").insert({
@@ -35,6 +38,9 @@ async function seedCompany() {
 beforeAll(async () => {
   const user = await seedAuthUser({ persistent: true });
   seededUserId = user.id;
+});
+
+beforeEach(async () => {
   await seedCompany();
 });
 
