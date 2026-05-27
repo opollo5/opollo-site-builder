@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { seedAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // Migration 0155 — V2 schema gaps (link_url + source_type).
@@ -12,7 +13,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // ---------------------------------------------------------------------------
 
 const COMPANY_ID = "00001550-0000-0000-0000-000000000001";
-const USER_ID    = "00001550-0000-0000-0000-000000000002";
+
+let seededUserId: string;
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
@@ -31,6 +33,8 @@ async function seedCompany() {
 }
 
 beforeAll(async () => {
+  const user = await seedAuthUser({ email: "m0155-test@opollo.test", persistent: true });
+  seededUserId = user.id;
   await seedCompany();
 });
 
@@ -38,6 +42,9 @@ afterAll(async () => {
   const svc = getServiceRoleClient();
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
+  if (seededUserId) {
+    await svc.auth.admin.deleteUser(seededUserId);
+  }
 });
 
 describe("Migration 0155 — social_post_drafts schema gaps", () => {
@@ -47,8 +54,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
       .from("social_post_drafts")
       .insert({
         company_id: COMPANY_ID,
-        created_by: USER_ID,
-        updated_by: USER_ID,
+        created_by: seededUserId,
+        updated_by: seededUserId,
         link_url: "https://example.com/blog/post-1",
       })
       .select("id, link_url")
@@ -69,8 +76,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
         .from("social_post_drafts")
         .insert({
           company_id: COMPANY_ID,
-          created_by: USER_ID,
-          updated_by: USER_ID,
+          created_by: seededUserId,
+          updated_by: seededUserId,
           source_type,
         })
         .select("id, source_type")
@@ -91,8 +98,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
       .from("social_post_drafts")
       .insert({
         company_id: COMPANY_ID,
-        created_by: USER_ID,
-        updated_by: USER_ID,
+        created_by: seededUserId,
+        updated_by: seededUserId,
         source_type: "unknown_value" as string,
       })
       .select("id")
@@ -108,8 +115,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
       .from("social_post_drafts")
       .insert({
         company_id: COMPANY_ID,
-        created_by: USER_ID,
-        updated_by: USER_ID,
+        created_by: seededUserId,
+        updated_by: seededUserId,
       })
       .select("id, link_url, source_type")
       .single();
