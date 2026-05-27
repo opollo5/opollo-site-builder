@@ -64,7 +64,11 @@ function makeDraftMock(draftData: Record<string, unknown> | null) {
             }),
           }),
           update: () => ({
-            eq: async () => ({ error: null }),
+            eq: () => ({
+              eq: () => ({
+                select: () => Promise.resolve({ data: [{ id: DRAFT_ID }], error: null }),
+              }),
+            }),
           }),
         };
       }

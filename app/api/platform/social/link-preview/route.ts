@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { internalError, validationError } from "@/lib/http";
 import { getRedisClient } from "@/lib/redis";
+import { assertSafeUrl, SsrfBlockedError } from "@/lib/ssrf-guard";
 
 // ---------------------------------------------------------------------------
 // POST /api/platform/social/link-preview
@@ -114,6 +115,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
     return validationError("url must use http or https protocol.");
+  }
+
+  // DI-006: SSRF guard — block private/loopback/link-local IPs (e.g.
+  // 169.254.169.254 metadata endpoints). Mirrors the pattern in
+  // app/api/admin/images/fetch-url/route.ts:66.
+  try {
+    await assertSafeUrl(parsed.href);
+  } catch (err) {
+    if (err instanceof SsrfBlockedError) {
+      return validationError("URL is not allowed.");
+    }
+    return internalError("Failed to validate URL.");
   }
 
   const gate = await requireCanDoForApi(company_id, "edit_post");
