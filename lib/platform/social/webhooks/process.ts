@@ -208,12 +208,67 @@ async function handlePostEvent(
     };
   }
   if (!attempt.data) {
-    // Common during S1-17 rollout — the publish path (S1-18+) hasn't
-    // run yet so there's no attempt row. Audit the event and move on.
+    // V2 fallback: check social_post_drafts.bundle_post_id. V2 posts are
+    // published directly by the publish-due cron (no social_publish_attempts
+    // row); the state change has already happened when the webhook arrives.
+    // We just need to dispatch the post_published / post_failed notification.
+    const v2draft = await svc
+      .from("social_post_drafts")
+      .select("id, company_id, created_by, target_profiles, published_url")
+      .eq("bundle_post_id", bundlePostId)
+      .maybeSingle();
+
+    if (v2draft.error) {
+      logger.warn("bundlesocial.webhook.v2_draft_lookup_failed", {
+        err: v2draft.error.message,
+        bundle_post_id: bundlePostId,
+      });
+    }
+
+    if (v2draft.data) {
+      const draftId = v2draft.data.id as string;
+      const draftCompanyId = v2draft.data.company_id as string | null;
+      const draftCreatedBy = v2draft.data.created_by as string | null;
+      const profiles =
+        (v2draft.data.target_profiles as Array<{ profile_id: string; platform: string }> | null) ?? [];
+      const platform = profiles[0]?.platform ?? "unknown";
+
+      if (type === "post.published" && draftCompanyId && draftCreatedBy) {
+        void notifyDispatch({
+          event: "post_published",
+          companyId: draftCompanyId,
+          postMasterId: draftId,
+          submitterUserId: draftCreatedBy,
+          platform,
+          postUrl: (v2draft.data.published_url as string | null) ?? parsed.data.platformPostUrl ?? "",
+        });
+      } else if (type === "post.failed" && draftCompanyId && draftCreatedBy) {
+        const errorClass = mapErrorClass(parsed.data.error?.class ?? null);
+        void notifyDispatch({
+          event: "post_failed",
+          companyId: draftCompanyId,
+          postMasterId: draftId,
+          submitterUserId: draftCreatedBy,
+          platform,
+          errorClass,
+          errorMessage:
+            (parsed.data.error as { message?: string } | null)?.message ?? "Publish failed.",
+        });
+      }
+
+      return {
+        kind: "ok",
+        webhookEventId,
+        action: `${type === "post.published" ? "post_published" : "post_failed"}_v2`,
+      };
+    }
+
+    // Common during S1-17 rollout and after V1 drain — the publish path
+    // may not have run yet or the bundle_post_id is not yet stamped.
     return {
       kind: "stored_no_action",
       webhookEventId,
-      reason: `No publish_attempt for bundle_post_id=${bundlePostId}.`,
+      reason: `No publish_attempt or V2 draft for bundle_post_id=${bundlePostId}.`,
     };
   }
 
