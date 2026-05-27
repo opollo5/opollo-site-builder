@@ -4,6 +4,7 @@ import { fromZonedTime } from "date-fns-tz";
 
 import { dbUuid, internalError, invalidState, notFound, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { checkRateLimit, rateLimitExceeded } from "@/lib/rate-limit";
 import {
   authenticateRequest,
   validateServiceActorCompany,
@@ -95,6 +96,12 @@ export async function POST(
     userId = gate.userId;
     const { canDo } = await import("@/lib/platform/auth");
     hasApprovePermission = await canDo(companyId, "approve_post");
+  }
+
+  // Rate-limit user sessions only (service actors / CAP bypass).
+  if (auth.kind !== "service") {
+    const rl = await checkRateLimit("social_publish", `user:${userId}`);
+    if (!rl.ok) return rateLimitExceeded(rl);
   }
 
   // Load draft.
