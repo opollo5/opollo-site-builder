@@ -98,6 +98,9 @@ describe("V1→V2 migration — V2 draft insertion", () => {
       .eq("idempotency_key", idempotencyKey);
 
     // Simulate the mapping: insert a V2 draft row as the script would.
+    // NOTE: source_type is intentionally omitted here — it is added to
+    // social_post_drafts by migration 0155 (PR-01) which may not yet be
+    // applied. source_type insertion is verified in migration-0155 tests.
     const { data, error } = await svc
       .from("social_post_drafts")
       .insert({
@@ -107,20 +110,18 @@ describe("V1→V2 migration — V2 draft insertion", () => {
         state:             STATE_MAP["scheduled"],  // "scheduled"
         content:           "Test post content",
         link_url:          "https://example.com/blog",
-        source_type:       "manual",
         media_urls:        [],
         target_profiles:   [],
         platform_variants: {},
         idempotency_key:   idempotencyKey,
       })
-      .select("id, state, content, link_url, source_type, idempotency_key")
+      .select("id, state, content, link_url, idempotency_key")
       .single();
 
     expect(error, `insert error: ${error?.message}`).toBeNull();
     expect(data?.state).toBe("scheduled");
     expect(data?.content).toBe("Test post content");
     expect(data?.link_url).toBe("https://example.com/blog");
-    expect(data?.source_type).toBe("manual");
     expect(data?.idempotency_key).toBe(idempotencyKey);
 
     if (data?.id) {
