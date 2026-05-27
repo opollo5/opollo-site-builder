@@ -106,6 +106,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return validationError("url (string) is required.");
   }
 
+  // Auth gate first — don't do URL parsing or SSRF checks for unauthorised callers.
+  const gate = await requireCanDoForApi(company_id, "edit_post");
+  if (gate.kind === "deny") return gate.response;
+
   let parsed: URL;
   try {
     parsed = new URL(url.trim());
@@ -128,9 +132,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
     return internalError("Failed to validate URL.");
   }
-
-  const gate = await requireCanDoForApi(company_id, "edit_post");
-  if (gate.kind === "deny") return gate.response;
 
   const normalizedUrl = parsed.href;
   const domain = extractDomain(normalizedUrl);
