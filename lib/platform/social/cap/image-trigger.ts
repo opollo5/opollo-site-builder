@@ -29,7 +29,7 @@ const DEFAULT_COLOUR = "#1a56db";
 function brandToGenerationParams(
   brand: BrandProfile | null,
   companyId: string,
-  postMasterId: string,
+  draftId: string,
 ): GenerationParams {
   const allowedStyles = getAllowedStyles(brand);
   const styleId = allowedStyles[0] ?? DEFAULT_STYLE;
@@ -46,32 +46,32 @@ function brandToGenerationParams(
     companyId,
     brandProfileId: brand?.id,
     brandProfileVersion: brand?.version,
-    postMasterId,
+    postMasterId: draftId,
     triggeredBy: undefined,
   };
 }
 
 export async function triggerCAPImageGen(opts: {
   companyId: string;
-  postMasterId: string;
+  draftId: string;
   brand: BrandProfile | null;
 }): Promise<void> {
-  const { companyId, postMasterId, brand } = opts;
+  const { companyId, draftId, brand } = opts;
 
   // Skip silently when image generation is not configured.
   if (!process.env.IDEOGRAM_API_KEY) {
-    logger.debug("cap.image.skipped — IDEOGRAM_API_KEY not set", { postMasterId });
+    logger.debug("cap.image.skipped — IDEOGRAM_API_KEY not set", { draftId });
     return;
   }
 
-  const params = brandToGenerationParams(brand, companyId, postMasterId);
+  const params = brandToGenerationParams(brand, companyId, draftId);
 
   let images: Awaited<ReturnType<typeof generateWithFallback>>;
   try {
     images = await generateWithFallback(params);
   } catch (err) {
     logger.warn("cap.image.generate_failed", {
-      postMasterId,
+      draftId,
       companyId,
       err: err instanceof Error ? err.message : String(err),
     });
@@ -79,7 +79,7 @@ export async function triggerCAPImageGen(opts: {
   }
 
   if (!images || images.length === 0) {
-    logger.warn("cap.image.no_images_returned", { postMasterId, companyId });
+    logger.warn("cap.image.no_images_returned", { draftId, companyId });
     return;
   }
 
@@ -93,7 +93,7 @@ export async function triggerCAPImageGen(opts: {
 
   if (signedErr || !signed?.signedUrl) {
     logger.warn("cap.image.signed_url_failed", {
-      postMasterId,
+      draftId,
       path: image.storagePath,
       err: signedErr?.message,
     });
@@ -117,7 +117,7 @@ export async function triggerCAPImageGen(opts: {
 
   if (assetErr || !asset?.id) {
     logger.warn("cap.image.asset_insert_failed", {
-      postMasterId,
+      draftId,
       err: assetErr?.message,
     });
     return;
@@ -125,21 +125,20 @@ export async function triggerCAPImageGen(opts: {
 
   const assetId = asset.id as string;
 
-  // Link the asset to all variants of this post (fresh drafts — no
-  // existing media_asset_ids to preserve).
-  const { error: variantErr } = await svc
-    .from("social_post_variant")
-    .update({ media_asset_ids: [assetId] })
-    .eq("post_master_id", postMasterId);
+  // Link the signed URL to the V2 draft's media_urls array.
+  const { error: draftErr } = await svc
+    .from("social_post_drafts")
+    .update({ media_urls: [signed.signedUrl] })
+    .eq("id", draftId);
 
-  if (variantErr) {
-    logger.warn("cap.image.variant_link_failed", {
-      postMasterId,
+  if (draftErr) {
+    logger.warn("cap.image.draft_link_failed", {
+      draftId,
       assetId,
-      err: variantErr.message,
+      err: draftErr.message,
     });
     return;
   }
 
-  logger.info("cap.image.done", { postMasterId, companyId, assetId });
+  logger.info("cap.image.done", { draftId, companyId, assetId });
 }

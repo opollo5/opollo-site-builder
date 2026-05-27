@@ -20,21 +20,24 @@ vi.mock("@/lib/platform/brand/get", () => ({
   getActiveBrandProfile: vi.fn(),
 }));
 
-vi.mock("@/lib/platform/social/posts/create", () => ({
-  createPostMaster: vi.fn(),
-}));
-
-vi.mock("@/lib/platform/social/variants/upsert", () => ({
-  upsertVariant: vi.fn(),
+vi.mock("@/lib/supabase", () => ({
+  getServiceRoleClient: vi.fn(),
 }));
 
 import { getActiveBrandProfile } from "@/lib/platform/brand/get";
-import { createPostMaster } from "@/lib/platform/social/posts/create";
-import { upsertVariant } from "@/lib/platform/social/variants/upsert";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 const mockGetBrand = getActiveBrandProfile as MockedFunction<typeof getActiveBrandProfile>;
-const mockCreate = createPostMaster as MockedFunction<typeof createPostMaster>;
-const mockUpsert = upsertVariant as MockedFunction<typeof upsertVariant>;
+const mockGetSvc = getServiceRoleClient as MockedFunction<typeof getServiceRoleClient>;
+
+function makeMockSvc(draftId = "draft-1") {
+  const mockSingle = vi.fn().mockResolvedValue({ data: { id: draftId }, error: null });
+  const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
+  const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
+  return {
+    from: vi.fn().mockReturnValue({ insert: mockInsert }),
+  };
+}
 
 const BASE_BRAND: BrandProfile = {
   id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
@@ -158,39 +161,7 @@ describe("PLATFORM_CHAR_LIMITS", () => {
 describe("generateCAPPosts", () => {
   it("returns created posts on happy path", async () => {
     mockGetBrand.mockResolvedValue(BASE_BRAND);
-    mockCreate.mockResolvedValue({
-      ok: true,
-      data: {
-        id: "post-1",
-        company_id: COMPANY_ID,
-        state: "draft",
-        source_type: "cap",
-        master_text: "Test post",
-        link_url: null,
-        reviewer_comment: null,
-        created_by: null,
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-        state_changed_at: "2026-01-01T00:00:00Z",
-      },
-      timestamp: "2026-01-01T00:00:00Z",
-    });
-    mockUpsert.mockResolvedValue({
-      ok: true,
-      data: {
-        id: "var-1",
-        post_master_id: "post-1",
-        platform: "linkedin_company",
-        connection_id: null,
-        variant_text: "LinkedIn version",
-        is_custom: true,
-        scheduled_at: null,
-        media_asset_ids: [],
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-      },
-      timestamp: "2026-01-01T00:00:00Z",
-    });
+    mockGetSvc.mockReturnValue(makeMockSvc("draft-1") as never);
 
     const callFn = makeStubCallFn(makeCannedResponse([
       { master_text: "Full post text about digital marketing", variants: { linkedin_company: "LinkedIn version", x: "X version" } },
@@ -205,28 +176,12 @@ describe("generateCAPPosts", () => {
     if (!result.ok) return;
     expect(result.posts).toHaveLength(1);
     expect(result.posts[0].masterText).toBe("Full post text about digital marketing");
+    expect(result.posts[0].draftId).toBe("draft-1");
   });
 
   it("calls Claude with correct model", async () => {
     mockGetBrand.mockResolvedValue(null);
-    mockCreate.mockResolvedValue({
-      ok: true,
-      data: {
-        id: "post-2",
-        company_id: COMPANY_ID,
-        state: "draft",
-        source_type: "cap",
-        master_text: "Test",
-        link_url: null,
-        reviewer_comment: null,
-        created_by: null,
-        created_at: "2026-01-01T00:00:00Z",
-        updated_at: "2026-01-01T00:00:00Z",
-        state_changed_at: "2026-01-01T00:00:00Z",
-      },
-      timestamp: "2026-01-01T00:00:00Z",
-    });
-    mockUpsert.mockResolvedValue({ ok: true, data: {} as never, timestamp: "" });
+    mockGetSvc.mockReturnValue(makeMockSvc("draft-2") as never);
 
     const callFn = vi.fn().mockResolvedValue(makeCannedResponse([
       { master_text: "Test", variants: { linkedin_company: "Test LI" } },
@@ -272,24 +227,7 @@ describe("generateCAPPosts", () => {
       variants: { linkedin_company: `LI ${i + 1}` },
     }));
     const callFn = makeStubCallFn(makeCannedResponse(posts));
-    mockCreate.mockResolvedValue({
-      ok: true,
-      data: {
-        id: "p",
-        company_id: COMPANY_ID,
-        state: "draft",
-        source_type: "cap",
-        master_text: "Post",
-        link_url: null,
-        reviewer_comment: null,
-        created_by: null,
-        created_at: "",
-        updated_at: "",
-        state_changed_at: "",
-      },
-      timestamp: "",
-    });
-    mockUpsert.mockResolvedValue({ ok: true, data: {} as never, timestamp: "" });
+    mockGetSvc.mockReturnValue(makeMockSvc("p") as never);
 
     const result = await generateCAPPosts({ companyId: COMPANY_ID, count: 99, triggeredBy: null }, callFn);
 
@@ -311,24 +249,7 @@ describe("generateCAPPosts", () => {
       stop_reason: "end_turn",
       usage: { input_tokens: 10, output_tokens: 20 },
     });
-    mockCreate.mockResolvedValue({
-      ok: true,
-      data: {
-        id: "p2",
-        company_id: COMPANY_ID,
-        state: "draft",
-        source_type: "cap",
-        master_text: "Clean text",
-        link_url: null,
-        reviewer_comment: null,
-        created_by: null,
-        created_at: "",
-        updated_at: "",
-        state_changed_at: "",
-      },
-      timestamp: "",
-    });
-    mockUpsert.mockResolvedValue({ ok: true, data: {} as never, timestamp: "" });
+    mockGetSvc.mockReturnValue(makeMockSvc("p2") as never);
 
     const result = await generateCAPPosts({ companyId: COMPANY_ID, count: 1, triggeredBy: null }, callFn);
 
