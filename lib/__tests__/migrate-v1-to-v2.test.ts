@@ -30,9 +30,22 @@ const STATE_MAP: Record<string, string> = {
   failed:                  "failed",
 };
 
-let seededUserId: string;
+let seededUser: { id: string; email: string };
 
-async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>, userId: string) {
+async function seedV1Post(
+  svc: ReturnType<typeof getServiceRoleClient>,
+  userId: string,
+  userEmail: string,
+) {
+  // social_post_master.created_by FK references platform_users(id), which is
+  // truncated by _setup.ts's global beforeEach truncateAll(). Re-seed the row
+  // here so the FK resolves on every test, not just the first.
+  const { error: puErr } = await svc.from("platform_users").upsert(
+    { id: userId, email: userEmail },
+    { onConflict: "id" },
+  );
+  if (puErr) throw new Error(`seed platform_users: ${puErr.message}`);
+
   // Clean stale drafts first so the company delete doesn't hit FK constraints.
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
@@ -55,17 +68,17 @@ async function seedV1Post(svc: ReturnType<typeof getServiceRoleClient>, userId: 
   if (masterErr) throw new Error(`seed master: ${masterErr.message}`);
 }
 
-// Company + V1 post seed is called in beforeEach (not beforeAll) because _setup.ts's
-// global beforeEach runs truncateAll() which wipes platform_companies before
-// each test. The auth user lives in auth.users which is NOT truncated by
-// truncateAll(), so it only needs to be created once in beforeAll.
+// Company + V1 post seed is in beforeEach (not beforeAll) because _setup.ts's
+// global beforeEach runs truncateAll() which wipes platform_companies and
+// platform_users before each test. auth.users is NOT truncated, so the auth
+// user only needs to be created once in beforeAll. platform_users IS truncated,
+// so it must be re-seeded in beforeEach via the upsert in seedV1Post.
 beforeAll(async () => {
-  const user = await seedAuthUser({ persistent: true });
-  seededUserId = user.id;
+  seededUser = await seedAuthUser({ persistent: true });
 });
 
 beforeEach(async () => {
-  await seedV1Post(getServiceRoleClient(), seededUserId);
+  await seedV1Post(getServiceRoleClient(), seededUser.id, seededUser.email);
 });
 
 afterAll(async () => {
@@ -73,8 +86,8 @@ afterAll(async () => {
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("social_post_master").delete().eq("id", MASTER_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
-  if (seededUserId) {
-    await svc.auth.admin.deleteUser(seededUserId);
+  if (seededUser?.id) {
+    await svc.auth.admin.deleteUser(seededUser.id);
   }
 });
 
@@ -112,8 +125,8 @@ describe("V1→V2 migration — V2 draft insertion", () => {
       .from("social_post_drafts")
       .insert({
         company_id:        COMPANY_ID,
-        created_by:        seededUserId,
-        updated_by:        seededUserId,
+        created_by:        seededUser.id,
+        updated_by:        seededUser.id,
         state:             STATE_MAP["scheduled"],  // "scheduled"
         content:           "Test post content",
         link_url:          "https://example.com/blog",
@@ -144,7 +157,7 @@ describe("V1→V2 migration — V2 draft insertion", () => {
     const { data: first } = await svc
       .from("social_post_drafts")
       .insert({
-        company_id: COMPANY_ID, created_by: seededUserId, updated_by: seededUserId,
+        company_id: COMPANY_ID, created_by: seededUser.id, updated_by: seededUser.id,
         idempotency_key: idempotencyKey, content: "original",
       })
       .select("id")
@@ -154,7 +167,7 @@ describe("V1→V2 migration — V2 draft insertion", () => {
     const { error: conflictError } = await svc
       .from("social_post_drafts")
       .upsert({
-        company_id: COMPANY_ID, created_by: seededUserId, updated_by: seededUserId,
+        company_id: COMPANY_ID, created_by: seededUser.id, updated_by: seededUser.id,
         idempotency_key: idempotencyKey, content: "duplicate",
       }, { onConflict: "company_id,idempotency_key", ignoreDuplicates: true });
 
