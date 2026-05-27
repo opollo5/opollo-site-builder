@@ -102,7 +102,7 @@ export default async function ReviewPage({
         )}
       </article>
 
-      <ReviewDecisionForm draftId={verified.draftId} disabled={alreadyDecided} />
+      <ReviewDecisionForm draftId={verified.draftId} reviewToken={token} disabled={alreadyDecided} />
     </main>
   );
 }

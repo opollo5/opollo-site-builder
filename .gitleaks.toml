@@ -24,6 +24,7 @@ commits = [
 paths = [
   '''lib/__tests__/''',
   '''e2e/''',
+  '''tests/regressions/''',
 ]
 
 regexes = [

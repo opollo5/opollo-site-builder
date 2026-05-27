@@ -6,12 +6,16 @@ import { cn } from "@/lib/utils";
 
 export interface ReviewDecisionFormProps {
   draftId: string;
+  /** JWT review token from the /review/[token] URL. When present, the form
+   * submits to the public /api/review/[token]/decision route (D5 magic-link
+   * auth) instead of the session-gated platform approve route. */
+  reviewToken?: string;
   disabled?: boolean;
 }
 
 type Decision = "approved" | "rejected";
 
-export function ReviewDecisionForm({ draftId, disabled = false }: ReviewDecisionFormProps) {
+export function ReviewDecisionForm({ draftId, reviewToken, disabled = false }: ReviewDecisionFormProps) {
   const [decision, setDecision] = React.useState<Decision | null>(null);
   const [rejectionReason, setRejectionReason] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
@@ -33,7 +37,13 @@ export function ReviewDecisionForm({ draftId, disabled = false }: ReviewDecision
       const body: Record<string, unknown> = { decision };
       if (decision === "rejected") body.rejection_reason = rejectionReason;
 
-      const res = await fetch(`/api/platform/social/drafts/${draftId}/approve`, {
+      // D5: when a review token is present, use the public magic-link route
+      // so external approvers don't need a Supabase session.
+      const url = reviewToken
+        ? `/api/review/${reviewToken}/decision`
+        : `/api/platform/social/drafts/${draftId}/approve`;
+
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
