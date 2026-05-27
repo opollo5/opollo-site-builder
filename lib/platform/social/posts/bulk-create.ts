@@ -3,20 +3,16 @@ import "server-only";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
-import type { PostMaster } from "./types";
-
 // ---------------------------------------------------------------------------
-// S7 — bulk insert social_post_master rows from CSV upload.
+// S7 — bulk insert social_post_drafts rows from CSV upload (V2).
 //
-// Validates each row first (same rules as createPostMaster), then inserts
-// the valid rows in a single PostgREST batch call. Rows that fail
-// validation are returned as per-row errors so the caller can surface
-// them to the user without aborting the whole upload.
+// Validates each row first, then inserts the valid rows in a single
+// PostgREST batch call. Rows that fail validation are returned as per-row
+// errors so the caller can surface them without aborting the whole upload.
 //
 // PostgREST batch insert requirement (from MEMORY.md): every row in the
 // insert array must spell out EVERY column; PostgREST sends NULL for any
-// missing key, which would violate NOT NULL constraints on `company_id`,
-// `state`, and `source_type`.
+// missing key, which would violate NOT NULL constraints.
 // ---------------------------------------------------------------------------
 
 export const ROW_LIMIT = 100;
@@ -33,8 +29,20 @@ export interface BulkRowError {
   message: string;
 }
 
+export interface BulkCreatedDraft {
+  id: string;
+  company_id: string;
+  state: string;
+  source_type: string;
+  content: string | null;
+  link_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BulkCreateResult {
-  created: PostMaster[];
+  created: BulkCreatedDraft[];
   errors: BulkRowError[];
 }
 
@@ -85,27 +93,31 @@ export async function bulkCreatePostMasters(
     return { created: [], errors };
   }
 
-  // Spell out every column on every row — PostgREST batch insert sends
-  // NULL for any key missing from a row; violates NOT NULL on company_id /
-  // state / source_type silently (see MEMORY.md PostgREST batch insert rule).
+  // Spell out every column on every row — PostgREST batch insert sends NULL
+  // for any key missing from a row; violates NOT NULL on required V2 columns
+  // (see MEMORY.md PostgREST batch insert rule).
   const inserts = validIndices.map((i) => {
     const row = rows[i]!;
     return {
-      company_id: companyId,
-      state: "draft" as const,
-      source_type: "csv" as const,
-      master_text: row.masterText?.trim() ?? null,
-      link_url: row.linkUrl?.trim() ?? null,
-      created_by: createdBy,
+      company_id:        companyId,
+      state:             "draft" as const,
+      source_type:       "csv" as const,
+      content:           row.masterText?.trim() ?? null,
+      link_url:          row.linkUrl?.trim() ?? null,
+      created_by:        createdBy,
+      updated_by:        createdBy,
+      media_urls:        [] as string[],
+      target_profiles:   [] as unknown[],
+      platform_variants: {} as Record<string, unknown>,
     };
   });
 
   const svc = getServiceRoleClient();
   const { data, error } = await svc
-    .from("social_post_master")
+    .from("social_post_drafts")
     .insert(inserts)
     .select(
-      "id, company_id, state, source_type, master_text, link_url, created_by, created_at, updated_at, state_changed_at",
+      "id, company_id, state, source_type, content, link_url, created_by, created_at, updated_at",
     );
 
   if (error) {
@@ -115,7 +127,6 @@ export async function bulkCreatePostMasters(
       err: error.message,
       code: error.code,
     });
-    // Mark all valid rows as failed — batch errors are systematic.
     const batchErrors: BulkRowError[] = validIndices.map((i) => ({
       row: i + 1,
       message: `Database error: ${error.message}`,
@@ -123,7 +134,6 @@ export async function bulkCreatePostMasters(
     return { created: [], errors: [...errors, ...batchErrors] };
   }
 
-  // Verify Supabase returned data (it should — select is attached).
   if (!data) {
     logger.error("social.posts.bulk-create.no-data", { companyId });
     const batchErrors: BulkRowError[] = validIndices.map((i) => ({
@@ -139,7 +149,7 @@ export async function bulkCreatePostMasters(
     validationErrors: errors.length,
   });
 
-  return { created: data as PostMaster[], errors };
+  return { created: data as BulkCreatedDraft[], errors };
 }
 
 function isHttpUrl(value: string): boolean {
