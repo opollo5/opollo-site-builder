@@ -1,4 +1,5 @@
 name: V1→V2 staging backfill
+# v2 — force GitHub Actions indexing
 
 # Applies schema migrations 0155/0156 to the staging DB, then backfills
 # social_post_master rows into social_post_drafts (idempotent, safe to re-run).
