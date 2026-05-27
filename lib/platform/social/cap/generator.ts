@@ -8,8 +8,7 @@ import {
   defaultAnthropicCall,
   type AnthropicCallFn,
 } from "@/lib/anthropic-call";
-import { createPostMaster } from "@/lib/platform/social/posts/create";
-import { upsertVariant } from "@/lib/platform/social/variants/upsert";
+import { getServiceRoleClient } from "@/lib/supabase";
 import { SUPPORTED_PLATFORMS } from "@/lib/platform/social/variants/types";
 import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 
@@ -27,11 +26,11 @@ import type {
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// D1 — CAP copy generator.
+// D1 — CAP copy generator (V2).
 //
 // Reads the company's active brand profile → builds prompts → calls Claude
-// → parses structured JSON response → creates social_post_master rows with
-// source_type='cap' + per-platform social_post_variant rows.
+// → parses structured JSON response → inserts social_post_drafts rows with
+// source_type='cap' + platform_variants JSONB (one entry per platform).
 //
 // AnthropicCallFn is dependency-injected (default = defaultAnthropicCall)
 // so unit tests substitute a stub without real API credentials.
@@ -125,58 +124,52 @@ export async function generateCAPPosts(
   }
 
   const created: CAPGeneratedPost[] = [];
+  const svc = getServiceRoleClient();
 
   for (const post of parsed.posts.slice(0, count)) {
     const masterText = post.master_text?.trim() ?? "";
     if (!masterText) continue;
 
-    const masterResult = await createPostMaster({
-      companyId,
-      masterText,
-      sourceType: "cap",
-      createdBy: triggeredBy,
-    });
+    // Build platform_variants JSONB in one pass before the DB insert.
+    const platformVariants: Record<string, { content: string }> = {};
+    const variantMap: Partial<Record<SocialPlatform, string>> = {};
+    for (const platform of platforms) {
+      const raw = post.variants?.[platform];
+      if (!raw?.trim()) continue;
+      const text = truncateToLimit(raw.trim(), platform);
+      platformVariants[platform] = { content: text };
+      variantMap[platform] = text;
+    }
 
-    if (!masterResult.ok) {
+    const { data: draft, error: draftErr } = await svc
+      .from("social_post_drafts")
+      .insert({
+        company_id:        companyId,
+        created_by:        triggeredBy,
+        updated_by:        triggeredBy,
+        content:           masterText,
+        source_type:       "cap",
+        state:             "draft",
+        media_urls:        [],
+        target_profiles:   [],
+        platform_variants: platformVariants,
+      })
+      .select("id")
+      .single();
+
+    if (draftErr || !draft?.id) {
       logger.error("cap.generate.post_create_failed", {
         companyId,
-        err: masterResult.error.message,
+        err: draftErr?.message,
       });
       continue;
     }
 
-    const postMasterId = masterResult.data.id;
-    const variantMap: Partial<Record<SocialPlatform, string>> = {};
+    const draftId = draft.id as string;
+    created.push({ draftId, masterText, variants: variantMap });
 
-    for (const platform of platforms) {
-      const raw = post.variants?.[platform];
-      if (!raw?.trim()) continue;
-      const variantText = truncateToLimit(raw.trim(), platform);
-
-      const vResult = await upsertVariant({
-        postMasterId,
-        companyId,
-        platform,
-        variantText,
-      });
-
-      if (vResult.ok) {
-        variantMap[platform] = variantText;
-      } else {
-        logger.warn("cap.generate.variant_failed", {
-          companyId,
-          postMasterId,
-          platform,
-          err: vResult.error.message,
-        });
-      }
-    }
-
-    created.push({ postMasterId, masterText, variants: variantMap });
-
-    // I5 — fire-and-forget image generation. Runs after variants are
-    // upserted so the variant rows exist before the link step.
-    void triggerCAPImageGen({ companyId, postMasterId, brand });
+    // I5 — fire-and-forget image generation.
+    void triggerCAPImageGen({ companyId, draftId, brand });
   }
 
   if (created.length === 0) {

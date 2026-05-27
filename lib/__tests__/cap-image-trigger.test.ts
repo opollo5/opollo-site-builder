@@ -30,7 +30,7 @@ const mockGetSvc = getServiceRoleClient as MockedFunction<typeof getServiceRoleC
 function makeMockSvc(overrides?: {
   signedUrlError?: boolean;
   assetInsertError?: boolean;
-  variantUpdateError?: boolean;
+  draftUpdateError?: boolean;
 }) {
   const mockSingle = vi.fn().mockResolvedValue(
     overrides?.assetInsertError
@@ -41,7 +41,7 @@ function makeMockSvc(overrides?: {
   const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
 
   const mockEq = vi.fn().mockResolvedValue(
-    overrides?.variantUpdateError
+    overrides?.draftUpdateError
       ? { error: { message: "update failed" } }
       : { error: null },
   );
@@ -57,7 +57,7 @@ function makeMockSvc(overrides?: {
   const svc = {
     from: vi.fn().mockImplementation((table: string) => {
       if (table === "social_media_assets") return { insert: mockInsert };
-      if (table === "social_post_variant") return { update: mockUpdate };
+      if (table === "social_post_drafts") return { update: mockUpdate };
       return {};
     }),
     storage: { from: mockStorageFrom },
@@ -91,7 +91,7 @@ describe("triggerCAPImageGen", () => {
 
     await triggerCAPImageGen({
       companyId: "company-id",
-      postMasterId: "post-master-id",
+      draftId: "draft-id-1",
       brand: null,
     });
 
@@ -107,7 +107,7 @@ describe("triggerCAPImageGen", () => {
     mockGetSvc.mockReturnValue(svc as never);
 
     await expect(
-      triggerCAPImageGen({ companyId: "c", postMasterId: "p", brand: null }),
+      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
     ).resolves.toBeUndefined();
 
     expect(mockGenerate).not.toHaveBeenCalled();
@@ -120,7 +120,7 @@ describe("triggerCAPImageGen", () => {
     mockGenerate.mockRejectedValue(new Error("Ideogram unreachable"));
 
     await expect(
-      triggerCAPImageGen({ companyId: "c", postMasterId: "p", brand: null }),
+      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
     ).resolves.toBeUndefined();
 
     expect(mockInsert).not.toHaveBeenCalled();
@@ -132,7 +132,7 @@ describe("triggerCAPImageGen", () => {
     mockGenerate.mockResolvedValue([]);
 
     await expect(
-      triggerCAPImageGen({ companyId: "c", postMasterId: "p", brand: null }),
+      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
     ).resolves.toBeUndefined();
 
     expect(mockInsert).not.toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe("triggerCAPImageGen", () => {
     mockGenerate.mockResolvedValue([makeFakeImage()]);
 
     await expect(
-      triggerCAPImageGen({ companyId: "c", postMasterId: "p", brand: null }),
+      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
     ).resolves.toBeUndefined();
 
     expect(mockInsert).not.toHaveBeenCalled();
@@ -161,7 +161,7 @@ describe("triggerCAPImageGen", () => {
     };
     mockGenerate.mockResolvedValue([imageWithoutBuffer]);
 
-    await triggerCAPImageGen({ companyId: "c", postMasterId: "p", brand: null });
+    await triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null });
 
     const insertArg = mockInsert.mock.calls[0][0] as Record<string, unknown>;
     expect(insertArg.bytes).toBe(0);
@@ -174,10 +174,10 @@ describe("triggerCAPImageGen", () => {
 
     await triggerCAPImageGen({
       companyId: "company-id",
-      postMasterId: "post-master-id",
+      draftId: "draft-id-1",
       brand: null,
     });
 
-    expect(mockEq).toHaveBeenCalledWith("post_master_id", "post-master-id");
+    expect(mockEq).toHaveBeenCalledWith("id", "draft-id-1");
   });
 });

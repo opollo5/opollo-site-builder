@@ -4,8 +4,8 @@ import type { SocialPlatform } from "@/lib/platform/social/variants/types";
 // D1 — CAP (Content Automation Platform) types.
 //
 // CAP generates social post copy from a company's brand profile via Claude.
-// Generated posts land in social_post_master with source_type='cap' and
-// flow through the normal draft → approval → schedule → publish pipeline.
+// Generated posts land in social_post_drafts (V2) with source_type='cap'
+// and flow through the V2 draft → approval → schedule → publish pipeline.
 // ---------------------------------------------------------------------------
 
 export type CAPGenerateInput = {
@@ -21,7 +21,7 @@ export type CAPGenerateInput = {
 };
 
 export type CAPGeneratedPost = {
-  postMasterId: string;
+  draftId: string;
   masterText: string;
   /** Keys are SocialPlatform values; values are the generated variant text. */
   variants: Partial<Record<SocialPlatform, string>>;
