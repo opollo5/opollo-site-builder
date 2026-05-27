@@ -19,6 +19,7 @@ import { seedAuthUser } from "./_auth-helpers";
 const COMPANY_ID = "00001570-0000-0000-0000-000000000001";
 
 let seededUserId: string;
+let seededUserEmail: string;
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
@@ -31,10 +32,10 @@ async function seedCompany() {
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 
   // platform_users is truncated by _setup.ts global beforeEach; re-seed so
-  // social_post_master.created_by FK resolves on every test run.
+  // social_post_master.created_by FK (NOT NULL) resolves on every test.
   const { error: puErr } = await svc
     .from("platform_users")
-    .upsert({ id: seededUserId }, { onConflict: "id" });
+    .upsert({ id: seededUserId, email: seededUserEmail }, { onConflict: "id" });
   if (puErr) throw new Error(`seed platform_users: ${puErr.message}`);
 
   const { error } = await svc.from("platform_companies").insert({
@@ -51,6 +52,7 @@ async function seedCompany() {
 beforeAll(async () => {
   const user = await seedAuthUser({ persistent: true });
   seededUserId = user.id;
+  seededUserEmail = user.email;
 });
 
 beforeEach(async () => {
