@@ -227,7 +227,7 @@ If any of these timestamps are recent (< 7 days), investigate before proceeding 
 | R-1 | **Production V1 data lost during backfill** | Low | Critical | PR-04 is Steven-merge. Run against staging first. Verify row counts before + after. Backfill script is idempotent (uses v1_post_master.id as idempotency key). 30-day archive window before V1 drop. |
 | R-2 | **Active V1 approval tokens (social_approval_recipients) expire or break mid-migration** | Medium | High | Approval tokens have 14-day TTL. During the token window, PR-09 must dual-read V1 + V2. The external approval route (`/api/approve/[token]/decision`) must continue working against V1 data until all tokens issued before cutover expire. Track token issuance in social_approval_events. |
 | R-3 | **QStash messages in flight when V1 schedule pipeline is removed** | Medium | High | Before removing the QStash publish routes (PR-13), drain and cancel all V1 schedule entries with `UPDATE social_schedule_entries SET cancelled_at = now() WHERE scheduled_at > now() AND cancelled_at IS NULL`. Wait for in-flight publishes to complete (monitored via social_publish_attempts.status). |
-| R-4 | **`approved` state gap causes drafts stuck after V1 approval** | Low | Medium | After backfill (PR-04), any post in V1 state='approved' must be mapped to V2 state='scheduled' (with scheduled_at = NULL or a near-future placeholder) so the editor can schedule it. An Open Decision (OD-2 below) must be resolved before PR-04 is written. |
+| R-4 | **`approved` state gap causes drafts stuck after V1 approval** | Low | Medium | After backfill (PR-04), V1 `approved` maps to V2 `scheduled` (with `scheduled_at = NULL`). Editor must set a schedule. Resolved in OD-1 + D6. |
 | R-5 | **BSP analytics source-attribution breaks for historical posts** | High | Low | The V1 `publish_attempt → variant → master.source_type` chain will work until PR-17 drops the tables. After drop, historical attribution will return 'composer' for all V1 posts (source_type lost). PR-02 can backfill source_type onto V2 drafts during the migration script to preserve the distinction. |
 | R-6 | **`idempotency_key` column missing in production DB** | Medium | Medium | `lib/platform/social/drafts.ts:79` queries `eq("idempotency_key", ...)` but no migration file adds this column. If it was added via the Supabase dashboard or a migration not in the repo, the backfill script will silently fail on CAP retry paths. Verify before PR-04. |
 | R-7 | **`social_media_assets` UUID → URL resolution fails for migrated posts** | Medium | Medium | V1 variant rows store media_asset_ids (UUIDs into social_media_assets). V2 stores URLs. The backfill script must join social_media_assets to get storage_path and construct the Supabase storage URL. If any asset row has been deleted, the migrated draft will have no media. |
@@ -249,37 +249,82 @@ The following are explicitly NOT being migrated in this workstream:
 
 ---
 
-## Open Decisions for Steven
+## Decisions — Locked
 
-**OD-1: What happens to the `approved` state?**
+All five open decisions resolved 2026-05-27 using locked decisions D1–D6
+(`docs/inventory/decisions-locked.md`) plus conservative inference.
 
-V1 has a distinct `approved` state between approval and scheduling. V2 skips directly from `pending_approval` to `scheduled` on approval. If MSP editors approve a post and want to hold it in an approved-but-not-yet-scheduled state before the client schedules it, V2 cannot represent this today.
+---
 
-Options:
-a. Accept the V2 model: approval = immediate scheduling. (Simplest; requires product agreement that approved = scheduled.)
-b. Add `approved` to the V2 CHECK constraint and update the approve route to land there. (More complexity; preserves the workflow.)
+**OD-1 RESOLVED: `approved` state → V2 `scheduled` (with `scheduled_at = NULL`)**
 
-**OD-2: What is the `changes_requested` equivalent in V2?**
+Accept the V2 model (option a). Approval in V2 immediately transitions the
+post to `scheduled` state. If `scheduled_at` is not set, the editor must
+schedule it explicitly before it publishes. This matches the existing V2
+approve route behaviour. The V2 UX already surfaces "scheduled with no date"
+as a pending-schedule indicator.
 
-V1 supports a `changes_requested` flow: approver requests changes with a comment → editor gets notified → editor reopens and edits → resubmits. V2 only has `rejected` (terminal). Does the product need multi-round review, or is reject-and-resubmit sufficient?
+Backfill mapping: V1 `approved` → V2 `scheduled` + `scheduled_at = NULL`.
+See D6 (`docs/inventory/decisions-locked.md`).
 
-Options:
-a. V2 `rejected` is terminal; editor creates a new draft if changes needed. (Simplest; breaks the round-trip workflow.)
-b. Add `changes_requested` to the V2 state CHECK constraint + add a reopen endpoint. (Preserves round-trip; ~1 PR.)
+---
 
-**OD-3: Should `social_approval_requests` / `social_viewer_links` be rebuilt for V2?**
+**OD-2 RESOLVED: `changes_requested` → V2 `pending_approval` (conservative)**
 
-The V1 approval system has rich features (multi-approver rules, OTP magic links, snapshot immutability, event audit log) that V2 entirely lacks. V2 approval is a single-row, single-approver record with a JWT magic link. Is the V1 richness needed for V2, or is the simpler V2 model acceptable going forward?
+V2 `rejected` is the terminal state. Posts that were in V1 `changes_requested`
+are migrated to V2 `pending_approval` — they surface in the approver's queue
+again. Going forward on V2, the approval workflow is: approve or reject (final).
+If the editor needs to revise after a rejection, they create a new draft.
 
-If V1 approval richness is required, this workstream needs an additional 3–5 PRs to rebuild those features on V2 tables before V1 tables can be dropped.
+This is option (a) — reject-and-recreate — with the conservative migration
+mapping ensuring no post silently advances. See D6.
 
-**OD-4: What to do with historical V1 publish attempt audit data?**
+Multi-round review (option b) is explicitly out of scope for this workstream.
+If it's needed in future, it's a separate 1-PR addition.
 
-`social_publish_attempts` contains an immutable audit log of every bundle.social API call: request/response payloads, error classifications, retry history. This data will be lost when PR-17 drops the table. Options:
-a. Export to cold storage (S3/Cloudflare R2) before drop.
-b. Keep the table in DB as a read-only archive indefinitely.
-c. Accept data loss.
+---
 
-**OD-5: What is the target row count and is a live migration acceptable?**
+**OD-3 RESOLVED: V1 approval richness NOT rebuilt for V2**
 
-If V1 tables have >10,000 rows in production, the backfill migration script (PR-04) may take minutes to run. This should be run as a background migration during low-traffic hours. If V1 has <1,000 rows (likely if it was not fully rolled out to customers), it can run inline. A staging row count query (see data-snapshot.md) should be run before writing PR-04.
+The V2 JWT magic-link model is sufficient. The rich V1 approval features
+(OTP, multi-approver rules, snapshot immutability, event audit log) are
+explicitly out of scope per the "Out of Scope" section above. The V2
+`social_post_approval_decisions` table covers the shipped use case (D5).
+
+If multi-approver richness is needed in future, it is a separate design
+workstream. This workstream does not add it.
+
+`social_approval_requests`, `social_approval_recipients`, `social_approval_events`,
+and `social_viewer_links` are kept read-only in DB alongside V1 tables until
+PR-17. No V2 equivalent is built here.
+
+---
+
+**OD-4 RESOLVED: `social_publish_attempts` kept as read-only archive for 90 days**
+
+Option (b): keep the table in DB as a read-only archive after PR-17.
+PR-17 does NOT drop `social_publish_attempts`. A follow-up migration
+(PR-18, separate session) drops it after 90 days if row counts confirm
+no live references.
+
+Rationale: publishing audit data is high-value forensic evidence. Data loss
+risk outweighs schema cleanliness. The table is renamed to
+`_archive_social_publish_attempts` in PR-17 to make its read-only status
+explicit and prevent accidental new writes.
+
+---
+
+**OD-5 RESOLVED: Treat as medium-scale migration, batch processing, off-peak**
+
+Staging row counts were unavailable at planning time. Conservative assumption:
+medium scale (hundreds to low thousands of rows). The backfill script (PR-04)
+must:
+
+1. Process in batches of 100 rows with a 200ms pause between batches
+2. Be idempotent (skip already-migrated rows via `idempotency_key`)
+3. Run during low-traffic hours (midnight–4am UTC)
+4. Run against staging first; verify row counts before production run
+5. Log progress to stdout in a format that shows rows processed / total
+
+If staging row count comes back >10,000, the script pauses and prints a
+warning requiring manual confirmation before continuing.
