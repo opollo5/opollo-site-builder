@@ -4,6 +4,7 @@ import { z } from "zod";
 import { dbUuid, readJsonBody, validationError, notFound, invalidState, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { cancelApprovalRequest } from "@/lib/platform/social/posts";
+import { getServiceRoleClient } from "@/lib/supabase";
 
 // ---------------------------------------------------------------------------
 // S1-10 — POST /api/platform/social/posts/[id]/cancel-approval
@@ -57,6 +58,33 @@ export async function POST(
   const gate = await requireCanDoForApi(parsed.data.company_id, "edit_post");
   if (gate.kind === "deny") return gate.response;
 
+  // V2 dispatch: pending_approval → draft.
+  const svc = getServiceRoleClient();
+  const { data: v2draft } = await svc
+    .from("social_post_drafts")
+    .select("id, state")
+    .eq("id", id)
+    .eq("company_id", parsed.data.company_id)
+    .maybeSingle();
+
+  if (v2draft) {
+    if ((v2draft.state as string) !== "pending_approval") {
+      return invalidState(`Draft is in state '${v2draft.state as string}', expected 'pending_approval'.`);
+    }
+    const { error } = await svc
+      .from("social_post_drafts")
+      .update({ state: "draft", updated_by: gate.userId, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("company_id", parsed.data.company_id)
+      .eq("state", "pending_approval");
+    if (error) return internalError(`Failed to cancel approval: ${error.message}`);
+    return NextResponse.json(
+      { ok: true, data: { id, state: "draft" }, timestamp: new Date().toISOString() },
+      { status: 200 },
+    );
+  }
+
+  // V1 fallback.
   const result = await cancelApprovalRequest({
     postId: id,
     companyId: parsed.data.company_id,
