@@ -45,6 +45,7 @@ When a session starts a migration, reserve the number here before writing the fi
 - ~~0073 — S1-10 cancel_post_approval transactional function.~~ Shipped (0073_cancel_post_approval_fn.sql in main).
 - ~~0112 — Session A — Spec 22 PR 1 social_post_drafts table (branch: feat/spec22-pr1-composer-shell).~~ Shipped in #789.
 - ~~0113 — Session A — Spec 22 PR 2 social-media-uploads storage bucket (branch: feat/spec22-pr2-core-editor).~~ Shipped.
+- 0153 — FIX-1 — platform_staff_audit_log (branch: feat/fix1-staff-access-audit-log)
 
 ## Claim block template
 
