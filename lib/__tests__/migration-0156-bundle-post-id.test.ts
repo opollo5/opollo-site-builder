@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { seedAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // Migration 0156 — bundle_post_id on social_post_drafts.
@@ -13,8 +14,9 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // ---------------------------------------------------------------------------
 
 const COMPANY_ID = "00001560-0000-0000-0000-000000000001";
-const USER_ID    = "00001560-0000-0000-0000-000000000002";
 const BUNDLE_ID  = "bsp-test-bundle-0156-abc123";
+
+let seededUserId: string;
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
@@ -33,6 +35,8 @@ async function seedCompany() {
 }
 
 beforeAll(async () => {
+  const user = await seedAuthUser({ email: "m0156-test@opollo.test", persistent: true });
+  seededUserId = user.id;
   await seedCompany();
 });
 
@@ -40,6 +44,9 @@ afterAll(async () => {
   const svc = getServiceRoleClient();
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
+  if (seededUserId) {
+    await svc.auth.admin.deleteUser(seededUserId);
+  }
 });
 
 describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
@@ -49,8 +56,8 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
       .from("social_post_drafts")
       .insert({
         company_id: COMPANY_ID,
-        created_by: USER_ID,
-        updated_by: USER_ID,
+        created_by: seededUserId,
+        updated_by: seededUserId,
         state: "published",
         bundle_post_id: BUNDLE_ID,
       })
@@ -71,8 +78,8 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
       .from("social_post_drafts")
       .insert({
         company_id: COMPANY_ID,
-        created_by: USER_ID,
-        updated_by: USER_ID,
+        created_by: seededUserId,
+        updated_by: seededUserId,
       })
       .select("id, bundle_post_id")
       .single();
@@ -91,8 +98,8 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
       .from("social_post_drafts")
       .insert({
         company_id: COMPANY_ID,
-        created_by: USER_ID,
-        updated_by: USER_ID,
+        created_by: seededUserId,
+        updated_by: seededUserId,
         bundle_post_id: BUNDLE_ID + "-lookup",
       })
       .select("id")
