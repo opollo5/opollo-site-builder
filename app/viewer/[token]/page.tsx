@@ -28,10 +28,29 @@ const BACK_DAYS = 30;
 type SchedulePreview = {
   id: string;
   scheduled_at: string;
-  platform: SocialPlatform;
+  platform: string; // V1 SocialPlatform | V2 Platform — display via labelFor()
   master_text: string | null;
   link_url: string | null;
 };
+
+// V2 platform strings differ from V1 SocialPlatform strings.
+const V2_PLATFORM_LABEL: Record<string, string> = {
+  linkedin:              "LinkedIn",
+  facebook:              "Facebook",
+  instagram:             "Instagram",
+  x:                     "X (Twitter)",
+  google_business_profile: "Google Business Profile",
+  pinterest:             "Pinterest",
+  tiktok:                "TikTok",
+};
+
+function labelFor(platform: string): string {
+  return (
+    PLATFORM_LABEL[platform as SocialPlatform] ??
+    V2_PLATFORM_LABEL[platform] ??
+    platform
+  );
+}
 
 export default async function ViewerLinkPage({
   params,
@@ -116,14 +135,43 @@ export default async function ViewerLinkPage({
           return {
             id: s.id as string,
             scheduled_at: s.scheduled_at as string,
-            platform: v.platform,
+            platform: v.platform as string,
             master_text: post.master_text,
             link_url: post.link_url,
-          } satisfies SchedulePreview;
+          };
         })
         .filter((x): x is SchedulePreview => x !== null);
     }
   }
+
+  // V2: social_post_drafts in scheduled/publishing/published states with scheduled_at in window.
+  const v2drafts = await svc
+    .from("social_post_drafts")
+    .select("id, content, link_url, scheduled_at, target_profiles")
+    .eq("company_id", company.id)
+    .in("state", ["scheduled", "publishing", "published"])
+    .gte("scheduled_at", fromIso)
+    .lte("scheduled_at", toIso)
+    .order("scheduled_at", { ascending: true });
+
+  for (const d of v2drafts.data ?? []) {
+    const draftId = d.id as string;
+    const scheduledAt = d.scheduled_at as string;
+    const masterText = (d.content as string | null) ?? null;
+    const linkUrl = (d.link_url as string | null) ?? null;
+    const profiles = (d.target_profiles as Array<{ profile_id: string; platform: string }> | null) ?? [];
+
+    if (profiles.length === 0) {
+      entries.push({ id: draftId, scheduled_at: scheduledAt, platform: "unknown", master_text: masterText, link_url: linkUrl });
+    } else {
+      for (const p of profiles) {
+        entries.push({ id: `${draftId}:${p.profile_id}`, scheduled_at: scheduledAt, platform: p.platform, master_text: masterText, link_url: linkUrl });
+      }
+    }
+  }
+
+  // Sort merged V1+V2 entries by scheduled_at.
+  entries.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
 
   // Group by local date for rendering.
   const grouped = groupByLocalDate(entries, company.timezone);
@@ -155,7 +203,7 @@ export default async function ViewerLinkPage({
                   >
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="font-medium">
-                        {PLATFORM_LABEL[e.platform] ?? e.platform}
+                        {labelFor(e.platform)}
                       </span>
                       <time className="text-sm text-muted-foreground tabular-nums">
                         {new Date(e.scheduled_at).toLocaleString("en-AU", {
