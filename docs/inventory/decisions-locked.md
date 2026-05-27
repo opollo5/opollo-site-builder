@@ -76,3 +76,28 @@ Explicitly excluded:
   - One-time use for the final Approve/Reject submission
 - Approver identity captured from the email the link was originally
   sent to.
+
+## D6 — V1→V2 state enum mapping (backfill)
+
+Conservative mapping for the V1→V2 social post backfill script. V1 states
+with no direct V2 equivalent default to the closest safe V2 state so that
+migrated posts require an explicit re-review rather than being silently
+auto-promoted.
+
+| V1 state | V2 state | Rationale |
+|---|---|---|
+| `draft` | `draft` | Direct equivalent |
+| `pending_client_approval` | `pending_approval` | Direct equivalent |
+| `approved` | `scheduled` | Approved but may lack scheduled_at; held for manual scheduling in V2 |
+| `changes_requested` | `pending_approval` | Conservative: requires re-review in V2 |
+| `pending_msp_release` | `pending_approval` | Conservative: requires explicit re-approval in V2 |
+| `rejected` | `rejected` | Direct equivalent |
+| `scheduled` | `scheduled` | Direct equivalent |
+| `publishing` | `publishing` | Direct equivalent |
+| `published` | `published` | Direct equivalent |
+| `failed` | `failed` | Direct equivalent |
+
+Null or unrecognised V1 states default to `"draft"`.
+
+Implemented in `scripts/migrate-v1-to-v2.ts` and tested in
+`lib/__tests__/migrate-v1-to-v2.test.ts`.
