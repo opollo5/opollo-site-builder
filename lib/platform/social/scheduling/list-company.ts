@@ -164,6 +164,59 @@ export async function listCompanyScheduleEntries(
     };
   });
 
+  // V2: include social_post_drafts in scheduled/publishing state with scheduled_at in window.
+  const v2drafts = await svc
+    .from("social_post_drafts")
+    .select("id, content, scheduled_at, target_profiles")
+    .eq("company_id", input.companyId)
+    .in("state", ["scheduled", "publishing"])
+    .gte("scheduled_at", input.fromIso)
+    .lte("scheduled_at", input.toIso)
+    .order("scheduled_at", { ascending: true });
+
+  if (!v2drafts.error) {
+    for (const d of v2drafts.data ?? []) {
+      const draftId = d.id as string;
+      const scheduledAt = d.scheduled_at as string;
+      const text = (d.content as string | null) ?? "";
+      const trimmed = text.trim();
+      const preview =
+        trimmed.length === 0
+          ? null
+          : trimmed.length <= PREVIEW_CHAR_LIMIT
+            ? trimmed
+            : `${trimmed.slice(0, PREVIEW_CHAR_LIMIT)}…`;
+      const profiles = (d.target_profiles as Array<{ profile_id: string; platform: string }> | null) ?? [];
+
+      if (profiles.length === 0) {
+        decorated.push({
+          id: draftId,
+          post_variant_id: draftId,
+          post_master_id: draftId,
+          platform: "unknown" as SocialPlatform,
+          scheduled_at: scheduledAt,
+          cancelled_at: null,
+          preview,
+        });
+      } else {
+        for (const p of profiles) {
+          decorated.push({
+            id: `${draftId}:${p.profile_id}`,
+            post_variant_id: draftId,
+            post_master_id: draftId,
+            platform: p.platform as SocialPlatform,
+            scheduled_at: scheduledAt,
+            cancelled_at: null,
+            preview,
+          });
+        }
+      }
+    }
+  }
+
+  // Sort merged V1 + V2 entries by scheduled_at.
+  decorated.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+
   return {
     ok: true,
     data: { entries: decorated },

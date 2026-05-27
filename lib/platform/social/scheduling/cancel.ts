@@ -31,8 +31,7 @@ export async function cancelScheduleEntry(
 
   const svc = getServiceRoleClient();
 
-  // Resolve entry → variant → post → company. Two reads + atomic
-  // UPDATE rather than one fancy embed (multi-FK pitfall avoided).
+  // V1 path: try to resolve the entry first.
   const entry = await svc
     .from("social_schedule_entries")
     .select(
@@ -46,7 +45,53 @@ export async function cancelScheduleEntry(
     });
     return internal(`Failed to read entry: ${entry.error.message}`);
   }
-  if (!entry.data) return notFound();
+
+  // V2 fallback: entry_id may be a draft UUID when the post lives in social_post_drafts.
+  if (!entry.data) {
+    const v2draft = await svc
+      .from("social_post_drafts")
+      .select("id, state, scheduled_at")
+      .eq("id", input.entryId)
+      .eq("company_id", input.companyId)
+      .maybeSingle();
+
+    if (v2draft.data) {
+      if ((v2draft.data.state as string) !== "scheduled") {
+        return invalidState(
+          `Draft is in state '${v2draft.data.state as string}' — no active schedule to cancel.`,
+        );
+      }
+      const { error } = await svc
+        .from("social_post_drafts")
+        .update({
+          scheduled_at: null,
+          state: "pending_approval",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", input.entryId)
+        .eq("company_id", input.companyId)
+        .eq("state", "scheduled");
+      if (error) {
+        return internal(`Failed to cancel V2 schedule: ${error.message}`);
+      }
+      const now = new Date().toISOString();
+      return {
+        ok: true,
+        data: {
+          id: input.entryId,
+          post_variant_id: input.entryId,
+          scheduled_at: (v2draft.data.scheduled_at as string | null) ?? now,
+          qstash_message_id: null,
+          scheduled_by: null,
+          cancelled_at: now,
+          created_at: now,
+        },
+        timestamp: now,
+      };
+    }
+
+    return notFound();
+  }
 
   const variant = await svc
     .from("social_post_variant")
