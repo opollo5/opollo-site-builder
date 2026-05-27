@@ -53,12 +53,11 @@ function fakePost(id: string) {
     company_id: COMPANY_ID,
     state: "draft",
     source_type: "csv",
-    master_text: "text",
+    content: "text",
     link_url: null,
     created_by: CREATOR_ID,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    state_changed_at: new Date().toISOString(),
   };
 }
 
@@ -202,9 +201,13 @@ describe("bulkCreatePostMasters", () => {
       "company_id",
       "state",
       "source_type",
-      "master_text",
+      "content",
       "link_url",
       "created_by",
+      "updated_by",
+      "media_urls",
+      "target_profiles",
+      "platform_variants",
     ] as const;
     for (const row of insertedRows!) {
       for (const col of REQUIRED) {
