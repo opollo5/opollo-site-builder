@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { createRouteAuthClient } from "@/lib/auth";
+import { logStaffAction } from "@/lib/platform/staff-audit";
 import { getServiceRoleClient } from "@/lib/supabase";
 
 import type {
@@ -66,6 +67,16 @@ export async function getCurrentPlatformSession(
     await svc
       .from("platform_users")
       .upsert({ id: userId, email, is_opollo_staff: true }, { onConflict: "id" });
+
+    // Audit: log the implicit staff grant for Opollo operators auto-provisioned
+    // via opollo_users (DI-007 / D4). No company_id yet — they haven't selected
+    // a company. Best-effort: never throws.
+    await logStaffAction({
+      staffUserId: userId,
+      staffEmail: email,
+      action: "staff_grant.auto",
+      resourceId: userId,
+    });
 
     // No company membership yet for auto-provisioned staff.
     return { userId, email, isOpolloStaff: true, company: null };
