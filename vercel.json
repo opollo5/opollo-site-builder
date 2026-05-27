@@ -81,14 +81,6 @@
       "schedule": "* * * * *"
     },
     {
-      "path": "/api/cron/social-publish-backfill",
-      "schedule": "*/5 * * * *"
-    },
-    {
-      "path": "/api/cron/social-publish-watchdog",
-      "schedule": "*/5 * * * *"
-    },
-    {
       "path": "/api/cron/cap-monthly-generation",
       "schedule": "0 4 1 * *"
     },
