@@ -90,8 +90,7 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
         company_id: COMPANY_ID,
         created_by: USER_ID,
         updated_by: USER_ID,
-        // @ts-expect-error intentionally invalid value to test DB constraint
-        source_type: "unknown_value",
+        source_type: "unknown_value" as string,
       })
       .select("id")
       .single();
