@@ -66,6 +66,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  logger.info("social.publish.v1_callback.received", {
+    scheduleEntryId: parsed.scheduleEntryId,
+    note: "V1 QStash pipeline draining — pr-13",
+  });
+
   const result = await fireScheduledPublish({
     scheduleEntryId: parsed.scheduleEntryId,
   });

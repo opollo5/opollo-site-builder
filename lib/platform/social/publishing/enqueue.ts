@@ -2,30 +2,20 @@ import "server-only";
 
 import { logger } from "@/lib/logger";
 import { getQstashClient } from "@/lib/qstash";
-import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
-// S1-18 — enqueue a QStash callback for a scheduled publish.
+// S1-18 — V1 QStash enqueue (RETIRED pr-13).
 //
-// Called from createScheduleEntry (after the row is inserted) with
-// the entry id + the absolute scheduled_at. Schedules a single QStash
-// message that POSTs back to /api/webhooks/qstash/social-publish at
-// the scheduled time. Stores the QStash messageId on the schedule
-// entry so cancellation can call back.
+// enqueueScheduledPublish is now a logged no-op. All new social posts use
+// the V2 publish-due cron (social_post_drafts, FOR UPDATE SKIP LOCKED).
+// No new QStash messages should be enqueued after pr-07 migrated all post
+// creation to social_post_drafts.
 //
-// Idempotency:
-//   - QStash deduplicationId = `social-publish-${scheduleEntryId}`. If
-//     this lib runs twice (route retry) the second publishJSON returns
-//     the same messageId without duplicating the queued job.
-//   - The schedule_entry's qstash_message_id is set unconditionally
-//     after a successful publishJSON; any prior id was for the SAME
-//     logical scheduled job (per the deduplicationId scope).
+// cancelScheduledPublish still works — it cancels pending QStash messages
+// for any V1 entries that were enqueued before this retirement.
 //
-// Degraded path: when QSTASH_TOKEN is unset (local dev without
-// Upstash, CI without provisioning) we no-op + log. The schedule entry
-// row still exists; an operator-triggered backfill cron (future slice)
-// can re-enqueue once QSTASH is wired.
+// Full V1 table drop in PRs 16-17.
 // ---------------------------------------------------------------------------
 
 export type EnqueuePublishInput = {
@@ -50,67 +40,13 @@ export async function enqueueScheduledPublish(
     return validation("scheduledAt must be a valid ISO timestamp.");
   }
 
-  const client = getQstashClient();
-  if (!client) {
-    logger.info("social.publish.enqueue.skipped_no_qstash", {
-      schedule_entry_id: input.scheduleEntryId,
-    });
-    return {
-      ok: true,
-      data: { messageId: null },
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  // QStash takes a delay in seconds. For past/now timestamps we still
-  // enqueue at delay=1 so the callback fires immediately rather than
-  // silently dropping (createScheduleEntry already rejected past
-  // timestamps but a backfill caller might pass one).
-  const delaySeconds = Math.max(1, Math.floor((fireAtMs - Date.now()) / 1000));
-
-  const callbackUrl = `${input.origin.replace(/\/+$/, "")}/api/webhooks/qstash/social-publish`;
-
-  let messageId: string | null = null;
-  try {
-    const response = (await client.publishJSON({
-      url: callbackUrl,
-      body: { scheduleEntryId: input.scheduleEntryId },
-      delay: delaySeconds,
-      // Idempotent across re-enqueues for the same logical job. QStash
-      // returns the existing messageId on collision.
-      deduplicationId: `social-publish-${input.scheduleEntryId}`,
-    })) as { messageId?: string };
-    messageId = response.messageId ?? null;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.error("social.publish.enqueue.publish_failed", {
-      err: message,
-      schedule_entry_id: input.scheduleEntryId,
-    });
-    return internal(`QStash publish failed: ${message}`);
-  }
-
-  if (messageId) {
-    const svc = getServiceRoleClient();
-    const update = await svc
-      .from("social_schedule_entries")
-      .update({ qstash_message_id: messageId })
-      .eq("id", input.scheduleEntryId);
-    if (update.error) {
-      // Log but don't fail — the QStash job is queued, the messageId
-      // just isn't stored. Cancellation lookup will fall through to
-      // best-effort behaviour (the schedule_entry.cancelled_at flag is
-      // the source of truth; the publish callback re-checks it).
-      logger.warn("social.publish.enqueue.message_id_update_failed", {
-        err: update.error.message,
-        schedule_entry_id: input.scheduleEntryId,
-      });
-    }
-  }
-
+  logger.warn("social.publish.enqueue.v1_retired", {
+    schedule_entry_id: input.scheduleEntryId,
+    note: "V1 QStash pipeline retired (pr-13); no QStash message enqueued",
+  });
   return {
     ok: true,
-    data: { messageId },
+    data: { messageId: null },
     timestamp: new Date().toISOString(),
   };
 }

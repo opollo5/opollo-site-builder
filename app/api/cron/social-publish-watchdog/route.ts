@@ -5,7 +5,6 @@ import {
   authorisedCronRequest,
   unauthorisedResponse,
 } from "@/lib/optimiser/sync/cron-shared";
-import { runPublishWatchdog } from "@/lib/platform/social/publishing/watchdog";
 
 // ---------------------------------------------------------------------------
 // GET /api/cron/social-publish-watchdog
@@ -24,22 +23,18 @@ export const maxDuration = 60;
 async function handle(req: NextRequest): Promise<NextResponse> {
   if (!authorisedCronRequest(req)) return unauthorisedResponse();
 
-  const result = await runPublishWatchdog();
-
-  if (!result.ok) {
-    logger.error("social.publish.watchdog.cron_failed", {
-      err: result.error.message,
-    });
-    return NextResponse.json(
-      { ok: false, error: result.error, timestamp: new Date().toISOString() },
-      { status: 500 },
-    );
-  }
-
-  logger.info("social.publish.watchdog.cron_ok", result.data);
-
+  // V1 watchdog cron retired (pr-12 removed vercel.json schedule entry;
+  // pr-13 retired the V1 QStash pipeline). Route kept alive to avoid 404s
+  // from any in-flight triggers. Returns 200 noop.
+  logger.warn("social.publish.watchdog.v1_retired", {
+    note: "V1 watchdog cron retired — route is a noop; vercel.json entry removed in pr-12",
+  });
   return NextResponse.json(
-    { ok: true, data: result.data, timestamp: new Date().toISOString() },
+    {
+      ok: true,
+      data: { status: "retired", reason: "V1 QStash pipeline retired (pr-13)" },
+      timestamp: new Date().toISOString(),
+    },
     { status: 200 },
   );
 }
