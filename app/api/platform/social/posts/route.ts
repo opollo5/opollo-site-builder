@@ -1,25 +1,27 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { dbUuid, readJsonBody, validationError, internalError, notFound } from "@/lib/http";
+import { dbUuid, readJsonBody, validationError, internalError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { logger } from "@/lib/logger";
+import { getServiceRoleClient } from "@/lib/supabase";
 import {
-  createPostMaster,
   listPostMasters,
   type SocialPostState,
 } from "@/lib/platform/social/posts";
 import { listConnections } from "@/lib/platform/social/connections";
-import { upsertVariant } from "@/lib/platform/social/variants/upsert";
 
 // ---------------------------------------------------------------------------
-// S1-2 — HTTP API for social_post_master.
+// S1-2 — HTTP API for social_post_master / social_post_drafts.
 //
-//   POST /api/platform/social/posts — create a new draft post.
+//   POST /api/platform/social/posts — create a new draft post (V2 path:
+//     writes to social_post_drafts). PR-07 V1→V2 migration.
 //     Body: { company_id, master_text?, link_url?, source_type? }
 //     Gate: canDo("create_post", company_id) — editor+.
 //
 //   GET /api/platform/social/posts?company_id=...&state=draft,approved
 //     Gate: canDo("view_calendar", company_id) — viewer+.
+//     Still reads from social_post_master (migrated in PR-15).
 //
 // Errors follow the standard envelope shape used across the platform
 // layer (lib/tool-schemas ApiResponse). State machine transitions
@@ -63,49 +65,63 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const gate = await requireCanDoForApi(parsed.data.company_id, "create_post");
+  const { company_id: companyId, master_text, link_url, source_type, connection_ids } = parsed.data;
+
+  const gate = await requireCanDoForApi(companyId, "create_post");
   if (gate.kind === "deny") return gate.response;
 
-  const result = await createPostMaster({
-    companyId: parsed.data.company_id,
-    masterText: parsed.data.master_text ?? null,
-    linkUrl: parsed.data.link_url ?? null,
-    sourceType: parsed.data.source_type ?? "manual",
-    createdBy: gate.userId,
-  });
+  const content = master_text?.trim() ?? null;
+  const linkUrl = link_url?.trim() ?? null;
 
-  if (!result.ok) {
-    if (result.error.code === "VALIDATION_FAILED") return validationError(result.error.message);
-    if (result.error.code === "NOT_FOUND") return notFound(result.error.message);
-    return internalError(result.error.message);
+  if (content === null && linkUrl === null) {
+    return validationError("A post must have at least master_text or link_url.");
   }
 
-  // If connection_ids were supplied, create variants for each.
-  const connectionIds = parsed.data.connection_ids;
-  if (connectionIds && connectionIds.length > 0) {
-    const connectionsResult = await listConnections({ companyId: parsed.data.company_id });
+  // Resolve connection_ids to target_profiles. Only include IDs that belong
+  // to this company (listConnections is company-scoped). V2 stores targets in
+  // the target_profiles JSONB array instead of variant rows.
+  let targetProfiles: Array<{ profile_id: string }> = [];
+  if (connection_ids && connection_ids.length > 0) {
+    const connectionsResult = await listConnections({ companyId });
     if (connectionsResult.ok) {
-      const connectionMap = new Map(connectionsResult.data.connections.map((c) => [c.id, c]));
-      await Promise.all(
-        connectionIds.map(async (connId) => {
-          const conn = connectionMap.get(connId);
-          if (!conn) return; // unknown / wrong-company connection — skip silently
-          await upsertVariant({
-            postMasterId: result.data.id,
-            companyId: parsed.data.company_id,
-            platform: conn.platform,
-            variantText: null,
-            connectionId: conn.id,
-          });
-        }),
-      );
+      const ownedIds = new Set(connectionsResult.data.connections.map((c) => c.id));
+      targetProfiles = connection_ids
+        .filter((id) => ownedIds.has(id))
+        .map((id) => ({ profile_id: id }));
     }
+  }
+
+  const svc = getServiceRoleClient();
+  const { data: draft, error } = await svc
+    .from("social_post_drafts")
+    .insert({
+      company_id:        companyId,
+      state:             "draft" as const,
+      source_type:       source_type ?? "manual",
+      content,
+      link_url:          linkUrl,
+      created_by:        gate.userId,
+      updated_by:        gate.userId,
+      media_urls:        [] as string[],
+      target_profiles:   targetProfiles,
+      platform_variants: {} as Record<string, unknown>,
+    })
+    .select("id, company_id, state, source_type, content, link_url, created_by, created_at, updated_at")
+    .single();
+
+  if (error) {
+    logger.error("social.posts.create_v2.failed", {
+      companyId,
+      err: error.message,
+      code: error.code,
+    });
+    return internalError(`Failed to create post: ${error.message}`);
   }
 
   return NextResponse.json(
     {
       ok: true,
-      data: { post: result.data },
+      data: { post: draft },
       timestamp: new Date().toISOString(),
     },
     { status: 201 },
