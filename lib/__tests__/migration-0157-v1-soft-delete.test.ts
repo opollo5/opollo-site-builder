@@ -30,6 +30,13 @@ async function seedCompany() {
   await svc.from("social_post_master").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 
+  // platform_users is truncated by _setup.ts global beforeEach; re-seed so
+  // social_post_master.created_by FK resolves on every test run.
+  const { error: puErr } = await svc
+    .from("platform_users")
+    .upsert({ id: seededUserId }, { onConflict: "id" });
+  if (puErr) throw new Error(`seed platform_users: ${puErr.message}`);
+
   const { error } = await svc.from("platform_companies").insert({
     id: COMPANY_ID,
     name: "M0157 Test Co",
