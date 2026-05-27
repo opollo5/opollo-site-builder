@@ -121,7 +121,7 @@ jobs:
             FROM social_post_master m
             WHERE m.created_by IS NOT NULL
               AND m.deleted_at IS NULL
-            ON CONFLICT (company_id, idempotency_key) DO NOTHING;
+            ON CONFLICT (company_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING;
           "
           echo "Backfill SQL complete."
 
