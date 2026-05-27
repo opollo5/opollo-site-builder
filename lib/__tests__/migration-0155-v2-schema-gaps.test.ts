@@ -16,6 +16,8 @@ const USER_ID    = "00001550-0000-0000-0000-000000000002";
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
+  // Clean stale drafts first so the company delete doesn't hit FK constraints.
+  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
   const { error } = await svc.from("platform_companies").insert({
     id: COMPANY_ID,
@@ -34,6 +36,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
+  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 });
 
