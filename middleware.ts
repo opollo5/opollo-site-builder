@@ -149,10 +149,11 @@ function isPublicPath(pathname: string): boolean {
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
-  // /api/cron/* carries its own CRON_SECRET check; Supabase Auth isn't
-  // involved. Required so the Vercel cron tick can reach the worker
-  // endpoint without a session.
+  // /api/cron/* and /api/internal/cron/* carry their own CRON_SECRET
+  // check; Supabase Auth isn't involved. Required so the Vercel cron
+  // tick can reach the worker endpoint without a session.
   if (pathname.startsWith("/api/cron/")) return true;
+  if (pathname.startsWith("/api/internal/cron/")) return true;
   // /api/webhooks/* carries its own HMAC signature verification (S1-17
   // bundle.social). External services aren't platform users — the
   // signature IS the auth. Without this, every webhook bounces to /login.
@@ -189,6 +190,15 @@ function basicAuthGate(req: NextRequest): NextResponse {
   // itself exposes only connectivity + build info. Mirrors the
   // isPublicPath check in the Supabase Auth gate.
   if (req.nextUrl.pathname === "/api/health") {
+    return NextResponse.next();
+  }
+  // Cron endpoints carry their own CRON_SECRET auth; Basic Auth is
+  // irrelevant. Without this, Vercel cron ticks return 401 when
+  // BASIC_AUTH_USER/PASSWORD are set, silently breaking the publish pipeline.
+  if (
+    req.nextUrl.pathname.startsWith("/api/cron/") ||
+    req.nextUrl.pathname.startsWith("/api/internal/cron/")
+  ) {
     return NextResponse.next();
   }
 
