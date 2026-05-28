@@ -49,12 +49,7 @@ const GenerateSchema = z.object({
     "geometric",
     "texture",
   ]),
-  aspect_ratio: z.enum([
-    "ASPECT_1_1",
-    "ASPECT_4_5",
-    "ASPECT_16_9",
-    "ASPECT_9_16",
-  ]),
+  aspect_ratio: z.enum(["1x1", "4x5", "9x16", "16x9", "4x3"]),
   count: z.number().int().min(1).max(6).default(4),
   post_master_id: z.string().uuid().optional(),
 });

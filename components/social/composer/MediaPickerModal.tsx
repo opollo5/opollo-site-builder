@@ -202,7 +202,7 @@ export function MediaPickerModal({
           body: JSON.stringify({
             company_id: companyId,
             prompt: aiPrompt.trim(),
-            aspect_ratio: "ASPECT_1_1",
+            aspect_ratio: "1x1",
           }),
         })
           .then(

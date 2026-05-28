@@ -22,7 +22,9 @@ export class IdeogramImageProvider implements IImageProvider {
 
   constructor(apiKey?: string, model?: string) {
     this.apiKey = apiKey ?? process.env.IDEOGRAM_API_KEY ?? "";
-    this.model = model ?? process.env.IDEOGRAM_STANDARD_MODEL ?? "ideogram-ai/ideogram-v3-flash";
+    // model field: legacy only — this file is superseded by the canonical
+    // lib/image/generator/ideogram.ts client and will be removed in A3.
+    this.model = model ?? process.env.IDEOGRAM_STANDARD_MODEL ?? "V_2_TURBO";
   }
 
   async generate(req: ImageGenRequest): Promise<ImageGenResponse> {
@@ -36,7 +38,7 @@ export class IdeogramImageProvider implements IImageProvider {
           image_request: {
             prompt: req.prompt,
             model: this.model,
-            aspect_ratio: req.aspectRatio ?? "ASPECT_1_1",
+            aspect_ratio: req.aspectRatio ?? "1x1",
             num_images: 1,
             style_type: "REALISTIC",
             negative_prompt: NEGATIVE_PROMPT,

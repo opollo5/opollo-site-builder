@@ -321,8 +321,7 @@ Read the image-generation skill before touching anything in `lib/image/`.
 - Watchdog timeout: 3 minutes
 - Reconciliation sweep: every 5 minutes
 - Image retry: 1 automatic retry, then stock fallback
-- Ideogram standard: 3.0 Flash (`ideogram-ai/ideogram-v3-flash`)
-- Ideogram premium: 3.0 Default (`ideogram-ai/ideogram-v3`)
+- Ideogram: v3 endpoint (`/v1/ideogram-v3/generate`), `rendering_speed=FLASH` (premium routing out of scope, §3 of mass-image-gen brief)
 - Image timeout: 30 seconds
 - Mood board options: 4–6 per request
 - version_lock conflict response: HTTP 409 with body `{ error: 'VERSION_CONFLICT' }`

@@ -39,7 +39,7 @@ function brandToGenerationParams(
     styleId,
     primaryColour,
     compositionType: "split_layout",
-    aspectRatio: "ASPECT_1_1",
+    aspectRatio: "1x1",
     model: "standard",
     count: 1,
     industry: brand?.industry ?? undefined,

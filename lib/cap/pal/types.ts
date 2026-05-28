@@ -14,7 +14,7 @@ export interface TextGenResponse {
 
 export interface ImageGenRequest {
   prompt: string;
-  aspectRatio?: "ASPECT_1_1" | "ASPECT_16_9" | "ASPECT_4_5";
+  aspectRatio?: "1x1" | "16x9" | "4x5";
 }
 
 export interface ImageGenResponse {

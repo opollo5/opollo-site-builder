@@ -42,10 +42,11 @@ const COMPOSITION_LABELS: Record<CompositionType, string> = {
 };
 
 const ASPECT_RATIO_LABELS: Record<AspectRatio, string> = {
-  ASPECT_1_1: "1:1 Square",
-  ASPECT_4_5: "4:5 Portrait",
-  ASPECT_16_9: "16:9 Landscape",
-  ASPECT_9_16: "9:16 Story",
+  "1x1": "1:1 Square",
+  "4x5": "4:5 Portrait",
+  "16x9": "16:9 Landscape",
+  "9x16": "9:16 Story",
+  "4x3": "4:3 Landscape (GBP)",
 };
 
 const ALL_COMPOSITIONS: CompositionType[] = [
@@ -57,10 +58,11 @@ const ALL_COMPOSITIONS: CompositionType[] = [
 ];
 
 const ALL_ASPECT_RATIOS: AspectRatio[] = [
-  "ASPECT_1_1",
-  "ASPECT_4_5",
-  "ASPECT_16_9",
-  "ASPECT_9_16",
+  "1x1",
+  "4x5",
+  "16x9",
+  "9x16",
+  "4x3",
 ];
 
 const COUNT_OPTIONS = [4, 5, 6] as const;
@@ -82,7 +84,7 @@ export function MoodBoardClient({
   const [composition, setComposition] = useState<CompositionType>(
     "split_layout",
   );
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("ASPECT_1_1");
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1x1");
   const [count, setCount] = useState<(typeof COUNT_OPTIONS)[number]>(4);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

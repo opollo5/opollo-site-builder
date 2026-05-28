@@ -15,11 +15,22 @@ export type CompositionType =
   | "geometric"
   | "texture";
 
-export type AspectRatio =
-  | "ASPECT_1_1"
-  | "ASPECT_4_5"
-  | "ASPECT_16_9"
-  | "ASPECT_9_16";
+// Ideogram v3 native aspect-ratio strings (sent verbatim in the API request).
+// Per §1.1 of the mass-image-gen brief — do not invent new values.
+export type AspectRatio = "1x1" | "4x5" | "9x16" | "16x9" | "4x3";
+
+// Platform → Ideogram v3 aspect ratio, per §1.1.
+// One image job is generated per distinct ratio derived from target_platforms.
+export const MASS_GEN_PLATFORM_MAP: Record<string, AspectRatio> = {
+  linkedin: "1x1",
+  linkedin_landscape: "16x9",
+  instagram: "4x5",
+  instagram_story: "9x16",
+  facebook: "1x1",
+  facebook_story: "9x16",
+  x: "16x9",
+  gbp: "4x3",
+};
 
 export type ModelTier = "standard" | "premium";
 
