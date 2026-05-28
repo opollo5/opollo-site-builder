@@ -7,9 +7,7 @@ import {
   it,
 } from "vitest";
 
-import { createPostMaster } from "@/lib/platform/social/posts";
 import {
-  createScheduleEntry,
   cancelScheduleEntry,
   listCompanyScheduleEntries,
 } from "@/lib/platform/social/scheduling";
@@ -19,6 +17,7 @@ import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // S1-25 — listCompanyScheduleEntries (calendar view lib).
+// V2: seeds social_post_drafts directly; no V1 tables.
 // ---------------------------------------------------------------------------
 
 const COMPANY_CAL_ID = "caddd000-0000-0000-0000-0000ca1e0001";
@@ -77,19 +76,29 @@ describe("lib/platform/social/scheduling/list-company", () => {
     if (creator) await svc.auth.admin.deleteUser(creator.id);
   });
 
-  async function createApprovedPost(masterText = "hello world"): Promise<string> {
-    const post = await createPostMaster({
-      companyId: COMPANY_CAL_ID,
-      masterText,
-      createdBy: creator.id,
-    });
-    if (!post.ok) throw new Error(`createApprovedPost: ${post.error.code}`);
+  async function createScheduledDraft(
+    content = "hello world",
+    options: { scheduledAt?: string; platform?: string } = {},
+  ): Promise<string> {
     const svc = getServiceRoleClient();
-    await svc
-      .from("social_post_master")
-      .update({ state: "approved" })
-      .eq("id", post.data.id);
-    return post.data.id;
+    const draftId = crypto.randomUUID();
+    const profileId = crypto.randomUUID();
+    const profiles = options.platform
+      ? [{ profile_id: profileId, platform: options.platform }]
+      : [];
+    const { error } = await svc.from("social_post_drafts").insert({
+      id: draftId,
+      company_id: COMPANY_CAL_ID,
+      created_by: creator.id,
+      updated_by: creator.id,
+      state: "scheduled",
+      content,
+      media_urls: [],
+      target_profiles: profiles,
+      scheduled_at: options.scheduledAt ?? futureIso(7),
+    });
+    if (error) throw new Error(`createScheduledDraft: ${error.message}`);
+    return draftId;
   }
 
   function futureIso(daysFromNow = 7): string {
@@ -157,20 +166,13 @@ describe("lib/platform/social/scheduling/list-company", () => {
     });
 
     it("returns scheduled entries in window ordered by scheduled_at asc", async () => {
-      const postId = await createApprovedPost("First post");
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
-        platform: "linkedin_personal",
+      await createScheduledDraft("First post", {
         scheduledAt: futureIso(10),
-        scheduledBy: creator.id,
+        platform: "linkedin_personal",
       });
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
-        platform: "x",
+      await createScheduledDraft("Second post", {
         scheduledAt: futureIso(3),
-        scheduledBy: creator.id,
+        platform: "x",
       });
 
       const r = await listCompanyScheduleEntries({
@@ -180,7 +182,7 @@ describe("lib/platform/social/scheduling/list-company", () => {
       expect(r.ok).toBe(true);
       if (!r.ok) return;
       expect(r.data.entries.length).toBeGreaterThanOrEqual(2);
-      // First entry is the sooner one (x at +3d).
+      // x is at +3d, linkedin is at +10d — x must come first.
       const entryPlatforms = r.data.entries.map((e) => e.platform);
       expect(entryPlatforms.indexOf("x")).toBeLessThan(
         entryPlatforms.indexOf("linkedin_personal"),
@@ -188,13 +190,8 @@ describe("lib/platform/social/scheduling/list-company", () => {
     });
 
     it("includes post_master_id and preview on each entry", async () => {
-      const postId = await createApprovedPost("Hello from calendar");
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
+      const postId = await createScheduledDraft("Hello from calendar", {
         platform: "facebook_page",
-        scheduledAt: futureIso(5),
-        scheduledBy: creator.id,
       });
 
       const r = await listCompanyScheduleEntries({
@@ -211,14 +208,7 @@ describe("lib/platform/social/scheduling/list-company", () => {
 
     it("truncates preview at 80 chars with ellipsis", async () => {
       const longText = "A".repeat(100);
-      const postId = await createApprovedPost(longText);
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
-        platform: "gbp",
-        scheduledAt: futureIso(2),
-        scheduledBy: creator.id,
-      });
+      const postId = await createScheduledDraft(longText, { platform: "gbp" });
 
       const r = await listCompanyScheduleEntries({
         companyId: COMPANY_CAL_ID,
@@ -230,19 +220,14 @@ describe("lib/platform/social/scheduling/list-company", () => {
       expect(entry?.preview).toMatch(/^A{80}…$/);
     });
 
-    it("excludes cancelled entries by default", async () => {
-      const postId = await createApprovedPost("cancelled post");
-      const created = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
+    it("excludes cancelled entries — cancel clears scheduled_at, removing from calendar", async () => {
+      const postId = await createScheduledDraft("cancelled post", {
         platform: "x",
         scheduledAt: futureIso(4),
-        scheduledBy: creator.id,
       });
-      expect(created.ok).toBe(true);
-      if (!created.ok) return;
+
       await cancelScheduleEntry({
-        entryId: created.data.id,
+        entryId: postId,
         companyId: COMPANY_CAL_ID,
       });
 
@@ -256,19 +241,14 @@ describe("lib/platform/social/scheduling/list-company", () => {
       expect(found).toBeUndefined();
     });
 
-    it("includes cancelled entries when includeCancelled=true", async () => {
-      const postId = await createApprovedPost("will be cancelled");
-      const created = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
+    it("cancelled entries do not appear even with includeCancelled=true (V2 semantic)", async () => {
+      const postId = await createScheduledDraft("will be cancelled", {
         platform: "linkedin_company",
         scheduledAt: futureIso(6),
-        scheduledBy: creator.id,
       });
-      expect(created.ok).toBe(true);
-      if (!created.ok) return;
+
       await cancelScheduleEntry({
-        entryId: created.data.id,
+        entryId: postId,
         companyId: COMPANY_CAL_ID,
       });
 
@@ -280,19 +260,15 @@ describe("lib/platform/social/scheduling/list-company", () => {
       });
       expect(r.ok).toBe(true);
       if (!r.ok) return;
+      // V2: cancel → pending_approval, scheduled_at cleared → not in window.
       const entry = r.data.entries.find((e) => e.post_master_id === postId);
-      expect(entry).toBeDefined();
-      expect(entry?.cancelled_at).not.toBeNull();
+      expect(entry).toBeUndefined();
     });
 
     it("excludes entries outside the time window", async () => {
-      const postId = await createApprovedPost("far future post");
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_CAL_ID,
+      const postId = await createScheduledDraft("far future post", {
         platform: "linkedin_personal",
         scheduledAt: futureIso(60),
-        scheduledBy: creator.id,
       });
 
       const r = await listCompanyScheduleEntries({
