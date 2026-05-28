@@ -1,6 +1,5 @@
 import "server-only";
 
-import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -10,13 +9,9 @@ import type {
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// S1-14 — list schedule entries for a post.
+// S1-14 — list schedule entries for a post (V2).
 //
-// Joins social_schedule_entries → social_post_variant to surface the
-// variant's platform alongside the entry. Two queries (lookup variants
-// for the post first, then entries) avoids the multi-FK embed gotcha
-// from memory feedback_postgrest_embed_ambiguous_fk.md.
-//
+// Returns a synthetic entry from social_post_drafts.scheduled_at.
 // Caller is responsible for canDo("view_calendar", company_id).
 // ---------------------------------------------------------------------------
 
@@ -36,110 +31,27 @@ export async function listScheduleEntries(
     .eq("company_id", input.companyId)
     .maybeSingle();
 
-  if (v2draft.data) {
-    const scheduledAt = v2draft.data.scheduled_at as string | null;
-    if (!scheduledAt || (input.includeCancelled === false)) {
-      // No scheduled_at means not yet scheduled; return empty like V1 would.
-      if (!scheduledAt) {
-        return { ok: true, data: { entries: [] }, timestamp: new Date().toISOString() };
-      }
-    }
-    const profiles = (v2draft.data.target_profiles as Array<{ profile_id: string; platform: string }> | null) ?? [];
-    const platform = (profiles[0]?.platform ?? "unknown") as ScheduleEntryWithPlatform["platform"];
-    const now = new Date().toISOString();
-    const entry: ScheduleEntryWithPlatform = {
-      id: input.postMasterId,
-      post_variant_id: input.postMasterId,
-      scheduled_at: scheduledAt ?? now,
-      qstash_message_id: null,
-      scheduled_by: null,
-      cancelled_at: null,
-      created_at: now,
-      platform,
-    };
-    return { ok: true, data: { entries: [entry] }, timestamp: now };
+  if (!v2draft.data) return notFound();
+
+  const scheduledAt = v2draft.data.scheduled_at as string | null;
+  if (!scheduledAt) {
+    return { ok: true, data: { entries: [] }, timestamp: new Date().toISOString() };
   }
 
-  // V1 fallback.
-  // Verify post belongs to this company; saves a leak across companies
-  // even though the entries themselves don't carry company_id.
-  const post = await svc
-    .from("social_post_master")
-    .select("id")
-    .eq("id", input.postMasterId)
-    .eq("company_id", input.companyId)
-    .maybeSingle();
-  if (post.error) {
-    logger.error("social.scheduling.list.post_lookup_failed", {
-      err: post.error.message,
-    });
-    return internal(`Failed to read post: ${post.error.message}`);
-  }
-  if (!post.data) return notFound();
-
-  // Resolve variant ids + their platforms for this post.
-  const variants = await svc
-    .from("social_post_variant")
-    .select("id, platform")
-    .eq("post_master_id", input.postMasterId);
-  if (variants.error) {
-    logger.error("social.scheduling.list.variants_failed", {
-      err: variants.error.message,
-    });
-    return internal(`Failed to list variants: ${variants.error.message}`);
-  }
-
-  const variantIds = (variants.data ?? []).map((v) => v.id as string);
-  if (variantIds.length === 0) {
-    return {
-      ok: true,
-      data: { entries: [] },
-      timestamp: new Date().toISOString(),
-    };
-  }
-
-  let query = svc
-    .from("social_schedule_entries")
-    .select(
-      "id, post_variant_id, scheduled_at, qstash_message_id, scheduled_by, cancelled_at, created_at",
-    )
-    .in("post_variant_id", variantIds)
-    .order("scheduled_at", { ascending: true });
-
-  if (!input.includeCancelled) {
-    query = query.is("cancelled_at", null);
-  }
-
-  const entries = await query;
-  if (entries.error) {
-    logger.error("social.scheduling.list.entries_failed", {
-      err: entries.error.message,
-    });
-    return internal(`Failed to list entries: ${entries.error.message}`);
-  }
-
-  // Build a variant_id → platform lookup so we can decorate each entry.
-  const platformByVariant = new Map<string, ScheduleEntryWithPlatform["platform"]>();
-  for (const v of variants.data ?? []) {
-    platformByVariant.set(
-      v.id as string,
-      v.platform as ScheduleEntryWithPlatform["platform"],
-    );
-  }
-
-  const decorated: ScheduleEntryWithPlatform[] = (entries.data ?? []).map(
-    (e) => ({
-      ...(e as Omit<ScheduleEntryWithPlatform, "platform">),
-      platform:
-        platformByVariant.get(e.post_variant_id as string) ?? "linkedin_personal",
-    }),
-  );
-
-  return {
-    ok: true,
-    data: { entries: decorated },
-    timestamp: new Date().toISOString(),
+  const profiles = (v2draft.data.target_profiles as Array<{ profile_id: string; platform: string }> | null) ?? [];
+  const platform = (profiles[0]?.platform ?? "unknown") as ScheduleEntryWithPlatform["platform"];
+  const now = new Date().toISOString();
+  const entry: ScheduleEntryWithPlatform = {
+    id: input.postMasterId,
+    post_variant_id: input.postMasterId,
+    scheduled_at: scheduledAt,
+    qstash_message_id: null,
+    scheduled_by: null,
+    cancelled_at: null,
+    created_at: now,
+    platform,
   };
+  return { ok: true, data: { entries: [entry] }, timestamp: now };
 }
 
 function validation(
@@ -170,18 +82,4 @@ function notFound(): ApiResponse<{ entries: ScheduleEntryWithPlatform[] }> {
   };
 }
 
-function internal(
-  message: string,
-): ApiResponse<{ entries: ScheduleEntryWithPlatform[] }> {
-  logger.error("social.scheduling.list.internal_error", { message });
-  return {
-    ok: false,
-    error: {
-      code: "INTERNAL_ERROR",
-      message,
-      retryable: false,
-      suggested_action: "Retry. If the error persists, contact support.",
-    },
-    timestamp: new Date().toISOString(),
-  };
-}
+
