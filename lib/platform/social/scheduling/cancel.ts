@@ -1,7 +1,6 @@
 import "server-only";
 
 import { logger } from "@/lib/logger";
-import { cancelScheduledPublish } from "@/lib/platform/social/publishing";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -11,16 +10,11 @@ import type {
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// S1-14 — cancel a non-cancelled schedule entry.
+// S1-14 — cancel a scheduled draft.
 //
-// Atomic UPDATE WHERE cancelled_at IS NULL. Concurrent cancels
-// converge: one transitions, the others see 0 rows and return
-// INVALID_STATE. Cross-company access caught by checking the entry's
-// variant's post belongs to companyId.
-//
-// QStash message cancellation lands when QStash enqueue lands
-// (S1-15+). Until then, the publish-handler will pick up the entry
-// and skip it because cancelled_at is non-null.
+// V2: draft must be in state='scheduled'. Sets scheduled_at=null and
+// state='pending_approval'. Cross-company isolation enforced by
+// company_id predicate on the update.
 // ---------------------------------------------------------------------------
 
 export async function cancelScheduleEntry(
@@ -31,136 +25,48 @@ export async function cancelScheduleEntry(
 
   const svc = getServiceRoleClient();
 
-  // V1 path: try to resolve the entry first.
-  const entry = await svc
-    .from("social_schedule_entries")
-    .select(
-      "id, post_variant_id, scheduled_at, qstash_message_id, scheduled_by, cancelled_at, created_at",
-    )
+  const v2draft = await svc
+    .from("social_post_drafts")
+    .select("id, state, scheduled_at")
     .eq("id", input.entryId)
-    .maybeSingle();
-  if (entry.error) {
-    logger.error("social.scheduling.cancel.entry_lookup_failed", {
-      err: entry.error.message,
-    });
-    return internal(`Failed to read entry: ${entry.error.message}`);
-  }
-
-  // V2 fallback: entry_id may be a draft UUID when the post lives in social_post_drafts.
-  if (!entry.data) {
-    const v2draft = await svc
-      .from("social_post_drafts")
-      .select("id, state, scheduled_at")
-      .eq("id", input.entryId)
-      .eq("company_id", input.companyId)
-      .maybeSingle();
-
-    if (v2draft.data) {
-      if ((v2draft.data.state as string) !== "scheduled") {
-        return invalidState(
-          `Draft is in state '${v2draft.data.state as string}' — no active schedule to cancel.`,
-        );
-      }
-      const { error } = await svc
-        .from("social_post_drafts")
-        .update({
-          scheduled_at: null,
-          state: "pending_approval",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", input.entryId)
-        .eq("company_id", input.companyId)
-        .eq("state", "scheduled");
-      if (error) {
-        return internal(`Failed to cancel V2 schedule: ${error.message}`);
-      }
-      const now = new Date().toISOString();
-      return {
-        ok: true,
-        data: {
-          id: input.entryId,
-          post_variant_id: input.entryId,
-          scheduled_at: (v2draft.data.scheduled_at as string | null) ?? now,
-          qstash_message_id: null,
-          scheduled_by: null,
-          cancelled_at: now,
-          created_at: now,
-        },
-        timestamp: now,
-      };
-    }
-
-    return notFound();
-  }
-
-  const variant = await svc
-    .from("social_post_variant")
-    .select("post_master_id")
-    .eq("id", entry.data.post_variant_id as string)
-    .maybeSingle();
-  if (variant.error || !variant.data) {
-    return notFound();
-  }
-
-  const post = await svc
-    .from("social_post_master")
-    .select("id")
-    .eq("id", variant.data.post_master_id as string)
     .eq("company_id", input.companyId)
     .maybeSingle();
-  if (post.error) {
-    logger.error("social.scheduling.cancel.post_lookup_failed", {
-      err: post.error.message,
-    });
-    return internal(`Failed to scope: ${post.error.message}`);
-  }
-  if (!post.data) {
-    // Entry exists but in another company. Same NOT_FOUND envelope to
-    // avoid leaking cross-company existence.
-    return notFound();
+
+  if (!v2draft.data) return notFound();
+
+  if ((v2draft.data.state as string) !== "scheduled") {
+    return invalidState(
+      `Draft is in state '${v2draft.data.state as string}' — no active schedule to cancel.`,
+    );
   }
 
-  if ((entry.data as ScheduleEntry).cancelled_at) {
-    return invalidState("Entry is already cancelled.");
-  }
-
-  const update = await svc
-    .from("social_schedule_entries")
-    .update({ cancelled_at: new Date().toISOString() })
+  const { error } = await svc
+    .from("social_post_drafts")
+    .update({
+      scheduled_at: null,
+      state: "pending_approval",
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", input.entryId)
-    .is("cancelled_at", null)
-    .select(
-      "id, post_variant_id, scheduled_at, qstash_message_id, scheduled_by, cancelled_at, created_at",
-    )
-    .maybeSingle();
-  if (update.error) {
-    logger.error("social.scheduling.cancel.update_failed", {
-      err: update.error.message,
-    });
-    return internal(`Failed to cancel: ${update.error.message}`);
-  }
-  if (!update.data) {
-    // Race: another caller cancelled between our lookup and update.
-    return invalidState("Entry was cancelled concurrently.");
+    .eq("company_id", input.companyId)
+    .eq("state", "scheduled");
+  if (error) {
+    return internal(`Failed to cancel schedule: ${error.message}`);
   }
 
-  // S1-18 — best-effort QStash message cancel. If this fails the
-  // callback may still fire, but claim_publish_job's CANCELLED gate
-  // (migration 0075) is the source of truth and will skip publishing.
-  const cancelResult = await cancelScheduledPublish(
-    (update.data as ScheduleEntry).qstash_message_id,
-  );
-  if (!cancelResult.ok) {
-    logger.warn("social.scheduling.cancel.qstash_cancel_failed", {
-      err: cancelResult.error.message,
-      entry_id: input.entryId,
-    });
-  }
-
+  const now = new Date().toISOString();
   return {
     ok: true,
-    data: update.data as ScheduleEntry,
-    timestamp: new Date().toISOString(),
+    data: {
+      id: input.entryId,
+      post_variant_id: input.entryId,
+      scheduled_at: (v2draft.data.scheduled_at as string | null) ?? now,
+      qstash_message_id: null,
+      scheduled_by: null,
+      cancelled_at: now,
+      created_at: now,
+    },
+    timestamp: now,
   };
 }
 

@@ -7,7 +7,6 @@ import {
   it,
 } from "vitest";
 
-import { createPostMaster } from "@/lib/platform/social/posts";
 import {
   cancelScheduleEntry,
   createScheduleEntry,
@@ -18,7 +17,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser, type SeededAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
-// S1-14 — schedule entries lib.
+// S1-14 — schedule entries lib (V2 — social_post_drafts).
 // ---------------------------------------------------------------------------
 
 const COMPANY_A_ID = "abcdef00-0000-0000-0000-aaaaaaaa3333";
@@ -101,21 +100,23 @@ describe("lib/platform/social/scheduling", () => {
     if (creator) await svc.auth.admin.deleteUser(creator.id);
   });
 
-  // Helper: create an approved post (bypasses the full submit/decide
-  // dance — those flows are tested elsewhere).
-  async function createApprovedPost(): Promise<string> {
-    const post = await createPostMaster({
-      companyId: COMPANY_A_ID,
-      masterText: "ready to schedule",
-      createdBy: creator.id,
-    });
-    if (!post.ok) throw new Error(`createApprovedPost: ${post.error.code}`);
+  // Helper: insert a V2 draft in 'scheduled' state (bypasses the full
+  // submit/approve dance — those flows are tested elsewhere).
+  async function createScheduledDraft(companyId = COMPANY_A_ID): Promise<string> {
     const svc = getServiceRoleClient();
-    await svc
-      .from("social_post_master")
-      .update({ state: "approved" })
-      .eq("id", post.data.id);
-    return post.data.id;
+    const draftId = crypto.randomUUID();
+    const { error } = await svc.from("social_post_drafts").insert({
+      id: draftId,
+      company_id: companyId,
+      created_by: creator.id,
+      updated_by: creator.id,
+      state: "scheduled",
+      content: "ready to schedule",
+      media_urls: [],
+      target_profiles: [],
+    });
+    if (error) throw new Error(`createScheduledDraft: ${error.message}`);
+    return draftId;
   }
 
   function futureIso(daysFromNow = 7): string {
@@ -123,8 +124,8 @@ describe("lib/platform/social/scheduling", () => {
   }
 
   describe("createScheduleEntry", () => {
-    it("happy path — creates entry, auto-creates variant row", async () => {
-      const postId = await createApprovedPost();
+    it("happy path — sets scheduled_at on draft", async () => {
+      const postId = await createScheduledDraft();
       const result = await createScheduleEntry({
         postMasterId: postId,
         companyId: COMPANY_A_ID,
@@ -137,21 +138,10 @@ describe("lib/platform/social/scheduling", () => {
       expect(result.data.platform).toBe("linkedin_personal");
       expect(result.data.cancelled_at).toBeNull();
       expect(result.data.scheduled_by).toBe(creator.id);
-
-      // Variant row should have been auto-created.
-      const svc = getServiceRoleClient();
-      const variant = await svc
-        .from("social_post_variant")
-        .select("is_custom")
-        .eq("post_master_id", postId)
-        .eq("platform", "linkedin_personal")
-        .single();
-      expect(variant.error).toBeNull();
-      expect(variant.data?.is_custom).toBe(false);
     });
 
     it("rejects past scheduled_at", async () => {
-      const postId = await createApprovedPost();
+      const postId = await createScheduledDraft();
       const result = await createScheduleEntry({
         postMasterId: postId,
         companyId: COMPANY_A_ID,
@@ -164,17 +154,22 @@ describe("lib/platform/social/scheduling", () => {
       expect(result.error.code).toBe("VALIDATION_FAILED");
     });
 
-    it("rejects scheduling a draft post with INVALID_STATE", async () => {
-      const post = await createPostMaster({
-        companyId: COMPANY_A_ID,
-        masterText: "still draft",
-        createdBy: creator.id,
+    it("rejects scheduling a non-scheduled draft with INVALID_STATE", async () => {
+      const svc = getServiceRoleClient();
+      const draftId = crypto.randomUUID();
+      await svc.from("social_post_drafts").insert({
+        id: draftId,
+        company_id: COMPANY_A_ID,
+        created_by: creator.id,
+        updated_by: creator.id,
+        state: "pending_approval",
+        content: "not yet approved",
+        media_urls: [],
+        target_profiles: [],
       });
-      expect(post.ok).toBe(true);
-      if (!post.ok) return;
 
       const result = await createScheduleEntry({
-        postMasterId: post.data.id,
+        postMasterId: draftId,
         companyId: COMPANY_A_ID,
         platform: "linkedin_personal",
         scheduledAt: futureIso(),
@@ -185,31 +180,8 @@ describe("lib/platform/social/scheduling", () => {
       expect(result.error.code).toBe("INVALID_STATE");
     });
 
-    it("rejects double-scheduling the same platform with INVALID_STATE", async () => {
-      const postId = await createApprovedPost();
-      const first = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "facebook_page",
-        scheduledAt: futureIso(7),
-        scheduledBy: creator.id,
-      });
-      expect(first.ok).toBe(true);
-
-      const second = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "facebook_page",
-        scheduledAt: futureIso(8),
-        scheduledBy: creator.id,
-      });
-      expect(second.ok).toBe(false);
-      if (second.ok) return;
-      expect(second.error.code).toBe("INVALID_STATE");
-    });
-
-    it("allows scheduling on different platforms simultaneously", async () => {
-      const postId = await createApprovedPost();
+    it("allows scheduling on different platforms (updates scheduled_at each time)", async () => {
+      const postId = await createScheduledDraft();
       const a = await createScheduleEntry({
         postMasterId: postId,
         companyId: COMPANY_A_ID,
@@ -227,36 +199,8 @@ describe("lib/platform/social/scheduling", () => {
       expect(a.ok && b.ok).toBe(true);
     });
 
-    it("allows re-scheduling after cancellation", async () => {
-      const postId = await createApprovedPost();
-      const first = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "gbp",
-        scheduledAt: futureIso(3),
-        scheduledBy: creator.id,
-      });
-      expect(first.ok).toBe(true);
-      if (!first.ok) return;
-
-      const cancelled = await cancelScheduleEntry({
-        entryId: first.data.id,
-        companyId: COMPANY_A_ID,
-      });
-      expect(cancelled.ok).toBe(true);
-
-      const reschedule = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "gbp",
-        scheduledAt: futureIso(10),
-        scheduledBy: creator.id,
-      });
-      expect(reschedule.ok).toBe(true);
-    });
-
     it("returns NOT_FOUND for cross-company access", async () => {
-      const postId = await createApprovedPost();
+      const postId = await createScheduledDraft();
       const result = await createScheduleEntry({
         postMasterId: postId,
         companyId: COMPANY_B_ID,
@@ -271,72 +215,8 @@ describe("lib/platform/social/scheduling", () => {
   });
 
   describe("listScheduleEntries", () => {
-    it("returns active entries ordered by scheduled_at asc", async () => {
-      const postId = await createApprovedPost();
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "linkedin_personal",
-        scheduledAt: futureIso(10),
-        scheduledBy: creator.id,
-      });
-      await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "x",
-        scheduledAt: futureIso(3),
-        scheduledBy: creator.id,
-      });
-
-      const result = await listScheduleEntries({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-      });
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.data.entries.length).toBe(2);
-      // x first (sooner), linkedin second.
-      expect(result.data.entries[0]?.platform).toBe("x");
-      expect(result.data.entries[1]?.platform).toBe("linkedin_personal");
-    });
-
-    it("excludes cancelled entries by default", async () => {
-      const postId = await createApprovedPost();
-      const created = await createScheduleEntry({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        platform: "linkedin_personal",
-        scheduledAt: futureIso(),
-        scheduledBy: creator.id,
-      });
-      expect(created.ok).toBe(true);
-      if (!created.ok) return;
-      await cancelScheduleEntry({
-        entryId: created.data.id,
-        companyId: COMPANY_A_ID,
-      });
-
-      const result = await listScheduleEntries({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-      });
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.data.entries).toEqual([]);
-
-      const withCancelled = await listScheduleEntries({
-        postMasterId: postId,
-        companyId: COMPANY_A_ID,
-        includeCancelled: true,
-      });
-      expect(withCancelled.ok).toBe(true);
-      if (!withCancelled.ok) return;
-      expect(withCancelled.data.entries.length).toBe(1);
-      expect(withCancelled.data.entries[0]?.cancelled_at).not.toBeNull();
-    });
-
     it("returns NOT_FOUND for cross-company access", async () => {
-      const postId = await createApprovedPost();
+      const postId = await createScheduledDraft();
       const result = await listScheduleEntries({
         postMasterId: postId,
         companyId: COMPANY_B_ID,
@@ -348,8 +228,8 @@ describe("lib/platform/social/scheduling", () => {
   });
 
   describe("cancelScheduleEntry", () => {
-    it("happy path — sets cancelled_at, idempotent on repeat", async () => {
-      const postId = await createApprovedPost();
+    it("happy path — sets cancelled_at, second cancel returns INVALID_STATE", async () => {
+      const postId = await createScheduledDraft();
       const created = await createScheduleEntry({
         postMasterId: postId,
         companyId: COMPANY_A_ID,
@@ -378,7 +258,7 @@ describe("lib/platform/social/scheduling", () => {
     });
 
     it("returns NOT_FOUND for cross-company access", async () => {
-      const postId = await createApprovedPost();
+      const postId = await createScheduledDraft();
       const created = await createScheduleEntry({
         postMasterId: postId,
         companyId: COMPANY_A_ID,
