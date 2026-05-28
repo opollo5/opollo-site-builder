@@ -2,7 +2,7 @@
 /**
  * scripts/audit.ts — Static analysis: catch logic errors before UAT.
  *
- * Fifteen checks (HIGH | MEDIUM | LOW severity):
+ * Seventeen checks (HIGH | MEDIUM | LOW severity):
  *   1. Middleware public paths              HIGH
  *   2. Admin API gate coverage              MEDIUM
  *   3. DB column references                 MEDIUM
@@ -18,6 +18,8 @@
  *  13. No raw <h1> in pages                 HIGH (Spec 02 §3.3)
  *  14. Milestones registry current          LOW
  *  15. Docs index up-to-date               LOW
+ *  16. publish-due uses atomic claim        HIGH
+ *  17. db-direct.ts rejects direct URLs     HIGH
  *
  * Output:
  *   - Per-issue lines: FILE:LINE — CATEGORY — message
@@ -1512,11 +1514,54 @@ function check16_publishDueAtomicClaim(): Issue[] {
 }
 
 // ============================================================================
+// Check 17 — db-direct.ts validates against Supabase direct connection URLs
+//
+// Incident (2026-05-27): SUPABASE_DB_URL was set to db.<ref>.supabase.co
+// (direct connection). Supabase direct connections are IPv6-only; Vercel
+// functions are IPv4-only → getaddrinfo ENOTFOUND on every cron tick that
+// uses requireDbConfig(). parseDbUrl() now explicitly rejects the direct-
+// connection host pattern with a descriptive error. This check ensures the
+// detection is never accidentally removed.
+// ============================================================================
+
+function check17_dbDirectUrlPoolerValidation(): Issue[] {
+  const issues: Issue[] = [];
+  const dbDirectPath = "lib/db-direct.ts";
+  if (!existsSync(dbDirectPath)) {
+    issues.push({
+      category: "db-direct-url-pooler-check",
+      severity: "HIGH",
+      file: dbDirectPath,
+      line: 0,
+      message:
+        "lib/db-direct.ts is missing — required for all direct-pg cron workers.",
+    });
+    return issues;
+  }
+  const content = readSafe(dbDirectPath);
+  // Must contain an explicit guard that rejects db.<ref>.supabase.co hosts.
+  // The detection pattern: test(host) for the direct-connection host regex.
+  if (!/supabase\.co/.test(content) || !/(throw|Error)/.test(content)) {
+    issues.push({
+      category: "db-direct-url-pooler-check",
+      severity: "HIGH",
+      file: dbDirectPath,
+      line: 0,
+      message:
+        "lib/db-direct.ts must reject direct-connection Supabase hosts (db.*.supabase.co). " +
+        "Incident 2026-05-27: direct host is IPv6-only, Vercel is IPv4-only → ENOTFOUND on all crons. " +
+        "The parseDbUrl function must detect and reject the direct-connection pattern.",
+    });
+  }
+  return issues;
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
 function main(): void {
-  console.log("scripts/audit.ts — running 16 static checks...\n");
+  console.log("scripts/audit.ts — running 17 static checks...\n");
 
   const all: Issue[] = [
     ...check1_middlewarePublicPaths(),
@@ -1536,6 +1581,7 @@ function main(): void {
     ...check15_docsIndexUpToDate(),
     ...check_tablesUseDataTable(),
     ...check16_publishDueAtomicClaim(),
+    ...check17_dbDirectUrlPoolerValidation(),
   ];
 
   const failed = printResults(all);

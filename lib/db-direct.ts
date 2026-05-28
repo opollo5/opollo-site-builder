@@ -49,6 +49,19 @@ export function parseDbUrl(raw: string): ClientConfig {
     );
   }
 
+  // Supabase direct connection hosts (db.<ref>.supabase.co) are IPv6-only.
+  // Vercel functions are IPv4-only → getaddrinfo ENOTFOUND at runtime.
+  // Use the session pooler URL instead:
+  //   postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres
+  if (/^db\.[^.]+\.supabase\.co$/.test(host)) {
+    throw new Error(
+      `SUPABASE_DB_URL uses a direct connection host (${host}). ` +
+        `Supabase direct connections are IPv6-only; Vercel is IPv4-only — this will ` +
+        `always fail with ENOTFOUND. Update SUPABASE_DB_URL to the session pooler URL: ` +
+        `postgresql://postgres.<project-ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres`,
+    );
+  }
+
   const port = url.port ? Number(url.port) : 5432;
   const user = url.username ? decodeURIComponent(url.username) : undefined;
   const password = url.password ? decodeURIComponent(url.password) : undefined;
