@@ -1,5 +1,7 @@
 import "server-only";
 
+import sharp from "sharp";
+
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
@@ -31,25 +33,25 @@ const GLOBAL_NEGATIVE_PROMPT = [
 const IMAGE_GEN_BUCKET =
   process.env.IMAGE_GENERATION_BUCKET ?? "generated-images";
 
+// v3 response: url is always present; width/height may or may not be.
+// Dimensions are extracted from the downloaded buffer via sharp — reliable regardless.
 interface IdeogramResponseImage {
   url: string;
-  width: number;
-  height: number;
+  width?: number;
+  height?: number;
 }
 
 interface IdeogramResponse {
   data: IdeogramResponseImage[];
 }
 
+// v3 endpoint — always FLASH. Premium routing is out of scope (§3 of brief).
+const IDEOGRAM_V3_URL = "https://api.ideogram.ai/v1/ideogram-v3/generate";
+const RENDERING_SPEED = "FLASH";
+
 export async function generateBackground(
   params: GenerationParams,
 ): Promise<GeneratedImage[]> {
-  const model =
-    params.model === "premium"
-      ? (process.env.IDEOGRAM_PREMIUM_MODEL ?? "ideogram-ai/ideogram-v3")
-      : (process.env.IDEOGRAM_STANDARD_MODEL ??
-          "ideogram-ai/ideogram-v3-flash");
-
   const apiKey = process.env.IDEOGRAM_API_KEY;
   if (!apiKey) {
     throw new IdeogramError(0, "IDEOGRAM_API_KEY is not set");
@@ -67,24 +69,22 @@ export async function generateBackground(
 
   const startMs = Date.now();
 
+  // v3 uses multipart/form-data — do NOT set Content-Type manually;
+  // fetch sets it with the correct boundary when body is FormData.
+  const form = new FormData();
+  form.append("prompt", prompt);
+  form.append("rendering_speed", RENDERING_SPEED);
+  form.append("aspect_ratio", params.aspectRatio); // e.g. "1x1", "16x9"
+  form.append("num_images", String(params.count ?? 1));
+  form.append("style_type", "REALISTIC");
+  form.append("negative_prompt", GLOBAL_NEGATIVE_PROMPT);
+
   let responseData: IdeogramResponse;
   try {
-    const response = await fetch("https://api.ideogram.ai/generate", {
+    const response = await fetch(IDEOGRAM_V3_URL, {
       method: "POST",
-      headers: {
-        "Api-Key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        image_request: {
-          prompt,
-          model,
-          aspect_ratio: params.aspectRatio,
-          num_images: params.count ?? 1,
-          style_type: "REALISTIC",
-          negative_prompt: GLOBAL_NEGATIVE_PROMPT,
-        },
-      }),
+      headers: { "Api-Key": apiKey },
+      body: form,
       signal: AbortSignal.timeout(
         parseInt(process.env.IMAGE_GENERATION_TIMEOUT_MS ?? "30000"),
       ),
@@ -102,7 +102,7 @@ export async function generateBackground(
 
     responseData = (await response.json()) as IdeogramResponse;
     logger.info("Ideogram generation success", {
-      model,
+      renderingSpeed: RENDERING_SPEED,
       styleId: params.styleId,
       count: responseData.data.length,
       durationMs: Date.now() - startMs,
@@ -161,16 +161,24 @@ async function downloadAndStore(
     throw new Error(`Storage upload failed: ${error.message}`);
   }
 
+  // Extract actual dimensions from the buffer — more reliable than API metadata
+  // (v3 may omit width/height in the response, and v2 values can mismatch storage).
+  const metadata = await sharp(buffer).metadata();
+  const width = metadata.width ?? img.width ?? 0;
+  const height = metadata.height ?? img.height ?? 0;
+
   logger.info("Generated image stored", {
     companyId,
     storagePath,
+    width,
+    height,
     durationMs: Date.now() - downloadStart,
   });
 
   return {
     storagePath,
-    width: img.width,
-    height: img.height,
+    width,
+    height,
     format: ext,
     buffer,
   };

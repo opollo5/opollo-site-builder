@@ -39,7 +39,7 @@ const TIMEOUT_MS = parseInt(process.env.IMAGE_GENERATION_TIMEOUT_MS ?? "30000");
 const BodySchema = z.object({
   company_id: dbUuid(),
   prompt: z.string().min(3).max(500),
-  aspect_ratio: z.enum(["ASPECT_1_1", "ASPECT_4_5", "ASPECT_16_9"]).optional(),
+  aspect_ratio: z.enum(["1x1", "4x5", "16x9"]).optional(),
 });
 
 interface IdeogramImage {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return validationError(
-      "Body must be { company_id: uuid, prompt: string(3-500), aspect_ratio?: 'ASPECT_1_1'|'ASPECT_4_5'|'ASPECT_16_9' }.",
+      "Body must be { company_id: uuid, prompt: string(3-500), aspect_ratio?: '1x1'|'4x5'|'16x9' }.",
       { issues: parsed.error.issues },
     );
   }
@@ -86,8 +86,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const model = process.env.IDEOGRAM_STANDARD_MODEL ?? "ideogram-ai/ideogram-v3-flash";
-
+  // NOTE: this route uses the legacy /generate endpoint and will be refactored
+  // to the canonical generateWithFallback() pipeline in slice A3.
   let ideogramData: IdeogramResponse;
   try {
     const resp = await fetch(IDEOGRAM_API, {
@@ -96,8 +96,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       body: JSON.stringify({
         image_request: {
           prompt: parsed.data.prompt,
-          model,
-          aspect_ratio: parsed.data.aspect_ratio ?? "ASPECT_1_1",
+          // model omitted — API defaults to V_2; A3 migrates this to the v3 canonical client
+          aspect_ratio: parsed.data.aspect_ratio ?? "1x1",
           num_images: 1,
           style_type: "REALISTIC",
           negative_prompt: NEGATIVE_PROMPT,
