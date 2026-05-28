@@ -64,6 +64,50 @@ export async function recordHealthEvent(input: RecordEventInput): Promise<void> 
 }
 
 /**
+ * Returns true if any unresolved (non-manual) event exists for the given
+ * service + operation pair. Used by withHealthMonitoring on the success
+ * path to decide whether a `recovered` sweep is warranted, in lieu of an
+ * in-memory flag that doesn't survive Vercel function cold-starts.
+ *
+ * Failures (Supabase error, network blip) return false and log a warning
+ * — the success path must not be blocked by a monitoring-table read.
+ */
+export async function hasUnresolvedHealthEvent(
+  serviceName: string,
+  operation: string,
+): Promise<boolean> {
+  try {
+    const svc = getServiceRoleClient();
+    const { data, error } = await svc
+      .from("service_health_events")
+      .select("id")
+      .eq("service_name", serviceName)
+      .eq("operation", operation)
+      .is("resolved_at", null)
+      .neq("event_type", "manual_flag")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      logger.warn("service_health.detect_unresolved_failed", {
+        service: serviceName,
+        operation,
+        err: error.message,
+      });
+      return false;
+    }
+    return data !== null;
+  } catch (err) {
+    logger.warn("service_health.detect_unresolved_threw", {
+      service: serviceName,
+      operation,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return false;
+  }
+}
+
+/**
  * Mark a service as recovered — resolves all open events for the service.
  * Called by withHealthMonitoring on a successful call after prior failures.
  */

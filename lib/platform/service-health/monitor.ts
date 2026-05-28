@@ -2,11 +2,11 @@ import "server-only";
 
 import { logger } from "@/lib/logger";
 import { classifyHttpError, classifyThrownError } from "./classify";
-import { recordHealthEvent, recordRecovery } from "./record";
-
-// Per-service state: tracks whether the last call was a failure so we can
-// fire a "recovered" event only on the first success after failures.
-const lastCallFailed = new Map<string, boolean>();
+import {
+  hasUnresolvedHealthEvent,
+  recordHealthEvent,
+  recordRecovery,
+} from "./record";
 
 /**
  * Wrap any external API call in health monitoring.
@@ -19,29 +19,32 @@ const lastCallFailed = new Map<string, boolean>();
  * On error: records a service_health_event and re-throws so the caller can
  * handle the failure. The monitoring layer never swallows errors.
  *
- * On recovery: if the previous call for this service/operation was a failure,
- * records a "recovered" event.
+ * On success: queries service_health_events for any unresolved row matching
+ * this service + operation. If one exists, fires a `recovered` event +
+ * resolves all unresolved rows for the service. The previous in-memory flag
+ * (lastCallFailed Map) was per-process and never survived Vercel function
+ * cold-starts, so recovery never fired in production. A single SELECT on
+ * the indexed (service_name, event_type) WHERE resolved_at IS NULL partial
+ * index is the cross-process replacement.
  */
 export async function withHealthMonitoring<T>(
   serviceName: string,
   operation: string,
   fn: () => Promise<T>,
 ): Promise<T> {
-  const key = `${serviceName}:${operation}`;
   try {
     const result = await fn();
 
-    // Fire recovery event only on the first success after prior failures.
-    if (lastCallFailed.get(key)) {
-      lastCallFailed.set(key, false);
-      // Non-blocking — don't await; recovery recording must not delay the caller.
+    // Cross-process recovery sweep: any unresolved row for this service +
+    // operation triggers recordRecovery. Non-blocking — never await; recovery
+    // recording must not delay the caller. hasUnresolvedHealthEvent returns
+    // false on its own errors so a DB blip doesn't break the success path.
+    if (await hasUnresolvedHealthEvent(serviceName, operation)) {
       void recordRecovery(serviceName, operation);
     }
 
     return result;
   } catch (err) {
-    lastCallFailed.set(key, true);
-
     // Extract HTTP status if the error carries one.
     const status =
       typeof (err as { status?: unknown }).status === "number"

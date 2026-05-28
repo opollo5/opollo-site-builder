@@ -13,6 +13,7 @@ vi.mock("@/lib/logger", () => ({
 vi.mock("@/lib/platform/service-health/record", () => ({
   recordHealthEvent: vi.fn().mockResolvedValue(undefined),
   recordRecovery: vi.fn().mockResolvedValue(undefined),
+  hasUnresolvedHealthEvent: vi.fn().mockResolvedValue(false),
 }));
 
 import { classifyHttpError, classifyThrownError } from "@/lib/platform/service-health/classify";
@@ -177,5 +178,99 @@ describe("getPlatformAdminEmails", () => {
     const { getPlatformAdminEmails } = await import("@/lib/platform/service-health/recipients");
     const result = await getPlatformAdminEmails();
     expect(result).toEqual(["alice@opollo.com", "bob@opollo.com"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// withHealthMonitoring cross-process recovery sweep
+//
+// Regression: the previous implementation used an in-memory Map
+// (`lastCallFailed`) to gate `recordRecovery`. Vercel functions are stateless
+// across cold-starts, so the flag was never set when a new process observed
+// a successful call after a failure recorded by a different process. Result:
+// unresolved rows accumulated forever (e.g. the 7-day-stuck bundle.social
+// row from PR #904's env-var typo, even after PR #1128 fixed the typo).
+//
+// The fix replaces the Map with a DB query against service_health_events.
+// These tests cover the three outcomes.
+// ---------------------------------------------------------------------------
+
+describe("withHealthMonitoring cross-process recovery", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  test("(a) successful call fires recordRecovery when unresolved row exists", async () => {
+    const { hasUnresolvedHealthEvent, recordRecovery } = await import(
+      "@/lib/platform/service-health/record"
+    );
+    vi.mocked(hasUnresolvedHealthEvent).mockResolvedValueOnce(true);
+
+    const { withHealthMonitoring } = await import(
+      "@/lib/platform/service-health/monitor"
+    );
+    const result = await withHealthMonitoring("bundle.social", "analytics", async () => "ok");
+
+    expect(result).toBe("ok");
+    expect(hasUnresolvedHealthEvent).toHaveBeenCalledWith("bundle.social", "analytics");
+    expect(recordRecovery).toHaveBeenCalledWith("bundle.social", "analytics");
+  });
+
+  test("(b) successful call does NOT fire recordRecovery when no unresolved row", async () => {
+    const { hasUnresolvedHealthEvent, recordRecovery } = await import(
+      "@/lib/platform/service-health/record"
+    );
+    vi.mocked(hasUnresolvedHealthEvent).mockResolvedValueOnce(false);
+
+    const { withHealthMonitoring } = await import(
+      "@/lib/platform/service-health/monitor"
+    );
+    const result = await withHealthMonitoring("bundle.social", "analytics", async () => "ok");
+
+    expect(result).toBe("ok");
+    expect(hasUnresolvedHealthEvent).toHaveBeenCalledWith("bundle.social", "analytics");
+    expect(recordRecovery).not.toHaveBeenCalled();
+  });
+
+  test("(c) detector failure does not throw or block the success path", async () => {
+    const { hasUnresolvedHealthEvent, recordRecovery } = await import(
+      "@/lib/platform/service-health/record"
+    );
+    // Real impl returns false on internal failure; mirror that contract here.
+    vi.mocked(hasUnresolvedHealthEvent).mockResolvedValueOnce(false);
+
+    const { withHealthMonitoring } = await import(
+      "@/lib/platform/service-health/monitor"
+    );
+    const result = await withHealthMonitoring("bundle.social", "analytics", async () => "ok");
+
+    expect(result).toBe("ok");
+    expect(recordRecovery).not.toHaveBeenCalled();
+  });
+
+  test("error path records a health event and re-throws (no recovery query)", async () => {
+    const { hasUnresolvedHealthEvent, recordHealthEvent, recordRecovery } = await import(
+      "@/lib/platform/service-health/record"
+    );
+    const err = Object.assign(new Error("boom"), { status: 500 });
+
+    const { withHealthMonitoring } = await import(
+      "@/lib/platform/service-health/monitor"
+    );
+    await expect(
+      withHealthMonitoring("bundle.social", "analytics", async () => {
+        throw err;
+      }),
+    ).rejects.toThrow("boom");
+
+    expect(recordHealthEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serviceName: "bundle.social",
+        operation: "analytics",
+        eventType: "service_5xx",
+      }),
+    );
+    expect(hasUnresolvedHealthEvent).not.toHaveBeenCalled();
+    expect(recordRecovery).not.toHaveBeenCalled();
   });
 });
