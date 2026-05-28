@@ -10,7 +10,7 @@ These must be set before PR B (API surface) ships. Without them, integration tes
 
 | Variable | Source | Used by |
 |---|---|---|
-| `BUNDLE_SOCIAL_API_KEY` | bundle.social dashboard | `lib/social/publishing/bundle-social-client.ts`. Publish + analytics calls. |
+| `BUNDLE_SOCIAL_API` | bundle.social dashboard | `lib/social/publishing/bundle-social-client.ts`. Publish + analytics calls. |
 | `BUNDLE_SOCIAL_WEBHOOK_SECRET` | bundle.social dashboard (if signing supported) or self-generated random hex | `app/api/webhooks/bundle-social/route.ts`. HMAC-SHA256 signature verification. |
 | `IDEOGRAM_API_KEY` | Ideogram dashboard | Composer image-generation tool + CAP. |
 | `UPSTASH_REDIS_REST_URL` | Upstash console → Redis | Hot analytics cache. |
@@ -88,7 +88,7 @@ After setting env vars in `.env.local`:
 
 ```bash
 node -e "
-['BUNDLE_SOCIAL_API_KEY','BUNDLE_SOCIAL_WEBHOOK_SECRET','IDEOGRAM_API_KEY','UPSTASH_REDIS_REST_URL','UPSTASH_REDIS_REST_TOKEN','SENDGRID_API_KEY','SENDGRID_FROM_EMAIL','ANTHROPIC_API_KEY','GIPHY_API_KEY','CRON_SECRET','NEXT_PUBLIC_FEATURE_COMPOSER_V2','NEXT_PUBLIC_SITE_URL','SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','DATABASE_URL']
+['BUNDLE_SOCIAL_API','BUNDLE_SOCIAL_WEBHOOK_SECRET','IDEOGRAM_API_KEY','UPSTASH_REDIS_REST_URL','UPSTASH_REDIS_REST_TOKEN','SENDGRID_API_KEY','SENDGRID_FROM_EMAIL','ANTHROPIC_API_KEY','GIPHY_API_KEY','CRON_SECRET','NEXT_PUBLIC_FEATURE_COMPOSER_V2','NEXT_PUBLIC_SITE_URL','SUPABASE_URL','SUPABASE_ANON_KEY','SUPABASE_SERVICE_ROLE_KEY','DATABASE_URL']
   .filter(k => !process.env[k])
   .forEach(k => console.log('MISSING:', k));
 "

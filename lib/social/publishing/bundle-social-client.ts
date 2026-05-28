@@ -30,8 +30,8 @@ interface AnalyticsResult {
 }
 
 function getApiKey(): string {
-  const key = process.env.BUNDLE_SOCIAL_API_KEY;
-  if (!key) throw new Error("BUNDLE_SOCIAL_API_KEY is not set.");
+  const key = process.env.BUNDLE_SOCIAL_API;
+  if (!key) throw new Error("BUNDLE_SOCIAL_API is not configured.");
   return key;
 }
 

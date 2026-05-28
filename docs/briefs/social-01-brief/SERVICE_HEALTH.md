@@ -65,7 +65,7 @@ export async function publishToProfile(profileId: string, payload: PublishPayloa
     async () => {
       const res = await fetch(`${BASE_URL}/post`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${BUNDLE_SOCIAL_API_KEY}` },
+        headers: { 'Authorization': `Bearer ${BUNDLE_SOCIAL_API}` },
         body: JSON.stringify(payload)
       });
       if (!res.ok) {
