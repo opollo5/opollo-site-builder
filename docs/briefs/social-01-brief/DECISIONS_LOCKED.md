@@ -102,7 +102,7 @@ Listed for clarity. Full descriptions in `composer/.env.example`.
 
 | Variable | Source | Required | Purpose |
 |---|---|---|---|
-| `BUNDLE_SOCIAL_API_KEY` | bundle.social dashboard | yes | Authenticate publish + analytics calls |
+| `BUNDLE_SOCIAL_API` | bundle.social dashboard | yes | Authenticate publish + analytics calls |
 | `BUNDLE_SOCIAL_WEBHOOK_SECRET` | bundle.social dashboard | yes | Verify incoming publish-status webhooks |
 | `IDEOGRAM_API_KEY` | Ideogram dashboard | yes | Image generation for CAP and composer |
 | `SENDGRID_API_KEY` | SendGrid dashboard | yes | Approval email notifications |

@@ -94,7 +94,7 @@ Open `composer/.env.example`. Every variable listed must be set in `.env.local` 
 **Required (set all of these before kickoff):**
 
 ```
-BUNDLE_SOCIAL_API_KEY=               # bundle.social dashboard
+BUNDLE_SOCIAL_API=                   # bundle.social dashboard
 BUNDLE_SOCIAL_WEBHOOK_SECRET=        # bundle.social or self-generated hex
 IDEOGRAM_API_KEY=                    # Ideogram dashboard
 UPSTASH_REDIS_REST_URL=              # Upstash console
