@@ -104,11 +104,12 @@ describe("MediaPickerModal", () => {
     expect(screen.queryByTestId("media-library-item-a2")).not.toBeInTheDocument();
   });
 
-  it("switches to AI tab and pre-fills draftBody as prompt", async () => {
+  it("switches to AI tab and shows generate button", async () => {
+    // A3: free-form prompt textarea removed; AI tab uses brand-derived params.
     setup({ draftBody: "Check out our product" });
     await userEvent.click(screen.getByTestId("media-picker-tab-ai"));
-    const promptInput = screen.getByTestId("ai-image-prompt") as HTMLTextAreaElement;
-    expect(promptInput.value).toBe("Check out our product");
+    expect(screen.getByTestId("ai-generate-btn")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-image-prompt")).not.toBeInTheDocument();
   });
 
   it("shows error when AI generation fails", async () => {

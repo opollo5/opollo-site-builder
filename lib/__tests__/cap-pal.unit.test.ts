@@ -98,52 +98,6 @@ describe("AnthropicTextProvider", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IdeogramImageProvider — mocked fetch
-// ─────────────────────────────────────────────────────────────────────────────
-const mockFetch = vi.fn();
-vi.stubGlobal("fetch", mockFetch);
-
-import { IdeogramImageProvider } from "@/lib/cap/pal/image-provider";
-
-describe("IdeogramImageProvider", () => {
-  beforeEach(() => mockFetch.mockReset());
-
-  it("happy path returns image URL", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [{ url: "https://cdn.ideogram.ai/image.jpg" }] }),
-    });
-
-    const provider = new IdeogramImageProvider("fake-key");
-    const result = await provider.generate({ prompt: "A professional MSP office" });
-
-    expect(result.url).toBe("https://cdn.ideogram.ai/image.jpg");
-    expect(result.latencyMs).toBeGreaterThanOrEqual(0);
-  });
-
-  it("throws on non-ok response", async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 503,
-      text: async () => "Service unavailable",
-    });
-
-    const provider = new IdeogramImageProvider("fake-key");
-    await expect(provider.generate({ prompt: "test" })).rejects.toThrow("Ideogram 503");
-  });
-
-  it("throws when data array is empty", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({ data: [] }),
-    });
-
-    const provider = new IdeogramImageProvider("fake-key");
-    await expect(provider.generate({ prompt: "test" })).rejects.toThrow("no image URL");
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
 // sanitizePromptInput
 // ─────────────────────────────────────────────────────────────────────────────
 import { sanitizePromptInput } from "@/lib/cap/generation/sanitize";

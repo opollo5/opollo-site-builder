@@ -1,59 +1,45 @@
-import { randomUUID } from "crypto";
-
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
 import { dbUuid, internalError, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
+import { getActiveBrandProfile } from "@/lib/platform/brand";
 import { createMediaAsset } from "@/lib/platform/social/media";
+import { generateWithFallback, getAllowedStyles } from "@/lib/image";
+import type { AspectRatio, StyleId } from "@/lib/image/types";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
-// Spec 22 PR 2 — AI image generation for the composer image picker.
-//
 // POST /api/platform/social/cap/generate-image
-//   Body: { company_id, prompt, aspect_ratio?: "1:1"|"4:5"|"16:9" }
+//   Body: { company_id, aspect_ratio?: "1x1"|"4x5"|"16x9" }
 //
-// Calls the Ideogram API with the user's free-form prompt (no structured
-// style params). Downloads the generated image, stores it in the existing
-// "generated-images" Supabase Storage bucket, creates a social_media_assets
-// row, and returns the signed source_url + asset id.
+// Generates a brand-derived background image for the composer image picker.
+// Routes through the canonical generateWithFallback() pipeline (v3 FLASH,
+// quality check, retry, image_generation_log). Stores in the generated-images
+// bucket and creates a social_media_assets row for the composer to attach.
 //
-// Degraded path: when IDEOGRAM_API_KEY is unset (local / test), returns
-// a 503 NOT_CONFIGURED response so the UI can show a helpful message
-// rather than an opaque error.
+// Replaces the legacy inline Ideogram fetch (A3). Free-form user prompts
+// are not accepted — the canonical image pipeline uses parameterised inputs
+// only (image-generation skill rule #2).
 //
+// Degraded path: IDEOGRAM_API_KEY unset → 503 NOT_CONFIGURED.
 // Gate: canDo("create_post") — editor+.
-// Rate limit: deferred to PR 4 (AI Assistant slice); this endpoint shares
-// the CAP 10/company/24h budget once wired.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const IMAGE_GEN_BUCKET = process.env.IMAGE_GENERATION_BUCKET ?? "generated-images";
-const IDEOGRAM_API = "https://api.ideogram.ai/generate";
-const SIGNED_URL_TTL = 365 * 24 * 3600;
-const TIMEOUT_MS = parseInt(process.env.IMAGE_GENERATION_TIMEOUT_MS ?? "30000");
+const SIGNED_URL_TTL = 365 * 24 * 3600; // 1 year — stored as source_url in media assets
+
+const DEFAULT_STYLE: StyleId = "clean_corporate";
+const DEFAULT_COLOUR = "#1a56db";
 
 const BodySchema = z.object({
   company_id: dbUuid(),
-  prompt: z.string().min(3).max(500),
   aspect_ratio: z.enum(["1x1", "4x5", "16x9"]).optional(),
 });
-
-interface IdeogramImage {
-  url: string;
-  width: number;
-  height: number;
-}
-
-interface IdeogramResponse {
-  data: IdeogramImage[];
-}
-
-const NEGATIVE_PROMPT =
-  "text, words, letters, typography, watermark, logo, blurry, distorted, low quality";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
   const body = await readJsonBody(req);
@@ -61,7 +47,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return validationError(
-      "Body must be { company_id: uuid, prompt: string(3-500), aspect_ratio?: '1x1'|'4x5'|'16x9' }.",
+      "Body must be { company_id: uuid, aspect_ratio?: '1x1'|'4x5'|'16x9' }.",
       { issues: parsed.error.issues },
     );
   }
@@ -69,8 +55,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireCanDoForApi(parsed.data.company_id, "create_post");
   if (gate.kind === "deny") return gate.response;
 
-  const apiKey = process.env.IDEOGRAM_API_KEY;
-  if (!apiKey) {
+  if (!process.env.IDEOGRAM_API_KEY) {
     return NextResponse.json(
       {
         ok: false,
@@ -86,79 +71,51 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // NOTE: this route uses the legacy /generate endpoint and will be refactored
-  // to the canonical generateWithFallback() pipeline in slice A3.
-  let ideogramData: IdeogramResponse;
+  const { company_id, aspect_ratio } = parsed.data;
+
+  // Read brand profile — degrade gracefully if missing.
+  const brand = await getActiveBrandProfile(company_id);
+  const allowedStyles = getAllowedStyles(brand);
+
+  let images;
   try {
-    const resp = await fetch(IDEOGRAM_API, {
-      method: "POST",
-      headers: { "Api-Key": apiKey, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        image_request: {
-          prompt: parsed.data.prompt,
-          // model omitted — API defaults to V_2; A3 migrates this to the v3 canonical client
-          aspect_ratio: parsed.data.aspect_ratio ?? "1x1",
-          num_images: 1,
-          style_type: "REALISTIC",
-          negative_prompt: NEGATIVE_PROMPT,
-        },
-      }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+    images = await generateWithFallback({
+      styleId: allowedStyles[0] ?? DEFAULT_STYLE,
+      primaryColour: brand?.primary_colour ?? DEFAULT_COLOUR,
+      compositionType: "split_layout",
+      aspectRatio: (aspect_ratio ?? "1x1") as AspectRatio,
+      count: 1,
+      industry: brand?.industry ?? undefined,
+      companyId: company_id,
+      brandProfileId: brand?.id,
+      brandProfileVersion: brand?.version,
     });
-
-    if (!resp.ok) {
-      const text = await resp.text();
-      return internalError(`Ideogram API error ${resp.status}: ${text.slice(0, 200)}`);
-    }
-
-    ideogramData = (await resp.json()) as IdeogramResponse;
   } catch (err) {
-    return internalError(err instanceof Error ? err.message : "Image generation request failed.");
+    logger.error("cap.generate-image.generation_failed", {
+      companyId: company_id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return internalError("Image generation failed.");
   }
 
-  const image = ideogramData.data[0];
-  if (!image?.url) {
-    return internalError("Ideogram returned no image.");
-  }
+  const image = images[0];
+  if (!image) return internalError("Image generation returned no result.");
 
-  // Download the ephemeral Ideogram URL immediately.
-  let imageBuffer: Buffer;
-  let mimeType = "image/jpeg";
-  try {
-    const imgResp = await fetch(image.url, { signal: AbortSignal.timeout(30_000) });
-    if (!imgResp.ok) return internalError("Failed to download generated image.");
-    const ct = imgResp.headers.get("content-type");
-    if (ct) mimeType = ct.split(";")[0]!.trim();
-    imageBuffer = Buffer.from(await imgResp.arrayBuffer());
-  } catch (err) {
-    return internalError(err instanceof Error ? err.message : "Image download failed.");
-  }
-
-  const ext = mimeType.includes("png") ? "png" : "jpg";
-  const storagePath = `${parsed.data.company_id}/${randomUUID()}.${ext}`;
-
+  // Sign the storage path for the media-asset source_url (1-year TTL).
   const svc = getServiceRoleClient();
-  const { error: uploadError } = await svc.storage
+  const { data: signed, error: signErr } = await svc.storage
     .from(IMAGE_GEN_BUCKET)
-    .upload(storagePath, imageBuffer, { contentType: mimeType, upsert: false });
+    .createSignedUrl(image.storagePath, SIGNED_URL_TTL);
 
-  if (uploadError) {
-    return internalError(`Storage upload failed: ${uploadError.message}`);
-  }
-
-  const { data: signed } = await svc.storage
-    .from(IMAGE_GEN_BUCKET)
-    .createSignedUrl(storagePath, SIGNED_URL_TTL);
-
-  if (!signed?.signedUrl) {
+  if (signErr || !signed?.signedUrl) {
     return internalError("Failed to generate signed URL for generated image.");
   }
 
+  const mimeType = image.format === "png" ? "image/png" : "image/jpeg";
   const result = await createMediaAsset({
-    companyId: parsed.data.company_id,
+    companyId: company_id,
     sourceUrl: signed.signedUrl,
     mimeType,
-    bytes: imageBuffer.length,
     uploadedBy: gate.userId,
   });
 
