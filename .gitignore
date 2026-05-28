@@ -56,3 +56,10 @@ LAYOUT_AUDIT*.md
 # Draft probe scripts (prefixed _ = not ready for CI).
 scripts/probes/_*
 scripts/probes/_screenshots/
+
+# Playwright test artifacts (local run outputs, not source).
+playwright-report/
+playwright-report-uat/
+playwright-report-verify/
+test-results/
+playwright.verify.config.ts
