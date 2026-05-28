@@ -32,7 +32,7 @@ describe("parseDbUrl — direct-connection rejection (regression)", () => {
   it("includes the pooler URL hint in the error message", () => {
     const directUrl =
       "postgresql://postgres:secret@db.abcdefghijklmnop.supabase.co:5432/postgres";
-    expect(() => parseDbUrl(directUrl)).toThrowError(/pooler\.supabase\.com/i);
+    expect(() => parseDbUrl(directUrl)).toThrowError("pooler.supabase.com");
   });
 
   it("accepts a valid session pooler URL", () => {
