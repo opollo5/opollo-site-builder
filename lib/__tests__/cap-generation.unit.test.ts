@@ -49,8 +49,10 @@ const { mockGenerateText, mockGenerateImage } = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/cap/pal", () => ({
   getTextProvider: vi.fn(() => ({ generate: mockGenerateText })),
-  getImageProvider: vi.fn(() => ({ generate: mockGenerateImage })),
 }));
+// image-orchestrator now calls Ideogram v3 directly; mock fetch for those tests
+const mockFetch = vi.fn();
+vi.stubGlobal("fetch", mockFetch);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Prompt builders
@@ -240,15 +242,16 @@ describe("generateImageForPost", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFrom.mockReturnValue(buildInsertChain());
+    process.env.IDEOGRAM_API_KEY = "test-key";
   });
 
   it("happy path returns image URL and records run", async () => {
     const mockInsert = vi.fn().mockResolvedValue({ error: null });
     mockFrom.mockReturnValue({ insert: mockInsert });
 
-    mockGenerateImage.mockResolvedValue({
-      url: "https://cdn.ideogram.ai/image.jpg",
-      latencyMs: 2000,
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ url: "https://cdn.ideogram.ai/image.jpg" }] }),
     });
 
     const result = await generateImageForPost({
@@ -273,7 +276,11 @@ describe("generateImageForPost", () => {
     const mockInsert = vi.fn().mockResolvedValue({ error: null });
     mockFrom.mockReturnValue({ insert: mockInsert });
 
-    mockGenerateImage.mockRejectedValue(new Error("Ideogram 503"));
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 503,
+      text: async () => "Service unavailable",
+    });
 
     await expect(
       generateImageForPost({
@@ -331,6 +338,7 @@ describe("runCampaign", () => {
 
   it("happy path: generates all 4 posts and sets status to review", async () => {
     const { campaign, upsertedPosts } = buildCampaignDb();
+    process.env.IDEOGRAM_API_KEY = "test-key";
 
     mockGenerateText.mockResolvedValue({
       text: JSON.stringify({ content: "post content", hashtags: ["#MSP"] }),
@@ -338,7 +346,11 @@ describe("runCampaign", () => {
       outputTokens: 50,
       latencyMs: 500,
     });
-    mockGenerateImage.mockResolvedValue({ url: "https://cdn.ideogram.ai/img.jpg", latencyMs: 2000 });
+    // generateImageForPost now calls Ideogram v3 directly via fetch
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ url: "https://cdn.ideogram.ai/img.jpg" }] }),
+    });
 
     let callCount = 0;
     mockFrom.mockImplementation((table: string) => {

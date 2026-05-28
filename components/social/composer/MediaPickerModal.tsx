@@ -72,7 +72,6 @@ export function MediaPickerModal({
   const libFetchedRef = React.useRef(false);
 
   // AI tab
-  const [aiPrompt, setAiPrompt] = React.useState(draftBody);
   const [generating, setGenerating] = React.useState(false);
   const [generated, setGenerated] = React.useState<{ id: string; url: string }[]>([]);
   const [selectedGenId, setSelectedGenId] = React.useState<string | null>(null);
@@ -90,7 +89,6 @@ export function MediaPickerModal({
       setGenerated([]);
       setSelectedGenId(null);
       setAiError(null);
-      setAiPrompt(draftBody);
       setAssets([]);
       setNextCursor(null);
       libFetchedRef.current = false;
@@ -185,10 +183,6 @@ export function MediaPickerModal({
   }
 
   async function generateAiImages() {
-    if (!aiPrompt.trim()) {
-      setAiError("Enter a prompt to generate images.");
-      return;
-    }
     setGenerating(true);
     setAiError(null);
     setGenerated([]);
@@ -201,7 +195,6 @@ export function MediaPickerModal({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             company_id: companyId,
-            prompt: aiPrompt.trim(),
             aspect_ratio: "1x1",
           }),
         })
@@ -476,36 +469,19 @@ export function MediaPickerModal({
           {/* ---- AI generate tab ---- */}
           {tab === "ai" && (
             <div className="space-y-4">
-              <div>
-                <label
-                  htmlFor="ai-image-prompt"
-                  className="text-xs font-medium text-foreground block mb-1.5"
-                >
-                  Describe the image you want
-                </label>
-                <textarea
-                  id="ai-image-prompt"
-                  value={aiPrompt}
-                  onChange={(e) => setAiPrompt(e.target.value)}
-                  placeholder="Professional product photo on white background…"
-                  rows={3}
-                  className="w-full rounded-lg border border-border px-3 py-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary"
-                  data-testid="ai-image-prompt"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Pre-filled from your post content. You can edit it.
-                </p>
-              </div>
+              <p className="text-sm text-muted-foreground">
+                Generate 4 background images in your brand style. Pick one to attach to your post.
+              </p>
 
               <button
                 type="button"
                 onClick={() => void generateAiImages()}
-                disabled={generating || !aiPrompt.trim()}
+                disabled={generating}
                 className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 data-testid="ai-generate-btn"
               >
                 <Sparkles size={14} aria-hidden />
-                {generating ? "Generating 4 variations…" : "Generate"}
+                {generating ? "Generating 4 variations…" : "Generate from your brand"}
               </button>
 
               {aiError && (
