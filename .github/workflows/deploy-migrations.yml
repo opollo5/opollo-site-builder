@@ -52,8 +52,23 @@ on:
           Leave blank for normal pushes. Reverted runs before applied
           when both are supplied, so a row can be cleared and re-marked
           in a single dispatch if needed.
+          IMPORTANT: if you are using this to restore "pending" state for
+          future migrations after a repair_versions_applied skipping run,
+          set skip_push=true to prevent the push step from immediately
+          applying all the just-restored pending migrations.
         required: false
         default: ""
+      skip_push:
+        type: boolean
+        default: false
+        description: |
+          When true, skip the 'supabase db push' step entirely.
+          Use for repair-only dispatches where you want to update
+          schema_migrations tracking rows WITHOUT applying any pending
+          SQL. Prevents the incident where repair_versions_reverted
+          restores pending migrations and db push immediately runs them.
+          (2026-05-28 incident: 0157 applied without per-migration approval
+          because the revert dispatch also triggered db push.)
 
 concurrency:
   # Serialise runs against the same project — two concurrent
@@ -126,6 +141,7 @@ jobs:
           done
 
       - name: Push pending migrations
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_push != true }}
         env:
           SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
         # --include-all ensures no migrations are skipped when the
@@ -133,6 +149,8 @@ jobs:
         # row was manually inserted but the migration files themselves
         # were never applied). supabase db push is idempotent — already-
         # applied migrations are no-ops.
+        # Skipped when skip_push=true (repair-only dispatch) to prevent
+        # accidentally applying pending migrations after a reverted repair.
         run: supabase db push --linked --include-all
 
       - name: Summarise on success
