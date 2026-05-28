@@ -121,6 +121,24 @@ below, the specific rule wins; otherwise apply these.
 5. **Prefer verification over inference.** See §"Verification over assumption".
 6. **Prefer matching existing patterns over inventing new ones.** If the same shape already works elsewhere in the codebase, the fix is to copy it — not redesign it. See §"Diagnose by working analog".
 
+## Decision policy
+
+When facing tradeoffs during autonomous work, apply these principles in
+order. Do not stop to ask for human input unless none of them resolves
+the choice.
+
+1. **Root cause over symptom.** If a fix addresses symptoms while leaving the underlying bug intact, choose the root-cause fix even if scope expands. Symptomatic patches are acceptable only when the root cause is genuinely out of scope (e.g. a third-party service bug) AND the symptomatic fix is logged in the backlog with a link to the root cause.
+2. **Validate over assume.** Where a fix is supposed to work under real conditions, validate it under real conditions before declaring done. A green test suite is not validation if the test doesn't exercise the actual broken path. If validation requires production traffic that doesn't exist, surface that — don't substitute "it compiles" for "it works."
+3. **System fix over workaround.** If the same class of bug can recur, fix the system that allows it (lint rule, regression test, schema constraint, type guard) in the same PR. A bug worth fixing once is worth preventing.
+4. **Ship correctness over preserve micro-optimisations.** If an optimisation's correctness is uncertain or expensive to prove, remove it. A single indexed SELECT per request is fine. Caches and in-memory flags are presumed wrong until proven right.
+5. **Pre-production: optimise for shipping; defer hardening to backlog.** Security hygiene items, credential rotations, observability polish, and similar items are explicitly deferred unless they actively block production use. Do not raise them in PR reviews or commit messages.
+6. **Single PR per logical change.** If a slice's work naturally splits into independent concerns (fix + test + docs is ONE concern; fix + unrelated refactor is TWO), split. If it's one concern that grew, keep it together.
+7. **Stop only when these principles conflict and the conflict is real.** "I could pick either" is not a real conflict — pick the one matching the brief and proceed. Real conflicts are: a system-fix that would block the slice for >2 hours; a root-cause fix that requires touching code owned by an unmerged parallel PR; a validation that would require production data the team has explicitly forbidden creating.
+
+When in doubt, choose the option that the user would have chosen if
+they were watching — they are running multiple sessions in parallel
+and cannot be the synchronous decision-maker on every fork.
+
 ## Merge decision tree
 
 The single source of truth on whether Claude Code can auto-merge a PR.
