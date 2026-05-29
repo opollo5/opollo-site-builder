@@ -185,6 +185,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       completed_at: new Date().toISOString(),
     }).eq("id", jobId);
 
+    // Update batch state after job completion (non-blocking).
+    if (batchId) void updateBatchProgress(svc, batchId);
+
     logger.info("image.qstash.completed", { jobId, storagePath: image.storagePath });
     return NextResponse.json({ ok: true, status: "completed", storagePath: image.storagePath });
 
@@ -202,6 +205,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       completed_at: new Date().toISOString(),
     }).eq("id", jobId);
 
+    // Update batch state after job failure (non-blocking).
+    if (batchId) void updateBatchProgress(svc, batchId);
+
     logger.error("image.qstash.generation_failed", { jobId, state, errorClass, errorDetail });
 
     // Return 200 — generation failure is permanent; QStash retrying won't help
@@ -211,5 +217,49 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } finally {
     // Always release the lease — runs even when generation throws.
     await releaseImageLease(jobId);
+  }
+}
+
+/**
+ * Recalculate batch progress from live job counts and update batch state.
+ * Non-blocking — called via void; errors are logged, never thrown.
+ */
+async function updateBatchProgress(
+  svc: ReturnType<typeof import("@/lib/supabase").getServiceRoleClient>,
+  batchId: string,
+): Promise<void> {
+  try {
+    const { data: counts } = await svc
+      .from("image_generation_jobs")
+      .select("state")
+      .eq("batch_id", batchId);
+
+    if (!counts) return;
+
+    const total = counts.length;
+    const completed = counts.filter((j) => j.state === "completed").length;
+    const failed = counts.filter((j) => j.state === "failed" || j.state === "escalated").length;
+    const pending = counts.filter((j) => j.state === "pending" || j.state === "running").length;
+
+    let state: string;
+    if (pending > 0) {
+      state = "running";
+    } else if (failed === total) {
+      state = "failed";
+    } else if (failed > 0) {
+      state = "partial";
+    } else {
+      state = "completed";
+    }
+
+    await svc
+      .from("image_generation_batches")
+      .update({ state, completed_jobs: completed, failed_jobs: failed, updated_at: new Date().toISOString() })
+      .eq("id", batchId);
+  } catch (err) {
+    logger.warn("image.batch.progress_update_failed", {
+      batchId,
+      err: err instanceof Error ? err.message : String(err),
+    });
   }
 }
