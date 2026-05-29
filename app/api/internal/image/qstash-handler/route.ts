@@ -18,6 +18,7 @@ import {
 } from "@/lib/image/lease";
 import { incrementImageGenSpend } from "@/lib/image/budget";
 import { notifyImageGenBudgetThreshold } from "@/lib/image/budget-notify";
+import { generatePreview } from "@/lib/image/generator/preview";
 
 // ---------------------------------------------------------------------------
 // POST /api/internal/image/qstash-handler
@@ -70,6 +71,8 @@ const BodySchema = z.object({
   capDraftId: z.string().uuid().optional(),
   headlineText: z.string().max(200).optional(),
   logoUrl: z.string().url().optional(),
+  // B5: when true, build the prompt and return without calling Ideogram.
+  previewOnly: z.boolean().optional(),
 });
 
 type Body = z.infer<typeof BodySchema>;
@@ -99,9 +102,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return validationError(`Invalid body: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  const { jobId, generationParams, batchId, capDraftId, headlineText, logoUrl } = parsed;
+  const { jobId, generationParams, batchId, capDraftId, headlineText, logoUrl, previewOnly } = parsed;
 
-  logger.info("image.qstash.received", { jobId, batchId, companyId: generationParams.companyId });
+  logger.info("image.qstash.received", {
+    jobId,
+    batchId,
+    companyId: generationParams.companyId,
+    previewOnly: previewOnly === true,
+  });
+
+  // ─── B5: preview-only short-circuit ─────────────────────────────────────
+  // Bypass lease + concurrency + Ideogram. Build the prompt, write the audit
+  // row, mark the job completed with null result. Never increments spend.
+  // Preview never enters the concurrency budget — it's a synchronous read
+  // from prompt-engine and has no cost to throttle.
+  if (previewOnly) {
+    return handlePreview({ jobId, generationParams, batchId });
+  }
 
   // ─── 1. Acquire Redis lease (dedup + concurrency token) ───────────────────
 
@@ -373,6 +390,82 @@ async function linkCapDraft(
       err: err instanceof Error ? err.message : String(err),
     });
   }
+}
+
+/**
+ * B5: handle a preview-only delivery. Build the prompt via prompt-engine,
+ * persist it to the job + image_generation_log, and return 200. Never calls
+ * Ideogram. Never increments spend. Never holds a lease.
+ */
+async function handlePreview(input: {
+  jobId: string;
+  generationParams: z.infer<typeof GenerationParamsSchema>;
+  batchId: string | undefined;
+}): Promise<NextResponse> {
+  const svc = getServiceRoleClient();
+
+  let prompt: string;
+  try {
+    const result = generatePreview(input.generationParams);
+    prompt = result.prompt;
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.warn("image.qstash.preview_prompt_failed", { jobId: input.jobId, err: detail });
+    await svc
+      .from("image_generation_jobs")
+      .update({
+        state: "failed",
+        error_class: "PreviewPromptError",
+        error_detail: detail.slice(0, 500),
+        completed_at: new Date().toISOString(),
+      })
+      .eq("id", input.jobId);
+    if (input.batchId) void updateBatchProgress(svc, input.batchId);
+    return NextResponse.json({ ok: false, status: "preview_failed", error: detail });
+  }
+
+  // Stash prompt into generation_params so the UI can show it without a new column.
+  const enrichedParams = { ...input.generationParams, preview_prompt: prompt };
+
+  await svc
+    .from("image_generation_jobs")
+    .update({
+      state: "completed",
+      result_storage_path: null,
+      generation_params: enrichedParams,
+      completed_at: new Date().toISOString(),
+    })
+    .eq("id", input.jobId);
+
+  // Audit row — outcome='preview' per §B5. Never block on this; warn on failure.
+  await svc
+    .from("image_generation_log")
+    .insert({
+      company_id: input.generationParams.companyId,
+      style_id: input.generationParams.styleId,
+      composition_type: input.generationParams.compositionType,
+      aspect_ratio: input.generationParams.aspectRatio,
+      model_used: "preview",
+      model_tier: input.generationParams.model ?? "standard",
+      prompt_used: prompt,
+      outcome: "preview",
+    })
+    .then(({ error }) => {
+      if (error) {
+        logger.warn("image.qstash.preview_log_insert_failed", {
+          jobId: input.jobId,
+          err: error.message,
+        });
+      }
+    });
+
+  if (input.batchId) void updateBatchProgress(svc, input.batchId);
+
+  logger.info("image.qstash.preview_completed", {
+    jobId: input.jobId,
+    promptLength: prompt.length,
+  });
+  return NextResponse.json({ ok: true, status: "preview", prompt });
 }
 
 /**
