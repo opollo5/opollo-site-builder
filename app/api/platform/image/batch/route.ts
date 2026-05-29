@@ -3,11 +3,7 @@ import { z } from "zod";
 
 import { dbUuid, internalError, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
-import { getServiceRoleClient } from "@/lib/supabase";
-import { logger } from "@/lib/logger";
-import { enqueueImageJob } from "@/lib/image/enqueue";
-import { checkImageGenBudget } from "@/lib/image/budget";
-import type { GenerationParams } from "@/lib/image/types";
+import { dispatchImageBatch } from "@/lib/image/dispatch";
 
 // ---------------------------------------------------------------------------
 // POST /api/platform/image/batch
@@ -15,9 +11,9 @@ import type { GenerationParams } from "@/lib/image/types";
 // Creates a batch + N image_generation_jobs, enqueues one QStash message per
 // job, returns the batchId for the operator to poll.
 //
-// B3: a per-company monthly budget cap is enforced before creating the batch.
-// Preview mode (mode='preview') skips the budget check — preview never calls
-// Ideogram and never increments spend.
+// Budget pre-flight, batch+job creation, QStash enqueue, and batch-state
+// advancement all live in lib/image/dispatch.ts so the C4 ingest route can
+// reuse the same surface without re-authing or duplicating side-effects.
 //
 // §1.2: route under /api/platform/image/*, not /social/
 // §1.7: one job per distinct aspect ratio derived from target_platforms.
@@ -62,151 +58,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const gate = await requireCanDoForApi(company_id, "create_post");
   if (gate.kind === "deny") return gate.response;
 
-  const svc = getServiceRoleClient();
+  const result = await dispatchImageBatch({
+    companyId: company_id,
+    triggeredBy: gate.userId,
+    jobs,
+    mode,
+    sourceFilename: source_filename,
+    sourceRowCount: source_row_count,
+  });
 
-  // ─── B3: budget pre-flight ───────────────────────────────────────────────
-  // Preview mode never spends real Ideogram credits (per B5), so skip.
-  // Per §1.7: projected job count is the number of jobs being enqueued, not
-  // the source row count. The caller (C4 ingestion route) deduplicates
-  // aspect ratios per row before constructing the jobs array.
-  if (mode !== "preview") {
-    const budget = await checkImageGenBudget(company_id, jobs.length);
-    if (!budget.allowed) {
-      logger.info("image.batch.budget_rejected", {
-        companyId: company_id,
-        projectedJobs: budget.projected_jobs,
-        projectedCents: budget.projected_cents,
-        remainingCents: budget.remaining_cents,
-        reason: budget.reason,
-      });
+  if (!result.ok) {
+    if (result.code === "BUDGET_EXCEEDED") {
       return NextResponse.json(
         {
           ok: false,
           error: {
-            code: "BUDGET_EXCEEDED",
-            message: `Projected ${budget.projected_jobs} images cost $${(budget.projected_cents / 100).toFixed(2)}; $${(budget.remaining_cents / 100).toFixed(2)} remaining this month.`,
-            projected_jobs: budget.projected_jobs,
-            projected_cents: budget.projected_cents,
-            source_row_count: source_row_count ?? null,
-            remaining_cents: budget.remaining_cents,
-            budget_cents: budget.budget_cents,
-            spent_cents: budget.spent_cents,
-            next_reset_at: budget.next_reset_at,
+            code: result.code,
+            message: result.message,
+            ...result.details,
           },
           timestamp: new Date().toISOString(),
         },
         { status: 402 },
       );
     }
+    return internalError(result.message);
   }
-
-  // Create the batch row.
-  const { data: batch, error: batchErr } = await svc
-    .from("image_generation_batches")
-    .insert({
-      company_id,
-      state: "pending",
-      total_jobs: jobs.length,
-      source_filename: source_filename ?? null,
-      source_row_count: source_row_count ?? null,
-      triggered_by: gate.userId,
-    })
-    .select("id")
-    .single();
-
-  if (batchErr || !batch) {
-    logger.error("image.batch.create_failed", { companyId: company_id, error: batchErr?.message });
-    return internalError("Failed to create batch.");
-  }
-
-  const batchId = batch.id as string;
-
-  // Create job rows + enqueue to QStash.
-  const jobErrors: string[] = [];
-  const jobIds: string[] = [];
-
-  for (const spec of jobs) {
-    const generationParams: GenerationParams = {
-      styleId: spec.styleId,
-      primaryColour: spec.primaryColour,
-      compositionType: spec.compositionType,
-      aspectRatio: spec.aspectRatio,
-      industry: spec.industry,
-      companyId: company_id,
-      count: 1,
-    };
-
-    // Create job row.
-    const { data: job, error: jobErr } = await svc
-      .from("image_generation_jobs")
-      .insert({
-        company_id,
-        batch_id: batchId,
-        state: "pending",
-        generation_params: generationParams,
-        target_platforms: spec.targetPlatforms ?? null,
-        target_publish_date: spec.targetPublishDate ?? null,
-        parent_post_index: spec.parentPostIndex ?? null,
-      })
-      .select("id")
-      .single();
-
-    if (jobErr || !job) {
-      logger.error("image.batch.job_create_failed", { batchId, error: jobErr?.message });
-      jobErrors.push(`Failed to create job: ${jobErr?.message ?? "unknown"}`);
-      continue;
-    }
-
-    const jobId = job.id as string;
-    jobIds.push(jobId);
-
-    // B5: preview mode enqueues through the same QStash handler with
-    // previewOnly=true. The handler builds the prompt and returns without
-    // calling Ideogram. Same code path exercise; zero spend.
-    const enqueue = await enqueueImageJob({
-      jobId,
-      generationParams,
-      batchId,
-      ...(mode === "preview" && { previewOnly: true }),
-    });
-    if (!enqueue.ok) {
-      logger.error("image.batch.enqueue_failed", { batchId, jobId, error: enqueue.error });
-      // Mark job failed immediately so the batch tracker has accurate counts.
-      await svc
-        .from("image_generation_jobs")
-        .update({ state: "failed", error_class: "EnqueueFailed", error_detail: enqueue.error })
-        .eq("id", jobId);
-      jobErrors.push(`Job ${jobId} failed to enqueue: ${enqueue.error}`);
-    }
-  }
-
-  // Advance batch to running (or failed if everything errored).
-  const allFailed = jobErrors.length === jobs.length;
-  await svc
-    .from("image_generation_batches")
-    .update({
-      state: allFailed ? "failed" : "running",
-      failed_jobs: jobErrors.length,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", batchId);
-
-  logger.info("image.batch.created", {
-    batchId,
-    companyId: company_id,
-    totalJobs: jobs.length,
-    enqueuedJobs: jobIds.length - jobErrors.length,
-    mode,
-  });
 
   return NextResponse.json(
     {
       ok: true,
       data: {
-        batchId,
-        totalJobs: jobs.length,
-        mode,
-        ...(jobErrors.length > 0 && { enqueueErrors: jobErrors }),
+        batchId: result.batchId,
+        totalJobs: result.totalJobs,
+        mode: result.mode,
+        ...(result.enqueueErrors && { enqueueErrors: result.enqueueErrors }),
       },
       timestamp: new Date().toISOString(),
     },
