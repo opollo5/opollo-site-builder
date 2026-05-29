@@ -61,12 +61,15 @@ const VALID_PARAMS = {
   companyId: COMPANY_UUID,
 };
 
-function makeRequest(body: unknown, signature = "valid-sig"): Request {
+// Returns a plain Request cast to NextRequest — body is readable in node env.
+// Passing Request to a handler typed as NextRequest is the standard test pattern
+// (NextRequest extends Request; body stream stays readable either way).
+function makeRequest(body: unknown, signature = "valid-sig"): NextRequest {
   return new Request("http://localhost/api/internal/image/qstash-handler", {
     method: "POST",
     headers: { "upstash-signature": signature, "content-type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 function buildFromMock(opts: {
@@ -94,7 +97,7 @@ function buildFromMock(opts: {
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────
 import { POST } from "@/app/api/internal/image/qstash-handler/route";
-// NextRequest not needed for test request construction — use plain Request (readable body in node env)
+import type { NextRequest } from "next/server";
 
 describe("POST /api/internal/image/qstash-handler", () => {
   beforeEach(() => {
