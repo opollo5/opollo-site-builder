@@ -5,7 +5,7 @@ description: Use this skill whenever working on image generation in Opollo — I
 
 # Image Generation
 
-Opollo uses Ideogram for background-only image generation and a compositing provider (Bannerbear or Placid) for programmatic text and logo overlay. The two concerns are permanently separated.
+Opollo uses Ideogram for background-only image generation and a native [`sharp`](https://sharp.pixelplumbing.com/)-based compositor for programmatic text and logo overlay. The two concerns are permanently separated. Compositing templates live in the `image_templates` database table, editable per-company via the visual editor at `/company/image/templates` (see `MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md` §1.8 + §1.9).
 
 ## The rules — all non-negotiable
 
@@ -14,7 +14,7 @@ Opollo uses Ideogram for background-only image generation and a compositing prov
 3. **Composition → text zone is deterministic.** See the mapping table below. No variation.
 4. **Brand from brand profile.** `get_active_brand_profile(companyId)` always. Never ad-hoc.
 5. **Every call writes to image_generation_log.** No exceptions.
-6. **compositeImage() is the only compositing call.** Never call Bannerbear or Placid directly.
+6. **compositeImage() is the only compositing call.** Never call `sharp` directly from product code — go through `lib/image/compositing/index.ts`.
 7. **Quality check before showing to user.** Luminance + safe zone + dimension.
 8. **Failure handler on every generation call.** quality fail → retry → stock → escalate.
 9. **safe_mode=true blocks bold_promo and editorial entirely.** Not just de-prioritised — removed.
@@ -466,7 +466,7 @@ async function writeImageLog(params: {
 
 ## compositeImage() — the only compositing call
 
-Product code never calls Bannerbear or Placid directly.
+Product code calls `compositeImage()` and nothing else. The function dynamic-imports the sharp renderer; there is no provider switch. Per `MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md` §1.8: native sharp-based rendering, no third party.
 
 ```typescript
 // lib/image/compositing/index.ts
@@ -490,23 +490,55 @@ export interface LogoConfig {
 
 export interface CompositeInput {
   backgroundStoragePath: string;  // Supabase Storage path of background
-  textZones: TextZone[];          // from TEXT_ZONE_MAP for the composition type
+  textZones: TextZone[];          // resolved from a DB template's customTextZone or TEXT_ZONE_MAP fallback
   logo: LogoConfig | null;
   outputFormat: 'jpeg' | 'png';
   outputWidth: number;
   outputHeight: number;
 }
 
-export async function compositeImage(input: CompositeInput): Promise<{ storagePath: string; provider: string; durationMs: number }> {
-  const provider = process.env.COMPOSITING_PROVIDER ?? 'bannerbear';
-  switch (provider) {
-    case 'bannerbear': return compositeBannerbear(input);
-    case 'placid':     return compositePlacid(input);
-    case 'sharp':      return compositeSharp(input);
-    default: throw new Error(`Unknown compositing provider: ${provider}`);
-  }
+export async function compositeImage(input: CompositeInput): Promise<CompositeResult> {
+  const { compositeSharp } = await import('./sharp-renderer');
+  return compositeSharp(input);
 }
 ```
+
+### Template resolution at call sites
+
+Callers resolve a template from the `image_templates` table BEFORE building `CompositeInput`. The pattern used in `app/api/internal/image/qstash-handler/route.ts`:
+
+```typescript
+import { get_template } from '@/lib/image/templates';
+import { TEXT_ZONE_MAP, compositeImage } from '@/lib/image/compositing';
+
+const dbTemplate = await get_template(companyId, aspectRatio);
+const textZone = dbTemplate?.definition.customTextZone
+  ?? TEXT_ZONE_MAP[(dbTemplate?.definition.compositionType ?? compositionType)];
+
+await compositeImage({
+  backgroundStoragePath: image.storagePath,
+  textZones: [{
+    ...textZone,
+    text: headlineText,
+    maxFontSize: dbTemplate?.definition.maxHeadlineFontSize ?? 56,
+    colour: 'white',
+  }],
+  logo: logoUrl ? {
+    url: logoUrl,
+    position: dbTemplate?.definition.logoPosition ?? 'bottom-right',
+    sizePercent: dbTemplate?.definition.logoSizePercent ?? 18,
+    padding: dbTemplate?.definition.logoPadding ?? 24,
+  } : null,
+  outputFormat: image.format === 'png' ? 'png' : 'jpeg',
+  outputWidth: image.width,
+  outputHeight: image.height,
+});
+```
+
+- Company-scoped templates override globals for the same name + aspect_ratio.
+- Falls back to `TEXT_ZONE_MAP[compositionType]` when no template row exists.
+- All template writes go through the `update_image_template()` RPC — never direct UPDATE.
+- The editor at `/company/image/templates/[id]/edit` (Fabric.js canvas) is the only write surface for templates.
 
 Generate fresh signed URLs for logos immediately before the compositing call (not at upload time — post could be weeks old):
 
@@ -585,11 +617,9 @@ Before calling any external image API, add its domain to `lib/security-headers.t
 
 ```
 api.ideogram.ai          — Ideogram API
-api.bannerbear.com       — Bannerbear compositing (if selected)
-api.placid.app           — Placid compositing (if selected)
 ```
 
-The static audit (`npm run audit:static`) checks CSP coverage and blocks CI on missing entries.
+Sharp compositing is in-process and adds no `connect-src` entry. The static audit (`npm run audit:static`) checks CSP coverage and blocks CI on missing entries.
 
 ---
 
@@ -600,12 +630,11 @@ IDEOGRAM_API_KEY=
 IDEOGRAM_STANDARD_MODEL=ideogram-ai/ideogram-v3-flash
 IDEOGRAM_PREMIUM_MODEL=ideogram-ai/ideogram-v3
 IMAGE_GENERATION_TIMEOUT_MS=30000
-COMPOSITING_PROVIDER=bannerbear        # or placid or sharp
-BANNERBEAR_API_KEY=
-PLACID_API_KEY=
 IMAGE_GENERATION_BUCKET=generated-images
 SOCIAL_MEDIA_BUCKET=social-media
 ```
+
+`COMPOSITING_PROVIDER` and all `BANNERBEAR_*` / `PLACID_*` env vars are gone (A-NEW-4). Sharp runs in-process; templates live in the `image_templates` DB table.
 
 ---
 
@@ -616,19 +645,23 @@ lib/image/
   generator/
     ideogram.ts           — Ideogram API client (backgrounds only)
     prompt-engine.ts      — parameterised prompt builder
+    preview.ts            — prompt-only preview generator (B5; no Ideogram call)
     stock.ts              — stock library client + ranking
     routing.ts            — model tier selection, style validation, getAllowedStyles
   compositing/
-    index.ts              — compositeImage() abstraction interface
-    text-zones.ts         — TEXT_ZONE_MAP (deterministic composition→zone mapping)
-    bannerbear.ts         — Bannerbear implementation
-    placid.ts             — Placid implementation
-    sharp.ts              — Sharp implementation (future)
+    index.ts              — compositeImage() abstraction (dynamic-imports sharp-renderer)
+    text-zones.ts         — TEXT_ZONE_MAP (deterministic composition→zone fallback)
+    sharp-renderer.ts     — the only renderer; uses sharp + librsvg
+  templates/
+    index.ts              — get_template(), list_templates(), create_template(),
+                            update_template() helpers over image_templates
   failure/
     quality-check.ts      — luminance, safe zone, dimension checks
     handler.ts            — generateWithFallback(), escalation, audit log write
   types.ts                — StyleId, CompositionType, AspectRatio, GeneratedImage, etc.
 ```
+
+`bannerbear.ts`, `placid.ts`, and `templates-v1.ts` were deleted in A-NEW-4 (#1159) when the DB-backed `image_templates` path became the source of truth.
 
 ## Common pitfalls
 
