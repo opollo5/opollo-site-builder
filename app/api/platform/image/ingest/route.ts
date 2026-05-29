@@ -7,9 +7,9 @@ import { logger } from "@/lib/logger";
 
 import { parseXlsxBuffer, type PostRow } from "@/lib/ingestion/xlsx-parse";
 import { parseDocxBuffer } from "@/lib/ingestion/docx-parse";
-import { interpretPosts, type InterpretedPost } from "@/lib/ingestion/interpret";
-import { dispatchImageBatch, type DispatchJobSpec } from "@/lib/image/dispatch";
-import { MASS_GEN_PLATFORM_MAP, type AspectRatio } from "@/lib/image/types";
+import { interpretPosts } from "@/lib/ingestion/interpret";
+import { dispatchImageBatch } from "@/lib/image/dispatch";
+import { fanOutJobs } from "@/lib/image/fan-out";
 
 // ---------------------------------------------------------------------------
 // POST /api/platform/image/ingest
@@ -211,49 +211,3 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
 }
 
-/**
- * Fan a post out into one job per distinct aspect ratio (§1.7). Each job
- * carries the `parentPostIndex` so D2's UI can group results back to their
- * source post, the post's `target_platforms` for B4's auto-attach, and the
- * post's optional `publish_date` looked up from the parsed source row.
- *
- * Exported for unit testing.
- */
-export function fanOutJobs(
-  posts: InterpretedPost[],
-  publishDateBySourceRow: Map<number, string> = new Map(),
-): DispatchJobSpec[] {
-  const out: DispatchJobSpec[] = [];
-  posts.forEach((post, postIndex) => {
-    const ratios = uniqueRatiosForPlatforms(post.image_brief.target_platforms);
-    const publishDate = publishDateBySourceRow.get(post.sourceRow);
-    for (const aspectRatio of ratios) {
-      out.push({
-        styleId: post.image_brief.style_id,
-        primaryColour: post.image_brief.primary_colour,
-        compositionType: post.image_brief.composition_type,
-        aspectRatio,
-        targetPlatforms: platformsForRatio(post.image_brief.target_platforms, aspectRatio),
-        ...(publishDate && { targetPublishDate: publishDate }),
-        parentPostIndex: postIndex,
-      });
-    }
-  });
-  return out;
-}
-
-function uniqueRatiosForPlatforms(platforms: string[]): AspectRatio[] {
-  const seen = new Set<AspectRatio>();
-  const out: AspectRatio[] = [];
-  for (const p of platforms) {
-    const r = MASS_GEN_PLATFORM_MAP[p];
-    if (!r || seen.has(r)) continue;
-    seen.add(r);
-    out.push(r);
-  }
-  return out;
-}
-
-function platformsForRatio(platforms: string[], ratio: AspectRatio): string[] {
-  return platforms.filter((p) => MASS_GEN_PLATFORM_MAP[p] === ratio);
-}

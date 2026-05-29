@@ -35,7 +35,8 @@ vi.mock("@/lib/ingestion/docx-parse", () => ({
   parseDocxBuffer: mockParseDocx,
 }));
 
-import { POST, fanOutJobs } from "@/app/api/platform/image/ingest/route";
+import { POST } from "@/app/api/platform/image/ingest/route";
+import { fanOutJobs } from "@/lib/image/fan-out";
 import type { InterpretedPost } from "@/lib/ingestion/interpret";
 import type { NextRequest } from "next/server";
 
