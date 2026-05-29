@@ -10,24 +10,33 @@ import {
   getAllowedStyles,
   validateStyleForBrand,
 } from "@/lib/image";
+import { compositeImage, TEXT_ZONE_MAP } from "@/lib/image/compositing";
+import type { CompositeInput } from "@/lib/image/compositing";
+import { getTemplateV1 } from "@/lib/image/compositing/templates-v1";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { AspectRatio, CompositionType, StyleId } from "@/lib/image";
 
 // ---------------------------------------------------------------------------
-// POST /api/platform/image/generate — I4 mood board generation
+// POST /api/platform/image/generate — I4 mood board generation (A4)
 //
-// Generates 4–6 background images for the customer to select from.
-// Each image goes through generateWithFallback() (Ideogram → quality
-// check → stock fallback if needed) and is stored in Supabase Storage.
-// Returns signed URLs for immediate display in the mood board UI.
+// Generates 4–6 composited images for the customer to select from.
+// Each image goes through:
+//   1. generateWithFallback() → Ideogram background → Supabase Storage
+//   2. compositeImage() → sharp renderer → overlay band + headline text
+//      + brand logo (if available) → composite stored at /composite/ prefix
 //
-// Auth: requires `create_post` permission (editor+ or Opollo staff).
+// Returns signed URLs for the composites (not raw backgrounds).
+//
+// Uses code templates from lib/image/compositing/templates-v1.ts (A-NEW-1).
+// Will be migrated to database templates in A-NEW-4's follow-up.
+//
+// Auth: canDo("create_post") — editor+.
 // Feature gate: IMAGE_FEATURE_MOOD_BOARD must be "true".
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120; // Ideogram can take ~30s per image
+export const maxDuration = 120; // ~11s Ideogram + ~1s compositing per image; 6 parallel = ~15s total
 
 const IMAGE_GEN_BUCKET =
   process.env.IMAGE_GENERATION_BUCKET ?? "generated-images";
@@ -52,6 +61,9 @@ const GenerateSchema = z.object({
   aspect_ratio: z.enum(["1x1", "4x5", "9x16", "16x9", "4x3"]),
   count: z.number().int().min(1).max(6).default(4),
   post_master_id: z.string().uuid().optional(),
+  // A4 addition: user-supplied headline for the overlay text.
+  // Default "Headline preview" is applied server-side when blank.
+  headline: z.string().max(120).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -80,7 +92,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { company_id: companyId, style_id, composition_type, aspect_ratio, count, post_master_id } =
+  const { company_id: companyId, style_id, composition_type, aspect_ratio, count, post_master_id, headline } =
     parsed.data;
 
   const gateResult = await requireCanDoForApi(companyId, "create_post");
@@ -90,7 +102,7 @@ export async function POST(req: NextRequest) {
 
   const { userId } = gateResult;
 
-  // Validate style against brand profile (safe_mode + approved_style_ids)
+  // Validate style against brand profile (safe_mode + approved_style_ids).
   const brand = await getActiveBrandProfile(companyId);
   try {
     validateStyleForBrand(style_id as StyleId, brand);
@@ -117,11 +129,20 @@ export async function POST(req: NextRequest) {
     userId,
   });
 
-  // Generate all images in parallel; use allSettled so partial failure
-  // doesn't abort the whole board.
   const primaryColour = brand?.primary_colour ?? "#1A1A1A";
   const industry = brand?.industry ?? undefined;
+  const headlineText = headline?.trim() || "Headline preview";
 
+  // Code template for this aspect ratio (from A-NEW-1 templates-v1.ts).
+  // Migrated to DB templates in A-NEW-4.
+  const template = getTemplateV1(aspect_ratio as AspectRatio);
+  const textZone = TEXT_ZONE_MAP[composition_type as CompositionType];
+
+  // Brand logo: prefer icon variant, fall back to primary.
+  // Used directly as-is; compositor handles fetch failure gracefully.
+  const logoUrl = brand?.logo_icon_url ?? brand?.logo_primary_url ?? null;
+
+  // Generate all backgrounds in parallel.
   const generationTasks = Array.from({ length: count }, (_, i) =>
     generateWithFallback({
       styleId: style_id as StyleId,
@@ -145,31 +166,73 @@ export async function POST(req: NextRequest) {
     }),
   );
 
-  const results = await Promise.all(generationTasks);
-  const successful = results.filter(
-    (r): r is NonNullable<typeof r> => r !== null,
-  );
+  const generationResults = await Promise.all(generationTasks);
+  const backgrounds = generationResults.filter((r): r is NonNullable<typeof r> => r !== null);
 
-  if (successful.length === 0) {
+  if (backgrounds.length === 0) {
     return NextResponse.json(
       { ok: false, error: { code: "GENERATION_FAILED", message: "All image generation attempts failed." } },
       { status: 502 },
     );
   }
 
-  // Get signed URLs for display
+  // Composite each background with overlay + text + logo.
+  const compositeResults = await Promise.all(
+    backgrounds.map(async (bg) => {
+      const compositeInput: CompositeInput = {
+        backgroundStoragePath: bg.storagePath,
+        textZones: [{
+          ...textZone,
+          text: headlineText,
+          maxFontSize: template.maxHeadlineFontSize,
+          colour: "white", // white text on dark overlay band
+        }],
+        logo: logoUrl
+          ? {
+              url: logoUrl,
+              position: template.logoPosition,
+              sizePercent: template.logoSizePercent,
+              padding: template.logoPadding,
+            }
+          : null,
+        outputFormat: bg.format === "png" ? "png" : "jpeg",
+        outputWidth: bg.width,
+        outputHeight: bg.height,
+      };
+
+      try {
+        return await compositeImage(compositeInput);
+      } catch (err) {
+        logger.warn("mood-board.composite.partial-failure", {
+          companyId,
+          backgroundPath: bg.storagePath,
+          error: String(err),
+        });
+        // Degrade: return the raw background path so the board doesn't lose a slot
+        return {
+          storagePath: bg.storagePath,
+          provider: "fallback_raw",
+          durationMs: 0,
+        };
+      }
+    }),
+  );
+
+  // Sign URLs for display (composite paths).
   const supabase = getServiceRoleClient();
   const images = await Promise.all(
-    successful.map(async (img) => {
+    compositeResults.map(async (comp, i) => {
+      const bg = backgrounds[i]!;
       const { data } = await supabase.storage
         .from(IMAGE_GEN_BUCKET)
-        .createSignedUrl(img.storagePath, SIGNED_URL_TTL);
+        .createSignedUrl(comp.storagePath, SIGNED_URL_TTL);
       return {
-        storagePath: img.storagePath,
+        storagePath: comp.storagePath,
         signedUrl: data?.signedUrl ?? null,
-        width: img.width,
-        height: img.height,
-        format: img.format,
+        width: bg.width,
+        height: bg.height,
+        format: bg.format,
+        composited: comp.provider !== "fallback_raw",
       };
     }),
   );
@@ -178,6 +241,7 @@ export async function POST(req: NextRequest) {
     companyId,
     requested: count,
     generated: images.length,
+    composited: images.filter((i) => i.composited).length,
     userId,
   });
 
