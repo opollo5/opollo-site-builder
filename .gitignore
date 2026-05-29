@@ -64,3 +64,5 @@ playwright-report-verify/
 test-results/
 playwright.verify.config.ts
 !assets/fonts/README.md
+!assets/fonts/*.woff2
+!assets/fonts/OFL-*.txt
