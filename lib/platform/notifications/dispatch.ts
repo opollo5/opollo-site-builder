@@ -128,6 +128,10 @@ async function resolveRecipients(
     case "connection_restored":
       // Company admins only.
       return resolveCompanyAdmins(payload.companyId);
+
+    case "image_generation_failed":
+      // Platform admins of the company — same audience as connection_lost.
+      return resolveCompanyAdmins(payload.companyId);
   }
 }
 
@@ -297,8 +301,9 @@ function renderInApp(
     case "invitation_sent":
     case "invitation_reminder":
     case "invitation_expired":
+    case "image_generation_failed":
       return {
-        title: "Invitation",
+        title: "Image generation failed",
         body: "",
         actionUrl: null,
       };
@@ -437,6 +442,12 @@ function renderEmailContent(
           label: "Open post",
           url: `${siteUrl()}/company/social/posts/${payload.postMasterId}`,
         },
+      };
+    case "image_generation_failed":
+      return {
+        subject: "Image generation failed — action may be required",
+        lead: `All ${payload.attemptsCount} generation attempts for a ${payload.aspectRatio} image failed (style: ${payload.styleId}, composition: ${payload.compositionType}). The image was not produced. Check Ideogram API status or review the image_generation_log for details.`,
+        action: null,
       };
   }
 }

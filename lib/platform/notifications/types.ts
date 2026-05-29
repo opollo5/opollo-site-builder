@@ -15,7 +15,8 @@ export type NotificationEvent =
   | "connection_restored"
   | "post_published"
   | "post_failed"
-  | "changes_requested";
+  | "changes_requested"
+  | "image_generation_failed";
 
 export type NotificationChannel = "email" | "in_app";
 
@@ -101,6 +102,14 @@ export type DispatchPayload =
       postMasterId: string;
       submitterUserId: string;
       comment: string;
+    }
+  | {
+      event: "image_generation_failed";
+      companyId: string;
+      styleId: string;
+      compositionType: string;
+      aspectRatio: string;
+      attemptsCount: number;
     };
 
 // The set of channels each event fires on. Mirrors the trigger table in
@@ -115,8 +124,9 @@ export const EVENT_CHANNELS: Record<NotificationEvent, readonly NotificationChan
   connection_lost:       ["email", "in_app"],
   connection_restored:   ["in_app"],
   post_published:        ["in_app"],
-  post_failed:           ["email", "in_app"],
-  changes_requested:     ["email", "in_app"],
+  post_failed:              ["email", "in_app"],
+  changes_requested:        ["email", "in_app"],
+  image_generation_failed:  ["email"],
 };
 
 // Recipient kinds the dispatcher knows how to resolve. Each event maps

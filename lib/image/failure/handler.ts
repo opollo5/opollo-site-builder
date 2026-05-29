@@ -2,13 +2,12 @@ import "server-only";
 
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
-// I3: dispatch('image_generation_failed') for escalation emails lands
-// when the NotificationEvent enum + migration are extended in I3.
+import { dispatch } from "@/lib/platform/notifications/dispatch";
 
 import type { GeneratedImage, GenerationParams, ImageGenOutcome } from "../types";
-import { IdeogramError, ImageGenerationError, StockUnavailableError } from "../types";
+import { IdeogramError, ImageGenerationError } from "../types";
 import { generateBackground, isRetryable } from "../generator/ideogram";
-import { stockFallback } from "../generator/stock";
+import { thirdAttemptFallback } from "../generator/stock";
 import { qualityCheck } from "./quality-check";
 
 // The entry point for all image generation. All product code calls this —
@@ -53,11 +52,11 @@ export async function generateWithFallback(
     logger.warn("Quality check failed on attempt 1", logBase);
   } catch (err) {
     if (err instanceof IdeogramError && !isRetryable(err)) {
-      logger.warn("Non-retryable Ideogram error", {
+      logger.warn("Non-retryable Ideogram error on attempt 1", {
         ...logBase,
         status: err.status,
       });
-      return stockFallbackWithLog(params, logBase);
+      return regenerateThenEscalate(params, logBase);
     }
     logger.warn("Retryable error on attempt 1", {
       ...logBase,
@@ -96,31 +95,29 @@ export async function generateWithFallback(
     logger.warn("Attempt 2 failed", logBase);
   }
 
-  return stockFallbackWithLog(params, logBase);
+  return regenerateThenEscalate(params, logBase);
 }
 
-async function stockFallbackWithLog(
+/**
+ * Attempt 3: different style + maximum simplification.
+ * If that also fails, escalate to human via email.
+ */
+async function regenerateThenEscalate(
   params: GenerationParams,
   logBase: { companyId: string; styleId: string; compositionType: string },
 ): Promise<GeneratedImage[]> {
   try {
-    const stock = await stockFallback(params);
-    await writeImageLog({
-      ...logBase,
-      brandProfileId: params.brandProfileId,
-      brandProfileVersion: params.brandProfileVersion,
-      aspectRatio: params.aspectRatio,
-      postMasterId: params.postMasterId,
-      triggeredBy: params.triggeredBy,
-      outcome: "stock_fallback",
-      retryCount: 1,
-      fallbackUsed: true,
-      backgroundStoragePath: stock[0]?.storagePath,
-    });
-    return stock;
-  } catch (err) {
-    if (err instanceof StockUnavailableError) {
-      await escalateToHuman(params);
+    const images = await thirdAttemptFallback(params);
+    const checks = await Promise.all(
+      images.map((img) =>
+        img.buffer
+          ? qualityCheck(img.buffer, params.compositionType)
+          : Promise.resolve({ passed: true, luminanceScore: 128, safeZoneScore: 0 }),
+      ),
+    );
+    const passed = images.filter((_, i) => checks[i].passed);
+
+    if (passed.length > 0) {
       await writeImageLog({
         ...logBase,
         brandProfileId: params.brandProfileId,
@@ -128,26 +125,62 @@ async function stockFallbackWithLog(
         aspectRatio: params.aspectRatio,
         postMasterId: params.postMasterId,
         triggeredBy: params.triggeredBy,
-        outcome: "escalated",
-        retryCount: 1,
-        fallbackUsed: true,
-        errorClass: "StockUnavailableError",
-        errorDetail: err.message,
+        outcome: "retry_success",
+        retryCount: 2,
+        backgroundStoragePath: passed[0].storagePath,
+        qualityCheck: checks[0],
       });
-      throw new ImageGenerationError(
-        "Image generation failed after all attempts — Opollo staff notified",
-      );
+      return passed;
     }
-    throw err;
+
+    logger.warn("Quality check failed on attempt 3 (different style)", logBase);
+  } catch (err) {
+    logger.warn("Attempt 3 (different style) failed", {
+      ...logBase,
+      error: String(err),
+    });
   }
+
+  // All 3 attempts failed — escalate to human.
+  await escalateToHuman(params);
+  await writeImageLog({
+    ...logBase,
+    brandProfileId: params.brandProfileId,
+    brandProfileVersion: params.brandProfileVersion,
+    aspectRatio: params.aspectRatio,
+    postMasterId: params.postMasterId,
+    triggeredBy: params.triggeredBy,
+    outcome: "escalated",
+    retryCount: 3,
+    fallbackUsed: true,
+    errorClass: "AllAttemptsExhausted",
+    errorDetail: "3 Ideogram attempts all failed quality check or errored",
+  });
+  throw new ImageGenerationError(
+    "Image generation failed after all attempts — Opollo staff notified",
+  );
 }
 
 async function escalateToHuman(params: GenerationParams): Promise<void> {
-  // I3: extend NotificationEvent + migration, then call dispatch() here.
-  logger.error("Image generation escalated — no stock fallback available", {
+  logger.error("Image generation escalated — all 3 attempts failed", {
     companyId: params.companyId,
     styleId: params.styleId,
     compositionType: params.compositionType,
+    aspectRatio: params.aspectRatio,
+  });
+
+  // Non-blocking — escalation failure must not propagate to the caller.
+  void dispatch({
+    event: "image_generation_failed",
+    companyId: params.companyId,
+    styleId: params.styleId,
+    compositionType: params.compositionType,
+    aspectRatio: params.aspectRatio,
+    attemptsCount: 3,
+  }).catch((err) => {
+    logger.warn("image.escalation.dispatch_failed", {
+      err: err instanceof Error ? err.message : String(err),
+    });
   });
 }
 
@@ -183,7 +216,7 @@ async function writeImageLog(params: {
     style_id: params.styleId,
     composition_type: params.compositionType,
     aspect_ratio: params.aspectRatio,
-    model_used: "unknown",
+    model_used: "ideogram-v3-flash",
     model_tier: "standard",
     prompt_used: "",
     outcome: params.outcome,
@@ -199,8 +232,6 @@ async function writeImageLog(params: {
     error_detail: params.errorDetail ?? null,
     generation_duration_ms: params.generationDurationMs ?? null,
     compositing_duration_ms: params.compositingDurationMs ?? null,
-    // triggered_by is a UUID FK — pass null if the caller provided a
-    // non-UUID string (e.g. a cron label). Callers should pass platform_users.id.
     triggered_by: params.triggeredBy ?? null,
   });
 
