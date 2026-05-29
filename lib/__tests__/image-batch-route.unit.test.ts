@@ -34,6 +34,37 @@ const VALID_JOB_SPEC = {
   aspectRatio: "1x1",
 };
 
+// B3: batch dispatch now does a budget pre-flight against platform_companies
+// + image_gen_spend before creating the batch row. Tests that exercise the
+// dispatch happy-path need to mock these reads. Returning a healthy budget
+// (1 million cents) keeps the budget check out of the assertion surface.
+function budgetCheckPassesMock(table: string): Record<string, unknown> | undefined {
+  if (table === "platform_companies") {
+    return {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          maybeSingle: vi.fn().mockResolvedValue({
+            data: { monthly_image_gen_budget_cents: 1_000_000 },
+            error: null,
+          }),
+        }),
+      }),
+    };
+  }
+  if (table === "image_gen_spend") {
+    return {
+      select: vi.fn().mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }),
+      }),
+    };
+  }
+  return undefined;
+}
+
 function makePostRequest(body: unknown): Request {
   return new Request("http://localhost/api/platform/image/batch", {
     method: "POST",
@@ -73,6 +104,8 @@ describe("POST /api/platform/image/batch", () => {
   it("creates batch + job and enqueues, returns 201 with batchId", async () => {
     const mockInsert = vi.fn();
     mockFrom.mockImplementation((table: string) => {
+      const budgetMock = budgetCheckPassesMock(table);
+      if (budgetMock) return budgetMock;
       if (table === "image_generation_batches") {
         return {
           insert: vi.fn().mockReturnValue({
@@ -110,6 +143,69 @@ describe("POST /api/platform/image/batch", () => {
     expect(vi.mocked(enqueueImageJob)).toHaveBeenCalledWith(
       expect.objectContaining({ jobId: JOB_UUID, batchId: BATCH_UUID }),
     );
+  });
+
+  it("returns 402 with structured payload when budget would be exceeded (B3)", async () => {
+    mockFrom.mockImplementation((table: string) => {
+      // Tight budget: 30 cents total, 0 spent → 6 jobs ($0.36) rejects.
+      if (table === "platform_companies") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { monthly_image_gen_budget_cents: 30 },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "image_gen_spend") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const req = makePostRequest({
+      company_id: COMPANY_UUID,
+      jobs: new Array(6).fill(VALID_JOB_SPEC),
+      source_row_count: 2,
+    }) as unknown as NextRequest;
+    const res = await POST(req);
+    expect(res.status).toBe(402);
+
+    const json = (await res.json()) as {
+      ok: boolean;
+      error: {
+        code: string;
+        projected_jobs: number;
+        projected_cents: number;
+        source_row_count: number;
+        remaining_cents: number;
+        budget_cents: number;
+        next_reset_at: string;
+      };
+    };
+    expect(json.ok).toBe(false);
+    expect(json.error.code).toBe("BUDGET_EXCEEDED");
+    expect(json.error.projected_jobs).toBe(6);
+    expect(json.error.projected_cents).toBe(36);
+    expect(json.error.source_row_count).toBe(2);
+    expect(json.error.remaining_cents).toBe(30);
+    expect(json.error.budget_cents).toBe(30);
+    expect(json.error.next_reset_at).toMatch(/^\d{4}-\d{2}-01T/);
+
+    // Budget rejection happens before the batch insert.
+    const { enqueueImageJob } = await import("@/lib/image/enqueue");
+    expect(vi.mocked(enqueueImageJob)).not.toHaveBeenCalled();
   });
 
   it("mode=preview skips QStash enqueue", async () => {
