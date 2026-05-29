@@ -117,7 +117,7 @@
     "eslint-config-next": "^14.2.35",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "lint-staged": "^15.2.11",
+    "lint-staged": "^17.0.5",
     "pg": "^8.20.0",
     "postcss": "^8.5.14",
     "stylelint": "^17.10.0",
