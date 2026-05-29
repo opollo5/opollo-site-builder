@@ -168,8 +168,13 @@ export async function generateCAPPosts(
     const draftId = draft.id as string;
     created.push({ draftId, masterText, variants: variantMap });
 
-    // I5 — fire-and-forget image generation.
-    void triggerCAPImageGen({ companyId, draftId, brand });
+    // I5/A5 — QStash-dispatched image generation (no longer fire-and-forget).
+    void triggerCAPImageGen({
+      companyId,
+      draftId,
+      brand,
+      masterText,
+    });
   }
 
   if (created.length === 0) {
