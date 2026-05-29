@@ -86,6 +86,7 @@ export function MoodBoardClient({
   );
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("1x1");
   const [count, setCount] = useState<(typeof COUNT_OPTIONS)[number]>(4);
+  const [headline, setHeadline] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [images, setImages] = useState<GeneratedImageResult[]>([]);
@@ -107,6 +108,7 @@ export function MoodBoardClient({
           composition_type: composition,
           aspect_ratio: aspectRatio,
           count,
+          headline: headline.trim() || undefined, // blank → server default "Headline preview"
         }),
       });
       const json = (await res.json()) as {
@@ -222,6 +224,25 @@ export function MoodBoardClient({
           </div>
         </div>
       </section>
+
+      {/* Headline text input — composited onto each generated image */}
+      <div>
+        <label htmlFor="mood-board-headline" className="mb-1.5 block text-sm font-medium">
+          Headline text
+        </label>
+        <input
+          id="mood-board-headline"
+          type="text"
+          value={headline}
+          onChange={(e) => setHeadline(e.target.value)}
+          maxLength={120}
+          placeholder="Headline preview"
+          className="w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">
+          Appears as an overlay on each generated image. Leave blank for &quot;Headline preview&quot;.
+        </p>
+      </div>
 
       {/* Generate button */}
       <div>
