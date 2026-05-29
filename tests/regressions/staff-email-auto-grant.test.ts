@@ -118,6 +118,16 @@ vi.mock("@/lib/supabase", () => ({
   getServiceRoleClient: vi.fn(),
 }));
 
+// Static sub-path imports avoid the barrel (@/lib/platform/invitations), which
+// re-exports callbacks.ts → @/lib/qstash + @/lib/platform/notifications. Those
+// transitive deps caused a 10s cold-transform timeout under pre-commit's
+// --bail=1 strict ordering. acceptInvitation + sendInvitation only need
+// supabase (mocked) + logger (mocked) + node:crypto, so sub-path imports get
+// the transform done once at file load with zero unused heavy modules.
+import { getServiceRoleClient } from "@/lib/supabase";
+import { acceptInvitation } from "@/lib/platform/invitations/accept";
+import { sendInvitation } from "@/lib/platform/invitations/send";
+
 const baseInvitation = {
   id: INVITATION_ID,
   company_id: COMPANY_A,
@@ -155,7 +165,6 @@ afterEach(() => vi.clearAllMocks());
 
 describe("acceptInvitation — is_opollo_staff detection", () => {
   it("sets is_opollo_staff=true for @opollo.com email", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSupabaseMock({
         invitationData: { ...baseInvitation, email: "alice@opollo.com" },
@@ -165,18 +174,15 @@ describe("acceptInvitation — is_opollo_staff detection", () => {
       }) as never,
     );
 
-    const { acceptInvitation, hashToken } = await import("@/lib/platform/invitations");
     // The token hash must match what the mock returns — mock always returns
     // invitationData regardless of hash, so any 32-char token works.
-    const input = makeInput("alice@opollo.com");
-    const result = await acceptInvitation(input);
+    const result = await acceptInvitation(makeInput("alice@opollo.com"));
     expect(result.ok).toBe(true);
     expect(platformUserInserts).toHaveLength(1);
     expect(platformUserInserts[0]).toMatchObject({ is_opollo_staff: true });
   });
 
   it("sets is_opollo_staff=false for non-@opollo.com email", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSupabaseMock({
         invitationData: { ...baseInvitation, email: "bob@customer.com" },
@@ -186,7 +192,6 @@ describe("acceptInvitation — is_opollo_staff detection", () => {
       }) as never,
     );
 
-    const { acceptInvitation } = await import("@/lib/platform/invitations");
     const result = await acceptInvitation(makeInput("bob@customer.com"));
     expect(result.ok).toBe(true);
     expect(platformUserInserts).toHaveLength(1);
@@ -194,7 +199,6 @@ describe("acceptInvitation — is_opollo_staff detection", () => {
   });
 
   it("writes staff_grant.auto audit row for @opollo.com acceptance", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSupabaseMock({
         invitationData: { ...baseInvitation, email: "alice@opollo.com" },
@@ -204,7 +208,6 @@ describe("acceptInvitation — is_opollo_staff detection", () => {
       }) as never,
     );
 
-    const { acceptInvitation } = await import("@/lib/platform/invitations");
     const result = await acceptInvitation(makeInput("alice@opollo.com"));
     expect(result.ok).toBe(true);
     const auditRow = auditLogInserts.find((r) => r.action === "staff_grant.auto");
@@ -214,7 +217,6 @@ describe("acceptInvitation — is_opollo_staff detection", () => {
   });
 
   it("does NOT write staff_grant.auto audit row for non-staff acceptance", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSupabaseMock({
         invitationData: { ...baseInvitation, email: "bob@customer.com" },
@@ -224,7 +226,6 @@ describe("acceptInvitation — is_opollo_staff detection", () => {
       }) as never,
     );
 
-    const { acceptInvitation } = await import("@/lib/platform/invitations");
     const result = await acceptInvitation(makeInput("bob@customer.com"));
     expect(result.ok).toBe(true);
     const auditRow = auditLogInserts.find((r) => r.action === "staff_grant.auto");
@@ -311,7 +312,6 @@ function makeSendMock({
 
 describe("sendInvitation — cross-tenant enforcement (D1)", () => {
   it("blocks non-@opollo.com invitee already in another company", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSendMock({
         existingUserId: USER_CUSTOMER,
@@ -319,7 +319,6 @@ describe("sendInvitation — cross-tenant enforcement (D1)", () => {
       }) as never,
     );
 
-    const { sendInvitation } = await import("@/lib/platform/invitations");
     const result = await sendInvitation({
       companyId: COMPANY_A,
       email: "bob@customer.com",
@@ -333,7 +332,6 @@ describe("sendInvitation — cross-tenant enforcement (D1)", () => {
   });
 
   it("allows @opollo.com invitee already in another company (D1 staff exemption)", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSendMock({
         existingUserId: USER_STAFF,
@@ -341,7 +339,6 @@ describe("sendInvitation — cross-tenant enforcement (D1)", () => {
       }) as never,
     );
 
-    const { sendInvitation } = await import("@/lib/platform/invitations");
     const result = await sendInvitation({
       companyId: COMPANY_A,
       email: "alice@opollo.com",
@@ -356,7 +353,6 @@ describe("sendInvitation — cross-tenant enforcement (D1)", () => {
   });
 
   it("allows non-@opollo.com invitee with no existing company membership", async () => {
-    const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeSendMock({
         existingUserId: null,
@@ -364,7 +360,6 @@ describe("sendInvitation — cross-tenant enforcement (D1)", () => {
       }) as never,
     );
 
-    const { sendInvitation } = await import("@/lib/platform/invitations");
     const result = await sendInvitation({
       companyId: COMPANY_A,
       email: "new@customer.com",
