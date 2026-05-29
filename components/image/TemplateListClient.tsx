@@ -18,7 +18,10 @@ interface Props {
 }
 
 export function TemplateListClient({ templates }: Props) {
-  const byRatio = Object.groupBy(templates, (t) => t.aspectRatio);
+  const byRatio = templates.reduce<Record<string, ImageTemplate[]>>((acc, t) => {
+    (acc[t.aspectRatio] ??= []).push(t);
+    return acc;
+  }, {});
 
   return (
     <div className="space-y-8">
