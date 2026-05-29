@@ -90,8 +90,6 @@ function buildReportOnlyCsp(): string {
     supabaseOrigin,
     wpOrigin,
     "https://api.ideogram.ai",
-    "https://api.bannerbear.com",
-    "https://api.placid.app",
   ]
     .filter(Boolean)
     .join(" ");

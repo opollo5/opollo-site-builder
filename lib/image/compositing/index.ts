@@ -28,29 +28,12 @@ export interface CompositeResult {
 // ---------------------------------------------------------------------------
 // Compositing abstraction — product code ONLY calls this function.
 //
-// Provider is now always "sharp_native" (A-NEW-1 onward).
-// Bannerbear and Placid providers will be removed in A-NEW-4.
-// COMPOSITING_PROVIDER env var is retained for backward compat during the
-// A-NEW transition but defaults to "sharp" (overriding the old "bannerbear"
-// default). Remove it in A-NEW-4.
+// A-NEW-4: Bannerbear and Placid are removed. Always uses the sharp renderer.
+// Templates are resolved from the image_templates database table.
 // ---------------------------------------------------------------------------
 export async function compositeImage(
   input: CompositeInput,
 ): Promise<CompositeResult> {
   const { compositeSharp } = await import("./sharp-renderer");
-
-  const provider = process.env.COMPOSITING_PROVIDER ?? "sharp";
-
-  // Both "sharp" and the old un-set default ("bannerbear") now route to sharp.
-  // A-NEW-4 removes the conditional entirely.
-  if (provider === "bannerbear" || provider === "sharp") {
-    return compositeSharp(input);
-  }
-
-  if (provider === "placid") {
-    // Placid was always a stub; keeping the error for the transition period.
-    throw new Error("Placid provider is not implemented. Set COMPOSITING_PROVIDER=sharp.");
-  }
-
-  throw new Error(`Unknown compositing provider: ${provider}`);
+  return compositeSharp(input);
 }
