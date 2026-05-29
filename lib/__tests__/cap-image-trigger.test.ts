@@ -1,183 +1,158 @@
-import { describe, expect, it, vi, beforeEach, type MockedFunction } from "vitest";
-
-import type { GeneratedImage } from "@/lib/image/types";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // ---------------------------------------------------------------------------
-// S-5 — unit tests for triggerCAPImageGen.
+// A5 — unit tests for triggerCAPImageGen (QStash dispatch version).
 //
-// Verifies that the `bytes` column in the social_media_assets insert reflects
-// the actual image buffer length, not the hard-coded 0 that was there before.
-//
-// All Supabase + image-gen calls are mocked — no real credentials needed.
+// After A5: the trigger no longer calls generateWithFallback() inline.
+// It creates an image_generation_jobs row and enqueues to the QStash handler.
+// All inline generation and asset-creation logic moved into the handler.
 // ---------------------------------------------------------------------------
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/logger", () => ({ logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/lib/image", () => ({
   generateWithFallback: vi.fn(),
   getAllowedStyles: vi.fn().mockReturnValue(["clean_corporate"]),
 }));
 
-vi.mock("@/lib/supabase", () => ({
-  getServiceRoleClient: vi.fn(),
-}));
+const { mockEnqueue } = vi.hoisted(() => ({ mockEnqueue: vi.fn() }));
+vi.mock("@/lib/image/enqueue", () => ({ enqueueImageJob: mockEnqueue }));
+
+vi.mock("@/lib/supabase", () => ({ getServiceRoleClient: vi.fn() }));
 
 import { generateWithFallback } from "@/lib/image";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { triggerCAPImageGen } from "@/lib/platform/social/cap/image-trigger";
 
-const mockGenerate = generateWithFallback as MockedFunction<typeof generateWithFallback>;
-const mockGetSvc = getServiceRoleClient as MockedFunction<typeof getServiceRoleClient>;
-
-function makeMockSvc(overrides?: {
-  signedUrlError?: boolean;
-  assetInsertError?: boolean;
-  draftUpdateError?: boolean;
-}) {
-  const mockSingle = vi.fn().mockResolvedValue(
-    overrides?.assetInsertError
+function makeMockSvc(opts?: { jobInsertError?: boolean; jobUpdateError?: boolean }) {
+  const mockJobSingle = vi.fn().mockResolvedValue(
+    opts?.jobInsertError
       ? { data: null, error: { message: "insert failed" } }
-      : { data: { id: "asset-uuid-1" }, error: null },
+      : { data: { id: "job-uuid-1" }, error: null },
   );
-  const mockSelect = vi.fn().mockReturnValue({ single: mockSingle });
-  const mockInsert = vi.fn().mockReturnValue({ select: mockSelect });
+  const mockJobInsert = vi.fn().mockReturnValue({ select: vi.fn().mockReturnValue({ single: mockJobSingle }) });
 
-  const mockEq = vi.fn().mockResolvedValue(
-    overrides?.draftUpdateError
-      ? { error: { message: "update failed" } }
-      : { error: null },
-  );
-  const mockUpdate = vi.fn().mockReturnValue({ eq: mockEq });
+  const mockJobUpdate = vi.fn().mockReturnValue({
+    eq: vi.fn().mockResolvedValue(opts?.jobUpdateError ? { error: { message: "update failed" } } : { error: null }),
+  });
 
-  const mockCreateSignedUrl = vi.fn().mockResolvedValue(
-    overrides?.signedUrlError
-      ? { data: null, error: { message: "signed url error" } }
-      : { data: { signedUrl: "https://storage.example.com/img.jpeg" }, error: null },
-  );
-  const mockStorageFrom = vi.fn().mockReturnValue({ createSignedUrl: mockCreateSignedUrl });
-
-  const svc = {
-    from: vi.fn().mockImplementation((table: string) => {
-      if (table === "social_media_assets") return { insert: mockInsert };
-      if (table === "social_post_drafts") return { update: mockUpdate };
-      return {};
-    }),
-    storage: { from: mockStorageFrom },
-  };
-
-  return { svc, mockInsert, mockSelect, mockSingle, mockUpdate, mockEq, mockCreateSignedUrl };
-}
-
-const FAKE_BUFFER = Buffer.from("fake-image-bytes-1234");
-
-function makeFakeImage(bufferOverride?: Buffer): GeneratedImage {
   return {
-    storagePath: "company-id/generated/test-img.jpeg",
-    width: 1024,
-    height: 1024,
-    format: "jpeg",
-    buffer: bufferOverride ?? FAKE_BUFFER,
+    svc: {
+      from: vi.fn().mockImplementation((table: string) => {
+        if (table === "image_generation_jobs") {
+          return { insert: mockJobInsert, update: mockJobUpdate };
+        }
+        return {};
+      }),
+    },
+    mockJobInsert,
+    mockJobUpdate,
   };
 }
 
 beforeEach(() => {
   process.env.IDEOGRAM_API_KEY = "test-key-not-real";
+  process.env.QSTASH_TOKEN = "test-qstash-token";
   vi.clearAllMocks();
+  mockEnqueue.mockResolvedValue({ ok: true });
 });
 
 describe("triggerCAPImageGen", () => {
-  it("inserts social_media_assets with bytes = buffer.length (S-5 fix)", async () => {
-    const { svc, mockInsert } = makeMockSvc();
-    mockGetSvc.mockReturnValue(svc as never);
-    mockGenerate.mockResolvedValue([makeFakeImage()]);
+  it("creates a job row and enqueues to QStash", async () => {
+    const { svc, mockJobInsert } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
+
+    await triggerCAPImageGen({ companyId: "company-id", draftId: "draft-id-1", brand: null });
+
+    // Job row created
+    expect(mockJobInsert).toHaveBeenCalledOnce();
+    const insertArg = mockJobInsert.mock.calls[0][0] as Record<string, unknown>;
+    expect(insertArg).toMatchObject({ company_id: "company-id", state: "pending" });
+    expect(insertArg.generation_params).toBeDefined();
+
+    // Enqueued to QStash
+    expect(mockEnqueue).toHaveBeenCalledOnce();
+    const enqueueArg = mockEnqueue.mock.calls[0][0] as Record<string, unknown>;
+    expect(enqueueArg.jobId).toBe("job-uuid-1");
+    expect(enqueueArg.capDraftId).toBe("draft-id-1");
+  });
+
+  it("passes headlineText (first sentence of masterText, truncated 80 chars)", async () => {
+    const { svc } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
 
     await triggerCAPImageGen({
-      companyId: "company-id",
-      draftId: "draft-id-1",
-      brand: null,
+      companyId: "c", draftId: "d", brand: null,
+      masterText: "This is the first sentence. This is the second sentence.",
     });
 
-    expect(mockInsert).toHaveBeenCalledOnce();
-    const insertArg = mockInsert.mock.calls[0][0] as Record<string, unknown>;
-    expect(insertArg.bytes).toBe(FAKE_BUFFER.length);
-    expect(insertArg.bytes).toBeGreaterThan(0);
+    const enqueueArg = mockEnqueue.mock.calls[0][0] as Record<string, unknown>;
+    expect(enqueueArg.headlineText).toBe("This is the first sentence");
+  });
+
+  it("truncates headlineText to 80 chars for square aspect ratio", async () => {
+    const { svc } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
+    const longSentence = "A".repeat(100);
+
+    await triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null, masterText: longSentence });
+
+    const enqueueArg = mockEnqueue.mock.calls[0][0] as Record<string, unknown>;
+    expect((enqueueArg.headlineText as string).length).toBeLessThanOrEqual(80);
+  });
+
+  it("does NOT call generateWithFallback inline — that is the handler's job", async () => {
+    const { svc } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
+
+    await triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null });
+
+    expect(generateWithFallback).not.toHaveBeenCalled();
   });
 
   it("skips silently when IDEOGRAM_API_KEY is unset", async () => {
     delete process.env.IDEOGRAM_API_KEY;
-    const { svc, mockInsert } = makeMockSvc();
-    mockGetSvc.mockReturnValue(svc as never);
+    const { svc, mockJobInsert } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
 
-    await expect(
-      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
-    ).resolves.toBeUndefined();
+    await expect(triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null })).resolves.toBeUndefined();
 
-    expect(mockGenerate).not.toHaveBeenCalled();
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockJobInsert).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  it("returns without throwing when generateWithFallback throws", async () => {
-    const { svc, mockInsert } = makeMockSvc();
-    mockGetSvc.mockReturnValue(svc as never);
-    mockGenerate.mockRejectedValue(new Error("Ideogram unreachable"));
+  it("skips silently when QSTASH_TOKEN is unset", async () => {
+    delete process.env.QSTASH_TOKEN;
+    const { svc, mockJobInsert } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
 
-    await expect(
-      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
-    ).resolves.toBeUndefined();
+    await expect(triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null })).resolves.toBeUndefined();
 
-    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockJobInsert).not.toHaveBeenCalled();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
-  it("returns without throwing when generateWithFallback returns empty array", async () => {
-    const { svc, mockInsert } = makeMockSvc();
-    mockGetSvc.mockReturnValue(svc as never);
-    mockGenerate.mockResolvedValue([]);
+  it("marks job failed and returns without throwing when enqueue fails", async () => {
+    mockEnqueue.mockResolvedValue({ ok: false, error: "QSTASH_TOKEN not set" });
+    const { svc, mockJobUpdate } = makeMockSvc();
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
 
-    await expect(
-      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
-    ).resolves.toBeUndefined();
+    await expect(triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null })).resolves.toBeUndefined();
 
-    expect(mockInsert).not.toHaveBeenCalled();
+    // Job cleaned up to failed state
+    expect(mockJobUpdate).toHaveBeenCalledOnce();
+    const updateArg = mockJobUpdate.mock.calls[0][0] as Record<string, unknown>;
+    expect(updateArg.state).toBe("failed");
   });
 
-  it("returns without throwing when signed URL creation fails", async () => {
-    const { svc, mockInsert } = makeMockSvc({ signedUrlError: true });
-    mockGetSvc.mockReturnValue(svc as never);
-    mockGenerate.mockResolvedValue([makeFakeImage()]);
+  it("returns without throwing when job row creation fails", async () => {
+    const { svc } = makeMockSvc({ jobInsertError: true });
+    vi.mocked(getServiceRoleClient).mockReturnValue(svc as never);
 
-    await expect(
-      triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null }),
-    ).resolves.toBeUndefined();
+    await expect(triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null })).resolves.toBeUndefined();
 
-    expect(mockInsert).not.toHaveBeenCalled();
-  });
-
-  it("falls back to bytes=0 when buffer is absent from GeneratedImage", async () => {
-    const { svc, mockInsert } = makeMockSvc();
-    mockGetSvc.mockReturnValue(svc as never);
-    const imageWithoutBuffer: GeneratedImage = {
-      storagePath: "company-id/generated/stock.jpeg",
-      width: 800,
-      height: 800,
-      format: "jpeg",
-    };
-    mockGenerate.mockResolvedValue([imageWithoutBuffer]);
-
-    await triggerCAPImageGen({ companyId: "c", draftId: "d", brand: null });
-
-    const insertArg = mockInsert.mock.calls[0][0] as Record<string, unknown>;
-    expect(insertArg.bytes).toBe(0);
-  });
-
-  it("links the new asset to all post variants", async () => {
-    const { svc, mockEq } = makeMockSvc();
-    mockGetSvc.mockReturnValue(svc as never);
-    mockGenerate.mockResolvedValue([makeFakeImage()]);
-
-    await triggerCAPImageGen({
-      companyId: "company-id",
-      draftId: "draft-id-1",
-      brand: null,
-    });
-
-    expect(mockEq).toHaveBeenCalledWith("id", "draft-id-1");
+    // No enqueue if job creation failed
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 });
