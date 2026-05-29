@@ -1,5 +1,7 @@
 # Mass Image Generation — Build Brief v3
 
+> **⚠ ADDENDUM IN EFFECT:** Compositing path changed — Bannerbear replaced by native sharp renderer + DB template editor. Read [`MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md`](./MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md) before acting on any slice from A3 onwards.
+
 **Programme:** Opollo Site Builder / Social Module — Mass-Production Image Generation
 **Owner:** Steven Morey
 **Author:** Drafted from recon at `docs/recon/mass-image-gen-recon.md`
