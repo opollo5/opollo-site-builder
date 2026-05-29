@@ -14,7 +14,7 @@ Three layers added on top of the existing Opollo Site Builder:
 
 **2. N-Series (Social Module)** — Social media scheduling and approval. MSPs draft posts → approvers review → posts schedule → bundle.social publishes.
 
-**3. Image Generation** — Ideogram background generation + programmatic text/logo compositing via Bannerbear or Placid.
+**3. Image Generation** — Ideogram background generation + programmatic text/logo compositing via a native `sharp`-based renderer. Templates live in the `image_templates` database table, editable per-company via the visual editor at `/company/image/templates`. (Original Bannerbear/Placid compositing path was removed in A-NEW-4 — see `MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md`.)
 
 **The existing codebase is operationally hot.** It runs real Anthropic money on real client WordPress sites. Do not touch anything in `lib/brief-runner.ts`, `lib/batch-worker.ts`, `lib/db-direct.ts`, `lib/encryption.ts`, `lib/2fa/*`, `lib/security-headers.ts`, or any landed migration without explicit approval. Read ARCHITECTURE.md §18 before proposing any refactor.
 
@@ -60,7 +60,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 - **Slice in progress:** none — V1 roadmap complete (Phase A + Phase B + Phase C I1-I5 + Phase D)
 - **Most recently shipped:** s1-57 cursor pagination for media library (#521)
 - **S0 (bundle.social verification):** complete
-- **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds), Bannerbear or Placid (compositing — evaluate at I2)
+- **Vendor confirmed:** bundle.social (publishing), Ideogram (backgrounds). Compositing is native (in-process `sharp` renderer + DB-backed templates) — no compositing vendor.
 
 > **Phase B post-V1 enhancements.** Since V1 shipped (S1–S8, s1-1 through s1-18), the social module has grown via additional `s1-N` slices (s1-19 through s1-57). These cover publish-route wiring, media library, approval actions, calendar nav, post list UX (search, filters, pagination, sorting), MSP release workflow, CAP-source badge, reviewer comments, notification dispatch, and connection management. Run `git log main --grep "feat(s1-"` for the full list.
 
@@ -102,7 +102,7 @@ Magic links never grant access to settings, brand profile, or management. Scoped
 | Slice | Scope | Status |
 |-------|-------|--------|
 | I1 | Ideogram client (backgrounds only, GLOBAL_NEGATIVE_PROMPT). Prompt engine (parameterised). Brand profile reader. Standard/premium routing. Stock fallback. image_generation_log writes. | ✅ Shipped (#455) |
-| I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ✅ Shipped (#457 Bannerbear primary, Placid stub, TEXT_ZONE_MAP pixel conversion) |
+| I2 | Evaluate Bannerbear vs Placid against 3 real client templates. Implement compositeImage() interface + winning provider. Text zones + logo positions. | ✅ Shipped (#457 Bannerbear primary, Placid stub, TEXT_ZONE_MAP pixel conversion). **Superseded by A-NEW-4 (#1159)** — Bannerbear / Placid removed; replaced by native sharp renderer + DB-backed `image_templates` (A-NEW-1 #1142, A-NEW-2 #1148, A-NEW-3 editor UI #1150, A-NEW-4 pipeline cut-over #1159). See `MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md`. |
 | I3 | Failure handler: luminance check + safe zone check → retry → stock fallback → escalation. Quality check rules. | ✅ Shipped (#459) |
 | I4 | Mood board UI: style selector, composition selector, 4–6 results, 1-click select. | ✅ Shipped (#463) |
 | I5 | CAP Phase 2: automated generation via source_type='cap' | ✅ Shipped (#510 — image generation trigger E1) |
@@ -274,9 +274,8 @@ When adding any new external API call, add the domain to `lib/security-headers.t
 ```typescript
 // Domains to add for this build:
 // api.ideogram.ai         — Ideogram API
-// api.bannerbear.com      — Bannerbear (if selected)
-// api.placid.app          — Placid (if selected)
 // mcp.bundle.social       — bundle.social (if not already present)
+// Sharp compositing runs in-process and adds no connect-src entry.
 ```
 
 The static audit (`npm run audit:static`) checks CSP coverage. Missing entries block CI.
@@ -292,7 +291,7 @@ Read the image-generation skill before touching anything in `lib/image/`.
 3. **Composition→text zone is deterministic.** The composition type dictates exactly where the text zone sits. See image-generation skill for the full mapping table.
 4. **Brand from brand profile.** `get_active_brand_profile(companyId)` — never pass brand config ad-hoc.
 5. **Every call writes to image_generation_log.** No exceptions. Include prompt, model, outcome, fallback, quality scores.
-6. **compositeImage() is the only compositing call.** Never call Bannerbear or Placid directly from product code.
+6. **compositeImage() is the only compositing call.** Never call `sharp` directly from product code — go through `lib/image/compositing/index.ts`, which resolves the template from `image_templates` and dispatches to the sharp renderer.
 7. **Quality check before showing to user.** Luminance check + safe zone check + dimension check. See image-generation skill.
 8. **Failure handler on every generation.** quality fail → retry once → stock fallback → escalate. Never surface raw failure.
 9. **safe_mode disables styles.** When safe_mode=true, `bold_promo` and `editorial` are blocked entirely in the UI. Only `clean_corporate`, `minimal_modern`, `product_focus` available.
@@ -306,7 +305,7 @@ Read the image-generation skill before touching anything in `lib/image/`.
 - **Auth:** Supabase Auth (email + password)
 - **Publishing:** bundle.social
 - **Image generation:** Ideogram (backgrounds only)
-- **Compositing:** Bannerbear or Placid (evaluate at I2, commit to one, implement interface)
+- **Compositing:** native `sharp` renderer (`lib/image/compositing/sharp-renderer.ts`); templates persisted in `image_templates`. No third-party compositing vendor.
 - **Email:** SendGrid via `lib/email/sendgrid.ts` exclusively
 - **Queue:** Upstash QStash
 - **Storage:** Supabase Storage
