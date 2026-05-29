@@ -68,7 +68,10 @@ vi.mock("@/lib/supabase", () => ({
   }),
 }));
 
-import { enqueuePostHistoryImport } from "@/lib/platform/social/analytics-ingest";
+// Sub-path import: barrel @/lib/platform/social/analytics-ingest also pulls
+// in ./refresh + ./dashboard. This test only needs enqueuePostHistoryImport;
+// importing the leaf file skips the other heavy sub-modules' transforms.
+import { enqueuePostHistoryImport } from "@/lib/platform/social/analytics-ingest/post-history-import";
 
 const PROFILE_ID = "11111111-1111-1111-1111-111111111111";
 

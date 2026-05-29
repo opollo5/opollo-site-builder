@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 
+// Sub-path import: the barrel @/lib/platform/social/analytics-ingest also
+// re-exports ./refresh + ./post-history-import which transitively pull
+// @/lib/bundlesocial + @/lib/qstash. This test only needs pure-function
+// platform mappers, so importing the leaf file directly skips those heavy
+// deps. Avoids the slow-import flake class from PR #1136.
 import {
   analyticsPlatformFor,
   internalPlatformsFor,
   postImportPlatformFor,
-} from "@/lib/platform/social/analytics-ingest";
+} from "@/lib/platform/social/analytics-ingest/platform-map";
 
 // LAYER 1 — Unit. Pure functions, no SDK, no DB.
 //
