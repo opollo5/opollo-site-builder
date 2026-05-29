@@ -1,0 +1,4 @@
+-- Rollback for 0160 — intentional no-op.
+-- PostgreSQL enum values cannot be removed once added without dropping
+-- the type. Leaving the value in place is safe; unused enum values have
+-- no runtime cost. If removal is ever required, DROP TYPE and re-create.
