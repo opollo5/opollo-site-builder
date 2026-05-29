@@ -553,7 +553,7 @@ These apply to every PR in the programme. Claude Code must respect them.
 - **Read the relevant skill before touching the layer.** `lib/image/**` → image-generation skill. `lib/platform/brand/**` → platform-brand-governance skill. `lib/social/**` → n-series-layer-rules skill.
 - **Every generation writes to `image_generation_log`.** No exceptions, no bypasses. Composer AI tab, CAP, mood board, batch handler, previews — all log.
 - **All file outputs go inside the repo.** `docs/`, `lib/`, `app/`, `supabase/migrations/`, `scripts/`. Never `/tmp`, never the Desktop, never outside the project.
-- **Tests for every new module.** Unit tests at minimum. Integration tests for any route that touches Ideogram or Bannerbear. Acceptance test for the slice from §5 if listed.
+- **Tests for every new module.** Unit tests at minimum. Integration tests for any route that touches Ideogram or the compositing layer. Acceptance test for the slice from §5 if listed.
 - **No `console.log`.** Use `lib/logger`.
 - **No direct UPDATE on `platform_brand_profiles`.** Always `update_brand_profile()` RPC.
 - **Cost-conscious.** Every Ideogram call costs money. Don't generate in tests if a fixture works. Mark all probe / test generations with `triggered_by='<slice_id>_<purpose>'` so they're filterable.
@@ -563,7 +563,6 @@ These apply to every PR in the programme. Claude Code must respect them.
 
 ## 8. How to start
 
-1. **Steven:** start D1 (Bannerbear account, **five** templates per §1.1, env vars). Half a day of dashboard work. This is the only thing blocking parallel Claude Code work.
 2. **Claude Code:** start A1 (Ideogram model identifier fix). Hand it this brief plus the recon, point it at the slice description, let it run with the standard checkpoint discipline.
 3. When A1 lands, proceed to A2, then A3. Each is a single PR with a clear checkpoint.
 4. By the time A3 is done, D1 should be complete on Steven's side, and Claude Code can proceed to B1 → A4 → A5 → A6.
@@ -574,16 +573,4 @@ If at any point a slice surfaces a contradiction with this brief or the recon, *
 
 ## 9. v1.1 backlog — deferred template variety
 
-After v1 ships, the following template enhancements were identified from real client examples (Blackbird IT, Cybersecure) and deferred. Do not implement in v1. Revisit after v1 is in production with at least 4 weeks of real client output.
-
-1. **CTA button as a fourth Bannerbear layer.** Pill-shaped call-to-action button with configurable text and icon. Example: "Shop Now →", "Book now →". Requires brand profile to gain a `cta_text` (per-post) field and template UID per CTA style.
-2. **Two-zone headline (multi-zone compositing).** Headline with highlighted phrase — e.g. white text + lime-highlighted phrase on next line. This was gap #22 in the recon. Requires Bannerbear template with second text layer + composite call to pass both zones.
-3. **Per-client template selection.** Cybersecure's split-photo-with-colour-block layout is fundamentally different from Blackbird's full-bleed-with-overlay layout. Both need to coexist. Requires:
-   - `brand_profile.template_pack` field (enum: `default`, `split_photo`, `full_bleed_overlay`, etc.)
-   - Bannerbear templates per pack per ratio (5 ratios × N packs)
-   - Compositing layer reads pack from brand profile, picks template UID accordingly
-4. **Configurable logo position.** Bottom-right is the v1 default. Some brands (Cybersecure) anchor top-right/top-left; some (Blackbird image 6) put logo top-centre. Requires `brand_profile.logo_position` field with enum and corresponding Bannerbear template variants.
-5. **Subhead / supporting copy layer.** A smaller text line below the main headline (e.g. "Tech-driven in harmony, simplifies life"). New `subhead` Bannerbear layer + per-post `subhead_text` field.
-6. **Photo style support — illustrated vs photographic.** Cybersecure image 10 uses an illustrated background instead of photographic. Requires either an Ideogram style addition (`style_id='illustrated'`) or a Bannerbear-side illustration-asset library.
-
-These six items together would constitute a v1.1 release worth 1.5–2 weeks of focused work after v1 stabilises. Reference examples live in `docs/briefs/image-generator/reference-examples/` (Blackbird IT + Cybersecure samples) — copy them into the repo before v1.1 scoping begins.
+See the [v3 addendum §5](./MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md#5-v11-backlog) for the current v1.1 backlog.
