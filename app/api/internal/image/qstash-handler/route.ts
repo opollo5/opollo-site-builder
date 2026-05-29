@@ -6,7 +6,9 @@ import { logger } from "@/lib/logger";
 import { verifyQstashSignature } from "@/lib/qstash";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { generateWithFallback } from "@/lib/image";
-import type { GenerationParams } from "@/lib/image/types";
+import type { GenerationParams, AspectRatio } from "@/lib/image/types";
+import { compositeImage, TEXT_ZONE_MAP } from "@/lib/image/compositing";
+import { getTemplateV1 } from "@/lib/image/compositing/templates-v1";
 import { enqueueImageJob } from "@/lib/image/enqueue";
 import {
   acquireImageLease,
@@ -62,6 +64,10 @@ const BodySchema = z.object({
   jobId: z.string().uuid(),
   generationParams: GenerationParamsSchema,
   batchId: z.string().uuid().optional(),
+  // CAP pipeline fields (optional — only present for CAP-triggered jobs)
+  capDraftId: z.string().uuid().optional(),
+  headlineText: z.string().max(200).optional(),
+  logoUrl: z.string().url().optional(),
 });
 
 type Body = z.infer<typeof BodySchema>;
@@ -91,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return validationError(`Invalid body: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  const { jobId, generationParams, batchId } = parsed;
+  const { jobId, generationParams, batchId, capDraftId, headlineText, logoUrl } = parsed;
 
   logger.info("image.qstash.received", { jobId, batchId, companyId: generationParams.companyId });
 
@@ -124,6 +130,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         jobId,
         generationParams,
         batchId,
+        capDraftId: parsed.capDraftId,
+        headlineText: parsed.headlineText,
+        logoUrl: parsed.logoUrl,
         delaySeconds: REQUEUE_DELAY_SECONDS,
       });
 
@@ -166,7 +175,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: true, status: "already_processed" });
   }
 
-  // ─── 4. Generate ─────────────────────────────────────────────────────────
+  // ─── 4. Generate + composite ─────────────────────────────────────────────
 
   try {
     const images = await generateWithFallback({
@@ -179,17 +188,55 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       throw new Error("generateWithFallback returned empty array");
     }
 
+    // Composite if we have a headline (indicates CAP or batch pipeline with
+    // templates-v1.ts code templates per §1.8 of the addendum).
+    let finalStoragePath = image.storagePath;
+    if (headlineText) {
+      try {
+        const template = getTemplateV1(generationParams.aspectRatio as AspectRatio);
+        const textZone = TEXT_ZONE_MAP[generationParams.compositionType];
+        const composite = await compositeImage({
+          backgroundStoragePath: image.storagePath,
+          textZones: [{
+            ...textZone,
+            text: headlineText,
+            maxFontSize: template.maxHeadlineFontSize,
+            colour: "white",
+          }],
+          logo: logoUrl ? {
+            url: logoUrl,
+            position: template.logoPosition,
+            sizePercent: template.logoSizePercent,
+            padding: template.logoPadding,
+          } : null,
+          outputFormat: image.format === "png" ? "png" : "jpeg",
+          outputWidth: image.width,
+          outputHeight: image.height,
+        });
+        finalStoragePath = composite.storagePath;
+      } catch (compErr) {
+        // Compositing failure is non-fatal — use raw background
+        logger.warn("image.qstash.composite_failed", {
+          jobId,
+          err: compErr instanceof Error ? compErr.message : String(compErr),
+        });
+      }
+    }
+
     await svc.from("image_generation_jobs").update({
       state: "completed",
-      result_storage_path: image.storagePath, // storage path only — never a signed URL (§1.6)
+      result_storage_path: finalStoragePath, // storage path only — never a signed URL (§1.6)
       completed_at: new Date().toISOString(),
     }).eq("id", jobId);
 
     // Update batch state after job completion (non-blocking).
     if (batchId) void updateBatchProgress(svc, batchId);
 
-    logger.info("image.qstash.completed", { jobId, storagePath: image.storagePath });
-    return NextResponse.json({ ok: true, status: "completed", storagePath: image.storagePath });
+    // CAP pipeline: link the composited image to the draft (non-blocking).
+    if (capDraftId) void linkCapDraft(svc, capDraftId, generationParams.companyId, finalStoragePath, image.format);
+
+    logger.info("image.qstash.completed", { jobId, storagePath: finalStoragePath, composited: finalStoragePath !== image.storagePath });
+    return NextResponse.json({ ok: true, status: "completed", storagePath: finalStoragePath });
 
   } catch (err) {
     const errorClass = err instanceof Error ? err.constructor.name : "UnknownError";
@@ -259,6 +306,63 @@ async function updateBatchProgress(
   } catch (err) {
     logger.warn("image.batch.progress_update_failed", {
       batchId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * After a CAP job completes: persist the composited image as a
+ * social_media_assets row and link it to the draft via media_urls.
+ * Non-blocking — called via void; errors logged, never thrown.
+ */
+async function linkCapDraft(
+  svc: ReturnType<typeof import("@/lib/supabase").getServiceRoleClient>,
+  draftId: string,
+  companyId: string,
+  storagePath: string,
+  format: string,
+): Promise<void> {
+  const IMAGE_GEN_BUCKET = process.env.IMAGE_GENERATION_BUCKET ?? "generated-images";
+  const SIGNED_URL_TTL = 365 * 24 * 3600; // 1 year
+
+  try {
+    // Sign a long-lived URL for source_url (legacy pattern — see §1.6 for new jobs).
+    const { data: signed } = await svc.storage
+      .from(IMAGE_GEN_BUCKET)
+      .createSignedUrl(storagePath, SIGNED_URL_TTL);
+
+    if (!signed?.signedUrl) {
+      logger.warn("cap.image.signed_url_failed", { draftId, storagePath });
+      return;
+    }
+
+    const { data: asset } = await svc
+      .from("social_media_assets")
+      .insert({
+        company_id: companyId,
+        storage_path: storagePath,
+        mime_type: `image/${format === "png" ? "png" : "jpeg"}`,
+        bytes: 0, // size unknown at this point; acceptable
+        source_url: signed.signedUrl,
+      })
+      .select("id")
+      .single();
+
+    if (!asset?.id) {
+      logger.warn("cap.image.asset_insert_failed", { draftId });
+      return;
+    }
+
+    await svc
+      .from("social_post_drafts")
+      .update({ media_urls: [signed.signedUrl] })
+      .eq("id", draftId);
+
+    logger.info("cap.image.draft_linked", { draftId, companyId, assetId: asset.id });
+  } catch (err) {
+    logger.warn("cap.image.link_failed", {
+      draftId,
       err: err instanceof Error ? err.message : String(err),
     });
   }

@@ -21,6 +21,13 @@ export interface EnqueueImageJobInput {
   batchId?: string;
   /** Delay in seconds before QStash delivers. Used when re-enqueuing at concurrency cap. */
   delaySeconds?: number;
+  // CAP-specific fields — used when generation was triggered by the CAP pipeline.
+  /** Draft ID to link the generated composite to after success. */
+  capDraftId?: string;
+  /** Headline text for the overlay composite (first sentence of post copy). */
+  headlineText?: string;
+  /** Brand logo URL (fresh-signed at enqueue time) for compositing. */
+  logoUrl?: string;
 }
 
 export type EnqueueResult = { ok: true } | { ok: false; error: string };
@@ -46,6 +53,9 @@ export async function enqueueImageJob(input: EnqueueImageJobInput): Promise<Enqu
         jobId: input.jobId,
         generationParams: input.generationParams,
         ...(input.batchId && { batchId: input.batchId }),
+        ...(input.capDraftId && { capDraftId: input.capDraftId }),
+        ...(input.headlineText && { headlineText: input.headlineText }),
+        ...(input.logoUrl && { logoUrl: input.logoUrl }),
       },
       deduplicationId: input.jobId,
       ...(input.delaySeconds && { delay: input.delaySeconds }),
