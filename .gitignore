@@ -63,3 +63,4 @@ playwright-report-uat/
 playwright-report-verify/
 test-results/
 playwright.verify.config.ts
+!assets/fonts/README.md
