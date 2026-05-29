@@ -5,6 +5,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 import { constantTimeEqual } from "@/lib/crypto-compare";
 import { sideEffectsGuarded } from "@/lib/runtime-env";
+import { recordCronRecovery } from "@/lib/platform/service-health/record";
 
 export function authorisedCronRequest(req: NextRequest): boolean {
   const secret = process.env.CRON_SECRET;
@@ -60,5 +61,17 @@ export async function updateHeartbeat(jobName: string, status: "ok" | "error", l
       .eq("job_name", jobName);
   } catch (err) {
     logger.warn("cron.heartbeat_update_failed", { jobName, err: err instanceof Error ? err.message : String(err) });
+  }
+
+  // Recovery sweep — only on success. A successful cron run means the cron
+  // is no longer stale; any unresolved cron_stale events for it should be
+  // marked resolved. Failures must NOT clear unresolved alerts; that would
+  // mask the very failure the alert is reporting.
+  //
+  // The sweep is non-blocking and never throws: recordCronRecovery catches
+  // its own errors. Mirrors the withHealthMonitoring → recordRecovery
+  // pattern from PR #1132 for external-service recovery.
+  if (status === "ok") {
+    await recordCronRecovery(jobName);
   }
 }
