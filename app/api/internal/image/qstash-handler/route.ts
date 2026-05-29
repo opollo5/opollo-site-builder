@@ -16,6 +16,8 @@ import {
   getActiveLeaseCount,
   getConcurrencyCap,
 } from "@/lib/image/lease";
+import { incrementImageGenSpend } from "@/lib/image/budget";
+import { notifyImageGenBudgetThreshold } from "@/lib/image/budget-notify";
 
 // ---------------------------------------------------------------------------
 // POST /api/internal/image/qstash-handler
@@ -229,6 +231,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       completed_at: new Date().toISOString(),
     }).eq("id", jobId);
 
+    // B3: increment per-company spend (non-blocking). Success only — never on
+    // failure, never on preview. The handler never sees preview jobs (the batch
+    // route skips QStash enqueue in preview mode).
+    void recordBudgetSpend(generationParams.companyId);
+
     // Update batch state after job completion (non-blocking).
     if (batchId) void updateBatchProgress(svc, batchId);
 
@@ -363,6 +370,39 @@ async function linkCapDraft(
   } catch (err) {
     logger.warn("cap.image.link_failed", {
       draftId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * B3: bump the company's monthly image-gen spend, and if this is the first
+ * time we crossed the 80% threshold for the month, send the operator email.
+ * Non-blocking — called via void; errors logged, never thrown.
+ */
+async function recordBudgetSpend(companyId: string): Promise<void> {
+  try {
+    const result = await incrementImageGenSpend(companyId, 1);
+    if (!result) return;
+    if (result.crossed_80_percent) {
+      // Look up the company name for a friendlier email subject.
+      const svc = getServiceRoleClient();
+      const { data: company } = await svc
+        .from("platform_companies")
+        .select("name")
+        .eq("id", companyId)
+        .maybeSingle();
+      const companyName = (company as { name: string } | null)?.name;
+      await notifyImageGenBudgetThreshold({
+        companyId,
+        companyName,
+        spentCents: result.spent_cents,
+        budgetCents: result.budget_cents,
+      });
+    }
+  } catch (err) {
+    logger.warn("image.budget.spend_record_failed", {
+      companyId,
       err: err instanceof Error ? err.message : String(err),
     });
   }

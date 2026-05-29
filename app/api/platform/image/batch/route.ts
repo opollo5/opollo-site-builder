@@ -6,6 +6,7 @@ import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 import { enqueueImageJob } from "@/lib/image/enqueue";
+import { checkImageGenBudget } from "@/lib/image/budget";
 import type { GenerationParams } from "@/lib/image/types";
 
 // ---------------------------------------------------------------------------
@@ -14,9 +15,9 @@ import type { GenerationParams } from "@/lib/image/types";
 // Creates a batch + N image_generation_jobs, enqueues one QStash message per
 // job, returns the batchId for the operator to poll.
 //
-// Budget pre-flight check (B3) is enforced in the next slice. This endpoint
-// creates and enqueues immediately; budget enforcement is added in B3 without
-// schema changes here.
+// B3: a per-company monthly budget cap is enforced before creating the batch.
+// Preview mode (mode='preview') skips the budget check — preview never calls
+// Ideogram and never increments spend.
 //
 // §1.2: route under /api/platform/image/*, not /social/
 // §1.7: one job per distinct aspect ratio derived from target_platforms.
@@ -62,6 +63,42 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (gate.kind === "deny") return gate.response;
 
   const svc = getServiceRoleClient();
+
+  // ─── B3: budget pre-flight ───────────────────────────────────────────────
+  // Preview mode never spends real Ideogram credits (per B5), so skip.
+  // Per §1.7: projected job count is the number of jobs being enqueued, not
+  // the source row count. The caller (C4 ingestion route) deduplicates
+  // aspect ratios per row before constructing the jobs array.
+  if (mode !== "preview") {
+    const budget = await checkImageGenBudget(company_id, jobs.length);
+    if (!budget.allowed) {
+      logger.info("image.batch.budget_rejected", {
+        companyId: company_id,
+        projectedJobs: budget.projected_jobs,
+        projectedCents: budget.projected_cents,
+        remainingCents: budget.remaining_cents,
+        reason: budget.reason,
+      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "BUDGET_EXCEEDED",
+            message: `Projected ${budget.projected_jobs} images cost $${(budget.projected_cents / 100).toFixed(2)}; $${(budget.remaining_cents / 100).toFixed(2)} remaining this month.`,
+            projected_jobs: budget.projected_jobs,
+            projected_cents: budget.projected_cents,
+            source_row_count: source_row_count ?? null,
+            remaining_cents: budget.remaining_cents,
+            budget_cents: budget.budget_cents,
+            spent_cents: budget.spent_cents,
+            next_reset_at: budget.next_reset_at,
+          },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 402 },
+      );
+    }
+  }
 
   // Create the batch row.
   const { data: batch, error: batchErr } = await svc
