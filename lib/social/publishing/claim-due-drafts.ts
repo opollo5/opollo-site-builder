@@ -18,6 +18,7 @@ export interface ClaimedDraft {
   company_id: string;
   content: string;
   media_urls: string[] | null;
+  media_asset_ids: string[] | null;
   target_profiles: Array<{ profile_id: string }> | null;
   platform_variants: Record<string, { content?: string; link?: string; cta?: string }> | null;
   publish_attempts: number | null;
@@ -48,7 +49,7 @@ export async function claimDueDrafts(
            updated_at = now()
       FROM claimed
      WHERE d.id = claimed.id
-    RETURNING d.id, d.company_id, d.content, d.media_urls,
+    RETURNING d.id, d.company_id, d.content, d.media_urls, d.media_asset_ids,
               d.target_profiles, d.platform_variants, d.publish_attempts
     `,
     [opts.maxAttempts, opts.batchSize, workerId],

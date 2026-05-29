@@ -6,6 +6,7 @@ import { requireDbConfig } from "@/lib/db-direct";
 import { authorisedCronRequest, unauthorisedResponse, updateHeartbeat } from "@/lib/platform/cron/cron-shared";
 import { publishPost } from "@/lib/social/publishing/bundle-social-client";
 import { claimDueDrafts, type ClaimedDraft } from "@/lib/social/publishing/claim-due-drafts";
+import { resolveMediaForPublish } from "@/lib/social/publishing/resolve-media";
 import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
@@ -86,10 +87,16 @@ async function handleCron(req: NextRequest): Promise<NextResponse> {
       chunk.map(async (draft) => {
         try {
           const targetProfileIds = (draft.target_profiles ?? []).map((p) => p.profile_id);
+          // B4 §1.6: prefer media_asset_ids (asset-derived signed URLs) over
+          // legacy media_urls. Sign at publish time so we never persist URLs.
+          const mediaUrls = await resolveMediaForPublish({
+            mediaAssetIds: draft.media_asset_ids,
+            legacyMediaUrls: draft.media_urls,
+          });
           const result = await publishPost({
             externalPostId: draft.id,
             content: draft.content,
-            mediaUrls: draft.media_urls ?? [],
+            mediaUrls,
             targetProfileIds,
             platformVariants: draft.platform_variants ?? {},
           });
