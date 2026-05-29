@@ -9,13 +9,23 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Heartbeat staleness threshold: each job must have run within 2× its schedule.
+//
+// Adding a new cron? Put its threshold here. The default fallback (30 min) is
+// wrong for anything other than a sub-30-min schedule — daily / weekly /
+// monthly crons trip the default constantly and create FALSE_POSITIVE
+// cron_stale rows. The dedup in record.ts now latches those to a single row
+// per cron, but the right fix is still to set the correct threshold.
 const STALENESS_THRESHOLDS: Record<string, number> = {
-  "publish-due":        2 * 60 * 1000,       // 2 min (runs every 1 min)
-  "heartbeat-check":    15 * 60 * 1000,      // 15 min (runs every 5 min)
-  "health-check":       15 * 60 * 1000,      // 15 min
-  "cleanup-cache":      26 * 60 * 60 * 1000, // 26h (runs daily)
-  "escalate-approvals": 8 * 60 * 60 * 1000,  // 8h (runs every 6h)
-  "health-digest":      26 * 60 * 60 * 1000, // 26h (runs daily)
+  "publish-due":                  2 * 60 * 1000,            // 2 min (runs every 1 min)
+  "heartbeat-check":              15 * 60 * 1000,           // 15 min (runs every 5 min)
+  "health-check":                 15 * 60 * 1000,           // 15 min
+  "cleanup-cache":                26 * 60 * 60 * 1000,      // 26h (runs daily)
+  "escalate-approvals":           8 * 60 * 60 * 1000,       // 8h (runs every 6h)
+  "health-digest":                26 * 60 * 60 * 1000,      // 26h (runs daily)
+  "cap-generation-runs-cleanup":  26 * 60 * 60 * 1000,      // 26h (runs daily at 02:00)
+  "cap-monthly-generation":       32 * 24 * 60 * 60 * 1000, // 32 days (runs 1st of month at 04:00)
+  "cap-weekly-generation":        8 * 24 * 60 * 60 * 1000,  // 8 days (runs Mondays at 06:00)
+  "cost-monitoring-daily-report": 26 * 60 * 60 * 1000,      // 26h (runs daily at 07:00)
 };
 
 // ---------------------------------------------------------------------------

@@ -5,34 +5,70 @@ import { logger } from "@/lib/logger";
 import type { RecordEventInput } from "./types";
 
 // Aggregation window: events of the same (service, operation, event_type)
-// within this window are merged by incrementing occurrence_count.
+// within this window are merged by incrementing occurrence_count. Used for
+// bursty failure types (5xx, rate_limit, connection_failure) where multiple
+// occurrences within a few minutes are the same incident.
 const AGGREGATE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+
+// Latched event types: once raised, they stay true until a recovery flips
+// resolved_at. There is no point inserting multiple unresolved rows for the
+// same (service, operation) — they all describe the same persistent state.
+// Dedup these by ANY existing unresolved row, regardless of time window.
+//
+// Why this matters: the heartbeat-check cron fires every 5 minutes. Without
+// latched dedup, a single stale cron produces ~12 rows per hour (one per
+// detector run after the 5-min window expires). Multiply by N stale crons
+// and the unresolved-row count grows without bound. The notifier cooldown
+// fires on every new row → email spam.
+const LATCHED_EVENT_TYPES = new Set<string>(["cron_stale"]);
 
 /**
  * Write a service health event to service_health_events.
  *
- * Within the 5-min aggregation window, updates the existing unresolved row
- * (increments occurrence_count + bumps last_seen_at). Outside the window,
- * or when no unresolved row exists, inserts a new row.
+ * Dedup behaviour depends on event type:
+ *   - Bursty types (default): within a 5-min window, update the existing
+ *     unresolved row matching (service, operation, event_type). Outside the
+ *     window or on first occurrence, insert.
+ *   - Latched types (LATCHED_EVENT_TYPES — currently cron_stale): drop the
+ *     time window. Any existing unresolved row matching
+ *     (service, operation, event_type) is updated; otherwise insert.
+ *
+ * The dedup query MUST include operation — multiple distinct operations of
+ * the same service can be failing simultaneously and need separate rows.
+ * Pre-fix code didn't filter on operation, so different crons collided on
+ * a single row, overwriting each other's operation field.
  *
  * Never throws — a logging failure must not cascade into the caller.
  */
 export async function recordHealthEvent(input: RecordEventInput): Promise<void> {
   try {
     const svc = getServiceRoleClient();
-    const windowStart = new Date(Date.now() - AGGREGATE_WINDOW_MS).toISOString();
+    const isLatched = LATCHED_EVENT_TYPES.has(input.eventType);
 
-    // Look for an existing unresolved event in the aggregation window.
-    const { data: existing } = await svc
+    // Look for an existing unresolved event matching service+operation+type.
+    let query = svc
       .from("service_health_events")
       .select("id, occurrence_count")
       .eq("service_name", input.serviceName)
       .eq("event_type", input.eventType)
       .is("resolved_at", null)
-      .gte("last_seen_at", windowStart)
       .order("last_seen_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+
+    // Operation may be undefined (e.g. service-level events); match exactly.
+    if (input.operation !== undefined) {
+      query = query.eq("operation", input.operation);
+    } else {
+      query = query.is("operation", null);
+    }
+
+    // Bursty types: scope to the recent window. Latched types: any unresolved row.
+    if (!isLatched) {
+      const windowStart = new Date(Date.now() - AGGREGATE_WINDOW_MS).toISOString();
+      query = query.gte("last_seen_at", windowStart);
+    }
+
+    const { data: existing } = await query.maybeSingle();
 
     if (existing) {
       await svc
@@ -40,7 +76,6 @@ export async function recordHealthEvent(input: RecordEventInput): Promise<void> 
         .update({
           occurrence_count: existing.occurrence_count + 1,
           last_seen_at: new Date().toISOString(),
-          ...(input.operation !== undefined && { operation: input.operation }),
           details: input.details ?? {},
         })
         .eq("id", existing.id);
