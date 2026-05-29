@@ -143,6 +143,54 @@ export async function hasUnresolvedHealthEvent(
 }
 
 /**
+ * Resolve stale-cron events for a job that just ran successfully.
+ *
+ * Parallel to recordRecovery() (PR #1132) — that function handles
+ * external-service recovery via withHealthMonitoring; this one handles
+ * cron recovery via updateHeartbeat(). Both clear unresolved health rows
+ * the moment the underlying thing starts working again, so the system
+ * self-heals across the deploy / restart / process-restart boundary.
+ *
+ * Called from updateHeartbeat() ONLY on the success path (status='ok').
+ * A failed heartbeat must NOT clear unresolved alerts — that would mask
+ * the very failure the alert is reporting.
+ *
+ * Never throws — a recovery-sweep failure must never break the cron's
+ * main work or its heartbeat update. Logs warn on Supabase errors.
+ */
+export async function recordCronRecovery(jobName: string): Promise<void> {
+  try {
+    const svc = getServiceRoleClient();
+    const { data, error } = await svc
+      .from("service_health_events")
+      .update({ resolved_at: new Date().toISOString() })
+      .eq("service_name", "cron")
+      .eq("event_type", "cron_stale")
+      .eq("operation", jobName)
+      .is("resolved_at", null)
+      .select("id");
+    if (error) {
+      logger.warn("service_health.cron_recovery_failed", {
+        jobName,
+        err: error.message,
+      });
+      return;
+    }
+    if (data && data.length > 0) {
+      logger.info("service_health.cron_recovery_swept", {
+        jobName,
+        resolved_count: data.length,
+      });
+    }
+  } catch (err) {
+    logger.warn("service_health.cron_recovery_threw", {
+      jobName,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
  * Mark a service as recovered — resolves all open events for the service.
  * Called by withHealthMonitoring on a successful call after prior failures.
  */
