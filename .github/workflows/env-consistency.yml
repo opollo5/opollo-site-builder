@@ -1,0 +1,82 @@
+name: Supabase env consistency
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  push:
+    branches: [main]
+
+# Catches the class of env-drift that caused the 2026-05-29 publish-due
+# incident: SUPABASE_URL pointing at one Supabase project while
+# SUPABASE_DB_URL pointed at a different one (or used the direct-connection
+# host format that's IPv6-only and unreachable from Vercel).
+#
+# Required GitHub repo secrets to enable the "production-mirror" check job:
+#   SUPABASE_URL                — same value as in Vercel production env
+#   SUPABASE_DB_URL             — same value as in Vercel production env
+#   NEXT_PUBLIC_SUPABASE_URL    — optional; only set if Vercel production has it
+#
+# The unit-tests job runs unconditionally on every push/PR and proves the
+# check script's logic is correct. The production-mirror job only fires when
+# the secrets above are configured; otherwise it skips with a notice (so a
+# new fork or unconfigured repo doesn't see a permanent red check).
+
+env:
+  RUN_CI: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+jobs:
+  # Unit tests proving the check script's logic. Independent from production
+  # secrets; runs always.
+  env-consistency-unit:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: Run check-supabase-env-consistency unit tests
+        run: npx vitest run --config vitest.unit.config.ts scripts/__tests__/check-supabase-env-consistency.test.ts
+
+  # Production-mirror check: runs the actual script against secrets that
+  # mirror Vercel production env. Catches drift between the two scopes.
+  # Skipped (not failed) when secrets aren't configured.
+  env-consistency-production:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [env-consistency-unit]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/cache@v5
+        id: cache-node-modules
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('package-lock.json') }}
+      - if: steps.cache-node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: Run consistency check against production-mirror secrets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_DB_URL:-}" ]; then
+            echo "::notice::SUPABASE_URL / SUPABASE_DB_URL repo secrets not configured. Skipping production-mirror check."
+            echo "::notice::To enable: add SUPABASE_URL and SUPABASE_DB_URL as GitHub repo secrets (mirroring Vercel production values)."
+            exit 0
+          fi
+          npm run check:supabase-env-consistency

@@ -27,6 +27,7 @@
     "screenshots": "RUN_SCREENSHOTS=1 playwright test screenshots.spec.ts",
     "screenshots:baseline": "RUN_SCREENSHOTS=1 playwright test screenshots.spec.ts --update-snapshots",
     "audit:static": "tsx scripts/audit.ts",
+    "check:supabase-env-consistency": "tsx scripts/check-supabase-env-consistency.ts",
     "smoke:harness": "vitest run --config vitest.unit.config.ts lib/__tests__/smoke-budget.unit.test.ts",
     "smoke:composer": "tsx scripts/smoke/composer.smoke.ts",
     "smoke:cap": "tsx scripts/smoke/cap.smoke.ts",
