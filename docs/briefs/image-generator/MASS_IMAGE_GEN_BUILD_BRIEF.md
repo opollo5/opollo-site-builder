@@ -1,5 +1,10 @@
 # Mass Image Generation — Build Brief v3
 
+> **⚠ ADDENDUM IN EFFECT:** The compositing path (Bannerbear) is superseded. Read
+> [`MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md`](./MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md)
+> before acting on any slice from A3 onwards. The addendum changes slices A4, A5, and D1, and
+> adds four new A-NEW slices. All other content in this document remains authoritative.
+
 **Programme:** Opollo Site Builder / Social Module — Mass-Production Image Generation
 **Owner:** Steven Morey
 **Author:** Drafted from recon at `docs/recon/mass-image-gen-recon.md`
