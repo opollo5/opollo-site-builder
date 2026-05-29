@@ -50,6 +50,7 @@ export default defineConfig({
       "lib/**/__tests__/**/*.unit.test.ts",
       "tests/regressions/**/*.test.{ts,tsx}",
       "tests/security/**/*.security.test.ts",
+      "scripts/__tests__/**/*.test.ts",
     ],
     testTimeout: 10_000,
     // No globalSetup — no Supabase. Tests must mock all I/O.
