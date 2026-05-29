@@ -160,11 +160,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const jobId = job.id as string;
     jobIds.push(jobId);
 
-    // Preview mode: skip QStash; job state stays 'pending' as a draft marker.
-    if (mode === "preview") continue;
-
-    // Enqueue to QStash.
-    const enqueue = await enqueueImageJob({ jobId, generationParams, batchId });
+    // B5: preview mode enqueues through the same QStash handler with
+    // previewOnly=true. The handler builds the prompt and returns without
+    // calling Ideogram. Same code path exercise; zero spend.
+    const enqueue = await enqueueImageJob({
+      jobId,
+      generationParams,
+      batchId,
+      ...(mode === "preview" && { previewOnly: true }),
+    });
     if (!enqueue.ok) {
       logger.error("image.batch.enqueue_failed", { batchId, jobId, error: enqueue.error });
       // Mark job failed immediately so the batch tracker has accurate counts.
@@ -181,7 +185,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   await svc
     .from("image_generation_batches")
     .update({
-      state: mode === "preview" ? "pending" : allFailed ? "failed" : "running",
+      state: allFailed ? "failed" : "running",
       failed_jobs: jobErrors.length,
       updated_at: new Date().toISOString(),
     })

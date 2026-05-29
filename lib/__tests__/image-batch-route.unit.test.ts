@@ -208,7 +208,7 @@ describe("POST /api/platform/image/batch", () => {
     expect(vi.mocked(enqueueImageJob)).not.toHaveBeenCalled();
   });
 
-  it("mode=preview skips QStash enqueue", async () => {
+  it("mode=preview enqueues with previewOnly=true (B5)", async () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "image_generation_batches") {
         return {
@@ -243,7 +243,60 @@ describe("POST /api/platform/image/batch", () => {
     const json = await res.json() as { data: { mode: string } };
     expect(json.data.mode).toBe("preview");
 
+    // §B5: preview flows through the same handler with previewOnly=true.
+    // Batch route does NOT skip QStash; the handler refuses to call Ideogram
+    // when it sees previewOnly.
     const { enqueueImageJob } = await import("@/lib/image/enqueue");
-    expect(vi.mocked(enqueueImageJob)).not.toHaveBeenCalled();
+    expect(vi.mocked(enqueueImageJob)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(enqueueImageJob)).toHaveBeenCalledWith(
+      expect.objectContaining({ jobId: JOB_UUID, previewOnly: true }),
+    );
+  });
+
+  it("mode=preview skips budget check (B5 ↔ B3)", async () => {
+    // Tight budget that would reject a 1-job batch in 'generate' mode,
+    // but preview must pass through without consulting the budget.
+    mockFrom.mockImplementation((table: string) => {
+      if (table === "platform_companies") {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              maybeSingle: vi.fn().mockResolvedValue({
+                data: { monthly_image_gen_budget_cents: 0 },
+                error: null,
+              }),
+            }),
+          }),
+        };
+      }
+      if (table === "image_generation_batches") {
+        return {
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: BATCH_UUID }, error: null }),
+            }),
+          }),
+          update: vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) }),
+        };
+      }
+      if (table === "image_generation_jobs") {
+        return {
+          insert: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: { id: JOB_UUID }, error: null }),
+            }),
+          }),
+        };
+      }
+      return {};
+    });
+
+    const req = makePostRequest({
+      company_id: COMPANY_UUID,
+      jobs: [VALID_JOB_SPEC],
+      mode: "preview",
+    }) as unknown as NextRequest;
+    const res = await POST(req);
+    expect(res.status).toBe(201);
   });
 });

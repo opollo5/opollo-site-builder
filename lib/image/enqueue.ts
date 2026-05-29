@@ -28,6 +28,8 @@ export interface EnqueueImageJobInput {
   headlineText?: string;
   /** Brand logo URL (fresh-signed at enqueue time) for compositing. */
   logoUrl?: string;
+  /** B5: when true, the handler builds the prompt and returns without calling Ideogram. */
+  previewOnly?: boolean;
 }
 
 export type EnqueueResult = { ok: true } | { ok: false; error: string };
@@ -56,6 +58,7 @@ export async function enqueueImageJob(input: EnqueueImageJobInput): Promise<Enqu
         ...(input.capDraftId && { capDraftId: input.capDraftId }),
         ...(input.headlineText && { headlineText: input.headlineText }),
         ...(input.logoUrl && { logoUrl: input.logoUrl }),
+        ...(input.previewOnly && { previewOnly: true }),
       },
       deduplicationId: input.jobId,
       ...(input.delaySeconds && { delay: input.delaySeconds }),
