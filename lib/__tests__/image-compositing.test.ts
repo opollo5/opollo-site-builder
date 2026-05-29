@@ -4,9 +4,9 @@ import { TEXT_ZONE_MAP } from "@/lib/image/compositing/text-zones";
 import type { CompositionType } from "@/lib/image/types";
 
 // Unit tests for the text-zone map and pixel coordinate conversion.
-// The conversion logic is inline in bannerbear.ts; we test the TEXT_ZONE_MAP
-// contract here so a future maintainer can't shift coordinates without
-// breaking these assertions.
+// The conversion logic is inline in lib/image/compositing/sharp-renderer.ts;
+// we test the TEXT_ZONE_MAP contract here so a future maintainer can't shift
+// coordinates without breaking these assertions.
 
 function toPixels(
   zonePercent: { x: number; y: number; width: number; height: number },

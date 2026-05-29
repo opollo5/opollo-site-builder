@@ -44,7 +44,7 @@ import { generatePreview } from "@/lib/image/generator/preview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 90; // matches lease TTL; Ideogram ~11s + Bannerbear ~30s
+export const maxDuration = 90; // matches lease TTL; Ideogram ~11s + sharp composite ~1-2s
 
 const GenerationParamsSchema = z.object({
   styleId: z.enum(["clean_corporate", "bold_promo", "minimal_modern", "editorial", "product_focus"]),
