@@ -16,9 +16,10 @@ import type { CompositeInput, CompositeResult } from "./index";
 // Replaces the Bannerbear third-party compositing path. No external API calls;
 // all rendering happens in-process using the bundled vips/rsvg build.
 //
-// Font: Inter (OFL-1.1, free for commercial use) from assets/fonts/.
-// Falls back to system sans-serif when TTF files are absent (local dev / CI).
-// See assets/fonts/README.md for download instructions.
+// Fonts (OFL-1.1, all free for commercial use) from assets/fonts/:
+//   Inter, Roboto, Montserrat, Open Sans, Poppins — regular + bold woff2.
+// Falls back to system sans-serif when woff2 files are absent.
+// See assets/fonts/README.md for sources and licence notices.
 //
 // Per §1.8 of MASS_IMAGE_GEN_BUILD_BRIEF_v3_ADDENDUM.md:
 //   - All compositing goes through compositeImage() → this module.
@@ -28,37 +29,57 @@ import type { CompositeInput, CompositeResult } from "./index";
 const BUCKET = process.env.IMAGE_GENERATION_BUCKET ?? "generated-images";
 const FONTS_DIR = join(process.cwd(), "assets", "fonts");
 
-// Pre-load fonts once at module initialisation time so we don't stat on
-// every render call.
-const FONT_BOLD_B64: string | null = (() => {
-  const p = join(FONTS_DIR, "Inter-Bold.ttf");
+// Load woff2 font as base64, or return null if absent.
+function loadFont(filename: string): string | null {
+  const p = join(FONTS_DIR, filename);
   if (!existsSync(p)) return null;
   return readFileSync(p).toString("base64");
-})();
+}
 
-const FONT_REGULAR_B64: string | null = (() => {
-  const p = join(FONTS_DIR, "Inter-Regular.ttf");
-  if (!existsSync(p)) return null;
-  return readFileSync(p).toString("base64");
-})();
+// All five font families (regular + bold) — pre-loaded once at module init.
+// The template editor (A-NEW-3) exposes these as the font picker options.
+interface FontPair { regular: string | null; bold: string | null }
+const FONTS: Record<string, FontPair> = {
+  Inter:       { regular: loadFont("Inter-Regular.woff2"),       bold: loadFont("Inter-Bold.woff2")       },
+  Roboto:      { regular: loadFont("Roboto-Regular.woff2"),      bold: loadFont("Roboto-Bold.woff2")      },
+  Montserrat:  { regular: loadFont("Montserrat-Regular.woff2"),  bold: loadFont("Montserrat-Bold.woff2")  },
+  "Open Sans": { regular: loadFont("OpenSans-Regular.woff2"),    bold: loadFont("OpenSans-Bold.woff2")    },
+  Poppins:     { regular: loadFont("Poppins-Regular.woff2"),     bold: loadFont("Poppins-Bold.woff2")     },
+};
 
-if (!FONT_BOLD_B64 || !FONT_REGULAR_B64) {
-  // Non-fatal — system sans-serif is used instead.
+// Default: first family that has both weights loaded; fall back to sans-serif.
+const DEFAULT_FONT_FAMILY = (
+  Object.entries(FONTS).find(([, p]) => p.regular && p.bold)?.[0] ?? null
+);
+
+if (!DEFAULT_FONT_FAMILY) {
   logger.warn("image.compositor.fonts_missing", {
     path: FONTS_DIR,
-    note: "See assets/fonts/README.md. Falling back to system sans-serif.",
+    note: "No woff2 fonts found. See assets/fonts/README.md. Falling back to system sans-serif.",
   });
 }
 
-// SVG @font-face block injected when custom fonts are available.
-const FONT_FACE_SVG = FONT_BOLD_B64 && FONT_REGULAR_B64
-  ? `<defs><style>
-      @font-face { font-family: 'Inter'; font-weight: 700; src: url('data:font/ttf;base64,${FONT_BOLD_B64}'); }
-      @font-face { font-family: 'Inter'; font-weight: 400; src: url('data:font/ttf;base64,${FONT_REGULAR_B64}'); }
-    </style></defs>`
-  : "";
+// Build SVG @font-face declarations for all available families.
+// woff2 is supported by librsvg 2.50+ (this build: 2.61.2).
+const FONT_FACE_SVG = (() => {
+  const rules: string[] = [];
+  for (const [family, pair] of Object.entries(FONTS)) {
+    if (pair.regular) {
+      rules.push(`@font-face { font-family: '${family}'; font-weight: 400; src: url('data:font/woff2;base64,${pair.regular}') format('woff2'); }`);
+    }
+    if (pair.bold) {
+      rules.push(`@font-face { font-family: '${family}'; font-weight: 700; src: url('data:font/woff2;base64,${pair.bold}') format('woff2'); }`);
+    }
+  }
+  return rules.length > 0
+    ? `<defs><style>${rules.join("\n")}</style></defs>`
+    : "";
+})();
 
-const FONT_FAMILY = FONT_BOLD_B64 ? "'Inter', sans-serif" : "sans-serif";
+// Font stack for SVG text elements: bundled family (if available) + system fallback.
+const FONT_FAMILY = DEFAULT_FONT_FAMILY
+  ? `'${DEFAULT_FONT_FAMILY}', sans-serif`
+  : "sans-serif";
 
 // ---------------------------------------------------------------------------
 // Public entry point — implements the compositeImage() contract.
