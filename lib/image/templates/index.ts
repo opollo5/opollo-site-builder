@@ -18,6 +18,11 @@ import type { LogoConfig } from "@/lib/image/compositing";
 
 export interface TemplateDefinition {
   compositionType: CompositionType;
+  /** Optional: explicit text-zone coordinates from canvas drag (overrides TEXT_ZONE_MAP). */
+  customTextZone?: {
+    x: number; y: number; width: number; height: number;
+    alignment: "left" | "center" | "right";
+  };
   overlayAlpha: number;
   logoPosition: LogoConfig["position"];
   logoSizePercent: number;
