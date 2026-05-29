@@ -12,7 +12,7 @@ import {
 } from "@/lib/image";
 import { compositeImage, TEXT_ZONE_MAP } from "@/lib/image/compositing";
 import type { CompositeInput } from "@/lib/image/compositing";
-import { getTemplateV1 } from "@/lib/image/compositing/templates-v1";
+import { get_template } from "@/lib/image/templates";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { AspectRatio, CompositionType, StyleId } from "@/lib/image";
 
@@ -133,10 +133,15 @@ export async function POST(req: NextRequest) {
   const industry = brand?.industry ?? undefined;
   const headlineText = headline?.trim() || "Headline preview";
 
-  // Code template for this aspect ratio (from A-NEW-1 templates-v1.ts).
-  // Migrated to DB templates in A-NEW-4.
-  const template = getTemplateV1(aspect_ratio as AspectRatio);
-  const textZone = TEXT_ZONE_MAP[composition_type as CompositionType];
+  // DB template for this aspect ratio (A-NEW-4). Falls back to TEXT_ZONE_MAP
+  // if no template row exists (shouldn't happen after A-NEW-2 seed).
+  const dbTemplate = await get_template(companyId, aspect_ratio as AspectRatio);
+  const textZone = dbTemplate?.definition.customTextZone
+    ?? TEXT_ZONE_MAP[(dbTemplate?.definition.compositionType ?? composition_type) as CompositionType];
+  const maxHeadlineFontSize = dbTemplate?.definition.maxHeadlineFontSize ?? 56;
+  const logoPosition = dbTemplate?.definition.logoPosition ?? "bottom-right";
+  const logoSizePercent = dbTemplate?.definition.logoSizePercent ?? 18;
+  const logoPadding = dbTemplate?.definition.logoPadding ?? 24;
 
   // Brand logo: prefer icon variant, fall back to primary.
   // Used directly as-is; compositor handles fetch failure gracefully.
@@ -184,15 +189,15 @@ export async function POST(req: NextRequest) {
         textZones: [{
           ...textZone,
           text: headlineText,
-          maxFontSize: template.maxHeadlineFontSize,
-          colour: "white", // white text on dark overlay band
+          maxFontSize: maxHeadlineFontSize,
+          colour: "white",
         }],
         logo: logoUrl
           ? {
               url: logoUrl,
-              position: template.logoPosition,
-              sizePercent: template.logoSizePercent,
-              padding: template.logoPadding,
+              position: logoPosition,
+              sizePercent: logoSizePercent,
+              padding: logoPadding,
             }
           : null,
         outputFormat: bg.format === "png" ? "png" : "jpeg",

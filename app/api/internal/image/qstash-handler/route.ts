@@ -8,7 +8,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { generateWithFallback } from "@/lib/image";
 import type { GenerationParams, AspectRatio } from "@/lib/image/types";
 import { compositeImage, TEXT_ZONE_MAP } from "@/lib/image/compositing";
-import { getTemplateV1 } from "@/lib/image/compositing/templates-v1";
+import { get_template } from "@/lib/image/templates";
 import { enqueueImageJob } from "@/lib/image/enqueue";
 import {
   acquireImageLease,
@@ -207,26 +207,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       throw new Error("generateWithFallback returned empty array");
     }
 
-    // Composite if we have a headline (indicates CAP or batch pipeline with
-    // templates-v1.ts code templates per §1.8 of the addendum).
+    // Composite if we have a headline (CAP or batch pipeline).
+    // Uses DB template (A-NEW-4); falls back to TEXT_ZONE_MAP if no template row.
     let finalStoragePath = image.storagePath;
     if (headlineText) {
       try {
-        const template = getTemplateV1(generationParams.aspectRatio as AspectRatio);
-        const textZone = TEXT_ZONE_MAP[generationParams.compositionType];
+        const dbTemplate = await get_template(generationParams.companyId, generationParams.aspectRatio as AspectRatio);
+        const textZone = dbTemplate?.definition.customTextZone
+          ?? TEXT_ZONE_MAP[(dbTemplate?.definition.compositionType ?? generationParams.compositionType)];
         const composite = await compositeImage({
           backgroundStoragePath: image.storagePath,
           textZones: [{
             ...textZone,
             text: headlineText,
-            maxFontSize: template.maxHeadlineFontSize,
+            maxFontSize: dbTemplate?.definition.maxHeadlineFontSize ?? 56,
             colour: "white",
           }],
           logo: logoUrl ? {
             url: logoUrl,
-            position: template.logoPosition,
-            sizePercent: template.logoSizePercent,
-            padding: template.logoPadding,
+            position: dbTemplate?.definition.logoPosition ?? "bottom-right",
+            sizePercent: dbTemplate?.definition.logoSizePercent ?? 18,
+            padding: dbTemplate?.definition.logoPadding ?? 24,
           } : null,
           outputFormat: image.format === "png" ? "png" : "jpeg",
           outputWidth: image.width,

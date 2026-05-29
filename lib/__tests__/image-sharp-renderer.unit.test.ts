@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 
 import { autoFitFontSize, wrapText } from "@/lib/image/compositing/sharp-renderer";
-import { TEMPLATES_V1 } from "@/lib/image/compositing/templates-v1";
 
 // ---------------------------------------------------------------------------
 // Unit tests for pure text-layout utilities in the sharp renderer.
@@ -79,26 +78,5 @@ describe("autoFitFontSize", () => {
   });
 });
 
-describe("TEMPLATES_V1", () => {
-  it("all 5 aspect ratios have a template", () => {
-    const expected = ["1x1", "4x5", "9x16", "16x9", "4x3"];
-    for (const ratio of expected) {
-      expect(TEMPLATES_V1).toHaveProperty(ratio);
-    }
-  });
-
-  it("each template has required fields", () => {
-    for (const [ratio, tpl] of Object.entries(TEMPLATES_V1)) {
-      expect(tpl, `template for ${ratio}`).toMatchObject({
-        aspectRatio: ratio,
-        compositionType: expect.any(String),
-        overlayAlpha: expect.any(Number),
-        logoPosition: expect.any(String),
-        logoSizePercent: expect.any(Number),
-        logoPadding: expect.any(Number),
-      });
-      expect(tpl.overlayAlpha).toBeGreaterThan(0);
-      expect(tpl.overlayAlpha).toBeLessThanOrEqual(1);
-    }
-  });
-});
+// Note: TEMPLATES_V1 tests removed in A-NEW-4 — templates-v1.ts deleted,
+// templates now live in image_templates DB table (A-NEW-2).
