@@ -154,6 +154,10 @@ function isPublicPath(pathname: string): boolean {
   // tick can reach the worker endpoint without a session.
   if (pathname.startsWith("/api/cron/")) return true;
   if (pathname.startsWith("/api/internal/cron/")) return true;
+  // /api/internal/image/qstash-handler — QStash webhook delivery. Carries
+  // its own Upstash-Signature verification (verifyQstashSignature in the
+  // route handler). QStash is not a platform user; the signature IS the auth.
+  if (pathname.startsWith("/api/internal/image/")) return true;
   // /api/webhooks/* carries its own HMAC signature verification (S1-17
   // bundle.social). External services aren't platform users — the
   // signature IS the auth. Without this, every webhook bounces to /login.
