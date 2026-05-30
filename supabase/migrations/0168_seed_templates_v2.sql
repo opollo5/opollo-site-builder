@@ -44,12 +44,14 @@ BEGIN
   IF NOT FOUND THEN RETURN; END IF; -- already upgraded or doesn't exist
 
   -- Record outgoing state in version history.
+  -- updated_by is NULL for schema migrations (no real user — FK requires
+  -- a valid platform_users row; NULL is allowed by the column definition).
   INSERT INTO image_template_versions(
     template_id, version, definition, schema_version, change_note, updated_by
   ) VALUES (
     v_tmpl.id, v_tmpl.version, v_tmpl.definition, v_tmpl.schema_version,
     'D6: upgrade to schema_version=2 layer-based format',
-    '00000000-0000-0000-0000-000000000000'::uuid
+    NULL
   );
 
   -- Advance the template.
