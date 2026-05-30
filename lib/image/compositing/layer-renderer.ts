@@ -15,7 +15,7 @@
  *
  * Slice coverage:
  *   E2 — text layer: text-fit, secondary style parser, glyph-hugging bg
- *   E3 — image layer (added in separate slice)
+ *   E3 — image layer: asset resolver, fill/anchor, tint, border_radius, clip_path
  *   E4 — rectangle layer (added in separate slice)
  *   E5 — transforms: rotation, skew, opacity (added in separate slice)
  */
@@ -31,6 +31,9 @@ import type {
   TextFitOptions,
   TextBackground,
   SecondaryStyle,
+  ImageLayer,
+  ImageAnchorX,
+  ImageAnchorY,
 } from "@/lib/image/template-model";
 
 // ─── Font face declarations (shared with sharp-renderer) ─────────────────────
@@ -543,6 +546,178 @@ export async function renderTextLayer(
 
   return {
     input: png,
+    left: Math.round(layer.x),
+    top: Math.round(layer.y),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// E3 — IMAGE LAYER (§3.4, §6.7)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Asset resolver (§1.4) ────────────────────────────────────────────────────
+
+/**
+ * Resolve the concrete image URL for an image layer.
+ *
+ * Resolution order: asset_id (looked up at render time) → image_url.
+ * The full asset_id resolver is implemented in D-series once the assets
+ * table exists. For now, asset_id is logged and image_url is used as
+ * the fallback — no templates in V1 use asset_id yet.
+ */
+export async function resolveImageUrl(layer: ImageLayer): Promise<string | null> {
+  if (layer.asset_id) {
+    logger.warn("image.layer-renderer.image.asset_id_not_implemented", {
+      layerId: layer.id,
+      assetId: layer.asset_id,
+      name: layer.name,
+    });
+  }
+  return layer.image_url ?? null;
+}
+
+// ─── Anchor → sharp gravity ───────────────────────────────────────────────────
+
+/**
+ * Map ImageLayer anchor values to the sharp gravity/position string.
+ * Used for both `cover` and `contain` (fit) resize modes.
+ */
+export function buildSharpPosition(anchorX: ImageAnchorX, anchorY: ImageAnchorY): string {
+  const h = anchorX === "left" ? "west" : anchorX === "right" ? "east" : "";
+  const v = anchorY === "top" ? "north" : anchorY === "bottom" ? "south" : "";
+  if (v && h) return `${v}${h}`;   // e.g. "northwest"
+  if (v) return v;                  // "north" / "south"
+  if (h) return h;                  // "west" / "east"
+  return "centre";                  // center/center
+}
+
+// ─── Masking helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Apply a rounded-rectangle mask to clip an image to border_radius corners.
+ * Uses SVG + `dest-in` composite (alpha masking).
+ */
+async function applyBorderRadiusMask(
+  buf: Buffer,
+  w: number,
+  h: number,
+  radius: number,
+): Promise<Buffer> {
+  const maskSvg = Buffer.from(
+    `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">` +
+    `<rect width="${w}" height="${h}" rx="${radius}" ry="${radius}" fill="white"/>` +
+    `</svg>`,
+  );
+  const maskPng = await sharp(maskSvg).png().toBuffer();
+  return sharp(buf).composite([{ input: maskPng, blend: "dest-in" }]).png().toBuffer();
+}
+
+/**
+ * Apply an SVG clip-path mask to the image.
+ * `clipPath` is an SVG path data string (e.g. a diagonal polygon).
+ * Used for split-layout diagonal cuts.
+ */
+async function applyClipPathMask(
+  buf: Buffer,
+  w: number,
+  h: number,
+  clipPath: string,
+): Promise<Buffer> {
+  const maskSvg = Buffer.from(
+    `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">` +
+    `<path d="${escapeXml(clipPath)}" fill="white"/>` +
+    `</svg>`,
+  );
+  const maskPng = await sharp(maskSvg).png().toBuffer();
+  return sharp(buf).composite([{ input: maskPng, blend: "dest-in" }]).png().toBuffer();
+}
+
+/**
+ * Apply a multiply-blend tint overlay to an image.
+ * tintColor is a CSS colour string (e.g. "#FF0000" or "rgba(0,0,255,0.5)").
+ */
+async function applyTint(buf: Buffer, w: number, h: number, tintColor: string): Promise<Buffer> {
+  const tintSvg = Buffer.from(
+    `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">` +
+    `<rect width="${w}" height="${h}" fill="${escapeXml(tintColor)}"/>` +
+    `</svg>`,
+  );
+  const tintPng = await sharp(tintSvg).png().toBuffer();
+  return sharp(buf).composite([{ input: tintPng, blend: "multiply" }]).png().toBuffer();
+}
+
+// ─── Public render function ───────────────────────────────────────────────────
+
+/**
+ * Render an ImageLayer into a sharp.OverlayOptions for compositing.
+ *
+ * Pipeline:
+ *   1. Resolve image URL (asset_id → image_url fallback)
+ *   2. Fetch the image bytes
+ *   3. Resize with fill mode + anchor gravity
+ *   4. Apply clip_path mask (if set)
+ *   5. Apply border_radius mask (if set)
+ *   6. Apply tint overlay (if set)
+ *
+ * Returns null if no image URL is available and hide_when_empty should apply.
+ * E5 adds rotation + skew transforms around this function.
+ */
+export async function renderImageLayer(
+  layer: ImageLayer,
+): Promise<sharp.OverlayOptions | null> {
+  const url = await resolveImageUrl(layer);
+
+  if (!url) {
+    if (layer.hide_when_empty) return null;
+    logger.warn("image.layer-renderer.image.no_url", { layerId: layer.id, name: layer.name });
+    return null;
+  }
+
+  // 1. Fetch image bytes.
+  let imgBuf: Buffer;
+  try {
+    const resp = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (!resp.ok) {
+      logger.warn("image.layer-renderer.image.fetch_failed", {
+        layerId: layer.id, status: resp.status, url,
+      });
+      return null;
+    }
+    imgBuf = Buffer.from(await resp.arrayBuffer());
+  } catch (err) {
+    logger.warn("image.layer-renderer.image.fetch_error", {
+      layerId: layer.id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+
+  // 2. Resize to layer dimensions with fill mode and anchor.
+  const fit = layer.fill === "fit" ? "contain" : "cover";
+  const position = buildSharpPosition(layer.anchor_x, layer.anchor_y);
+
+  let buf = await sharp(imgBuf)
+    .resize(layer.width, layer.height, { fit, position })
+    .png()
+    .toBuffer();
+
+  // 3. Apply clip_path mask (before border_radius — clip first, round after).
+  if (layer.clip_path) {
+    buf = await applyClipPathMask(buf, layer.width, layer.height, layer.clip_path);
+  }
+
+  // 4. Apply border_radius mask.
+  if (layer.border_radius > 0) {
+    buf = await applyBorderRadiusMask(buf, layer.width, layer.height, layer.border_radius);
+  }
+
+  // 5. Apply tint overlay.
+  if (layer.tint_color) {
+    buf = await applyTint(buf, layer.width, layer.height, layer.tint_color);
+  }
+
+  return {
+    input: buf,
     left: Math.round(layer.x),
     top: Math.round(layer.y),
   };
