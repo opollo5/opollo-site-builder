@@ -16,11 +16,24 @@ import { signInAsCompanyAdmin } from "./helpers";
 const COMPANY_ID = "11111111-2222-3333-4444-555555555555";
 const MOCK_POST_ID = "aaaaaaaa-bbbb-4ccc-8ddd-000000000001";
 
+// Calendar opens on the current month. Schedule the mocked post on the 15th
+// of the current month so the post-chip is always within the visible grid,
+// regardless of which weekday the month starts/ends on. (Previous "+2 days"
+// scheduling broke on the last 1-2 days of any month ending Fri/Sat/Sun —
+// buildGrid in SocialCalendarGrid.tsx renders no trailing-month overflow
+// cells when the month ends on Sunday, so a date in the next month wouldn't
+// render anywhere on the visible grid.)
+function dateInCurrentMonth(dayOfMonth = 15): string {
+  const now = new Date();
+  // Noon UTC avoids edge cases around the calendar's start-of-day comparisons.
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), dayOfMonth, 12, 0, 0)).toISOString();
+}
+
 function makePost(overrides: Record<string, unknown> = {}) {
   return {
     id: MOCK_POST_ID,
     state: "scheduled",
-    scheduled_at: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+    scheduled_at: dateInCurrentMonth(15),
     published_at: null,
     content_excerpt: "Test post for dashboard spec",
     primary_media_url: null,
@@ -137,7 +150,7 @@ test.describe("dashboard — calendar grid (PR F)", () => {
         body: JSON.stringify({
           ok: true,
           data: {
-            posts: [makePost({ scheduled_at: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() })],
+            posts: [makePost({ scheduled_at: dateInCurrentMonth(15) })],
             range: { from: "2026-01-01", to: "2026-12-31" },
           },
           timestamp: new Date().toISOString(),
