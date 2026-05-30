@@ -107,6 +107,185 @@ metadata quality.
   by this workstream.
 - `OPOLLO_MASTER_KEY` / `CLOUDFLARE_*` / `SUPABASE_*` — unchanged.
 
+## Charts
+
+### Mandate
+
+Every chart in every Opollo product renders through **Apache ECharts**
+via the `echarts-for-react` wrapper. This applies to:
+
+- Site Builder analytics surfaces
+- Optimiser dashboards
+- CAP reporting and PURL pages
+- Admin / operator tooling
+- Customer-facing report exports (server-rendered SVG, see "Server
+  rendering for exports" below)
+
+**Banned for standard charts**, no carve-outs: Recharts, Chart.js,
+Plotly, Nivo, Visx, Victory, hand-rolled `<svg>` charts.
+
+**Permitted exception:** D3 may be used directly for non-chart
+visualisation primitives (force graphs, network diagrams, custom
+geometric layouts) only where ECharts has no equivalent — and ECharts
+covers Sankey, graph, tree, treemap, sunburst, parallel, heatmap,
+candlestick, boxplot, gauge, funnel, calendar, and pictorial charts
+out of the box, so "no equivalent" is rare. Any use of D3 for chart-
+shaped data (axes, series, ticks) is a banned chart.
+
+### Why
+
+1. **One library, every chart type.** Avoids the Recharts-for-bars-
+   plus-D3-for-Sankey-plus-Chart.js-for-radar trap.
+2. **One styling pipeline.** A single theme drives every chart.
+3. **Performance at scale.** Canvas renderer handles 10k+ datapoints
+   without React reconciliation cost on every tick.
+4. **Server-rendering for PDF/email** is a native first-class feature
+   (see below).
+5. **One mental model per contributor.** Every reviewer reads one
+   options object, not N library APIs.
+
+### Version
+
+Use the current stable `echarts` and `echarts-for-react` releases on
+npm. As of 2026-05-22, `echarts` latest is **6.1.0** and `echarts-for-react`
+is on its current major; **do not assume the project remains on 5.x**.
+Verify before bumping that:
+
+- `echarts-for-react` declares compatibility with the chosen `echarts`
+  major (check its `peerDependencies`).
+- The Next.js build (`pnpm build`) succeeds — ECharts ships native
+  modules; resolve any Webpack / Turbopack module-resolution issues
+  before merging.
+- SSR rendering for exports works against the chosen version.
+
+If a major-version bump introduces breakage, pin to the highest stable
+minor that builds clean and open an issue for the upgrade.
+
+### Implementation contract
+
+All chart components live under `components/charts/`. Every chart
+component is a thin wrapper that:
+
+1. Imports `ReactECharts` from `echarts-for-react`.
+2. Builds an `EChartsOption` via a helper in `lib/charts/options/`
+   (one helper per chart type: `buildLineOptions`, `buildBarOptions`,
+   `buildAreaOptions`, etc.).
+3. Passes the shared theme from `lib/charts/theme.ts` — never inline
+   colours.
+4. Sets `notMerge={true}` unless there is a documented reason
+   otherwise.
+
+```typescript
+// components/charts/LineChart.tsx
+import ReactECharts from 'echarts-for-react';
+import { buildLineOptions } from '@/lib/charts/options/line';
+import { opolloChartTheme } from '@/lib/charts/theme';
+
+export function LineChart({ data, xKey, yKeys, height = 320 }: Props) {
+  const option = buildLineOptions({ data, xKey, yKeys });
+  return (
+    <ReactECharts
+      option={option}
+      theme={opolloChartTheme}
+      style={{ height, width: '100%' }}
+      notMerge
+      opts={{ renderer: 'canvas' }}
+    />
+  );
+}
+```
+
+### Theme
+
+`lib/charts/theme.ts` exports a single ECharts theme object,
+`opolloChartTheme`. Its palette is derived from the design-system
+colour tokens.
+
+The exact derivation depends on the existing token pipeline in this
+repo — verify before implementation:
+
+- If the design system already exposes resolved colour values as
+  module-level constants (TypeScript exports, generated from
+  Tailwind/PostCSS at build time), import them and build the theme
+  from those constants.
+- If colours are CSS-variable-only with no build-time-resolved
+  exports, add a small generation step (e.g. read the source-of-truth
+  token file at build, emit `lib/charts/theme.generated.ts`).
+- **Do not** read `getComputedStyle(document.documentElement)` to
+  resolve CSS vars at runtime — that breaks SSR, breaks the canvas
+  renderer's first paint, and is invisible on the server-side export
+  path.
+
+Register light and dark variants; the active variant is selected at
+mount time from the same theme-mode state the rest of the app uses.
+
+### Server rendering for exports
+
+PDF and email exports render charts server-side using ECharts' native
+SSR support. The configuration is:
+
+```typescript
+import * as echarts from 'echarts';
+
+const chart = echarts.init(null, opolloChartTheme, {
+  renderer: 'svg',
+  ssr: true,
+  width: 800,
+  height: 400,
+});
+chart.setOption(buildLineOptions({ data, xKey, yKeys }));
+const svgString = chart.renderToSVGString();
+chart.dispose();
+```
+
+`renderer: 'svg'` + `ssr: true` enable headless rendering with no
+browser dependency. The output is an SVG string suitable for direct
+embedding in PDF generators or HTML emails. **Do not** use the canvas
+renderer for export paths.
+
+### Migration of existing charting surfaces
+
+The migration of any existing non-ECharts chart surfaces is the scope
+of a follow-up PR, not this documentation PR. That PR will:
+
+1. Inventory every chart in the codebase as the first step (verify
+   what's actually there — do not trust assertions from earlier docs).
+2. Build `lib/charts/theme.ts` and the option builders for the chart
+   types in use (line, area, bar, donut, etc.).
+3. Build the wrapper components under `components/charts/`.
+4. Replace every non-ECharts import call site.
+5. Run a visual-regression check against the previous render.
+6. Remove the deprecated library/libraries from `package.json`.
+7. Land the ESLint guardrail (see "Enforcement", below).
+
+### Enforcement
+
+The follow-up migration PR adds an ESLint rule to prevent regression:
+
+```json
+{
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          { "name": "recharts", "message": "Use ECharts via components/charts/*. See DESIGN_SYSTEM.md §Charts." },
+          { "name": "chart.js", "message": "Use ECharts via components/charts/*. See DESIGN_SYSTEM.md §Charts." },
+          { "name": "plotly.js", "message": "Use ECharts via components/charts/*. See DESIGN_SYSTEM.md §Charts." },
+          { "name": "victory", "message": "Use ECharts via components/charts/*. See DESIGN_SYSTEM.md §Charts." }
+        ],
+        "patterns": [
+          { "group": ["recharts/*", "@nivo/*", "@visx/*", "victory-*"], "message": "Use ECharts via components/charts/*. See DESIGN_SYSTEM.md §Charts." }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Land this rule **in the migration PR**, not the docs PR — adding the
+rule to a repo that still contains banned imports breaks CI.
+
 ## Known gaps / deferred items
 
 - **Pre-existing CI Supabase-stack failure.** Migrations
