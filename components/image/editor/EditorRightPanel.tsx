@@ -13,7 +13,9 @@
 
 import { useEditor } from "./EditorContext";
 import { TextLayerPanel } from "./panels/TextLayerPanel";
-import type { TextLayer } from "@/lib/image/template-model";
+import { ImageLayerPanel } from "./panels/ImageLayerPanel";
+import { RectangleLayerPanel } from "./panels/RectangleLayerPanel";
+import type { TextLayer, ImageLayer, RectangleLayer } from "@/lib/image/template-model";
 
 export function EditorRightPanel() {
   const { selectedLayer } = useEditor();
@@ -34,14 +36,10 @@ export function EditorRightPanel() {
               <TextLayerPanel layer={selectedLayer as TextLayer} />
             )}
             {selectedLayer.type === "image" && (
-              <div className="px-3 py-6 text-xs text-muted-foreground text-center">
-                Image properties (U8)
-              </div>
+              <ImageLayerPanel layer={selectedLayer as ImageLayer} />
             )}
             {selectedLayer.type === "rectangle" && (
-              <div className="px-3 py-6 text-xs text-muted-foreground text-center">
-                Rectangle properties (U9)
-              </div>
+              <RectangleLayerPanel layer={selectedLayer as RectangleLayer} />
             )}
             {selectedLayer.type !== "text" && selectedLayer.type !== "image" && selectedLayer.type !== "rectangle" && (
               <div className="px-3 py-6 text-xs text-muted-foreground text-center">
