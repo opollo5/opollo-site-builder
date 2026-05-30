@@ -1,25 +1,23 @@
 "use client";
 
 /**
- * KonvaInteractionLayer — react-konva overlay for canvas interaction (U2).
+ * KonvaInteractionLayer — react-konva overlay for canvas interaction (U2+U3).
  *
  * Rendered on top of CanvasContent (DOM renderer). Provides:
  *   - Layer selection (click a transparent Rect that mirrors each layer)
- *   - Drag to move (updates x,y in EditorContext on dragEnd)
- *   - Transformer: resize handles + rotation handle (updates w/h/rotation on transformEnd)
+ *   - Drag to move with snap guides (§6.4, U3)
+ *   - Transformer: resize handles + rotation handle per §6.3
  *
- * The DOM renderer (CanvasContent) remains the source of visual truth;
- * this layer handles ONLY interaction. All shapes are fill="transparent".
- *
- * Design spec §6.3: Selected object shows outline + resize handles + rotate handle.
- * Fade heavy content during resize: handled via opacity in CanvasContent (U5+).
+ * The DOM renderer (CanvasContent) remains the visual source of truth.
+ * All Rects are fill="transparent" — interaction only.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Layer, Rect, Stage, Transformer } from "react-konva";
 import type Konva from "konva";
 
 import { useEditor } from "./EditorContext";
+import { GuideLines, computeSnap, type Guide } from "./GuideLines";
 
 interface KonvaInteractionLayerProps {
   width: number;
@@ -32,6 +30,7 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
 
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef<Map<string, Konva.Rect>>(new Map());
+  const [guides, setGuides] = useState<Guide[]>([]);
 
   // Attach / detach Transformer when selection changes.
   useEffect(() => {
@@ -56,6 +55,12 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
     }
   }, [template.layers]);
 
+  const guidesEnabled = template.settings?.guides !== false;
+
+  const snapLayers = template.layers.map((l) => ({
+    id: l.id, x: l.x, y: l.y, width: l.width, height: l.height,
+  }));
+
   return (
     <Stage
       width={width}
@@ -68,70 +73,73 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
       }}
     >
       <Layer>
-        {template.layers.map((layer) => {
-          const locked = layer.locked;
-          return (
-            <Rect
-              key={layer.id}
-              ref={(node) => {
-                if (node) shapeRefs.current.set(layer.id, node);
-                else shapeRefs.current.delete(layer.id);
-              }}
-              x={layer.x}
-              y={layer.y}
-              width={layer.width}
-              height={layer.height}
-              rotation={layer.rotation}
-              draggable={!locked}
-              fill="transparent"
-              listening={!layer.hide}
-              onMouseDown={() => dispatch({ type: "select", layerId: layer.id })}
-              onDragEnd={(e) => {
-                dispatch({
-                  type: "update_layer",
-                  layerId: layer.id,
-                  patch: {
-                    x: Math.round(e.target.x()),
-                    y: Math.round(e.target.y()),
-                  },
-                });
-              }}
-              onTransformEnd={(e) => {
-                const node = e.target as Konva.Rect;
-                const scaleX = node.scaleX();
-                const scaleY = node.scaleY();
-                // Absorb scale into width/height; reset scale to 1.
-                node.scaleX(1);
-                node.scaleY(1);
-                dispatch({
-                  type: "update_layer",
-                  layerId: layer.id,
-                  patch: {
-                    x: Math.round(node.x()),
-                    y: Math.round(node.y()),
-                    width: Math.max(4, Math.round(node.width() * scaleX)),
-                    height: Math.max(4, Math.round(node.height() * scaleY)),
-                    rotation: Math.round(node.rotation() * 100) / 100,
-                  },
-                });
-              }}
-            />
-          );
-        })}
+        {/* Snap guide lines (§6.4) */}
+        {guidesEnabled && <GuideLines guides={guides} width={width} height={height} />}
+
+        {template.layers.map((layer) => (
+          <Rect
+            key={layer.id}
+            ref={(node) => {
+              if (node) shapeRefs.current.set(layer.id, node);
+              else shapeRefs.current.delete(layer.id);
+            }}
+            x={layer.x}
+            y={layer.y}
+            width={layer.width}
+            height={layer.height}
+            rotation={layer.rotation}
+            draggable={!layer.locked}
+            fill="transparent"
+            listening={!layer.hide}
+            onMouseDown={() => dispatch({ type: "select", layerId: layer.id })}
+            onDragMove={(e) => {
+              if (!guidesEnabled) return;
+              const node = e.target as Konva.Rect;
+              const { x, y, guides: newGuides } = computeSnap(
+                { x: node.x(), y: node.y(), width: layer.width, height: layer.height, id: layer.id },
+                snapLayers, width, height,
+              );
+              node.x(x);
+              node.y(y);
+              setGuides(newGuides);
+            }}
+            onDragEnd={(e) => {
+              setGuides([]);
+              dispatch({
+                type: "update_layer",
+                layerId: layer.id,
+                patch: { x: Math.round(e.target.x()), y: Math.round(e.target.y()) },
+              });
+            }}
+            onTransformEnd={(e) => {
+              const node = e.target as Konva.Rect;
+              const scaleX = node.scaleX();
+              const scaleY = node.scaleY();
+              node.scaleX(1);
+              node.scaleY(1);
+              dispatch({
+                type: "update_layer",
+                layerId: layer.id,
+                patch: {
+                  x: Math.round(node.x()),
+                  y: Math.round(node.y()),
+                  width: Math.max(4, Math.round(node.width() * scaleX)),
+                  height: Math.max(4, Math.round(node.height() * scaleY)),
+                  rotation: Math.round(node.rotation() * 100) / 100,
+                },
+              });
+            }}
+          />
+        ))}
 
         <Transformer
           ref={transformerRef}
           rotateEnabled
           keepRatio={false}
           enabledAnchors={[
-            "top-left",
-            "top-center",
-            "top-right",
-            "middle-right",
-            "bottom-right",
-            "bottom-center",
-            "bottom-left",
-            "middle-left",
+            "top-left", "top-center", "top-right",
+            "middle-right", "bottom-right", "bottom-center",
+            "bottom-left", "middle-left",
           ]}
           boundBoxFunc={(oldBox, newBox) => {
             if (Math.abs(newBox.width) < 4 || Math.abs(newBox.height) < 4) return oldBox;
