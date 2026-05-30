@@ -1,0 +1,244 @@
+"use client";
+
+/**
+ * EditorContext — shared state for the v2 template editor.
+ *
+ * Manages the live template object, selection, dirty state, and undo/redo op log.
+ * The op log (§5.1) is added incrementally: U1 has state + selection, U16 adds
+ * the full invertible operation log.
+ */
+
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useReducer,
+  type Dispatch,
+  type ReactNode,
+} from "react";
+
+import type { Layer, Op, Template } from "@/lib/image/template-model";
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+export interface EditorState {
+  template: Template;
+  selectedLayerId: string | null;
+  /** Ops for the current unsaved session (undo/redo stack is managed here). */
+  past: Op[][];
+  future: Op[][];
+  isDirty: boolean;
+  isSaving: boolean;
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+
+export type EditorAction =
+  | { type: "select"; layerId: string | null }
+  | { type: "update_layer"; layerId: string; patch: Partial<Layer> }
+  | { type: "update_template_name"; name: string }
+  | { type: "reorder_layers"; fromIndex: number; toIndex: number }
+  | { type: "add_layer"; layer: Layer; index: number }
+  | { type: "remove_layer"; layerId: string }
+  | { type: "undo" }
+  | { type: "redo" }
+  | { type: "set_saving"; isSaving: boolean }
+  | { type: "mark_clean" };
+
+// ─── Reducer ──────────────────────────────────────────────────────────────────
+
+function applyLayerPatch(layers: Layer[], layerId: string, patch: Partial<Layer>): Layer[] {
+  return layers.map((l) => (l.id === layerId ? ({ ...l, ...patch } as Layer) : l));
+}
+
+function editorReducer(state: EditorState, action: EditorAction): EditorState {
+  switch (action.type) {
+    case "select":
+      return { ...state, selectedLayerId: action.layerId };
+
+    case "update_layer": {
+      const layers = applyLayerPatch(state.template.layers, action.layerId, action.patch);
+      // Build a set op for undo history (simplified — full op log in U16).
+      const ops: Op[] = Object.entries(action.patch).map(([key, to]) => {
+        const from = (state.template.layers.find((l) => l.id === action.layerId) as unknown as Record<string, unknown>)?.[key];
+        return { t: "set", id: action.layerId, key, from, to } satisfies Op;
+      });
+      return {
+        ...state,
+        template: { ...state.template, layers },
+        past: [...state.past, ops],
+        future: [],
+        isDirty: true,
+      };
+    }
+
+    case "update_template_name":
+      return {
+        ...state,
+        template: { ...state.template, name: action.name },
+        isDirty: true,
+      };
+
+    case "reorder_layers": {
+      const layers = [...state.template.layers];
+      const [moved] = layers.splice(action.fromIndex, 1);
+      layers.splice(action.toIndex, 0, moved);
+      const op: Op = { t: "reorder", id: moved.id, from: action.fromIndex, to: action.toIndex };
+      return {
+        ...state,
+        template: { ...state.template, layers },
+        past: [...state.past, [op]],
+        future: [],
+        isDirty: true,
+      };
+    }
+
+    case "add_layer": {
+      const layers = [...state.template.layers];
+      layers.splice(action.index, 0, action.layer);
+      const op: Op = { t: "add", layer: action.layer, index: action.index };
+      return {
+        ...state,
+        template: { ...state.template, layers },
+        past: [...state.past, [op]],
+        future: [],
+        isDirty: true,
+        selectedLayerId: action.layer.id,
+      };
+    }
+
+    case "remove_layer": {
+      const index = state.template.layers.findIndex((l) => l.id === action.layerId);
+      if (index === -1) return state;
+      const layer = state.template.layers[index];
+      const layers = state.template.layers.filter((l) => l.id !== action.layerId);
+      const op: Op = { t: "remove", layer, index };
+      return {
+        ...state,
+        template: { ...state.template, layers },
+        past: [...state.past, [op]],
+        future: [],
+        isDirty: true,
+        selectedLayerId: state.selectedLayerId === action.layerId ? null : state.selectedLayerId,
+      };
+    }
+
+    case "undo": {
+      if (state.past.length === 0) return state;
+      const ops = state.past[state.past.length - 1];
+      const past = state.past.slice(0, -1);
+      // Apply inverse ops (simplified — full invertible log in U16).
+      let layers = [...state.template.layers];
+      for (const op of [...ops].reverse()) {
+        if (op.t === "set") {
+          layers = applyLayerPatch(layers, op.id, { [op.key]: op.from } as Partial<Layer>);
+        } else if (op.t === "reorder") {
+          const moved = layers[op.to];
+          layers.splice(op.to, 1);
+          layers.splice(op.from, 0, moved);
+        } else if (op.t === "add") {
+          layers = layers.filter((l) => l.id !== op.layer.id);
+        } else if (op.t === "remove") {
+          layers.splice(op.index, 0, op.layer);
+        }
+      }
+      return {
+        ...state,
+        template: { ...state.template, layers },
+        past,
+        future: [ops, ...state.future],
+        isDirty: past.length > 0,
+      };
+    }
+
+    case "redo": {
+      if (state.future.length === 0) return state;
+      const ops = state.future[0];
+      const future = state.future.slice(1);
+      let layers = [...state.template.layers];
+      for (const op of ops) {
+        if (op.t === "set") {
+          layers = applyLayerPatch(layers, op.id, { [op.key]: op.to } as Partial<Layer>);
+        } else if (op.t === "reorder") {
+          const moved = layers[op.from];
+          layers.splice(op.from, 1);
+          layers.splice(op.to, 0, moved);
+        } else if (op.t === "add") {
+          layers.splice(op.index, 0, op.layer);
+        } else if (op.t === "remove") {
+          layers = layers.filter((l) => l.id !== op.layer.id);
+        }
+      }
+      return {
+        ...state,
+        template: { ...state.template, layers },
+        past: [...state.past, ops],
+        future,
+        isDirty: true,
+      };
+    }
+
+    case "set_saving":
+      return { ...state, isSaving: action.isSaving };
+
+    case "mark_clean":
+      return { ...state, isDirty: false, past: [], future: [] };
+
+    default:
+      return state;
+  }
+}
+
+// ─── Context ──────────────────────────────────────────────────────────────────
+
+interface EditorContextValue {
+  state: EditorState;
+  dispatch: Dispatch<EditorAction>;
+  selectedLayer: Layer | null;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+const EditorContext = createContext<EditorContextValue | null>(null);
+
+export function EditorProvider({
+  template,
+  children,
+}: {
+  template: Template;
+  children: ReactNode;
+}) {
+  const [state, dispatch] = useReducer(editorReducer, {
+    template,
+    selectedLayerId: null,
+    past: [],
+    future: [],
+    isDirty: false,
+    isSaving: false,
+  });
+
+  const selectedLayer = useMemo(
+    () => state.template.layers.find((l) => l.id === state.selectedLayerId) ?? null,
+    [state.template.layers, state.selectedLayerId],
+  );
+
+  const value: EditorContextValue = useMemo(
+    () => ({
+      state,
+      dispatch,
+      selectedLayer,
+      canUndo: state.past.length > 0,
+      canRedo: state.future.length > 0,
+    }),
+    [state, selectedLayer],
+  );
+
+  return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
+}
+
+export function useEditor(): EditorContextValue {
+  const ctx = useContext(EditorContext);
+  if (!ctx) throw new Error("useEditor must be used within EditorProvider");
+  return ctx;
+}
