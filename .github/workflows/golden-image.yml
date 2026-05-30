@@ -27,8 +27,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run golden-image suite
+      # Phase 1: generate CI-native snapshots (Linux/librsvg canonical render).
+      # Text rendering via librsvg/FreeType differs between platforms — committed
+      # snapshots must be generated on Linux CI, not on the dev machine.
+      - name: Generate CI-native golden snapshots
+        run: UPDATE_GOLDEN=1 npm run test:golden
+        env:
+          NODE_ENV: test
+
+      # Phase 2: compare this run against the just-generated snapshots (determinism).
+      # Tests that the renderer is stable within a single CI run.
+      - name: Verify renderer determinism
         run: npm run test:golden
         env:
-          # No Supabase env vars needed — renderer-only tests.
           NODE_ENV: test
+
+      # Upload generated snapshots as artifacts so Steven can review them.
+      # After reviewing, commit them as the new canonical Linux baseline by running:
+      #   UPDATE_GOLDEN=1 npm run test:golden   (on a Linux CI runner or Docker)
+      - name: Upload golden snapshots for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-snapshots-${{ github.run_number }}
+          path: tests/golden/snapshots/
+          retention-days: 14

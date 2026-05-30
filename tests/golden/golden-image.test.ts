@@ -5,20 +5,25 @@
  * output to a committed reference PNG. Any pixel difference beyond the
  * tolerance fails the test.
  *
- * FIRST RUN / SNAPSHOT UPDATE:
- *   UPDATE_GOLDEN=1 npm run test:golden
- *   This writes new snapshots to tests/golden/snapshots/<fixture-id>.png.
- *   Commit the generated PNGs, then request Steven's §7 visual review.
+ * PLATFORM NOTE: Text rendering via librsvg/FreeType differs between
+ * Windows (dev) and Linux (CI). Committed snapshots must be generated on
+ * the same platform as CI. The golden-image.yml workflow regenerates
+ * snapshots from CI on each run (UPDATE_GOLDEN=1 first, then comparison),
+ * so the comparison is always within-platform.
  *
- * NORMAL CI RUN:
+ * To commit Linux-canonical snapshots (run on a Linux machine or CI):
+ *   UPDATE_GOLDEN=1 npm run test:golden
+ *   git add tests/golden/snapshots/
+ *   git commit -m "chore(golden): update Linux-canonical snapshots"
+ *
+ * NORMAL CI RUN (comparison mode):
  *   npm run test:golden
- *   Compares current renderer output against committed snapshots.
+ *   Compares current renderer output against the snapshots in the working tree.
  *   Fails if any pixel channel value differs by > PIXEL_TOLERANCE.
  *
  * Tolerance: PIXEL_TOLERANCE=4 (per-channel, 0–255 scale).
- *   The 2-pixel spatial tolerance in §7 applies to the DOM vs sharp comparison
- *   (E7 baseline). Run-to-run sharp output should be pixel-perfect (tolerance=0),
- *   but we allow a small margin for any system-level rendering variance.
+ *   Within-platform (same Linux CI runner) output should be pixel-perfect.
+ *   The 4-unit margin covers any minor RGBA rounding across sharp versions.
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
