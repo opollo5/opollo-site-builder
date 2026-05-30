@@ -4,6 +4,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 import type { AspectRatio, CompositionType } from "@/lib/image/types";
 import type { LogoConfig } from "@/lib/image/compositing";
+import type { Template } from "@/lib/image/template-model";
+import { TEMPLATE_SCHEMA_VERSION, LEGACY_SCHEMA_VERSION } from "@/lib/image/template-model";
 
 // ---------------------------------------------------------------------------
 // Template access layer — reads image_templates from the database.
@@ -36,6 +38,11 @@ export interface ImageTemplate {
   companyId: string | null;
   name: string;
   aspectRatio: AspectRatio;
+  /**
+   * Legacy fixed-zone definition (schema_version=1).
+   * Present for all templates; for schema_version=2 templates this is the
+   * raw JSONB cast as TemplateDefinition — use `resolvedTemplate` instead.
+   */
   definition: TemplateDefinition;
   version: number;
   /**
@@ -44,6 +51,12 @@ export interface ImageTemplate {
    * 2 = layer-based format (v2 editor, routes to compositeLayerBased).
    */
   schemaVersion: number;
+  /**
+   * Populated only when schemaVersion=2.
+   * The layer-based Template parsed from the definition JSONB.
+   * Use this when routing to compositeLayerBased() / renderTemplate().
+   */
+  resolvedTemplate?: Template;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -55,7 +68,7 @@ interface TemplateRow {
   company_id: string | null;
   name: string;
   aspect_ratio: string;
-  definition: TemplateDefinition;
+  definition: unknown; // JSONB: TemplateDefinition for v1, Template for v2
   version: number;
   schema_version: number;
   is_active: boolean;
@@ -64,18 +77,27 @@ interface TemplateRow {
 }
 
 function toTemplate(row: TemplateRow): ImageTemplate {
-  return {
+  const schemaVersion = row.schema_version ?? LEGACY_SCHEMA_VERSION;
+
+  const base: ImageTemplate = {
     id: row.id,
     companyId: row.company_id,
     name: row.name,
     aspectRatio: row.aspect_ratio as AspectRatio,
-    definition: row.definition,
+    definition: row.definition as TemplateDefinition,
     version: row.version,
-    schemaVersion: row.schema_version ?? 1,
+    schemaVersion,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+
+  if (schemaVersion === TEMPLATE_SCHEMA_VERSION) {
+    // schema_version=2: definition JSONB is a full layer-based Template object.
+    base.resolvedTemplate = row.definition as Template;
+  }
+
+  return base;
 }
 
 /**
