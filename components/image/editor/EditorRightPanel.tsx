@@ -3,11 +3,17 @@
 /**
  * EditorRightPanel — right properties panel of the v2 template editor.
  *
- * U1: renders a placeholder showing the selected layer's type and name.
- * U5-U10 add the full properties panels per layer type.
+ * Dispatches to per-type panels (§9):
+ *   TextLayer  → TextLayerPanel   (U5/U6/U7) + GeometryPanel (U10)
+ *   ImageLayer → ImageLayerPanel  (U8)        + GeometryPanel (U10)
+ *   Rectangle  → RectanglePanel   (U9)        + GeometryPanel (U10)
+ *
+ * U8, U9, U10 panels are stubs — wired fully in their respective slices.
  */
 
 import { useEditor } from "./EditorContext";
+import { TextLayerPanel } from "./panels/TextLayerPanel";
+import type { TextLayer } from "@/lib/image/template-model";
 
 export function EditorRightPanel() {
   const { selectedLayer } = useEditor();
@@ -16,16 +22,32 @@ export function EditorRightPanel() {
     <aside className="w-[280px] border-l border-border flex flex-col overflow-hidden bg-background shrink-0">
       {selectedLayer ? (
         <>
-          <div className="px-3 py-2 border-b border-border text-xs text-muted-foreground flex items-center justify-between">
-            <span className="font-medium text-foreground">{selectedLayer.name}</span>
-            <span className="capitalize">{selectedLayer.type}</span>
+          {/* Panel header */}
+          <div className="px-3 py-2 border-b border-border text-xs flex items-center justify-between shrink-0">
+            <span className="font-medium text-foreground truncate">{selectedLayer.name}</span>
+            <span className="capitalize text-muted-foreground">{selectedLayer.type}</span>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-3 px-3">
-            {/* Properties panels slot in from U5-U10 */}
-            <div className="text-xs text-muted-foreground text-center py-8">
-              Properties panel coming in U5–U10
-            </div>
+          {/* Scrollable properties */}
+          <div className="flex-1 overflow-y-auto">
+            {selectedLayer.type === "text" && (
+              <TextLayerPanel layer={selectedLayer as TextLayer} />
+            )}
+            {selectedLayer.type === "image" && (
+              <div className="px-3 py-6 text-xs text-muted-foreground text-center">
+                Image properties (U8)
+              </div>
+            )}
+            {selectedLayer.type === "rectangle" && (
+              <div className="px-3 py-6 text-xs text-muted-foreground text-center">
+                Rectangle properties (U9)
+              </div>
+            )}
+            {selectedLayer.type !== "text" && selectedLayer.type !== "image" && selectedLayer.type !== "rectangle" && (
+              <div className="px-3 py-6 text-xs text-muted-foreground text-center">
+                Reserved layer type — not editable in V1
+              </div>
+            )}
           </div>
         </>
       ) : (
