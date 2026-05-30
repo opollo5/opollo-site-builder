@@ -121,7 +121,7 @@ function isPublicPath(pathname: string): boolean {
   // Belt-and-suspenders extension check: any path that looks like a
   // static asset (by extension) should never be auth-gated regardless of
   // directory prefix.
-  if (/\.(?:css|js|mjs|png|jpe?g|gif|svg|woff2?|ttf|otf|ico|webp)(?:[?#]|$)/i.test(pathname)) return true;
+  if (/\.(?:css|js|mjs|png|jpe?g|gif|svg|woff2?|ttf|otf|ico|webp|xlsx|docx|pdf|zip)(?:[?#]|$)/i.test(pathname)) return true;
   // UAT harness endpoints carry their own STAGING_UAT_SECRET auth.
   if (pathname.startsWith("/api/uat/")) return true;
   // /invite/<token> — platform-layer invitation accept page. Token IS
