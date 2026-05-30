@@ -19,6 +19,7 @@
  *   E4 — rectangle layer: solid/gradient fill, border, border_radius
  *   E5 — transforms: rotation (top-left origin), skew, opacity
  *   E6 — constraints + variant reflow
+ *   E7 — renderTemplate() compositor + modification merge
  */
 
 import "server-only";
@@ -41,7 +42,9 @@ import type {
   Template,
   Variant,
   VariantOverride,
+  Modification,
 } from "@/lib/image/template-model";
+import { isV1Layer } from "@/lib/image/template-model";
 
 // ─── Font face declarations (shared with sharp-renderer) ─────────────────────
 
@@ -1113,4 +1116,158 @@ export function applyVariant(
   });
 
   return { width: tW, height: tH, layers: reflowed };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// E7 — COMPOSITOR + MODIFICATION MERGE (§1.5, §13)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Color parsing helper ─────────────────────────────────────────────────────
+
+/**
+ * Parse a CSS hex colour string (#RGB, #RRGGBB, #RRGGBBAA) to an RGBA object
+ * usable with sharp's `create` background. Defaults to opaque black on failure.
+ */
+export function parseHexColor(hex: string): { r: number; g: number; b: number; alpha: number } {
+  const h = hex.replace(/^#/, "");
+  if (h.length === 3) {
+    const [r, g, b] = h.split("").map((c) => parseInt(c + c, 16));
+    return { r, g, b, alpha: 255 };
+  }
+  if (h.length === 6) {
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16),
+      alpha: 255,
+    };
+  }
+  if (h.length === 8) {
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16),
+      alpha: parseInt(h.slice(6, 8), 16),
+    };
+  }
+  return { r: 0, g: 0, b: 0, alpha: 255 };
+}
+
+// ─── Modification merge (§1.5, §9) ───────────────────────────────────────────
+
+/**
+ * Apply request-level modifications to a layer list.
+ * Resolution order: base layer → variant override (already applied) → request modification.
+ * Modifications are keyed by layer.name (binding key). Unknown names are ignored.
+ * Multiple modifications for the same name are merged in order (last wins).
+ */
+export function applyModifications(layers: Layer[], modifications: Modification[]): Layer[] {
+  if (!modifications.length) return layers;
+
+  // Build a name→merged-mod map (last-write wins for same key)
+  const modMap = new Map<string, Omit<Modification, "name">>();
+  for (const { name, ...rest } of modifications) {
+    const existing = modMap.get(name) ?? {};
+    modMap.set(name, { ...existing, ...rest });
+  }
+
+  return layers.map((layer) => {
+    const mod = modMap.get(layer.name);
+    if (!mod) return layer;
+    return { ...layer, ...mod } as Layer;
+  });
+}
+
+// ─── Template compositor (§13) ────────────────────────────────────────────────
+
+export interface RenderTemplateInput {
+  /** Template to render (subset of full Template — variants and fonts optional). */
+  template: Pick<Template, "width" | "height" | "background_color" | "layers" | "render_settings"> & {
+    variants?: Template["variants"];
+  };
+  /** Runtime modifications keyed by layer name (§1.5). */
+  modifications?: Modification[];
+  /** Variant key to render (omit for base canvas size). */
+  variantKey?: string;
+}
+
+export interface RenderTemplateOutput {
+  png: Buffer;
+  width: number;
+  height: number;
+}
+
+/**
+ * Composite a layer-based template to a PNG buffer.
+ *
+ * Pipeline:
+ *   1. Apply variant reflow (if variantKey supplied)
+ *   2. Apply request modifications
+ *   3. Create canvas with background_color
+ *   4. Render each V1 layer (bottom-to-top order) via the layer-specific renderer
+ *   5. Composite overlays; return PNG buffer
+ *
+ * Used by E7 golden-image suite and wired into compositeImage() in E8.
+ * E9 adds modification merge into the E8 wiring.
+ */
+export async function renderTemplate(
+  input: RenderTemplateInput,
+): Promise<RenderTemplateOutput> {
+  const { modifications = [], variantKey } = input;
+  let { template } = input;
+  let { width, height } = template;
+  let layers = [...template.layers];
+
+  // 1. Variant reflow.
+  if (variantKey && template.variants) {
+    const variant = template.variants.find((v) => v.key === variantKey);
+    if (variant) {
+      const reflowed = applyVariant(template, variant);
+      width = reflowed.width;
+      height = reflowed.height;
+      layers = reflowed.layers;
+    } else {
+      logger.warn("image.layer-renderer.compositor.variant_not_found", { variantKey });
+    }
+  }
+
+  // 2. Request modifications.
+  if (modifications.length) {
+    layers = applyModifications(layers, modifications);
+  }
+
+  // 3. Canvas background.
+  const bg = parseHexColor(template.background_color);
+  const canvas = sharp({
+    create: { width, height, channels: 4, background: bg },
+  });
+
+  // 4. Render layers (bottom-to-top: reverse the top-first array).
+  const overlays: sharp.OverlayOptions[] = [];
+  for (const layer of [...layers].reverse()) {
+    if (layer.hide) continue;
+
+    let overlay: sharp.OverlayOptions | null = null;
+
+    if (isV1Layer(layer)) {
+      if (layer.type === "text") {
+        if (layer.hide_when_empty && !layer.text.trim()) continue;
+        overlay = await renderTextLayer(layer);
+      } else if (layer.type === "image") {
+        overlay = await renderImageLayer(layer); // null on fetch failure / empty
+      } else {
+        overlay = await renderRectangleLayer(layer);
+      }
+    } else {
+      logger.warn("image.layer-renderer.compositor.reserved_layer_skipped", {
+        type: layer.type, name: layer.name,
+      });
+    }
+
+    if (overlay) overlays.push(overlay);
+  }
+
+  // 5. Composite.
+  const png = await canvas.composite(overlays).png().toBuffer();
+  return { png, width, height };
 }

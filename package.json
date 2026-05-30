@@ -23,6 +23,7 @@
     "test:e2e": "playwright test",
     "test:e2e:update-snapshots": "playwright test --update-snapshots",
     "test:smoke": "playwright test --config=playwright.smoke.config.ts",
+    "test:golden": "vitest run --config vitest.golden.config.ts",
     "test:precommit": "npm run lint && npm run typecheck && npm run test:unit",
     "screenshots": "RUN_SCREENSHOTS=1 playwright test screenshots.spec.ts",
     "screenshots:baseline": "RUN_SCREENSHOTS=1 playwright test screenshots.spec.ts --update-snapshots",
