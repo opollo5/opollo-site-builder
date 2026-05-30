@@ -38,6 +38,12 @@ export interface ImageTemplate {
   aspectRatio: AspectRatio;
   definition: TemplateDefinition;
   version: number;
+  /**
+   * Added by migration 0166 (D1).
+   * 1 = fixed-zone format (A-NEW-3, routes to compositeSharp).
+   * 2 = layer-based format (v2 editor, routes to compositeLayerBased).
+   */
+  schemaVersion: number;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +57,7 @@ interface TemplateRow {
   aspect_ratio: string;
   definition: TemplateDefinition;
   version: number;
+  schema_version: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -64,6 +71,7 @@ function toTemplate(row: TemplateRow): ImageTemplate {
     aspectRatio: row.aspect_ratio as AspectRatio,
     definition: row.definition,
     version: row.version,
+    schemaVersion: row.schema_version ?? 1,
     isActive: row.is_active,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
