@@ -18,10 +18,15 @@ import { logger } from "@/lib/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Accepts either legacy v1 definition or v2 layer_template.
 const BodySchema = z.object({
   company_id: dbUuid(),
-  definition: z.record(z.string(), z.unknown()),
+  definition: z.record(z.string(), z.unknown()).optional(),
+  layer_template: z.record(z.string(), z.unknown()).optional(),
+  schema_version: z.number().int().min(1).max(2).optional(),
   change_note: z.string().optional(),
+}).refine((d) => d.definition || d.layer_template, {
+  message: "Either definition or layer_template is required",
 });
 
 export async function PATCH(
@@ -41,12 +46,21 @@ export async function PATCH(
   if (gate.kind === "deny") return gate.response;
 
   try {
-    const updated = await update_template({
-      templateId: id,
-      updatedBy: gate.userId,
-      definition: parsed.data.definition as unknown as import("@/lib/image/templates").TemplateDefinition,
-      changeNote: parsed.data.change_note,
-    });
+    const updated = await update_template(
+      parsed.data.layer_template
+        ? {
+            templateId: id,
+            updatedBy: gate.userId,
+            layerTemplate: parsed.data.layer_template as unknown as import("@/lib/image/template-model").Template,
+            changeNote: parsed.data.change_note,
+          }
+        : {
+            templateId: id,
+            updatedBy: gate.userId,
+            definition: parsed.data.definition as unknown as import("@/lib/image/templates").TemplateDefinition,
+            changeNote: parsed.data.change_note,
+          },
+    );
 
     return NextResponse.json({ ok: true, data: updated, timestamp: new Date().toISOString() });
   } catch (err) {
