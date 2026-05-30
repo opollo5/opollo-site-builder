@@ -16,8 +16,8 @@
  * Slice coverage:
  *   E2 — text layer: text-fit, secondary style parser, glyph-hugging bg
  *   E3 — image layer: asset resolver, fill/anchor, tint, border_radius, clip_path
- *   E4 — rectangle layer (added in separate slice)
- *   E5 — transforms: rotation, skew, opacity (added in separate slice)
+ *   E4 — rectangle layer: solid/gradient fill, border, border_radius
+ *   E5 — transforms: rotation (top-left origin), skew, opacity
  */
 
 import "server-only";
@@ -36,6 +36,7 @@ import type {
   ImageAnchorY,
   RectangleLayer,
   Gradient,
+  Layer,
 } from "@/lib/image/template-model";
 
 // ─── Font face declarations (shared with sharp-renderer) ─────────────────────
@@ -546,11 +547,8 @@ export async function renderTextLayer(
   // compiled with librsvg support, which our build guarantees.
   const png = await sharp(buf).png().toBuffer();
 
-  return {
-    input: png,
-    left: Math.round(layer.x),
-    top: Math.round(layer.y),
-  };
+  const base = { input: png, left: Math.round(layer.x), top: Math.round(layer.y) };
+  return applyLayerTransforms(layer, base);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -718,11 +716,8 @@ export async function renderImageLayer(
     buf = await applyTint(buf, layer.width, layer.height, layer.tint_color);
   }
 
-  return {
-    input: buf,
-    left: Math.round(layer.x),
-    top: Math.round(layer.y),
-  };
+  const base = { input: buf, left: Math.round(layer.x), top: Math.round(layer.y) };
+  return applyLayerTransforms(layer, base);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -813,9 +808,171 @@ export async function renderRectangleLayer(
 ): Promise<sharp.OverlayOptions> {
   const svg = buildRectangleLayerSvg(layer);
   const png = await sharp(Buffer.from(svg)).png().toBuffer();
+  const base = { input: png, left: Math.round(layer.x), top: Math.round(layer.y) };
+  return applyLayerTransforms(layer, base);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// E5 — TRANSFORMS: rotation (top-left origin), skew, opacity (§6.1)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Rotated bounding-box math ────────────────────────────────────────────────
+
+/**
+ * Compute the axis-aligned bounding box of a W×H rectangle rotated by `deg`
+ * degrees (clockwise, screen space) around its top-left corner (0,0).
+ *
+ * Returns the four rotated corners and the bounding box origin (min_x, min_y)
+ * plus the new canvas dimensions (rotated_w, rotated_h).
+ */
+export function computeRotatedBBox(
+  w: number,
+  h: number,
+  deg: number,
+): { min_x: number; min_y: number; rotated_w: number; rotated_h: number } {
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  // Four corners rotated around (0,0)
+  const xs = [0, w * cos, w * cos - h * sin, -h * sin];
+  const ys = [0, w * sin, w * sin + h * cos, h * cos];
+
+  const min_x = Math.min(...xs);
+  const max_x = Math.max(...xs);
+  const min_y = Math.min(...ys);
+  const max_y = Math.max(...ys);
+
   return {
-    input: png,
-    left: Math.round(layer.x),
-    top: Math.round(layer.y),
+    min_x,
+    min_y,
+    rotated_w: max_x - min_x,
+    rotated_h: max_y - min_y,
   };
+}
+
+// ─── Opacity helper ───────────────────────────────────────────────────────────
+
+/**
+ * Apply an opacity multiplier to a PNG buffer via an alpha mask.
+ * `opacity` is in [0, 1]. Values of 1 are a no-op.
+ */
+async function applyOpacity(buf: Buffer, w: number, h: number, opacity: number): Promise<Buffer> {
+  const alpha = Math.round(opacity * 255);
+  const mask = await sharp({
+    create: { width: w, height: h, channels: 4, background: { r: 255, g: 255, b: 255, alpha } },
+  })
+    .png()
+    .toBuffer();
+  return sharp(buf).composite([{ input: mask, blend: "dest-in" }]).png().toBuffer();
+}
+
+// ─── SVG-based rotation + skew wrapper ───────────────────────────────────────
+
+/**
+ * Apply rotation (top-left origin) and/or skew to a rasterized layer buffer.
+ *
+ * Transform order per §6.1: rotateZ(rotation) → skewX → skewY.
+ * In SVG transform attribute (right-to-left), this is:
+ *   `translate(tx, ty) skewY(sy) skewX(sx) rotate(rz)`
+ *
+ * For rotate_x / rotate_y (3D perspective): not implemented in V1 — logged
+ * as a warning and skipped. The DOM renderer uses CSS perspective; SVG has no
+ * direct equivalent without a computed matrix.
+ *
+ * Returns the transformed buffer and the adjusted composite position.
+ */
+async function applyRotationSkew(
+  buf: Buffer,
+  w: number,
+  h: number,
+  rotation: number,
+  rotateX: number,
+  rotateY: number,
+  skewX: number,
+  skewY: number,
+  layerName: string,
+): Promise<{ buf: Buffer; dx: number; dy: number }> {
+  const hasRotation = rotation !== 0;
+  const hasSkew = skewX !== 0 || skewY !== 0;
+
+  if (rotateX !== 0 || rotateY !== 0) {
+    logger.warn("image.layer-renderer.transform.3d_not_implemented", {
+      name: layerName, rotateX, rotateY,
+    });
+  }
+
+  if (!hasRotation && !hasSkew) return { buf, dx: 0, dy: 0 };
+
+  // Compute bounding box for the combined transform.
+  const { min_x, min_y, rotated_w, rotated_h } = computeRotatedBBox(w, h, rotation);
+
+  // SVG wraps the PNG via a data URI <image> element.
+  const pngBase64 = buf.toString("base64");
+
+  // Build transform string (right-to-left = spec order left-to-right).
+  const parts: string[] = [];
+  parts.push(`translate(${(-min_x).toFixed(3)},${(-min_y).toFixed(3)})`);
+  if (hasSkew) {
+    if (skewY !== 0) parts.push(`skewY(${skewY})`);
+    if (skewX !== 0) parts.push(`skewX(${skewX})`);
+  }
+  if (hasRotation) parts.push(`rotate(${rotation})`);
+  const transform = parts.join(" ");
+
+  // Expand canvas slightly to account for potential skew overflow.
+  const canvasW = Math.ceil(rotated_w + Math.abs(skewX));
+  const canvasH = Math.ceil(rotated_h + Math.abs(skewY));
+
+  const svg =
+    `<svg width="${canvasW}" height="${canvasH}" xmlns="http://www.w3.org/2000/svg">` +
+    `<g transform="${transform}">` +
+    `<image href="data:image/png;base64,${pngBase64}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none"/>` +
+    `</g>` +
+    `</svg>`;
+
+  const transformed = await sharp(Buffer.from(svg)).png().toBuffer();
+  return { buf: transformed, dx: Math.round(min_x), dy: Math.round(min_y) };
+}
+
+// ─── Public transform wrapper ─────────────────────────────────────────────────
+
+/**
+ * Apply rotation, skew, and opacity from a layer to an already-rendered
+ * sharp.OverlayOptions. Called at the end of each render function.
+ *
+ * Layers with default transforms (all zeros, opacity=1) pass through instantly.
+ */
+export async function applyLayerTransforms(
+  layer: Pick<Layer, "rotation" | "rotate_x" | "rotate_y" | "rotate_z" | "skew_x" | "skew_y" | "opacity" | "width" | "height" | "name">,
+  opts: sharp.OverlayOptions,
+): Promise<sharp.OverlayOptions> {
+  const {
+    rotation, rotate_x, rotate_y, skew_x, skew_y, opacity,
+    width: w, height: h, name,
+  } = layer;
+
+  let { input } = opts;
+  let { left = 0, top = 0 } = opts;
+
+  // 1. Apply rotation + skew via SVG wrapper.
+  if (rotation !== 0 || skew_x !== 0 || skew_y !== 0 || rotate_x !== 0 || rotate_y !== 0) {
+    const { buf: rotated, dx, dy } = await applyRotationSkew(
+      input as Buffer, w, h,
+      rotation, rotate_x, rotate_y, skew_x, skew_y, name,
+    );
+    input = rotated;
+    left += dx;
+    top += dy;
+  }
+
+  // 2. Apply opacity if not fully opaque.
+  if (opacity < 1) {
+    const meta = await sharp(input as Buffer).metadata();
+    const pw = meta.width ?? w;
+    const ph = meta.height ?? h;
+    input = await applyOpacity(input as Buffer, pw, ph, opacity);
+  }
+
+  return { input, left: Math.round(left), top: Math.round(top) };
 }
