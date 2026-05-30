@@ -64,6 +64,7 @@ function walkTsFiles(root: string): string[] {
         continue;
       }
       if (st.isDirectory()) {
+        // Skip node_modules and build dirs defensively.
         if (entry === "node_modules" || entry === ".next" || entry === "dist") continue;
         stack.push(full);
       } else if (SCAN_EXTENSIONS.some((ext) => entry.endsWith(ext))) {
@@ -82,6 +83,8 @@ interface Hit {
 
 function scanAll(): Hit[] {
   const hits: Hit[] = [];
+  // Match `process.env.BUNDLE_SOCIAL_<NAME>` — i.e. names that start with
+  // BUNDLE_SOCIAL_ (with the underscore between BUNDLE and SOCIAL).
   const re = /process\.env\.(BUNDLE_SOCIAL_[A-Z0-9_]+)/g;
   for (const root of SCAN_ROOTS) {
     for (const file of walkTsFiles(root)) {
@@ -104,6 +107,9 @@ describe("R7: bundle.social env var names are pinned across lib/ and app/", () =
   const hits = scanAll();
 
   it("scans something — guards against the scan silently finding zero files", () => {
+    // Sanity: lib/bundlesocial.ts is known to contain at least
+    // BUNDLE_SOCIAL_API and BUNDLE_SOCIAL_TEAMID, so the scan must find
+    // at least 2 hits.
     expect(hits.length).toBeGreaterThanOrEqual(2);
   });
 
