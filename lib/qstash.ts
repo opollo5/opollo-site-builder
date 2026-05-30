@@ -35,7 +35,13 @@ export function getQstashClient(): Client | null {
     cachedClient = null;
     return null;
   }
-  cachedClient = new Client({ token });
+  // Explicitly pass baseUrl so the correct regional endpoint is used even if
+  // the SDK's env-var auto-detection fails. Without this, the SDK defaults to
+  // "https://qstash.upstash.io" (EU) which rejects US-region tokens.
+  cachedClient = new Client({
+    token,
+    ...(process.env.QSTASH_URL && { baseUrl: process.env.QSTASH_URL }),
+  });
   return cachedClient;
 }
 
