@@ -18,6 +18,7 @@
  *   E3 — image layer: asset resolver, fill/anchor, tint, border_radius, clip_path
  *   E4 — rectangle layer: solid/gradient fill, border, border_radius
  *   E5 — transforms: rotation (top-left origin), skew, opacity
+ *   E6 — constraints + variant reflow
  */
 
 import "server-only";
@@ -37,6 +38,9 @@ import type {
   RectangleLayer,
   Gradient,
   Layer,
+  Template,
+  Variant,
+  VariantOverride,
 } from "@/lib/image/template-model";
 
 // ─── Font face declarations (shared with sharp-renderer) ─────────────────────
@@ -975,4 +979,138 @@ export async function applyLayerTransforms(
   }
 
   return { input, left: Math.round(left), top: Math.round(top) };
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// E6 — CONSTRAINTS + VARIANT REFLOW (§8.1, §8.2, §1.8)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Reflow a single layer to a new canvas size using its constraint pins.
+ *
+ * Constraint semantics (Figma-style, §8.1):
+ *
+ *  horizontal:
+ *   left       — x is fixed (left margin constant)
+ *   right      — right margin constant: new_x = targetW - layerW - rightMargin
+ *   center     — layer tracks horizontal centre, offset from centre constant
+ *   left_right — both margins fixed, layer stretches (new_width changes)
+ *   scale      — position + size scale proportionally with canvas width
+ *
+ *  vertical: analogous with targetH / sourceH.
+ *
+ * Text layers with text_fit re-fit automatically because the renderer reads
+ * layer.width/height from the returned layer object.
+ */
+export function reflowLayerForVariant(
+  layer: Layer,
+  sourceW: number,
+  sourceH: number,
+  targetW: number,
+  targetH: number,
+): Layer {
+  const { horizontal, vertical } = layer.constraints;
+  const ratioW = targetW / sourceW;
+  const ratioH = targetH / sourceH;
+
+  let x = layer.x;
+  let width = layer.width;
+  let y = layer.y;
+  let height = layer.height;
+
+  // Horizontal reflow
+  switch (horizontal) {
+    case "right": {
+      const rightMargin = sourceW - (layer.x + layer.width);
+      x = targetW - layer.width - rightMargin;
+      break;
+    }
+    case "center": {
+      const offsetFromCenter = (layer.x + layer.width / 2) - sourceW / 2;
+      x = targetW / 2 + offsetFromCenter - layer.width / 2;
+      break;
+    }
+    case "left_right": {
+      const rightMargin = sourceW - (layer.x + layer.width);
+      x = layer.x;
+      width = targetW - layer.x - rightMargin;
+      break;
+    }
+    case "scale":
+      x = layer.x * ratioW;
+      width = layer.width * ratioW;
+      break;
+    default: // "left"
+      break;
+  }
+
+  // Vertical reflow
+  switch (vertical) {
+    case "bottom": {
+      const bottomMargin = sourceH - (layer.y + layer.height);
+      y = targetH - layer.height - bottomMargin;
+      break;
+    }
+    case "center": {
+      const offsetFromCenter = (layer.y + layer.height / 2) - sourceH / 2;
+      y = targetH / 2 + offsetFromCenter - layer.height / 2;
+      break;
+    }
+    case "top_bottom": {
+      const bottomMargin = sourceH - (layer.y + layer.height);
+      y = layer.y;
+      height = targetH - layer.y - bottomMargin;
+      break;
+    }
+    case "scale":
+      y = layer.y * ratioH;
+      height = layer.height * ratioH;
+      break;
+    default: // "top"
+      break;
+  }
+
+  return { ...layer, x, y, width, height };
+}
+
+/**
+ * Apply per-variant layer overrides (§8.2).
+ * Overrides are keyed by layer `name` (the binding key).
+ * Only properties present in the override are changed.
+ */
+export function applyVariantLayerOverride(
+  layer: Layer,
+  override: VariantOverride,
+): Layer {
+  // Omit `name` from the spread (it's the lookup key, not a layer field to override)
+  const { name: _name, ...rest } = override;
+  return { ...layer, ...rest };
+}
+
+/**
+ * Reflow a full template's layers to a variant's canvas size.
+ *
+ * Resolution order per §8.2 and §1.8:
+ *   base layer → constraint reflow → variant override
+ *
+ * Returns the target canvas dimensions and the fully reflowed + overridden
+ * layer list. The caller renders these layers as-is.
+ */
+export function applyVariant(
+  template: Pick<Template, "width" | "height" | "layers">,
+  variant: Variant,
+): { width: number; height: number; layers: Layer[] } {
+  const { width: sW, height: sH, layers } = template;
+  const { width: tW, height: tH, overrides } = variant;
+
+  const reflowed = layers.map((layer) => {
+    // 1. Constraint reflow
+    const reflowedLayer = reflowLayerForVariant(layer, sW, sH, tW, tH);
+    // 2. Per-variant override (if any)
+    const override = overrides.find((o) => o.name === layer.name);
+    return override ? applyVariantLayerOverride(reflowedLayer, override) : reflowedLayer;
+  });
+
+  return { width: tW, height: tH, layers: reflowed };
 }
