@@ -34,6 +34,8 @@ import type {
   ImageLayer,
   ImageAnchorX,
   ImageAnchorY,
+  RectangleLayer,
+  Gradient,
 } from "@/lib/image/template-model";
 
 // ─── Font face declarations (shared with sharp-renderer) ─────────────────────
@@ -718,6 +720,101 @@ export async function renderImageLayer(
 
   return {
     input: buf,
+    left: Math.round(layer.x),
+    top: Math.round(layer.y),
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// E4 — RECTANGLE LAYER (§3.5)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── Gradient SVG builder ─────────────────────────────────────────────────────
+
+function buildGradientDef(gradient: Gradient, w: number, h: number, id: string): string {
+  const stops = gradient.stops
+    .map((s) => `<stop offset="${(s.position * 100).toFixed(1)}%" stop-color="${escapeXml(s.color)}"/>`)
+    .join("");
+
+  if (gradient.type === "radial") {
+    return `<radialGradient id="${id}" cx="50%" cy="50%" r="50%" gradientUnits="objectBoundingBox">${stops}</radialGradient>`;
+  }
+
+  // Linear gradient: angle 0 = top-to-bottom; rotate around the rect centre.
+  const angle = gradient.angle ?? 0;
+  const rad = (angle * Math.PI) / 180;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  // Compute gradient vector endpoints in SVG userSpaceOnUse coordinates.
+  // A unit vector at `angle` degrees from top:
+  //   angle=0   → top-to-bottom (x1=50%,y1=0,x2=50%,y2=100%)
+  //   angle=90  → left-to-right
+  //   angle=180 → bottom-to-top
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // Half-diagonal of the bounding box
+  const d = Math.sqrt(cx * cx + cy * cy);
+  const x1 = (cx - sin * d).toFixed(2);
+  const y1 = (cy - cos * d).toFixed(2);
+  const x2 = (cx + sin * d).toFixed(2);
+  const y2 = (cy + cos * d).toFixed(2);
+
+  return (
+    `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" gradientUnits="userSpaceOnUse">` +
+    stops +
+    `</linearGradient>`
+  );
+}
+
+// ─── Rectangle SVG builder ───────────────────────────────────────────────────
+
+/**
+ * Build the SVG string for a rectangle layer overlay.
+ * Supports solid colour, linear/radial gradient fill, border_radius, and border.
+ */
+export function buildRectangleLayerSvg(layer: RectangleLayer): string {
+  const { width: w, height: h } = layer;
+  const rx = layer.border_radius > 0 ? ` rx="${layer.border_radius}" ry="${layer.border_radius}"` : "";
+
+  let defs = "";
+  let fill: string;
+
+  if (layer.gradient) {
+    const gradId = "g0";
+    defs = `<defs>${buildGradientDef(layer.gradient, w, h, gradId)}</defs>`;
+    fill = `url(#${gradId})`;
+  } else {
+    fill = escapeXml(layer.color ?? "transparent");
+  }
+
+  let strokeAttrs = "";
+  if (layer.border) {
+    const { color, width: sw, style } = layer.border;
+    strokeAttrs = ` stroke="${escapeXml(color)}" stroke-width="${sw}"`;
+    if (style === "dashed") strokeAttrs += ` stroke-dasharray="${sw * 4} ${sw * 2}"`;
+    if (style === "dotted") strokeAttrs += ` stroke-dasharray="${sw} ${sw * 2}" stroke-linecap="round"`;
+  }
+
+  const rect =
+    `<rect x="0" y="0" width="${w}" height="${h}"${rx} fill="${fill}"${strokeAttrs}/>`;
+
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${defs}${rect}</svg>`;
+}
+
+// ─── Public render function ───────────────────────────────────────────────────
+
+/**
+ * Render a RectangleLayer into a sharp.OverlayOptions for compositing.
+ * E5 adds rotation + skew. E8 wires into compositeImage() dispatch.
+ */
+export async function renderRectangleLayer(
+  layer: RectangleLayer,
+): Promise<sharp.OverlayOptions> {
+  const svg = buildRectangleLayerSvg(layer);
+  const png = await sharp(Buffer.from(svg)).png().toBuffer();
+  return {
+    input: png,
     left: Math.round(layer.x),
     top: Math.round(layer.y),
   };
