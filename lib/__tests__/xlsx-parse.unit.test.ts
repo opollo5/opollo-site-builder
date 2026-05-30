@@ -267,11 +267,14 @@ describe("parseXlsxBuffer — rejection paths", () => {
 });
 
 describe("parseXlsxBuffer — multi-sheet", () => {
-  test("uses only the first sheet, logs the rest", async () => {
+  test("prefers 'Posts' sheet by name; row 3 = headers, row 4+ = data", async () => {
     const wb = new ExcelJS.Workbook();
+    // "Posts" sheet uses the canonical 3-row preamble format
     const ws1 = wb.addWorksheet("Posts");
-    ws1.addRow(FULL_HEADERS.slice(0, 4));
-    ws1.addRow(["T1", "H1", "B1", "linkedin"]);
+    ws1.addRow(["Mass Image Generation"]); // row 1: title (ignored)
+    ws1.addRow(["Fill one row per post"]);  // row 2: description (ignored)
+    ws1.addRow(FULL_HEADERS.slice(0, 4));  // row 3: headers ← parser reads here
+    ws1.addRow(["T1", "H1", "B1", "linkedin"]); // row 4: first data row
     const ws2 = wb.addWorksheet("Other");
     ws2.addRow(["something", "else"]);
     ws2.addRow(["a", "b"]);
@@ -287,11 +290,11 @@ describe("parseXlsxBuffer — multi-sheet", () => {
 
 describe("parseXlsxBuffer — date cell handling", () => {
   test("accepts an Excel date cell (JS Date) and emits YYYY-MM-DD", async () => {
-    const wb = new ExcelJS.Workbook();
-    const ws = wb.addWorksheet("Posts");
-    ws.addRow(FULL_HEADERS);
-    ws.addRow(["T", "H", "B", "linkedin", "", "", new Date(Date.UTC(2026, 5, 15)), ""]);
-    const buf = Buffer.from(await wb.xlsx.writeBuffer());
+    // Use a non-"Posts" sheet name so headers are read from row 1 (the simple path)
+    const buf = await buildXlsx({
+      headers: FULL_HEADERS,
+      rows: [["T", "H", "B", "linkedin", "", "", new Date(Date.UTC(2026, 5, 15)), ""]],
+    });
 
     const result = await parseXlsxBuffer(buf);
     expect(result.ok).toBe(true);

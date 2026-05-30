@@ -50,9 +50,13 @@ const BATCH_UUID = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 async function buildXlsxBuffer(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Posts");
-  ws.addRow(["post_topic", "headline_text", "body_text", "target_platforms"]);
-  ws.addRow(["Topic 1", "Head 1", "Body 1", "linkedin, instagram"]);
-  ws.addRow(["Topic 2", "Head 2", "Body 2", "x"]);
+  // Row 1/2 = preamble (title/description), row 3 = headers, row 4+ = data
+  // (matches the canonical template format read by the parser)
+  ws.addRow(["Mass Image Generation"]); // row 1: title
+  ws.addRow(["Instructions"]);           // row 2: description
+  ws.addRow(["post_topic", "headline_text", "body_text", "target_platforms"]); // row 3: headers
+  ws.addRow(["Topic 1", "Head 1", "Body 1", "linkedin, instagram"]); // row 4
+  ws.addRow(["Topic 2", "Head 2", "Body 2", "x"]);                   // row 5
   const buf = await wb.xlsx.writeBuffer();
   return Buffer.from(buf);
 }
