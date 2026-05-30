@@ -3,14 +3,30 @@
 /**
  * EditorCanvas — center pane wrapper for the v2 template editor.
  *
- * Handles scale-to-fit (§4): geometry stored in true canvas px; this
- * wrapper applies CSS transform: scale() so the canvas fits the viewport.
- * The scale is recalculated on container resize via ResizeObserver.
+ * Renders two overlapping layers at true canvas pixel dimensions,
+ * then applies CSS scale-to-fit to the whole container:
+ *
+ *   ┌──────────────────────────────────┐
+ *   │  CanvasContent (DOM renderer)    │  ← §6 visual truth
+ *   │  KonvaInteractionLayer           │  ← §6.3 handles, transparent
+ *   └──────────────────────────────────┘
+ *     ↑ transformed: scale(s) where s = min(cw/W, ch/H)
+ *
+ * Scale recalculated on container resize via ResizeObserver.
+ * Konva stage is dynamically imported (browser Canvas API, no SSR).
  */
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { CanvasContent } from "./CanvasContent";
+
 import { useEditor } from "./EditorContext";
+import { CanvasContent } from "./CanvasContent";
+
+// Dynamic import keeps Konva out of the SSR bundle (Canvas API not available server-side).
+const KonvaInteractionLayer = dynamic(
+  () => import("./KonvaInteractionLayer").then((m) => m.KonvaInteractionLayer),
+  { ssr: false },
+);
 
 export function EditorCanvas() {
   const { state, dispatch } = useEditor();
@@ -23,11 +39,8 @@ export function EditorCanvas() {
     const el = containerRef.current;
     if (!el) return;
     const { clientWidth: cw, clientHeight: ch } = el;
-    const padding = 48; // px breathing room on each axis
-    const s = Math.min(
-      (cw - padding) / template.width,
-      (ch - padding) / template.height,
-    );
+    const padding = 48;
+    const s = Math.min((cw - padding) / template.width, (ch - padding) / template.height);
     setScale(Math.max(0.05, Math.min(s, 4)));
   }, [template.width, template.height]);
 
@@ -50,25 +63,32 @@ export function EditorCanvas() {
       style={{ position: "relative" }}
     >
       {/* Scale indicator */}
-      <div className="absolute top-2 right-2 text-xs text-white/40 select-none z-10">
+      <div className="absolute top-2 right-2 text-xs text-white/40 select-none z-10 pointer-events-none">
         {Math.round(scale * 100)}%
       </div>
 
-      {/* Canvas at true pixel size, scaled to fit */}
+      {/* Canvas at true pixel dimensions, scaled to fit viewport */}
       <div
         style={{
           transform: `scale(${scale})`,
           transformOrigin: "center center",
           boxShadow: "0 4px 32px rgba(0,0,0,0.5)",
           flexShrink: 0,
+          position: "relative",
+          width: template.width,
+          height: template.height,
         }}
       >
+        {/* DOM renderer — visual source of truth */}
         <CanvasContent
           template={template}
           selectedLayerId={selectedLayerId}
           onSelectLayer={handleSelect}
           scale={scale}
         />
+
+        {/* react-konva interaction layer — transparent, handles only */}
+        <KonvaInteractionLayer width={template.width} height={template.height} />
       </div>
     </div>
   );
