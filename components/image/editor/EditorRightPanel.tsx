@@ -15,6 +15,7 @@ import { useEditor } from "./EditorContext";
 import { TextLayerPanel } from "./panels/TextLayerPanel";
 import { ImageLayerPanel } from "./panels/ImageLayerPanel";
 import { RectangleLayerPanel } from "./panels/RectangleLayerPanel";
+import { GeometryPanel } from "./panels/GeometryPanel";
 import type { TextLayer, ImageLayer, RectangleLayer } from "@/lib/image/template-model";
 
 export function EditorRightPanel() {
@@ -32,6 +33,9 @@ export function EditorRightPanel() {
 
           {/* Scrollable properties */}
           <div className="flex-1 overflow-y-auto">
+            {/* Geometry block — shown for all layer types (U10) */}
+            <GeometryPanel layer={selectedLayer} />
+
             {selectedLayer.type === "text" && (
               <TextLayerPanel layer={selectedLayer as TextLayer} />
             )}
