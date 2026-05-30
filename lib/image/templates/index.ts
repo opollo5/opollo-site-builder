@@ -165,25 +165,51 @@ export async function list_templates(companyId: string): Promise<ImageTemplate[]
  * Update a template's definition, incrementing its version and recording history.
  * This is the ONLY write path for templates — mirrors update_brand_profile().
  * Never call UPDATE directly on image_templates.
+ *
+ * Accepts either the legacy fixed-zone definition (schema_version=1) via
+ * `definition`, or a full layer-based Template (schema_version=2) via
+ * `layerTemplate`. Exactly one must be supplied.
+ *
+ * D4 addition: passes p_schema_version to the updated RPC (migration 0167).
  */
 export async function update_template(opts: {
   templateId: string;
   updatedBy: string;
-  definition: TemplateDefinition;
   changeNote?: string;
-}): Promise<ImageTemplate> {
+} & (
+  | { definition: TemplateDefinition; layerTemplate?: never }
+  | { layerTemplate: Template; definition?: never }
+)): Promise<ImageTemplate> {
   const svc = getServiceRoleClient();
+
+  let definition: unknown;
+  let schemaVersion: number;
+
+  if (opts.layerTemplate) {
+    // schema_version=2: validate the shape has the minimum required fields.
+    const t = opts.layerTemplate;
+    if (!t.id || !Array.isArray(t.layers) || t.width <= 0 || t.height <= 0) {
+      throw new Error("update_template: layerTemplate must have id, layers[], width>0, height>0");
+    }
+    definition = t;
+    schemaVersion = TEMPLATE_SCHEMA_VERSION;
+  } else {
+    definition = opts.definition;
+    schemaVersion = LEGACY_SCHEMA_VERSION;
+  }
 
   const { data, error } = await svc.rpc("update_image_template", {
     p_template_id: opts.templateId,
     p_updated_by: opts.updatedBy,
-    p_definition: opts.definition,
+    p_definition: definition,
     p_change_note: opts.changeNote ?? null,
+    p_schema_version: schemaVersion,
   });
 
   if (error) {
     logger.error("image.templates.update_failed", {
       templateId: opts.templateId,
+      schemaVersion,
       error: error.message,
     });
     throw new Error(`Template update failed: ${error.message}`);
@@ -195,15 +221,35 @@ export async function update_template(opts: {
 /**
  * Create a new template (company-scoped or global).
  * Admins create company-scoped; Opollo staff create globals (company_id null).
+ *
+ * D4 addition: accepts either legacy `definition` (schema_version=1) or
+ * `layerTemplate` (schema_version=2). Exactly one must be supplied.
  */
 export async function create_template(opts: {
   companyId: string | null;
   name: string;
   aspectRatio: AspectRatio;
-  definition: TemplateDefinition;
   createdBy: string;
-}): Promise<ImageTemplate> {
+} & (
+  | { definition: TemplateDefinition; layerTemplate?: never }
+  | { layerTemplate: Template; definition?: never }
+)): Promise<ImageTemplate> {
   const svc = getServiceRoleClient();
+
+  let definition: unknown;
+  let schemaVersion: number;
+
+  if (opts.layerTemplate) {
+    const t = opts.layerTemplate;
+    if (!t.id || !Array.isArray(t.layers) || t.width <= 0 || t.height <= 0) {
+      throw new Error("create_template: layerTemplate must have id, layers[], width>0, height>0");
+    }
+    definition = t;
+    schemaVersion = TEMPLATE_SCHEMA_VERSION;
+  } else {
+    definition = opts.definition;
+    schemaVersion = LEGACY_SCHEMA_VERSION;
+  }
 
   const { data, error } = await svc
     .from("image_templates")
@@ -211,14 +257,15 @@ export async function create_template(opts: {
       company_id: opts.companyId,
       name: opts.name,
       aspect_ratio: opts.aspectRatio,
-      definition: opts.definition,
+      definition,
+      schema_version: schemaVersion,
       created_by: opts.createdBy,
     })
     .select("*")
     .single();
 
   if (error) {
-    logger.error("image.templates.create_failed", { error: error.message });
+    logger.error("image.templates.create_failed", { schemaVersion, error: error.message });
     throw new Error(`Template creation failed: ${error.message}`);
   }
 
