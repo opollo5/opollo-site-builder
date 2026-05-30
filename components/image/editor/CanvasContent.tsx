@@ -20,7 +20,7 @@ import type {
   Gradient,
 } from "@/lib/image/template-model";
 import { isV1Layer } from "@/lib/image/template-model";
-import { parseSecondaryRuns } from "@/lib/image/compositing/layer-renderer";
+import { parseSecondaryRuns } from "@/lib/image/secondary-style-parser";
 
 // ─── Transform builder (§6.1) ─────────────────────────────────────────────────
 

@@ -255,33 +255,13 @@ export function fitFontSize(
 }
 
 // ─── Secondary style parser (§6.6, §1.7) ──────────────────────────────────────
+// Lives in a client-safe module (no server-only) so the DOM renderer
+// (CanvasContent) can import it without pulling server-only into the bundle.
+// Re-exported here for backward compat with existing test imports.
 
-export interface TextRun {
-  text: string;
-  secondary: boolean;
-}
-
-/**
- * Split a text string into normal and secondary runs.
- * Text wrapped in *asterisks* is marked secondary: true.
- * Parser must be identical across all renderers — do not diverge.
- *
- * "Mindset Shifts That *Matter*" →
- *   [{text:"Mindset Shifts That ",secondary:false},{text:"Matter",secondary:true}]
- */
-export function parseSecondaryRuns(text: string): TextRun[] {
-  const runs: TextRun[] = [];
-  // Match: (normal text)(* secondary text *) pairs, plus trailing normal text.
-  const re = /([^*]*)(?:\*([^*]*)\*)?/g;
-  let match: RegExpExecArray | null;
-  while ((match = re.exec(text)) !== null) {
-    // Guard against infinite loop at end-of-string
-    if (match[0].length === 0) break;
-    if (match[1]) runs.push({ text: match[1], secondary: false });
-    if (match[2]) runs.push({ text: match[2], secondary: true });
-  }
-  return runs.filter((r) => r.text.length > 0);
-}
+import { parseSecondaryRuns, type TextRun } from "@/lib/image/secondary-style-parser";
+export type { TextRun };
+export { parseSecondaryRuns };
 
 // ─── XML helpers ─────────────────────────────────────────────────────────────
 
