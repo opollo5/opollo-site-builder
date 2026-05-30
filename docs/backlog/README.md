@@ -5,6 +5,7 @@ struck-through — ship-state lives in git log.
 
 | File | Scope |
 |---|---|
+| [BACKLOG.md](BACKLOG.md) | Image-gen programme deferred work (V1.5+) |
 | [ux-debt.md](ux-debt.md) | Operator-facing jargon and label cleanups |
 | [v1-launch-blockers.md](v1-launch-blockers.md) | Items that MUST be resolved before any client gets v1 |
 
