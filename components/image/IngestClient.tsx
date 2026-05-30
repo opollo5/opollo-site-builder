@@ -116,9 +116,9 @@ export function IngestClient({ companyId }: { companyId: string }) {
       {/* Template downloads */}
       <div className="text-xs text-muted-foreground">
         Need a template?{" "}
-        <a href="/docs/briefs/image-generator/mass-image-gen-template.xlsx" download className="underline">Download .xlsx</a>
+        <a href="/templates/mass-image-gen-template.xlsx" download className="underline">Download .xlsx</a>
         {" · "}
-        <a href="/docs/briefs/image-generator/mass-image-gen-template.docx" download className="underline">Download .docx</a>
+        <a href="/templates/mass-image-gen-template.docx" download className="underline">Download .docx</a>
       </div>
 
       {/* Mode toggle */}

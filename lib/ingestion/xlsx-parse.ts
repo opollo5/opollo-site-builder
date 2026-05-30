@@ -54,7 +54,7 @@ const KNOWN_PLATFORMS = new Set(Object.keys(MASS_GEN_PLATFORM_MAP));
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export interface PostRow {
-  /** 1-indexed row number in the source sheet (header row = 1; first data row = 2). */
+  /** 1-indexed row number in the source sheet (for "Posts" sheet: header=3, first data=4; for single-sheet: header=1, first data=2). */
   sourceRow: number;
   post_topic: string;
   headline_text: string;
@@ -98,11 +98,24 @@ export async function parseXlsxBuffer(buffer: Buffer | ArrayBuffer): Promise<Xls
     };
   }
 
-  const ws = wb.worksheets[0];
+  // ─── Sheet selection ────────────────────────────────────────────────────
+  //
+  // The canonical mass-image-gen-template.xlsx has three sheets:
+  //   • "Posts"        — the data sheet operators fill in
+  //   • "Instructions" — usage guide (ignored)
+  //   • "Reference"    — valid values reference (ignored)
+  //
+  // Prefer the "Posts" sheet by name; fall back to the first sheet for
+  // single-sheet or custom templates.
+  const ws =
+    wb.worksheets.find((s) => s.name.trim().toLowerCase() === "posts") ??
+    wb.worksheets[0];
+
   if (!ws) {
     return { ok: false, error: "Workbook contains no sheets." };
   }
-  if (wb.worksheets.length > 1) {
+
+  if (wb.worksheets.length > 1 && ws.name.toLowerCase() !== "posts") {
     logger.info("xlsx_parse.multi_sheet_ignored", {
       sheetCount: wb.worksheets.length,
       usedSheet: ws.name,
@@ -110,7 +123,20 @@ export async function parseXlsxBuffer(buffer: Buffer | ArrayBuffer): Promise<Xls
   }
 
   // ─── Header row ──────────────────────────────────────────────────────────
-  const headerRow = ws.getRow(1);
+  //
+  // The canonical "Posts" sheet has two preamble rows before the column
+  // headers: row 1 is a display title and row 2 is an operator instruction.
+  // The actual column headers (e.g. "post_topic *", "headline_text *") live
+  // on row 3. Row 4 onwards are data rows.
+  //
+  // For single-sheet or custom templates that lack preamble rows, row 1 is
+  // used instead — making the parser backwards-compatible with the simpler
+  // format used in unit tests.
+  const isPostsSheet = ws.name.trim().toLowerCase() === "posts";
+  const HEADER_ROW_NUM = isPostsSheet ? 3 : 1;
+  const DATA_START_ROW = HEADER_ROW_NUM + 1;
+
+  const headerRow = ws.getRow(HEADER_ROW_NUM);
   if (!headerRow || headerRow.cellCount === 0) {
     return { ok: false, error: "Sheet has no header row." };
   }
@@ -119,13 +145,17 @@ export async function parseXlsxBuffer(buffer: Buffer | ArrayBuffer): Promise<Xls
   const warnings: string[] = [];
 
   // Iterate explicitly across cells so we get blank cells too.
+  // Strip trailing " *" (and similar required-field markers) before matching:
+  //   "post_topic *"  → "post_topic"
+  //   "headline_text *" → "headline_text"
   for (let c = 1; c <= headerRow.cellCount; c++) {
     const raw = cellString(headerRow.getCell(c));
     if (!raw) continue;
-    const key = raw.trim().toLowerCase();
+    // Strip required-field suffix: " *", " (required)", " (req)" etc.
+    const key = raw.trim().toLowerCase().replace(/\s*\*$/, "").replace(/\s*\(required\)$/i, "").trim();
     if (KNOWN_COLUMNS.has(key)) {
       columnIndex[key] = c;
-    } else {
+    } else if (key) {
       warnings.push(`Unknown column "${raw}" ignored.`);
     }
   }
@@ -143,7 +173,7 @@ export async function parseXlsxBuffer(buffer: Buffer | ArrayBuffer): Promise<Xls
   const posts: PostRow[] = [];
   const lastRow = ws.actualRowCount; // exceljs: actualRowCount counts populated rows
 
-  for (let r = 2; r <= lastRow; r++) {
+  for (let r = DATA_START_ROW; r <= lastRow; r++) {
     const row = ws.getRow(r);
     if (rowIsBlank(row, columnIndex)) continue;
 
