@@ -5,11 +5,15 @@
  *
  * Rendered on top of CanvasContent (DOM renderer). Provides:
  *   - Layer selection (click a transparent Rect that mirrors each layer)
- *   - Drag to move with snap guides (§6.4, U3)
- *   - Transformer: resize handles + rotation handle per §6.3
+ *   - Drag to move with snap guides (§6.4, U3) — live feedback via update_layer_live
+ *   - Transformer: resize handles + rotation handle per §6.3 — live feedback
  *
- * The DOM renderer (CanvasContent) remains the visual source of truth.
- * All Rects are fill="transparent" — interaction only.
+ * Live drag/resize pattern:
+ *   onDragMove / onTransform  → dispatch(update_layer_live)  — no undo entry, real-time DOM update
+ *   onDragEnd  / onTransformEnd → dispatch(update_layer)     — one undoable op per gesture
+ *
+ * The model→Konva sync useEffect is guarded against fighting the Transformer
+ * during live resize via isTransformingRef.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +36,10 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
   const shapeRefs = useRef<Map<string, Konva.Rect>>(new Map());
   const [guides, setGuides] = useState<Guide[]>([]);
 
+  // Track which layer ids are actively being transformed (resized/rotated) so
+  // the model→Konva sync useEffect doesn't fight the Transformer mid-gesture.
+  const isTransformingRef = useRef<Set<string>>(new Set());
+
   // Attach / detach Transformer when selection changes.
   useEffect(() => {
     const tr = transformerRef.current;
@@ -41,16 +49,19 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
     tr.getLayer()?.batchDraw();
   }, [selectedLayerId]);
 
-  // Sync Konva shape positions when EditorContext changes externally (undo/redo).
+  // Sync Konva shape positions when EditorContext changes externally (undo/redo,
+  // panel edits). Guarded for dragging AND transforming to avoid feedback loops.
   useEffect(() => {
     for (const layer of template.layers) {
       const node = shapeRefs.current.get(layer.id);
-      if (node && !node.isDragging()) {
+      if (node && !node.isDragging() && !isTransformingRef.current.has(layer.id)) {
         node.x(layer.x);
         node.y(layer.y);
         node.width(layer.width);
         node.height(layer.height);
         node.rotation(layer.rotation);
+        node.scaleX(1);
+        node.scaleY(1);
       }
     }
   }, [template.layers]);
@@ -77,10 +88,8 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
         {guidesEnabled && <GuideLines guides={guides} width={width} height={height} />}
 
         {/* Render Rects in REVERSE layer order so that the visually-topmost layer
-            (layers[0]) is the LAST Rect drawn, making it the top of the Konva
-            z-order and the first to receive pointer events. Without this reversal
-            the background Rect (layers[N-1], rendered last) sits on top in Konva
-            and intercepts every canvas click, preventing selection of any other layer. */}
+            (layers[0]) is the LAST Rect drawn — Konva top z-order — and receives
+            pointer events first. */}
         {[...template.layers].reverse().map((layer) => (
           <Rect
             key={layer.id}
@@ -97,17 +106,32 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
             fill="transparent"
             listening={!layer.hide}
             onMouseDown={() => dispatch({ type: "select", layerId: layer.id })}
+
+            // LIVE drag: snap + dispatch update_layer_live on every frame so the
+            // DOM renderer (CanvasContent) tracks the cursor in real-time.
             onDragMove={(e) => {
-              if (!guidesEnabled) return;
               const node = e.target as Konva.Rect;
-              const { x, y, guides: newGuides } = computeSnap(
-                { x: node.x(), y: node.y(), width: layer.width, height: layer.height, id: layer.id },
-                snapLayers, width, height,
-              );
-              node.x(x);
-              node.y(y);
-              setGuides(newGuides);
+              let x = node.x();
+              let y = node.y();
+              if (guidesEnabled) {
+                const snapped = computeSnap(
+                  { x, y, width: layer.width, height: layer.height, id: layer.id },
+                  snapLayers, width, height,
+                );
+                x = snapped.x;
+                y = snapped.y;
+                node.x(x);
+                node.y(y);
+                setGuides(snapped.guides);
+              }
+              dispatch({
+                type: "update_layer_live",
+                layerId: layer.id,
+                patch: { x: Math.round(x), y: Math.round(y) },
+              });
             }}
+
+            // Commit drag: single undoable op capturing pre-drag → post-drag.
             onDragEnd={(e) => {
               setGuides([]);
               dispatch({
@@ -116,7 +140,28 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
                 patch: { x: Math.round(e.target.x()), y: Math.round(e.target.y()) },
               });
             }}
+
+            // LIVE resize/rotate: absorb scale into w/h on every frame so the DOM
+            // renderer tracks the Transformer handles in real-time.
+            onTransform={(e) => {
+              isTransformingRef.current.add(layer.id);
+              const node = e.target as Konva.Rect;
+              dispatch({
+                type: "update_layer_live",
+                layerId: layer.id,
+                patch: {
+                  x: Math.round(node.x()),
+                  y: Math.round(node.y()),
+                  width: Math.max(4, Math.round(node.width() * node.scaleX())),
+                  height: Math.max(4, Math.round(node.height() * node.scaleY())),
+                  rotation: Math.round(node.rotation() * 100) / 100,
+                },
+              });
+            }}
+
+            // Commit resize/rotate: absorb scale, then single undoable op.
             onTransformEnd={(e) => {
+              isTransformingRef.current.delete(layer.id);
               const node = e.target as Konva.Rect;
               const scaleX = node.scaleX();
               const scaleY = node.scaleY();
@@ -150,10 +195,10 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
             if (Math.abs(newBox.width) < 4 || Math.abs(newBox.height) < 4) return oldBox;
             return newBox;
           }}
-          anchorStroke="#3b82f6"
+          anchorStroke="hsl(var(--primary))"
           anchorFill="#ffffff"
           anchorSize={8}
-          borderStroke="#3b82f6"
+          borderStroke="hsl(var(--primary))"
           borderDash={[]}
           rotateAnchorOffset={24}
         />
