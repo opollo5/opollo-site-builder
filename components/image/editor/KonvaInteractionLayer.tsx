@@ -29,8 +29,13 @@ interface KonvaInteractionLayerProps {
 }
 
 export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerProps) {
-  const { state, dispatch } = useEditor();
-  const { template, selectedLayerId } = state;
+  const { state, dispatch, displayTemplate } = useEditor();
+  const { selectedLayerId } = state;
+  // Use displayTemplate so Konva Rects track the reflowed layer positions in
+  // active variants. Previously reading state.template (base coords) caused
+  // Rects to appear at BASE positions while CanvasContent showed reflowed
+  // positions — breaking selection, drag, and Transformer handles in variants.
+  const template = displayTemplate;
 
   const transformerRef = useRef<Konva.Transformer>(null);
   const shapeRefs = useRef<Map<string, Konva.Rect>>(new Map());
@@ -195,10 +200,10 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
             if (Math.abs(newBox.width) < 4 || Math.abs(newBox.height) < 4) return oldBox;
             return newBox;
           }}
-          anchorStroke="hsl(var(--primary))"
+          anchorStroke="#3b82f6"
           anchorFill="#ffffff"
           anchorSize={8}
-          borderStroke="hsl(var(--primary))"
+          borderStroke="#3b82f6"
           borderDash={[]}
           rotateAnchorOffset={24}
         />

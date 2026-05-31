@@ -461,3 +461,125 @@ Each image layer produces a separate `sharp.OverlayOptions` entry in the `overla
 
 **Verdict: Multiple image layers coexist correctly in both the editor DOM renderer and the sharp renderer.** A template with a photo layer + decorative image layer + logo layer produces correct layered output with independent fill/anchor/tint per layer. No fix needed.
 
+
+---
+
+## Variant Reflow + Selection Audit — 2026-06-01
+
+### Investigation methodology
+
+Code trace only, no assumptions. Read `EditorContext.tsx`, `EditorCanvas.tsx`,
+`KonvaInteractionLayer.tsx`, `CanvasContent.tsx`, `SafeZoneOverlay.tsx`.
+
+---
+
+### Root cause of ALL reflow + interaction bugs (issues 1–4): one line
+
+**`KonvaInteractionLayer.tsx` line 33 reads `state.template` instead of `displayTemplate`.**
+
+```typescript
+const { state, dispatch } = useEditor();
+const { template, selectedLayerId } = state;  // ← BASE template, not reflowed
+```
+
+`EditorCanvas` correctly switches to `displayTemplate` when a variant is active:
+```typescript
+const { state, dispatch, displayTemplate } = useEditor();
+const template = displayTemplate;  // ← correct: reflowed
+```
+
+But `KonvaInteractionLayer` never received the memo. It creates Konva Rects from
+`state.template.layers` (the BASE 1080×1080 positions) while `CanvasContent` renders
+the same layers at their REFLOWED landscape positions from `displayTemplate.layers`.
+
+In landscape view (1200×630):
+- `CanvasContent` shows background at width=1200, height=630 → correctly fills canvas
+- `KonvaInteractionLayer` creates a Rect at width=1080, height=1080 → overflows the 630-height Stage
+- The logo `CanvasContent` div is at reflowed x=1025, y=455 → correct
+- The logo Konva Rect is at BASE x=905, y=905 → entirely BELOW the Stage (905 > 630)
+- Clicking the logo's visual position hits the Stage background or wrong Rect → nothing selected
+- Drag dispatch `update_layer_live { x, y }` patches `state.template.layers` using Konva Rect's
+  position, which is BASE-coordinate, not reflowed-coordinate → incorrect write-back
+
+**This single bug causes all four critical issues:**
+- Issue 1 (background not resizing): `CanvasContent` DOES resize (correct). The "1080×1080"
+  the user sees is the Konva Rect outline at base size, which appears as a second box over
+  the correctly-reflowed CSS background.
+- Issue 2 (logo bleeding): Logo Konva Rect is at y=905 in a 630-height Stage. Invisible to
+  Konva but the CSS rendered logo appears at y=455 — below its interaction area.
+- Issue 3 (drag disabled): Konva Rects are at wrong positions. Clicking the visual layer
+  position hits a Rect from a different layer or the Stage background. Drag never starts.
+- Issue 4 (bounding boxes beyond canvas): Konva Rects at 1080×1080 extend beyond the 630-tall Stage.
+
+**Fix**: Pass `displayTemplate` to `KonvaInteractionLayer` as a prop, or read it from context.
+
+---
+
+### Root cause — issue 5: two visual outlines at different positions
+
+There are THREE separate "selection" indicators rendered simultaneously:
+
+1. **`CanvasContent.SelectionOutline`** (CSS div) — positioned at `displayTemplate` layer coords
+   (reflowed). Line 348-365 of `CanvasContent.tsx`. Correct position.
+
+2. **Konva `Transformer` border** — positioned at the Konva Rect position, which (due to bug
+   above) is at BASE coords when in variant view. Wrong position. Color: `"hsl(var(--primary))"` —
+   this is an invalid Canvas2D color string; CSS variables don't work in `<canvas>`. The Canvas2D
+   API parses it as an unknown color and falls back to **green** (`#008000`). This is the "green
+   outline that's misaligned."
+
+3. **`SafeZoneOverlay`** (Konva Layer) — a dashed white guide 5% inset from canvas edges.
+   Not a selection indicator; a separate concern.
+
+**Two bugs:**
+- Konva `anchorStroke="hsl(var(--primary))"` → invalid → renders green
+- Duplicate selection outlines (CSS + Konva) at different positions in variant view
+
+**Fix**: (a) Replace `hsl(var(--primary))` with a valid hex (`#3b82f6`). (b) Remove
+`SelectionOutline` from `CanvasContent` — the Konva Transformer already shows selection. Having
+both is redundant and confusing.
+
+---
+
+### Root cause — issue 6: selection grabs multiple layers
+
+Two causes:
+
+**A. CanvasContent wrapper divs each have `style={{ position: "absolute", inset: 0 }}`** —
+every wrapper fills the FULL canvas (line 414). The topmost layer's wrapper captures all clicks.
+However, clicks go to the Konva Stage first (it's rendered on top of CanvasContent), so this
+doesn't cause the issue in isolation.
+
+**B. In variant view, Konva Rects are at BASE positions.** The Konva hit-test finds the
+topmost Rect under the cursor — but in landscape, that Rect corresponds to a different layer
+than the one the user visually clicked (because layers are at different coordinates in base vs.
+reflowed). Result: clicking layer A selects layer B.
+
+The "second lighter box" = `CanvasContent.SelectionOutline` (CSS, reflowed position) + Konva
+Transformer border (wrong position, green) visible simultaneously, giving the appearance that
+selection grabbed two things.
+
+**Fix**: Fix the Konva Rect positions (root fix from issue 1) + remove `SelectionOutline`.
+
+---
+
+### Summary of fixes required (ordered by severity)
+
+| # | Root cause | File | Fix |
+|---|-----------|------|-----|
+| 1–4 | `KonvaInteractionLayer` reads `state.template` (base) not `displayTemplate` (reflowed) | `KonvaInteractionLayer.tsx` line 33 | Destructure `displayTemplate` from `useEditor()` instead of `state.template` |
+| 5a | `hsl(var(--primary))` is invalid Canvas2D color → renders green | `KonvaInteractionLayer.tsx` lines 198,201 | Replace with `"#3b82f6"` (blue-500) |
+| 5b | `CanvasContent.SelectionOutline` duplicates Konva Transformer border | `CanvasContent.tsx` lines 348–365, 422–425 | Remove entirely — Transformer handles selection display |
+| 6 | Follows from fixes 1 and 5b | — | Fixed by the above |
+
+---
+
+### UX issues (separate PRs, lower risk)
+
+| # | Issue | Root cause | Fix |
+|---|-------|-----------|-----|
+| 7 | "Base" tab confusing (= Square for seed templates) | Variant switcher always shows Base + variants | Suppress Base tab when a variant matches the base dimensions |
+| 8 | Format tabs too small, no transition | Styling only | Larger tabs, `transition-all` on canvas resize |
+| 9 | Placeholder text near-invisible | `opacity: 0.3` on dark text layer bg | Use `text-muted-foreground` visible against any bg |
+| 10 | Geometry fields stacked vertically | `PairField` uses stacked layout | Inline "W [ ] H [ ]" layout for paired fields |
+

@@ -40,11 +40,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
  * Gives the full column width (~124px) to the number input instead of sharing
  * it with a 64px side label that left only ~52px for values like "1080".
  */
+/**
+ * Photoshop-style inline label: "W [____]" — label left, input right on the
+ * same row. The label is narrow (w-8) so the input gets most of the column.
+ */
 function PairField({ label, children, title }: { label: string; children: React.ReactNode; title?: string }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-xs text-muted-foreground leading-none opacity-70" title={title}>{label}</span>
-      {children}
+    <div className="flex items-center gap-1" title={title}>
+      <span className="text-xs text-muted-foreground/70 w-8 shrink-0 text-right leading-none">{label}</span>
+      <div className="flex-1">{children}</div>
     </div>
   );
 }
