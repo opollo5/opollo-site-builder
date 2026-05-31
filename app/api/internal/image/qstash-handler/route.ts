@@ -8,8 +8,10 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { generateWithFallback } from "@/lib/image";
 import type { GenerationParams, AspectRatio } from "@/lib/image/types";
 import { compositeImage, TEXT_ZONE_MAP } from "@/lib/image/compositing";
-import { get_template } from "@/lib/image/templates";
+import { get_template, get_template_by_id } from "@/lib/image/templates";
 import { enqueueImageJob } from "@/lib/image/enqueue";
+// Stream B template-mode imports
+import type { TemplateJobSpec } from "@/lib/image/template-bulk-types";
 import {
   acquireImageLease,
   releaseImageLease,
@@ -63,15 +65,24 @@ const GenerationParamsSchema = z.object({
   simplifyPrompt: z.boolean().optional(),
 }) satisfies z.ZodType<GenerationParams>;
 
+// Unified body schema: accepts BOTH legacy Ideogram payloads (no jobType) and
+// Stream B template payloads (jobType="template"). All fields are validated
+// as-is; the handler discriminates and cross-validates in code.
+//
+// Legacy Ideogram payload: generationParams is a GenerationParams object.
+// Template payload:        generationParams is the full TemplateJobSpec stored
+//                          as JSONB (includes jobType, templateId, modifications).
 const BodySchema = z.object({
   jobId: z.string().uuid(),
-  generationParams: GenerationParamsSchema,
+  // Stream B: present only for template jobs. Absent = legacy Ideogram path.
+  jobType: z.literal("template").optional(),
+  // Accepts both GenerationParams and TemplateJobSpec (JSONB passthrough for template jobs).
+  generationParams: z.record(z.string(), z.unknown()),
   batchId: z.string().uuid().optional(),
-  // CAP pipeline fields (optional — only present for CAP-triggered jobs)
+  // CAP pipeline / Ideogram fields (not used for template jobs)
   capDraftId: z.string().uuid().optional(),
   headlineText: z.string().max(200).optional(),
   logoUrl: z.string().url().optional(),
-  // B5: when true, build the prompt and return without calling Ideogram.
   previewOnly: z.boolean().optional(),
 });
 
@@ -104,10 +115,23 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const { jobId, generationParams, batchId, capDraftId, headlineText, logoUrl, previewOnly } = parsed;
 
+  // Determine job type. Template jobs carry jobType="template" in the body OR
+  // in generationParams.jobType (stored as JSONB in the DB → re-read from there).
+  const isTemplateJob =
+    parsed.jobType === "template" ||
+    (generationParams as Record<string, unknown>).jobType === "template";
+
+  const companyId = String(
+    isTemplateJob
+      ? (generationParams as Record<string, unknown>).companyId
+      : (generationParams as unknown as GenerationParams).companyId,
+  );
+
   logger.info("image.qstash.received", {
     jobId,
     batchId,
-    companyId: generationParams.companyId,
+    companyId,
+    jobType: isTemplateJob ? "template" : "ideogram",
     previewOnly: previewOnly === true,
   });
 
@@ -116,8 +140,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // row, mark the job completed with null result. Never increments spend.
   // Preview never enters the concurrency budget — it's a synchronous read
   // from prompt-engine and has no cost to throttle.
-  if (previewOnly) {
-    return handlePreview({ jobId, generationParams, batchId });
+  if (previewOnly && !isTemplateJob) {
+    return handlePreview({ jobId, generationParams: generationParams as unknown as GenerationParams, batchId });
   }
 
   // ─── 1. Acquire Redis lease (dedup + concurrency token) ───────────────────
@@ -147,7 +171,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
       const requeue = await enqueueImageJob({
         jobId,
-        generationParams,
+        generationParams: generationParams as unknown as GenerationParams, // handler accepts both shapes
         batchId,
         capDraftId: parsed.capDraftId,
         headlineText: parsed.headlineText,
@@ -195,10 +219,26 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // ─── 4. Generate + composite ─────────────────────────────────────────────
+  //
+  // FORK: template jobs use renderTemplate() + compositeLayerBased().
+  //       Ideogram jobs use the existing generateWithFallback() path.
+  //       Retry/failure/budget/lease semantics are IDENTICAL for both forks —
+  //       the only difference is what produces the image bytes.
+
+  if (isTemplateJob) {
+    return handleTemplateJob({
+      jobId,
+      batchId,
+      svc,
+      templateJobSpec: generationParams as unknown as TemplateJobSpec,
+      companyId,
+    });
+  }
 
   try {
+    const ideogramParams = generationParams as unknown as GenerationParams;
     const images = await generateWithFallback({
-      ...generationParams,
+      ...ideogramParams,
       count: 1, // single image per job
     });
 
@@ -212,9 +252,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     let finalStoragePath = image.storagePath;
     if (headlineText) {
       try {
-        const dbTemplate = await get_template(generationParams.companyId, generationParams.aspectRatio as AspectRatio);
+        const gp = generationParams as unknown as GenerationParams;
+        const dbTemplate = await get_template(gp.companyId, gp.aspectRatio as AspectRatio);
         const textZone = dbTemplate?.definition.customTextZone
-          ?? TEXT_ZONE_MAP[(dbTemplate?.definition.compositionType ?? generationParams.compositionType)];
+          ?? TEXT_ZONE_MAP[(dbTemplate?.definition.compositionType ?? (generationParams as unknown as GenerationParams).compositionType)];
         const composite = await compositeImage({
           backgroundStoragePath: image.storagePath,
           textZones: [{
@@ -252,13 +293,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     // B3: increment per-company spend (non-blocking). Success only — never on
     // failure, never on preview. The handler never sees preview jobs (the batch
     // route skips QStash enqueue in preview mode).
-    void recordBudgetSpend(generationParams.companyId);
+    void recordBudgetSpend(companyId);
 
     // Update batch state after job completion (non-blocking).
     if (batchId) void updateBatchProgress(svc, batchId);
 
     // CAP pipeline: link the composited image to the draft (non-blocking).
-    if (capDraftId) void linkCapDraft(svc, capDraftId, generationParams.companyId, finalStoragePath, image.format);
+    if (capDraftId) void linkCapDraft(svc, capDraftId, companyId, finalStoragePath, image.format);
 
     logger.info("image.qstash.completed", { jobId, storagePath: finalStoragePath, composited: finalStoragePath !== image.storagePath });
     return NextResponse.json({ ok: true, status: "completed", storagePath: finalStoragePath });
@@ -499,5 +540,86 @@ async function recordBudgetSpend(companyId: string): Promise<void> {
       companyId,
       err: err instanceof Error ? err.message : String(err),
     });
+  }
+}
+
+// ─── Stream B: Template job handler ──────────────────────────────────────────
+//
+// Identical retry/failure/budget/lease semantics to the Ideogram path.
+// The caller (POST handler) has already: acquired the lease, checked concurrency
+// cap, and marked the job running. This function only does the rendering step
+// and the completion write.
+
+interface HandleTemplateJobInput {
+  jobId: string;
+  batchId?: string;
+  svc: ReturnType<typeof getServiceRoleClient>;
+  templateJobSpec: TemplateJobSpec;
+  companyId: string;
+}
+
+async function handleTemplateJob(input: HandleTemplateJobInput): Promise<NextResponse> {
+  const { jobId, batchId, svc, templateJobSpec, companyId } = input;
+
+  try {
+    const { templateId, variantKey, modifications } = templateJobSpec;
+
+    // Fetch the template (company-scoped: company templates override globals).
+    const tmpl = await get_template_by_id(templateId, companyId);
+    if (!tmpl?.resolvedTemplate) {
+      throw new Error(`Template ${templateId} not found or not schema_version=2 for company ${companyId}`);
+    }
+
+    // Build storage path: same convention as compositeLayerBased().
+    const ts = Date.now();
+    const outputStoragePath = `${companyId}/template-composite/${ts}-${jobId}.png`;
+
+    // Render the template with modifications + variant (must-have #4: image URL
+    // fetch failures are handled per-layer: null overlay = layer skipped, warning logged).
+    const result = await compositeImage({
+      schema_version: 2,
+      template: tmpl.resolvedTemplate,
+      modifications: modifications ?? [],
+      variantKey,
+      outputStoragePath,
+    });
+
+    // Mark completed.
+    await svc.from("image_generation_jobs").update({
+      state: "completed",
+      result_storage_path: result.storagePath,
+      completed_at: new Date().toISOString(),
+    }).eq("id", jobId);
+
+    // Increment spend + batch progress (identical to Ideogram path).
+    void recordBudgetSpend(companyId);
+    if (batchId) void updateBatchProgress(svc, batchId);
+
+    logger.info("image.qstash.template.completed", {
+      jobId,
+      templateId,
+      variantKey,
+      storagePath: result.storagePath,
+    });
+    return NextResponse.json({ ok: true, status: "completed", storagePath: result.storagePath });
+
+  } catch (err) {
+    const errorClass = err instanceof Error ? err.constructor.name : "UnknownError";
+    const errorDetail = err instanceof Error ? err.message : String(err);
+
+    await svc.from("image_generation_jobs").update({
+      state: "failed",
+      error_class: errorClass,
+      error_detail: errorDetail.slice(0, 500),
+      completed_at: new Date().toISOString(),
+    }).eq("id", jobId);
+
+    logger.error("image.qstash.template.failed", { jobId, error: errorDetail });
+    // 500 → QStash retries. Identical to the Ideogram failure path.
+    return internalError(errorDetail);
+
+  } finally {
+    // Always release the lease — identical to the Ideogram path.
+    await releaseImageLease(jobId);
   }
 }

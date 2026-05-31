@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import { enqueueImageJob } from "@/lib/image/enqueue";
 import { checkImageGenBudget } from "@/lib/image/budget";
 import type { GenerationParams } from "@/lib/image/types";
+import type { TemplateJobSpec } from "@/lib/image/template-bulk-types";
 
 // ---------------------------------------------------------------------------
 // Image-batch dispatch helper. Owns the per-batch DB + QStash side effects
@@ -34,7 +35,8 @@ export interface DispatchJobSpec {
 export interface DispatchInput {
   companyId: string;
   triggeredBy: string;
-  jobs: DispatchJobSpec[];
+  /** Accepts Ideogram job specs (existing) OR template job specs (Stream B). */
+  jobs: (DispatchJobSpec | TemplateJobSpec)[];
   mode: BatchMode;
   sourceFilename?: string;
   sourceRowCount?: number;
@@ -121,15 +123,22 @@ export async function dispatchImageBatch(input: DispatchInput): Promise<Dispatch
   const jobIds: string[] = [];
 
   for (const spec of jobs) {
-    const generationParams: GenerationParams = {
-      styleId: spec.styleId,
-      primaryColour: spec.primaryColour,
-      compositionType: spec.compositionType,
-      aspectRatio: spec.aspectRatio,
-      industry: spec.industry,
-      companyId,
-      count: 1,
-    };
+    // Determine job type and build the params JSONB stored on the job row.
+    const isTemplateJob = "jobType" in spec && spec.jobType === "template";
+
+    // For Ideogram jobs: GenerationParams. For template jobs: TemplateJobSpec (sans jobType).
+    // Both are stored as JSONB in generation_params; the QStash handler discriminates via jobType.
+    const generationParams: unknown = isTemplateJob
+      ? spec // store the full TemplateJobSpec; handler reads jobType to route
+      : {
+          styleId: (spec as DispatchJobSpec).styleId,
+          primaryColour: (spec as DispatchJobSpec).primaryColour,
+          compositionType: (spec as DispatchJobSpec).compositionType,
+          aspectRatio: (spec as DispatchJobSpec).aspectRatio,
+          industry: (spec as DispatchJobSpec).industry,
+          companyId,
+          count: 1,
+        };
 
     const { data: job, error: jobErr } = await svc
       .from("image_generation_jobs")
@@ -154,9 +163,10 @@ export async function dispatchImageBatch(input: DispatchInput): Promise<Dispatch
     const jobId = (job as { id: string }).id;
     jobIds.push(jobId);
 
+    // Enqueue to QStash. Template jobs carry the full spec; Ideogram jobs carry generationParams.
     const enqueue = await enqueueImageJob({
       jobId,
-      generationParams,
+      generationParams: generationParams as GenerationParams, // handler handles both shapes
       batchId,
       ...(mode === "preview" && { previewOnly: true }),
     });
