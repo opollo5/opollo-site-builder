@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../EditorContext";
 import type { TextLayer } from "@/lib/image/template-model";
+import { VarMetadataPanel } from "./VarMetadataPanel";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -339,6 +340,11 @@ export function TextLayerPanel({ layer }: { layer: TextLayer }) {
         />
         <p className="text-xs text-muted-foreground mt-1">Wrap text in *asterisks* for secondary style.</p>
       </Section>
+
+      {/* Variable metadata — §3.7, drives N-Series auto-form */}
+      <div className="px-0">
+        <VarMetadataPanel layer={layer} />
+      </div>
     </div>
   );
 }

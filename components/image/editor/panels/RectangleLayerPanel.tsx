@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../EditorContext";
 import type { RectangleLayer, Gradient, GradientStop } from "@/lib/image/template-model";
+import { VarMetadataPanel } from "./VarMetadataPanel";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -192,6 +193,8 @@ export function RectangleLayerPanel({ layer }: { layer: RectangleLayer }) {
           </button>
         )}
       </Section>
+
+      <VarMetadataPanel layer={layer} />
     </div>
   );
 }
