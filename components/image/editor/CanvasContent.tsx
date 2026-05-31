@@ -337,32 +337,17 @@ function TextLayerEl({ layer }: { layer: TextLayer }) {
                 <React.Fragment key={i}>{run.text}</React.Fragment>
               ),
             )
-          : layer.text || <span style={{ opacity: 0.3 }}>Empty text layer</span>}
+          : layer.text || <span style={{ opacity: 0.5, fontStyle: "italic" }}>Click to add text</span>}
       </span>
     </div>
   );
 }
 
 // ─── Selection outline ────────────────────────────────────────────────────────
-
-function SelectionOutline({ layer }: { layer: Layer }) {
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: layer.x - 1,
-        top: layer.y - 1,
-        width: layer.width + 2,
-        height: layer.height + 2,
-        border: "2px solid hsl(var(--primary))",
-        pointerEvents: "none",
-        boxSizing: "content-box",
-        transform: buildTransform(layer),
-        transformOrigin: "top left",
-      }}
-    />
-  );
-}
+// REMOVED: the CSS SelectionOutline was redundant with the Konva Transformer
+// border and appeared at misaligned positions in variant view (because it used
+// displayTemplate coords while Konva was at base coords). The Konva Transformer
+// already provides selection handles. One source of truth is cleaner.
 
 // ─── Canvas content ───────────────────────────────────────────────────────────
 
@@ -419,10 +404,7 @@ export function CanvasContent({ template, selectedLayerId, onSelectLayer }: Canv
         );
       })}
 
-      {selectedLayerId && (() => {
-        const sel = template.layers.find((l) => l.id === selectedLayerId);
-        return sel ? <SelectionOutline key="sel" layer={sel} /> : null;
-      })()}
+      {/* Selection display is handled by the Konva Transformer in KonvaInteractionLayer. */}
     </div>
   );
 }

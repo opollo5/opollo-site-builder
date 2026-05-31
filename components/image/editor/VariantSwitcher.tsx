@@ -47,14 +47,21 @@ export function VariantSwitcher() {
   // Only render the switcher when the template has at least one variant.
   if (template.variants.length === 0) return null;
 
+  // Suppress the "Base" tab when a named variant already matches the base
+  // dimensions — showing both "Base 1080×1080" and "Square 1080×1080" is
+  // confusing because they look identical in the editor.
+  const baseMatchesVariant = template.variants.some(
+    v => v.width === template.width && v.height === template.height,
+  );
+
   const tabs: Array<{ key: string | null; label: string; dims: string; platforms: SocialPlatformIconKey[] }> = [
-    // Base tab (the template's own dimensions)
-    {
-      key: null,
+    // Only show Base tab when no variant covers the base canvas size
+    ...(baseMatchesVariant ? [] : [{
+      key: null as string | null,
       label: "Base",
       dims: `${template.width}×${template.height}`,
-      platforms: [],
-    },
+      platforms: [] as SocialPlatformIconKey[],
+    }]),
     // One tab per variant
     ...template.variants.map(v => ({
       key: v.key,
@@ -65,7 +72,7 @@ export function VariantSwitcher() {
   ];
 
   return (
-    <div className="flex items-center justify-center gap-1 px-3 py-1.5 border-b border-border bg-muted/30 shrink-0">
+    <div className="flex items-center justify-center gap-2 px-4 py-2 border-b border-border bg-muted/20 shrink-0">
       {tabs.map(tab => {
         const isActive = tab.key === activeVariantKey;
         return (
@@ -73,24 +80,30 @@ export function VariantSwitcher() {
             key={tab.key ?? "__base__"}
             onClick={() => dispatch({ type: "set_active_variant", variantKey: tab.key })}
             className={[
-              "flex items-center gap-1.5 px-3 py-1 rounded text-xs transition-colors border",
+              "flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-150 border",
               isActive
                 ? "bg-background border-border text-foreground shadow-sm"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-background/60",
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-background/50",
             ].join(" ")}
             title={tab.dims}
           >
-            <span className="font-medium">{tab.label}</span>
-            <span className="text-muted-foreground/60 text-xs leading-none hidden sm:inline">
+            <span>{tab.label}</span>
+            <span className={[
+              "text-xs tabular-nums hidden sm:inline",
+              isActive ? "text-muted-foreground" : "text-muted-foreground/50",
+            ].join(" ")}>
               {tab.dims}
             </span>
             {tab.platforms.length > 0 && (
-              <span className="flex items-center gap-0.5 ml-0.5">
+              <span className="flex items-center gap-1 ml-0.5">
                 {tab.platforms.map(p => (
                   <SocialPlatformIcon
                     key={p}
                     platform={p}
-                    className="w-3 h-3 text-muted-foreground/60"
+                    className={[
+                      "w-4 h-4 transition-opacity",
+                      isActive ? "opacity-60" : "opacity-40",
+                    ].join(" ")}
                   />
                 ))}
               </span>
