@@ -165,73 +165,88 @@ function uniqueName(prefix: string, existing: string[]): string {
 
 const menuItemCls = "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors rounded flex items-center gap-2";
 
+/**
+ * AddLayerMenu — in-place drill-down navigation (no flyout submenus).
+ *
+ * Root view: Text / Image / Rectangle / Shape.
+ * Clicking "Shape" replaces the list in-place with shape options + a ← Back
+ * button. No positioning math — the same Radix Popover bounds it correctly
+ * regardless of where the trigger sits on-screen.
+ */
 export function AddLayerMenu() {
   const { state, dispatch } = useEditor();
   const [open, setOpen] = useState(false);
-  const [shapesOpen, setShapesOpen] = useState(false);
+  const [view, setView] = useState<"root" | "shapes">("root");
 
   const { width, height, layers } = state.template;
   const existingNames = layers.map((l) => l.name);
 
   function addLayer(layer: Layer) {
     setOpen(false);
-    setShapesOpen(false);
+    setView("root");
     dispatch({ type: "add_layer", layer, index: 0 });
   }
 
   return (
-    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShapesOpen(false); }}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setView("root"); }}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-6 text-xs px-2">
           + Layer
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-44 p-1" align="end" sideOffset={4}>
-        {/* Text */}
-        <button className={menuItemCls}
-          onClick={() => addLayer(makeTextLayer(width, height, existingNames))}>
-          <span className="w-4 text-center text-muted-foreground font-bold text-sm">T</span>
-          Text
-        </button>
-        {/* Image */}
-        <button className={menuItemCls}
-          onClick={() => addLayer(makeImageLayer(width, height, existingNames))}>
-          <span className="w-4 text-center text-muted-foreground text-sm">⬜</span>
-          Image
-        </button>
-        {/* Rectangle */}
-        <button className={menuItemCls}
-          onClick={() => addLayer(makeRectLayer(width, height, existingNames))}>
-          <span className="w-4 text-center text-muted-foreground text-sm">▭</span>
-          Rectangle
-        </button>
-        {/* Shape submenu */}
-        <div className="relative">
-          <button
-            className={[menuItemCls, "justify-between"].join(" ")}
-            onClick={() => setShapesOpen((v) => !v)}
-          >
-            <span className="flex items-center gap-2">
-              <Circle size={13} className="text-muted-foreground" />
-              Shape
-            </span>
-            <span className="text-muted-foreground text-xs">▶</span>
-          </button>
-          {shapesOpen && (
-            <div className="absolute right-full top-0 mr-1 w-36 bg-popover border border-border rounded-md shadow-md p-1 z-50">
-              {SHAPE_OPTIONS.map(({ kind, label, icon: Icon }) => (
-                <button
-                  key={kind}
-                  className={menuItemCls}
-                  onClick={() => addLayer(makeShapeLayer(kind, width, height, existingNames))}
-                >
-                  <Icon size={13} className="text-muted-foreground shrink-0" />
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {view === "shapes" ? (
+          /* ── Shape drill-down view ── */
+          <>
+            <button
+              className={[menuItemCls, "text-muted-foreground"].join(" ")}
+              onClick={() => setView("root")}
+            >
+              <span className="text-xs leading-none">←</span>
+              <span>Back</span>
+            </button>
+            <div className="border-t border-border my-1" />
+            {SHAPE_OPTIONS.map(({ kind, label, icon: Icon }) => (
+              <button
+                key={kind}
+                className={menuItemCls}
+                onClick={() => addLayer(makeShapeLayer(kind, width, height, existingNames))}
+              >
+                <Icon size={13} className="text-muted-foreground shrink-0" />
+                {label}
+              </button>
+            ))}
+          </>
+        ) : (
+          /* ── Root view ── */
+          <>
+            <button className={menuItemCls}
+              onClick={() => addLayer(makeTextLayer(width, height, existingNames))}>
+              <span className="w-4 text-center text-muted-foreground font-bold text-sm leading-none">T</span>
+              Text
+            </button>
+            <button className={menuItemCls}
+              onClick={() => addLayer(makeImageLayer(width, height, existingNames))}>
+              <span className="w-4 text-center text-muted-foreground text-sm leading-none">⬜</span>
+              Image
+            </button>
+            <button className={menuItemCls}
+              onClick={() => addLayer(makeRectLayer(width, height, existingNames))}>
+              <span className="w-4 text-center text-muted-foreground text-sm leading-none">▭</span>
+              Rectangle
+            </button>
+            <button
+              className={[menuItemCls, "justify-between"].join(" ")}
+              onClick={() => setView("shapes")}
+            >
+              <span className="flex items-center gap-2">
+                <Circle size={13} className="text-muted-foreground" />
+                Shape
+              </span>
+              <span className="text-muted-foreground text-xs leading-none">›</span>
+            </button>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );
