@@ -14,7 +14,7 @@
  *  - fixture-composite: multi-layer (rect bg + text + rect overlay)
  */
 
-import type { Template } from "@/lib/image/template-model";
+import type { Template, ShapeLayer } from "@/lib/image/template-model";
 import { TEMPLATE_SCHEMA_VERSION } from "@/lib/image/template-model";
 
 const BASE: Pick<Template, "version" | "orientation" | "groups" | "fonts" | "variants" | "render_settings" | "settings"> = {
@@ -232,6 +232,90 @@ export const FIXTURE_COMPOSITE: Template = {
   ],
 };
 
+// ─── Shape layer fixtures (S-renderer) ───────────────────────────────────────
+
+const SHAPE_BASE: Omit<ShapeLayer, "id" | "name" | "shapeKind" | "color" | "gradient" | "border"> = {
+  type: "shape",
+  x: 50, y: 50, width: 300, height: 200,
+  rotation: 0, rotate_x: 0, rotate_y: 0, rotate_z: 0,
+  skew_x: 0, skew_y: 0, opacity: 1,
+  locked: false, hide: false, hide_when_empty: false,
+  lock_aspect_ratio: false, description: "", group: null,
+  constraints: CONSTRAINTS_FIXED,
+};
+
+export const FIXTURE_SHAPE_ELLIPSE: Template = {
+  ...BASE,
+  id: "fixture-shape-ellipse",
+  name: "Shape Ellipse",
+  width: 400, height: 300,
+  orientation: "landscape",
+  background_color: "#1e1b4b",
+  layers: [{
+    ...SHAPE_BASE,
+    id: "s_ellipse", name: "ellipse", shapeKind: "ellipse",
+    color: "#818cf8",
+    gradient: null,
+    border: { color: "#ffffff", width: 3, style: "solid" },
+  }],
+};
+
+export const FIXTURE_SHAPE_TRIANGLE: Template = {
+  ...BASE,
+  id: "fixture-shape-triangle",
+  name: "Shape Triangle",
+  width: 400, height: 300,
+  orientation: "landscape",
+  background_color: "#064e3b",
+  layers: [{
+    ...SHAPE_BASE,
+    id: "s_tri", name: "triangle", shapeKind: "triangle",
+    color: "#34d399",
+    gradient: null,
+    border: null,
+  }],
+};
+
+export const FIXTURE_SHAPE_LINE: Template = {
+  ...BASE,
+  id: "fixture-shape-line",
+  name: "Shape Line",
+  width: 400, height: 100,
+  orientation: "landscape",
+  background_color: "#1f2937",
+  layers: [{
+    ...SHAPE_BASE,
+    id: "s_line", name: "line", shapeKind: "line",
+    x: 50, y: 45, width: 300, height: 10, // height = stroke width
+    color: "#f59e0b",
+    gradient: null,
+    border: null,
+  }],
+};
+
+export const FIXTURE_SHAPE_DIAMOND: Template = {
+  ...BASE,
+  id: "fixture-shape-diamond",
+  name: "Shape Diamond",
+  width: 400, height: 300,
+  orientation: "landscape",
+  background_color: "#4c1d95",
+  layers: [{
+    ...SHAPE_BASE,
+    id: "s_diamond", name: "diamond", shapeKind: "diamond",
+    color: null,
+    gradient: {
+      type: "linear",
+      angle: 45,
+      stops: [
+        { color: "#f9a8d4", position: 0 },
+        { color: "#c084fc", position: 1 },
+      ],
+    },
+    border: null,
+  }],
+};
+
 export const ALL_FIXTURES: Template[] = [
   FIXTURE_TEXT_BASIC,
   FIXTURE_TEXT_SECONDARY,
@@ -239,4 +323,9 @@ export const ALL_FIXTURES: Template[] = [
   FIXTURE_RECTANGLE_SOLID,
   FIXTURE_RECTANGLE_GRADIENT,
   FIXTURE_COMPOSITE,
+  // Shape layer fixtures (S-renderer)
+  FIXTURE_SHAPE_ELLIPSE,
+  FIXTURE_SHAPE_TRIANGLE,
+  FIXTURE_SHAPE_LINE,
+  FIXTURE_SHAPE_DIAMOND,
 ];
