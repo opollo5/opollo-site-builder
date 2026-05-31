@@ -10,8 +10,13 @@
  */
 
 import { useCallback } from "react";
+import {
+  AlignLeft, AlignCenter, AlignRight, AlignJustify,
+  AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEditor } from "../EditorContext";
 import type { TextLayer } from "@/lib/image/template-model";
 import { VarMetadataPanel } from "./VarMetadataPanel";
@@ -114,6 +119,19 @@ function SelectInput<T extends string>({
 }
 
 const FONT_FAMILIES = ["Inter", "Roboto", "Montserrat", "Open Sans", "Poppins"];
+
+const H_ALIGN_ICONS = {
+  left:    { icon: AlignLeft,    label: "Align left" },
+  center:  { icon: AlignCenter,  label: "Align centre" },
+  right:   { icon: AlignRight,   label: "Align right" },
+  justify: { icon: AlignJustify, label: "Justify" },
+} as const;
+
+const V_ALIGN_ICONS = {
+  top:    { icon: AlignVerticalJustifyStart,  label: "Align top" },
+  center: { icon: AlignVerticalJustifyCenter, label: "Align middle" },
+  bottom: { icon: AlignVerticalJustifyEnd,    label: "Align bottom" },
+} as const;
 const FONT_WEIGHTS = [100, 200, 300, 400, 500, 600, 700, 800, 900];
 
 // ─── Panel ────────────────────────────────────────────────────────────────────
@@ -132,11 +150,16 @@ export function TextLayerPanel({ layer }: { layer: TextLayer }) {
       {/* ── U5: TYPOGRAPHY ─────────────────────────────────────────── */}
       <Section title="Typography">
         <Field label="Font">
-          <SelectInput
+          {/* Each option renders in its own typeface so the user can visually compare */}
+          <select
             value={layer.font_family}
-            options={FONT_FAMILIES.map((f) => ({ value: f, label: f }))}
-            onChange={(v) => up({ font_family: v })}
-          />
+            className="h-7 text-xs w-full border border-input rounded px-2 bg-background"
+            onChange={(e) => up({ font_family: e.target.value })}
+          >
+            {FONT_FAMILIES.map((f) => (
+              <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+            ))}
+          </select>
         </Field>
         <Field label="Size">
           <NumInput value={layer.font_size} onChange={(v) => up({ font_size: v })} min={4} max={400} />
@@ -165,34 +188,54 @@ export function TextLayerPanel({ layer }: { layer: TextLayer }) {
         </div>
 
         <Field label="H-Align">
-          <div className="flex gap-1">
-            {(["left", "center", "right", "justify"] as const).map((a) => (
-              <Button
-                key={a}
-                variant={layer.text_align_h === a ? "default" : "outline"}
-                size="sm"
-                className="flex-1 h-7 text-xs px-1"
-                onClick={() => up({ text_align_h: a })}
-              >
-                {a[0].toUpperCase()}
-              </Button>
-            ))}
-          </div>
+          <TooltipProvider delayDuration={400}>
+            <div className="flex gap-1">
+              {(["left", "center", "right", "justify"] as const).map((a) => {
+                const { icon: Icon, label } = H_ALIGN_ICONS[a];
+                return (
+                  <Tooltip key={a}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={layer.text_align_h === a ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1 h-7 px-1"
+                        onClick={() => up({ text_align_h: a })}
+                        aria-label={label}
+                      >
+                        <Icon size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">{label}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </TooltipProvider>
         </Field>
         <Field label="V-Align">
-          <div className="flex gap-1">
-            {(["top", "center", "bottom"] as const).map((a) => (
-              <Button
-                key={a}
-                variant={layer.text_align_v === a ? "default" : "outline"}
-                size="sm"
-                className="flex-1 h-7 text-xs px-1"
-                onClick={() => up({ text_align_v: a })}
-              >
-                {a[0].toUpperCase()}
-              </Button>
-            ))}
-          </div>
+          <TooltipProvider delayDuration={400}>
+            <div className="flex gap-1">
+              {(["top", "center", "bottom"] as const).map((a) => {
+                const { icon: Icon, label } = V_ALIGN_ICONS[a];
+                return (
+                  <Tooltip key={a}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={layer.text_align_v === a ? "default" : "outline"}
+                        size="sm"
+                        className="flex-1 h-7 px-1"
+                        onClick={() => up({ text_align_v: a })}
+                        aria-label={label}
+                      >
+                        <Icon size={14} />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="text-xs">{label}</TooltipContent>
+                  </Tooltip>
+                );
+              })}
+            </div>
+          </TooltipProvider>
         </Field>
         <Field label="Transform">
           <SelectInput

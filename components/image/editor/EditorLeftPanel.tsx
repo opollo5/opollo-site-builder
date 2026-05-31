@@ -11,6 +11,7 @@
  */
 
 import { useRef, useState } from "react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEditor } from "./EditorContext";
 import { LayerRow } from "./LayerRow";
 import { AddLayerMenu } from "./AddLayerMenu";
@@ -38,8 +39,8 @@ export function EditorLeftPanel() {
       </div>
 
       {/* Layer list (top-first, drag-to-reorder) */}
-      <div
-        className="flex-1 overflow-y-auto"
+      <ScrollArea
+        className="flex-1"
         onDragOver={(e) => { e.preventDefault(); }}
         onDrop={(e) => {
           e.preventDefault();
@@ -56,7 +57,7 @@ export function EditorLeftPanel() {
           <div
             key={layer.id}
             onDragOver={(e) => { e.preventDefault(); setDragOverIndex(idx); }}
-            className={dragOverIndex === idx ? "bg-blue-500/10 border-t-2 border-blue-500" : ""}
+            className={dragOverIndex === idx ? "bg-accent/10 border-t-2 border-accent" : ""}
           >
             <LayerRow
               layer={layer}
@@ -76,7 +77,7 @@ export function EditorLeftPanel() {
             No layers yet.<br />Click + to add one.
           </p>
         )}
-      </div>
+      </ScrollArea>
 
       {/* Footer: guides toggle + layer count + add-layer menu */}
       <div className="px-3 py-2 border-t border-border space-y-1">
