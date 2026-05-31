@@ -349,3 +349,73 @@ After fixing Item 1 (live drag via `update_layer_live`), undo must still work: `
 - `components/image/editor/EditorContext.tsx` — add `update_layer_live` action (no undo push)
 - `components/image/editor/KonvaInteractionLayer.tsx` — dispatch `update_layer_live` from `onDragMove` and new `onTransform`; guard sync useEffect from fighting live Transformer
 
+
+---
+
+## Tier 2 UAT Investigation — 2026-05-31
+
+### Item 1: Per-layer actions (⋯ menu)
+
+**Code traced:** All five actions in `LayerRow.tsx` dispatch to `EditorContext` and are correctly wired:
+
+| Action | Dispatch | Persists |
+|--------|---------|---------|
+| Lock/Unlock | `update_layer({ locked: !layer.locked })` | ✓ via save |
+| Hide/Show | `update_layer({ hide: !layer.hide })` | ✓ |
+| Rename | `update_layer({ name: newName })` with slug validation | ✓ |
+| Duplicate | `add_layer(copy, index)` — inserts above original in top-first order | ✓ |
+| Delete | `remove_layer(layerId)` | ✓ |
+
+**Verdict: All actions work correctly. No fix needed.**
+
+Note: locked layers show `draggable={false}` on Konva Rects; the visual lock icon (🔒) appears in the layer row. CanvasContent does not reduce opacity for locked layers (cosmetic gap, Tier 3).
+
+---
+
+### Item 2: + Layer button
+
+**Root cause:** `EditorLeftPanel.tsx` line 85: the `+ Layer` `<Button>` has NO `onClick` handler — it's a complete placeholder from U1. Clicking it does nothing.
+
+**Fix:** Implement `AddLayerMenu` component — a Radix Popover with three options (Text, Image, Rectangle). Each creates a default Layer object and dispatches `add_layer` at index 0 (top of stack). Layer IDs use `${type}_${Date.now().toString(36)}`.
+
+---
+
+### Item 3: Snap/alignment guides
+
+**Root cause A (bug): `guides.splice(findIndex(-1), 1)`.** In `GuideLines.ts` `computeSnap()`:
+
+```typescript
+guides.splice(guides.findIndex((g) => g.orientation === "V"), 1);
+```
+
+When no V-orientation guide exists yet, `findIndex` returns -1. `Array.splice(-1, 1)` removes the LAST element — potentially destroying an already-added H-orientation guide. This causes guides to disappear unpredictably when both axes snap near-simultaneously.
+
+**Fix:** Guard with `!== -1` before splicing.
+
+**Root cause B (missing UI): No guides toggle.** `KonvaInteractionLayer` reads `template.settings?.guides !== false` to enable snap, but `EditorLeftPanel` has no control to set `template.settings.guides`. The user can't disable guides from the editor.
+
+**Fix:** Add a guides toggle button to the `EditorLeftPanel` footer (dispatch `update_template_settings`... actually use a simpler approach: add a `toggle_guides` action or dispatch `update_layer` equivalent for settings).
+
+Actually the cleanest fix: add `update_settings` action to EditorContext that patches `template.settings`, and wire a toggle button in `EditorLeftPanel`.
+
+---
+
+### Item 4: Text Fit
+
+**Root cause:** `CanvasContent.TextLayerEl` uses `layer.font_size` unconditionally (line 148). There is no text-fit computation in the DOM renderer. The `fitFontSize` binary-search algorithm lives only in `lib/image/compositing/layer-renderer.ts` (has `import "server-only"`) and runs at sharp-render time. The editor shows a static font size regardless of `text_fit.enabled`.
+
+**Fix:** Extract `fitFontSize`, `wrapLayerText`, `measureTextWidth`, and `CHAR_RATIO` from `layer-renderer.ts` into a client-safe module (like `lib/image/secondary-style-parser.ts` was extracted). Then in `TextLayerEl`, when `layer.text_fit.enabled`, call the extracted `fitFontSize` to compute the display font size.
+
+This ensures the editor preview matches the server-rendered image for text-fit layers.
+
+---
+
+### Tier 2 Fix Plan
+
+| Fix | Severity | Files |
+|-----|----------|-------|
+| Add `+ Layer` menu (AddLayerMenu component) | Major | `EditorLeftPanel.tsx`, new `AddLayerMenu.tsx` |
+| Fix `splice(-1)` bug in `computeSnap` | Major | `GuideLines.tsx` |
+| Add guides toggle to EditorLeftPanel | Minor | `EditorLeftPanel.tsx`, `EditorContext.tsx` |
+| Text-fit in DOM renderer | Major | New `lib/image/text-fit-utils.ts`, `CanvasContent.tsx` |
+

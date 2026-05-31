@@ -1,18 +1,19 @@
 "use client";
 
 /**
- * EditorLeftPanel — left panel of the v2 template editor (U4).
+ * EditorLeftPanel — left panel of the v2 template editor (U4 + Tier 2 UAT).
  *
  * Layer list: top-first (index 0 = visual top). Drag-to-reorder via HTML5
  * drag-and-drop (dispatches reorder_layers on drop). Each row: LayerRow
  * with type icon, editable name, lock/hide indicators, context menu.
- * New Layer (+) button at the bottom (opens AddLayerMenu from U14 — placeholder for now).
+ * AddLayerMenu: + Layer button opens type picker (text/image/rectangle).
+ * Guides toggle: snaps on/off, persists in template.settings.guides.
  */
 
 import { useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { useEditor } from "./EditorContext";
 import { LayerRow } from "./LayerRow";
+import { AddLayerMenu } from "./AddLayerMenu";
 
 export function EditorLeftPanel() {
   const { state, dispatch } = useEditor();
@@ -20,6 +21,8 @@ export function EditorLeftPanel() {
 
   const dragFromIndex = useRef<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const guidesEnabled = template.settings?.guides !== false;
 
   return (
     <aside className="w-[280px] border-r border-border flex flex-col overflow-hidden bg-background shrink-0">
@@ -75,15 +78,25 @@ export function EditorLeftPanel() {
         )}
       </div>
 
-      {/* Footer: layer count + new layer button */}
-      <div className="px-3 py-2 border-t border-border flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">
-          {template.layers.length} layer{template.layers.length !== 1 ? "s" : ""}
-        </span>
-        {/* New Layer menu — wired in U14 */}
-        <Button variant="ghost" size="sm" className="h-6 text-xs px-2" title="Add layer (U14)">
-          + Layer
-        </Button>
+      {/* Footer: guides toggle + layer count + add-layer menu */}
+      <div className="px-3 py-2 border-t border-border space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">
+            {template.layers.length} layer{template.layers.length !== 1 ? "s" : ""}
+          </span>
+          <AddLayerMenu />
+        </div>
+        <button
+          className={[
+            "flex items-center gap-1.5 text-xs w-full transition-colors",
+            guidesEnabled ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/50 hover:text-muted-foreground",
+          ].join(" ")}
+          onClick={() => dispatch({ type: "toggle_guides" })}
+          title={guidesEnabled ? "Snap guides on — click to disable" : "Snap guides off — click to enable"}
+        >
+          <span>{guidesEnabled ? "⊞" : "⊡"}</span>
+          <span>Snap guides {guidesEnabled ? "on" : "off"}</span>
+        </button>
       </div>
     </aside>
   );

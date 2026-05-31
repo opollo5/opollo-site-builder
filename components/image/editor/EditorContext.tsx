@@ -52,7 +52,9 @@ export type EditorAction =
   | { type: "undo" }
   | { type: "redo" }
   | { type: "set_saving"; isSaving: boolean }
-  | { type: "mark_clean" };
+  | { type: "mark_clean" }
+  /** Toggle template.settings.guides (snap guides on/off). */
+  | { type: "toggle_guides" };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -204,6 +206,18 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
 
     case "mark_clean":
       return { ...state, isDirty: false, past: [], future: [] };
+
+    case "toggle_guides": {
+      const current = state.template.settings?.guides !== false;
+      return {
+        ...state,
+        template: {
+          ...state.template,
+          settings: { ...state.template.settings, guides: !current },
+        },
+        isDirty: true,
+      };
+    }
 
     default:
       return state;
