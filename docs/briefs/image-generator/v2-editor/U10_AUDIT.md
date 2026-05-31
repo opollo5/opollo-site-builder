@@ -461,3 +461,85 @@ Each image layer produces a separate `sharp.OverlayOptions` entry in the `overla
 
 **Verdict: Multiple image layers coexist correctly in both the editor DOM renderer and the sharp renderer.** A template with a photo layer + decorative image layer + logo layer produces correct layered output with independent fill/anchor/tint per layer. No fix needed.
 
+
+---
+
+## Tier 4 — Feature-Parity vs Opollo/Blackbird IT Socials
+
+Reference: bold headline with one word/phrase on a solid colour-block highlight, B&W or colour photo in an image layer, angular brand shapes, logo, two formats (square 1080×1080 and landscape 1200×630).
+
+### A — Per-word colour highlight (TextBackground)
+
+**Achievable today: per-line only.**
+
+`TextLayer.background.color` renders a solid coloured rectangle behind each wrapped line using `buildLineBackgrounds()` in `layer-renderer.ts`. The block is sized to the full line width plus configurable `padding_h`/`padding_v` and `border_radius`. It does correctly produce a solid fill behind the text.
+
+**Gap:** The renderer produces ONE rect per wrapped *line*, not per *word*. "Blackbird" style where a single word in the middle of a sentence sits on a colour block requires either: (a) putting that word on its own forced line (achievable today via line breaks + narrow box + text-fit), or (b) a per-word run highlighting mechanism (not built). The `background.shadow` field exists in the model but is **not rendered** — the renderer reads the field but never applies it to the SVG rect.
+
+**Status: ✅ per-line highlight achievable; ❌ per-word mid-sentence highlight not built; ❌ shadow not implemented.**
+
+### B — Photo in image layer with crop/fit
+
+**Fully achievable today.**
+
+`ImageLayer` has `fill: "cover" | "fit"` + `anchor_x: "left"|"center"|"right"` + `anchor_y: "top"|"center"|"bottom"`. The renderer calls `sharp.resize(w, h, { fit: "cover"|"contain", position: buildSharpPosition(anchor_x, anchor_y) })`. Both crop modes and anchor-based gravity are implemented. ✅
+
+### C — Gradient fill (smooth multi-stop + angle)
+
+**Fully achievable today.**
+
+`RectangleLayer.gradient: Gradient` supports `type: "linear"|"radial"`, `angle` (degrees), and `stops: GradientStop[]` (arbitrary count). `buildGradientDef()` generates valid SVG `linearGradient`/`radialGradient` elements with exact stop positions and colours. No limitation on stop count. ✅
+
+### D — High-radius rounded-rect (pill / badge shapes)
+
+**Fully achievable today.**
+
+`RectangleLayer.border_radius` is a plain number applied as SVG `rx`/`ry`. Value of `100` on a 200×60 rectangle produces a pill shape. No upper cap in the code. ✅
+
+### E — Shadow / glow
+
+**Gap — not implemented.**
+
+`TextLayer.background.shadow: string | null` exists in the data model but `buildLineBackgrounds()` **never reads or applies it** to the SVG rect. `RectangleLayer` has no shadow field at all. No drop-shadow, box-shadow, or glow capability exists anywhere in the renderer.
+
+**Status: ❌ shadow/glow — model stub only, not rendered. Flag for a separate hardening brief.**
+
+### F — Multi-format / variants (1080×1080 + 1200×630)
+
+**Fully achievable today.**
+
+`Template.variants: Variant[]` supports multiple alternate canvas sizes. Each variant has `key`, `width`, `height`, and `overrides`. `renderTemplate({ variantKey: "landscape" })` triggers `applyVariant()` which runs constraint-driven reflow (all 5H × 5V pin modes from E6) plus any per-variant layer overrides. The caller picks the variant at generation time. ✅
+
+**Gap worth noting:** The editor's variant-switcher UI (U15) is not yet built — variants can be defined in the model but there's no way to preview them in the editor. Backlog.
+
+### Summary table
+
+| Blackbird capability | Status | Notes |
+|---|---|---|
+| Per-line colour highlight | ✅ | `TextLayer.background.color` + `border_radius` |
+| Per-word mid-sentence highlight | ❌ | Not built; requires run-level background renderer |
+| Shadow on text background | ❌ | Model stub exists, not rendered |
+| Photo with cover/fit + anchor | ✅ | `ImageLayer.fill` + `anchor_x/y` |
+| Gradient fill (multi-stop + angle) | ✅ | `RectangleLayer.gradient` |
+| High-radius pill/badge shape | ✅ | `border_radius` on `RectangleLayer` |
+| Layer shadow/glow | ❌ | No shadow field on RectangleLayer; not in renderer |
+| Two formats from one template | ✅ | `Template.variants` + `applyVariant()` |
+| Angular brand shapes (non-rect) | ❌ | `clip_path` on ImageLayer exists but no shape layer type |
+| Variant-switcher in editor UI | ❌ | U15 not built — backlog |
+
+---
+
+## Tier 5 — Stream B Wiring Confirmation
+
+**Question:** Does the chain "template Default content → Variable Label exposes API field → generation data overrides default" work end-to-end?
+
+**Trace:**
+
+1. **Default content** — `layer.text = "New text layer"` (default). When generating without modifications, `renderTemplate({ modifications: [] })` uses `layer.text` as-is. ✅
+
+2. **Variable Label → `/fields` response** — ❌ **The `/fields` route does NOT exist.** `lib/image/template-model.ts` defines `TemplateField` and the spec §13 describes `GET /templates/:id/fields`, but there is no API route file at `app/api/platform/image/templates/fields/route.ts` or similar. Stream B (`B1: Composer reads /fields to auto-generate form inputs`) cannot proceed until this endpoint is built.
+
+3. **Modification override** — ✅ `applyModifications()` correctly merges `modification.name === layer.name` → overwrites `layer.text` (and any other patched fields). Tested in `image-modification-merge.unit.test.ts`. Resolution order: base → variant override → request modification is correctly implemented in `renderTemplate()`.
+
+**Verdict:** The *modification merge* logic is sound and ready for Stream B. The *missing link* is the `/fields` API endpoint — without it, the N-Series composer has no way to discover which layers in a template are modifiable and what their labels/required/default values are. **Build `/fields` before starting B1.**
+
