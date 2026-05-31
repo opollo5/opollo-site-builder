@@ -27,7 +27,10 @@ interface EditorShellProps {
 export function EditorShell({ template, companyId, templateId }: EditorShellProps) {
   return (
     <EditorProvider template={template}>
-      <div className="h-screen flex flex-col overflow-hidden bg-background">
+      {/* fixed inset-0: escapes the platform NavShell's max-w-7xl / py-8 content
+          wrapper so the editor occupies the full viewport. z-50 keeps it above
+          the NavShell chrome (rail + section panel). */}
+      <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background">
         <EditorHeader companyId={companyId} templateId={templateId} />
 
         <div className="flex-1 flex overflow-hidden">
