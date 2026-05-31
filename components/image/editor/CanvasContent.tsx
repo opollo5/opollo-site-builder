@@ -105,15 +105,10 @@ function ImageLayerEl({ layer }: { layer: ImageLayer }) {
         />
       ) : (
         <div
+          className="w-full h-full flex items-center justify-center text-xs"
           style={{
-            width: "100%",
-            height: "100%",
-            background: "#e2e8f0",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            color: "#94a3b8",
+            background: "hsl(var(--muted))",
+            color: "hsl(var(--muted-foreground))",
             fontFamily: "Inter, sans-serif",
           }}
         >
@@ -222,7 +217,7 @@ function SelectionOutline({ layer }: { layer: Layer }) {
         top: layer.y - 1,
         width: layer.width + 2,
         height: layer.height + 2,
-        border: "2px solid #3b82f6",
+        border: "2px solid hsl(var(--primary))",
         pointerEvents: "none",
         boxSizing: "content-box",
         transform: buildTransform(layer),
