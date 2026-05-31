@@ -119,7 +119,7 @@ export function ShapeLayerPanel({ layer }: { layer: ShapeLayer }) {
                     up({ gradient: { ...layer.gradient!, stops } });
                   }} />
                 <Input type="number" value={Math.round(stop.position * 100)} min={0} max={100}
-                  className="h-6 text-xs w-14"
+                  className="h-6 text-xs w-12"
                   onChange={(e) => {
                     const v = parseInt(e.target.value, 10);
                     if (isNaN(v)) return;
@@ -128,6 +128,16 @@ export function ShapeLayerPanel({ layer }: { layer: ShapeLayer }) {
                     up({ gradient: { ...layer.gradient!, stops } });
                   }} />
                 <span className="text-xs text-muted-foreground">%</span>
+                <Input type="number" value={Math.round((stop.opacity ?? 1) * 100)} min={0} max={100}
+                  className="h-6 text-xs w-12" title="Opacity %"
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value, 10);
+                    if (isNaN(v)) return;
+                    const stops = [...(layer.gradient?.stops ?? [])];
+                    stops[i] = { ...stop, opacity: v / 100 };
+                    up({ gradient: { ...layer.gradient!, stops } });
+                  }} />
+                <span className="text-xs text-muted-foreground">α</span>
                 {(layer.gradient?.stops.length ?? 0) > 2 && (
                   <button className="text-xs text-muted-foreground"
                     onClick={() => {

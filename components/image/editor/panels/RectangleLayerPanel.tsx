@@ -111,31 +111,44 @@ export function RectangleLayerPanel({ layer }: { layer: RectangleLayer }) {
             )}
             <div className="text-xs text-muted-foreground mb-1">Stops</div>
             {layer.gradient?.stops.map((stop, i) => (
-              <div key={i} className="flex items-center gap-1 mb-1">
-                <input type="color" value={stop.color}
-                  className="w-6 h-6 rounded border border-border cursor-pointer p-0.5 bg-transparent"
-                  onChange={(e) => {
-                    const stops = [...(layer.gradient?.stops ?? [])];
-                    stops[i] = { ...stop, color: e.target.value };
-                    up({ gradient: { ...layer.gradient!, stops } });
-                  }} />
-                <Input type="number" value={Math.round(stop.position * 100)} min={0} max={100}
-                  className="h-6 text-xs w-14"
-                  onChange={(e) => {
-                    const v = parseInt(e.target.value, 10);
-                    if (isNaN(v)) return;
-                    const stops = [...(layer.gradient?.stops ?? [])];
-                    stops[i] = { ...stop, position: v / 100 };
-                    up({ gradient: { ...layer.gradient!, stops } });
-                  }} />
-                <span className="text-xs text-muted-foreground">%</span>
-                {(layer.gradient?.stops.length ?? 0) > 2 && (
-                  <button className="text-xs text-muted-foreground"
-                    onClick={() => {
-                      const stops = (layer.gradient?.stops ?? []).filter((_, j) => j !== i);
+              <div key={i} className="flex flex-col gap-0.5 mb-2 border-b border-border pb-1">
+                <div className="flex items-center gap-1">
+                  <input type="color" value={stop.color}
+                    className="w-6 h-6 rounded border border-border cursor-pointer p-0.5 bg-transparent"
+                    onChange={(e) => {
+                      const stops = [...(layer.gradient?.stops ?? [])];
+                      stops[i] = { ...stop, color: e.target.value };
                       up({ gradient: { ...layer.gradient!, stops } });
-                    }}>✕</button>
-                )}
+                    }} />
+                  <Input type="number" value={Math.round(stop.position * 100)} min={0} max={100}
+                    className="h-6 text-xs w-12"
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (isNaN(v)) return;
+                      const stops = [...(layer.gradient?.stops ?? [])];
+                      stops[i] = { ...stop, position: v / 100 };
+                      up({ gradient: { ...layer.gradient!, stops } });
+                    }} />
+                  <span className="text-xs text-muted-foreground">%</span>
+                  {/* Opacity for this stop — enables colour-to-transparent fades */}
+                  <Input type="number" value={Math.round((stop.opacity ?? 1) * 100)} min={0} max={100}
+                    className="h-6 text-xs w-12" title="Opacity %"
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      if (isNaN(v)) return;
+                      const stops = [...(layer.gradient?.stops ?? [])];
+                      stops[i] = { ...stop, opacity: v / 100 };
+                      up({ gradient: { ...layer.gradient!, stops } });
+                    }} />
+                  <span className="text-xs text-muted-foreground">α</span>
+                  {(layer.gradient?.stops.length ?? 0) > 2 && (
+                    <button className="text-xs text-muted-foreground ml-auto"
+                      onClick={() => {
+                        const stops = (layer.gradient?.stops ?? []).filter((_, j) => j !== i);
+                        up({ gradient: { ...layer.gradient!, stops } });
+                      }}>✕</button>
+                  )}
+                </div>
               </div>
             ))}
             <button
