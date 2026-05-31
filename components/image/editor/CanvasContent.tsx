@@ -21,6 +21,7 @@ import type {
 } from "@/lib/image/template-model";
 import { isV1Layer } from "@/lib/image/template-model";
 import { parseSecondaryRuns } from "@/lib/image/secondary-style-parser";
+import { fitFontSize } from "@/lib/image/text-fit-utils";
 
 // ─── Transform builder (§6.1) ─────────────────────────────────────────────────
 
@@ -133,6 +134,20 @@ function TextLayerEl({ layer }: { layer: TextLayer }) {
   const runs = parseSecondaryRuns(layer.text);
   const hasSecondary = runs.some((r) => r.secondary);
 
+  // Compute display font size: use text-fit binary search if enabled (§7, §1.6).
+  // This keeps the DOM renderer in sync with the sharp renderer for text-fit layers.
+  const displayFontSize = layer.text_fit.enabled && layer.text.trim()
+    ? fitFontSize(
+        layer.text,
+        { width: layer.width, height: layer.height },
+        layer.text_fit,
+        layer.font_weight,
+        layer.letter_spacing,
+        layer.line_height,
+        layer.word_break,
+      )
+    : layer.font_size;
+
   const textAlignH = layer.text_align_h === "justify" ? "justify" : layer.text_align_h;
   const justifyContent =
     layer.text_align_h === "left" ? "flex-start"
@@ -145,7 +160,7 @@ function TextLayerEl({ layer }: { layer: TextLayer }) {
 
   const textStyle: React.CSSProperties = {
     fontFamily: `'${layer.font_family}', sans-serif`,
-    fontSize: layer.font_size,
+    fontSize: displayFontSize,
     fontWeight: layer.font_weight,
     color: layer.color,
     textAlign: textAlignH as React.CSSProperties["textAlign"],
