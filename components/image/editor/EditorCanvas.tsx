@@ -59,7 +59,7 @@ export function EditorCanvas() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-hidden flex items-center justify-center bg-[#1e1e1e]"
+      className="flex-1 overflow-hidden flex items-center justify-center bg-zinc-900"
       style={{ position: "relative" }}
     >
       {/* Scale indicator */}
