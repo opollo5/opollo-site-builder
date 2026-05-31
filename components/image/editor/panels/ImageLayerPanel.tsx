@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "../EditorContext";
 import type { ImageLayer } from "@/lib/image/template-model";
+import { VarMetadataPanel } from "./VarMetadataPanel";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -171,6 +172,8 @@ export function ImageLayerPanel({ layer }: { layer: ImageLayer }) {
           </div>
         </Field>
       </Section>
+
+      <VarMetadataPanel layer={layer} />
     </div>
   );
 }
