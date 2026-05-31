@@ -17,7 +17,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import {
-  GripVertical, Type, Image, Square,
+  GripVertical, Type, Image, Square, Circle,
   Eye, EyeOff, Lock, Unlock, MoreVertical,
 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -48,6 +48,7 @@ export function LayerRow({ layer, index, isSelected, dragHandleProps }: LayerRow
   const TypeIcon =
     layer.type === "text" ? Type
     : layer.type === "image" ? Image
+    : layer.type === "shape" ? Circle  // generic shape icon; shapeKind could refine later
     : Square;
 
   const commitName = useCallback(() => {
