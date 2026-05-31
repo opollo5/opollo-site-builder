@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 
-import { internalError, routeError, validationError } from "@/lib/http";
+import { dbUuid, internalError, routeError, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { verifyQstashSignature } from "@/lib/qstash";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -55,7 +55,7 @@ const GenerationParamsSchema = z.object({
   count: z.number().int().min(1).max(6).optional(),
   industry: z.string().optional(),
   mood: z.string().optional(),
-  companyId: z.string().uuid(),
+  companyId: dbUuid(),
   brandProfileId: z.string().uuid().optional(),
   brandProfileVersion: z.number().int().optional(),
   postMasterId: z.string().uuid().optional(),
