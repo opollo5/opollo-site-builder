@@ -82,177 +82,20 @@ const FONT_FACE_SVG = (() => {
 })();
 
 // ─── Text measurement (§7) ────────────────────────────────────────────────────
+// Imported from the client-safe shared module so the DOM renderer (CanvasContent)
+// can also use these functions without importing server-only files.
+// The implementations live in lib/image/text-fit-utils.ts.
 
-/**
- * Per-character advance-width ratios (advance_width / font_size) for Inter Regular.
- * Derived from Inter 4.0 UPM=2048 advance widths, normalised.
- * Used for both Inter and as an approximate baseline for other Latin fonts.
- * Characters outside the table fall back to AVERAGE_CHAR_RATIO.
- */
-const CHAR_RATIO: Record<string, number> = {
-  // space / punctuation
-  " ": 0.250, ",": 0.278, ".": 0.278, ":": 0.278, ";": 0.278,
-  "!": 0.278, "?": 0.444, "'": 0.222, '"': 0.361, "`": 0.278,
-  "-": 0.333, "–": 0.556, "—": 1.000, "(": 0.333, ")": 0.333,
-  "[": 0.333, "]": 0.333, "{": 0.333, "}": 0.333, "/": 0.389,
-  "\\": 0.389, "|": 0.222, "@": 0.861, "#": 0.556, "$": 0.556,
-  "%": 0.722, "&": 0.722, "*": 0.556, "+": 0.583, "=": 0.583,
-  "<": 0.583, ">": 0.583,
-  // lowercase
-  a: 0.556, b: 0.556, c: 0.500, d: 0.556, e: 0.556, f: 0.278,
-  g: 0.556, h: 0.556, i: 0.222, j: 0.222, k: 0.500, l: 0.222,
-  m: 0.833, n: 0.556, o: 0.556, p: 0.556, q: 0.556, r: 0.333,
-  s: 0.500, t: 0.333, u: 0.556, v: 0.500, w: 0.722, x: 0.500,
-  y: 0.500, z: 0.500,
-  // uppercase
-  A: 0.667, B: 0.611, C: 0.667, D: 0.722, E: 0.611, F: 0.556,
-  G: 0.722, H: 0.722, I: 0.278, J: 0.444, K: 0.667, L: 0.556,
-  M: 0.833, N: 0.722, O: 0.778, P: 0.611, Q: 0.778, R: 0.667,
-  S: 0.556, T: 0.611, U: 0.722, V: 0.667, W: 0.944, X: 0.667,
-  Y: 0.611, Z: 0.611,
-  // digits (tabular in Inter)
-  "0": 0.556, "1": 0.556, "2": 0.556, "3": 0.556, "4": 0.556,
-  "5": 0.556, "6": 0.556, "7": 0.556, "8": 0.556, "9": 0.556,
-};
+import {
+  CHAR_RATIO,
+  AVERAGE_CHAR_RATIO,
+  measureTextWidth,
+  wrapLayerText,
+  fitFontSize,
+} from "@/lib/image/text-fit-utils";
 
-const AVERAGE_CHAR_RATIO = 0.550; // fallback for unmapped characters
-
-/**
- * Measure the rendered width of a string in pixels.
- * Accounts for letter-spacing: each character (except the last) adds letterSpacing px.
- * Bold text uses ~1.05× wider glyphs on average (well-approximated for Latin).
- */
-export function measureTextWidth(
-  text: string,
-  fontSize: number,
-  fontWeight: number,
-  letterSpacing: number,
-): number {
-  if (!text) return 0;
-  const boldFactor = fontWeight >= 700 ? 1.05 : 1.0;
-  let width = 0;
-  for (const ch of text) {
-    const ratio = CHAR_RATIO[ch] ?? AVERAGE_CHAR_RATIO;
-    width += ratio * fontSize * boldFactor;
-  }
-  // letter-spacing applies between characters (N-1 gaps for N chars)
-  width += letterSpacing * Math.max(0, text.length - 1);
-  return width;
-}
-
-/**
- * Word-wrap text to lines fitting within boxWidth pixels.
- * Greedy algorithm: pack words onto a line until the next word would overflow.
- * A word wider than boxWidth is kept as its own line (allowed to overflow per spec).
- */
-export function wrapLayerText(
-  text: string,
-  boxWidth: number,
-  fontSize: number,
-  fontWeight: number,
-  letterSpacing: number,
-  wordBreak: string = "normal",
-): string[] {
-  const TOL = 2; // px tolerance per §7
-  const words = text.split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = "";
-  let currentW = 0;
-  const spaceW = measureTextWidth(" ", fontSize, fontWeight, 0);
-
-  for (const word of words) {
-    const wordW = measureTextWidth(word, fontSize, fontWeight, letterSpacing);
-    if (!current) {
-      current = word;
-      currentW = wordW;
-    } else {
-      const candidateW = currentW + spaceW + wordW + letterSpacing;
-      if (candidateW <= boxWidth + TOL) {
-        current += ` ${word}`;
-        currentW = candidateW;
-      } else {
-        lines.push(current);
-        current = word;
-        currentW = wordW;
-      }
-    }
-  }
-  if (current) lines.push(current);
-
-  // break-all: break individual words if they overflow (already handled by greedy,
-  // but honour the flag for single long words)
-  if (wordBreak === "break-all" || wordBreak === "break-word") {
-    return lines.flatMap((line) => {
-      const lw = measureTextWidth(line, fontSize, fontWeight, letterSpacing);
-      if (lw <= boxWidth + TOL) return [line];
-      // hard-break: split character by character
-      const result: string[] = [];
-      let chunk = "";
-      let chunkW = 0;
-      for (const ch of line) {
-        const cw = (CHAR_RATIO[ch] ?? AVERAGE_CHAR_RATIO) * fontSize + letterSpacing;
-        if (chunkW + cw > boxWidth + TOL && chunk) {
-          result.push(chunk);
-          chunk = ch;
-          chunkW = cw;
-        } else {
-          chunk += ch;
-          chunkW += cw;
-        }
-      }
-      if (chunk) result.push(chunk);
-      return result;
-    });
-  }
-
-  return lines.length > 0 ? lines : [""];
-}
-
-/**
- * Binary search for the largest integer font size in [min_size, max_size] such that
- * the wrapped text fits within box.width × box.height and within max_lines.
- * Implements design spec §7 exactly: max 20 iterations, 1-2px tolerance.
- */
-export function fitFontSize(
-  text: string,
-  box: { width: number; height: number },
-  opts: TextFitOptions,
-  fontWeight: number,
-  letterSpacing: number,
-  lineHeight: number,
-  wordBreak: string,
-): number {
-  const MAX_ITERS = 20;
-  const TOL = 2; // px
-
-  let lo = opts.min_size;
-  let hi = opts.max_size;
-  let best = lo;
-
-  for (let i = 0; i < MAX_ITERS; i++) {
-    const mid = Math.floor((lo + hi) / 2);
-    const lines = wrapLayerText(text, box.width, mid, fontWeight, letterSpacing, wordBreak);
-    const lineH = mid * lineHeight;
-    const totalH = lines.length * lineH;
-
-    const maxLineW = Math.max(...lines.map((l) => measureTextWidth(l, mid, fontWeight, letterSpacing)));
-
-    const fitsWidth = maxLineW <= box.width + TOL;
-    const fitsHeight = totalH <= box.height + TOL;
-    const fitsLines = lines.length <= opts.max_lines;
-
-    if (fitsWidth && fitsHeight && fitsLines) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-
-    if (lo > hi) break;
-  }
-
-  return best;
-}
+// Re-export so consumers that previously imported these from layer-renderer still work.
+export { CHAR_RATIO, AVERAGE_CHAR_RATIO, measureTextWidth, wrapLayerText, fitFontSize };
 
 // ─── Secondary style parser (§6.6, §1.7) ──────────────────────────────────────
 // Lives in a client-safe module (no server-only) so the DOM renderer
