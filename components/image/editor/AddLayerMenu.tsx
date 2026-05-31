@@ -9,6 +9,7 @@
  */
 
 import { useState } from "react";
+import { Circle, Triangle, Minus, Diamond } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "./EditorContext";
@@ -16,6 +17,8 @@ import type {
   TextLayer,
   ImageLayer,
   RectangleLayer,
+  ShapeLayer,
+  ShapeKind,
   Layer,
 } from "@/lib/image/template-model";
 
@@ -116,6 +119,39 @@ function makeRectLayer(canvasW: number, canvasH: number, existingNames: string[]
   };
 }
 
+function makeShapeLayer(
+  kind: ShapeKind,
+  canvasW: number,
+  canvasH: number,
+  existingNames: string[],
+): ShapeLayer {
+  const name = uniqueName(kind, existingNames);
+  const isLine = kind === "line";
+  const w = Math.round(canvasW * (isLine ? 0.6 : 0.35));
+  const h = Math.round(isLine ? canvasH * 0.03 : canvasH * 0.35);
+  return {
+    ...BASE,
+    id: uid(kind),
+    name,
+    type: "shape",
+    shapeKind: kind,
+    x: Math.round((canvasW - w) / 2),
+    y: Math.round((canvasH - h) / 2),
+    width: w,
+    height: h,
+    color: "#7c3aed",
+    gradient: null,
+    border: null,
+  };
+}
+
+const SHAPE_OPTIONS: { kind: ShapeKind; label: string; icon: React.ElementType }[] = [
+  { kind: "ellipse",  label: "Ellipse",  icon: Circle },
+  { kind: "triangle", label: "Triangle", icon: Triangle },
+  { kind: "line",     label: "Line",     icon: Minus },
+  { kind: "diamond",  label: "Diamond",  icon: Diamond },
+];
+
 /** Generate a slug-safe unique name not already in the template. */
 function uniqueName(prefix: string, existing: string[]): string {
   for (let i = 1; i <= 99; i++) {
@@ -127,44 +163,75 @@ function uniqueName(prefix: string, existing: string[]): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+const menuItemCls = "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors rounded flex items-center gap-2";
+
 export function AddLayerMenu() {
   const { state, dispatch } = useEditor();
   const [open, setOpen] = useState(false);
+  const [shapesOpen, setShapesOpen] = useState(false);
 
   const { width, height, layers } = state.template;
   const existingNames = layers.map((l) => l.name);
 
   function addLayer(layer: Layer) {
     setOpen(false);
-    dispatch({ type: "add_layer", layer, index: 0 }); // insert at top of visual stack
+    setShapesOpen(false);
+    dispatch({ type: "add_layer", layer, index: 0 });
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setShapesOpen(false); }}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className="h-6 text-xs px-2">
           + Layer
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-44 p-1" align="end" sideOffset={4}>
-        <button
-          className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors rounded"
-          onClick={() => addLayer(makeTextLayer(width, height, existingNames))}
-        >
-          T  Text
+        {/* Text */}
+        <button className={menuItemCls}
+          onClick={() => addLayer(makeTextLayer(width, height, existingNames))}>
+          <span className="w-4 text-center text-muted-foreground font-bold text-sm">T</span>
+          Text
         </button>
-        <button
-          className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors rounded"
-          onClick={() => addLayer(makeImageLayer(width, height, existingNames))}
-        >
-          ⬜  Image
+        {/* Image */}
+        <button className={menuItemCls}
+          onClick={() => addLayer(makeImageLayer(width, height, existingNames))}>
+          <span className="w-4 text-center text-muted-foreground text-sm">⬜</span>
+          Image
         </button>
-        <button
-          className="w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors rounded"
-          onClick={() => addLayer(makeRectLayer(width, height, existingNames))}
-        >
-          ▭  Rectangle
+        {/* Rectangle */}
+        <button className={menuItemCls}
+          onClick={() => addLayer(makeRectLayer(width, height, existingNames))}>
+          <span className="w-4 text-center text-muted-foreground text-sm">▭</span>
+          Rectangle
         </button>
+        {/* Shape submenu */}
+        <div className="relative">
+          <button
+            className={[menuItemCls, "justify-between"].join(" ")}
+            onClick={() => setShapesOpen((v) => !v)}
+          >
+            <span className="flex items-center gap-2">
+              <Circle size={13} className="text-muted-foreground" />
+              Shape
+            </span>
+            <span className="text-muted-foreground text-xs">▶</span>
+          </button>
+          {shapesOpen && (
+            <div className="absolute right-full top-0 mr-1 w-36 bg-popover border border-border rounded-md shadow-md p-1 z-50">
+              {SHAPE_OPTIONS.map(({ kind, label, icon: Icon }) => (
+                <button
+                  key={kind}
+                  className={menuItemCls}
+                  onClick={() => addLayer(makeShapeLayer(kind, width, height, existingNames))}
+                >
+                  <Icon size={13} className="text-muted-foreground shrink-0" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );
