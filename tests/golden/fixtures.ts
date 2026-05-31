@@ -16,6 +16,7 @@
 
 import type { Template, ShapeLayer } from "@/lib/image/template-model";
 import { TEMPLATE_SCHEMA_VERSION } from "@/lib/image/template-model";
+import type { Variant } from "@/lib/image/template-model";
 
 const BASE: Pick<Template, "version" | "orientation" | "groups" | "fonts" | "variants" | "render_settings" | "settings"> = {
   version: TEMPLATE_SCHEMA_VERSION,
@@ -316,6 +317,70 @@ export const FIXTURE_SHAPE_DIAMOND: Template = {
   }],
 };
 
+// ─── Multi-format fixtures (Phase A) ─────────────────────────────────────────
+// One base template with Square + Landscape variants. The golden tests render
+// BOTH variants and confirm each produces the correct dimensions.
+
+const MULTI_FORMAT_VARIANTS: Variant[] = [
+  { key: "square",    width: 1080, height: 1080, overrides: [] },
+  { key: "landscape", width: 1200, height: 630,  overrides: [] },
+];
+
+// Base template: 1080×1080 square with two layers using different constraints
+// so the reflow is visually verifiable (headline stretches, logo pins to corner).
+export const FIXTURE_MULTI_FORMAT_BASE: Template = {
+  ...BASE,
+  id: "fixture-multi-format",
+  name: "Multi-format base",
+  width: 1080, height: 1080,
+  orientation: "square",
+  background_color: "#1e3a5f",
+  variants: MULTI_FORMAT_VARIANTS,
+  layers: [
+    // Background: stretches to fill any canvas size
+    {
+      ...LAYER_BASE,
+      id: "mf_bg", name: "background", type: "rectangle",
+      x: 0, y: 0, width: 1080, height: 1080,
+      constraints: { horizontal: "left_right" as const, vertical: "top_bottom" as const },
+      color: "#1e3a5f", gradient: null, border_radius: 0, border: null,
+    },
+    // Headline: centred horizontally, pinned top
+    {
+      ...LAYER_BASE,
+      id: "mf_hl", name: "headline", type: "text",
+      x: 140, y: 400, width: 800, height: 280,
+      constraints: { horizontal: "center" as const, vertical: "center" as const },
+      text: "Multi-format test",
+      font_family: "Inter", font_size: 72, font_weight: 700,
+      color: "#ffffff",
+      text_align_h: "center" as const, text_align_v: "center" as const,
+      letter_spacing: -2, line_height: 1.1,
+      text_transform: "none" as const, text_decoration: "none" as const,
+      word_break: "normal" as const, style: "", direction: "ltr" as const,
+      text_fit: { enabled: true, min_size: 24, max_size: 72, max_lines: 3 },
+      truncate: false,
+      text_box: { padding: null, border: null },
+      background: { color: null, border: null, border_width: null, padding_h: 0, padding_v: 0, shadow: null, radius: null, shift: null },
+      secondary: { font_family: null, color: null },
+    },
+    // Logo placeholder: pinned bottom-right
+    {
+      ...LAYER_BASE,
+      id: "mf_logo", name: "logo", type: "rectangle",
+      x: 916, y: 916, width: 120, height: 120,
+      constraints: { horizontal: "right" as const, vertical: "bottom" as const },
+      color: "#4ade80",
+      gradient: null, border_radius: 60, border: null,
+    },
+  ],
+};
+
+// These two are derived variants — rendered for golden-image parity tests.
+// They're not standalone templates; the test renders FIXTURE_MULTI_FORMAT_BASE
+// with variantKey = "square" and "landscape" respectively.
+// See golden-image.test.ts for how these are exercised.
+
 export const ALL_FIXTURES: Template[] = [
   FIXTURE_TEXT_BASIC,
   FIXTURE_TEXT_SECONDARY,
@@ -328,4 +393,6 @@ export const ALL_FIXTURES: Template[] = [
   FIXTURE_SHAPE_TRIANGLE,
   FIXTURE_SHAPE_LINE,
   FIXTURE_SHAPE_DIAMOND,
+  // Multi-format base (renders at 1080×1080 square)
+  FIXTURE_MULTI_FORMAT_BASE,
 ];

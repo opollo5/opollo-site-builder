@@ -22,15 +22,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useEditor } from "./EditorContext";
 import { CanvasContent } from "./CanvasContent";
 
-// Dynamic import keeps Konva out of the SSR bundle (Canvas API not available server-side).
+// Dynamic imports keep Konva out of the SSR bundle (Canvas API not available server-side).
 const KonvaInteractionLayer = dynamic(
   () => import("./KonvaInteractionLayer").then((m) => m.KonvaInteractionLayer),
   { ssr: false },
 );
 
+const SafeZoneOverlayKonva = dynamic(
+  () => import("./SafeZoneOverlay").then((m) => m.SafeZoneOverlay),
+  { ssr: false },
+);
+
 export function EditorCanvas() {
-  const { state, dispatch } = useEditor();
-  const { template, selectedLayerId } = state;
+  const { state, dispatch, displayTemplate } = useEditor();
+  const { selectedLayerId } = state;
+  // Use displayTemplate so the canvas shows the reflowed layout for active variants.
+  const template = displayTemplate;
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -89,6 +96,13 @@ export function EditorCanvas() {
 
         {/* react-konva interaction layer — transparent, handles only */}
         <KonvaInteractionLayer width={template.width} height={template.height} />
+
+        {/* Safe-zone overlay — guides only, no effect on rendered output */}
+        <SafeZoneOverlayKonva
+          canvasW={template.width}
+          canvasH={template.height}
+          visible={state.template.settings?.guides !== false}
+        />
       </div>
     </div>
   );

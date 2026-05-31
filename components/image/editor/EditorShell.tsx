@@ -13,6 +13,7 @@
 
 import { EditorProvider } from "./EditorContext";
 import { EditorHeader } from "./EditorHeader";
+import { VariantSwitcher } from "./VariantSwitcher";
 import { EditorLeftPanel } from "./EditorLeftPanel";
 import { EditorCanvas } from "./EditorCanvas";
 import { EditorRightPanel } from "./EditorRightPanel";
@@ -32,6 +33,7 @@ export function EditorShell({ template, companyId, templateId }: EditorShellProp
           the NavShell chrome (rail + section panel). */}
       <div className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background">
         <EditorHeader companyId={companyId} templateId={templateId} />
+        <VariantSwitcher />
 
         <div className="flex-1 flex overflow-hidden">
           <EditorLeftPanel />
