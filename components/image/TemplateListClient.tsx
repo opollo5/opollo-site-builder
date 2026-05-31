@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { ImageTemplate } from "@/lib/image/templates";
+import { TEMPLATE_SCHEMA_VERSION } from "@/lib/image/template-model";
 
 const RATIO_LABELS: Record<string, string> = {
   "1x1": "1:1 Square",
@@ -48,8 +49,8 @@ export function TemplateListClient({ templates }: Props) {
 }
 
 function TemplateCard({ template }: { template: ImageTemplate }) {
-  const def = template.definition;
   const isGlobal = template.companyId === null;
+  const isV2 = template.schemaVersion === TEMPLATE_SCHEMA_VERSION;
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 space-y-3">
@@ -58,6 +59,7 @@ function TemplateCard({ template }: { template: ImageTemplate }) {
           <p className="font-medium text-sm">{template.name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">
             {isGlobal ? "Global default" : "Custom"} · v{template.version}
+            {isV2 && <span className="ml-1.5 rounded-full bg-primary/10 text-primary px-1.5 py-0.5">v2</span>}
           </p>
         </div>
         {isGlobal && (
@@ -67,26 +69,65 @@ function TemplateCard({ template }: { template: ImageTemplate }) {
         )}
       </div>
 
-      <div className="space-y-1 text-xs text-muted-foreground">
-        <div className="flex justify-between">
-          <span>Composition</span>
-          <span className="font-medium text-foreground">{def.compositionType.replace("_", " ")}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Font</span>
-          <span className="font-medium text-foreground">{def.fontFamily ?? "Inter"}</span>
-        </div>
-        <div className="flex justify-between">
-          <span>Logo</span>
-          <span className="font-medium text-foreground">{def.logoPosition.replace(/-/g, " ")}</span>
-        </div>
-      </div>
+      {isV2 ? (
+        // v2 layer-based template: definition is a Template object, not TemplateDefinition.
+        // Show canvas dimensions and layer count instead of v1 composition fields.
+        <V2TemplateDetails template={template} />
+      ) : (
+        // v1 fixed-zone template: safe to read compositionType / logoPosition.
+        <V1TemplateDetails template={template} />
+      )}
 
       <Link href={`/company/image/templates/${template.id}/edit`} className="block">
         <Button variant="outline" size="sm" className="w-full">
           Edit
         </Button>
       </Link>
+    </div>
+  );
+}
+
+function V1TemplateDetails({ template }: { template: ImageTemplate }) {
+  const def = template.definition;
+  return (
+    <div className="space-y-1 text-xs text-muted-foreground">
+      <div className="flex justify-between">
+        <span>Composition</span>
+        <span className="font-medium text-foreground">
+          {typeof def.compositionType === "string" ? def.compositionType.replace("_", " ") : "—"}
+        </span>
+      </div>
+      <div className="flex justify-between">
+        <span>Font</span>
+        <span className="font-medium text-foreground">{def.fontFamily ?? "Inter"}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Logo</span>
+        <span className="font-medium text-foreground">
+          {typeof def.logoPosition === "string" ? def.logoPosition.replace(/-/g, " ") : "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function V2TemplateDetails({ template }: { template: ImageTemplate }) {
+  const t = template.resolvedTemplate;
+  if (!t) return null;
+  return (
+    <div className="space-y-1 text-xs text-muted-foreground">
+      <div className="flex justify-between">
+        <span>Canvas</span>
+        <span className="font-medium text-foreground">{t.width} × {t.height}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Layers</span>
+        <span className="font-medium text-foreground">{t.layers.length}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>Variants</span>
+        <span className="font-medium text-foreground">{t.variants.length || "None"}</span>
+      </div>
     </div>
   );
 }
