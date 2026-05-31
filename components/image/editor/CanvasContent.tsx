@@ -17,6 +17,7 @@ import type {
   TextLayer,
   ImageLayer,
   RectangleLayer,
+  ShapeLayer,
   Gradient,
 } from "@/lib/image/template-model";
 import { isV1Layer } from "@/lib/image/template-model";
@@ -86,6 +87,73 @@ function RectLayer({ layer }: { layer: RectangleLayer }) {
         borderRadius: layer.border_radius || undefined,
       }}
     />
+  );
+}
+
+// ─── Shape layer renderer ─────────────────────────────────────────────────────
+// Uses inline SVG for pixel-identical output with the sharp renderer.
+// SVG primitives exactly match buildShapeLayerSvg() in layer-renderer.ts.
+
+function ShapeLayerEl({ layer }: { layer: ShapeLayer }) {
+  const { width: w, height: h, shapeKind, color, gradient, border } = layer;
+
+  const fill = gradient ? gradientToCss(gradient) : (color ?? "transparent");
+  const strokeAttrs = (shapeKind !== "line" && border)
+    ? { stroke: border.color, strokeWidth: border.width }
+    : {};
+
+  let shapeEl: React.ReactNode;
+  switch (shapeKind) {
+    case "ellipse":
+      shapeEl = (
+        <ellipse cx={w / 2} cy={h / 2} rx={w / 2} ry={h / 2}
+          fill={fill} {...strokeAttrs} />
+      );
+      break;
+    case "triangle":
+      shapeEl = (
+        <polygon points={`${w / 2},0 ${w},${h} 0,${h}`}
+          fill={fill} {...strokeAttrs} />
+      );
+      break;
+    case "line":
+      shapeEl = (
+        <line x1={0} y1={h / 2} x2={w} y2={h / 2}
+          stroke={color ?? "#000000"} strokeWidth={h} />
+      );
+      break;
+    case "diamond":
+      shapeEl = (
+        <polygon points={`${w / 2},0 ${w},${h / 2} ${w / 2},${h} 0,${h / 2}`}
+          fill={fill} {...strokeAttrs} />
+      );
+      break;
+  }
+
+  return (
+    <div style={{ ...layerBaseStyle(layer), overflow: "visible" }}>
+      <svg
+        width={w}
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        xmlns="http://www.w3.org/2000/svg"
+        style={{ display: "block", overflow: "visible" }}
+      >
+        {gradient && (
+          <defs>
+            <linearGradient id={`sg_${layer.id}`} x1="0%" y1="0%" x2="0%" y2="100%"
+              gradientTransform={`rotate(${gradient.angle ?? 0}, ${w / 2}, ${h / 2})`}>
+              {gradient.stops.map((s, i) => (
+                <stop key={i} offset={`${(s.position * 100).toFixed(1)}%`} stopColor={s.color} />
+              ))}
+            </linearGradient>
+          </defs>
+        )}
+        {gradient
+          ? React.cloneElement(shapeEl as React.ReactElement, { fill: `url(#sg_${layer.id})` })
+          : shapeEl}
+      </svg>
+    </div>
   );
 }
 
@@ -280,6 +348,8 @@ export function CanvasContent({ template, selectedLayerId, onSelectLayer }: Canv
           el = <TextLayerEl key={layer.id} layer={layer} />;
         } else if (layer.type === "image") {
           el = <ImageLayerEl key={layer.id} layer={layer} />;
+        } else if (layer.type === "shape") {
+          el = <ShapeLayerEl key={layer.id} layer={layer as ShapeLayer} />;
         } else {
           el = <RectLayer key={layer.id} layer={layer as RectangleLayer} />;
         }

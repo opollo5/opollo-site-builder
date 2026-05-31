@@ -259,6 +259,32 @@ export interface RectangleLayer extends LayerBase {
   border: Border | null;
 }
 
+// ─── Shape layer (V1 — ellipse, triangle, line, diamond) ─────────────────────
+//
+// Design brief: docs/briefs/image-generator/v2-editor/SHAPE_LAYER_BRIEF.md
+//
+// Data-model decision: new ShapeLayer type (not extending RectangleLayer).
+// RectangleLayer stays unchanged — additive only. Rectangle and rounded-rect
+// continue to use RectangleLayer. The four new shapes (ellipse, triangle, line,
+// diamond) use ShapeLayer because they require fundamentally different SVG
+// primitives (<ellipse>, <polygon>, <line>) rather than <rect>.
+//
+// ShapeKind determines the SVG primitive and DOM/Konva rendering path.
+// All shape kinds share: geometry (LayerBase), fill (color/gradient), border.
+// Line is special: its layer.height = stroke width; fill = stroke color.
+
+export type ShapeKind = "ellipse" | "triangle" | "line" | "diamond";
+
+export interface ShapeLayer extends LayerBase {
+  type: "shape";
+  shapeKind: ShapeKind;
+  /** Solid fill colour (or stroke colour for lines). Null when gradient used. */
+  color: string | null;
+  gradient: Gradient | null;
+  /** Border/stroke around the shape. For lines, ignored (line IS the stroke). */
+  border: Border | null;
+}
+
 // ─── Reserved layer types (post-V1 — schema space only, §2, §5 out-of-scope) ─
 // These types carry only the base fields.  The renderer treats them as inert
 // in V1.  Do not implement rendering logic for these until post-V1.
@@ -285,6 +311,7 @@ export type Layer =
   | TextLayer
   | ImageLayer
   | RectangleLayer
+  | ShapeLayer
   | SvgLayer
   | QrLayer
   | BarcodeLayer
@@ -293,16 +320,17 @@ export type Layer =
 export type LayerType = Layer["type"];
 
 /** V1 layer types — the only types that have full renderer implementations. */
-export type V1LayerType = "text" | "image" | "rectangle";
+export type V1LayerType = "text" | "image" | "rectangle" | "shape";
 
 /** Type guard: narrows Layer to a V1-implemented type. */
 export function isV1Layer(
   layer: Layer,
-): layer is TextLayer | ImageLayer | RectangleLayer {
+): layer is TextLayer | ImageLayer | RectangleLayer | ShapeLayer {
   return (
     layer.type === "text" ||
     layer.type === "image" ||
-    layer.type === "rectangle"
+    layer.type === "rectangle" ||
+    layer.type === "shape"
   );
 }
 

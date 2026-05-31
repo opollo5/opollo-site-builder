@@ -20,6 +20,7 @@
  *   E5 — transforms: rotation (top-left origin), skew, opacity
  *   E6 — constraints + variant reflow
  *   E7 — renderTemplate() compositor + modification merge
+ *   S-renderer — shape layer: ellipse, triangle, line, diamond
  */
 
 import "server-only";
@@ -37,6 +38,7 @@ import type {
   ImageAnchorX,
   ImageAnchorY,
   RectangleLayer,
+  ShapeLayer,
   Gradient,
   Layer,
   Template,
@@ -643,6 +645,90 @@ export async function renderRectangleLayer(
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// S-renderer — SHAPE LAYER (brief: docs/briefs/image-generator/v2-editor/SHAPE_LAYER_BRIEF.md)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Build the SVG string for a ShapeLayer.
+ *
+ * SVG primitives per shapeKind:
+ *   ellipse  → <ellipse cx=w/2 cy=h/2 rx=w/2 ry=h/2>
+ *   triangle → <polygon> (upward-pointing, vertices: top-centre, bottom-right, bottom-left)
+ *   line     → <line> (horizontal, y=h/2, stroke-width=h; layer.height IS the thickness)
+ *   diamond  → <polygon> (rhombus, vertices: top, right, bottom, left)
+ *
+ * Lines: color = stroke colour, gradient/border ignored (a line IS a stroke).
+ * All others: color/gradient = fill; border = optional stroke.
+ */
+export function buildShapeLayerSvg(layer: ShapeLayer): string {
+  const { width: w, height: h, shapeKind } = layer;
+
+  // Gradient defs (not used for lines)
+  let defs = "";
+  let fill = "transparent";
+
+  if (shapeKind !== "line") {
+    if (layer.gradient) {
+      const gradId = "sh0";
+      defs = `<defs>${buildGradientDef(layer.gradient, w, h, gradId)}</defs>`;
+      fill = `url(#${gradId})`;
+    } else {
+      fill = escapeXml(layer.color ?? "transparent");
+    }
+  }
+
+  // Border/stroke attributes (not used for lines)
+  let strokeAttrs = "";
+  if (shapeKind !== "line" && layer.border) {
+    const { color: sc, width: sw, style } = layer.border;
+    strokeAttrs = ` stroke="${escapeXml(sc)}" stroke-width="${sw}"`;
+    if (style === "dashed") strokeAttrs += ` stroke-dasharray="${sw * 4} ${sw * 2}"`;
+    if (style === "dotted") strokeAttrs += ` stroke-dasharray="${sw} ${sw * 2}" stroke-linecap="round"`;
+  }
+
+  let shapeEl: string;
+  switch (shapeKind) {
+    case "ellipse":
+      shapeEl = `<ellipse cx="${(w / 2).toFixed(2)}" cy="${(h / 2).toFixed(2)}" rx="${(w / 2).toFixed(2)}" ry="${(h / 2).toFixed(2)}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+
+    case "triangle":
+      // Upward-pointing: top-centre → bottom-right → bottom-left
+      shapeEl = `<polygon points="${(w / 2).toFixed(2)},0 ${w},${h} 0,${h}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+
+    case "line": {
+      // layer.height = visual stroke width; stroke colour = layer.color
+      const strokeColor = escapeXml(layer.color ?? "#000000");
+      const dashArray = layer.border?.style === "dashed"
+        ? ` stroke-dasharray="${h * 4} ${h * 2}"`
+        : layer.border?.style === "dotted"
+        ? ` stroke-dasharray="${h} ${h * 2}" stroke-linecap="round"`
+        : "";
+      shapeEl = `<line x1="0" y1="${(h / 2).toFixed(2)}" x2="${w}" y2="${(h / 2).toFixed(2)}" stroke="${strokeColor}" stroke-width="${h}"${dashArray}/>`;
+      break;
+    }
+
+    case "diamond":
+      // Rhombus: top-centre → right-centre → bottom-centre → left-centre
+      shapeEl = `<polygon points="${(w / 2).toFixed(2)},0 ${w},${(h / 2).toFixed(2)} ${(w / 2).toFixed(2)},${h} 0,${(h / 2).toFixed(2)}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+  }
+
+  return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${defs}${shapeEl}</svg>`;
+}
+
+/** Render a ShapeLayer to a sharp.OverlayOptions for compositing. */
+export async function renderShapeLayer(
+  layer: ShapeLayer,
+): Promise<sharp.OverlayOptions> {
+  const svg = buildShapeLayerSvg(layer);
+  const png = await sharp(Buffer.from(svg)).png().toBuffer();
+  const base = { input: png, left: Math.round(layer.x), top: Math.round(layer.y) };
+  return applyLayerTransforms(layer, base);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // E5 — TRANSFORMS: rotation (top-left origin), skew, opacity (§6.1)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1078,6 +1164,8 @@ export async function renderTemplate(
         overlay = await renderTextLayer(layer);
       } else if (layer.type === "image") {
         overlay = await renderImageLayer(layer); // null on fetch failure / empty
+      } else if (layer.type === "shape") {
+        overlay = await renderShapeLayer(layer);
       } else {
         overlay = await renderRectangleLayer(layer);
       }
