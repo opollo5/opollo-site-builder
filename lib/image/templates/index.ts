@@ -219,6 +219,36 @@ export async function update_template(opts: {
 }
 
 /**
+ * Get a template by its primary key UUID.
+ * Used by the Stream B QStash handler to fetch the template for rendering
+ * without knowing the aspect ratio or name in advance.
+ *
+ * Resolution: company-scoped templates override globals (same as get_template).
+ * Returns null when the template does not exist or is not visible to the company.
+ */
+export async function get_template_by_id(
+  templateId: string,
+  companyId: string,
+): Promise<ImageTemplate | null> {
+  const svc = getServiceRoleClient();
+
+  const { data, error } = await svc
+    .from("image_templates")
+    .select("*")
+    .eq("id", templateId)
+    .eq("is_active", true)
+    .or(`company_id.eq.${companyId},company_id.is.null`)
+    .maybeSingle();
+
+  if (error) {
+    logger.error("image.templates.get_by_id_failed", { templateId, companyId, error: error.message });
+    return null;
+  }
+
+  return data ? toTemplate(data as TemplateRow) : null;
+}
+
+/**
  * Create a new template (company-scoped or global).
  * Admins create company-scoped; Opollo staff create globals (company_id null).
  *
