@@ -419,3 +419,45 @@ This ensures the editor preview matches the server-rendered image for text-fit l
 | Add guides toggle to EditorLeftPanel | Minor | `EditorLeftPanel.tsx`, `EditorContext.tsx` |
 | Text-fit in DOM renderer | Major | New `lib/image/text-fit-utils.ts`, `CanvasContent.tsx` |
 
+
+---
+
+## Tier 2 Re-Investigation — 2026-05-31 (second UAT pass)
+
+### Items 1, 2, 4, 5 — Status from previous session
+
+These were investigated, fixed, and deployed in the previous Tier 2 pass:
+
+| Item | Status | PR | Evidence |
+|------|--------|----|---------|
+| 1. Per-layer ⋯ actions | ✅ Working + persists | — | Code trace confirmed Lock/Hide/Rename/Duplicate/Delete all dispatch to EditorContext and survive save/reload via the full template JSON write path |
+| 2. + Layer menu | ✅ Implemented | #1206 | AddLayerMenu component: Text/Image/Rectangle, unique names, inserted at index 0 |
+| 4. Snap guides | ✅ Fixed + toggle | #1206/#1207 | splice(-1) bug fixed; toggle_guides action + UI toggle in left panel footer |
+| 5. Text Fit auto-size | ✅ Fixed | #1208 | fitFontSize() now runs in CanvasContent via lib/image/text-fit-utils.ts; editor preview matches generated image |
+
+---
+
+### Item 3: Multiple image layers coexist
+
+**Code trace — CanvasContent (DOM renderer):**
+
+`renderOrder = [...template.layers].reverse()`. Each layer is wrapped in a `div style={{ position:"absolute", inset:0 }}` click-capture div containing an `ImageLayerEl` with explicit `left/top/width/height`. Multiple ImageLayerEl components render independently at their own canvas coordinates — no collision, no shared state. ✓
+
+**Code trace — sharp renderer (renderTemplate):**
+
+```typescript
+for (const layer of [...layers].reverse()) {
+  if (layer.type === "image") {
+    overlay = await renderImageLayer(layer); // null on fetch failure
+  }
+  if (overlay) overlays.push(overlay);
+}
+const png = await canvas.composite(overlays).png().toBuffer();
+```
+
+Each image layer produces a separate `sharp.OverlayOptions` entry in the `overlays` array. `sharp.composite()` accepts multiple overlays and renders them in order (later entries appear on top). Multiple image layers composite independently with their own `left`/`top` positions. ✓
+
+**Potential performance note (not a bug):** If two image layers share the same `image_url`, the renderer fetches the URL twice (no deduplication at the fetch level). Acceptable for V1 — optimisable later.
+
+**Verdict: Multiple image layers coexist correctly in both the editor DOM renderer and the sharp renderer.** A template with a photo layer + decorative image layer + logo layer produces correct layered output with independent fill/anchor/tint per layer. No fix needed.
+

@@ -11,6 +11,7 @@
  * U8, U9, U10 panels are stubs — wired fully in their respective slices.
  */
 
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useEditor } from "./EditorContext";
 import { TextLayerPanel } from "./panels/TextLayerPanel";
 import { ImageLayerPanel } from "./panels/ImageLayerPanel";
@@ -31,8 +32,8 @@ export function EditorRightPanel() {
             <span className="capitalize text-muted-foreground">{selectedLayer.type}</span>
           </div>
 
-          {/* Scrollable properties */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Scrollable properties — ScrollArea gives a styled thin scrollbar */}
+          <ScrollArea className="flex-1">
             {/* Geometry block — shown for all layer types (U10) */}
             <GeometryPanel layer={selectedLayer} />
 
@@ -50,7 +51,7 @@ export function EditorRightPanel() {
                 Reserved layer type — not editable in V1
               </div>
             )}
-          </div>
+          </ScrollArea>
         </>
       ) : (
         <div className="flex-1 flex items-center justify-center">
