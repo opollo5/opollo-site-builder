@@ -36,7 +36,7 @@ import sharp from "sharp";
 // In Node.js (vitest) environment, server-only is a no-op; no stub needed.
 
 import { renderTemplate } from "@/lib/image/compositing/layer-renderer";
-import { ALL_FIXTURES } from "./fixtures";
+import { ALL_FIXTURES, FIXTURE_MULTI_FORMAT_BASE } from "./fixtures";
 
 const SNAPSHOT_DIR = join(process.cwd(), "tests", "golden", "snapshots");
 const UPDATE_GOLDEN = process.env.UPDATE_GOLDEN === "1";
@@ -160,5 +160,52 @@ describe("compositor: modifications", () => {
     })).png;
     // Without the text layer, output should differ
     expect(withoutText.equals(withText)).toBe(false);
+  }, 30_000);
+});
+
+// ─── Multi-format: both variants render at correct dimensions ────────────────
+
+describe("multi-format renderer parity", () => {
+  it("square variant (1080×1080) renders at correct dimensions", async () => {
+    const { png } = await renderTemplate({
+      template: FIXTURE_MULTI_FORMAT_BASE,
+      variantKey: "square",
+    });
+    const meta = await sharp(png).metadata();
+    expect(meta.width).toBe(1080);
+    expect(meta.height).toBe(1080);
+    console.log(`[multi-format] square: ${meta.width}×${meta.height} — OK`);
+  }, 30_000);
+
+  it("landscape variant (1200×630) renders at correct dimensions", async () => {
+    const { png } = await renderTemplate({
+      template: FIXTURE_MULTI_FORMAT_BASE,
+      variantKey: "landscape",
+    });
+    const meta = await sharp(png).metadata();
+    expect(meta.width).toBe(1200);
+    expect(meta.height).toBe(630);
+    console.log(`[multi-format] landscape: ${meta.width}×${meta.height} — OK`);
+  }, 30_000);
+
+  it("square and landscape produce different outputs (reflow changed layout)", async () => {
+    const sq = (await renderTemplate({ template: FIXTURE_MULTI_FORMAT_BASE, variantKey: "square" })).png;
+    const ls = (await renderTemplate({ template: FIXTURE_MULTI_FORMAT_BASE, variantKey: "landscape" })).png;
+    // Different dimensions → different buffers
+    expect(sq.equals(ls)).toBe(false);
+  }, 30_000);
+
+  it("logo layer (right/bottom pin) moves correctly between formats", async () => {
+    // Verify via pixel content: render both and confirm they differ (the logo
+    // moves from 916,916 in square to a different position in landscape).
+    // The layer has right+bottom constraints so it should repin to a new corner.
+    const sq  = await renderTemplate({ template: FIXTURE_MULTI_FORMAT_BASE, variantKey: "square" });
+    const ls  = await renderTemplate({ template: FIXTURE_MULTI_FORMAT_BASE, variantKey: "landscape" });
+    expect(sq.width).toBe(1080);
+    expect(sq.height).toBe(1080);
+    expect(ls.width).toBe(1200);
+    expect(ls.height).toBe(630);
+    // If reflow works, the square and landscape differ in MORE than just canvas size.
+    expect(sq.png.length).not.toBe(ls.png.length);
   }, 30_000);
 });

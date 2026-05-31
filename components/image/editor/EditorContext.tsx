@@ -18,13 +18,19 @@ import {
   type ReactNode,
 } from "react";
 
-import type { Layer, Op, Template } from "@/lib/image/template-model";
+import type { Layer, Op, Template, Variant } from "@/lib/image/template-model";
+import { applyVariant } from "@/lib/image/variant-utils";
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
 export interface EditorState {
   template: Template;
   selectedLayerId: string | null;
+  /**
+   * Active variant key (null = base template view).
+   * When non-null, the canvas shows the reflowed layout for that variant.
+   */
+  activeVariantKey: string | null;
   /** Ops for the current unsaved session (undo/redo stack is managed here). */
   past: Op[][];
   future: Op[][];
@@ -54,7 +60,11 @@ export type EditorAction =
   | { type: "set_saving"; isSaving: boolean }
   | { type: "mark_clean" }
   /** Toggle template.settings.guides (snap guides on/off). */
-  | { type: "toggle_guides" };
+  | { type: "toggle_guides" }
+  /** Switch the active format variant (null = base / square). */
+  | { type: "set_active_variant"; variantKey: string | null }
+  /** Add or update a variant in template.variants. */
+  | { type: "upsert_variant"; variant: Variant };
 
 // ─── Reducer ──────────────────────────────────────────────────────────────────
 
@@ -219,6 +229,17 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
       };
     }
 
+    case "set_active_variant":
+      return { ...state, activeVariantKey: action.variantKey };
+
+    case "upsert_variant": {
+      const existing = state.template.variants.findIndex(v => v.key === action.variant.key);
+      const variants = existing >= 0
+        ? state.template.variants.map((v, i) => i === existing ? action.variant : v)
+        : [...state.template.variants, action.variant];
+      return { ...state, template: { ...state.template, variants }, isDirty: true };
+    }
+
     default:
       return state;
   }
@@ -230,6 +251,10 @@ interface EditorContextValue {
   state: EditorState;
   dispatch: Dispatch<EditorAction>;
   selectedLayer: Layer | null;
+  /** Template as it appears on the canvas for the active variant (reflowed). */
+  displayTemplate: Template;
+  /** The active Variant object, or null when showing the base template. */
+  activeVariant: Variant | null;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -246,15 +271,29 @@ export function EditorProvider({
   const [state, dispatch] = useReducer(editorReducer, {
     template,
     selectedLayerId: null,
+    activeVariantKey: null,
     past: [],
     future: [],
     isDirty: false,
     isSaving: false,
   });
 
+  const activeVariant = useMemo(
+    () => state.template.variants.find(v => v.key === state.activeVariantKey) ?? null,
+    [state.template.variants, state.activeVariantKey],
+  );
+
+  // displayTemplate: the template as shown on the canvas.
+  // When a variant is active, layers are reflowed + overrides applied.
+  const displayTemplate = useMemo((): Template => {
+    if (!activeVariant) return state.template;
+    const { width, height, layers } = applyVariant(state.template, activeVariant);
+    return { ...state.template, width, height, layers };
+  }, [state.template, activeVariant]);
+
   const selectedLayer = useMemo(
-    () => state.template.layers.find((l) => l.id === state.selectedLayerId) ?? null,
-    [state.template.layers, state.selectedLayerId],
+    () => displayTemplate.layers.find((l) => l.id === state.selectedLayerId) ?? null,
+    [displayTemplate.layers, state.selectedLayerId],
   );
 
   const value: EditorContextValue = useMemo(
@@ -262,10 +301,12 @@ export function EditorProvider({
       state,
       dispatch,
       selectedLayer,
+      displayTemplate,
+      activeVariant,
       canUndo: state.past.length > 0,
       canRedo: state.future.length > 0,
     }),
-    [state, selectedLayer],
+    [state, selectedLayer, displayTemplate, activeVariant],
   );
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
