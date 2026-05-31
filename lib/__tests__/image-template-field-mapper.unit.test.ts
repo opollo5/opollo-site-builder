@@ -25,7 +25,7 @@ function makeTextField(name: string, label: string, required = false, defaultVal
   return {
     name,
     type: "text",
-    var: { label, required, default: defaultValue, category: "content" },
+    var: { label, required, default: defaultValue, category: "content", help: "" },
   };
 }
 
@@ -33,7 +33,7 @@ function makeImageField(name: string, label: string, required = false): Template
   return {
     name,
     type: "image",
-    var: { label, required, default: "", category: "media" },
+    var: { label, required, default: "", category: "media", help: "" },
   };
 }
 
@@ -64,7 +64,7 @@ describe("mapFieldsToColumns", () => {
     const specialField: TemplateField = {
       name: "cta_btn",
       type: "text",
-      var: { label: "Call To Action Button", required: false, default: "", category: "content" },
+      var: { label: "Call To Action Button", required: false, default: "", category: "content", help: "" },
     };
     const headers = ["Call To Action Button"];
     const result = mapFieldsToColumns([specialField], headers);
@@ -140,7 +140,7 @@ describe("rowToModifications", () => {
   it("omits field when cell is empty and no default", () => {
     const headers = ["headline"];
     const mapping = mapFieldsToColumns(
-      [{ name: "headline", type: "text", var: { label: "Headline", required: false, default: "", category: "content" as const } }],
+      [{ name: "headline", type: "text", var: { label: "Headline", required: false, default: "", category: "content" as const, help: "" } }],
       headers,
     );
     const mods = rowToModifications({ headline: "" }, mapping);
@@ -169,7 +169,7 @@ describe("rowToModifications", () => {
     const rectField: TemplateField = {
       name: "bg_rect",
       type: "rectangle",
-      var: { label: "Background Color", required: false, default: "", category: "branding" },
+      var: { label: "Background Color", required: false, default: "", category: "branding", help: "" },
     };
     const headers = ["bg_rect"];
     const mapping = mapFieldsToColumns([rectField], headers);

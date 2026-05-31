@@ -129,7 +129,7 @@ export async function dispatchImageBatch(input: DispatchInput): Promise<Dispatch
     // For Ideogram jobs: GenerationParams. For template jobs: TemplateJobSpec (sans jobType).
     // Both are stored as JSONB in generation_params; the QStash handler discriminates via jobType.
     const generationParams: unknown = isTemplateJob
-      ? spec // store the full TemplateJobSpec; handler reads jobType to route
+      ? { ...spec, companyId } // inject companyId so QStash handler can read it from JSONB
       : {
           styleId: (spec as DispatchJobSpec).styleId,
           primaryColour: (spec as DispatchJobSpec).primaryColour,

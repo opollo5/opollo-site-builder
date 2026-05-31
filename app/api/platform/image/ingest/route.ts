@@ -7,31 +7,43 @@ import { logger } from "@/lib/logger";
 
 import { parseXlsxBuffer, type PostRow } from "@/lib/ingestion/xlsx-parse";
 import { parseDocxBuffer } from "@/lib/ingestion/docx-parse";
+import { parseXlsxRawRows } from "@/lib/ingestion/xlsx-raw-parse";
 import { interpretPosts } from "@/lib/ingestion/interpret";
 import { dispatchImageBatch } from "@/lib/image/dispatch";
 import { fanOutJobs } from "@/lib/image/fan-out";
+import { get_template_by_id } from "@/lib/image/templates";
+import { mapFieldsToColumns, rowToModifications, validateMapping } from "@/lib/image/template-field-mapper";
+import { PRICE_CENTS_PER_JOB } from "@/lib/image/budget";
+import type { TemplateJobSpec } from "@/lib/image/template-bulk-types";
+import type { TemplateField, Layer } from "@/lib/image/template-model";
+import { TEMPLATE_SCHEMA_VERSION } from "@/lib/image/template-model";
 
 // ---------------------------------------------------------------------------
 // POST /api/platform/image/ingest
 //
-// §C4 of MASS_IMAGE_GEN_BUILD_BRIEF. End-to-end mass-image-gen ingestion:
-//   upload .xlsx or .docx → parse → AI interpret → fan-out into per-ratio
-//   image jobs → dispatch batch → return batchId.
+// §C4 of MASS_IMAGE_GEN_BUILD_BRIEF. End-to-end mass-image-gen ingestion.
 //
 // Multipart body:
-//   - company_id (uuid)
-//   - file       (.xlsx or .docx, ≤ 5 MB)
+//   - company_id  (uuid)
+//   - file        (.xlsx or .docx, ≤ 5 MB)
+//   - ingest_mode "ideogram" | "template"  (default "ideogram")
+//   - template_id uuid  (required when ingest_mode=template)
 //
 // Query:
-//   - mode=preview|generate  (default 'generate'; preview routes to B5)
+//   - mode=preview|generate  (default 'generate')
 //
-// Caps (per brief §C4):
+// Caps:
 //   - 5 MB file size
 //   - 100 parsed-row cap
-//   - 5/hour/company rate limit (reuses csv_upload limiter)
+//   - 5/hour/company rate limit (csv_upload bucket)
 //
-// Returns the batchId so the operator can poll
-// /api/platform/image/batch/[id] for completion.
+// ingest_mode=ideogram (default):
+//   xlsx/docx → parse → AI interpret → fan-out → dispatch → { batchId }
+//
+// ingest_mode=template (Stream B Phase 2):
+//   xlsx → parse raw rows → column-map to template fields → fan-out per
+//   variant → dispatch → { batchId, mappingSummary, estimatedCostCents }
+//   XLSX only; DOCX not supported for template mode.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -48,9 +60,9 @@ const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.s
 const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 type FileFormat = "xlsx" | "docx";
+type IngestMode = "ideogram" | "template";
 
 function detectFormat(file: File): FileFormat | null {
-  // Trust mime type when explicit; fall back to extension.
   if (file.type === XLSX_MIME) return "xlsx";
   if (file.type === DOCX_MIME) return "docx";
   const name = file.name?.toLowerCase() ?? "";
@@ -59,9 +71,31 @@ function detectFormat(file: File): FileFormat | null {
   return null;
 }
 
-function parseMode(req: NextRequest): "preview" | "generate" {
+function parseGenerateMode(req: NextRequest): "preview" | "generate" {
   const v = new URL(req.url).searchParams.get("mode");
   return v === "preview" ? "preview" : "generate";
+}
+
+function parseIngestMode(formData: FormData): IngestMode {
+  const v = (formData.get("ingest_mode") as string | null)?.trim();
+  return v === "template" ? "template" : "ideogram";
+}
+
+/** Extract modifiable fields from a v2 template's layer list. */
+function extractTemplateFields(layers: Layer[]): TemplateField[] {
+  const fields: TemplateField[] = [];
+  for (const layer of layers) {
+    const l = layer as Layer;
+    if (
+      l.var &&
+      typeof l.var.label === "string" &&
+      l.var.label.trim().length > 0 &&
+      (l.type === "text" || l.type === "image" || l.type === "rectangle")
+    ) {
+      fields.push({ name: l.name, type: l.type, var: l.var });
+    }
+  }
+  return fields;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -102,12 +136,36 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (gate.kind === "deny") return gate.response;
 
   // ─── Rate-limit (5/hour/company) ────────────────────────────────────────
-  // Reuses csv_upload (3/hour) for v1; can split into a dedicated limiter
-  // if image-gen ingestion volume warrants its own bucket later.
   const rl = await checkRateLimit("csv_upload", `company:${companyId}`);
   if (!rl.ok) return rateLimitExceeded(rl);
 
-  // ─── Parse ──────────────────────────────────────────────────────────────
+  // ─── Route by ingest mode ────────────────────────────────────────────────
+  const ingestMode = parseIngestMode(formData);
+
+  if (ingestMode === "template") {
+    return handleTemplateIngest({ formData, fileBlob, format, companyId, gate, req });
+  }
+
+  return handleIdeogramIngest({ fileBlob, format, companyId, gate, req });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ideogram ingest (existing flow — unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleIdeogramIngest({
+  fileBlob,
+  format,
+  companyId,
+  gate,
+  req,
+}: {
+  fileBlob: File;
+  format: FileFormat;
+  companyId: string;
+  gate: { userId: string };
+  req: NextRequest;
+}): Promise<NextResponse> {
   const buffer = Buffer.from(await fileBlob.arrayBuffer());
   const parsed =
     format === "xlsx"
@@ -131,7 +189,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ─── Interpret (Anthropic) ─────────────────────────────────────────────
   const interpreted = await interpretPosts({
     companyId,
     posts: parsed.posts as PostRow[],
@@ -148,17 +205,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ─── Fan-out into per-ratio jobs (§1.7) ─────────────────────────────────
-  // Build the source-row → publish_date lookup from the parser output;
-  // interpretPosts strips it from InterpretedPost shape.
   const publishDateBySourceRow = new Map<number, string>();
   for (const row of parsed.posts) {
     if (row.publish_date) publishDateBySourceRow.set(row.sourceRow, row.publish_date);
   }
   const jobSpecs = fanOutJobs(interpreted.posts, publishDateBySourceRow);
 
-  // ─── Dispatch ───────────────────────────────────────────────────────────
-  const mode = parseMode(req);
+  const mode = parseGenerateMode(req);
   const dispatched = await dispatchImageBatch({
     companyId,
     triggeredBy: gate.userId,
@@ -173,11 +226,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           ok: false,
-          error: {
-            code: dispatched.code,
-            message: dispatched.message,
-            ...dispatched.details,
-          },
+          error: { code: dispatched.code, message: dispatched.message, ...dispatched.details },
           timestamp: new Date().toISOString(),
         },
         { status: 402 },
@@ -186,7 +235,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return internalError(dispatched.message);
   }
 
-  logger.info("image.ingest.ok", {
+  logger.info("image.ingest.ideogram.ok", {
     companyId,
     format,
     mode,
@@ -211,3 +260,220 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   );
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Template ingest — Stream B Phase 2
+//
+// Pipeline:
+//   1. Validate: XLSX only + template_id required
+//   2. Parse XLSX into generic header+row format (no Ideogram-specific validation)
+//   3. Fetch template → extract fields + variants
+//   4. Column-map fields to spreadsheet headers
+//   5. Validate mapping (fail on unmatched required fields)
+//   6. Fan-out: one TemplateJobSpec per (row × variant)
+//   7. Dispatch via existing dispatchImageBatch()
+//   8. Return pre-dispatch summary (must-have #3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function handleTemplateIngest({
+  formData,
+  fileBlob,
+  format,
+  companyId,
+  gate,
+  req,
+}: {
+  formData: FormData;
+  fileBlob: File;
+  format: FileFormat;
+  companyId: string;
+  gate: { userId: string };
+  req: NextRequest;
+}): Promise<NextResponse> {
+  // ─── 1. Validate template mode constraints ───────────────────────────────
+  if (format !== "xlsx") {
+    return validationError(
+      "Template mode only supports .xlsx files. " +
+      "DOCX ingestion is available for the Ideogram flow (omit ingest_mode=template).",
+    );
+  }
+
+  const templateId = (formData.get("template_id") as string | null)?.trim() ?? "";
+  if (!UUID_RE.test(templateId)) {
+    return validationError("template_id must be a valid UUID (required for ingest_mode=template).");
+  }
+
+  // ─── 2. Parse XLSX into raw rows ────────────────────────────────────────
+  const buffer = Buffer.from(await fileBlob.arrayBuffer());
+  const parsed = await parseXlsxRawRows(buffer);
+
+  if (!parsed.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: { code: "PARSE_FAILED", message: parsed.error },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 422 },
+    );
+  }
+
+  if (parsed.rowCount === 0) {
+    return validationError("Spreadsheet has no data rows.");
+  }
+
+  if (parsed.rowCount > MAX_ROWS) {
+    return validationError(
+      `Spreadsheet has ${parsed.rowCount} rows; max ${MAX_ROWS} per upload.`,
+    );
+  }
+
+  // ─── 3. Fetch template + extract fields + variants ───────────────────────
+  const tmpl = await get_template_by_id(templateId, companyId);
+  if (!tmpl) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: { code: "TEMPLATE_NOT_FOUND", message: `Template ${templateId} not found.` },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 404 },
+    );
+  }
+
+  if (tmpl.schemaVersion !== TEMPLATE_SCHEMA_VERSION || !tmpl.resolvedTemplate) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "TEMPLATE_NOT_V2",
+          message: "Template bulk generation requires a v2 (layer-based) template. " +
+                   "Create or migrate your template in the template editor.",
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 422 },
+    );
+  }
+
+  const resolvedTemplate = tmpl.resolvedTemplate;
+  const templateFields = extractTemplateFields(resolvedTemplate.layers as Layer[]);
+
+  // Variant keys to render. Base canvas always included (undefined variantKey).
+  // Named variants come from the template's variants array.
+  const variantKeys: Array<string | undefined> = [undefined]; // base
+  for (const v of resolvedTemplate.variants ?? []) {
+    variantKeys.push(v.key);
+  }
+
+  // ─── 4. Column mapping ───────────────────────────────────────────────────
+  const mapping = mapFieldsToColumns(templateFields, parsed.headers, parsed.rows[0]);
+
+  // ─── 5. Validate mapping ─────────────────────────────────────────────────
+  const validation = validateMapping(mapping);
+  if (!validation.ok) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: {
+          code: "MAPPING_FAILED",
+          message: validation.reason,
+          unmatchedRequired: mapping.unmatched_required,
+          availableColumns: parsed.headers,
+          templateFields: templateFields.map((f) => ({
+            name: f.name,
+            label: f.var.label,
+            required: f.var.required,
+          })),
+        },
+        timestamp: new Date().toISOString(),
+      },
+      { status: 422 },
+    );
+  }
+
+  // ─── 6. Fan-out: one TemplateJobSpec per (row × variant) ─────────────────
+  const jobSpecs: TemplateJobSpec[] = [];
+
+  for (let rowIdx = 0; rowIdx < parsed.rows.length; rowIdx++) {
+    const row = parsed.rows[rowIdx];
+    const modifications = rowToModifications(row, mapping);
+
+    for (const variantKey of variantKeys) {
+      jobSpecs.push({
+        jobType: "template",
+        templateId,
+        variantKey,
+        modifications,
+        aspectRatio: resolvedTemplate.width === resolvedTemplate.height
+          ? "1x1"
+          : resolvedTemplate.width > resolvedTemplate.height
+            ? "16x9"
+            : "4x5",
+        parentPostIndex: rowIdx,
+      });
+    }
+  }
+
+  // ─── 7. Dispatch ─────────────────────────────────────────────────────────
+  const generateMode = parseGenerateMode(req);
+  const dispatched = await dispatchImageBatch({
+    companyId,
+    triggeredBy: gate.userId,
+    jobs: jobSpecs,
+    mode: generateMode,
+    sourceFilename: fileBlob.name,
+    sourceRowCount: parsed.rowCount,
+  });
+
+  if (!dispatched.ok) {
+    if (dispatched.code === "BUDGET_EXCEEDED") {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: { code: dispatched.code, message: dispatched.message, ...dispatched.details },
+          timestamp: new Date().toISOString(),
+        },
+        { status: 402 },
+      );
+    }
+    return internalError(dispatched.message);
+  }
+
+  // ─── 8. Pre-dispatch summary (must-have #3) ───────────────────────────────
+  const matchedFields = mapping.fields.filter((f) => f.matchedColumn !== null).length;
+  const unmatchedOptional = mapping.fields.filter(
+    (f) => f.matchedColumn === null && !f.required,
+  ).length;
+
+  logger.info("image.ingest.template.ok", {
+    companyId,
+    templateId,
+    rowCount: parsed.rowCount,
+    variantCount: variantKeys.length,
+    jobCount: jobSpecs.length,
+    matchedFields,
+    batchId: dispatched.batchId,
+  });
+
+  return NextResponse.json(
+    {
+      ok: true,
+      data: {
+        batchId: dispatched.batchId,
+        totalJobs: dispatched.totalJobs,
+        rowCount: parsed.rowCount,
+        variantCount: variantKeys.length,
+        estimatedCostCents: dispatched.totalJobs * PRICE_CENTS_PER_JOB,
+        mode: dispatched.mode,
+        mappingSummary: {
+          matchedFields,
+          unmatchedOptional,
+          unusedColumns: mapping.unusedColumns,
+        },
+        ...(dispatched.enqueueErrors && { enqueueErrors: dispatched.enqueueErrors }),
+      },
+      timestamp: new Date().toISOString(),
+    },
+    { status: 201 },
+  );
+}

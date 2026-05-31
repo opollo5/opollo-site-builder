@@ -69,16 +69,15 @@ function makeImageLayer(name: string, imageUrl: string): ImageLayer {
   return {
     ...baseLayer(name),
     type: "image",
+    asset_id: null,
     image_url: imageUrl,
-    fit: "cover",
-    position: "center center",
-    border: null, border_radius: null, border_width: null,
-    flip_h: false, flip_v: false,
-    brightness: 0, contrast: 0, saturation: 0, blur: 0,
-    overlay_color: null, overlay_alpha: 0,
-    mask: null,
-    drop_shadow: null,
-    filter: "none",
+    fill: "cover",
+    anchor_x: "center",
+    anchor_y: "center",
+    tint_color: null,
+    border_radius: 0,
+    clip_path: null,
+    face_detect: false,
   };
 }
 
@@ -87,10 +86,9 @@ function makeRectLayer(name: string, color: string): RectangleLayer {
     ...baseLayer(name),
     type: "rectangle",
     color,
-    opacity: 1,
-    border: null, border_width: null, border_radius: null,
     gradient: null,
-    drop_shadow: null,
+    border_radius: 0,
+    border: null,
   };
 }
 
@@ -128,7 +126,7 @@ describe("applyModifications", () => {
 
     const modified = result[0] as ImageLayer;
     expect(modified.image_url).toBe("https://cdn.example.com/new.jpg");
-    expect(modified.fit).toBe("cover"); // unchanged
+    expect(modified.fill).toBe("cover"); // unchanged
   });
 
   it("applies color modification to a rectangle layer", () => {
