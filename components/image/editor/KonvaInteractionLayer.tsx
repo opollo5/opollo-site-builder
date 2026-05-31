@@ -76,7 +76,12 @@ export function KonvaInteractionLayer({ width, height }: KonvaInteractionLayerPr
         {/* Snap guide lines (§6.4) */}
         {guidesEnabled && <GuideLines guides={guides} width={width} height={height} />}
 
-        {template.layers.map((layer) => (
+        {/* Render Rects in REVERSE layer order so that the visually-topmost layer
+            (layers[0]) is the LAST Rect drawn, making it the top of the Konva
+            z-order and the first to receive pointer events. Without this reversal
+            the background Rect (layers[N-1], rendered last) sits on top in Konva
+            and intercepts every canvas click, preventing selection of any other layer. */}
+        {[...template.layers].reverse().map((layer) => (
           <Rect
             key={layer.id}
             ref={(node) => {
