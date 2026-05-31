@@ -37,6 +37,14 @@ export interface EditorState {
 export type EditorAction =
   | { type: "select"; layerId: string | null }
   | { type: "update_layer"; layerId: string; patch: Partial<Layer> }
+  /**
+   * update_layer_live: same as update_layer but does NOT push to the undo
+   * stack. Used for real-time drag/resize preview so every mouse-move frame
+   * doesn't create a separate undo entry. The owning gesture (onDragEnd /
+   * onTransformEnd) follows up with a regular update_layer that records the
+   * single undoable op for the entire gesture.
+   */
+  | { type: "update_layer_live"; layerId: string; patch: Partial<Layer> }
   | { type: "update_template_name"; name: string }
   | { type: "reorder_layers"; fromIndex: number; toIndex: number }
   | { type: "add_layer"; layer: Layer; index: number }
@@ -69,6 +77,18 @@ function editorReducer(state: EditorState, action: EditorAction): EditorState {
         template: { ...state.template, layers },
         past: [...state.past, ops],
         future: [],
+        isDirty: true,
+      };
+    }
+
+    case "update_layer_live": {
+      // Updates the model in real-time (every drag frame) WITHOUT adding to
+      // the undo stack. The Konva gesture's onDragEnd/onTransformEnd must
+      // follow up with a regular update_layer to record the undoable op.
+      const layers = applyLayerPatch(state.template.layers, action.layerId, action.patch);
+      return {
+        ...state,
+        template: { ...state.template, layers },
         isDirty: true,
       };
     }
