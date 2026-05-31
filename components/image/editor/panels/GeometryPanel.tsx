@@ -115,7 +115,7 @@ export function GeometryPanel({ layer }: { layer: Layer }) {
       </div>
 
       {/* Angle, Opacity */}
-      <div className="flex gap-1 mb-2">
+      <div className="flex gap-1 mb-1">
         <div className="flex-1">
           <Field label="Angle">
             <NumInput value={layer.rotation} onChange={(v) => up({ rotation: v })} min={-360} max={360} step={0.1} />
@@ -124,6 +124,20 @@ export function GeometryPanel({ layer }: { layer: Layer }) {
         <div className="flex-1">
           <Field label="Opacity">
             <NumInput value={layer.opacity} onChange={(v) => up({ opacity: Math.max(0, Math.min(1, v)) })} min={0} max={1} step={0.01} />
+          </Field>
+        </div>
+      </div>
+
+      {/* Skew X, Skew Y (§6.1, §1.3 — all layer types) */}
+      <div className="flex gap-1 mb-2">
+        <div className="flex-1">
+          <Field label="Skew X">
+            <NumInput value={layer.skew_x} onChange={(v) => up({ skew_x: v })} min={-89} max={89} step={0.5} />
+          </Field>
+        </div>
+        <div className="flex-1">
+          <Field label="Skew Y">
+            <NumInput value={layer.skew_y} onChange={(v) => up({ skew_y: v })} min={-89} max={89} step={0.5} />
           </Field>
         </div>
       </div>
