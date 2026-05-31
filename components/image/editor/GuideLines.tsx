@@ -117,7 +117,10 @@ export function computeSnap(
         bestV = diff;
         const dx = ref - val;
         snapX = dragging.x + dx;
-        guides.splice(guides.findIndex((g) => g.orientation === "V"), 1);
+        // Guard: findIndex returns -1 when no V guide exists yet. splice(-1,1)
+        // would incorrectly remove the last element (possibly an H guide).
+        const vIdx = guides.findIndex((g) => g.orientation === "V");
+        if (vIdx !== -1) guides.splice(vIdx, 1);
         guides.push({ orientation: "V", lineGuide: ref, snap, diff });
       }
     }
@@ -137,7 +140,8 @@ export function computeSnap(
         bestH = diff;
         const dy = ref - val;
         snapY = dragging.y + dy;
-        guides.splice(guides.findIndex((g) => g.orientation === "H"), 1);
+        const hIdx = guides.findIndex((g) => g.orientation === "H");
+        if (hIdx !== -1) guides.splice(hIdx, 1);
         guides.push({ orientation: "H", lineGuide: ref, snap, diff });
       }
     }
