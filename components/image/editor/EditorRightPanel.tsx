@@ -24,7 +24,7 @@ export function EditorRightPanel() {
   const { selectedLayer } = useEditor();
 
   return (
-    <aside className="w-[280px] border-l border-border flex flex-col overflow-hidden bg-background shrink-0">
+    <aside className="w-[320px] border-l border-border flex flex-col overflow-hidden bg-background shrink-0">
       {selectedLayer ? (
         <>
           {/* Panel header */}
@@ -50,9 +50,9 @@ export function EditorRightPanel() {
             {selectedLayer.type === "shape" && (
               <ShapeLayerPanel layer={selectedLayer as ShapeLayer} />
             )}
-            {selectedLayer.type !== "text" && selectedLayer.type !== "image" && selectedLayer.type !== "rectangle" && (
+            {selectedLayer.type !== "text" && selectedLayer.type !== "image" && selectedLayer.type !== "rectangle" && selectedLayer.type !== "shape" && (
               <div className="px-3 py-6 text-xs text-muted-foreground text-center">
-                Reserved layer type — not editable in V1
+                This layer type is reserved for a future update.
               </div>
             )}
           </ScrollArea>

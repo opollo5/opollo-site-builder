@@ -381,6 +381,86 @@ export const FIXTURE_MULTI_FORMAT_BASE: Template = {
 // with variantKey = "square" and "landscape" respectively.
 // See golden-image.test.ts for how these are exercised.
 
+// ─── Phase B new shapes ───────────────────────────────────────────────────────
+
+const SHAPE_BASE_SMALL: Omit<ShapeLayer, "id" | "name" | "shapeKind" | "color" | "gradient" | "border"> = {
+  type: "shape",
+  x: 50, y: 50, width: 200, height: 200,
+  rotation: 0, rotate_x: 0, rotate_y: 0, rotate_z: 0,
+  skew_x: 0, skew_y: 0, opacity: 1,
+  locked: false, hide: false, hide_when_empty: false,
+  lock_aspect_ratio: false, description: "", group: null,
+  constraints: CONSTRAINTS_FIXED,
+};
+
+export const FIXTURE_SHAPE_PENTAGON: Template = {
+  ...BASE,
+  id: "fixture-shape-pentagon",
+  name: "Shape Pentagon",
+  width: 300, height: 300,
+  orientation: "square",
+  background_color: "#172554",
+  layers: [{ ...SHAPE_BASE_SMALL, id: "s_pent", name: "pentagon", shapeKind: "pentagon", color: "#60a5fa", gradient: null, border: null }],
+};
+
+export const FIXTURE_SHAPE_HEXAGON: Template = {
+  ...BASE,
+  id: "fixture-shape-hexagon",
+  name: "Shape Hexagon",
+  width: 300, height: 300,
+  orientation: "square",
+  background_color: "#14532d",
+  layers: [{ ...SHAPE_BASE_SMALL, id: "s_hex", name: "hexagon", shapeKind: "hexagon", color: "#4ade80", gradient: null, border: null }],
+};
+
+export const FIXTURE_SHAPE_STAR: Template = {
+  ...BASE,
+  id: "fixture-shape-star",
+  name: "Shape Star",
+  width: 300, height: 300,
+  orientation: "square",
+  background_color: "#713f12",
+  layers: [{ ...SHAPE_BASE_SMALL, id: "s_star", name: "star", shapeKind: "star", color: "#fbbf24", gradient: null, border: null }],
+};
+
+export const FIXTURE_SHAPE_ARROW: Template = {
+  ...BASE,
+  id: "fixture-shape-arrow",
+  name: "Shape Arrow",
+  width: 400, height: 200,
+  orientation: "landscape",
+  background_color: "#1c1917",
+  layers: [{ ...SHAPE_BASE_SMALL, id: "s_arrow", name: "arrow", shapeKind: "arrow", x: 100, y: 50, width: 200, height: 100, color: "#f87171", gradient: null, border: null }],
+};
+
+export const FIXTURE_GRADIENT_OPACITY: Template = {
+  ...BASE,
+  id: "fixture-gradient-opacity",
+  name: "Gradient with opacity",
+  width: 400, height: 200,
+  orientation: "landscape",
+  background_color: "#0f172a",
+  layers: [
+    {
+      ...LAYER_BASE,
+      id: "go_rect", name: "fade_overlay", type: "rectangle",
+      x: 0, y: 0, width: 400, height: 200,
+      constraints: CONSTRAINTS_FIXED,
+      color: null,
+      gradient: {
+        type: "linear",
+        angle: 90,
+        stops: [
+          { color: "#7c3aed", position: 0, opacity: 1 },   // fully opaque purple
+          { color: "#7c3aed", position: 1, opacity: 0 },   // fully transparent → reveals background
+        ],
+      },
+      border_radius: 0,
+      border: null,
+    },
+  ],
+};
+
 export const ALL_FIXTURES: Template[] = [
   FIXTURE_TEXT_BASIC,
   FIXTURE_TEXT_SECONDARY,
@@ -393,6 +473,13 @@ export const ALL_FIXTURES: Template[] = [
   FIXTURE_SHAPE_TRIANGLE,
   FIXTURE_SHAPE_LINE,
   FIXTURE_SHAPE_DIAMOND,
+  // Phase B new shapes
+  FIXTURE_SHAPE_PENTAGON,
+  FIXTURE_SHAPE_HEXAGON,
+  FIXTURE_SHAPE_STAR,
+  FIXTURE_SHAPE_ARROW,
+  // Gradient per-stop opacity
+  FIXTURE_GRADIENT_OPACITY,
   // Multi-format base (renders at 1080×1080 square)
   FIXTURE_MULTI_FORMAT_BASE,
 ];

@@ -560,7 +560,12 @@ export async function renderImageLayer(
 
 function buildGradientDef(gradient: Gradient, w: number, h: number, id: string): string {
   const stops = gradient.stops
-    .map((s) => `<stop offset="${(s.position * 100).toFixed(1)}%" stop-color="${escapeXml(s.color)}"/>`)
+    .map((s) => {
+      const opacityAttr = (s.opacity !== undefined && s.opacity < 1)
+        ? ` stop-opacity="${s.opacity.toFixed(3)}"`
+        : "";
+      return `<stop offset="${(s.position * 100).toFixed(1)}%" stop-color="${escapeXml(s.color)}"${opacityAttr}/>`;
+    })
     .join("");
 
   if (gradient.type === "radial") {
@@ -713,6 +718,60 @@ export function buildShapeLayerSvg(layer: ShapeLayer): string {
       // Rhombus: top-centre → right-centre → bottom-centre → left-centre
       shapeEl = `<polygon points="${(w / 2).toFixed(2)},0 ${w},${(h / 2).toFixed(2)} ${(w / 2).toFixed(2)},${h} 0,${(h / 2).toFixed(2)}" fill="${fill}"${strokeAttrs}/>`;
       break;
+
+    case "right_triangle":
+      // Right angle at bottom-left: (0,h) → (w,h) → (0,0)
+      shapeEl = `<polygon points="0,${h} ${w},${h} 0,0" fill="${fill}"${strokeAttrs}/>`;
+      break;
+
+    case "pentagon": {
+      // Regular 5-gon inscribed in the bounding ellipse, starting at top
+      const p5pts = Array.from({ length: 5 }, (_, i) => {
+        const a = (2 * Math.PI * i) / 5 - Math.PI / 2;
+        return `${(w / 2 + (w / 2) * Math.cos(a)).toFixed(2)},${(h / 2 + (h / 2) * Math.sin(a)).toFixed(2)}`;
+      }).join(" ");
+      shapeEl = `<polygon points="${p5pts}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+    }
+
+    case "hexagon": {
+      // Regular 6-gon (flat-top orientation)
+      const p6pts = Array.from({ length: 6 }, (_, i) => {
+        const a = (Math.PI * i) / 3;
+        return `${(w / 2 + (w / 2) * Math.cos(a)).toFixed(2)},${(h / 2 + (h / 2) * Math.sin(a)).toFixed(2)}`;
+      }).join(" ");
+      shapeEl = `<polygon points="${p6pts}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+    }
+
+    case "star": {
+      // 5-pointed star — outer radius = bounding ellipse, inner radius = 40%
+      const starPts: string[] = [];
+      for (let i = 0; i < 10; i++) {
+        const a = (Math.PI * i) / 5 - Math.PI / 2;
+        const r = i % 2 === 0 ? 1 : 0.4;  // alternate outer/inner
+        starPts.push(`${(w / 2 + (w / 2) * r * Math.cos(a)).toFixed(2)},${(h / 2 + (h / 2) * r * Math.sin(a)).toFixed(2)}`);
+      }
+      shapeEl = `<polygon points="${starPts.join(" ")}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+    }
+
+    case "arrow": {
+      // Right-pointing chevron arrow within W×H bounding box
+      const ny = (v: number) => (v * h).toFixed(2);
+      const nx = (v: number) => (v * w).toFixed(2);
+      const arrowPts = [
+        `0,${ny(0.25)}`,          // top-left of body
+        `${nx(0.62)},${ny(0.25)}`, // body top-right
+        `${nx(0.62)},0`,           // head top
+        `${nx(1)},${ny(0.5)}`,     // arrow tip
+        `${nx(0.62)},${h}`,        // head bottom
+        `${nx(0.62)},${ny(0.75)}`, // body bottom-right
+        `0,${ny(0.75)}`,           // bottom-left of body
+      ].join(" ");
+      shapeEl = `<polygon points="${arrowPts}" fill="${fill}"${strokeAttrs}/>`;
+      break;
+    }
   }
 
   return `<svg width="${w}" height="${h}" xmlns="http://www.w3.org/2000/svg">${defs}${shapeEl}</svg>`;

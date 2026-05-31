@@ -234,6 +234,12 @@ export interface GradientStop {
   color: string;
   /** Stop position 0–1 (0 = start, 1 = end). */
   position: number;
+  /**
+   * Stop opacity 0–1. Defaults to 1 (fully opaque) when absent.
+   * Enables solid→transparent fade effects. Rendered via SVG stop-opacity
+   * in the sharp renderer and rgba() in the DOM renderer.
+   */
+  opacity?: number;
 }
 
 export interface Gradient {
@@ -273,7 +279,16 @@ export interface RectangleLayer extends LayerBase {
 // All shape kinds share: geometry (LayerBase), fill (color/gradient), border.
 // Line is special: its layer.height = stroke width; fill = stroke color.
 
-export type ShapeKind = "ellipse" | "triangle" | "line" | "diamond";
+export type ShapeKind =
+  | "ellipse"       // oval / circle (use lock_aspect_ratio for circle)
+  | "triangle"      // equilateral, pointing up
+  | "right_triangle" // right angle at bottom-left
+  | "line"          // horizontal line (height = stroke width)
+  | "diamond"       // rhombus
+  | "pentagon"      // regular 5-gon
+  | "hexagon"       // regular 6-gon
+  | "star"          // 5-pointed star
+  | "arrow";        // right-pointing chevron arrow
 
 export interface ShapeLayer extends LayerBase {
   type: "shape";

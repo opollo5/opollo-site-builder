@@ -9,7 +9,7 @@
  */
 
 import { useState } from "react";
-import { Circle, Triangle, Minus, Diamond } from "lucide-react";
+import { Circle, Triangle, Minus, Diamond, Pentagon, Hexagon, Star, ArrowRight } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { useEditor } from "./EditorContext";
@@ -146,10 +146,15 @@ function makeShapeLayer(
 }
 
 const SHAPE_OPTIONS: { kind: ShapeKind; label: string; icon: React.ElementType }[] = [
-  { kind: "ellipse",  label: "Ellipse",  icon: Circle },
-  { kind: "triangle", label: "Triangle", icon: Triangle },
-  { kind: "line",     label: "Line",     icon: Minus },
-  { kind: "diamond",  label: "Diamond",  icon: Diamond },
+  { kind: "ellipse",       label: "Ellipse / Circle", icon: Circle },
+  { kind: "triangle",      label: "Triangle",          icon: Triangle },
+  { kind: "right_triangle",label: "Right Triangle",    icon: Triangle },
+  { kind: "diamond",       label: "Diamond",           icon: Diamond },
+  { kind: "pentagon",      label: "Pentagon",          icon: Pentagon },
+  { kind: "hexagon",       label: "Hexagon",           icon: Hexagon },
+  { kind: "star",          label: "Star",              icon: Star },
+  { kind: "arrow",         label: "Arrow",             icon: ArrowRight },
+  { kind: "line",          label: "Line",              icon: Minus },
 ];
 
 /** Generate a slug-safe unique name not already in the template. */

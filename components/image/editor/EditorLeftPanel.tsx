@@ -26,7 +26,7 @@ export function EditorLeftPanel() {
   const guidesEnabled = template.settings?.guides !== false;
 
   return (
-    <aside className="w-[280px] border-r border-border flex flex-col overflow-hidden bg-background shrink-0">
+    <aside className="w-[300px] border-r border-border flex flex-col overflow-hidden bg-background shrink-0">
       {/* Canvas info */}
       <div className="px-3 py-2 border-b border-border text-xs text-muted-foreground flex items-center justify-between">
         <span className="font-medium text-foreground truncate">{template.name}</span>

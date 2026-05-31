@@ -159,12 +159,12 @@ export function LayerRow({ layer, index, isSelected, dragHandleProps }: LayerRow
                 "shrink-0 transition-opacity",
                 layer.hide
                   ? "text-muted-foreground opacity-100"
-                  : "text-muted-foreground/30 opacity-0 group-hover:opacity-100",
+                  : "text-muted-foreground/50 opacity-0 group-hover:opacity-80",
               ].join(" ")}
               onClick={toggleHide}
               aria-label={layer.hide ? "Show layer" : "Hide layer"}
             >
-              {layer.hide ? <EyeOff size={13} /> : <Eye size={13} />}
+              {layer.hide ? <EyeOff size={15} /> : <Eye size={15} />}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">{layer.hide ? "Show" : "Hide"}</TooltipContent>
@@ -178,12 +178,12 @@ export function LayerRow({ layer, index, isSelected, dragHandleProps }: LayerRow
                 "shrink-0 transition-opacity",
                 layer.locked
                   ? "text-muted-foreground opacity-100"
-                  : "text-muted-foreground/30 opacity-0 group-hover:opacity-100",
+                  : "text-muted-foreground/50 opacity-0 group-hover:opacity-80",
               ].join(" ")}
               onClick={toggleLock}
               aria-label={layer.locked ? "Unlock layer" : "Lock layer"}
             >
-              {layer.locked ? <Lock size={13} /> : <Unlock size={13} />}
+              {layer.locked ? <Lock size={15} /> : <Unlock size={15} />}
             </button>
           </TooltipTrigger>
           <TooltipContent side="top" className="text-xs">{layer.locked ? "Unlock" : "Lock"}</TooltipContent>
@@ -197,7 +197,7 @@ export function LayerRow({ layer, index, isSelected, dragHandleProps }: LayerRow
               onClick={(e: React.MouseEvent) => { e.stopPropagation(); setMenuOpen(!menuOpen); }}
               aria-label="Layer options"
             >
-              <MoreVertical size={13} />
+              <MoreVertical size={15} />
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-40 p-1" align="end" sideOffset={4}>

@@ -54,12 +54,11 @@ export function VarMetadataPanel({ layer }: VarMetadataPanelProps) {
   return (
     <div className="mb-3">
       <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider pb-1 border-b border-border mb-2">
-        Variable (API field)
+        Dynamic content
       </div>
       <p className="text-xs text-muted-foreground mb-2">
-        Set a label to expose this layer as a named field in{" "}
-        <code className="text-xs font-mono">GET /templates/:id/fields</code>.
-        Empty label = not modifiable via the API.
+        Give this layer a label so it can be filled in automatically when generating images.
+        Leave blank if the layer is a fixed design element that never changes.
       </p>
 
       {/* Label */}

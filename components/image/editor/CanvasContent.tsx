@@ -57,7 +57,16 @@ function layerBaseStyle(layer: Layer): React.CSSProperties {
 
 function gradientToCss(g: Gradient): string {
   const stops = g.stops
-    .map((s) => `${s.color} ${(s.position * 100).toFixed(1)}%`)
+    .map((s) => {
+      // If stop has opacity < 1, convert to rgba() so the CSS gradient respects it.
+      if (s.opacity !== undefined && s.opacity < 1 && /^#[0-9a-fA-F]{6}$/.test(s.color)) {
+        const r = parseInt(s.color.slice(1, 3), 16);
+        const gv = parseInt(s.color.slice(3, 5), 16);
+        const b = parseInt(s.color.slice(5, 7), 16);
+        return `rgba(${r},${gv},${b},${s.opacity.toFixed(3)}) ${(s.position * 100).toFixed(1)}%`;
+      }
+      return `${s.color} ${(s.position * 100).toFixed(1)}%`;
+    })
     .join(", ");
   if (g.type === "radial") return `radial-gradient(circle, ${stops})`;
   return `linear-gradient(${g.angle ?? 0}deg, ${stops})`;
@@ -128,6 +137,49 @@ function ShapeLayerEl({ layer }: { layer: ShapeLayer }) {
           fill={fill} {...strokeAttrs} />
       );
       break;
+    case "right_triangle":
+      shapeEl = (
+        <polygon points={`0,${h} ${w},${h} 0,0`} fill={fill} {...strokeAttrs} />
+      );
+      break;
+    case "pentagon": {
+      const p5 = Array.from({ length: 5 }, (_, i) => {
+        const a = (2 * Math.PI * i) / 5 - Math.PI / 2;
+        return `${(w / 2 + (w / 2) * Math.cos(a)).toFixed(2)},${(h / 2 + (h / 2) * Math.sin(a)).toFixed(2)}`;
+      }).join(" ");
+      shapeEl = <polygon points={p5} fill={fill} {...strokeAttrs} />;
+      break;
+    }
+    case "hexagon": {
+      const p6 = Array.from({ length: 6 }, (_, i) => {
+        const a = (Math.PI * i) / 3;
+        return `${(w / 2 + (w / 2) * Math.cos(a)).toFixed(2)},${(h / 2 + (h / 2) * Math.sin(a)).toFixed(2)}`;
+      }).join(" ");
+      shapeEl = <polygon points={p6} fill={fill} {...strokeAttrs} />;
+      break;
+    }
+    case "star": {
+      const starPts = Array.from({ length: 10 }, (_, i) => {
+        const a = (Math.PI * i) / 5 - Math.PI / 2;
+        const r = i % 2 === 0 ? 1 : 0.4;
+        return `${(w / 2 + (w / 2) * r * Math.cos(a)).toFixed(2)},${(h / 2 + (h / 2) * r * Math.sin(a)).toFixed(2)}`;
+      }).join(" ");
+      shapeEl = <polygon points={starPts} fill={fill} {...strokeAttrs} />;
+      break;
+    }
+    case "arrow": {
+      const arrowPts = [
+        `0,${(0.25 * h).toFixed(2)}`,
+        `${(0.62 * w).toFixed(2)},${(0.25 * h).toFixed(2)}`,
+        `${(0.62 * w).toFixed(2)},0`,
+        `${w},${(0.5 * h).toFixed(2)}`,
+        `${(0.62 * w).toFixed(2)},${h}`,
+        `${(0.62 * w).toFixed(2)},${(0.75 * h).toFixed(2)}`,
+        `0,${(0.75 * h).toFixed(2)}`,
+      ].join(" ");
+      shapeEl = <polygon points={arrowPts} fill={fill} {...strokeAttrs} />;
+      break;
+    }
   }
 
   return (
@@ -144,7 +196,9 @@ function ShapeLayerEl({ layer }: { layer: ShapeLayer }) {
             <linearGradient id={`sg_${layer.id}`} x1="0%" y1="0%" x2="0%" y2="100%"
               gradientTransform={`rotate(${gradient.angle ?? 0}, ${w / 2}, ${h / 2})`}>
               {gradient.stops.map((s, i) => (
-                <stop key={i} offset={`${(s.position * 100).toFixed(1)}%`} stopColor={s.color} />
+                <stop key={i} offset={`${(s.position * 100).toFixed(1)}%`}
+                  stopColor={s.color}
+                  stopOpacity={s.opacity ?? 1} />
               ))}
             </linearGradient>
           </defs>

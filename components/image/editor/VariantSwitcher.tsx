@@ -81,7 +81,7 @@ export function VariantSwitcher() {
             title={tab.dims}
           >
             <span className="font-medium">{tab.label}</span>
-            <span className="text-muted-foreground/60 text-[10px] leading-none hidden sm:inline">
+            <span className="text-muted-foreground/60 text-xs leading-none hidden sm:inline">
               {tab.dims}
             </span>
             {tab.platforms.length > 0 && (
