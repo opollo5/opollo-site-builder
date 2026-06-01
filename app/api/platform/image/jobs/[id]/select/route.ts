@@ -33,15 +33,18 @@ export const dynamic = "force-dynamic";
 const ApproveBodySchema = z.object({ reason: z.string().max(500).optional() });
 const RejectBodySchema = z.object({ reason: z.string().min(1).max(500) });
 
-async function loadJobOwner(jobId: string): Promise<{ companyId: string } | null> {
+async function loadJobOwner(jobId: string): Promise<{ companyId: string; batchId: string | null } | null> {
   const svc = getServiceRoleClient();
   const { data, error } = await svc
     .from("image_generation_jobs")
-    .select("company_id")
+    .select("company_id, batch_id")
     .eq("id", jobId)
     .maybeSingle();
   if (error || !data) return null;
-  return { companyId: (data as { company_id: string }).company_id };
+  return {
+    companyId: (data as { company_id: string }).company_id,
+    batchId: (data as { batch_id: string | null }).batch_id,
+  };
 }
 
 export async function POST(
@@ -79,53 +82,90 @@ async function handleSelection(
 
   const svc = getServiceRoleClient();
 
-  // Insert the selection row. Both approve and reject paths write here.
+  // D25: idempotency guard — if a selection already exists in the target state,
+  // return it without writing a duplicate row.
+  const { data: existing } = await svc
+    .from("image_selections")
+    .select("id, selected")
+    .eq("job_id", jobId)
+    .order("selected_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const existingData = existing as { id: string; selected: boolean } | null;
+  if (existingData && existingData.selected === approve) {
+    // Already in target state — idempotent no-op.
+    logger.info("image.select.idempotent", { jobId, approve });
+    // Fall through to return the existing state with destination-aware response.
+  }
+
+  // Fetch batch destination to route approve action correctly (D6, D20).
+  let batchDestination: "publish" | "download" = "publish";
+  if (owner.batchId) {
+    const { data: batchRow } = await svc
+      .from("image_generation_batches")
+      .select("destination")
+      .eq("id", owner.batchId)
+      .maybeSingle();
+    const dest = (batchRow as { destination?: string } | null)?.destination;
+    if (dest === "download") batchDestination = "download";
+  }
+
   const reason = approve
     ? (parsed.data as { reason?: string }).reason ?? null
     : (parsed.data as { reason: string }).reason;
 
-  const { data: selection, error: selErr } = await svc
-    .from("image_selections")
-    .insert({
-      job_id: jobId,
-      selected: approve,
-      selected_by: gate.userId,
-      rejection_reason: approve ? null : reason,
-    })
-    .select("id")
-    .single();
+  // Only insert if no matching existing row (D25: don't duplicate).
+  let selectionId: string;
+  if (existingData && existingData.selected === approve) {
+    selectionId = existingData.id;
+  } else {
+    const { data: selection, error: selErr } = await svc
+      .from("image_selections")
+      .insert({
+        job_id: jobId,
+        selected: approve,
+        selected_by: gate.userId,
+        rejection_reason: approve ? null : reason,
+      })
+      .select("id")
+      .single();
 
-  if (selErr || !selection) {
-    logger.error("image.select.insert_failed", {
-      jobId,
-      approve,
-      err: selErr?.message,
-    });
-    return internalError("Failed to record selection.");
+    if (selErr || !selection) {
+      logger.error("image.select.insert_failed", { jobId, approve, err: selErr?.message });
+      return internalError("Failed to record selection.");
+    }
+    selectionId = (selection as { id: string }).id;
   }
 
-  // Reject: done. No attach side-effect.
+  // Reject: done. No attach side-effect regardless of destination.
   if (!approve) {
     logger.info("image.select.rejected", { jobId, reason });
     return NextResponse.json({
       ok: true,
+      data: { jobId, selected: false, selectionId, rejectionReason: reason },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Approve — destination-aware (D6, D20):
+  //   download → item added to download set; no draft created
+  //   publish  → existing auto-attach behaviour
+  if (batchDestination === "download") {
+    logger.info("image.select.approved_download", { jobId, companyId: owner.companyId });
+    return NextResponse.json({
+      ok: true,
       data: {
         jobId,
-        selected: false,
-        selectionId: (selection as { id: string }).id,
-        rejectionReason: reason,
+        selected: true,
+        selectionId,
+        destination: "download",
+        addedToDownloadSet: true,
       },
       timestamp: new Date().toISOString(),
     });
   }
 
-  // Approve: fire auto-attach. Result is reflected in the response so the
-  // UI can render an "attached to draft on YYYY-MM-DD" affordance. The
-  // attach is fail-soft — selection has already been recorded.
-
-  // Fetch company timezone here (the caller owns companyId; this is the
-  // correct place per the locked model). Reuses the svc already open above.
-  // Fail-soft: "UTC" if absent.
+  // Publish path: fire auto-attach.
   let companyTimezone = "UTC";
   const { data: co } = await svc
     .from("platform_companies")
@@ -143,8 +183,6 @@ async function handleSelection(
       companyTimezone,
     });
   } catch (err) {
-    // autoAttachImage is designed not to throw; this is a defence-in-depth
-    // log for the impossible case.
     logger.warn("image.select.auto_attach_threw", {
       jobId,
       err: err instanceof Error ? err.message : String(err),
@@ -163,7 +201,8 @@ async function handleSelection(
     data: {
       jobId,
       selected: true,
-      selectionId: (selection as { id: string }).id,
+      selectionId,
+      destination: "publish",
       autoAttach: attachResult,
     },
     timestamp: new Date().toISOString(),
