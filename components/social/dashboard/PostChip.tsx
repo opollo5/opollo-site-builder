@@ -1,8 +1,8 @@
 import * as React from "react";
-import { Image, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SocialPlatformIcon, type SocialPlatformIconKey } from "@/components/ui/SocialPlatformIcon";
-import type { CalendarPost, Platform } from "@/lib/social/types";
+import type { CalendarPost } from "@/lib/social/types";
 
 interface PostChipProps {
   post: CalendarPost;
@@ -82,30 +82,51 @@ export function PostChip({ post, className, highlighted = false, onClick }: Post
     ? (primaryProfile.platform.toUpperCase().replace("GOOGLE_BUSINESS_PROFILE", "GOOGLE_BUSINESS") as SocialPlatformIconKey)
     : null;
 
-  const hasMedia = post.primary_media_url !== null;
-  const hasLink = !hasMedia && post.link_url !== null;
+  const hasLink = !post.primary_media_url && post.link_url !== null;
 
   return (
+    // D3: larger/higher-contrast entries — taller chip, excerpt, thumbnail.
     <div
       className={cn(
-        "flex items-center gap-1 rounded px-1 py-0.5 text-xs bg-background border border-border hover:bg-muted cursor-pointer transition-colors",
+        "flex items-start gap-1.5 rounded px-1.5 py-1 text-xs bg-background border border-border hover:bg-muted cursor-pointer transition-colors overflow-hidden",
         highlighted && "ring-2 ring-emerald-500",
         className,
       )}
       data-testid="post-chip"
       onClick={onClick}
     >
-      {iconKey && (
-        <SocialPlatformIcon
-          platform={iconKey}
-          size={14}
-          className="shrink-0"
-        />
+      {/* Left: icon + time + state + excerpt */}
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-center gap-1">
+          {/* Brand-colour platform icon (D3) */}
+          {iconKey && (
+            <SocialPlatformIcon platform={iconKey} size={14} className="shrink-0" />
+          )}
+          {time && (
+            <span className="truncate font-medium text-foreground">{time}</span>
+          )}
+          {hasLink && <Link2 size={10} className="shrink-0 text-muted-foreground" aria-label="has link" />}
+          {stateIcon(post.state)}
+        </div>
+        {post.content_excerpt && (
+          <p className="line-clamp-1 text-xs leading-tight text-foreground/70">
+            {post.content_excerpt}
+          </p>
+        )}
+      </div>
+
+      {/* Right: thumbnail — reuse primary_media_url (D3) */}
+      {post.primary_media_url && (
+        <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-border" aria-label="has media">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={post.primary_media_url}
+            alt=""
+            className="h-full w-full object-cover"
+            data-testid="post-chip-thumbnail"
+          />
+        </div>
       )}
-      {hasMedia && <Image size={12} className="shrink-0 text-muted-foreground" aria-label="has media" />}
-      {hasLink && <Link2 size={12} className="shrink-0 text-muted-foreground" aria-label="has link" />}
-      {time && <span className="text-muted-foreground font-medium">{time}</span>}
-      {stateIcon(post.state)}
     </div>
   );
 }
