@@ -40,6 +40,14 @@ export interface DispatchInput {
   mode: BatchMode;
   sourceFilename?: string;
   sourceRowCount?: number;
+  /**
+   * AI-generated social captions keyed by parentPostIndex.
+   * Populated by the Ideogram ingest path (from interpretPosts()).
+   * Written to image_generation_jobs.post_text so auto-attach can pre-fill
+   * social_post_drafts.content on draft creation.
+   * Absent for template mode, mood board, and direct batch dispatch.
+   */
+  postTextByParentIndex?: Record<number, string>;
 }
 
 export type DispatchResult =
@@ -140,6 +148,15 @@ export async function dispatchImageBatch(input: DispatchInput): Promise<Dispatch
           count: 1,
         };
 
+    // Look up the AI-generated caption for this job's source row (Ideogram path only).
+    // parentPostIndex is the zero-based row index shared by all aspect-ratio variants
+    // of the same source row, so multiple jobs for the same row carry the same caption.
+    const parentIdx = spec.parentPostIndex ?? null;
+    const postText =
+      parentIdx !== null && input.postTextByParentIndex?.[parentIdx]
+        ? input.postTextByParentIndex[parentIdx]
+        : null;
+
     const { data: job, error: jobErr } = await svc
       .from("image_generation_jobs")
       .insert({
@@ -149,7 +166,8 @@ export async function dispatchImageBatch(input: DispatchInput): Promise<Dispatch
         generation_params: generationParams,
         target_platforms: spec.targetPlatforms ?? null,
         target_publish_date: spec.targetPublishDate ?? null,
-        parent_post_index: spec.parentPostIndex ?? null,
+        parent_post_index: parentIdx,
+        post_text: postText,
       })
       .select("id")
       .single();

@@ -44,7 +44,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
     const { data: job, error: jobErr } = await svc
       .from("image_generation_jobs")
       .select(
-        "id, company_id, state, result_storage_path, target_publish_date, generation_params",
+        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text",
       )
       .eq("id", input.jobId)
       .maybeSingle();
@@ -62,6 +62,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       result_storage_path: string | null;
       target_publish_date: string | null;
       generation_params: Record<string, unknown>;
+      post_text: string | null;
     };
 
     if (j.company_id !== input.companyId) {
@@ -126,6 +127,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       companyId: input.companyId,
       publishDate: j.target_publish_date,
       approvedBy: input.approvedBy,
+      postText: j.post_text ?? null,
     });
 
     if (!draftId) {
@@ -226,6 +228,13 @@ interface FindOrCreateDraftInput {
   companyId: string;
   publishDate: string; // YYYY-MM-DD
   approvedBy: string;
+  /**
+   * AI-generated social caption from the source spreadsheet row.
+   * Written to content ONLY when creating a new draft — never overwrites an
+   * existing draft's content. This is the non-negotiable create-only rule:
+   * the operator may have already edited the caption on an existing draft.
+   */
+  postText: string | null;
 }
 
 async function findOrCreateScheduledDraft(
@@ -237,6 +246,8 @@ async function findOrCreateScheduledDraft(
 
   // Look for an existing scheduled draft for (company, publish_date).
   // Match by scheduled_at exact equality + state='scheduled' + not archived.
+  // IMPORTANT: if found, we return only the id. We do NOT update content —
+  // the operator may have already edited the caption on this draft.
   const { data: existing, error: lookupErr } = await svc
     .from("social_post_drafts")
     .select("id")
@@ -257,12 +268,15 @@ async function findOrCreateScheduledDraft(
   }
 
   if (existing) {
+    // Draft exists — do NOT touch content. Only the caller (Step 3) will
+    // append the new asset id to media_asset_ids.
     return (existing as { id: string }).id;
   }
 
-  // Create a placeholder scheduled draft. Empty content + empty target_profiles;
-  // the operator will fill those in later. created_by/updated_by are required
-  // FKs to auth.users; we pass the approver's id.
+  // No existing draft — create one. Pre-fill content from the AI-generated
+  // caption if available; fall back to empty string so the operator can write
+  // from scratch. This is the ONLY place content is set; it is never
+  // overwritten after creation.
   const { data: created, error: createErr } = await svc
     .from("social_post_drafts")
     .insert({
@@ -270,7 +284,7 @@ async function findOrCreateScheduledDraft(
       created_by: input.approvedBy,
       updated_by: input.approvedBy,
       state: "scheduled",
-      content: "",
+      content: input.postText ?? "",
       media_urls: [],
       media_asset_ids: [],
       target_profiles: [],

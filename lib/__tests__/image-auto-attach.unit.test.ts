@@ -506,3 +506,119 @@ describe("autoAttachImage — failure paths", () => {
     expect(result.error).toMatch(/state=running/);
   });
 });
+
+// ---------------------------------------------------------------------------
+// post_text persistence — caption pre-fill and create-only safety rule
+// ---------------------------------------------------------------------------
+
+describe("autoAttachImage — post_text / caption pre-fill", () => {
+  const AI_CAPTION = "Here's a compelling social caption written by Claude.";
+
+  test("new draft: content is set from post_text when caption is present", async () => {
+    responses.jobLookup = {
+      data: {
+        id: JOB_ID,
+        company_id: COMPANY_ID,
+        state: "completed",
+        result_storage_path: STORAGE_PATH,
+        target_publish_date: "2026-08-01",
+        generation_params: { aspectRatio: "1x1" },
+        post_text: AI_CAPTION,
+      },
+      error: null,
+    };
+    responses.draftLookup = { data: null, error: null }; // no existing draft
+    responses.draftInsert = { data: { id: NEW_DRAFT_ID }, error: null };
+    responses.draftRead = { data: { media_asset_ids: [] }, error: null };
+
+    const result = await autoAttachImage({
+      jobId: JOB_ID,
+      companyId: COMPANY_ID,
+      approvedBy: APPROVER_ID,
+    });
+
+    expect(result.state).toBe("attached");
+
+    const draftInsert = calls.find((c) => c.table === "social_post_drafts" && c.op === "insert");
+    expect(draftInsert).toBeDefined();
+    expect((draftInsert!.inserted as { content: string }).content).toBe(AI_CAPTION);
+  });
+
+  test("new draft: content is empty string when post_text is null (no AI caption available)", async () => {
+    responses.jobLookup = {
+      data: {
+        id: JOB_ID,
+        company_id: COMPANY_ID,
+        state: "completed",
+        result_storage_path: STORAGE_PATH,
+        target_publish_date: "2026-08-02",
+        generation_params: { aspectRatio: "4x5" },
+        post_text: null,
+      },
+      error: null,
+    };
+    responses.draftLookup = { data: null, error: null };
+    responses.draftInsert = { data: { id: NEW_DRAFT_ID }, error: null };
+    responses.draftRead = { data: { media_asset_ids: [] }, error: null };
+
+    await autoAttachImage({
+      jobId: JOB_ID,
+      companyId: COMPANY_ID,
+      approvedBy: APPROVER_ID,
+    });
+
+    const draftInsert = calls.find((c) => c.table === "social_post_drafts" && c.op === "insert");
+    expect((draftInsert!.inserted as { content: string }).content).toBe("");
+  });
+
+  // NON-NEGOTIABLE SAFETY RULE: when a draft already exists for (company, date),
+  // the second approval appends to media_asset_ids but must NEVER overwrite content.
+  // An operator may have already edited the caption on the existing draft.
+  test("existing draft: content is NOT overwritten — create-only rule enforced", async () => {
+    responses.jobLookup = {
+      data: {
+        id: JOB_ID,
+        company_id: COMPANY_ID,
+        state: "completed",
+        result_storage_path: STORAGE_PATH,
+        target_publish_date: "2026-08-01",
+        generation_params: { aspectRatio: "16x9" },
+        // A second approval for the same date carries a different caption.
+        post_text: "A second AI caption that must NOT overwrite the existing draft.",
+      },
+      error: null,
+    };
+    // Draft already exists (first approval created it with a different caption).
+    responses.draftLookup = { data: { id: EXISTING_DRAFT_ID }, error: null };
+    responses.draftRead = {
+      data: { media_asset_ids: ["first-asset-uuid"] },
+      error: null,
+    };
+
+    const result = await autoAttachImage({
+      jobId: JOB_ID,
+      companyId: COMPANY_ID,
+      approvedBy: APPROVER_ID,
+    });
+
+    expect(result.state).toBe("attached");
+    expect(result.draftId).toBe(EXISTING_DRAFT_ID);
+
+    // ASSERT: no INSERT into social_post_drafts — find path, not create path.
+    const draftInserts = calls.filter(
+      (c) => c.table === "social_post_drafts" && c.op === "insert",
+    );
+    expect(draftInserts).toHaveLength(0);
+
+    // ASSERT: the UPDATE to social_post_drafts only touches media_asset_ids —
+    // never content.
+    const draftUpdate = calls.find(
+      (c) => c.op === "update" && c.table === "social_post_drafts",
+    );
+    expect(draftUpdate).toBeDefined();
+    const patch = draftUpdate!.patch as Record<string, unknown>;
+    expect("content" in patch).toBe(false); // content must not appear in the patch at all
+    expect(patch.media_asset_ids).toContain(ASSET_ID);
+    expect(patch.media_asset_ids).toContain("first-asset-uuid");
+  });
+});
