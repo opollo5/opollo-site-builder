@@ -131,65 +131,28 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
 
     const assetId = (asset as { id: string }).id;
 
-    // ─── Step 2: find or create the scheduled draft ──────────────────────
-    // companyTimezone is provided by the caller (select route); it has the
-    // companyId and fetches the timezone before calling autoAttachImage.
-    const draftId = await findOrCreateScheduledDraft(svc, {
+    // ─── Step 2: create a new scheduled draft ────────────────────────────
+    // ALWAYS inserts a new draft — never finds an existing one. Each approved
+    // image creates its own post: separate image, separate caption, separate
+    // channel selection, and scheduled_at anchored to company midnight.
+    // The asset is included directly in the INSERT — one atomic operation.
+    const draftId = await createScheduledDraft(svc, {
       companyId: input.companyId,
       publishDate: j.target_publish_date,
       approvedBy: input.approvedBy,
       postText: j.post_text ?? null,
       targetPlatforms: (j.target_platforms as string[] | null) ?? [],
       companyTimezone: input.companyTimezone ?? "UTC",
+      assetId,
     });
 
     if (!draftId) {
-      const reason = "find/create draft failed";
+      const reason = "draft creation failed";
       await markJobAttachState(svc, input.jobId, "attach_failed", null, reason);
       return { state: "attach_failed", error: reason };
     }
 
-    // ─── Step 3: append assetId to media_asset_ids ───────────────────────
-    // Read-modify-write with the service-role client. Concurrent attach
-    // calls for the same draft can race — the worst case is a duplicated
-    // asset id in the array, which the publish-layer dedupes when it
-    // resolves URLs. Acceptable per §B4.
-    const { data: draft, error: readErr } = await svc
-      .from("social_post_drafts")
-      .select("media_asset_ids")
-      .eq("id", draftId)
-      .maybeSingle();
-
-    if (readErr || !draft) {
-      const reason = readErr?.message ?? "draft disappeared between create and update";
-      logger.warn("image.auto_attach.draft_read_failed", {
-        jobId: input.jobId,
-        draftId,
-        err: reason,
-      });
-      await markJobAttachState(svc, input.jobId, "attach_failed", null, reason);
-      return { state: "attach_failed", error: reason };
-    }
-
-    const existingIds = ((draft as { media_asset_ids: string[] | null }).media_asset_ids) ?? [];
-    const nextIds = existingIds.includes(assetId) ? existingIds : [...existingIds, assetId];
-
-    const { error: updErr } = await svc
-      .from("social_post_drafts")
-      .update({ media_asset_ids: nextIds, updated_at: new Date().toISOString() })
-      .eq("id", draftId);
-
-    if (updErr) {
-      logger.warn("image.auto_attach.draft_update_failed", {
-        jobId: input.jobId,
-        draftId,
-        err: updErr.message,
-      });
-      await markJobAttachState(svc, input.jobId, "attach_failed", draftId, updErr.message);
-      return { state: "attach_failed", error: updErr.message, draftId, assetId };
-    }
-
-    // ─── Step 4: mark attached ───────────────────────────────────────────
+    // ─── Step 3: mark job attached ───────────────────────────────────────
     await markJobAttachState(svc, input.jobId, "attached", draftId, null);
     logger.info("image.auto_attach.attached", {
       jobId: input.jobId,
@@ -351,93 +314,56 @@ async function resolveTargetConnections(
   return resolved;
 }
 
-interface FindOrCreateDraftInput {
+interface CreateDraftInput {
   companyId: string;
   publishDate: string; // YYYY-MM-DD
   approvedBy: string;
-  /**
-   * AI-generated social caption from the source spreadsheet row.
-   * Written to content ONLY when creating a new draft — never overwrites an
-   * existing draft's content. This is the non-negotiable create-only rule:
-   * the operator may have already edited the caption on an existing draft.
-   */
+  /** AI-generated social caption from the source spreadsheet row. */
   postText: string | null;
-  /**
-   * Generic platform codes from the spreadsheet row (e.g. ["linkedin", "facebook"]).
-   * Resolved to the company's actual connected social_connections on new draft
-   * creation only. Empty array or unmatched codes are silently skipped.
-   */
+  /** Generic platform codes — resolved to connected social_connections. */
   targetPlatforms: string[];
   /**
    * IANA timezone for the company (e.g. "Australia/Melbourne").
-   * Used to anchor midnight to the company's local date — a spreadsheet row
-   * saying "June 14" becomes June 14 00:00 in the company timezone, not UTC.
-   * Defaults to "UTC" if unavailable.
+   * Used to anchor midnight to the company's local date — "June 14"
+   * becomes June 14 00:00 in the company timezone, not UTC.
    */
   companyTimezone: string;
+  /** Asset UUID to attach — included directly in the INSERT. */
+  assetId: string;
 }
 
-async function findOrCreateScheduledDraft(
+/**
+ * Always inserts a new social_post_drafts row — never finds an existing one.
+ *
+ * Each approved image creates its own post: its own image, caption, channel
+ * selection, and date. Re-uploading the same spreadsheet row = a separate
+ * post per approval, not an update to an existing one. This eliminates the
+ * stacking problem (multiple aspect-ratio variants collapsing onto one draft)
+ * and the silent-update problem (a second approval silently replacing an
+ * operator-edited draft).
+ *
+ * The asset is included in the INSERT so there is no separate Step 3
+ * read-modify-write — the draft is fully populated in one operation.
+ */
+async function createScheduledDraft(
   svc: ReturnType<typeof getServiceRoleClient>,
-  input: FindOrCreateDraftInput,
+  input: CreateDraftInput,
 ): Promise<string | null> {
   // Normalise publish_date → scheduled_at = midnight in the COMPANY timezone.
-  // A spreadsheet row saying "June 14" means June 14 00:00 in the client's
-  // local timezone, not UTC midnight. fromZonedTime converts local midnight
-  // to the correct UTC equivalent (e.g. June 14 00:00 AEST = June 13 14:00 UTC).
+  // "June 14" means June 14 00:00 in the company timezone, not UTC midnight.
   const scheduledAtIso = fromZonedTime(
     `${input.publishDate}T00:00:00`,
     input.companyTimezone,
   ).toISOString();
 
-  // Look for an existing scheduled draft for (company, publish_date).
-  // Match by scheduled_at exact equality + state='scheduled' + not archived.
-  // IMPORTANT: if found, we return only the id. We do NOT update content —
-  // the operator may have already edited the caption on this draft.
-  const { data: existing, error: lookupErr } = await svc
-    .from("social_post_drafts")
-    .select("id")
-    .eq("company_id", input.companyId)
-    .eq("scheduled_at", scheduledAtIso)
-    .eq("state", "scheduled")
-    .is("archived_at", null)
-    .limit(1)
-    .maybeSingle();
-
-  if (lookupErr) {
-    logger.warn("image.auto_attach.draft_lookup_failed", {
-      companyId: input.companyId,
-      publishDate: input.publishDate,
-      err: lookupErr.message,
-    });
-    return null;
-  }
-
-  if (existing) {
-    // Draft exists — do NOT touch content. Only the caller (Step 3) will
-    // append the new asset id to media_asset_ids.
-    return (existing as { id: string }).id;
-  }
-
-  // No existing draft — create one.
-  //
-  // Resolve target platforms → connected social accounts (fail-soft: returns []
-  // on error or when no matching connections exist, so the draft is still created).
   const resolvedConnections = await resolveTargetConnections(
     svc,
     input.companyId,
     input.targetPlatforms,
   );
 
-  // target_profiles stores the full connection shape for the Composer display layer.
-  // draft_data.target_connection_ids stores the UUIDs for the V2 save/publish path.
-  // Both must be written — mapV1ToV2Draft reads target_connection_ids first (§draft_data
-  // mirroring convention), falling back to target_profiles. Writing both is safe.
   const connectionIds = resolvedConnections.map((c) => c.profile_id);
 
-  // Pre-fill content from the AI-generated caption if available; fall back to
-  // empty string. This is the ONLY place content is set; never overwritten after
-  // creation (create-only rule — same as target_profiles and content).
   const { data: created, error: createErr } = await svc
     .from("social_post_drafts")
     .insert({
@@ -447,12 +373,11 @@ async function findOrCreateScheduledDraft(
       state: "scheduled",
       content: input.postText ?? "",
       media_urls: [],
-      media_asset_ids: [],
+      media_asset_ids: [input.assetId],
       target_profiles: resolvedConnections,
       platform_variants: {},
       scheduled_at: scheduledAtIso,
       approval_required: false,
-      // Mirror connection IDs into draft_data for the V2 Composer save path.
       draft_data: connectionIds.length > 0
         ? { target_connection_ids: connectionIds }
         : {},
