@@ -33,7 +33,7 @@ export async function GET(
   // Fetch batch.
   const { data: batch, error: batchErr } = await svc
     .from("image_generation_batches")
-    .select("id, company_id, state, total_jobs, completed_jobs, failed_jobs, source_filename, source_row_count, created_at, updated_at")
+    .select("id, company_id, state, total_jobs, completed_jobs, failed_jobs, source_filename, source_row_count, destination, created_at, updated_at")
     .eq("id", idCheck.value)
     .single();
 
@@ -49,7 +49,7 @@ export async function GET(
   // Fetch jobs.
   const { data: jobs, error: jobsErr } = await svc
     .from("image_generation_jobs")
-    .select("id, state, generation_params, result_storage_path, error_class, error_detail, target_platforms, target_publish_date, parent_post_index, started_at, completed_at")
+    .select("id, state, generation_params, result_storage_path, error_class, error_detail, target_platforms, target_publish_date, parent_post_index, post_text, started_at, completed_at")
     .eq("batch_id", idCheck.value)
     .order("parent_post_index", { ascending: true, nullsFirst: true })
     .order("created_at", { ascending: true });
@@ -80,6 +80,7 @@ export async function GET(
         targetPlatforms: job.target_platforms,
         targetPublishDate: job.target_publish_date,
         parentPostIndex: job.parent_post_index,
+        postText: job.post_text ?? null,
         startedAt: job.started_at,
         completedAt: job.completed_at,
       };
@@ -96,6 +97,7 @@ export async function GET(
       failedJobs: batch.failed_jobs,
       sourceFilename: batch.source_filename,
       sourceRowCount: batch.source_row_count,
+      destination: (batch.destination as string | null) ?? "publish",
       createdAt: batch.created_at,
       updatedAt: batch.updated_at,
       jobs: jobsWithUrls,
