@@ -5,8 +5,8 @@
  * D29: Map coordinates to a fixed 3×3 grid (GridRegion).
  * D30: Build the exact composition-constraints prompt fragment.
  *
- * Used by buildPrompt (Slice H) and by Slice I feedback pins.
- * Same grid, same builder — single source of truth per D29/D30.
+ * Used by buildPrompt (PRIMARY path) and available for Slice I feedback pins
+ * (same grid, same builder).
  */
 
 import type { TextZone } from "@/lib/image/compositing/text-zones";
@@ -20,6 +20,7 @@ export type GridRegion =
 
 /**
  * Map normalised coordinates (0–1) to the 3×3 GridRegion they fall in.
+ * The grid divides the image into equal thirds on each axis.
  */
 export function coordToGridRegion(xNorm: number, yNorm: number): GridRegion {
   const col = xNorm < 1 / 3 ? "left" : xNorm < 2 / 3 ? "center" : "right";
@@ -35,7 +36,8 @@ export function coordToGridRegion(xNorm: number, yNorm: number): GridRegion {
 }
 
 /**
- * Convert TextZone coordinates (0–100 percentages) to GridRegions via centre point.
+ * Convert TextZone coordinates (0–100 percentages) to GridRegions via the
+ * zone's centre point.
  */
 export function textZonesToGridRegions(zones: TextZone[]): GridRegion[] {
   const seen = new Set<GridRegion>();
@@ -57,6 +59,11 @@ export function textZonesToGridRegions(zones: TextZone[]): GridRegion[] {
 /**
  * Build the exact D30 keep-clear composition hint.
  * Returns empty string when regions is empty (no constraint added).
+ *
+ * Exact format (authoritative per brief §1.1 D30):
+ *   "Composition constraints: keep the {regions} area(s) visually simple and
+ *    low-detail for overlaid text and logo. Do not place faces, hands, product
+ *    hero elements, or fine details there."
  */
 export function buildSafeZoneFragment(regions: GridRegion[]): string {
   if (regions.length === 0) return "";

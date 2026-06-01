@@ -8,6 +8,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import type { GeneratedImage, GenerationParams } from "../types";
 import { IdeogramError } from "../types";
 import { buildPrompt } from "./prompt-engine";
+import { textZonesToGridRegions, buildSafeZoneFragment } from "./safe-zones";
+import { TEXT_ZONE_MAP } from "@/lib/image/compositing/text-zones";
 
 const GLOBAL_NEGATIVE_PROMPT = [
   "text",
@@ -57,6 +59,12 @@ export async function generateBackground(
     throw new IdeogramError(0, "IDEOGRAM_API_KEY is not set");
   }
 
+  // D11/H: derive keep-clear regions from the text zone for this composition type.
+  const textZone = TEXT_ZONE_MAP[params.compositionType];
+  const keepClearFragment = textZone
+    ? buildSafeZoneFragment(textZonesToGridRegions([textZone]))
+    : "";
+
   const prompt = buildPrompt({
     styleId: params.styleId,
     primaryColour: params.primaryColour,
@@ -65,6 +73,7 @@ export async function generateBackground(
     mood: params.mood,
     safeMode: false, // safe_mode gates styles in routing.ts; prompt simplification is separate
     simplify: params.simplifyPrompt,
+    keepClearFragment,
   });
 
   const startMs = Date.now();
