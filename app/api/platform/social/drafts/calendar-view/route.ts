@@ -36,11 +36,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const svc = getServiceRoleClient();
   let query = svc
     .from("social_post_drafts")
-    .select("id, state, scheduled_at, published_at, content, media_urls, media_asset_ids, target_profiles, parent_draft_id, link_url")
+    .select("id, state, scheduled_at, published_at, planned_for_at, content, media_urls, media_asset_ids, target_profiles, parent_draft_id, link_url")
     .eq("company_id", companyId)
     .is("archived_at", null)
-    .or(`scheduled_at.gte.${from},published_at.gte.${from}`)
-    .or(`scheduled_at.lte.${to}T23:59:59Z,published_at.lte.${to}T23:59:59Z`)
+    // planned_for_at is the date field for state='draft' posts with a planned date.
+    // Including it in both filter arms makes planned drafts calendar-visible without
+    // affecting scheduled or published posts (they continue to use scheduled_at / published_at).
+    .or(`scheduled_at.gte.${from},published_at.gte.${from},planned_for_at.gte.${from}`)
+    .or(`scheduled_at.lte.${to}T23:59:59Z,published_at.lte.${to}T23:59:59Z,planned_for_at.lte.${to}T23:59:59Z`)
     .order("scheduled_at", { ascending: true })
     .limit(200);
 
@@ -137,6 +140,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         state: row.state as string,
         scheduled_at: row.scheduled_at as string | null,
         published_at: row.published_at as string | null,
+        planned_for_at: (row.planned_for_at as string | null) ?? null,
         content_excerpt: ((row.content as string | null) ?? "").slice(0, 100),
         primary_media_url: primaryMediaUrl,
         link_url: (row.link_url as string | null) ?? null,

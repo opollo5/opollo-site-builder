@@ -53,6 +53,8 @@ export interface CalendarPost {
   state: DraftState;
   scheduled_at: string | null;
   published_at: string | null;
+  /** Set for state='draft' posts saved with a planned date. Used for calendar bucketing. */
+  planned_for_at: string | null;
   content_excerpt: string;
   primary_media_url: string | null;
   link_url: string | null;
