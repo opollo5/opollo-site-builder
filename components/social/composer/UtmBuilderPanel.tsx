@@ -115,7 +115,7 @@ export function UtmBuilderPanel({ onInsert, onClose, platforms = [] }: UtmBuilde
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">UTM tags</p>
         <button type="button" onClick={onClose} aria-label="Close UTM panel" className="text-muted-foreground hover:text-foreground transition-colors">
-          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
+          <CloseIcon size={15} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
 
@@ -213,8 +213,8 @@ export function UtmBuilderPanel({ onInsert, onClose, platforms = [] }: UtmBuilde
       >
         <span>Advanced</span>
         {showAdvanced
-          ? <ChevronUp size={12} strokeWidth={1.75} aria-hidden />
-          : <ChevronDown size={12} strokeWidth={1.75} aria-hidden />
+          ? <ChevronUp size={15} strokeWidth={1.75} aria-hidden />
+          : <ChevronDown size={15} strokeWidth={1.75} aria-hidden />
         }
       </button>
 

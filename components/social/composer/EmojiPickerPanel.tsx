@@ -91,7 +91,7 @@ export function EmojiPickerPanel({
           className="text-muted-foreground hover:text-foreground transition-colors"
           data-testid="emoji-picker-close"
         >
-          <X size={12} strokeWidth={1.75} aria-hidden />
+          <X size={15} strokeWidth={1.75} aria-hidden />
         </button>
       </div>
 

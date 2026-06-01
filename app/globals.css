@@ -103,6 +103,9 @@
 }
 
 @layer base {
+  html {
+    font-size: 106.25%; /* 17px at browser-default 16px — +1px global readability bump 2026-06-02 */
+  }
   * {
     @apply border-border;
   }
@@ -247,7 +250,7 @@
  *   <H2>      section heading       text-base font-display ~16px
  *   <H3>      sub-section / card    text-sm  font-display  ~14px
  *   <Eyebrow> .lbl                  0.75rem  font-body 700 uppercase (12px design exception)
- *   Body      p / td / form values  font-body 400          1rem = 16px floor
+ *   Body      p / td / form values  font-body 400          1rem = 17px floor
  *
  * 16px is the absolute minimum on operator surfaces.
  * font-mono reserved for literal data (IDs, cost values, code tokens).
@@ -423,9 +426,10 @@
 }
 
 /* ---------------------------------------------------------------------------
- * Operator-readability floor — 16px minimum (raised 2026-05-06).
- * text-xs = text-sm = 1rem. Lucide icons floored at 20px.
- * Only exception: .lbl eyebrow (0.75rem/12px — hierarchy-critical).
+ * Operator-readability floor — 17px minimum (raised 2026-06-02, was 16px).
+ * html font-size: 106.25% makes 1rem = 17px; text-xs = text-sm = 1rem.
+ * NavIcon floored at 15px; default stays 20px. Lucide icons floored at 15px.
+ * Only exception: .lbl eyebrow (0.75rem ≈ 13px — hierarchy-critical).
  * ------------------------------------------------------------------------- */
 
 .text-xs {

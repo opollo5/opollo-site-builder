@@ -4,8 +4,8 @@
  * SINGLE SOURCE OF TRUTH for all design tokens.
  *
  * Rules enforced by lint + CI (see audit:static and .eslintrc):
- * - Minimum font size: 16px (text-xs = text-sm = text-base = 1rem)
- * - Minimum body font size: 16px (text-base)
+ * - Minimum font size: 17px (text-xs = text-sm = text-base = 1rem; html font-size: 106.25%)
+ * - Minimum body font size: 17px (text-base)
  * - No hardcoded hex colours — use semantic tokens below
  * - No arbitrary Tailwind values
  *
@@ -15,14 +15,14 @@
 
 :root {
   /* ── Typography scale ────────────────────────────────────────────
-   * 16px is the absolute minimum — text-xs = text-sm = text-base = 1rem.
-   * NEVER use font sizes below 16px on operator surfaces (eyebrow .lbl is 0.75rem, design exception).
+   * 17px is the absolute minimum — html font-size: 106.25% → 1rem = 17px.
+   * NEVER use font sizes below 17px on operator surfaces (eyebrow .lbl is 0.75rem ≈ 13px, design exception).
    * ─────────────────────────────────────────────────────────────── */
-  --font-size-xs:   1rem; /* 16px — absolute minimum */
-  --font-size-sm:   1rem; /* 16px — absolute minimum */
-  --font-size-base: 1rem;      /* 16px — standard body */
-  --font-size-lg:   1.125rem;  /* 18px */
-  --font-size-xl:   1.25rem;   /* 20px */
+  --font-size-xs:   1rem; /* 17px — absolute minimum */
+  --font-size-sm:   1rem; /* 17px — absolute minimum */
+  --font-size-base: 1rem;      /* 17px — standard body */
+  --font-size-lg:   1.125rem;  /* ~19px */
+  --font-size-xl:   1.25rem;   /* ~21px */
   --font-size-2xl:  1.5rem;    /* 24px */
   --font-size-3xl:  1.875rem;  /* 30px */
   --font-size-4xl:  2.25rem;   /* 36px */

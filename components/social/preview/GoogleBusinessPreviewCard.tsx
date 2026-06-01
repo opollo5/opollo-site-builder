@@ -105,7 +105,7 @@ export function GoogleBusinessPreviewCard({
           className="flex items-center gap-1.5 rounded border border-border px-4 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors"
           data-testid="gbp-preview-cta"
         >
-          <ExternalLink size={12} strokeWidth={2} />
+          <ExternalLink size={15} strokeWidth={2} />
           {ctaLabel}
         </button>
       </div>

@@ -134,9 +134,9 @@ export function ProfileChip({
         aria-hidden
       >
         {disconnected ? (
-          <AlertTriangle size={11} strokeWidth={2.5} className="text-amber-500" />
+          <AlertTriangle size={15} strokeWidth={2.5} className="text-amber-500" />
         ) : selected ? (
-          <Check size={11} strokeWidth={3} className="text-white" />
+          <Check size={15} strokeWidth={3} className="text-white" />
         ) : null}
       </span>
 

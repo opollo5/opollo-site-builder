@@ -86,7 +86,7 @@ export function EvidenceDetail({
                       rel="noreferrer"
                       className="ml-auto text-pk hover:text-pk/80"
                     >
-                      <ExternalLinkIcon size={14} />
+                      <ExternalLinkIcon size={15} />
                     </a>
                   )}
                 </div>

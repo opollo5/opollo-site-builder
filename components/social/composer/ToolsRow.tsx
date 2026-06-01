@@ -83,7 +83,7 @@ function TraceIdBadge({ traceId }: { traceId: string }) {
         onClick={copy}
         className="h-5 w-5 text-muted-foreground hover:text-foreground"
       >
-        {copied ? <Check size={10} aria-hidden /> : <Copy size={10} aria-hidden />}
+        {copied ? <Check size={15} aria-hidden /> : <Copy size={15} aria-hidden />}
       </IconButton>
     </div>
   );
@@ -443,7 +443,7 @@ function GifPanel({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold">GIF picker</p>
         <IconButton label="Close GIF panel" onClick={onClose} className="h-6 w-6 text-muted-foreground hover:text-foreground">
-          <CloseIcon size={14} strokeWidth={1.75} aria-hidden />
+          <CloseIcon size={15} strokeWidth={1.75} aria-hidden />
         </IconButton>
       </div>
 

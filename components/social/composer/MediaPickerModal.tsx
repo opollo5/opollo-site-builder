@@ -372,7 +372,7 @@ export function MediaPickerModal({
                     <option value="gif">GIFs</option>
                   </select>
                   <ChevronDown
-                    size={10}
+                    size={15}
                     className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground"
                     aria-hidden
                   />
@@ -440,7 +440,7 @@ export function MediaPickerModal({
                         {isSelected && (
                           <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                             <div className="rounded-full bg-primary p-0.5">
-                              <Check size={12} className="text-white" aria-hidden />
+                              <Check size={15} className="text-white" aria-hidden />
                             </div>
                           </div>
                         )}
@@ -480,7 +480,7 @@ export function MediaPickerModal({
                 className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 data-testid="ai-generate-btn"
               >
-                <Sparkles size={14} aria-hidden />
+                <Sparkles size={15} aria-hidden />
                 {generating ? "Generating 4 variations…" : "Generate from your brand"}
               </button>
 
@@ -535,7 +535,7 @@ export function MediaPickerModal({
                           {isSelected && (
                             <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
                               <div className="rounded-full bg-primary p-0.5">
-                                <Check size={12} className="text-white" aria-hidden />
+                                <Check size={15} className="text-white" aria-hidden />
                               </div>
                             </div>
                           )}

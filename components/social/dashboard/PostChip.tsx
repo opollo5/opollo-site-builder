@@ -100,12 +100,12 @@ export function PostChip({ post, className, highlighted = false, onClick }: Post
         <div className="flex items-center gap-1">
           {/* Brand-colour platform icon (D3) */}
           {iconKey && (
-            <SocialPlatformIcon platform={iconKey} size={14} className="shrink-0" />
+            <SocialPlatformIcon platform={iconKey} size={15} className="shrink-0" />
           )}
           {time && (
             <span className="truncate font-medium text-foreground">{time}</span>
           )}
-          {hasLink && <Link2 size={10} className="shrink-0 text-muted-foreground" aria-label="has link" />}
+          {hasLink && <Link2 size={15} className="shrink-0 text-muted-foreground" aria-label="has link" />}
           {stateIcon(post.state)}
         </div>
         {post.content_excerpt && (

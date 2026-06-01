@@ -20,10 +20,11 @@ interface NavIconProps {
 }
 
 export function NavIcon({ name, size = 20, className }: NavIconProps) {
+  const px = Math.max(size, 15); // floor: 15px minimum per icon-sizing sweep 2026-06-02
   return (
     <i
       className={cn(`icon-${name}`, className)}
-      style={{ fontSize: `${size}px`, display: "inline-block", lineHeight: 1 }}
+      style={{ fontSize: `${px}px`, display: "inline-block", lineHeight: 1 }}
       aria-hidden="true"
     />
   );

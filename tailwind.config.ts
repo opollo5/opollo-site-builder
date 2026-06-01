@@ -17,10 +17,10 @@ const config: Config = {
     },
     extend: {
       fontSize: {
-        // 16px is the absolute minimum for all operator-facing text
-        'xs':   ['1rem', { lineHeight: '1.5' }],   // 16px — minimum
-        'sm':   ['1rem', { lineHeight: '1.5' }],   // 16px — minimum
-        'base': ['1rem', { lineHeight: '1.5' }],   // 16px — standard body
+        // 17px is the absolute minimum for all operator-facing text (html font-size: 106.25% → 1rem = 17px)
+        'xs':   ['1rem', { lineHeight: '1.5' }],   // 17px — minimum
+        'sm':   ['1rem', { lineHeight: '1.5' }],   // 17px — minimum
+        'base': ['1rem', { lineHeight: '1.5' }],   // 17px — standard body
         'lg':   ['1.125rem',  { lineHeight: '1.75rem' }],
         'xl':   ['1.25rem',   { lineHeight: '1.75rem' }],
         '2xl':  ['1.5rem',    { lineHeight: '2rem' }],

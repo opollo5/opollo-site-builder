@@ -72,7 +72,7 @@ export function LinkPreviewCard({ data, url, onDismiss, className }: LinkPreview
           className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           data-testid="link-preview-domain"
         >
-          <ExternalLink size={10} strokeWidth={1.75} aria-hidden />
+          <ExternalLink size={15} strokeWidth={1.75} aria-hidden />
           {data.domain}
         </a>
       </div>
@@ -85,7 +85,7 @@ export function LinkPreviewCard({ data, url, onDismiss, className }: LinkPreview
         className="shrink-0 self-start text-muted-foreground hover:text-foreground transition-colors"
         data-testid="link-preview-dismiss"
       >
-        <X size={14} strokeWidth={1.75} aria-hidden />
+        <X size={15} strokeWidth={1.75} aria-hidden />
       </button>
     </div>
   );

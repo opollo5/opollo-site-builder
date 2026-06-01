@@ -251,7 +251,7 @@ export function PostAnalyticsModal({ open, onClose, draftId, onScheduleAgain, on
           <div className="flex flex-col gap-3">
             {primaryProfile && (
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                <SocialPlatformIcon platform={iconKey} size={14} />
+                <SocialPlatformIcon platform={iconKey} size={15} />
                 <span>{platform.toUpperCase().replace("_", " ")}</span>
               </div>
             )}

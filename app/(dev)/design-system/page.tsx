@@ -434,7 +434,7 @@ function ProfileChip({
             boxShadow: "0 0 0 2px var(--c3-surface)",
           }}
         >
-          <PlatformIcon size={14} />
+          <PlatformIcon size={15} />
         </div>
       </div>
 
@@ -461,7 +461,7 @@ function ProfileChip({
             color: "#fff",
           }}
         >
-          <Check size={10} strokeWidth={2.5} />
+          <Check size={15} strokeWidth={2.5} />
         </div>
       )}
     </div>
