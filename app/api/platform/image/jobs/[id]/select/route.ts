@@ -122,12 +122,25 @@ async function handleSelection(
   // Approve: fire auto-attach. Result is reflected in the response so the
   // UI can render an "attached to draft on YYYY-MM-DD" affordance. The
   // attach is fail-soft — selection has already been recorded.
+
+  // Fetch company timezone here (the caller owns companyId; this is the
+  // correct place per the locked model). Reuses the svc already open above.
+  // Fail-soft: "UTC" if absent.
+  let companyTimezone = "UTC";
+  const { data: co } = await svc
+    .from("platform_companies")
+    .select("timezone")
+    .eq("id", owner.companyId)
+    .maybeSingle();
+  if (co?.timezone) companyTimezone = co.timezone as string;
+
   let attachResult: { state: AutoAttachState; draftId?: string; assetId?: string; error?: string };
   try {
     attachResult = await autoAttachImage({
       jobId,
       companyId: owner.companyId,
       approvedBy: gate.userId,
+      companyTimezone,
     });
   } catch (err) {
     // autoAttachImage is designed not to throw; this is a defence-in-depth

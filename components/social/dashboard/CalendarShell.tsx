@@ -112,11 +112,26 @@ function endOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth() + 1, 0);
 }
 
-function postsForDate(posts: CalendarPost[], date: Date): CalendarPost[] {
-  const key = isoDate(date);
+/**
+ * Format a Date or UTC ISO string as YYYY-MM-DD in the given IANA timezone.
+ * Uses Intl.DateTimeFormat (built-in, no extra imports) with the en-CA locale
+ * which reliably produces YYYY-MM-DD.
+ */
+export function dateInTimeZone(date: Date | string, tz: string): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+function postsForDate(posts: CalendarPost[], date: Date, companyTimezone: string): CalendarPost[] {
+  const key = dateInTimeZone(date, companyTimezone);
   return posts.filter((p) => {
     const at = p.scheduled_at ?? p.published_at;
-    return at ? at.slice(0, 10) === key : false;
+    return at ? dateInTimeZone(at, companyTimezone) === key : false;
   });
 }
 
@@ -124,9 +139,11 @@ interface CalendarShellProps {
   companyId: string;
   hasConnections: boolean;
   availableConnections: Connection[];
+  /** IANA timezone for the company (e.g. "Australia/Melbourne"). Anchors all date display and storage. */
+  companyTimezone?: string;
 }
 
-export function CalendarShell({ companyId, hasConnections, availableConnections }: CalendarShellProps) {
+export function CalendarShell({ companyId, hasConnections, availableConnections, companyTimezone = "UTC" }: CalendarShellProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -229,7 +246,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
     }
   }
 
-  const selectedDayPosts = postsForDate(posts, selectedDate);
+  const selectedDayPosts = postsForDate(posts, selectedDate, companyTimezone);
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden" data-testid="calendar-shell">
@@ -278,6 +295,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
               <SocialCalendarGrid
                 context="page"
                 companyId={companyId}
+                companyTimezone={companyTimezone}
                 year={currentMonth.getFullYear()}
                 month={currentMonth.getMonth()}
                 onNavigate={(y, m) => {
@@ -375,6 +393,7 @@ export function CalendarShell({ companyId, hasConnections, availableConnections 
         initialDraft={composerState.draft}
         prefilledDate={composerState.prefilledDate}
         companyId={companyId}
+        companyTimezone={companyTimezone}
         availableConnections={availableConnections}
       />
     </div>

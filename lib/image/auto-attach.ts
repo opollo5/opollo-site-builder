@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fromZonedTime } from "date-fns-tz";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
@@ -34,6 +35,13 @@ export interface AutoAttachInput {
   jobId: string;
   companyId: string;
   approvedBy: string; // platform_users.id of the approving operator
+  /**
+   * IANA timezone for the company (e.g. "Australia/Melbourne").
+   * Fetched by the caller (select route) which already has companyId.
+   * Used to anchor bulk auto-attach scheduled_at to company-local midnight.
+   * Defaults to "UTC" inside the function if absent.
+   */
+  companyTimezone?: string;
 }
 
 export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttachResult> {
@@ -124,12 +132,15 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
     const assetId = (asset as { id: string }).id;
 
     // ─── Step 2: find or create the scheduled draft ──────────────────────
+    // companyTimezone is provided by the caller (select route); it has the
+    // companyId and fetches the timezone before calling autoAttachImage.
     const draftId = await findOrCreateScheduledDraft(svc, {
       companyId: input.companyId,
       publishDate: j.target_publish_date,
       approvedBy: input.approvedBy,
       postText: j.post_text ?? null,
       targetPlatforms: (j.target_platforms as string[] | null) ?? [],
+      companyTimezone: input.companyTimezone ?? "UTC",
     });
 
     if (!draftId) {
@@ -357,14 +368,27 @@ interface FindOrCreateDraftInput {
    * creation only. Empty array or unmatched codes are silently skipped.
    */
   targetPlatforms: string[];
+  /**
+   * IANA timezone for the company (e.g. "Australia/Melbourne").
+   * Used to anchor midnight to the company's local date — a spreadsheet row
+   * saying "June 14" becomes June 14 00:00 in the company timezone, not UTC.
+   * Defaults to "UTC" if unavailable.
+   */
+  companyTimezone: string;
 }
 
 async function findOrCreateScheduledDraft(
   svc: ReturnType<typeof getServiceRoleClient>,
   input: FindOrCreateDraftInput,
 ): Promise<string | null> {
-  // Normalise publish_date → scheduled_at = midnight UTC of that day.
-  const scheduledAtIso = `${input.publishDate}T00:00:00.000Z`;
+  // Normalise publish_date → scheduled_at = midnight in the COMPANY timezone.
+  // A spreadsheet row saying "June 14" means June 14 00:00 in the client's
+  // local timezone, not UTC midnight. fromZonedTime converts local midnight
+  // to the correct UTC equivalent (e.g. June 14 00:00 AEST = June 13 14:00 UTC).
+  const scheduledAtIso = fromZonedTime(
+    `${input.publishDate}T00:00:00`,
+    input.companyTimezone,
+  ).toISOString();
 
   // Look for an existing scheduled draft for (company, publish_date).
   // Match by scheduled_at exact equality + state='scheduled' + not archived.

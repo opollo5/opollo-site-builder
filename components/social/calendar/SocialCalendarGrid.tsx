@@ -72,6 +72,8 @@ export interface SocialCalendarGridProps {
   showTodayButton?: boolean;
   /** Profile IDs to pass to useCalendarView */
   profileFilter?: string[];
+  /** IANA timezone for bucketing posts into calendar day cells. Defaults to "UTC". */
+  companyTimezone?: string;
   /**
    * Custom day-cell renderer. When provided, replaces the default cell.
    * The caller is responsible for DnD wiring; SocialCalendarGrid handles the
@@ -181,6 +183,7 @@ export function SocialCalendarGrid({
   onNavigate,
   showTodayButton,
   profileFilter,
+  companyTimezone = "UTC",
   renderDay,
 }: SocialCalendarGridProps) {
   const today = new Date();
@@ -299,10 +302,19 @@ export function SocialCalendarGrid({
         data-testid="calendar-grid"
       >
         {cells.map((date) => {
-          const key = isoDate(date);
+          // Bucket posts into calendar days using the company timezone.
+          // Both the cell key and the post timestamp are converted to the same
+          // timezone before comparing so the day boundary is local, not UTC.
+          const key = new Intl.DateTimeFormat("en-CA", {
+            timeZone: companyTimezone, year: "numeric", month: "2-digit", day: "2-digit",
+          }).format(date);
           const dayPosts = posts.filter((p) => {
             const at = p.scheduled_at ?? p.published_at;
-            return at ? at.slice(0, 10) === key : false;
+            if (!at) return false;
+            const dayKey = new Intl.DateTimeFormat("en-CA", {
+              timeZone: companyTimezone, year: "numeric", month: "2-digit", day: "2-digit",
+            }).format(new Date(at));
+            return dayKey === key;
           });
           const isCurrentMonth = date.getMonth() === viewMonth;
           const todayFlag = isSameDay(date, today);
