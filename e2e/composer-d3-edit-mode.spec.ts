@@ -148,12 +148,16 @@ test.describe("PR-D3 edit-mode parity", () => {
     const post = makeCalendarPost("d3-scheduled", "scheduled");
     await setupCalendarWithPost(page, context, post, "scheduled");
 
-    // Click the post chip
+    // D1: chip click selects the day, showing the side-pane post card
     const chip = page.locator('[data-testid="post-chip"]').first();
     await expect(chip).toBeVisible({ timeout: 10_000 });
     await chip.click();
 
-    // Composer overlay should open (not analytics modal)
+    // Side-pane card appears; clicking it opens Composer (not analytics modal)
+    const card = page.getByTestId("day-detail-post-card").first();
+    await expect(card).toBeVisible({ timeout: 5_000 });
+    await card.click();
+
     await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId("post-analytics-modal")).not.toBeVisible();
   });
@@ -189,6 +193,11 @@ test.describe("PR-D3 edit-mode parity", () => {
     const chip = page.locator('[data-testid="post-chip"]').first();
     await expect(chip).toBeVisible({ timeout: 10_000 });
     await chip.click();
+
+    // D1: chip click selects the day, showing the side-pane post card
+    const card = page.getByTestId("day-detail-post-card").first();
+    await expect(card).toBeVisible({ timeout: 5_000 });
+    await card.click();
 
     // Analytics modal should open; composer overlay should NOT open
     await expect(page.getByTestId("post-analytics-modal")).toBeVisible({ timeout: 5_000 });

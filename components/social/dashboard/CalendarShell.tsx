@@ -306,7 +306,6 @@ export function CalendarShell({ companyId, hasConnections, availableConnections,
                 profileFilter={profileFilter}
                 selectedDate={selectedDate}
                 onDateSelect={(d) => setSelectedDate(d)}
-                onClickPost={handleClickPost}
                 renderDay={(date, dayPosts, meta) => (
                   <DnDCell
                     date={date}
@@ -316,7 +315,9 @@ export function CalendarShell({ companyId, hasConnections, availableConnections,
                     isOtherMonth={meta.isOtherMonth}
                     isToday={meta.isToday}
                     onClick={() => setSelectedDate(date)}
-                    onClickPost={handleClickPost}
+                    // D1: in-cell click = select day only. No onClickPost here —
+                    // PostChip clicks bubble up to the cell and select the date.
+                    // Opening Composer happens only from the side-pane (DayDetail).
                   />
                 )}
               />
@@ -328,7 +329,6 @@ export function CalendarShell({ companyId, hasConnections, availableConnections,
               posts={selectedDayPosts}
               onPostClick={handleClickPost}
               onDelete={handleDelete}
-              onReschedule={handleReschedule}
               onAddPost={() => openComposer({ prefilledDate: selectedDate })}
               className="w-72 shrink-0"
             />

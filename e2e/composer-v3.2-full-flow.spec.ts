@@ -421,6 +421,11 @@ test.describe("Item 15 — click routing by post status", () => {
     await expect(chip).toBeVisible({ timeout: 10_000 });
     await chip.click();
 
+    // D1: chip click selects the day; side-pane card click opens Composer
+    const card = page.getByTestId("day-detail-post-card").first();
+    await expect(card).toBeVisible({ timeout: 5_000 });
+    await card.click();
+
     await expect(page.getByTestId("composer-overlay")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId("post-analytics-modal")).not.toBeVisible();
   });
@@ -450,6 +455,11 @@ test.describe("Item 15 — click routing by post status", () => {
     const chip = page.getByTestId("post-chip").first();
     await expect(chip).toBeVisible({ timeout: 10_000 });
     await chip.click();
+
+    // D1: chip click selects the day; side-pane card click opens analytics modal
+    const card = page.getByTestId("day-detail-post-card").first();
+    await expect(card).toBeVisible({ timeout: 5_000 });
+    await card.click();
 
     await expect(page.getByTestId("post-analytics-modal")).toBeVisible({ timeout: 5_000 });
     await expect(page.getByTestId("composer-overlay")).not.toBeVisible();
