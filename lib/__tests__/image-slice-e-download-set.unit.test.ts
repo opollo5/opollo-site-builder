@@ -72,7 +72,7 @@ describe("Slice E — download set (D6, D20, D25)", () => {
 
   it("download mode: approve adds to download set (no autoAttach)", async () => {
     batchDestination = "download";
-    const res = await POST(makeApproveReq(), { params: Promise.resolve({ id: JOB_ID }) });
+    const res = await POST(makeApproveReq(), { params: { id: JOB_ID } });
     const body = await res.json() as { ok: boolean; data: Record<string, unknown> };
     expect(body.ok).toBe(true);
     expect(body.data.addedToDownloadSet).toBe(true);
@@ -83,7 +83,7 @@ describe("Slice E — download set (D6, D20, D25)", () => {
   it("D25: idempotent approve — returns existing selection without inserting duplicate", async () => {
     existingSelection = { id: SEL_ID, selected: true };
     batchDestination = "publish";
-    const res = await POST(makeApproveReq(), { params: Promise.resolve({ id: JOB_ID }) });
+    const res = await POST(makeApproveReq(), { params: { id: JOB_ID } });
     const body = await res.json() as { ok: boolean; data: { selectionId: string } };
     expect(body.ok).toBe(true);
     expect(body.data.selectionId).toBe(SEL_ID);
@@ -93,7 +93,7 @@ describe("Slice E — download set (D6, D20, D25)", () => {
 
   it("publish mode: approve fires autoAttach (unaffected by Slice E)", async () => {
     batchDestination = "publish";
-    const res = await POST(makeApproveReq(), { params: Promise.resolve({ id: JOB_ID }) });
+    const res = await POST(makeApproveReq(), { params: { id: JOB_ID } });
     const body = await res.json() as { ok: boolean; data: Record<string, unknown> };
     expect(body.ok).toBe(true);
     expect(body.data.destination).toBe("publish");
