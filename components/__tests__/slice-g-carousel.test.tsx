@@ -21,7 +21,7 @@ vi.mock("@/components/social/composer/PreviewCard", () => ({
   ),
 }));
 
-vi.mock("sonner", () => ({ toast: vi.fn(), default: { success: vi.fn(), error: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), loading: vi.fn(), dismiss: vi.fn() }, default: { success: vi.fn(), error: vi.fn() } }));
 
 // Minimal fetch mock — returns publish-mode approval by default.
 let fetchMock = vi.fn();
