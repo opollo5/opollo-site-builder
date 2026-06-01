@@ -42,6 +42,7 @@ const BatchSchema = z.object({
   source_filename: z.string().optional(),
   source_row_count: z.number().int().min(1).optional(),
   mode: z.enum(["generate", "preview"]).default("generate"),
+  destination: z.enum(["publish", "download"]).default("publish"),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -53,7 +54,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return validationError("Invalid batch spec.", { issues: parsed.error.issues });
   }
 
-  const { company_id, jobs, source_filename, source_row_count, mode } = parsed.data;
+  const { company_id, jobs, source_filename, source_row_count, mode, destination } = parsed.data;
 
   const gate = await requireCanDoForApi(company_id, "create_post");
   if (gate.kind === "deny") return gate.response;
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     mode,
     sourceFilename: source_filename,
     sourceRowCount: source_row_count,
+    destination,
   });
 
   if (!result.ok) {
