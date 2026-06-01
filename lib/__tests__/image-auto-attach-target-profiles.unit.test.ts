@@ -211,8 +211,9 @@ describe("autoAttachImage — target_profiles prefill (Gap 2)", () => {
     expect(linkedinIds[0]).toBe(LI_COMPANY_ID);
   });
 
-  it("existing draft (find path) → no INSERT, target_profiles untouched (create-only rule)", async () => {
-    existingDraftForDate = { id: EXISTING_DRAFT_ID };
+  it("always-create: every approval INSERTs its own draft (never finds existing)", async () => {
+    // There is no find-existing logic anymore. Even if a draft for this date
+    // already exists, a second approval always creates a new one.
     socialConnectionsResult = [
       { id: LI_COMPANY_ID, platform: "linkedin_company", display_name: "Acme", avatar_url: null },
     ];
@@ -222,8 +223,11 @@ describe("autoAttachImage — target_profiles prefill (Gap 2)", () => {
     });
 
     expect(result.state).toBe("attached");
-    // No INSERT — existing draft was found, not created
-    expect(capturedDraftInsert).toBeNull();
+    // Always inserts — capturedDraftInsert is populated.
+    expect(capturedDraftInsert).not.toBeNull();
+    // target_profiles populated on the INSERT.
+    const profiles = capturedDraftInsert!.target_profiles as Array<{ profile_id: string }>;
+    expect(profiles.some(p => p.profile_id === LI_COMPANY_ID)).toBe(true);
   });
 
   it("both linkedin variants + facebook → 2 entries, personal excluded", async () => {

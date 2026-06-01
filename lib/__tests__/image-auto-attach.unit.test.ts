@@ -227,11 +227,11 @@ describe("autoAttachImage — no publish date", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Path 2: attach to a brand-new draft
+// Path 2: always-create — one approval = one new draft, fully populated
 // ---------------------------------------------------------------------------
 
-describe("autoAttachImage — new draft", () => {
-  test("creates social_media_assets row + new social_post_drafts row; marks attached", async () => {
+describe("autoAttachImage — always creates a new draft", () => {
+  test("creates social_media_assets row + new social_post_drafts row with asset in INSERT; marks attached", async () => {
     responses.jobLookup = {
       data: {
         id: JOB_ID,
@@ -243,9 +243,7 @@ describe("autoAttachImage — new draft", () => {
       },
       error: null,
     };
-    responses.draftLookup = { data: null, error: null }; // no existing draft
     responses.draftInsert = { data: { id: NEW_DRAFT_ID }, error: null };
-    responses.draftRead = { data: { media_asset_ids: [] }, error: null };
 
     const result = await autoAttachImage({
       jobId: JOB_ID,
@@ -257,15 +255,11 @@ describe("autoAttachImage — new draft", () => {
     expect(result.draftId).toBe(NEW_DRAFT_ID);
     expect(result.assetId).toBe(ASSET_ID);
 
-    // Asset insert carried the right shape.
+    // Asset insert: correct shape and dimensions for 4x5.
     const assetInsert = calls.find((c) => c.table === "social_media_assets" && c.op === "insert");
     const row = assetInsert!.inserted as {
-      company_id: string;
-      storage_path: string;
-      uploaded_by: string;
-      width: number;
-      height: number;
-      mime_type: string;
+      company_id: string; storage_path: string; uploaded_by: string;
+      width: number; height: number; mime_type: string;
     };
     expect(row.company_id).toBe(COMPANY_ID);
     expect(row.storage_path).toBe(STORAGE_PATH);
@@ -274,20 +268,21 @@ describe("autoAttachImage — new draft", () => {
     expect(row.height).toBe(1280);
     expect(row.mime_type).toBe("image/jpeg");
 
-    // Draft was inserted because lookup returned null.
+    // Draft INSERT: asset is in the INSERT row (not a separate UPDATE).
     const draftInsert = calls.find((c) => c.table === "social_post_drafts" && c.op === "insert");
     expect(draftInsert).toBeDefined();
-    const draftRow = draftInsert!.inserted as { state: string; scheduled_at: string };
+    const draftRow = draftInsert!.inserted as {
+      state: string; scheduled_at: string; media_asset_ids: string[];
+    };
     expect(draftRow.state).toBe("scheduled");
     expect(draftRow.scheduled_at).toBe("2026-06-15T00:00:00.000Z");
+    expect(draftRow.media_asset_ids).toEqual([ASSET_ID]);
 
-    // media_asset_ids on the draft got the new asset appended.
-    const draftUpdate = calls.find(
+    // No UPDATE to social_post_drafts.media_asset_ids — asset is in the INSERT.
+    const draftUpdates = calls.filter(
       (c) => c.op === "update" && c.table === "social_post_drafts",
     );
-    expect((draftUpdate?.patch as { media_asset_ids: string[] }).media_asset_ids).toEqual([
-      ASSET_ID,
-    ]);
+    expect(draftUpdates).toHaveLength(0);
 
     // Final state mark.
     const stateUpdates = calls.filter(
@@ -302,11 +297,14 @@ describe("autoAttachImage — new draft", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Path 3: attach to an existing scheduled draft
+// Path 3: two approvals for the same date → two SEPARATE drafts
 // ---------------------------------------------------------------------------
 
-describe("autoAttachImage — existing draft", () => {
-  test("does NOT create a new draft when one exists for (company, date); appends asset id", async () => {
+describe("autoAttachImage — two approvals same date = two separate drafts", () => {
+  test("second approval creates a new draft regardless of existing drafts for that date", async () => {
+    const SECOND_DRAFT_ID = "77777777-7777-4777-8777-777777777777";
+    const SECOND_ASSET_ID = "88888888-8888-4888-8888-888888888888";
+
     responses.jobLookup = {
       data: {
         id: JOB_ID,
@@ -318,64 +316,36 @@ describe("autoAttachImage — existing draft", () => {
       },
       error: null,
     };
-    responses.draftLookup = { data: { id: EXISTING_DRAFT_ID }, error: null };
-    responses.draftRead = {
-      data: { media_asset_ids: ["existing-asset-a", "existing-asset-b"] },
-      error: null,
-    };
 
-    const result = await autoAttachImage({
-      jobId: JOB_ID,
-      companyId: COMPANY_ID,
-      approvedBy: APPROVER_ID,
+    // First approval.
+    responses.draftInsert = { data: { id: NEW_DRAFT_ID }, error: null };
+    responses.assetInsert = { data: { id: ASSET_ID }, error: null };
+    const result1 = await autoAttachImage({
+      jobId: JOB_ID, companyId: COMPANY_ID, approvedBy: APPROVER_ID,
     });
 
-    expect(result.state).toBe("attached");
-    expect(result.draftId).toBe(EXISTING_DRAFT_ID);
-
-    // No INSERT into social_post_drafts.
-    expect(calls.filter((c) => c.table === "social_post_drafts" && c.op === "insert"))
-      .toHaveLength(0);
-
-    // media_asset_ids should be the union, preserving existing order.
-    const draftUpdate = calls.find(
-      (c) => c.op === "update" && c.table === "social_post_drafts",
-    );
-    expect((draftUpdate?.patch as { media_asset_ids: string[] }).media_asset_ids).toEqual([
-      "existing-asset-a",
-      "existing-asset-b",
-      ASSET_ID,
-    ]);
-  });
-
-  test("idempotent: assetId already present → media_asset_ids unchanged", async () => {
-    responses.jobLookup = {
-      data: {
-        id: JOB_ID,
-        company_id: COMPANY_ID,
-        state: "completed",
-        result_storage_path: STORAGE_PATH,
-        target_publish_date: "2026-06-15",
-        generation_params: { aspectRatio: "1x1" },
-      },
-      error: null,
-    };
-    responses.draftLookup = { data: { id: EXISTING_DRAFT_ID }, error: null };
-    responses.draftRead = { data: { media_asset_ids: [ASSET_ID] }, error: null };
-
-    const result = await autoAttachImage({
-      jobId: JOB_ID,
-      companyId: COMPANY_ID,
-      approvedBy: APPROVER_ID,
+    // Reset for second approval (simulating a second image job for the same date).
+    calls.length = 0;
+    draftSelectCallCount = 0;
+    responses.draftInsert = { data: { id: SECOND_DRAFT_ID }, error: null };
+    responses.assetInsert = { data: { id: SECOND_ASSET_ID }, error: null };
+    const result2 = await autoAttachImage({
+      jobId: JOB_ID, companyId: COMPANY_ID, approvedBy: APPROVER_ID,
     });
 
-    expect(result.state).toBe("attached");
-    const draftUpdate = calls.find(
-      (c) => c.op === "update" && c.table === "social_post_drafts",
-    );
-    expect((draftUpdate?.patch as { media_asset_ids: string[] }).media_asset_ids).toEqual([
-      ASSET_ID,
-    ]);
+    // Both approvals succeed.
+    expect(result1.state).toBe("attached");
+    expect(result1.draftId).toBe(NEW_DRAFT_ID);
+    expect(result2.state).toBe("attached");
+    expect(result2.draftId).toBe(SECOND_DRAFT_ID);
+
+    // Second call creates its own INSERT — no SELECT for existing draft.
+    const draftInserts2 = calls.filter((c) => c.table === "social_post_drafts" && c.op === "insert");
+    expect(draftInserts2).toHaveLength(1);
+
+    // No SELECT on social_post_drafts (no find-existing logic).
+    const draftSelects2 = calls.filter((c) => c.table === "social_post_drafts" && c.op === "select");
+    expect(draftSelects2).toHaveLength(0);
   });
 });
 
@@ -455,7 +425,7 @@ describe("autoAttachImage — failure paths", () => {
     );
   });
 
-  test("draft update error → attach_failed; draftId surfaced in result for diagnostics", async () => {
+  test("draft INSERT error → attach_failed", async () => {
     responses.jobLookup = {
       data: {
         id: JOB_ID,
@@ -467,9 +437,8 @@ describe("autoAttachImage — failure paths", () => {
       },
       error: null,
     };
-    responses.draftLookup = { data: { id: EXISTING_DRAFT_ID }, error: null };
-    responses.draftRead = { data: { media_asset_ids: [] }, error: null };
-    responses.draftUpdate = { error: { message: "deadlock detected" } };
+    // Simulate a DB constraint failure on draft INSERT.
+    responses.draftInsert = { data: null, error: { message: "violates FK constraint" } };
 
     const result = await autoAttachImage({
       jobId: JOB_ID,
@@ -478,9 +447,7 @@ describe("autoAttachImage — failure paths", () => {
     });
 
     expect(result.state).toBe("attach_failed");
-    expect(result.draftId).toBe(EXISTING_DRAFT_ID);
-    expect(result.assetId).toBe(ASSET_ID);
-    expect(result.error).toBe("deadlock detected");
+    expect(result.error).toBe("draft creation failed");
   });
 
   test("job not in 'completed' state → attach_failed (not allowed to attach a pending/failed job)", async () => {
@@ -571,10 +538,10 @@ describe("autoAttachImage — post_text / caption pre-fill", () => {
     expect((draftInsert!.inserted as { content: string }).content).toBe("");
   });
 
-  // NON-NEGOTIABLE SAFETY RULE: when a draft already exists for (company, date),
-  // the second approval appends to media_asset_ids but must NEVER overwrite content.
-  // An operator may have already edited the caption on the existing draft.
-  test("existing draft: content is NOT overwritten — create-only rule enforced", async () => {
+  // Always-create rule: each approval produces its own draft with its own caption.
+  // A second approval for the same date creates a SECOND draft — it never merges
+  // or overwrites the first operator-created draft.
+  test("second approval for same date → creates its own draft with its own caption", async () => {
     responses.jobLookup = {
       data: {
         id: JOB_ID,
@@ -583,17 +550,12 @@ describe("autoAttachImage — post_text / caption pre-fill", () => {
         result_storage_path: STORAGE_PATH,
         target_publish_date: "2026-08-01",
         generation_params: { aspectRatio: "16x9" },
-        // A second approval for the same date carries a different caption.
-        post_text: "A second AI caption that must NOT overwrite the existing draft.",
+        post_text: "Second post caption — goes on its own fresh draft.",
       },
       error: null,
     };
-    // Draft already exists (first approval created it with a different caption).
-    responses.draftLookup = { data: { id: EXISTING_DRAFT_ID }, error: null };
-    responses.draftRead = {
-      data: { media_asset_ids: ["first-asset-uuid"] },
-      error: null,
-    };
+    const SECOND_DRAFT_ID = "99999999-9999-4999-8999-999999999999";
+    responses.draftInsert = { data: { id: SECOND_DRAFT_ID }, error: null };
 
     const result = await autoAttachImage({
       jobId: JOB_ID,
@@ -602,23 +564,19 @@ describe("autoAttachImage — post_text / caption pre-fill", () => {
     });
 
     expect(result.state).toBe("attached");
-    expect(result.draftId).toBe(EXISTING_DRAFT_ID);
+    expect(result.draftId).toBe(SECOND_DRAFT_ID);
 
-    // ASSERT: no INSERT into social_post_drafts — find path, not create path.
+    // ASSERT: always inserts a new draft.
     const draftInserts = calls.filter(
       (c) => c.table === "social_post_drafts" && c.op === "insert",
     );
-    expect(draftInserts).toHaveLength(0);
+    expect(draftInserts).toHaveLength(1);
 
-    // ASSERT: the UPDATE to social_post_drafts only touches media_asset_ids —
-    // never content.
-    const draftUpdate = calls.find(
-      (c) => c.op === "update" && c.table === "social_post_drafts",
-    );
-    expect(draftUpdate).toBeDefined();
-    const patch = draftUpdate!.patch as Record<string, unknown>;
-    expect("content" in patch).toBe(false); // content must not appear in the patch at all
-    expect(patch.media_asset_ids).toContain(ASSET_ID);
-    expect(patch.media_asset_ids).toContain("first-asset-uuid");
+    // ASSERT: new draft carries its own caption (not merged into an existing one).
+    const insertedRow = draftInserts[0]!.inserted as {
+      content: string; media_asset_ids: string[];
+    };
+    expect(insertedRow.content).toBe("Second post caption — goes on its own fresh draft.");
+    expect(insertedRow.media_asset_ids).toEqual([ASSET_ID]);
   });
 });
