@@ -129,7 +129,8 @@ function DefaultCell({
       onClick={() => onClick(date)}
       data-testid={`calendar-day-${date.toISOString().slice(0, 10)}`}
       className={cn(
-        "relative flex min-h-[80px] flex-col gap-0.5 rounded border border-border p-2 cursor-pointer transition-colors",
+        // D3: taller cells for richer post chip display
+        "relative flex min-h-[96px] flex-col gap-0.5 rounded border border-border p-2 cursor-pointer transition-colors",
         isOtherMonth && "bg-muted/30 text-muted-foreground",
         isPast && !isOtherMonth && "bg-muted/20",
         isToday && !isOtherMonth && !isSelected && "bg-primary/5",
