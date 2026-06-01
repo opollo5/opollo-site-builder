@@ -58,6 +58,18 @@ function configureFrom(opts: {
         }),
       };
     }
+    if (table === "platform_companies") {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { timezone: "Australia/Melbourne" },
+              error: null,
+            }),
+          }),
+        }),
+      };
+    }
     return {};
   });
 }
@@ -110,6 +122,7 @@ describe("POST /api/platform/image/jobs/[id]/select (approve)", () => {
       jobId: JOB_ID,
       companyId: COMPANY_ID,
       approvedBy: USER_ID,
+      companyTimezone: "Australia/Melbourne",
     });
   });
 
