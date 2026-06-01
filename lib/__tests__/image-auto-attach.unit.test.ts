@@ -571,10 +571,10 @@ describe("autoAttachImage — post_text / caption pre-fill", () => {
     expect((draftInsert!.inserted as { content: string }).content).toBe("");
   });
 
-  // NON-NEGOTIABLE SAFETY RULE: when a draft already exists for (company, date),
-  // the second approval appends to media_asset_ids but must NEVER overwrite content.
-  // An operator may have already edited the caption on the existing draft.
-  test("existing draft: content is NOT overwritten — create-only rule enforced", async () => {
+  // NON-NEGOTIABLE SAFETY RULE: when a draft already exists for (company, date)
+  // with OPERATOR-WRITTEN content, the second approval must NEVER overwrite it.
+  // (Empty-shell fill from Fix 2 only applies when content === "" — not here.)
+  test("existing draft with operator content: content is NOT overwritten — create-only rule enforced", async () => {
     responses.jobLookup = {
       data: {
         id: JOB_ID,
@@ -583,13 +583,22 @@ describe("autoAttachImage — post_text / caption pre-fill", () => {
         result_storage_path: STORAGE_PATH,
         target_publish_date: "2026-08-01",
         generation_params: { aspectRatio: "16x9" },
-        // A second approval for the same date carries a different caption.
+        // A second approval for the same date carries a different AI caption.
         post_text: "A second AI caption that must NOT overwrite the existing draft.",
       },
       error: null,
     };
-    // Draft already exists (first approval created it with a different caption).
-    responses.draftLookup = { data: { id: EXISTING_DRAFT_ID }, error: null };
+    // Draft already exists — operator has already written a caption.
+    // Fix 2 must leave this non-empty content alone.
+    responses.draftLookup = {
+      data: {
+        id: EXISTING_DRAFT_ID,
+        content: "Operator wrote this caption already.",
+        target_profiles: [{ profile_id: "existing-profile" }],
+        draft_data: { target_connection_ids: ["existing-profile"] },
+      },
+      error: null,
+    };
     responses.draftRead = {
       data: { media_asset_ids: ["first-asset-uuid"] },
       error: null,

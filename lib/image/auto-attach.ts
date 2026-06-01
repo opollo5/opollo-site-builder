@@ -44,7 +44,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
     const { data: job, error: jobErr } = await svc
       .from("image_generation_jobs")
       .select(
-        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text, target_platforms",
+        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text, target_platforms, parent_post_index, batch_id",
       )
       .eq("id", input.jobId)
       .maybeSingle();
@@ -64,6 +64,8 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       generation_params: Record<string, unknown>;
       post_text: string | null;
       target_platforms: string[] | null;
+      parent_post_index: number | null;
+      batch_id: string | null;
     };
 
     if (j.company_id !== input.companyId) {
@@ -138,11 +140,12 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       return { state: "attach_failed", error: reason };
     }
 
-    // ─── Step 3: append assetId to media_asset_ids ───────────────────────
-    // Read-modify-write with the service-role client. Concurrent attach
-    // calls for the same draft can race — the worst case is a duplicated
-    // asset id in the array, which the publish-layer dedupes when it
-    // resolves URLs. Acceptable per §B4.
+    // ─── Step 3: update media_asset_ids (variant-aware) ─────────────────
+    // Fix 1: if the job has a parent_post_index and batch_id, look up any
+    // prior aspect-ratio variants from the same source row that are already
+    // attached to this draft, and REPLACE them instead of stacking.
+    // These are format alternatives (1:1 / 16:9), not separate images.
+    // Falls back to append when no variant context is available.
     const { data: draft, error: readErr } = await svc
       .from("social_post_drafts")
       .select("media_asset_ids")
@@ -161,7 +164,14 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
     }
 
     const existingIds = ((draft as { media_asset_ids: string[] | null }).media_asset_ids) ?? [];
-    const nextIds = existingIds.includes(assetId) ? existingIds : [...existingIds, assetId];
+    const nextIds = await resolveNextMediaAssetIds(svc, {
+      existingIds,
+      newAssetId: assetId,
+      batchId: j.batch_id,
+      parentPostIndex: j.parent_post_index,
+      incomingJobId: j.id,
+      draftId,
+    });
 
     const { error: updErr } = await svc
       .from("social_post_drafts")
@@ -368,11 +378,10 @@ async function findOrCreateScheduledDraft(
 
   // Look for an existing scheduled draft for (company, publish_date).
   // Match by scheduled_at exact equality + state='scheduled' + not archived.
-  // IMPORTANT: if found, we return only the id. We do NOT update content —
-  // the operator may have already edited the caption on this draft.
+  // Select content + target_profiles + draft_data to check empty-shell conditions.
   const { data: existing, error: lookupErr } = await svc
     .from("social_post_drafts")
-    .select("id")
+    .select("id, content, target_profiles, draft_data")
     .eq("company_id", input.companyId)
     .eq("scheduled_at", scheduledAtIso)
     .eq("state", "scheduled")
@@ -390,9 +399,62 @@ async function findOrCreateScheduledDraft(
   }
 
   if (existing) {
-    // Draft exists — do NOT touch content. Only the caller (Step 3) will
-    // append the new asset id to media_asset_ids.
-    return (existing as { id: string }).id;
+    const e = existing as {
+      id: string;
+      content: string | null;
+      target_profiles: ResolvedConnection[] | null;
+      draft_data: Record<string, unknown> | null;
+    };
+
+    // Fix 2: fill empty-shell content and channels.
+    //
+    // Create-only rule extended to the find path:
+    //   - If content is blank (""), write post_text → content.
+    //   - If target_profiles is empty AND draft_data.target_connection_ids
+    //     is also absent/empty, resolve and write connections.
+    //   - Neither field is touched if already non-empty — operator-intentional.
+    // Fail-soft: lookup or patch errors are logged; draft id still returned.
+    const patches: Record<string, unknown> = {};
+
+    if ((e.content ?? "") === "" && input.postText) {
+      patches.content = input.postText;
+    }
+
+    const existingProfiles = e.target_profiles ?? [];
+    const existingConnectionIds =
+      (e.draft_data?.target_connection_ids as string[] | undefined) ?? [];
+    const channelsEmpty = existingProfiles.length === 0 && existingConnectionIds.length === 0;
+
+    if (channelsEmpty && input.targetPlatforms.length > 0) {
+      const resolved = await resolveTargetConnections(svc, input.companyId, input.targetPlatforms);
+      if (resolved.length > 0) {
+        patches.target_profiles = resolved;
+        // Mirror into draft_data.target_connection_ids so the V2 Composer
+        // save path (which reads draft_data first) also picks up the channels.
+        const currentDraftData = e.draft_data ?? {};
+        patches.draft_data = {
+          ...currentDraftData,
+          target_connection_ids: resolved.map((c) => c.profile_id),
+        };
+      }
+    }
+
+    if (Object.keys(patches).length > 0) {
+      patches.updated_at = new Date().toISOString();
+      const { error: patchErr } = await svc
+        .from("social_post_drafts")
+        .update(patches)
+        .eq("id", e.id);
+      if (patchErr) {
+        logger.warn("image.auto_attach.shell_fill_failed", {
+          draftId: e.id,
+          err: patchErr.message,
+        });
+        // Fail-soft: continue even if patch fails; draft id is still valid.
+      }
+    }
+
+    return e.id;
   }
 
   // No existing draft — create one.
@@ -446,6 +508,107 @@ async function findOrCreateScheduledDraft(
   }
 
   return (created as { id: string }).id;
+}
+
+// ---------------------------------------------------------------------------
+// Fix 1: variant-aware media_asset_ids update
+//
+// When approving an image that has a parent_post_index and batch_id, check
+// whether a prior aspect-ratio variant from the same source row is already
+// attached to this draft. If found, REPLACE it rather than stacking.
+//
+// These are format alternatives (1:1 for Instagram, 16:9 for LinkedIn) —
+// the same content at different sizes — not distinct images. Stacking them
+// produces a post with duplicate images; swapping gives one image that
+// reflects the latest approved variant.
+//
+// The prior variant's asset row in social_media_assets is left intact so
+// a future per-platform image selector can retrieve it. Only the draft's
+// media_asset_ids array changes.
+//
+// Falls back to simple append on any lookup error or when no variant
+// context is present (batch_id null, parent_post_index null, standalone job).
+// ---------------------------------------------------------------------------
+
+interface ResolveNextIdsInput {
+  existingIds: string[];
+  newAssetId: string;
+  batchId: string | null;
+  parentPostIndex: number | null;
+  incomingJobId: string;
+  draftId: string;
+}
+
+async function resolveNextMediaAssetIds(
+  svc: ReturnType<typeof getServiceRoleClient>,
+  opts: ResolveNextIdsInput,
+): Promise<string[]> {
+  // Without variant context (standalone job or no parent index), append normally.
+  if (!opts.batchId || opts.parentPostIndex === null) {
+    return opts.existingIds.includes(opts.newAssetId)
+      ? opts.existingIds
+      : [...opts.existingIds, opts.newAssetId];
+  }
+
+  // Find prior jobs from the same batch + source row already attached to this draft.
+  const { data: priorJobs, error: priorErr } = await svc
+    .from("image_generation_jobs")
+    .select("result_storage_path")
+    .eq("batch_id", opts.batchId)
+    .eq("parent_post_index", opts.parentPostIndex)
+    .eq("auto_attached_draft_id", opts.draftId)
+    .neq("id", opts.incomingJobId);
+
+  if (priorErr) {
+    logger.warn("image.auto_attach.variant_lookup_failed", {
+      draftId: opts.draftId,
+      err: priorErr.message,
+    });
+    // Fail-soft: fall back to append.
+    return opts.existingIds.includes(opts.newAssetId)
+      ? opts.existingIds
+      : [...opts.existingIds, opts.newAssetId];
+  }
+
+  const priorPaths = (priorJobs ?? [])
+    .map((j) => (j as { result_storage_path: string | null }).result_storage_path)
+    .filter((p): p is string => p !== null);
+
+  if (priorPaths.length === 0) {
+    // No prior variants attached — plain append.
+    return opts.existingIds.includes(opts.newAssetId)
+      ? opts.existingIds
+      : [...opts.existingIds, opts.newAssetId];
+  }
+
+  // Resolve storage paths → asset UUIDs.
+  const { data: priorAssets, error: assetErr } = await svc
+    .from("social_media_assets")
+    .select("id")
+    .in("storage_path", priorPaths);
+
+  if (assetErr) {
+    logger.warn("image.auto_attach.variant_asset_lookup_failed", {
+      draftId: opts.draftId,
+      err: assetErr.message,
+    });
+    return opts.existingIds.includes(opts.newAssetId)
+      ? opts.existingIds
+      : [...opts.existingIds, opts.newAssetId];
+  }
+
+  const priorAssetIds = new Set(
+    (priorAssets ?? []).map((a) => (a as { id: string }).id),
+  );
+
+  // Swap: remove prior variant asset IDs, add the incoming one.
+  const filtered = opts.existingIds.filter((id) => !priorAssetIds.has(id));
+  logger.info("image.auto_attach.variant_swapped", {
+    draftId: opts.draftId,
+    replaced: [...priorAssetIds],
+    with: opts.newAssetId,
+  });
+  return filtered.includes(opts.newAssetId) ? filtered : [...filtered, opts.newAssetId];
 }
 
 function aspectRatioToDimensions(ratio: string | undefined): {
