@@ -178,7 +178,26 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
               </a>
             </Button>
           )}
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${batch.state === "completed" ? "bg-green-100 text-green-700" : batch.state === "failed" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+          {batch.completedJobs > 0 && !isRunning && (
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+            >
+              <a
+                href={`/api/platform/image/batch/${batchId}/download?company_id=${companyId}`}
+                download
+              >
+                Download all ({batch.completedJobs})
+              </a>
+            </Button>
+          )}
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            batch.state === "completed" ? "bg-green-100 text-green-700"
+            : batch.state === "failed" ? "bg-red-100 text-red-700"
+            : batch.state === "partial" ? "bg-amber-100 text-amber-700"
+            : "bg-blue-100 text-blue-700"
+          }`}>
             {batch.state.charAt(0).toUpperCase() + batch.state.slice(1)}
           </span>
         </div>
