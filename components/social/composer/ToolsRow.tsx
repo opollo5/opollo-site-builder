@@ -507,9 +507,9 @@ function GifPanel({
 // AI uses Dialog (not Popover) to avoid overflowing the composer bounds.
 // Emoji, GIF, UTM remain Popover-anchored.
 const PANEL_TOOLS = [
-  { id: "emoji" as const, label: "Emoji",    icon: <Smile size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "gif" as const,   label: "GIF",      icon: <Film  size={14} strokeWidth={1.75} aria-hidden /> },
-  { id: "utm" as const,   label: "UTM tags", icon: <Tags  size={14} strokeWidth={1.75} aria-hidden /> },
+  { id: "emoji" as const, label: "Emoji",    icon: <Smile size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: "gif" as const,   label: "GIF",      icon: <Film  size={20} strokeWidth={1.75} aria-hidden /> },
+  { id: "utm" as const,   label: "UTM tags", icon: <Tags  size={20} strokeWidth={1.75} aria-hidden /> },
 ] as const;
 
 export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachGif, platforms, className }: ToolsRowProps) {
@@ -527,7 +527,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
         data-testid="composer-tool-media"
         onClick={onOpenMediaPicker}
       >
-        <ImagePlus size={14} strokeWidth={1.75} aria-hidden />
+        <ImagePlus size={20} strokeWidth={1.75} aria-hidden />
         Media
       </Button>
 
@@ -539,7 +539,7 @@ export function ToolsRow({ companyId, onInsertText, onOpenMediaPicker, onAttachG
         aria-pressed={activePanel === "ai"}
         onClick={() => setActivePanel(activePanel === "ai" ? null : "ai")}
       >
-        <Sparkles size={14} strokeWidth={1.75} aria-hidden />
+        <Sparkles size={20} strokeWidth={1.75} aria-hidden />
         AI assistant
       </Button>
       <Dialog open={activePanel === "ai"} onOpenChange={(open) => setActivePanel(open ? "ai" : null)}>
