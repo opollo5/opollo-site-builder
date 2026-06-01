@@ -88,13 +88,13 @@ export const primaryNavItems: PrimaryNavItem[] = [
   },
   {
     key: "batches",
-    label: "Batches",
+    label: "Page builder",
     icon: "layers",
     href: "/admin/batches",
     pathPrefixes: ["/admin/batches"],
     testId: "nav-batches",
     sectionNav: {
-      title: "Batches",
+      title: "Page builder",
       showSiteSelector: true,
       siteIdSegment: 3,
       siteSelectPath: "/admin/batches/{siteId}",
@@ -138,6 +138,14 @@ export const primaryNavItems: PrimaryNavItem[] = [
             { label: "Sharing", href: "/company/social/sharing", testId: "cnav-sharing", requiresCompanyAdmin: true },
             { label: "Analytics", href: "/company/social/analytics", testId: "cnav-analytics" },
             { label: "Insights", href: "/company/social/insights", testId: "cnav-insights" },
+          ],
+        },
+        {
+          label: "Images",
+          items: [
+            { label: "Generate", href: "/company/image/ingest", testId: "cnav-image-generate" },
+            { label: "Templates", href: "/company/image/templates", testId: "cnav-image-templates" },
+            { label: "Batch history", href: "/company/image/batches", testId: "cnav-image-batches" },
           ],
         },
         {
