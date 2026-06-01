@@ -11,6 +11,11 @@ interface PromptParams {
   mood?: string;
   safeMode?: boolean;
   simplify?: boolean; // retry pass — strip optional modifiers
+  /**
+   * D30 keep-clear composition fragment derived from text/logo layer positions
+   * (Slice H). Injected before the negative-prompt suffix when present.
+   */
+  keepClearFragment?: string;
 }
 
 export function buildPrompt(params: PromptParams): string {
@@ -31,7 +36,12 @@ export function buildPrompt(params: PromptParams): string {
   const moodMod = params.mood ? `${params.mood} mood, ` : "";
   const industryPart = industryCtx ? `, ${industryCtx}` : "";
 
-  return `${safeMod}${moodMod}${base}, ${composition}, ${colourDesc} colour accent${industryPart}, no text, no words, no letters, no typography`.trim();
+  // D30: append keep-clear fragment before the negative suffix when provided.
+  const keepClearSuffix = params.keepClearFragment
+    ? `. ${params.keepClearFragment}`
+    : "";
+
+  return `${safeMod}${moodMod}${base}, ${composition}, ${colourDesc} colour accent${industryPart}${keepClearSuffix}, no text, no words, no letters, no typography`.trim();
 }
 
 function hexToColourDescription(hex: string): string {
