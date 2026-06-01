@@ -211,6 +211,15 @@ async function handleIdeogramIngest({
   }
   const jobSpecs = fanOutJobs(interpreted.posts, publishDateBySourceRow);
 
+  // Build caption map: parentPostIndex (0-based) → AI-generated social copy.
+  // fanOutJobs assigns parentPostIndex = the array index of the InterpretedPost,
+  // which is the same as the index here. Multiple jobs per row (different aspect
+  // ratios) share the same parentPostIndex and therefore the same caption.
+  const postTextByParentIndex: Record<number, string> = {};
+  interpreted.posts.forEach((p, i) => {
+    if (p.post_text) postTextByParentIndex[i] = p.post_text;
+  });
+
   const mode = parseGenerateMode(req);
   const dispatched = await dispatchImageBatch({
     companyId,
@@ -219,6 +228,7 @@ async function handleIdeogramIngest({
     mode,
     sourceFilename: fileBlob.name,
     sourceRowCount: interpreted.posts.length,
+    postTextByParentIndex,
   });
 
   if (!dispatched.ok) {
