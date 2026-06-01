@@ -130,7 +130,8 @@ export function dateInTimeZone(date: Date | string, tz: string): string {
 function postsForDate(posts: CalendarPost[], date: Date, companyTimezone: string): CalendarPost[] {
   const key = dateInTimeZone(date, companyTimezone);
   return posts.filter((p) => {
-    const at = p.scheduled_at ?? p.published_at;
+    // Prefer scheduled_at, then published_at, then planned_for_at (draft with planned date).
+    const at = p.scheduled_at ?? p.published_at ?? p.planned_for_at;
     return at ? dateInTimeZone(at, companyTimezone) === key : false;
   });
 }
