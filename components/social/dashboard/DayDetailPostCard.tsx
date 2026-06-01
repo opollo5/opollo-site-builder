@@ -10,7 +10,6 @@ import type { CalendarPost } from "@/lib/social/types";
 interface DayDetailPostCardProps {
   post: CalendarPost;
   onDelete: (id: string) => void;
-  onReschedule: (id: string) => void;
   onClick: (post: CalendarPost) => void;
 }
 
@@ -67,7 +66,7 @@ function StateIcon({ state }: { state: CalendarPost["state"] }) {
   return null;
 }
 
-export function DayDetailPostCard({ post, onDelete, onReschedule, onClick }: DayDetailPostCardProps) {
+export function DayDetailPostCard({ post, onDelete, onClick }: DayDetailPostCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: post.id,
     data: { postId: post.id, scheduledAt: post.scheduled_at },
@@ -86,7 +85,8 @@ export function DayDetailPostCard({ post, onDelete, onReschedule, onClick }: Day
       ref={setNodeRef}
       style={style}
       className={cn(
-        "group relative flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3 transition-shadow hover:shadow-sm",
+        // D2: muted at rest → full opacity + lift on hover.
+        "group relative flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-card p-3 transition-all opacity-80 hover:opacity-100 hover:shadow-md",
         isDragging && "opacity-50 shadow-lg z-50",
       )}
       data-testid="day-detail-post-card"
@@ -129,26 +129,29 @@ export function DayDetailPostCard({ post, onDelete, onReschedule, onClick }: Day
         </div>
       )}
 
-      {/* Hover action buttons */}
+      {/* Hover action buttons — D2: Open (edit) + Delete */}
       <div className="absolute right-2 top-2 hidden gap-1 group-hover:flex" data-testid="hover-actions">
         <button
           type="button"
-          aria-label="Delete"
-          onClick={(e) => { e.stopPropagation(); onDelete(post.id); }}
-          className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-destructive hover:border-destructive transition-colors"
+          aria-label="Open post"
+          onClick={(e) => { e.stopPropagation(); onClick(post); }}
+          data-testid="hover-open-btn"
+          className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-primary hover:border-primary transition-colors"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
           </svg>
         </button>
         <button
           type="button"
-          aria-label="Reschedule"
-          onClick={(e) => { e.stopPropagation(); onReschedule(post.id); }}
-          className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-primary hover:border-primary transition-colors"
+          aria-label="Delete post"
+          onClick={(e) => { e.stopPropagation(); onDelete(post.id); }}
+          data-testid="hover-delete-btn"
+          className="flex h-7 w-7 items-center justify-center rounded border border-border bg-background text-muted-foreground hover:text-destructive hover:border-destructive transition-colors"
         >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
           </svg>
         </button>
       </div>

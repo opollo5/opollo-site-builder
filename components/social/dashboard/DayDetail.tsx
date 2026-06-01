@@ -10,7 +10,6 @@ interface DayDetailProps {
   posts: CalendarPost[];
   onPostClick: (post: CalendarPost) => void;
   onDelete: (id: string) => void;
-  onReschedule: (id: string) => void;
   onAddPost: () => void;
   className?: string;
 }
@@ -20,7 +19,6 @@ export function DayDetail({
   posts,
   onPostClick,
   onDelete,
-  onReschedule,
   onAddPost,
   className,
 }: DayDetailProps) {
@@ -77,7 +75,6 @@ export function DayDetail({
               key={post.id}
               post={post}
               onDelete={onDelete}
-              onReschedule={onReschedule}
               onClick={onPostClick}
             />
           ))}
