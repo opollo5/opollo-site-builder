@@ -117,7 +117,7 @@ export function PostChip({ post, className, highlighted = false, onClick }: Post
 
       {/* Right: thumbnail — reuse primary_media_url (D3) */}
       {post.primary_media_url && (
-        <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-border" aria-hidden>
+        <div className="h-8 w-8 shrink-0 overflow-hidden rounded border border-border" aria-label="has media">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={post.primary_media_url}
