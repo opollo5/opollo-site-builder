@@ -44,7 +44,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
     const { data: job, error: jobErr } = await svc
       .from("image_generation_jobs")
       .select(
-        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text",
+        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text, target_platforms",
       )
       .eq("id", input.jobId)
       .maybeSingle();
@@ -63,6 +63,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       target_publish_date: string | null;
       generation_params: Record<string, unknown>;
       post_text: string | null;
+      target_platforms: string[] | null;
     };
 
     if (j.company_id !== input.companyId) {
@@ -128,6 +129,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       publishDate: j.target_publish_date,
       approvedBy: input.approvedBy,
       postText: j.post_text ?? null,
+      targetPlatforms: (j.target_platforms as string[] | null) ?? [],
     });
 
     if (!draftId) {
@@ -224,6 +226,120 @@ async function markJobAttachState(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Platform code → social_connections.platform resolution
+//
+// Spreadsheet target_platforms use generic codes ("linkedin", "facebook").
+// social_connections.platform uses bundle.social-specific sub-types.
+// This map defines which DB platform values satisfy each generic code,
+// ordered by PREFERENCE: business/company pages first, personal pages last.
+//
+// Preference rule (baked in per spec):
+//   If a company has BOTH linkedin_personal AND linkedin_company, use
+//   linkedin_company — the normal business-posting target. The same
+//   "prefer company/business account over personal" logic applies to
+//   any platform that has a personal vs business variant.
+// ---------------------------------------------------------------------------
+
+type DbPlatform = "linkedin_personal" | "linkedin_company" | "facebook_page"
+  | "instagram_business" | "x" | "gbp";
+
+const GENERIC_TO_DB_PLATFORMS: Record<string, DbPlatform[]> = {
+  // Business page preferred over personal page.
+  linkedin:           ["linkedin_company", "linkedin_personal"],
+  linkedin_landscape: ["linkedin_company", "linkedin_personal"],
+  // Only one DB variant per platform below.
+  instagram:          ["instagram_business"],
+  instagram_story:    ["instagram_business"],
+  facebook:           ["facebook_page"],
+  facebook_story:     ["facebook_page"],
+  x:                  ["x"],
+  gbp:                ["gbp"],
+};
+
+interface ResolvedConnection {
+  profile_id: string;
+  platform: string;
+  account_name: string | null;
+  account_avatar_url: string | null;
+}
+
+/**
+ * Resolve generic platform codes to the company's connected social accounts.
+ *
+ * For each generic code, picks the highest-priority connected DB platform
+ * (business over personal). Silently skips platforms the company hasn't
+ * connected. Returns [] if the lookup fails (fail-soft contract).
+ */
+async function resolveTargetConnections(
+  svc: ReturnType<typeof getServiceRoleClient>,
+  companyId: string,
+  genericPlatformCodes: string[],
+): Promise<ResolvedConnection[]> {
+  // Collect the unique set of DB platform values needed across all codes.
+  const dbPlatformsNeeded = new Set<DbPlatform>();
+  for (const code of genericPlatformCodes) {
+    for (const dbP of GENERIC_TO_DB_PLATFORMS[code] ?? []) {
+      dbPlatformsNeeded.add(dbP);
+    }
+  }
+
+  if (dbPlatformsNeeded.size === 0) return [];
+
+  const { data, error } = await svc
+    .from("social_connections")
+    .select("id, platform, display_name, avatar_url")
+    .eq("company_id", companyId)
+    .in("platform", [...dbPlatformsNeeded])
+    .neq("status", "disconnected");
+
+  if (error) {
+    logger.warn("image.auto_attach.connections_lookup_failed", {
+      companyId,
+      err: error.message,
+    });
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    platform: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  }>;
+
+  // Build a map of dbPlatform → connection row (one per platform sub-type).
+  const byDbPlatform = new Map<string, (typeof rows)[0]>();
+  for (const row of rows) {
+    byDbPlatform.set(row.platform, row);
+  }
+
+  // For each generic code, pick the highest-priority matching connection.
+  // Deduplicate by connection id so two generic codes that resolve to the
+  // same DB platform (e.g. linkedin + linkedin_landscape) don't add duplicates.
+  const seen = new Set<string>();
+  const resolved: ResolvedConnection[] = [];
+
+  for (const code of genericPlatformCodes) {
+    const candidates = GENERIC_TO_DB_PLATFORMS[code] ?? [];
+    for (const dbPlatform of candidates) {
+      const conn = byDbPlatform.get(dbPlatform);
+      if (conn && !seen.has(conn.id)) {
+        seen.add(conn.id);
+        resolved.push({
+          profile_id: conn.id,
+          platform: conn.platform,
+          account_name: conn.display_name,
+          account_avatar_url: conn.avatar_url,
+        });
+        break; // highest-priority match found for this generic code
+      }
+    }
+  }
+
+  return resolved;
+}
+
 interface FindOrCreateDraftInput {
   companyId: string;
   publishDate: string; // YYYY-MM-DD
@@ -235,6 +351,12 @@ interface FindOrCreateDraftInput {
    * the operator may have already edited the caption on an existing draft.
    */
   postText: string | null;
+  /**
+   * Generic platform codes from the spreadsheet row (e.g. ["linkedin", "facebook"]).
+   * Resolved to the company's actual connected social_connections on new draft
+   * creation only. Empty array or unmatched codes are silently skipped.
+   */
+  targetPlatforms: string[];
 }
 
 async function findOrCreateScheduledDraft(
@@ -273,10 +395,25 @@ async function findOrCreateScheduledDraft(
     return (existing as { id: string }).id;
   }
 
-  // No existing draft — create one. Pre-fill content from the AI-generated
-  // caption if available; fall back to empty string so the operator can write
-  // from scratch. This is the ONLY place content is set; it is never
-  // overwritten after creation.
+  // No existing draft — create one.
+  //
+  // Resolve target platforms → connected social accounts (fail-soft: returns []
+  // on error or when no matching connections exist, so the draft is still created).
+  const resolvedConnections = await resolveTargetConnections(
+    svc,
+    input.companyId,
+    input.targetPlatforms,
+  );
+
+  // target_profiles stores the full connection shape for the Composer display layer.
+  // draft_data.target_connection_ids stores the UUIDs for the V2 save/publish path.
+  // Both must be written — mapV1ToV2Draft reads target_connection_ids first (§draft_data
+  // mirroring convention), falling back to target_profiles. Writing both is safe.
+  const connectionIds = resolvedConnections.map((c) => c.profile_id);
+
+  // Pre-fill content from the AI-generated caption if available; fall back to
+  // empty string. This is the ONLY place content is set; never overwritten after
+  // creation (create-only rule — same as target_profiles and content).
   const { data: created, error: createErr } = await svc
     .from("social_post_drafts")
     .insert({
@@ -287,10 +424,14 @@ async function findOrCreateScheduledDraft(
       content: input.postText ?? "",
       media_urls: [],
       media_asset_ids: [],
-      target_profiles: [],
+      target_profiles: resolvedConnections,
       platform_variants: {},
       scheduled_at: scheduledAtIso,
       approval_required: false,
+      // Mirror connection IDs into draft_data for the V2 Composer save path.
+      draft_data: connectionIds.length > 0
+        ? { target_connection_ids: connectionIds }
+        : {},
     })
     .select("id")
     .single();

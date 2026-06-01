@@ -82,7 +82,7 @@ describe("getDraft — media_asset_ids resolution", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect((result.data as { media_urls: string[] }).media_urls).toEqual([SIGNED_URL_1]);
+    expect((result.data as unknown as { media_urls: string[] }).media_urls).toEqual([SIGNED_URL_1]);
 
     // resolveMediaForPublish was called with correct args
     expect(mockResolveMedia).toHaveBeenCalledWith({
@@ -106,7 +106,7 @@ describe("getDraft — media_asset_ids resolution", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const urls = (result.data as { media_urls: string[] }).media_urls;
+    const urls = (result.data as unknown as { media_urls: string[] }).media_urls;
     expect(urls).toContain(SIGNED_URL_1);
     expect(urls).toContain(SIGNED_URL_2);
     expect(urls).toContain(LEGACY_URL);
@@ -122,7 +122,7 @@ describe("getDraft — media_asset_ids resolution", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect((result.data as { media_urls: string[] }).media_urls).toEqual([LEGACY_URL]);
+    expect((result.data as unknown as { media_urls: string[] }).media_urls).toEqual([LEGACY_URL]);
     expect(mockResolveMedia).not.toHaveBeenCalled();
   });
 
@@ -136,7 +136,7 @@ describe("getDraft — media_asset_ids resolution", () => {
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect((result.data as { media_urls: string[] }).media_urls).toEqual([LEGACY_URL]);
+    expect((result.data as unknown as { media_urls: string[] }).media_urls).toEqual([LEGACY_URL]);
     expect(mockResolveMedia).not.toHaveBeenCalled();
   });
 
@@ -153,6 +153,6 @@ describe("getDraft — media_asset_ids resolution", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     // Falls back to original media_urls (empty) — no images shown but no crash
-    expect((result.data as { media_urls: string[] }).media_urls).toEqual([]);
+    expect((result.data as unknown as { media_urls: string[] }).media_urls).toEqual([]);
   });
 });
