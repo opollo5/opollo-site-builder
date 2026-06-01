@@ -61,7 +61,9 @@ const BATCH_PUBLISH = {
 
 function setupFetch(
   batchData: Omit<typeof BATCH_PUBLISH, "destination"> & { destination: string } = BATCH_PUBLISH,
-  approveResponse = { ok: true, data: { destination: "publish", autoAttach: { draftId: "draft-abc" } } },
+  approveResponse: { ok: boolean; data: Record<string, unknown> } = {
+    ok: true, data: { destination: "publish", autoAttach: { draftId: "draft-abc" } },
+  },
 ) {
   fetchMock.mockImplementation(async (url: string, opts?: RequestInit) => {
     if (!opts?.method || opts.method === "GET") {
@@ -102,7 +104,7 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
     fireEvent.click(screen.getByTestId("approve-btn"));
     await waitFor(() => {
       const postCall = fetchMock.mock.calls.find(
-        ([, opts]: [string, RequestInit?]) => opts?.method === "POST",
+        (call) => (call[1] as RequestInit | undefined)?.method === "POST",
       );
       expect(postCall).toBeDefined();
       expect(postCall![0]).toContain("job-1");
@@ -115,7 +117,7 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
     fireEvent.click(screen.getByTestId("reject-btn"));
     await waitFor(() => {
       const patchCall = fetchMock.mock.calls.find(
-        ([, opts]: [string, RequestInit?]) => opts?.method === "PATCH",
+        (call) => (call[1] as RequestInit | undefined)?.method === "PATCH",
       );
       expect(patchCall).toBeDefined();
     });
