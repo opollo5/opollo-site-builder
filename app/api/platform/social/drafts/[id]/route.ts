@@ -126,7 +126,7 @@ export async function PATCH(
   const client = getServiceRoleClient();
   const { data: row } = await client
     .from("social_post_drafts")
-    .select("company_id, draft_data, draft_version")
+    .select("company_id, draft_data, draft_version, media_asset_ids")
     .eq("id", idCheck.value)
     .is("archived_at", null)
     .maybeSingle();
@@ -143,7 +143,7 @@ export async function PATCH(
     const {
       draft_version,
       content,
-      media_urls,
+      media_urls: rawMediaUrls,
       target_profile_ids,
       platform_variants,
       mode,
@@ -152,6 +152,18 @@ export async function PATCH(
       approval_required,
       approver_user_id,
     } = parsed.data;
+
+    // Strip Supabase-signed storage URLs from media_urls when this draft has
+    // media_asset_ids. Those signed URLs were injected by getDraft() for display
+    // only; re-persisting them alongside the permanent asset IDs causes duplicate
+    // images at publish time (the publish pipeline resolves asset IDs to fresh
+    // URLs independently). Non-Supabase URLs (external CDN, user uploads) are kept.
+    const draftAssetIds = (row.media_asset_ids as string[] | null) ?? [];
+    const supabaseStorageBase = (process.env.SUPABASE_URL ?? "") + "/storage/v1/object/sign/";
+    const media_urls =
+      draftAssetIds.length > 0
+        ? rawMediaUrls.filter((u) => !u.startsWith(supabaseStorageBase))
+        : rawMediaUrls;
 
     // Guard: cannot schedule a post with zero target channels.
     // A scheduled post with no targets is stuck — the publish cron has nothing to send to.
