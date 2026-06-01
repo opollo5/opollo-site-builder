@@ -88,7 +88,7 @@ export interface SocialCalendarGridProps {
 // Issue 4: bg-primary/5 tint on today's cell
 // ---------------------------------------------------------------------------
 
-const MAX_VISIBLE = 3;
+const MAX_VISIBLE = 2;
 
 interface DefaultCellProps {
   date: Date;

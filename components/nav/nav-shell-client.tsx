@@ -233,11 +233,19 @@ export function NavShellClient({
         <main
           id={skipToId}
           tabIndex={-1}
-          className="flex-1 overflow-auto scroll-mt-4 focus:outline-none px-4 py-6 sm:px-8 sm:py-8"
+          className={cn(
+            "flex-1 scroll-mt-4 focus:outline-none",
+            // Full-bleed pages (calendar) fill edge-to-edge with their own
+            // internal padding; all other pages get the standard page gutter
+            // and the 7xl max-width cap.
+            pathname.includes("/social/calendar")
+              ? "overflow-hidden"
+              : "overflow-auto px-4 py-6 sm:px-8 sm:py-8",
+          )}
         >
-          <div className="mx-auto max-w-7xl">
-            {children}
-          </div>
+          {pathname.includes("/social/calendar") ? children : (
+            <div className="mx-auto max-w-7xl">{children}</div>
+          )}
         </main>
       </div>
     </div>
