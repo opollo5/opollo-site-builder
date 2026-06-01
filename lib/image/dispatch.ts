@@ -48,6 +48,12 @@ export interface DispatchInput {
    * Absent for template mode, mood board, and direct batch dispatch.
    */
   postTextByParentIndex?: Record<number, string>;
+  /**
+   * Operator-chosen output path for batch approvals (D5).
+   * 'publish' (default) → auto-attach creates drafts on approval.
+   * 'download' → approvals add to a download set; no draft created.
+   */
+  destination?: "publish" | "download";
 }
 
 export type DispatchResult =
@@ -113,6 +119,7 @@ export async function dispatchImageBatch(input: DispatchInput): Promise<Dispatch
       source_filename: input.sourceFilename ?? null,
       source_row_count: input.sourceRowCount ?? null,
       triggered_by: triggeredBy,
+      destination: input.destination ?? "publish",
     })
     .select("id")
     .single();

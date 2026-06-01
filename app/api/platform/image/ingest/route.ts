@@ -81,6 +81,11 @@ function parseIngestMode(formData: FormData): IngestMode {
   return v === "template" ? "template" : "ideogram";
 }
 
+function parseDestination(formData: FormData): "publish" | "download" {
+  const v = (formData.get("destination") as string | null)?.trim();
+  return v === "download" ? "download" : "publish";
+}
+
 /** Extract modifiable fields from a v2 template's layer list. */
 function extractTemplateFields(layers: Layer[]): TemplateField[] {
   const fields: TemplateField[] = [];
@@ -141,12 +146,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   // ─── Route by ingest mode ────────────────────────────────────────────────
   const ingestMode = parseIngestMode(formData);
+  const destination = parseDestination(formData);
 
   if (ingestMode === "template") {
-    return handleTemplateIngest({ formData, fileBlob, format, companyId, gate, req });
+    return handleTemplateIngest({ formData, fileBlob, format, companyId, gate, req, destination });
   }
 
-  return handleIdeogramIngest({ fileBlob, format, companyId, gate, req });
+  return handleIdeogramIngest({ fileBlob, format, companyId, gate, req, destination });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -159,12 +165,14 @@ async function handleIdeogramIngest({
   companyId,
   gate,
   req,
+  destination,
 }: {
   fileBlob: File;
   format: FileFormat;
   companyId: string;
   gate: { userId: string };
   req: NextRequest;
+  destination: "publish" | "download";
 }): Promise<NextResponse> {
   const buffer = Buffer.from(await fileBlob.arrayBuffer());
   const parsed =
@@ -229,6 +237,7 @@ async function handleIdeogramIngest({
     sourceFilename: fileBlob.name,
     sourceRowCount: interpreted.posts.length,
     postTextByParentIndex,
+    destination,
   });
 
   if (!dispatched.ok) {
@@ -291,6 +300,7 @@ async function handleTemplateIngest({
   companyId,
   gate,
   req,
+  destination,
 }: {
   formData: FormData;
   fileBlob: File;
@@ -298,6 +308,7 @@ async function handleTemplateIngest({
   companyId: string;
   gate: { userId: string };
   req: NextRequest;
+  destination: "publish" | "download";
 }): Promise<NextResponse> {
   // ─── 1. Validate template mode constraints ───────────────────────────────
   if (format !== "xlsx") {
@@ -431,6 +442,7 @@ async function handleTemplateIngest({
     triggeredBy: gate.userId,
     jobs: jobSpecs,
     mode: generateMode,
+    destination,
     sourceFilename: fileBlob.name,
     sourceRowCount: parsed.rowCount,
   });

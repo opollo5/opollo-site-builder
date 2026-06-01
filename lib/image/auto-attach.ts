@@ -1,5 +1,6 @@
 import "server-only";
 
+import { fromZonedTime } from "date-fns-tz";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
@@ -34,6 +35,13 @@ export interface AutoAttachInput {
   jobId: string;
   companyId: string;
   approvedBy: string; // platform_users.id of the approving operator
+  /**
+   * IANA timezone for the company (e.g. "Australia/Melbourne").
+   * Fetched by the caller (select route) which already has companyId.
+   * Used to anchor bulk auto-attach scheduled_at to company-local midnight.
+   * Defaults to "UTC" inside the function if absent.
+   */
+  companyTimezone?: string;
 }
 
 export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttachResult> {
@@ -44,7 +52,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
     const { data: job, error: jobErr } = await svc
       .from("image_generation_jobs")
       .select(
-        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text",
+        "id, company_id, state, result_storage_path, target_publish_date, generation_params, post_text, target_platforms",
       )
       .eq("id", input.jobId)
       .maybeSingle();
@@ -63,6 +71,7 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       target_publish_date: string | null;
       generation_params: Record<string, unknown>;
       post_text: string | null;
+      target_platforms: string[] | null;
     };
 
     if (j.company_id !== input.companyId) {
@@ -122,61 +131,28 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
 
     const assetId = (asset as { id: string }).id;
 
-    // ─── Step 2: find or create the scheduled draft ──────────────────────
-    const draftId = await findOrCreateScheduledDraft(svc, {
+    // ─── Step 2: create a new scheduled draft ────────────────────────────
+    // ALWAYS inserts a new draft — never finds an existing one. Each approved
+    // image creates its own post: separate image, separate caption, separate
+    // channel selection, and scheduled_at anchored to company midnight.
+    // The asset is included directly in the INSERT — one atomic operation.
+    const draftId = await createScheduledDraft(svc, {
       companyId: input.companyId,
       publishDate: j.target_publish_date,
       approvedBy: input.approvedBy,
       postText: j.post_text ?? null,
+      targetPlatforms: (j.target_platforms as string[] | null) ?? [],
+      companyTimezone: input.companyTimezone ?? "UTC",
+      assetId,
     });
 
     if (!draftId) {
-      const reason = "find/create draft failed";
+      const reason = "draft creation failed";
       await markJobAttachState(svc, input.jobId, "attach_failed", null, reason);
       return { state: "attach_failed", error: reason };
     }
 
-    // ─── Step 3: append assetId to media_asset_ids ───────────────────────
-    // Read-modify-write with the service-role client. Concurrent attach
-    // calls for the same draft can race — the worst case is a duplicated
-    // asset id in the array, which the publish-layer dedupes when it
-    // resolves URLs. Acceptable per §B4.
-    const { data: draft, error: readErr } = await svc
-      .from("social_post_drafts")
-      .select("media_asset_ids")
-      .eq("id", draftId)
-      .maybeSingle();
-
-    if (readErr || !draft) {
-      const reason = readErr?.message ?? "draft disappeared between create and update";
-      logger.warn("image.auto_attach.draft_read_failed", {
-        jobId: input.jobId,
-        draftId,
-        err: reason,
-      });
-      await markJobAttachState(svc, input.jobId, "attach_failed", null, reason);
-      return { state: "attach_failed", error: reason };
-    }
-
-    const existingIds = ((draft as { media_asset_ids: string[] | null }).media_asset_ids) ?? [];
-    const nextIds = existingIds.includes(assetId) ? existingIds : [...existingIds, assetId];
-
-    const { error: updErr } = await svc
-      .from("social_post_drafts")
-      .update({ media_asset_ids: nextIds, updated_at: new Date().toISOString() })
-      .eq("id", draftId);
-
-    if (updErr) {
-      logger.warn("image.auto_attach.draft_update_failed", {
-        jobId: input.jobId,
-        draftId,
-        err: updErr.message,
-      });
-      await markJobAttachState(svc, input.jobId, "attach_failed", draftId, updErr.message);
-      return { state: "attach_failed", error: updErr.message, draftId, assetId };
-    }
-
-    // ─── Step 4: mark attached ───────────────────────────────────────────
+    // ─── Step 3: mark job attached ───────────────────────────────────────
     await markJobAttachState(svc, input.jobId, "attached", draftId, null);
     logger.info("image.auto_attach.attached", {
       jobId: input.jobId,
@@ -224,59 +200,170 @@ async function markJobAttachState(
   }
 }
 
-interface FindOrCreateDraftInput {
+// ---------------------------------------------------------------------------
+// Platform code → social_connections.platform resolution
+//
+// Spreadsheet target_platforms use generic codes ("linkedin", "facebook").
+// social_connections.platform uses bundle.social-specific sub-types.
+// This map defines which DB platform values satisfy each generic code,
+// ordered by PREFERENCE: business/company pages first, personal pages last.
+//
+// Preference rule (baked in per spec):
+//   If a company has BOTH linkedin_personal AND linkedin_company, use
+//   linkedin_company — the normal business-posting target. The same
+//   "prefer company/business account over personal" logic applies to
+//   any platform that has a personal vs business variant.
+// ---------------------------------------------------------------------------
+
+type DbPlatform = "linkedin_personal" | "linkedin_company" | "facebook_page"
+  | "instagram_business" | "x" | "gbp";
+
+const GENERIC_TO_DB_PLATFORMS: Record<string, DbPlatform[]> = {
+  // Business page preferred over personal page.
+  linkedin:           ["linkedin_company", "linkedin_personal"],
+  linkedin_landscape: ["linkedin_company", "linkedin_personal"],
+  // Only one DB variant per platform below.
+  instagram:          ["instagram_business"],
+  instagram_story:    ["instagram_business"],
+  facebook:           ["facebook_page"],
+  facebook_story:     ["facebook_page"],
+  x:                  ["x"],
+  gbp:                ["gbp"],
+};
+
+interface ResolvedConnection {
+  profile_id: string;
+  platform: string;
+  account_name: string | null;
+  account_avatar_url: string | null;
+}
+
+/**
+ * Resolve generic platform codes to the company's connected social accounts.
+ *
+ * For each generic code, picks the highest-priority connected DB platform
+ * (business over personal). Silently skips platforms the company hasn't
+ * connected. Returns [] if the lookup fails (fail-soft contract).
+ */
+async function resolveTargetConnections(
+  svc: ReturnType<typeof getServiceRoleClient>,
+  companyId: string,
+  genericPlatformCodes: string[],
+): Promise<ResolvedConnection[]> {
+  // Collect the unique set of DB platform values needed across all codes.
+  const dbPlatformsNeeded = new Set<DbPlatform>();
+  for (const code of genericPlatformCodes) {
+    for (const dbP of GENERIC_TO_DB_PLATFORMS[code] ?? []) {
+      dbPlatformsNeeded.add(dbP);
+    }
+  }
+
+  if (dbPlatformsNeeded.size === 0) return [];
+
+  const { data, error } = await svc
+    .from("social_connections")
+    .select("id, platform, display_name, avatar_url")
+    .eq("company_id", companyId)
+    .in("platform", [...dbPlatformsNeeded])
+    .neq("status", "disconnected");
+
+  if (error) {
+    logger.warn("image.auto_attach.connections_lookup_failed", {
+      companyId,
+      err: error.message,
+    });
+    return [];
+  }
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    platform: string;
+    display_name: string | null;
+    avatar_url: string | null;
+  }>;
+
+  // Build a map of dbPlatform → connection row (one per platform sub-type).
+  const byDbPlatform = new Map<string, (typeof rows)[0]>();
+  for (const row of rows) {
+    byDbPlatform.set(row.platform, row);
+  }
+
+  // For each generic code, pick the highest-priority matching connection.
+  // Deduplicate by connection id so two generic codes that resolve to the
+  // same DB platform (e.g. linkedin + linkedin_landscape) don't add duplicates.
+  const seen = new Set<string>();
+  const resolved: ResolvedConnection[] = [];
+
+  for (const code of genericPlatformCodes) {
+    const candidates = GENERIC_TO_DB_PLATFORMS[code] ?? [];
+    for (const dbPlatform of candidates) {
+      const conn = byDbPlatform.get(dbPlatform);
+      if (conn && !seen.has(conn.id)) {
+        seen.add(conn.id);
+        resolved.push({
+          profile_id: conn.id,
+          platform: conn.platform,
+          account_name: conn.display_name,
+          account_avatar_url: conn.avatar_url,
+        });
+        break; // highest-priority match found for this generic code
+      }
+    }
+  }
+
+  return resolved;
+}
+
+interface CreateDraftInput {
   companyId: string;
   publishDate: string; // YYYY-MM-DD
   approvedBy: string;
-  /**
-   * AI-generated social caption from the source spreadsheet row.
-   * Written to content ONLY when creating a new draft — never overwrites an
-   * existing draft's content. This is the non-negotiable create-only rule:
-   * the operator may have already edited the caption on an existing draft.
-   */
+  /** AI-generated social caption from the source spreadsheet row. */
   postText: string | null;
+  /** Generic platform codes — resolved to connected social_connections. */
+  targetPlatforms: string[];
+  /**
+   * IANA timezone for the company (e.g. "Australia/Melbourne").
+   * Used to anchor midnight to the company's local date — "June 14"
+   * becomes June 14 00:00 in the company timezone, not UTC.
+   */
+  companyTimezone: string;
+  /** Asset UUID to attach — included directly in the INSERT. */
+  assetId: string;
 }
 
-async function findOrCreateScheduledDraft(
+/**
+ * Always inserts a new social_post_drafts row — never finds an existing one.
+ *
+ * Each approved image creates its own post: its own image, caption, channel
+ * selection, and date. Re-uploading the same spreadsheet row = a separate
+ * post per approval, not an update to an existing one. This eliminates the
+ * stacking problem (multiple aspect-ratio variants collapsing onto one draft)
+ * and the silent-update problem (a second approval silently replacing an
+ * operator-edited draft).
+ *
+ * The asset is included in the INSERT so there is no separate Step 3
+ * read-modify-write — the draft is fully populated in one operation.
+ */
+async function createScheduledDraft(
   svc: ReturnType<typeof getServiceRoleClient>,
-  input: FindOrCreateDraftInput,
+  input: CreateDraftInput,
 ): Promise<string | null> {
-  // Normalise publish_date → scheduled_at = midnight UTC of that day.
-  const scheduledAtIso = `${input.publishDate}T00:00:00.000Z`;
+  // Normalise publish_date → scheduled_at = midnight in the COMPANY timezone.
+  // "June 14" means June 14 00:00 in the company timezone, not UTC midnight.
+  const scheduledAtIso = fromZonedTime(
+    `${input.publishDate}T00:00:00`,
+    input.companyTimezone,
+  ).toISOString();
 
-  // Look for an existing scheduled draft for (company, publish_date).
-  // Match by scheduled_at exact equality + state='scheduled' + not archived.
-  // IMPORTANT: if found, we return only the id. We do NOT update content —
-  // the operator may have already edited the caption on this draft.
-  const { data: existing, error: lookupErr } = await svc
-    .from("social_post_drafts")
-    .select("id")
-    .eq("company_id", input.companyId)
-    .eq("scheduled_at", scheduledAtIso)
-    .eq("state", "scheduled")
-    .is("archived_at", null)
-    .limit(1)
-    .maybeSingle();
+  const resolvedConnections = await resolveTargetConnections(
+    svc,
+    input.companyId,
+    input.targetPlatforms,
+  );
 
-  if (lookupErr) {
-    logger.warn("image.auto_attach.draft_lookup_failed", {
-      companyId: input.companyId,
-      publishDate: input.publishDate,
-      err: lookupErr.message,
-    });
-    return null;
-  }
+  const connectionIds = resolvedConnections.map((c) => c.profile_id);
 
-  if (existing) {
-    // Draft exists — do NOT touch content. Only the caller (Step 3) will
-    // append the new asset id to media_asset_ids.
-    return (existing as { id: string }).id;
-  }
-
-  // No existing draft — create one. Pre-fill content from the AI-generated
-  // caption if available; fall back to empty string so the operator can write
-  // from scratch. This is the ONLY place content is set; it is never
-  // overwritten after creation.
   const { data: created, error: createErr } = await svc
     .from("social_post_drafts")
     .insert({
@@ -286,11 +373,14 @@ async function findOrCreateScheduledDraft(
       state: "scheduled",
       content: input.postText ?? "",
       media_urls: [],
-      media_asset_ids: [],
-      target_profiles: [],
+      media_asset_ids: [input.assetId],
+      target_profiles: resolvedConnections,
       platform_variants: {},
       scheduled_at: scheduledAtIso,
       approval_required: false,
+      draft_data: connectionIds.length > 0
+        ? { target_connection_ids: connectionIds }
+        : {},
     })
     .select("id")
     .single();

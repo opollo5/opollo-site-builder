@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CalendarShell } from "@/components/social/dashboard/CalendarShell";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { listConnections } from "@/lib/platform/social/connections";
+import { getServiceRoleClient } from "@/lib/supabase";
 import type { Connection, Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,17 @@ export default async function CompanySocialCalendarPage() {
   }
 
   const companyId = session.company.companyId;
+
+  // Fetch company timezone — the single anchor for all date display and storage.
+  // Defaults to "UTC" if the row is missing or the column is null.
+  const svc = getServiceRoleClient();
+  const { data: co } = await svc
+    .from("platform_companies")
+    .select("timezone")
+    .eq("id", companyId)
+    .maybeSingle();
+  const companyTimezone = (co?.timezone as string | null) ?? "UTC";
+
   const connectionsResult = await listConnections({ companyId });
   const rawConnections = connectionsResult.ok ? connectionsResult.data.connections : [];
   const availableConnections: Connection[] = rawConnections
@@ -57,6 +69,7 @@ export default async function CompanySocialCalendarPage() {
         companyId={companyId}
         hasConnections={availableConnections.length > 0}
         availableConnections={availableConnections}
+        companyTimezone={companyTimezone}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { getServiceRoleClient } from "@/lib/supabase";
+import { logger } from "@/lib/logger";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
 // ---------------------------------------------------------------------------
@@ -163,9 +164,39 @@ export async function getDraft(params: {
     };
   }
 
+  // Resolve media_asset_ids → signed URLs so the Composer can display
+  // auto-attached images (Gap 3 fix). Uses the same resolveMediaForPublish
+  // logic as the publish pipeline — no duplication.
+  //
+  // Resolution is merged into media_urls for the API response only.
+  // The DB row is not modified here; asset IDs remain the authoritative source.
+  const row = data as Record<string, unknown>;
+  const rawAssetIds = (row.media_asset_ids as string[] | null) ?? [];
+  let resolvedData = data;
+
+  if (rawAssetIds.length > 0) {
+    try {
+      const { resolveMediaForPublish } = await import("@/lib/social/publishing/resolve-media");
+      const rawMediaUrls = (row.media_urls as string[] | null) ?? [];
+      const resolvedUrls = await resolveMediaForPublish({
+        mediaAssetIds: rawAssetIds,
+        legacyMediaUrls: rawMediaUrls,
+      });
+      resolvedData = { ...data, media_urls: resolvedUrls };
+    } catch (err) {
+      // Fail-soft: if resolution fails, return the draft without images rather
+      // than blocking the Composer from opening. The publish pipeline will
+      // re-resolve from media_asset_ids at publish time.
+      logger.warn("social.drafts.get.asset_resolve_failed", {
+        draftId: params.draftId,
+        err: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   return {
     ok: true,
-    data: data as unknown as Draft,
+    data: resolvedData as unknown as Draft,
     timestamp: new Date().toISOString(),
   };
 }

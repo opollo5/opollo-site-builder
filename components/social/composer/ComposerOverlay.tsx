@@ -12,6 +12,7 @@ import { SocialCalendarGrid } from "@/components/social/calendar/SocialCalendarG
 import { SchedulingCard, defaultSchedulingCardValue, type SchedulingCardValue } from "@/components/social/composer/SchedulingCard";
 import { UnsavedChangesDialog } from "@/components/social/composer/UnsavedChangesDialog";
 import { ComposerErrorBoundary } from "@/components/social/composer/ComposerErrorBoundary";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Pill } from "@/components/ui/pill";
 import { SocialPlatformIcon } from "@/components/ui/SocialPlatformIcon";
@@ -151,6 +152,7 @@ export function ComposerOverlay({
   );
   const [submitting, setSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
 
   // Unsaved-changes guard
   const [showDiscard, setShowDiscard] = React.useState(false);
@@ -268,6 +270,19 @@ export function ComposerOverlay({
       onClose();
     } catch {
       // ignore — UI shows nothing on failure; user can retry
+    }
+  }
+
+  async function handleDeletePost() {
+    if (!draft.id) return;
+    try {
+      await fetch(`/api/platform/social/drafts/${draft.id}`, { method: "DELETE" });
+      void swrMutate(
+        (key) => typeof key === "string" && key.includes("/api/platform/social/drafts/calendar-view"),
+      );
+      onClose();
+    } catch {
+      // ignore — draft may already be gone; calendar refresh via swrMutate covers it
     }
   }
 
@@ -488,6 +503,16 @@ export function ComposerOverlay({
           className="w-full rounded-md border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
         >
           Convert to draft
+        </button>
+      )}
+      {draft.id && (
+        <button
+          type="button"
+          onClick={() => setShowDeleteConfirm(true)}
+          data-testid="delete-post-btn"
+          className="w-full rounded-md px-4 py-2 text-sm font-medium text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition-colors"
+        >
+          Delete post
         </button>
       )}
     </div>
@@ -713,6 +738,16 @@ export function ComposerOverlay({
         onDiscard={handleDiscard}
         onCancel={() => { setShowDiscard(false); setPendingNavigateId(null); }}
         onSave={companyId ? () => void handleSaveFromDialog() : undefined}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        title="Delete this post?"
+        description="This will permanently remove the post from your calendar. This action cannot be undone."
+        confirmLabel="Delete"
+        confirmVariant="destructive"
+        onConfirm={() => void handleDeletePost()}
       />
     </>
   );
