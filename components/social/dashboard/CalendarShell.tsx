@@ -86,15 +86,15 @@ function DnDCell({
       </span>
 
       <div className="flex flex-col gap-0.5 overflow-hidden">
-        {posts.slice(0, 3).map((post) => (
+        {posts.slice(0, 2).map((post) => (
           <PostChip
             key={post.id}
             post={post}
             onClick={onClickPost ? (e) => { e.stopPropagation(); onClickPost(post); } : undefined}
           />
         ))}
-        {posts.length > 3 && (
-          <span className="text-xs text-muted-foreground pl-1">+{posts.length - 3} more</span>
+        {posts.length > 2 && (
+          <span className="text-xs text-muted-foreground pl-1">+{posts.length - 2} more</span>
         )}
       </div>
     </div>
