@@ -35,7 +35,9 @@ function configureFrom(opts: {
   jobOwner?: { company_id: string } | null;
   selectionInsertError?: string | null;
 } = {}): void {
-  const jobOwner = opts.jobOwner === undefined ? { company_id: COMPANY_ID } : opts.jobOwner;
+  const jobOwner = opts.jobOwner === undefined
+    ? { company_id: COMPANY_ID, batch_id: "batch-1" }
+    : opts.jobOwner;
   mockFrom.mockImplementation((table: string) => {
     if (table === "image_generation_jobs") {
       return {
@@ -47,12 +49,34 @@ function configureFrom(opts: {
       };
     }
     if (table === "image_selections") {
+      // Support BOTH the idempotency check (select) and the insert.
+      const selectChain: Record<string, unknown> = {};
+      selectChain["select"] = () => selectChain;
+      selectChain["eq"] = () => selectChain;
+      selectChain["order"] = () => selectChain;
+      selectChain["limit"] = () => selectChain;
+      selectChain["in"] = () => selectChain;
+      // Idempotency check returns null (no existing selection) by default.
+      selectChain["maybeSingle"] = vi.fn().mockResolvedValue({ data: null, error: null });
       return {
+        select: vi.fn().mockReturnValue(selectChain),
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
             single: vi.fn().mockResolvedValue({
               data: opts.selectionInsertError ? null : { id: SELECTION_ID },
               error: opts.selectionInsertError ? { message: opts.selectionInsertError } : null,
+            }),
+          }),
+        }),
+      };
+    }
+    if (table === "image_generation_batches") {
+      return {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { destination: "publish" },
+              error: null,
             }),
           }),
         }),

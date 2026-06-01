@@ -72,7 +72,7 @@ export async function GET(
   // ─── 1. Fetch batch + company-scope check ────────────────────────────────
   const { data: batch, error: batchErr } = await svc
     .from("image_generation_batches")
-    .select("id, company_id, state, total_jobs")
+    .select("id, company_id, state, total_jobs, destination")
     .eq("id", batchId)
     .single();
 
@@ -90,22 +90,66 @@ export async function GET(
   const gate = await requireCanDoForApi(companyId, "create_post");
   if (gate.kind === "deny") return gate.response;
 
+  const isDownloadMode = (batch.destination as string | null) === "download";
+
   // ─── 2. Fetch completed jobs ──────────────────────────────────────────────
-  const { data: jobs, error: jobsErr } = await svc
-    .from("image_generation_jobs")
-    .select("id, result_storage_path, parent_post_index, generation_params")
-    .eq("batch_id", batchId)
-    .eq("state", "completed")
-    .not("result_storage_path", "is", null)
-    .order("parent_post_index", { ascending: true, nullsFirst: true })
-    .order("created_at", { ascending: true });
+  // For download-mode batches: only jobs with image_selections.selected=true.
+  // For publish-mode batches: all completed jobs (original #1219 behaviour).
+  let completedJobs: CompletedJob[];
 
-  if (jobsErr) {
-    logger.error("image.batch.download.jobs_failed", { batchId, error: jobsErr.message });
-    return internalError("Failed to fetch batch jobs.");
+  if (isDownloadMode) {
+    const { data: selRows, error: selErr } = await svc
+      .from("image_selections")
+      .select("job_id")
+      .eq("selected", true)
+      .in(
+        "job_id",
+        (await svc
+          .from("image_generation_jobs")
+          .select("id")
+          .eq("batch_id", batchId)
+          .eq("state", "completed")
+          .not("result_storage_path", "is", null)
+          .then(({ data }) => (data ?? []).map((j: { id: string }) => j.id))),
+      );
+    if (selErr) {
+      logger.error("image.batch.download.sel_failed", { batchId, error: selErr.message });
+      return internalError("Failed to fetch approved set.");
+    }
+    const approvedJobIds = new Set((selRows ?? []).map((r: { job_id: string }) => r.job_id));
+    if (approvedJobIds.size === 0) {
+      return NextResponse.json(
+        { ok: false, error: { code: "NO_APPROVED_IMAGES", message: "No approved images in download set." } },
+        { status: 422 },
+      );
+    }
+    const { data: jobRows, error: jobErr } = await svc
+      .from("image_generation_jobs")
+      .select("id, result_storage_path, parent_post_index, generation_params")
+      .eq("batch_id", batchId)
+      .eq("state", "completed")
+      .not("result_storage_path", "is", null)
+      .in("id", [...approvedJobIds]);
+    if (jobErr) {
+      logger.error("image.batch.download.jobs_failed", { batchId, error: jobErr.message });
+      return internalError("Failed to fetch batch jobs.");
+    }
+    completedJobs = (jobRows ?? []) as CompletedJob[];
+  } else {
+    const { data: jobs, error: jobsErr } = await svc
+      .from("image_generation_jobs")
+      .select("id, result_storage_path, parent_post_index, generation_params")
+      .eq("batch_id", batchId)
+      .eq("state", "completed")
+      .not("result_storage_path", "is", null)
+      .order("parent_post_index", { ascending: true, nullsFirst: true })
+      .order("created_at", { ascending: true });
+    if (jobsErr) {
+      logger.error("image.batch.download.jobs_failed", { batchId, error: jobsErr.message });
+      return internalError("Failed to fetch batch jobs.");
+    }
+    completedJobs = (jobs ?? []) as CompletedJob[];
   }
-
-  const completedJobs = (jobs ?? []) as CompletedJob[];
 
   if (completedJobs.length === 0) {
     return NextResponse.json(
