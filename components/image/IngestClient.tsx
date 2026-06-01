@@ -30,11 +30,15 @@ interface IngestResponse {
   error?: { message: string };
 }
 
+type Destination = "publish" | "download";
+
 export function IngestClient({ companyId }: { companyId: string }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [mode, setMode] = useState<Mode>("generate");
+  // D4: Destination fork — explicit Download vs Publish BEFORE generating.
+  const [destination, setDestination] = useState<Destination>("publish");
   const [submitting, setSubmitting] = useState(false);
   const [previewResult, setPreviewResult] = useState<IngestResponse["data"] | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -61,6 +65,7 @@ export function IngestClient({ companyId }: { companyId: string }) {
     const fd = new FormData();
     fd.append("company_id", companyId);
     fd.append("file", file);
+    fd.append("destination", destination);
 
     try {
       const res = await fetch(`/api/platform/image/ingest?mode=${mode}`, {
@@ -119,6 +124,31 @@ export function IngestClient({ companyId }: { companyId: string }) {
         <a href="/templates/mass-image-gen-template.xlsx" download className="underline">Download .xlsx</a>
         {" · "}
         <a href="/templates/mass-image-gen-template.docx" download className="underline">Download .docx</a>
+      </div>
+
+      {/* D4: Destination fork — Download vs Publish, separate from cost toggle */}
+      <div className="rounded-xl border border-border bg-card p-4 space-y-3">
+        <p className="text-sm font-semibold">What do you want to do with approved images?</p>
+        <div className="grid grid-cols-2 gap-3">
+          {(["publish", "download"] as const).map((d) => (
+            <button
+              key={d}
+              type="button"
+              data-testid={`destination-${d}`}
+              onClick={() => setDestination(d)}
+              className={`flex flex-col gap-1 rounded-lg border-2 p-3 text-left transition-colors ${destination === d ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"}`}
+            >
+              <span className="text-sm font-medium">
+                {d === "publish" ? "Create scheduled posts" : "Download images"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {d === "publish"
+                  ? "Approved images create draft posts with caption, channel, and date pre-filled."
+                  : "Approved images go into a download set. No posts created."}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Mode toggle */}
