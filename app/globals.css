@@ -376,6 +376,21 @@
   50%       { background-position: 100% 50%; }
 }
 
+/* ---------------------------------------------------------------------------
+ * Carousel lane — card exit (fly-up fade). Fires when a card is
+ * approved/rejected and the next card slides in to replace it.
+ * Matches the c3-snap easing used throughout the Composer.
+ * ------------------------------------------------------------------------- */
+.card-lane-exit {
+  animation: card-lane-exit 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  pointer-events: none;
+}
+
+@keyframes card-lane-exit {
+  from { opacity: 1; transform: translateX(0) translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateX(0) translateY(-56px) scale(0.88); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .transition-smooth,
   .opollo-fade-in,
@@ -394,12 +409,14 @@
   .opollo-stagger-in-6,
   .opollo-stagger-in-7,
   .opollo-stagger-in-8,
+  .card-lane-exit,
   .mesh,
   .lbl.lbl-live::before {
     animation: none !important;
     animation-delay: 0 !important;
     transition: none !important;
   }
+  .card-lane-exit { opacity: 0 !important; }
   .opollo-shimmer {
     background: hsl(var(--muted)) !important;
   }

@@ -4,12 +4,19 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PreviewCard } from "@/components/social/composer/PreviewCard";
+import { cn } from "@/lib/utils";
 
 // ---------------------------------------------------------------------------
 // G — Batch results approval carousel (D8, D9, D10, D24, D25).
 //
-// Replaces the flat grid with a horizontal, one-card-at-a-time carousel.
-// Cards reuse the Composer PreviewCard component (D8, Slice F confirmed reusable).
+// Lane layout: active card is full-size + lifted; upcoming cards to the right
+// are smaller and dimmed so the operator sees what's coming. Approve/reject
+// triggers a fly-up exit on the departing card while the next card slides in.
+//
+// Animation mechanism: CSS transitions (transform + opacity) for lane shifts,
+// CSS keyframes (.card-lane-exit in globals.css) for the exit fly-out.
+// Matches the c3-snap easing used throughout the Composer. Respects
+// prefers-reduced-motion (instant advance when set).
 //
 // Actions per card (D10):
 //   Approve   → POST /api/platform/image/jobs/[id]/select
@@ -59,11 +66,37 @@ function platformKey(code: string): "linkedin" | "facebook" | "instagram" | "x" 
   return "linkedin"; // fallback
 }
 
+// Lane positioning helpers — drive the CSS transform + opacity for each card
+// based on its offset from the active card (0 = active, 1 = next, 2 = peek…).
+function laneTransform(offset: number): string {
+  if (offset === 0) return "none";
+  if (offset === 1) return "translateX(62%) scale(0.88)";
+  if (offset === 2) return "translateX(112%) scale(0.80)";
+  return "translateX(140%) scale(0.74)";
+}
+function laneOpacity(offset: number): number {
+  if (offset === 0) return 1;
+  if (offset === 1) return 0.65;
+  if (offset === 2) return 0.35;
+  return 0;
+}
+function laneZ(offset: number): number {
+  return Math.max(10 - offset, 7);
+}
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== "undefined" &&
+    (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false);
+}
+
 export function BatchResultsClient({ batchId, companyId }: { batchId: string; companyId: string }) {
   const [batch, setBatch] = useState<BatchData | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [transitioning, setTransitioning] = useState(false);
+  // exitingIndex: the card currently playing its fly-out animation.
+  // Set to the old currentIndex simultaneously with advancing currentIndex so
+  // the exit animation and lane slide-in play at the same time.
+  const [exitingIndex, setExitingIndex] = useState<number | null>(null);
   const [actioning, setActioning] = useState<Record<string, boolean>>({});
   // Track per-job action outcomes so approved/rejected cards show status.
   const [outcomes, setOutcomes] = useState<Record<string, {
@@ -89,12 +122,16 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
   }, [fetchBatch, batch?.state]);
 
   function navigateTo(index: number) {
-    if (transitioning) return;
-    setTransitioning(true);
-    setTimeout(() => {
+    if (exitingIndex !== null) return;
+    if (prefersReducedMotion()) {
       setCurrentIndex(index);
-      setTransitioning(false);
-    }, 180);
+      return;
+    }
+    // React 18 batches these two setState calls into one render so the
+    // exit animation and the lane slide-in start simultaneously.
+    setExitingIndex(currentIndex);
+    setCurrentIndex(index);
+    setTimeout(() => setExitingIndex(null), 380);
   }
 
   async function act(jobId: string, action: "approve" | "reject") {
@@ -122,14 +159,16 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
             setOutcomes((p) => ({ ...p, [jobId]: { status: "approved_publish", draftId } }));
             toast.success(draftId ? "Draft created." : "Approved.");
           }
-          // Auto-advance to next pending card.
-          const completedJobs = batch?.jobs ?? [];
-          const nextIdx = completedJobs.findIndex((j, i) => i > currentIndex && j.state === "completed" && !outcomes[j.id]);
-          if (nextIdx !== -1) navigateTo(nextIdx);
         } else {
           setOutcomes((p) => ({ ...p, [jobId]: { status: "rejected" } }));
           toast.success("Rejected.");
         }
+        // Auto-advance to next undecided card after approve OR reject.
+        const allJobs = batch?.jobs ?? [];
+        const nextIdx = allJobs
+          .filter((j) => j.state === "completed")
+          .findIndex((j, i) => i > currentIndex && !outcomes[j.id] && j.id !== jobId);
+        if (nextIdx !== -1) navigateTo(nextIdx);
         void fetchBatch();
       } else {
         toast.error(json.error?.message ?? `${action} failed.`);
@@ -147,14 +186,6 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
   const isRunning = batch.state === "running" || batch.state === "pending";
   const completedJobs = batch.jobs.filter((j) => j.state === "completed");
   const total = completedJobs.length;
-
-  const currentJob = completedJobs[currentIndex];
-  const outcome = currentJob ? outcomes[currentJob.id] : null;
-  const primaryPlatform = currentJob?.targetPlatforms?.[0] ?? "linkedin";
-  const platform = platformKey(primaryPlatform);
-
-  // Minimal Connection stub so PreviewCard renders correctly.
-  const connectionStub = { id: "preview", platform, account_name: platform, account_avatar_url: "" };
 
   return (
     <div className="space-y-6" data-testid="batch-results-carousel">
@@ -209,14 +240,13 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
         </div>
       )}
 
-      {total > 0 && currentJob && (
+      {total > 0 && (
         <div className="space-y-4">
-          {/* Numbering (D9) */}
+          {/* Numbering + navigation (D9) */}
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-muted-foreground" data-testid="carousel-numbering">
               {currentIndex + 1} of {total}
             </p>
-            {/* Navigation dots */}
             <div className="flex gap-1.5">
               {completedJobs.map((_, i) => (
                 <button
@@ -228,98 +258,134 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
               ))}
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={currentIndex === 0} onClick={() => navigateTo(currentIndex - 1)}>← Prev</Button>
-              <Button variant="outline" size="sm" disabled={currentIndex === total - 1} onClick={() => navigateTo(currentIndex + 1)}>Next →</Button>
+              <Button variant="outline" size="sm" disabled={currentIndex === 0 || exitingIndex !== null} onClick={() => navigateTo(currentIndex - 1)}>← Prev</Button>
+              <Button variant="outline" size="sm" disabled={currentIndex === total - 1 || exitingIndex !== null} onClick={() => navigateTo(currentIndex + 1)}>Next →</Button>
             </div>
           </div>
 
-          {/* Carousel card — fade transition (D9) */}
-          <div
-            className={`transition-opacity duration-[180ms] ${transitioning ? "opacity-0" : "opacity-100"}`}
-            data-testid="carousel-card"
-          >
-            <div className="rounded-xl border border-border bg-card overflow-hidden">
-              {/* Platform + caption header (D9) */}
-              <div className="px-5 pt-4 pb-3 border-b border-border space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{platform}</span>
-                  {currentJob.targetPublishDate && (
-                    <span className="text-xs text-muted-foreground">· {currentJob.targetPublishDate}</span>
+          {/* ── Lane: all cards stacked in a CSS grid; transforms position them ── */}
+          {/* Active card (offset 0) renders in normal flow, setting container height.  */}
+          {/* Upcoming cards (offset 1, 2) sit absolutely on top, scaled + dimmed.      */}
+          {/* Exiting card plays the .card-lane-exit fly-up animation as an overlay.     */}
+          <div className="relative grid overflow-hidden">
+            {completedJobs.map((job, i) => {
+              const offset = i - currentIndex;
+              const isExiting = exitingIndex === i;
+              // Render: active + 2 upcoming + the card currently exiting.
+              // offset < 0 cards (prev) are hidden — prev navigation snaps instantly.
+              const isVisible = isExiting || (offset >= 0 && offset <= 2);
+              if (!isVisible) return null;
+
+              const jobOutcome = outcomes[job.id];
+              const jobPlatform = platformKey(job.targetPlatforms?.[0] ?? "linkedin");
+              const jobConnection = { id: "preview", platform: jobPlatform, account_name: jobPlatform, account_avatar_url: "" };
+
+              return (
+                <div
+                  key={job.id}
+                  // Active card: col/row 1 in normal flow (sets container height).
+                  // All others: absolute overlay so they don't push layout.
+                  className={cn(
+                    "col-start-1 row-start-1 transition-[transform,opacity] duration-[420ms] ease-c3-snap",
+                    !isExiting && offset !== 0 && "absolute inset-x-0 top-0",
+                    isExiting && "absolute inset-x-0 top-0 card-lane-exit",
                   )}
+                  style={isExiting
+                    ? { zIndex: 20 }
+                    : { transform: laneTransform(offset), opacity: laneOpacity(offset), zIndex: laneZ(offset), pointerEvents: offset === 0 ? "auto" : "none" }
+                  }
+                  data-testid={offset === 0 && !isExiting ? "carousel-card" : undefined}
+                  aria-hidden={offset !== 0 || isExiting}
+                >
+                  <div className={cn(
+                    "rounded-xl border border-border bg-card overflow-hidden",
+                    offset === 0 && !isExiting && "shadow-md ring-1 ring-primary/10",
+                  )}>
+                    {/* Platform + caption header (D9) */}
+                    <div className="px-5 pt-4 pb-3 border-b border-border space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{jobPlatform}</span>
+                        {job.targetPublishDate && (
+                          <span className="text-xs text-muted-foreground">· {job.targetPublishDate}</span>
+                        )}
+                      </div>
+                      {job.postText && (
+                        <p className="text-sm text-foreground line-clamp-2">{job.postText}</p>
+                      )}
+                    </div>
+
+                    {/* Preview — reuses Composer PreviewCard (D8) */}
+                    <div className="flex justify-center bg-muted/20 p-6">
+                      {job.resultSignedUrl ? (
+                        <div className="max-w-sm w-full">
+                          <PreviewCard
+                            platform={jobPlatform}
+                            content={job.postText ?? ""}
+                            mediaUrls={[job.resultSignedUrl]}
+                            connection={jobConnection}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex h-48 w-full max-w-sm items-center justify-center rounded-xl bg-muted">
+                          <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Actions (D10) — only interactive on the active card */}
+                    <div className="px-5 py-4 border-t border-border">
+                      {jobOutcome ? (
+                        <div className="flex items-center gap-3">
+                          <span className={`rounded-full px-3 py-1 text-sm font-medium ${
+                            jobOutcome.status === "approved_publish" ? "bg-green-100 text-green-700"
+                            : jobOutcome.status === "approved_download" ? "bg-blue-100 text-blue-700"
+                            : "bg-red-100 text-red-700"
+                          }`} data-testid={offset === 0 && !isExiting ? "card-outcome" : undefined}>
+                            {jobOutcome.status === "approved_publish" ? "Draft created" : jobOutcome.status === "approved_download" ? "In download set" : "Rejected"}
+                          </span>
+                          {jobOutcome.status === "approved_publish" && jobOutcome.draftId && (
+                            <a href={`/company/social/posts?compose=${jobOutcome.draftId}`} className="text-sm text-primary underline">
+                              Open in Composer →
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex gap-3 flex-wrap">
+                          <Button
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            onClick={() => void act(job.id, "approve")}
+                            disabled={(actioning[job.id] ?? false) || offset !== 0}
+                            data-testid={offset === 0 && !isExiting ? "approve-btn" : undefined}
+                          >
+                            {batch.destination === "download" ? "Add to download" : "Approve"}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toast("Request changes coming in Slice I.")}
+                            data-testid={offset === 0 && !isExiting ? "request-changes-btn" : undefined}
+                            disabled={offset !== 0}
+                          >
+                            Request changes
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive hover:text-destructive hover:border-destructive"
+                            onClick={() => void act(job.id, "reject")}
+                            disabled={(actioning[job.id] ?? false) || offset !== 0}
+                            data-testid={offset === 0 && !isExiting ? "reject-btn" : undefined}
+                          >
+                            Reject
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                {currentJob.postText && (
-                  <p className="text-sm text-foreground line-clamp-2">{currentJob.postText}</p>
-                )}
-              </div>
-
-              {/* Preview — reuses Composer PreviewCard (D8) */}
-              <div className="flex justify-center bg-muted/20 p-6">
-                {currentJob.resultSignedUrl ? (
-                  <div className="max-w-sm w-full">
-                    <PreviewCard
-                      platform={platform}
-                      content={currentJob.postText ?? ""}
-                      mediaUrls={[currentJob.resultSignedUrl]}
-                      connection={connectionStub}
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-48 w-full max-w-sm items-center justify-center rounded-xl bg-muted">
-                    <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-                  </div>
-                )}
-              </div>
-
-              {/* Actions (D10) */}
-              <div className="px-5 py-4 border-t border-border">
-                {outcome ? (
-                  <div className="flex items-center gap-3">
-                    <span className={`rounded-full px-3 py-1 text-sm font-medium ${
-                      outcome.status === "approved_publish" ? "bg-green-100 text-green-700"
-                      : outcome.status === "approved_download" ? "bg-blue-100 text-blue-700"
-                      : "bg-red-100 text-red-700"
-                    }`} data-testid="card-outcome">
-                      {outcome.status === "approved_publish" ? "Draft created" : outcome.status === "approved_download" ? "In download set" : "Rejected"}
-                    </span>
-                    {outcome.status === "approved_publish" && outcome.draftId && (
-                      <a href={`/company/social/posts?compose=${outcome.draftId}`} className="text-sm text-primary underline">
-                        Open in Composer →
-                      </a>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex gap-3 flex-wrap">
-                    <Button
-                      size="sm"
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={() => void act(currentJob.id, "approve")}
-                      disabled={actioning[currentJob.id] ?? false}
-                      data-testid="approve-btn"
-                    >
-                      {batch.destination === "download" ? "Add to download" : "Approve"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toast("Request changes coming in Slice I.")}
-                      data-testid="request-changes-btn"
-                    >
-                      Request changes
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive hover:border-destructive"
-                      onClick={() => void act(currentJob.id, "reject")}
-                      disabled={actioning[currentJob.id] ?? false}
-                      data-testid="reject-btn"
-                    >
-                      Reject
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 /**
- * Slice G — Approval carousel (D8, D9, D10, D24, D25)
+ * Slice G + Lane carousel — BatchResultsClient
  *
  * Tests:
  *  - Carousel renders (not the old grid)
@@ -9,9 +9,11 @@
  *  - Reject button calls PATCH endpoint (D10)
  *  - Request changes button present (D10 stub for Slice I)
  *  - Post-approve state shows "Draft created" or "In download set" per destination (D10)
+ *  - Active card advances on approve (lane advance)
+ *  - Active card advances on reject (lane advance)
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import React from "react";
 
 // Mock PreviewCard so we can assert it's used without needing all its deps.
@@ -81,16 +83,20 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
     setupFetch();
   });
 
-  it("renders the carousel container (not the old grid)", async () => {
+  it("renders the carousel container with the active card (lane layout)", async () => {
     render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
     await waitFor(() => expect(screen.getByTestId("batch-results-carousel")).toBeInTheDocument());
-    // Old grid had class grid-cols — new carousel uses carousel-card
-    expect(screen.queryByTestId("carousel-card")).toBeInTheDocument();
+    // Active card (offset=0) carries the testid; upcoming cards do not.
+    expect(screen.getByTestId("carousel-card")).toBeInTheDocument();
   });
 
-  it("shows PreviewCard (D8)", async () => {
+  it("shows PreviewCard on the active card (D8)", async () => {
     render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
-    await waitFor(() => expect(screen.getByTestId("preview-card")).toBeInTheDocument());
+    // The lane renders multiple cards; assert the active card has a PreviewCard.
+    await waitFor(() => {
+      const activeCard = screen.getByTestId("carousel-card");
+      expect(within(activeCard).getByTestId("preview-card")).toBeInTheDocument();
+    });
   });
 
   it("shows N of M numbering (D9)", async () => {
@@ -149,5 +155,35 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
       const outcome = screen.queryByTestId("card-outcome");
       if (outcome) expect(outcome.textContent).toContain("In download set");
     });
+  });
+
+  it("approving the active card advances the lane to the next card", async () => {
+    render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
+    await waitFor(() => screen.getByTestId("approve-btn"));
+
+    // Starts on card 1 of 2.
+    expect(screen.getByTestId("carousel-numbering").textContent).toContain("1 of 2");
+
+    fireEvent.click(screen.getByTestId("approve-btn"));
+
+    // After approve, currentIndex advances → numbering shows card 2.
+    await waitFor(
+      () => expect(screen.getByTestId("carousel-numbering").textContent).toContain("2 of 2"),
+      { timeout: 1000 },
+    );
+  });
+
+  it("rejecting the active card advances the lane to the next card", async () => {
+    render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
+    await waitFor(() => screen.getByTestId("reject-btn"));
+
+    expect(screen.getByTestId("carousel-numbering").textContent).toContain("1 of 2");
+
+    fireEvent.click(screen.getByTestId("reject-btn"));
+
+    await waitFor(
+      () => expect(screen.getByTestId("carousel-numbering").textContent).toContain("2 of 2"),
+      { timeout: 1000 },
+    );
   });
 });
