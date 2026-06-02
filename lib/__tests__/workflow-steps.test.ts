@@ -17,10 +17,11 @@ const COMPANY_ID = "00001760-0000-0000-0000-000000000001";
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
-  // Delete first to avoid slug UNIQUE conflict from prior runs, then insert.
-  await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
-  const { error } = await svc.from("platform_companies").insert(
+  // Use upsert with onConflict:"id" — idempotent and handles the slug UNIQUE
+  // constraint cleanly (same pattern as magic-link-service.test.ts which passes).
+  const { error } = await svc.from("platform_companies").upsert(
     { id: COMPANY_ID, name: "Workflow Steps Test Co", slug: `wf-steps-${COMPANY_ID.slice(-8)}` },
+    { onConflict: "id" },
   );
   if (error) throw new Error(`seedCompany failed: ${error.message}`);
 }

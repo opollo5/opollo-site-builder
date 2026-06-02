@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "crypto";
 import { fromZonedTime } from "date-fns-tz";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
@@ -457,6 +458,11 @@ async function createScheduledDraft(
       ? { target_connection_ids: connectionIds }
       : {},
   };
+
+  // B2 migration 0175 requires content_group_id + version_number explicitly.
+  // Each auto-attached draft is its own content group (standalone post, v1).
+  insertPayload.content_group_id = randomUUID();
+  insertPayload.version_number = 1;
 
   // workflow_state is null for the legacy path (gate disabled).
   // For the gate-enabled path it is 'pending_image_review'.
