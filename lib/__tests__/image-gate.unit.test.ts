@@ -378,27 +378,20 @@ describe("autoAttachImage — gate enabled", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. onGatePass — batch approved, drafts set to ready_to_schedule
+// 3. onGatePass — batch approved, drafts auto-scheduled or ready_to_schedule
 // ---------------------------------------------------------------------------
 
 describe("onGatePass", () => {
-  it("sets batch approval_status='approved' and drafts workflow_state='ready_to_schedule'", async () => {
-    // Jobs with draft ids.
+  it("sets batch approval_status='approved' when gate passes", async () => {
     getState("image_generation_jobs").selectResponse = {
-      data: [
-        { auto_attached_draft_id: "draft-a" },
-        { auto_attached_draft_id: "draft-b" },
-      ],
+      data: [{ auto_attached_draft_id: "draft-a" }],
       error: null,
     };
-    // Drafts lookup.
     getState("social_post_drafts").selectResponse = {
-      data: [
-        { id: "draft-a", scheduled_at: "2026-06-15T00:00:00.000Z" },
-        { id: "draft-b", scheduled_at: null },
-      ],
+      data: [{ id: "draft-a", scheduled_at: "2026-06-15T00:00:00.000Z", target_profiles: [] }],
       error: null,
     };
+    getState("social_connections").selectResponse = { data: [], error: null };
 
     await onGatePass({
       approvalRequestId: REQUEST_ID,
@@ -414,9 +407,155 @@ describe("onGatePass", () => {
       (u) => (u.patch as { approval_status?: string }).approval_status === "approved",
     );
     expect(batchApproveUpdate).toBeDefined();
+  });
+
+  it("autoSchedule=true + scheduled_at set → draft state='scheduled'", async () => {
+    getState("image_generation_jobs").selectResponse = {
+      data: [{ auto_attached_draft_id: "draft-a" }],
+      error: null,
+    };
+    getState("social_post_drafts").selectResponse = {
+      data: [
+        {
+          id: "draft-a",
+          scheduled_at: "2026-06-15T00:00:00.000Z",
+          target_profiles: [{ profile_id: "conn-1" }],
+        },
+      ],
+      error: null,
+    };
+    // Connection is still live.
+    getState("social_connections").selectResponse = {
+      data: [{ id: "conn-1", status: "connected" }],
+      error: null,
+    };
+
+    await onGatePass({
+      approvalRequestId: REQUEST_ID,
+      batchId: BATCH_ID,
+      companyId: COMPANY_ID,
+      actorId: APPROVER_ID,
+      autoSchedule: true,
+    });
 
     const draftUpdates = getState("social_post_drafts").updates;
-    expect(draftUpdates.length).toBeGreaterThan(0);
+    const scheduledUpdate = draftUpdates.find(
+      (u) => (u.patch as { state?: string }).state === "scheduled",
+    );
+    expect(scheduledUpdate).toBeDefined();
+    expect(
+      (scheduledUpdate!.patch as { workflow_state?: string }).workflow_state,
+    ).toBe("ready_to_schedule");
+  });
+
+  it("autoSchedule=true + scheduled_at null → draft stays workflow_state='ready_to_schedule', not state='scheduled'", async () => {
+    getState("image_generation_jobs").selectResponse = {
+      data: [{ auto_attached_draft_id: "draft-b" }],
+      error: null,
+    };
+    getState("social_post_drafts").selectResponse = {
+      data: [{ id: "draft-b", scheduled_at: null, target_profiles: [] }],
+      error: null,
+    };
+    getState("social_connections").selectResponse = { data: [], error: null };
+
+    await onGatePass({
+      approvalRequestId: REQUEST_ID,
+      batchId: BATCH_ID,
+      companyId: COMPANY_ID,
+      actorId: APPROVER_ID,
+      autoSchedule: true,
+    });
+
+    const draftUpdates = getState("social_post_drafts").updates;
+    // Must not have set state='scheduled'.
+    const scheduledUpdate = draftUpdates.find(
+      (u) => (u.patch as { state?: string }).state === "scheduled",
+    );
+    expect(scheduledUpdate).toBeUndefined();
+    // Must have set workflow_state='ready_to_schedule'.
+    const readyUpdate = draftUpdates.find(
+      (u) => (u.patch as { workflow_state?: string }).workflow_state === "ready_to_schedule",
+    );
+    expect(readyUpdate).toBeDefined();
+  });
+
+  it("autoSchedule=false → draft not scheduled (workflow_state='ready_to_schedule' only)", async () => {
+    getState("image_generation_jobs").selectResponse = {
+      data: [{ auto_attached_draft_id: "draft-c" }],
+      error: null,
+    };
+    getState("social_post_drafts").selectResponse = {
+      data: [
+        {
+          id: "draft-c",
+          scheduled_at: "2026-06-15T00:00:00.000Z",
+          target_profiles: [{ profile_id: "conn-1" }],
+        },
+      ],
+      error: null,
+    };
+    getState("social_connections").selectResponse = {
+      data: [{ id: "conn-1", status: "connected" }],
+      error: null,
+    };
+
+    await onGatePass({
+      approvalRequestId: REQUEST_ID,
+      batchId: BATCH_ID,
+      companyId: COMPANY_ID,
+      actorId: APPROVER_ID,
+      autoSchedule: false,
+    });
+
+    const draftUpdates = getState("social_post_drafts").updates;
+    const scheduledUpdate = draftUpdates.find(
+      (u) => (u.patch as { state?: string }).state === "scheduled",
+    );
+    expect(scheduledUpdate).toBeUndefined();
+    // Still sets ready_to_schedule.
+    const readyUpdate = draftUpdates.find(
+      (u) => (u.patch as { workflow_state?: string }).workflow_state === "ready_to_schedule",
+    );
+    expect(readyUpdate).toBeDefined();
+  });
+
+  it("autoSchedule=true + all connections disconnected → workflow_state='ready_to_schedule' only (L16d)", async () => {
+    getState("image_generation_jobs").selectResponse = {
+      data: [{ auto_attached_draft_id: "draft-d" }],
+      error: null,
+    };
+    getState("social_post_drafts").selectResponse = {
+      data: [
+        {
+          id: "draft-d",
+          scheduled_at: "2026-06-15T00:00:00.000Z",
+          target_profiles: [{ profile_id: "conn-disconnected" }],
+        },
+      ],
+      error: null,
+    };
+    // All connections are disconnected.
+    getState("social_connections").selectResponse = {
+      data: [{ id: "conn-disconnected", status: "disconnected" }],
+      error: null,
+    };
+
+    await onGatePass({
+      approvalRequestId: REQUEST_ID,
+      batchId: BATCH_ID,
+      companyId: COMPANY_ID,
+      actorId: APPROVER_ID,
+      autoSchedule: true,
+    });
+
+    const draftUpdates = getState("social_post_drafts").updates;
+    // Must NOT auto-schedule.
+    const scheduledUpdate = draftUpdates.find(
+      (u) => (u.patch as { state?: string }).state === "scheduled",
+    );
+    expect(scheduledUpdate).toBeUndefined();
+    // Must fall back to ready_to_schedule.
     const readyUpdate = draftUpdates.find(
       (u) => (u.patch as { workflow_state?: string }).workflow_state === "ready_to_schedule",
     );
