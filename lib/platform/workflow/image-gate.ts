@@ -177,12 +177,15 @@ export async function createBatchApprovalRequest(
 //
 // Called when an image_batch approval request is finalised as approved.
 // - Marks the batch approval_status='approved'.
-// - Sets all attached drafts to workflow_state='ready_to_schedule'.
+// - When autoSchedule=true and the draft has a scheduled_at, sets
+//   state='scheduled' so the V2 publish-due cron picks it up automatically.
+// - Otherwise sets workflow_state='ready_to_schedule' for operator action.
 //
-// Phase-1 limitation: full auto-scheduling into social_schedule_entries
-// requires social_post_variants which are not created by the image-gen
-// pipeline. For Phase 1, all drafts land in workflow_state='ready_to_schedule'
-// and scheduling is completed by the operator. See PR body for Phase-2 plan.
+// L16 edge cases:
+//   L16a: scheduled_at null → 'ready_to_schedule' (operator must set date)
+//   L16b: scheduled_at past → 'schedule_now' (cron fires immediately)
+//   L16c: scheduled_at future → 'schedule_now' (cron fires at that time)
+//   L16d: all connections disconnected → 'ready_to_schedule' + warning
 // ---------------------------------------------------------------------------
 
 export async function onGatePass(params: OnGatePassParams): Promise<void> {
@@ -230,14 +233,10 @@ export async function onGatePass(params: OnGatePassParams): Promise<void> {
       return;
     }
 
-    // 3. For each draft: set workflow_state='ready_to_schedule'.
-    //
-    // Phase-1 note: full scheduling requires social_post_variants which
-    // do not exist for image-gen drafts. We set ready_to_schedule in all
-    // cases and leave final scheduling to the operator.
+    // 3. Look up active drafts with scheduling context.
     const { data: drafts, error: draftsErr } = await svc
       .from("social_post_drafts")
-      .select("id, scheduled_at")
+      .select("id, scheduled_at, target_profiles")
       .in("id", draftIds)
       .is("archived_at", null);
 
@@ -250,36 +249,88 @@ export async function onGatePass(params: OnGatePassParams): Promise<void> {
       return;
     }
 
-    const activeDraftIds = ((drafts ?? []) as Array<{ id: string; scheduled_at: string | null }>)
-      .map((d) => {
-        if (!d.scheduled_at) {
-          // L16a: no publish date — will need scheduling by operator.
-          logger.info("workflow.image_gate.pass.draft_no_date", {
-            draftId: d.id,
-            batchId,
-          });
-        } else {
-          // L16b: has a date — full auto-scheduling requires variants (Phase 2).
-          logger.info("workflow.image_gate.pass.draft_has_date_phase1", {
-            draftId: d.id,
-            batchId,
-            scheduledAt: d.scheduled_at,
-            note: "Phase 1: scheduling deferred to operator; full auto-scheduling in Phase 2",
-          });
-        }
-        return d.id;
-      });
+    type DraftRow = { id: string; scheduled_at: string | null; target_profiles: unknown };
 
-    if (activeDraftIds.length > 0) {
+    // 4. Decide the outcome for each draft and bucket into two lists.
+    const scheduleNowIds: string[] = [];
+    const readyToScheduleIds: string[] = [];
+
+    for (const d of (drafts ?? []) as DraftRow[]) {
+      const scheduledAt = d.scheduled_at;
+      const targetProfiles = d.target_profiles as Array<{ profile_id: string }> | null;
+
+      if (!params.autoSchedule || !scheduledAt) {
+        // L16a / autoSchedule=false: leave for operator.
+        if (!scheduledAt) {
+          logger.info("workflow.image_gate.pass.draft_no_date", { draftId: d.id, batchId });
+        }
+        readyToScheduleIds.push(d.id);
+        continue;
+      }
+
+      // L16d: Check whether any target connection is still connected.
+      if (targetProfiles && targetProfiles.length > 0) {
+        const profileIds = targetProfiles.map((p) => p.profile_id);
+        const { data: conns } = await svc
+          .from("social_connections")
+          .select("id, status")
+          .in("id", profileIds);
+
+        const connectedCount = ((conns ?? []) as Array<{ id: string; status: string }>)
+          .filter((c) => c.status !== "disconnected").length;
+
+        if (connectedCount === 0) {
+          // L16d: all connections disconnected — operator must handle.
+          logger.warn("workflow.image_gate.pass.connections_disconnected", {
+            batchId,
+            draftId: d.id,
+          });
+          readyToScheduleIds.push(d.id);
+          continue;
+        }
+      }
+
+      // L16b / L16c: schedule_now — past dates satisfy scheduled_at <= now() so
+      // the cron fires immediately; future dates fire at the scheduled time.
+      scheduleNowIds.push(d.id);
+    }
+
+    // 5a. Auto-schedule: set state='scheduled' so the V2 publish-due cron picks
+    //     up these drafts. workflow_state stays 'ready_to_schedule' as the
+    //     human-readable stage label. Guard: only update drafts still in a
+    //     pre-scheduled state to avoid clobbering already-published drafts.
+    if (scheduleNowIds.length > 0) {
+      const { error: scheduleErr } = await svc
+        .from("social_post_drafts")
+        .update({ state: "scheduled", workflow_state: "ready_to_schedule" })
+        .in("id", scheduleNowIds);
+
+      if (scheduleErr) {
+        logger.error("workflow.image_gate.pass.draft_schedule_failed", {
+          batchId,
+          draftIds: scheduleNowIds,
+          err: scheduleErr.message,
+        });
+      } else {
+        logger.info("workflow.image_gate.pass.drafts_scheduled", {
+          batchId,
+          companyId,
+          draftCount: scheduleNowIds.length,
+        });
+      }
+    }
+
+    // 5b. Ready-to-schedule: operator completes scheduling manually.
+    if (readyToScheduleIds.length > 0) {
       const { error: updateErr } = await svc
         .from("social_post_drafts")
         .update({ workflow_state: "ready_to_schedule" })
-        .in("id", activeDraftIds);
+        .in("id", readyToScheduleIds);
 
       if (updateErr) {
         logger.error("workflow.image_gate.pass.draft_update_failed", {
           batchId,
-          draftIds: activeDraftIds,
+          draftIds: readyToScheduleIds,
           err: updateErr.message,
         });
       }
@@ -288,7 +339,8 @@ export async function onGatePass(params: OnGatePassParams): Promise<void> {
     logger.info("workflow.image_gate.pass.complete", {
       batchId,
       companyId,
-      draftCount: activeDraftIds.length,
+      scheduledCount: scheduleNowIds.length,
+      readyToScheduleCount: readyToScheduleIds.length,
     });
   } catch (err) {
     logger.error("workflow.image_gate.pass.unexpected", {
