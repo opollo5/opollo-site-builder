@@ -2,6 +2,7 @@ import "server-only";
 
 import { logger } from "@/lib/logger";
 import { hashToken } from "@/lib/platform/invitations";
+import { consume, validate } from "@/lib/platform/magic-link";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -11,20 +12,17 @@ import type { ApprovalRecipient } from "../types";
 // S1-7 — record an approval decision via magic-link.
 //
 // Two phases:
-//   A. Token verification (this lib): hash the raw token, look up
-//      the recipient row, return NOT_FOUND on no match. We deliberately
-//      do NOT pre-check revoked_at / parent state here — we let the
-//      atomic SQL function handle that so the decision recording and
-//      the state checks happen in one transaction.
-//   B. RPC call to record_approval_decision (migration 0072) which:
-//      - re-checks recipient + parent request state
-//      - inserts the event row
-//      - finalises the request + flips the post state per approval_rule
-//      - all atomic
+//   A. Token resolution (this lib) — two lookup paths:
+//        • New tokens (magic_links row exists): validate via service.
+//          If a magic_links row exists, its verdict is FINAL — the legacy
+//          token_hash fallback MUST NOT be used even if the row is invalid.
+//        • Legacy tokens (no magic_links row): hash → direct lookup on
+//          social_approval_recipients.token_hash.
+//   B. RPC call to record_approval_decision (migration 0072).
 //
-// Token-as-auth: the route layer trusts the SHA-256 hash match; there
-// is no canDo gate. A leaked token grants exactly one decision on
-// exactly one approval request and can be revoked by an admin.
+// resolveRecipientByToken additionally calls consume() (session open)
+// for new tokens on every page-load; recordApprovalDecision calls
+// validate() (read-only) to confirm the session is still active.
 // ---------------------------------------------------------------------------
 
 export type Decision = "approved" | "rejected" | "changes_requested";
@@ -33,7 +31,6 @@ export type RecordDecisionInput = {
   rawToken: string;
   decision: Decision;
   comment?: string | null;
-  // For audit columns. Caller passes from the request headers.
   ipAddress?: string | null;
   userAgent?: string | null;
 };
@@ -42,34 +39,34 @@ export type RecordDecisionResult = {
   requestId: string;
   postId: string;
   postState: string;
-  // True when this decision finalised the request. False for the
-  // intermediate decisions in all_must mode.
   finalised: boolean;
   eventId: string;
 };
 
 // Resolve the recipient + parent context from a raw magic-link token.
-// Returns NOT_FOUND when the token doesn't match anything; never
-// throws. Useful for the viewer page (which renders state before
-// asking the user to decide).
+// Calls consume() for new tokens — establishes the session on first page-load.
+// Returns NOT_FOUND when the token doesn't match anything; SESSION_EXPIRED
+// when the reviewer needs a fresh link; never throws.
 export async function resolveRecipientByToken(
   rawToken: string,
-): Promise<ApiResponse<{
-  recipient: ApprovalRecipient;
-  request: {
-    id: string;
-    post_master_id: string;
-    company_id: string;
-    approval_rule: "any_one" | "all_must";
-    expires_at: string;
-    revoked_at: string | null;
-    final_approved_at: string | null;
-    final_rejected_at: string | null;
-    snapshot_payload: unknown;
-  };
-  company: { id: string; name: string };
-  postState: string;
-}>> {
+): Promise<
+  ApiResponse<{
+    recipient: ApprovalRecipient;
+    request: {
+      id: string;
+      post_master_id: string;
+      company_id: string;
+      approval_rule: "any_one" | "all_must";
+      expires_at: string;
+      revoked_at: string | null;
+      final_approved_at: string | null;
+      final_rejected_at: string | null;
+      snapshot_payload: unknown;
+    };
+    company: { id: string; name: string };
+    postState: string;
+  }>
+> {
   if (!rawToken || !/^[0-9a-f]{64}$/i.test(rawToken)) {
     return tokenNotFound();
   }
@@ -77,20 +74,67 @@ export async function resolveRecipientByToken(
   const tokenHash = hashToken(rawToken);
   const svc = getServiceRoleClient();
 
+  // -------------------------------------------------------------------------
+  // Step 1: check for a magic_links row.
+  // HARD RULE: if a row exists, honour its verdict exclusively.
+  // Fall back to legacy lookup only when NO magic_links row exists.
+  // -------------------------------------------------------------------------
+  const mlLookup = await svc
+    .from("magic_links")
+    .select("id")
+    .eq("token_hash", tokenHash)
+    .maybeSingle();
+
+  let recipientRow: { id: string } | null = null;
+
+  if (mlLookup.error) {
+    logger.error("social.approvals.decisions.ml_lookup_failed", {
+      err: mlLookup.error.message,
+    });
+    return internal("Token lookup failed.");
+  }
+
+  if (mlLookup.data) {
+    // New token — consume (establishes session on first access; idempotent thereafter)
+    const consumeResult = await consume(rawToken);
+    if (!consumeResult.valid) {
+      if (consumeResult.reason === "session_expired") {
+        return sessionExpired();
+      }
+      return tokenNotFound();
+    }
+    // Resolve recipient via magic_link_id FK
+    const rl = await svc
+      .from("social_approval_recipients")
+      .select("id")
+      .eq("magic_link_id", mlLookup.data.id)
+      .maybeSingle();
+    if (rl.error || !rl.data) return tokenNotFound();
+    recipientRow = rl.data as { id: string };
+  } else {
+    // Legacy token — direct hash lookup (back-compat)
+    const rl = await svc
+      .from("social_approval_recipients")
+      .select("id")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+    if (rl.error || !rl.data) return tokenNotFound();
+    recipientRow = rl.data as { id: string };
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 2: hydrate the full recipient + request + company + post state.
+  // -------------------------------------------------------------------------
   const recipient = await svc
     .from("social_approval_recipients")
     .select(
       "id, approval_request_id, email, name, platform_user_id, requires_otp, otp_expires_at, revoked_at, created_at",
     )
-    .eq("token_hash", tokenHash)
+    .eq("id", recipientRow.id)
     .maybeSingle();
-  if (recipient.error) {
-    logger.error("social.approvals.decisions.token_lookup_failed", {
-      err: recipient.error.message,
-    });
-    return internal(`Failed to read recipient: ${recipient.error.message}`);
+  if (recipient.error || !recipient.data) {
+    return internal("Approval recipient missing.");
   }
-  if (!recipient.data) return tokenNotFound();
 
   const request = await svc
     .from("social_approval_requests")
@@ -163,24 +207,60 @@ export async function recordApprovalDecision(
   const tokenHash = hashToken(input.rawToken);
   const svc = getServiceRoleClient();
 
-  // Resolve recipient_id from token. Refresh-safe: a revoked or
-  // expired recipient still resolves to its row here; the SQL
-  // function will reject the decision atomically.
-  const recipientRow = await svc
-    .from("social_approval_recipients")
+  // -------------------------------------------------------------------------
+  // Token resolution (same dual-path as resolveRecipientByToken).
+  // HARD RULE: magic_links row present → honour its verdict; no fallthrough.
+  // -------------------------------------------------------------------------
+  const mlLookup = await svc
+    .from("magic_links")
     .select("id")
     .eq("token_hash", tokenHash)
     .maybeSingle();
-  if (recipientRow.error) {
+
+  if (mlLookup.error) {
     logger.error("social.approvals.decisions.token_lookup_failed", {
-      err: recipientRow.error.message,
+      err: mlLookup.error.message,
     });
-    return internal(`Failed to read recipient: ${recipientRow.error.message}`);
+    return internal(`Token lookup failed: ${mlLookup.error.message}`);
   }
-  if (!recipientRow.data) return tokenNotFound();
+
+  let recipientId: string;
+
+  if (mlLookup.data) {
+    // New token — validate session is still active (read-only, no re-consume)
+    const vr = await validate(input.rawToken);
+    if (!vr.valid) {
+      if (vr.reason === "session_expired") {
+        return sessionExpired();
+      }
+      return tokenNotFound();
+    }
+    const rl = await svc
+      .from("social_approval_recipients")
+      .select("id")
+      .eq("magic_link_id", mlLookup.data.id)
+      .maybeSingle();
+    if (rl.error || !rl.data) return tokenNotFound();
+    recipientId = (rl.data as { id: string }).id;
+  } else {
+    // Legacy token — direct hash lookup
+    const rl = await svc
+      .from("social_approval_recipients")
+      .select("id")
+      .eq("token_hash", tokenHash)
+      .maybeSingle();
+    if (rl.error) {
+      logger.error("social.approvals.decisions.legacy_token_lookup_failed", {
+        err: rl.error.message,
+      });
+      return internal(`Token lookup failed: ${rl.error.message}`);
+    }
+    if (!rl.data) return tokenNotFound();
+    recipientId = (rl.data as { id: string }).id;
+  }
 
   const rpc = await svc.rpc("record_approval_decision", {
-    p_recipient_id: recipientRow.data.id as string,
+    p_recipient_id: recipientId,
     p_decision: input.decision,
     p_comment: input.comment ?? null,
     p_ip: input.ipAddress ?? null,
@@ -256,10 +336,22 @@ function invalidState<T>(message: string): ApiResponse<T> {
   };
 }
 
+function sessionExpired<T>(): ApiResponse<T> {
+  return {
+    ok: false,
+    error: {
+      code: "SESSION_EXPIRED",
+      message: "Your review session has expired.",
+      retryable: false,
+      suggested_action:
+        "Request a fresh link by entering your email on the re-request page.",
+    },
+    timestamp: new Date().toISOString(),
+  };
+}
+
 function tokenNotFound<T>(): ApiResponse<T> {
-  return notFound<T>(
-    "This approval link is invalid or has been revoked.",
-  );
+  return notFound<T>("This approval link is invalid or has been revoked.");
 }
 
 function notFound<T>(message: string): ApiResponse<T> {

@@ -146,6 +146,9 @@ function isPublicPath(pathname: string): boolean {
   // External recipients aren't platform users; the link must work
   // pre-session.
   if (pathname.startsWith("/viewer/")) return true;
+  // /magic-link/* — consumption routes for login and reconnect magic links.
+  // Token IS the auth; no session required to reach the route handler.
+  if (pathname.startsWith("/magic-link/")) return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;

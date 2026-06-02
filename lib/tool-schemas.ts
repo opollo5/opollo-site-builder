@@ -97,6 +97,8 @@ export const ERROR_CODES = [
   "CONFLICT",
   // Cross-tenant channel conflict (set-channel Layer 2 block with override path).
   "CROSS_TENANT_CONFLICT",
+  // B1 magic-link service — reviewer session expired.
+  "SESSION_EXPIRED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
@@ -229,6 +231,8 @@ export function errorCodeToStatus(code: ErrorCode): number {
     case "CONFLICT":
     case "CROSS_TENANT_CONFLICT":
       return 409;
+    case "SESSION_EXPIRED":
+      return 401;
   }
 }
 
