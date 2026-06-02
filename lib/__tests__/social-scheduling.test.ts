@@ -114,6 +114,8 @@ describe("lib/platform/social/scheduling", () => {
       content: "ready to schedule",
       media_urls: [],
       target_profiles: [],
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     if (error) throw new Error(`createScheduledDraft: ${error.message}`);
     return draftId;
@@ -166,6 +168,8 @@ describe("lib/platform/social/scheduling", () => {
         content: "not yet approved",
         media_urls: [],
         target_profiles: [],
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       });
 
       const result = await createScheduleEntry({

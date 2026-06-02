@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, expect, it, beforeAll, beforeEach, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser } from "./_auth-helpers";
@@ -134,6 +135,8 @@ describe("V1→V2 migration — V2 draft insertion", () => {
         target_profiles:   [],
         platform_variants: {},
         idempotency_key:   idempotencyKey,
+        content_group_id:  crypto.randomUUID(),
+        version_number:    1,
       })
       .select("id, state, content, link_url, idempotency_key")
       .single();
@@ -159,6 +162,7 @@ describe("V1→V2 migration — V2 draft insertion", () => {
       .insert({
         company_id: COMPANY_ID, created_by: seededUser.id, updated_by: seededUser.id,
         idempotency_key: idempotencyKey, content: "original",
+        content_group_id: crypto.randomUUID(), version_number: 1,
       })
       .select("id")
       .single();
@@ -171,6 +175,7 @@ describe("V1→V2 migration — V2 draft insertion", () => {
       .insert({
         company_id: COMPANY_ID, created_by: seededUser.id, updated_by: seededUser.id,
         idempotency_key: idempotencyKey, content: "duplicate",
+        content_group_id: crypto.randomUUID(), version_number: 1,
       });
 
     expect(conflictError?.code).toBe("23505");

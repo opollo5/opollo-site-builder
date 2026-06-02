@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, expect, it, beforeAll, beforeEach, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser } from "./_auth-helpers";
@@ -66,6 +67,8 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
         updated_by: seededUserId,
         state: "published",
         bundle_post_id: BUNDLE_ID,
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       })
       .select("id, bundle_post_id")
       .single();
@@ -86,6 +89,8 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
         company_id: COMPANY_ID,
         created_by: seededUserId,
         updated_by: seededUserId,
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       })
       .select("id, bundle_post_id")
       .single();
@@ -107,6 +112,8 @@ describe("Migration 0156 — social_post_drafts.bundle_post_id", () => {
         created_by: seededUserId,
         updated_by: seededUserId,
         bundle_post_id: BUNDLE_ID + "-lookup",
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       })
       .select("id")
       .single();
