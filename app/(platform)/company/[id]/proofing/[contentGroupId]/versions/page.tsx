@@ -37,7 +37,7 @@ export default async function VersionComparisonPage({
 
       <div className="flex gap-2 flex-wrap">
         <a
-          href={`/api/platform/proofing/${contentGroupId}/audit?company_id=${companyId}&format=csv`}
+          href={`/api/platform/proofing/groups/${contentGroupId}/audit?company_id=${companyId}&format=csv`}
           className="text-sm text-primary hover:underline"
           download
         >
