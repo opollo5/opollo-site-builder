@@ -10,6 +10,9 @@ import { renderBaseEmail, escapeHtml } from "./base";
 // rather than being inlined in the email, so reviewers always see the
 // most up-to-date snapshot at the time of review (and can't be tricked
 // by a stale email forward into approving a different draft).
+//
+// Phase-2 additions: optional versionLabel, dueDateDisplay, reviewerRole
+// fields surfaced when provided (workflow approval engine).
 
 export interface SocialApprovalRequestEmailInput {
   recipient_email: string;
@@ -19,6 +22,13 @@ export interface SocialApprovalRequestEmailInput {
   review_url: string;
   // ISO timestamp string; rendered in the recipient's locale.
   expires_at: string;
+  // Optional Phase-2 fields from the approval workflow engine.
+  // "Version 2" — derived from review_round + 1 at creation time.
+  versionLabel?: string;
+  // Formatted due date in company timezone, e.g. "14 Jun 2026".
+  dueDateDisplay?: string;
+  // "Approver" or "External reviewer".
+  reviewerRole?: string;
 }
 
 export function renderSocialApprovalRequestEmail(
@@ -30,6 +40,20 @@ export function renderSocialApprovalRequestEmail(
     : "Hi";
   const expiresLocal = formatExpiry(input.expires_at);
 
+  const metaRows = [
+    input.versionLabel
+      ? `<p style="margin:0 0 6px 0;font-size:13px;color:#64748b;"><strong>Version:</strong> ${escapeHtml(input.versionLabel)}</p>`
+      : "",
+    input.reviewerRole
+      ? `<p style="margin:0 0 6px 0;font-size:13px;color:#64748b;"><strong>Your role:</strong> ${escapeHtml(input.reviewerRole)}</p>`
+      : "",
+    input.dueDateDisplay
+      ? `<p style="margin:0 0 6px 0;font-size:13px;color:#64748b;"><strong>Due by:</strong> ${escapeHtml(input.dueDateDisplay)}</p>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
   const bodyHtml = `
     <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;color:#0f172a;">
       ${greeting},
@@ -38,9 +62,10 @@ export function renderSocialApprovalRequestEmail(
       <strong>${escapeHtml(input.company_name)}</strong> has prepared a
       social post and would like your approval before it's scheduled.
     </p>
+    ${metaRows}
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:16px 0;">
       <tr>
-        <td style="border-radius:6px;background-color:#0f172a;">
+        <td style="border-radius:6px;background-color:#16a34a;">
           <a href="${escapeHtml(input.review_url)}" style="display:inline-block;padding:12px 24px;font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;border-radius:6px;">
             Review and respond
           </a>
@@ -56,10 +81,16 @@ export function renderSocialApprovalRequestEmail(
     </p>
   `;
 
+  const textMetaLines: string[] = [];
+  if (input.versionLabel) textMetaLines.push(`Version: ${input.versionLabel}`);
+  if (input.reviewerRole) textMetaLines.push(`Your role: ${input.reviewerRole}`);
+  if (input.dueDateDisplay) textMetaLines.push(`Due by: ${input.dueDateDisplay}`);
+
   const textBody = [
     `${input.recipient_name?.trim() ?? "Hi"},`,
     ``,
     `${input.company_name} has prepared a social post and would like your approval.`,
+    ...(textMetaLines.length > 0 ? ["", ...textMetaLines] : []),
     ``,
     `Review and respond: ${input.review_url}`,
     ``,
