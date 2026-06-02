@@ -58,6 +58,9 @@ export type AddRecipientInput = {
   // an OTP before showing the snapshot. V1 stores requires_otp but
   // the OTP issuance flow lands in the viewer slice.
   requiresOtp?: boolean;
+  // B3 role model: false for non-blocking reviewer role (decision
+  // recorded but does not affect quorum finalization). DEFAULT true.
+  isBlocking?: boolean;
 };
 
 export type AddRecipientResult = {

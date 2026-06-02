@@ -180,6 +180,7 @@ export async function POST(
             contentGroupId,
             companyId,
             actorUserId: (requestRow as { created_by: string | null } | null)?.created_by ?? null,
+            origin: req.nextUrl.origin,
           });
         } else {
           // rejected or changes_requested

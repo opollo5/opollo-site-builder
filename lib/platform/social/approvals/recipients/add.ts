@@ -116,6 +116,7 @@ export async function addRecipient(
       token_hash: magicLinkIssue.link.token_hash, // back-compat: legacy lookup still works
       magic_link_id: magicLinkIssue.link.id,       // new service FK
       requires_otp: input.requiresOtp === true,
+      is_blocking: input.isBlocking !== false,      // DEFAULT true; false only for reviewer role
     })
     .select(
       "id, approval_request_id, email, name, platform_user_id, requires_otp, otp_expires_at, revoked_at, created_at",

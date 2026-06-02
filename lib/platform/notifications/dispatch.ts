@@ -152,6 +152,13 @@ async function resolveRecipients(
       const admins = await resolveCompanyAdmins(payload.companyId);
       return submitter ? [submitter, ...admins] : admins;
     }
+
+    case "proof_step_advanced":
+    case "proof_sent_back": {
+      const submitter = await resolveUserById(payload.submitterUserId);
+      const admins = await resolveCompanyAdmins(payload.companyId);
+      return submitter ? [submitter, ...admins] : admins;
+    }
   }
 }
 
@@ -352,6 +359,19 @@ function renderInApp(
         body: "A revised version has been submitted for re-review.",
         actionUrl: null,
       };
+    // B3 step events
+    case "proof_step_advanced":
+      return {
+        title: `Proof moved to: ${payload.stepName}`,
+        body: "The previous step passed. The next step is now open for review.",
+        actionUrl: null,
+      };
+    case "proof_sent_back":
+      return {
+        title: `Proof sent back to: ${payload.priorStepName}`,
+        body: payload.comment ?? "A gatekeeper has requested re-review of a prior step.",
+        actionUrl: null,
+      };
   }
 }
 
@@ -519,6 +539,21 @@ function renderEmailContent(
       return {
         subject: `New proof version ${payload.versionLabel} submitted for review`,
         lead: "A revised version has been submitted. Reviewers have been notified.",
+        action: null,
+      };
+    // B3 step events
+    case "proof_step_advanced":
+      return {
+        subject: `Proof advanced to: ${payload.stepName}`,
+        lead: `The previous step passed. The proof has moved to the next step: ${payload.stepName}. Reviewers for this step have been notified.`,
+        action: null,
+      };
+    case "proof_sent_back":
+      return {
+        subject: `Proof sent back to: ${payload.priorStepName}`,
+        lead: payload.comment
+          ? payload.comment
+          : `A gatekeeper has sent the proof back to ${payload.priorStepName} for re-review.`,
         action: null,
       };
   }

@@ -5,6 +5,8 @@ import { internalError, readJsonBody, validationError } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { createProof } from "@/lib/platform/proofing";
+import { createStepProof } from "@/lib/platform/proofing/engine";
+import { getWorkflowSteps } from "@/lib/platform/workflow/steps";
 
 // ---------------------------------------------------------------------------
 // POST /api/platform/proofing/[draftId]/create
@@ -51,6 +53,27 @@ export async function POST(
   if (gate.kind === "deny") return gate.response;
 
   try {
+    // B3: if company has workflow_steps, use the step-based engine.
+    // Otherwise fall back to B2's simple (explicit-recipient) flow.
+    const steps = await getWorkflowSteps(company_id);
+
+    if (steps.length > 0) {
+      const result = await createStepProof({
+        draftId,
+        companyId: company_id,
+        submitterUserId: gate.userId,
+        origin: req.nextUrl.origin,
+      });
+
+      if (!result) return internalError("Failed to create step-based proof.");
+
+      return NextResponse.json(
+        { ok: true, data: result, timestamp: new Date().toISOString() },
+        { status: 200 },
+      );
+    }
+
+    // Simple flow (no workflow steps configured)
     const result = await createProof({
       draftId,
       companyId: company_id,
