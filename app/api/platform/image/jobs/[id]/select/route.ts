@@ -5,7 +5,8 @@ import { internalError, readJsonBody, validationError } from "@/lib/http";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
-import { autoAttachImage, type AutoAttachState } from "@/lib/image/auto-attach";
+import { autoAttachImage, type AutoAttachResult } from "@/lib/image/auto-attach";
+import { getEnabledGate } from "@/lib/platform/workflow";
 
 // ---------------------------------------------------------------------------
 // /api/platform/image/jobs/[id]/select
@@ -174,13 +175,31 @@ async function handleSelection(
     .maybeSingle();
   if (co?.timezone) companyTimezone = co.timezone as string;
 
-  let attachResult: { state: AutoAttachState; draftId?: string; assetId?: string; error?: string };
+  // Check whether the image_review workflow gate is enabled for this company.
+  // Fail-soft: if the gate lookup throws, proceed without the gate.
+  let imageGate = null;
+  try {
+    imageGate = await getEnabledGate(owner.companyId, "image_review");
+  } catch (err) {
+    logger.warn("image.select.gate_lookup_failed", {
+      jobId,
+      companyId: owner.companyId,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  let attachResult: AutoAttachResult;
   try {
     attachResult = await autoAttachImage({
       jobId,
       companyId: owner.companyId,
       approvedBy: gate.userId,
       companyTimezone,
+      options: {
+        gateEnabled: imageGate !== null,
+        gate: imageGate ?? undefined,
+        batchId: owner.batchId ?? undefined,
+      },
     });
   } catch (err) {
     logger.warn("image.select.auto_attach_threw", {
@@ -204,6 +223,8 @@ async function handleSelection(
       selectionId,
       destination: "publish",
       autoAttach: attachResult,
+      // Surfaces pending_review=true when the image_review gate held the draft.
+      ...(attachResult.pendingReview ? { pending_review: true } : {}),
     },
     timestamp: new Date().toISOString(),
   });

@@ -18,6 +18,11 @@ vi.mock("@/lib/image/auto-attach", () => ({
   autoAttachImage: mockAutoAttach,
 }));
 
+const { mockGetEnabledGate } = vi.hoisted(() => ({ mockGetEnabledGate: vi.fn() }));
+vi.mock("@/lib/platform/workflow", () => ({
+  getEnabledGate: mockGetEnabledGate,
+}));
+
 const JOB_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const COMPANY_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const USER_ID = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
@@ -105,6 +110,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGate.mockResolvedValue({ kind: "allow", userId: USER_ID });
   mockAutoAttach.mockResolvedValue({ state: "attached", draftId: "draft-1", assetId: "asset-1" });
+  // Gate lookup defaults to null (gate disabled) — most tests assert gate-off behaviour.
+  mockGetEnabledGate.mockResolvedValue(null);
 });
 
 describe("POST /api/platform/image/jobs/[id]/select (approve)", () => {
@@ -147,6 +154,11 @@ describe("POST /api/platform/image/jobs/[id]/select (approve)", () => {
       companyId: COMPANY_ID,
       approvedBy: USER_ID,
       companyTimezone: "Australia/Melbourne",
+      options: {
+        gateEnabled: false,
+        gate: undefined,
+        batchId: "batch-1",
+      },
     });
   });
 
