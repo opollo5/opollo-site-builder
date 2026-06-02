@@ -3,6 +3,8 @@ import "server-only";
 import { fromZonedTime } from "date-fns-tz";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
+import { createBatchApprovalRequest } from "@/lib/platform/workflow/image-gate";
+import type { WorkflowGateWithApprovers } from "@/lib/platform/workflow/types";
 
 // ---------------------------------------------------------------------------
 // B4 — auto-attach a selected image to a scheduled social_post_draft.
@@ -29,6 +31,25 @@ export interface AutoAttachResult {
   draftId?: string;
   assetId?: string;
   error?: string;
+  /** Set when gateEnabled=true and the approval request was created. */
+  approvalRequestId?: string;
+  /** 'pending_review' when the draft is held for gate approval. */
+  pendingReview?: boolean;
+}
+
+/**
+ * Gate options for the image_review workflow gate.
+ * When gateEnabled=true the draft is created in workflow_state='pending_image_review'
+ * and state='draft'; an approval request is created for the configured approvers.
+ * When gateEnabled=false (default) the existing behaviour is unchanged.
+ */
+export interface AutoAttachOptions {
+  /** If true, hold the draft for image_review gate approval. */
+  gateEnabled: boolean;
+  /** Gate config — required when gateEnabled=true. */
+  gate?: WorkflowGateWithApprovers;
+  /** The batch this job belongs to — used to link the approval request. */
+  batchId?: string;
 }
 
 export interface AutoAttachInput {
@@ -42,6 +63,11 @@ export interface AutoAttachInput {
    * Defaults to "UTC" inside the function if absent.
    */
   companyTimezone?: string;
+  /**
+   * Workflow gate options. Omit or set gateEnabled=false for legacy behaviour
+   * (backwards-compatible default).
+   */
+  options?: AutoAttachOptions;
 }
 
 export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttachResult> {
@@ -131,11 +157,20 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
 
     const assetId = (asset as { id: string }).id;
 
-    // ─── Step 2: create a new scheduled draft ────────────────────────────
+    // ─── Step 2: create a new draft ─────────────────────────────────────
     // ALWAYS inserts a new draft — never finds an existing one. Each approved
     // image creates its own post: separate image, separate caption, separate
     // channel selection, and scheduled_at anchored to company midnight.
     // The asset is included directly in the INSERT — one atomic operation.
+    //
+    // When the image_review gate is enabled, the draft is created with
+    // state='draft' and workflow_state='pending_image_review' so it is held
+    // for approval before appearing in the publish queue.
+    const opts = input.options;
+    const gateEnabled = opts?.gateEnabled === true;
+    const draftState: DraftState = gateEnabled ? "draft" : "scheduled";
+    const workflowState: string | null = gateEnabled ? "pending_image_review" : null;
+
     const draftId = await createScheduledDraft(svc, {
       companyId: input.companyId,
       publishDate: j.target_publish_date,
@@ -144,6 +179,8 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       targetPlatforms: (j.target_platforms as string[] | null) ?? [],
       companyTimezone: input.companyTimezone ?? "UTC",
       assetId,
+      draftState,
+      workflowState,
     });
 
     if (!draftId) {
@@ -152,15 +189,42 @@ export async function autoAttachImage(input: AutoAttachInput): Promise<AutoAttac
       return { state: "attach_failed", error: reason };
     }
 
-    // ─── Step 3: mark job attached ───────────────────────────────────────
+    // ─── Step 3: gate approval request (when gate enabled) ───────────────
+    let approvalRequestId: string | undefined;
+    if (gateEnabled && opts?.gate) {
+      const batchId = opts.batchId ?? j.id; // fallback to job id if no batch
+      const result = await createBatchApprovalRequest({
+        batchId,
+        draftId,
+        gate: opts.gate,
+        companyId: input.companyId,
+        createdBy: input.approvedBy,
+      });
+      if (result) {
+        approvalRequestId = result.approvalRequestId;
+      } else {
+        logger.warn("image.auto_attach.approval_request_failed", {
+          jobId: input.jobId,
+          draftId,
+          note: "draft created; approval request could not be created",
+        });
+      }
+    }
+
+    // ─── Step 4: mark job attached ───────────────────────────────────────
     await markJobAttachState(svc, input.jobId, "attached", draftId, null);
     logger.info("image.auto_attach.attached", {
       jobId: input.jobId,
       companyId: input.companyId,
       draftId,
       assetId,
+      gateEnabled,
+      approvalRequestId,
     });
 
+    if (gateEnabled) {
+      return { state: "attached", draftId, assetId, approvalRequestId, pendingReview: true };
+    }
     return { state: "attached", draftId, assetId };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
@@ -314,6 +378,8 @@ async function resolveTargetConnections(
   return resolved;
 }
 
+type DraftState = "scheduled" | "draft";
+
 interface CreateDraftInput {
   companyId: string;
   publishDate: string; // YYYY-MM-DD
@@ -330,6 +396,17 @@ interface CreateDraftInput {
   companyTimezone: string;
   /** Asset UUID to attach — included directly in the INSERT. */
   assetId: string;
+  /**
+   * Draft state for the INSERT.
+   * 'scheduled' — legacy / gate-disabled path (default).
+   * 'draft'     — gate-enabled path; holds the draft for review.
+   */
+  draftState: DraftState;
+  /**
+   * workflow_state for the INSERT.
+   * 'pending_image_review' when the gate is enabled, null otherwise.
+   */
+  workflowState: string | null;
 }
 
 /**
@@ -364,24 +441,36 @@ async function createScheduledDraft(
 
   const connectionIds = resolvedConnections.map((c) => c.profile_id);
 
+  const insertPayload: Record<string, unknown> = {
+    company_id: input.companyId,
+    created_by: input.approvedBy,
+    updated_by: input.approvedBy,
+    state: input.draftState,
+    content: input.postText ?? "",
+    media_urls: [],
+    media_asset_ids: [input.assetId],
+    target_profiles: resolvedConnections,
+    platform_variants: {},
+    scheduled_at: scheduledAtIso,
+    approval_required: false,
+    draft_data: connectionIds.length > 0
+      ? { target_connection_ids: connectionIds }
+      : {},
+  };
+
+  // workflow_state is null for the legacy path (gate disabled).
+  // For the gate-enabled path it is 'pending_image_review'.
+  // The column exists after migration 0172; setting null here is a no-op
+  // for existing rows. We spread it conditionally to avoid sending an
+  // explicit null to tables that may not have the column yet (local dev
+  // without migration 0172 applied).
+  if (input.workflowState !== null) {
+    insertPayload.workflow_state = input.workflowState;
+  }
+
   const { data: created, error: createErr } = await svc
     .from("social_post_drafts")
-    .insert({
-      company_id: input.companyId,
-      created_by: input.approvedBy,
-      updated_by: input.approvedBy,
-      state: "scheduled",
-      content: input.postText ?? "",
-      media_urls: [],
-      media_asset_ids: [input.assetId],
-      target_profiles: resolvedConnections,
-      platform_variants: {},
-      scheduled_at: scheduledAtIso,
-      approval_required: false,
-      draft_data: connectionIds.length > 0
-        ? { target_connection_ids: connectionIds }
-        : {},
-    })
+    .insert(insertPayload)
     .select("id")
     .single();
 
