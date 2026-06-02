@@ -4,7 +4,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { createProof, reviseProof, onProofPass, onProofReject } from "@/lib/platform/proofing";
 import { resolveRecipientByToken } from "@/lib/platform/social/approvals";
 import { addRecipient } from "@/lib/platform/social/approvals/recipients/add";
-import { seedAuthUser, cleanupTrackedAuthUsers } from "./_auth-helpers";
+import { seedAuthUser } from "./_auth-helpers";
 import type { SeededAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
@@ -51,7 +51,9 @@ async function seedDraft(overrides: Record<string, unknown> = {}) {
 }
 
 beforeAll(async () => {
-  submitterUser = await seedAuthUser({ role: "user" });
+  // persistent: true — not tracked by cleanupTrackedAuthUsers(), so truncateAll()
+  // doesn't delete this user between tests. Cleaned up explicitly in afterAll.
+  submitterUser = await seedAuthUser({ role: "user", persistent: true });
 });
 
 // _setup.ts truncateAll() runs before each test and wipes platform_companies.
@@ -63,7 +65,9 @@ beforeEach(async () => {
 afterAll(async () => {
   const svc = getServiceRoleClient();
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
-  await cleanupTrackedAuthUsers();
+  if (submitterUser?.id) {
+    await svc.auth.admin.deleteUser(submitterUser.id);
+  }
 });
 
 // ---------------------------------------------------------------------------
