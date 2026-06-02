@@ -153,6 +153,8 @@ export async function generateCAPPosts(
         media_urls:        [],
         target_profiles:   [],
         platform_variants: platformVariants,
+        content_group_id:  randomUUID(), // each CAP draft is its own content group (v1)
+        version_number:    1,
       })
       .select("id")
       .single();
