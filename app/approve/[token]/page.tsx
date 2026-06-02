@@ -51,6 +51,9 @@ export default async function ApproveViewerPage({
 
   const resolved = await resolveRecipientByToken(token);
   if (!resolved.ok) {
+    if (resolved.error?.code === "SESSION_EXPIRED") {
+      return <SessionExpiredPanel />;
+    }
     return <InvalidLink />;
   }
 
@@ -192,6 +195,18 @@ function ExpiredPanel({ companyName }: { companyName: string }) {
       <p className="mt-3 text-muted-foreground">
         The approval window for this {companyName} post has expired.
         If you still need to review it, ask the team for a fresh link.
+      </p>
+    </main>
+  );
+}
+
+function SessionExpiredPanel() {
+  return (
+    <main className="mx-auto max-w-xl p-6 text-sm">
+      <h1 className="text-page-title text-foreground">Session expired</h1>
+      <p className="mt-3 text-muted-foreground">
+        Your review session has expired. Enter your email address to receive a
+        fresh link and continue your review.
       </p>
     </main>
   );

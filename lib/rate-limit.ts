@@ -50,7 +50,9 @@ export type LimiterName =
   | "error_report"
   | "client_errors"
   | "review_link"
-  | "social_publish";
+  | "social_publish"
+  | "magic-link-login"
+  | "magic-link-reconnect";
 
 type LimiterConfig = {
   requests: number;
@@ -139,6 +141,8 @@ const CONFIGS: Record<LimiterName, LimiterConfig> = {
   // call. 30/hour covers rapid editorial use without opening cost-amplification
   // paths. Keyed by user ID; service actors (CAP) bypass this limiter.
   social_publish: { requests: 30, window: "1 h" },
+  "magic-link-login": { requests: 5, window: "1 h" },
+  "magic-link-reconnect": { requests: 10, window: "1 h" },
 };
 
 export type RateLimitResult =

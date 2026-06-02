@@ -1,7 +1,9 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 import { logger } from "@/lib/logger";
-import { generateRawToken, hashToken } from "@/lib/platform/invitations";
+import { issue } from "@/lib/platform/magic-link";
 import { getServiceRoleClient } from "@/lib/supabase";
 import type { ApiResponse } from "@/lib/tool-schemas";
 
@@ -10,22 +12,16 @@ import type { AddRecipientInput, AddRecipientResult } from "../types";
 // ---------------------------------------------------------------------------
 // S1-6 — add a recipient (reviewer) to an open approval_request.
 //
-// The caller passes an approval_request_id; we verify the parent
-// request belongs to companyId and is still open (not revoked + not
-// already finalised) before inserting the recipient row.
-//
-// Token contract:
-//   - Generate a 64-char hex random token.
-//   - Store SHA-256 hex hash in social_approval_recipients.token_hash.
-//   - Return the raw token ONCE to the caller for the email body.
-//   - Caller must build the magic-link URL and send the email; the
-//     lib does not know the deployment origin and stays decoupled
-//     from SendGrid for testability (mirror of sendInvitation in
-//     lib/platform/invitations).
+// Token contract (B1 upgrade):
+//   - Issue via magic-link service (purpose='approval').
+//   - Dual write: magic_links.token_hash AND social_approval_recipients.token_hash
+//     are kept in sync so the legacy /approve/[token] lookup still works
+//     for tokens issued before the service migration.
+//   - magic_link_id FK set on the recipient row for new-token lookups.
+//   - Pre-generate recipient UUID so magic_links.subject_id is set at
+//     issuance time (no second UPDATE round-trip).
 //
 // Caller is responsible for canDo("submit_for_approval", companyId).
-// Approval recipients can be added by anyone who could submit the
-// post — typically the editor who drafted it.
 // ---------------------------------------------------------------------------
 
 export async function addRecipient(
@@ -44,10 +40,7 @@ export async function addRecipient(
 
   const svc = getServiceRoleClient();
 
-  // 1. Look up the parent request, scope by company_id, verify it's
-  // still open. Open = !revoked_at AND no final_*_at timestamps.
-  // Scoping at the lib (in addition to RLS) so a service-role caller
-  // can't add recipients to another company's request via stale id.
+  // 1. Verify the parent request belongs to companyId and is still open.
   const reqLookup = await svc
     .from("social_approval_requests")
     .select(
@@ -62,7 +55,9 @@ export async function addRecipient(
       err: reqLookup.error.message,
       approval_request_id: input.approvalRequestId,
     });
-    return internal(`Failed to read approval request: ${reqLookup.error.message}`);
+    return internal(
+      `Failed to read approval request: ${reqLookup.error.message}`,
+    );
   }
   if (!reqLookup.data) {
     return notFound("No approval request with that id in this company.");
@@ -73,13 +68,8 @@ export async function addRecipient(
   if (reqLookup.data.final_approved_at || reqLookup.data.final_rejected_at) {
     return invalidState("Approval request is already finalised.");
   }
-  // expires_at is informational here — the recipient list works
-  // until revoke/finalise; the magic-link viewer slice will reject
-  // expired tokens server-side at click time.
 
-  // 2. Look up whether this email already corresponds to a platform
-  // user, to denormalise the link in social_approval_recipients
-  // (audit makes "approved by" attribution easier downstream).
+  // 2. Resolve platform user id for audit attribution.
   const userLookup = await svc
     .from("platform_users")
     .select("id")
@@ -93,22 +83,38 @@ export async function addRecipient(
   }
   const platformUserId = userLookup.data?.id ?? null;
 
-  // 3. Generate the token.
-  const rawToken = generateRawToken();
-  const tokenHash = hashToken(rawToken);
+  // 3. Pre-generate recipient UUID so magic_links.subject_id can be set
+  //    at issuance time without a second UPDATE.
+  const recipientId = randomUUID();
 
-  // 4. Insert. The schema has no UNIQUE on (approval_request_id, email)
-  // — operators can deliberately add the same email twice (e.g. send
-  // two reminder rounds with different tokens). That matches the spec:
-  // each recipient row is one magic link.
+  // 4. Issue via the magic-link service.
+  let magicLinkIssue: Awaited<ReturnType<typeof issue>>;
+  try {
+    magicLinkIssue = await issue({
+      purpose: "approval",
+      subjectType: "approval_recipient",
+      subjectId: recipientId,
+      companyId: input.companyId,
+      email,
+    });
+  } catch (err) {
+    logger.error("social.approvals.recipients.add.magic_link_issue_failed", {
+      err: String(err),
+    });
+    return internal("Failed to issue magic link for recipient.");
+  }
+
+  // 5. Insert recipient with dual-write token_hash + magic_link_id.
   const insertResult = await svc
     .from("social_approval_recipients")
     .insert({
+      id: recipientId,
       approval_request_id: input.approvalRequestId,
       email,
       name: input.name?.trim() || null,
       platform_user_id: platformUserId,
-      token_hash: tokenHash,
+      token_hash: magicLinkIssue.link.token_hash, // back-compat: legacy lookup still works
+      magic_link_id: magicLinkIssue.link.id,       // new service FK
       requires_otp: input.requiresOtp === true,
     })
     .select(
@@ -122,14 +128,16 @@ export async function addRecipient(
       code: insertResult.error.code,
       approval_request_id: input.approvalRequestId,
     });
-    return internal(`Failed to add recipient: ${insertResult.error.message}`);
+    return internal(
+      `Failed to add recipient: ${insertResult.error.message}`,
+    );
   }
 
   return {
     ok: true,
     data: {
       recipient: insertResult.data as AddRecipientResult["recipient"],
-      rawToken,
+      rawToken: magicLinkIssue.rawToken,
     },
     timestamp: new Date().toISOString(),
   };
