@@ -21,10 +21,13 @@ const COMPANY_ID = "00001740-0000-0000-0000-000000000001";
 
 async function seedCompany(id: string) {
   const svc = getServiceRoleClient();
-  await svc.from("platform_companies").upsert(
-    { id, name: "Magic Link Test Co", slug: `ml-test-${id.slice(-4)}` },
+  // Use the last 8 chars for the slug to avoid UNIQUE collisions with other test
+  // suites. Fail loudly — silently swallowing the error leaves the FK dangling.
+  const { error } = await svc.from("platform_companies").upsert(
+    { id, name: "Magic Link Test Co", slug: `ml-test-${id.slice(-8)}` },
     { onConflict: "id" },
   );
+  if (error) throw new Error(`seedCompany failed: ${error.message}`);
 }
 
 async function seedApprovalRequest(companyId: string) {
