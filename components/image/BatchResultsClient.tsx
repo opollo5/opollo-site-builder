@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { NavIcon } from "@/components/ui/nav-icon";
 import { PreviewCard } from "@/components/social/composer/PreviewCard";
+import { WorkflowStatusDrawer } from "@/components/workflow/WorkflowStatusDrawer";
 import {
   Dialog,
   DialogContent,
@@ -119,6 +121,7 @@ function prefersReducedMotion(): boolean {
 export function BatchResultsClient({ batchId, companyId }: { batchId: string; companyId: string }) {
   const [batch, setBatch] = useState<BatchData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   // exitingIndex: the card currently playing its fly-out animation.
   // Set to the old currentIndex simultaneously with advancing currentIndex so
@@ -275,8 +278,29 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
           }`}>
             {batch.state.charAt(0).toUpperCase() + batch.state.slice(1)}
           </span>
+          {batch.approvalStatus !== undefined && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setDrawerOpen(true)}
+              data-testid="workflow-status-btn"
+              className="gap-1.5 text-muted-foreground"
+            >
+              <NavIcon name="layers" size={15} />
+              Workflow
+            </Button>
+          )}
         </div>
       </div>
+
+      <WorkflowStatusDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        companyId={companyId}
+        batchId={batchId}
+        approvalStatus={batch.approvalStatus}
+        reviewRound={batch.reviewRound}
+      />
 
       {total === 0 && (
         <div className="rounded-xl border border-dashed border-border p-12 text-center text-sm text-muted-foreground">
