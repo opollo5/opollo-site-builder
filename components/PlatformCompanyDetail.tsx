@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { PlatformInviteUserModal } from "@/components/PlatformInviteUserModal";
 import { PlatformRevokeInvitationButton } from "@/components/PlatformRevokeInvitationButton";
+import { WorkflowGatesTab } from "@/components/admin/WorkflowGatesTab";
 import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
@@ -16,7 +17,7 @@ import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
 // nav) lives in app/admin/companies/[id]/page.tsx via Spec 04 migration.
 // This component renders the staff-join section, tabs, and tab body only.
 
-type Tab = "overview" | "settings" | "members";
+type Tab = "overview" | "settings" | "members" | "workflow";
 
 export function PlatformCompanyDetail({
   detail,
@@ -70,7 +71,7 @@ export function PlatformCompanyDetail({
         aria-label="Company sections"
         className="flex gap-1 border-b"
       >
-        {(["overview", "settings", "members"] as Tab[]).map((tab) => (
+        {(["overview", "settings", "members", "workflow"] as Tab[]).map((tab) => (
           <button
             key={tab}
             type="button"
@@ -102,6 +103,18 @@ export function PlatformCompanyDetail({
           company={company}
           members={members}
           pending_invitations={pending_invitations}
+        />
+      )}
+
+      {activeTab === "workflow" && (
+        <WorkflowGatesTab
+          companyId={company.id}
+          members={members.map((m) => ({
+            id: m.user_id,
+            name: m.full_name ?? "",
+            email: m.email,
+            role: m.role,
+          }))}
         />
       )}
     </div>
