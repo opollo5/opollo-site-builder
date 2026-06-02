@@ -186,9 +186,6 @@ export async function GET(
       reviewRound: (batch.review_round as number | null) ?? null,
       createdAt: batch.created_at,
       updatedAt: batch.updated_at,
-      // Change 2: approval workflow fields for Phase 1 UI
-      approvalStatus: (batch as Record<string, unknown>).approval_status as string | null ?? null,
-      reviewRound: (batch as Record<string, unknown>).review_round as number | null ?? null,
       jobs: jobsWithData,
     },
     timestamp: new Date().toISOString(),
