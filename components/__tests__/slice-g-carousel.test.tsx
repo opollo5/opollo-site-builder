@@ -4,10 +4,12 @@
  * Tests:
  *  - Carousel renders (not the old grid)
  *  - PreviewCard is used (D8)
- *  - Numbering "N of M" shown (D9)
+ *  - Numbering "N of M" shown in action bar (D9 — now inside the action bar)
  *  - Approve button calls correct endpoint (D10)
- *  - Reject button calls PATCH endpoint (D10)
- *  - Request changes button present (D10 stub for Slice I)
+ *  - Reject button opens comment dialog (Change 4 / L17)
+ *  - Request changes button opens comment dialog (Change 4 / L17)
+ *  - Reject with empty comment: dialog submit disabled
+ *  - Reject with comment calls PATCH with reason in body
  *  - Post-approve state shows "Draft created" or "In download set" per destination (D10)
  *  - Active card advances on approve (lane advance)
  *  - Active card advances on reject (lane advance)
@@ -41,6 +43,8 @@ const BATCH_PUBLISH = {
   sourceRowCount: 1,
   destination: "publish" as const,
   createdAt: "2026-06-01T00:00:00Z",
+  approvalStatus: null,
+  reviewRound: null,
   jobs: [
     {
       id: "job-1", state: "completed",
@@ -49,6 +53,7 @@ const BATCH_PUBLISH = {
       targetPlatforms: ["linkedin"], targetPublishDate: "2026-06-14",
       parentPostIndex: 0, postText: "Post one caption",
       startedAt: null, completedAt: null,
+      resolvedConnections: null,
     },
     {
       id: "job-2", state: "completed",
@@ -57,6 +62,7 @@ const BATCH_PUBLISH = {
       targetPlatforms: ["instagram"], targetPublishDate: null,
       parentPostIndex: 1, postText: "Post two caption",
       startedAt: null, completedAt: null,
+      resolvedConnections: null,
     },
   ],
 };
@@ -99,8 +105,9 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
     });
   });
 
-  it("shows N of M numbering (D9)", async () => {
+  it("shows N of M numbering in the action bar (D9)", async () => {
     render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
+    // carousel-numbering is now inside the action bar, not a separate header row.
     await waitFor(() => expect(screen.getByTestId("carousel-numbering").textContent).toContain("1 of 2"));
   });
 
@@ -117,21 +124,63 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
     });
   });
 
-  it("Reject button calls PATCH endpoint (D10)", async () => {
+  it("reject button opens comment dialog (Change 4 / L17)", async () => {
     render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
     await waitFor(() => screen.getByTestId("reject-btn"));
     fireEvent.click(screen.getByTestId("reject-btn"));
+    // Dialog should appear with title "Reject image"
+    await waitFor(() => {
+      expect(screen.getByText("Reject image")).toBeInTheDocument();
+    });
+    // Textarea should be present
+    expect(screen.getByTestId("comment-dialog-textarea")).toBeInTheDocument();
+  });
+
+  it("reject with empty comment: dialog submit is disabled", async () => {
+    render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
+    await waitFor(() => screen.getByTestId("reject-btn"));
+    fireEvent.click(screen.getByTestId("reject-btn"));
+    await waitFor(() => screen.getByTestId("comment-dialog-submit"));
+    // With empty text the submit button must be disabled.
+    expect(screen.getByTestId("comment-dialog-submit")).toBeDisabled();
+  });
+
+  it("reject with short comment (< 10 chars) keeps submit disabled", async () => {
+    render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
+    await waitFor(() => screen.getByTestId("reject-btn"));
+    fireEvent.click(screen.getByTestId("reject-btn"));
+    await waitFor(() => screen.getByTestId("comment-dialog-textarea"));
+    fireEvent.change(screen.getByTestId("comment-dialog-textarea"), { target: { value: "too short" } });
+    expect(screen.getByTestId("comment-dialog-submit")).toBeDisabled();
+  });
+
+  it("reject with comment (>= 10 chars) calls PATCH with reason in body", async () => {
+    render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
+    await waitFor(() => screen.getByTestId("reject-btn"));
+    fireEvent.click(screen.getByTestId("reject-btn"));
+    await waitFor(() => screen.getByTestId("comment-dialog-textarea"));
+    fireEvent.change(screen.getByTestId("comment-dialog-textarea"), { target: { value: "This image does not meet our brand guidelines." } });
+    // Submit should now be enabled
+    expect(screen.getByTestId("comment-dialog-submit")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("comment-dialog-submit"));
     await waitFor(() => {
       const patchCall = fetchMock.mock.calls.find(
         (call) => (call[1] as RequestInit | undefined)?.method === "PATCH",
       );
       expect(patchCall).toBeDefined();
+      const body = JSON.parse((patchCall![1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.reason).toContain("brand guidelines");
     });
   });
 
-  it("Request changes button present (D10 stub for Slice I)", async () => {
+  it("Request changes button opens comment dialog (Change 4 / L17)", async () => {
     render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
-    await waitFor(() => expect(screen.getByTestId("request-changes-btn")).toBeInTheDocument());
+    await waitFor(() => screen.getByTestId("request-changes-btn"));
+    fireEvent.click(screen.getByTestId("request-changes-btn"));
+    // Dialog textarea is the reliable signal the dialog is open.
+    await waitFor(() => {
+      expect(screen.getByTestId("comment-dialog-textarea")).toBeInTheDocument();
+    });
   });
 
   it("publish approve shows Draft created status (D10)", async () => {
@@ -173,13 +222,17 @@ describe("BatchResultsClient — carousel (Slice G)", () => {
     );
   });
 
-  it("rejecting the active card advances the lane to the next card", async () => {
+  it("rejecting the active card (with comment) advances the lane to the next card", async () => {
     render(<BatchResultsClient batchId="batch-1" companyId="co-1" />);
     await waitFor(() => screen.getByTestId("reject-btn"));
 
     expect(screen.getByTestId("carousel-numbering").textContent).toContain("1 of 2");
 
+    // Open dialog, enter comment, submit.
     fireEvent.click(screen.getByTestId("reject-btn"));
+    await waitFor(() => screen.getByTestId("comment-dialog-textarea"));
+    fireEvent.change(screen.getByTestId("comment-dialog-textarea"), { target: { value: "Does not match brand style guide." } });
+    fireEvent.click(screen.getByTestId("comment-dialog-submit"));
 
     await waitFor(
       () => expect(screen.getByTestId("carousel-numbering").textContent).toContain("2 of 2"),
