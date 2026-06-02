@@ -115,7 +115,7 @@ function ProofList({
                 View versions
               </a>
               <a
-                href={`/api/platform/proofing/${item.contentGroupId}/audit?company_id=${companyId}&format=csv`}
+                href={`/api/platform/proofing/groups/${item.contentGroupId}/audit?company_id=${companyId}&format=csv`}
                 className="text-xs text-muted-foreground hover:underline"
                 download
               >
