@@ -104,7 +104,8 @@ describe("upsertWorkflowSteps", () => {
 // ---------------------------------------------------------------------------
 
 describe("getNextStep / getPriorStep", () => {
-  beforeAll(async () => {
+  // truncateAll() wipes workflow_steps before each test; re-seed here.
+  beforeEach(async () => {
     await upsertWorkflowSteps(COMPANY_ID, [
       { step_order: 1, name: "Step 1", pass_rule: "any_one", participants: [] },
       { step_order: 2, name: "Step 2", pass_rule: "all_must", participants: [] },
