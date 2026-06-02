@@ -17,13 +17,17 @@ const COMPANY_ID = "00001760-0000-0000-0000-000000000001";
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
-  // Use upsert with onConflict:"id" — idempotent and handles the slug UNIQUE
-  // constraint cleanly (same pattern as magic-link-service.test.ts which passes).
-  const { error } = await svc.from("platform_companies").upsert(
-    { id: COMPANY_ID, name: "Workflow Steps Test Co", slug: `wf-steps-${COMPANY_ID.slice(-8)}` },
-    { onConflict: "id" },
-  );
+  // Delete first then insert — guarantees a fresh row regardless of prior state.
+  await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
+  const { error } = await svc.from("platform_companies").insert({
+    id: COMPANY_ID,
+    name: "Workflow Steps Test Co",
+    slug: `wf-${COMPANY_ID.slice(0, 8)}-${COMPANY_ID.slice(-4)}`,
+  });
   if (error) throw new Error(`seedCompany failed: ${error.message}`);
+  const { data: verify } = await svc.from("platform_companies")
+    .select("id").eq("id", COMPANY_ID).maybeSingle();
+  if (!verify) throw new Error(`seedCompany: company not found after insert`);
 }
 
 beforeAll(async () => {
