@@ -4,6 +4,8 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { createProof, reviseProof, onProofPass, onProofReject } from "@/lib/platform/proofing";
 import { resolveRecipientByToken } from "@/lib/platform/social/approvals";
 import { addRecipient } from "@/lib/platform/social/approvals/recipients/add";
+import { seedAuthUser, cleanupTrackedAuthUsers } from "./_auth-helpers";
+import type { SeededAuthUser } from "./_auth-helpers";
 
 // ---------------------------------------------------------------------------
 // Integration tests for Core Proofing V1 (B2).
@@ -11,7 +13,8 @@ import { addRecipient } from "@/lib/platform/social/approvals/recipients/add";
 // ---------------------------------------------------------------------------
 
 const COMPANY_ID = "00001750-0000-0000-0000-000000000001";
-const SUBMITTER_USER_ID = "00001750-0000-0000-0000-000000000002";
+// SUBMITTER_USER_ID is set from the seeded auth user in beforeAll.
+let submitterUser: SeededAuthUser;
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
@@ -30,8 +33,8 @@ async function seedDraft(overrides: Record<string, unknown> = {}) {
     .from("social_post_drafts")
     .insert({
       company_id: COMPANY_ID,
-      created_by: null,
-      updated_by: null,
+      created_by: submitterUser.id,
+      updated_by: submitterUser.id,
       content: "Test social proof content",
       media_urls: ["https://example.com/test.jpg"],
       state: "draft",
@@ -48,21 +51,18 @@ async function seedDraft(overrides: Record<string, unknown> = {}) {
 }
 
 beforeAll(async () => {
+  submitterUser = await seedAuthUser({ role: "user" });
   await seedCompany();
 });
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
-  // Clean up in dependency order
-  await svc.from("social_approval_events").delete().eq("approval_request_id",
-    // We can't easily cascade here so we just let the FK cascade from request deletion
-    "00000000-0000-0000-0000-000000000000" // no-op placeholder
-  );
   await svc.from("social_approval_recipients").delete().eq("email", "proof-reviewer@test.example.com");
   await svc.from("social_approval_requests").delete().eq("company_id", COMPANY_ID);
   await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
   await svc.from("magic_links").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
+  await cleanupTrackedAuthUsers();
 });
 
 // ---------------------------------------------------------------------------
@@ -77,7 +77,7 @@ describe("createProof", () => {
     const result = await createProof({
       draftId: draft.id,
       companyId: COMPANY_ID,
-      submitterUserId: SUBMITTER_USER_ID,
+      submitterUserId: submitterUser.id,
       approvalRule: "any_one",
       recipients: [{ email: "proof-reviewer@test.example.com", name: "Test Reviewer" }],
       origin: "http://localhost:3000",
@@ -113,7 +113,7 @@ describe("createProof", () => {
     const result = await createProof({
       draftId: draft.id,
       companyId: COMPANY_ID,
-      submitterUserId: SUBMITTER_USER_ID,
+      submitterUserId: submitterUser.id,
       approvalRule: "any_one",
       recipients: [{ email: "proof-reviewer2@test.example.com" }],
       origin: "http://localhost:3000",
@@ -145,7 +145,7 @@ describe("reviseProof", () => {
     const result = await reviseProof({
       draftId: draft.id,
       companyId: COMPANY_ID,
-      revisedByUserId: SUBMITTER_USER_ID,
+      revisedByUserId: submitterUser.id,
     });
 
     expect(result.newDraftId).not.toBe(draft.id);
@@ -269,7 +269,7 @@ describe("B1 hard rule: expired magic_links row is NOT resolvable via legacy fal
     const createResult = await createProof({
       draftId: draft.id,
       companyId: COMPANY_ID,
-      submitterUserId: SUBMITTER_USER_ID,
+      submitterUserId: submitterUser.id,
       approvalRule: "any_one",
       recipients: [{ email: "hard-rule-test@test.example.com" }],
       origin: "http://localhost:3000",
