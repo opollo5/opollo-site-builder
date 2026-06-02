@@ -4,6 +4,7 @@ import { generateRawToken, hashToken } from "@/lib/platform/invitations/tokens";
 import { logger } from "@/lib/logger";
 import { getServiceRoleClient } from "@/lib/supabase";
 
+import { enqueueApprovalCallbacks } from "./approval-callbacks";
 import type { WorkflowGateWithApprovers } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -159,6 +160,22 @@ export async function createBatchApprovalRequest(
       batchId,
       companyId,
       approverCount: gate.approvers.length,
+    });
+
+    // Enqueue the day-3/7/14 reminder and day-14 escalation ladder.
+    // Failures are logged inside enqueueApprovalCallbacks and never
+    // throw — the approval request row is already created and usable.
+    const rawOrigin =
+      process.env.NEXTAUTH_URL ??
+      process.env.VERCEL_URL ??
+      "http://localhost:3000";
+    const origin = rawOrigin.startsWith("http")
+      ? rawOrigin
+      : `https://${rawOrigin}`;
+    await enqueueApprovalCallbacks({
+      approvalRequestId,
+      timeoutDays: gate.timeoutDays,
+      origin,
     });
 
     return { approvalRequestId };
