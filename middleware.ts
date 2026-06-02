@@ -149,6 +149,11 @@ function isPublicPath(pathname: string): boolean {
   // /magic-link/* — consumption routes for login and reconnect magic links.
   // Token IS the auth; no session required to reach the route handler.
   if (pathname.startsWith("/magic-link/")) return true;
+  // /proof/* — reviewer-facing queue, re-request, and proof pages.
+  // All token-authenticated or public (no platform session required).
+  if (pathname.startsWith("/proof/")) return true;
+  // /api/platform/proofing/link-request — public re-request endpoint.
+  if (pathname === "/api/platform/proofing/link-request") return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
   // callback, future invite/reset routes) are by definition pre-session.
   if (pathname.startsWith("/api/auth/")) return true;
