@@ -4,10 +4,26 @@ import { useEffect, useState, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { PreviewCard } from "@/components/social/composer/PreviewCard";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import type { Connection, Platform } from "@/lib/social/types";
 
 // ---------------------------------------------------------------------------
 // G — Batch results approval carousel (D8, D9, D10, D24, D25).
+//
+// Phase 1 wireframe changes (Step 5):
+//   - Removed duplicate caption/platform/date block above preview (Change 1)
+//   - Resolved real social connections from API (Change 2)
+//   - Fixed always-visible PageProof-style action bar (Change 3)
+//   - Comment dialog for Reject and Request changes (Change 4 / L17)
 //
 // Lane layout: active card is full-size + lifted; upcoming cards to the right
 // are smaller and dimmed so the operator sees what's coming. Approve/reject
@@ -19,15 +35,22 @@ import { cn } from "@/lib/utils";
 // prefers-reduced-motion (instant advance when set).
 //
 // Actions per card (D10):
-//   Approve   → POST /api/platform/image/jobs/[id]/select
-//               publish  → "Draft created" + ?compose=<draftId> link
-//               download → "Added to download set"
-//   Request changes → stub opens Slice I handler (wired when I is built)
-//   Reject    → PATCH /api/platform/image/jobs/[id]/select
+//   Approve         → POST /api/platform/image/jobs/[id]/select
+//                     publish  → "Draft created" + ?compose=<draftId> link
+//                     download → "Added to download set"
+//   Request changes → PATCH with requestChanges:true + comment (L17)
+//   Reject          → PATCH with reason + comment (L17)
 //
 // Server transitions (D24/D25): status returned from API, idempotent guard
 // on server. Client carousel reflects server state; never owns it.
 // ---------------------------------------------------------------------------
+
+interface ResolvedConnection {
+  profileId: string;
+  platform: string;
+  accountName: string | null;
+  avatarUrl: string | null;
+}
 
 interface Job {
   id: string;
@@ -42,6 +65,7 @@ interface Job {
   autoAttachState?: string | null;
   startedAt: string | null;
   completedAt: string | null;
+  resolvedConnections: ResolvedConnection[] | null;
 }
 
 interface BatchData {
@@ -54,15 +78,18 @@ interface BatchData {
   sourceRowCount: number | null;
   destination: "publish" | "download";
   createdAt: string;
+  approvalStatus: string | null;
+  reviewRound: number | null;
   jobs: Job[];
 }
 
-// Map generic platform codes to Composer Connection-compatible platform keys.
-function platformKey(code: string): "linkedin" | "facebook" | "instagram" | "x" | "google_business_profile" {
-  if (code === "linkedin" || code === "linkedin_landscape") return "linkedin";
-  if (code === "facebook" || code === "facebook_story") return "facebook";
-  if (code === "instagram" || code === "instagram_story") return "instagram";
+// Map generic platform codes or DB platform names to Composer Platform type.
+function platformKey(code: string): Platform {
+  if (code === "linkedin" || code === "linkedin_landscape" || code === "linkedin_company" || code === "linkedin_personal") return "linkedin";
+  if (code === "facebook" || code === "facebook_story" || code === "facebook_page") return "facebook";
+  if (code === "instagram" || code === "instagram_story" || code === "instagram_business") return "instagram";
   if (code === "x") return "x";
+  if (code === "gbp") return "google_business_profile";
   return "linkedin"; // fallback
 }
 
@@ -104,6 +131,10 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
     draftId?: string;
   }>>({});
 
+  // Change 4: Comment dialog state
+  const [commentDialog, setCommentDialog] = useState<{ jobId: string; action: "reject" | "request_changes" } | null>(null);
+  const [commentText, setCommentText] = useState("");
+
   const fetchBatch = useCallback(async () => {
     const res = await fetch(`/api/platform/image/batch/${batchId}`);
     if (!res.ok) return;
@@ -134,13 +165,26 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
     setTimeout(() => setExitingIndex(null), 380);
   }
 
-  async function act(jobId: string, action: "approve" | "reject") {
+  // Change 4: open comment dialog helper
+  function openCommentDialog(jobId: string, action: "reject" | "request_changes") {
+    setCommentText("");
+    setCommentDialog({ jobId, action });
+  }
+
+  // Change 4: act() now accepts an optional comment
+  async function act(jobId: string, action: "approve" | "reject" | "request_changes", comment?: string) {
     setActioning((p) => ({ ...p, [jobId]: true }));
     try {
+      const method = action === "approve" ? "POST" : "PATCH";
+      const body: Record<string, unknown> = { company_id: companyId };
+      if (action !== "approve") {
+        body.reason = comment ?? "";
+        if (action === "request_changes") body.requestChanges = true;
+      }
       const res = await fetch(`/api/platform/image/jobs/${jobId}/select`, {
-        method: action === "approve" ? "POST" : "PATCH",
+        method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ company_id: companyId, ...(action === "reject" && { reason: "Rejected by operator" }) }),
+        body: JSON.stringify(body),
       });
       const json = await res.json() as {
         ok: boolean;
@@ -161,7 +205,7 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
           }
         } else {
           setOutcomes((p) => ({ ...p, [jobId]: { status: "rejected" } }));
-          toast.success("Rejected.");
+          toast.success(action === "request_changes" ? "Changes requested." : "Rejected.");
         }
         // Auto-advance to next undecided card after approve OR reject.
         const allJobs = batch?.jobs ?? [];
@@ -242,27 +286,6 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
 
       {total > 0 && (
         <div className="space-y-4">
-          {/* Numbering + navigation (D9) */}
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-muted-foreground" data-testid="carousel-numbering">
-              {currentIndex + 1} of {total}
-            </p>
-            <div className="flex gap-1.5">
-              {completedJobs.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => navigateTo(i)}
-                  className={`h-2 w-2 rounded-full transition-colors ${i === currentIndex ? "bg-primary" : "bg-border hover:bg-muted-foreground"}`}
-                  aria-label={`Go to image ${i + 1}`}
-                />
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={currentIndex === 0 || exitingIndex !== null} onClick={() => navigateTo(currentIndex - 1)}>← Prev</Button>
-              <Button variant="outline" size="sm" disabled={currentIndex === total - 1 || exitingIndex !== null} onClick={() => navigateTo(currentIndex + 1)}>Next →</Button>
-            </div>
-          </div>
-
           {/* ── Lane: all cards stacked in a CSS grid; transforms position them ── */}
           {/* Active card (offset 0) renders in normal flow, setting container height.  */}
           {/* Upcoming cards (offset 1, 2) sit absolutely on top, scaled + dimmed.      */}
@@ -278,7 +301,13 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
 
               const jobOutcome = outcomes[job.id];
               const jobPlatform = platformKey(job.targetPlatforms?.[0] ?? "linkedin");
-              const jobConnection = { id: "preview", platform: jobPlatform, account_name: jobPlatform, account_avatar_url: "" };
+
+              // Change 2: use resolved connection if available, fall back to stub.
+              // Map DB platform names (e.g. linkedin_company) to Composer Platform type.
+              const conn = job.resolvedConnections?.[0];
+              const jobConnection: Connection = conn
+                ? { id: conn.profileId, platform: platformKey(conn.platform), account_name: conn.accountName ?? conn.platform, account_avatar_url: conn.avatarUrl ?? "" }
+                : { id: "preview", platform: jobPlatform, account_name: jobPlatform, account_avatar_url: "" };
 
               return (
                 <div
@@ -297,25 +326,14 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
                   data-testid={offset === 0 && !isExiting ? "carousel-card" : undefined}
                   aria-hidden={offset !== 0 || isExiting}
                 >
+                  {/* Change 1: removed duplicate caption/platform/date block above preview */}
+                  {/* Change 3: flex-col card with sticky bottom action bar */}
                   <div className={cn(
-                    "rounded-xl border border-border bg-card overflow-hidden",
+                    "rounded-xl border border-border bg-card overflow-hidden flex flex-col",
                     offset === 0 && !isExiting && "shadow-md ring-1 ring-primary/10",
                   )}>
-                    {/* Platform + caption header (D9) */}
-                    <div className="px-5 pt-4 pb-3 border-b border-border space-y-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{jobPlatform}</span>
-                        {job.targetPublishDate && (
-                          <span className="text-xs text-muted-foreground">· {job.targetPublishDate}</span>
-                        )}
-                      </div>
-                      {job.postText && (
-                        <p className="text-sm text-foreground line-clamp-2">{job.postText}</p>
-                      )}
-                    </div>
-
-                    {/* Preview — reuses Composer PreviewCard (D8) */}
-                    <div className="flex justify-center bg-muted/20 p-6">
+                    {/* Preview fills remaining space */}
+                    <div className="flex-1 flex justify-center bg-muted/20 p-6">
                       {job.resultSignedUrl ? (
                         <div className="max-w-sm w-full">
                           <PreviewCard
@@ -332,8 +350,8 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
                       )}
                     </div>
 
-                    {/* Actions (D10) — only interactive on the active card */}
-                    <div className="px-5 py-4 border-t border-border">
+                    {/* Change 3: Sticky action bar — always visible at bottom */}
+                    <div className="sticky bottom-0 border-t border-border bg-card px-5 py-4">
                       {jobOutcome ? (
                         <div className="flex items-center gap-3">
                           <span className={`rounded-full px-3 py-1 text-sm font-medium ${
@@ -350,35 +368,81 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
                           )}
                         </div>
                       ) : (
-                        <div className="flex gap-3 flex-wrap">
-                          <Button
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                            onClick={() => void act(job.id, "approve")}
-                            disabled={(actioning[job.id] ?? false) || offset !== 0}
-                            data-testid={offset === 0 && !isExiting ? "approve-btn" : undefined}
-                          >
-                            {batch.destination === "download" ? "Add to download" : "Approve"}
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toast("Request changes coming in Slice I.")}
-                            data-testid={offset === 0 && !isExiting ? "request-changes-btn" : undefined}
-                            disabled={offset !== 0}
-                          >
-                            Request changes
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-destructive hover:text-destructive hover:border-destructive"
-                            onClick={() => void act(job.id, "reject")}
-                            disabled={(actioning[job.id] ?? false) || offset !== 0}
-                            data-testid={offset === 0 && !isExiting ? "reject-btn" : undefined}
-                          >
-                            Reject
-                          </Button>
+                        <div className="flex items-center gap-3">
+                          {/* Left: round indicator (only when approvalStatus is set) */}
+                          {batch.approvalStatus && batch.approvalStatus !== "none" && (
+                            <span className="text-sm text-muted-foreground">
+                              Round {(batch.reviewRound ?? 0) + 1} of 3
+                            </span>
+                          )}
+
+                          {/* Center: position + dots navigation */}
+                          <div className="flex-1 flex items-center justify-center gap-3">
+                            <button
+                              disabled={currentIndex === 0 || exitingIndex !== null}
+                              onClick={() => navigateTo(currentIndex - 1)}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                              aria-label="Previous image"
+                            >
+                              ←
+                            </button>
+                            <span
+                              className="text-sm text-muted-foreground"
+                              data-testid={offset === 0 && !isExiting ? "carousel-numbering" : undefined}
+                            >
+                              {currentIndex + 1} of {total}
+                            </span>
+                            <div className="flex gap-1">
+                              {completedJobs.map((_, dotIdx) => (
+                                <button
+                                  key={dotIdx}
+                                  onClick={() => navigateTo(dotIdx)}
+                                  className={`h-1.5 w-1.5 rounded-full transition-colors ${dotIdx === currentIndex ? "bg-primary" : "bg-border"}`}
+                                  aria-label={`Go to image ${dotIdx + 1}`}
+                                />
+                              ))}
+                            </div>
+                            <button
+                              disabled={currentIndex === total - 1 || exitingIndex !== null}
+                              onClick={() => navigateTo(currentIndex + 1)}
+                              className="text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:cursor-not-allowed"
+                              aria-label="Next image"
+                            >
+                              →
+                            </button>
+                          </div>
+
+                          {/* Right: action buttons */}
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700 text-white font-semibold"
+                              onClick={() => void act(job.id, "approve")}
+                              disabled={(actioning[job.id] ?? false) || offset !== 0}
+                              data-testid={offset === 0 && !isExiting ? "approve-btn" : undefined}
+                            >
+                              {batch.destination === "download" ? "Add to download" : "Approve"}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openCommentDialog(job.id, "request_changes")}
+                              disabled={offset !== 0}
+                              data-testid={offset === 0 && !isExiting ? "request-changes-btn" : undefined}
+                            >
+                              Request changes
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-destructive hover:text-destructive hover:border-destructive"
+                              onClick={() => openCommentDialog(job.id, "reject")}
+                              disabled={offset !== 0}
+                              data-testid={offset === 0 && !isExiting ? "reject-btn" : undefined}
+                            >
+                              Reject
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -396,6 +460,49 @@ export function BatchResultsClient({ batchId, companyId }: { batchId: string; co
           {batch.jobs.filter((j) => j.state === "failed").length} image(s) failed to generate.
         </div>
       )}
+
+      {/* Change 4: Comment dialog for Reject and Request changes (L17) */}
+      <Dialog open={commentDialog !== null} onOpenChange={(open) => { if (!open) setCommentDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {commentDialog?.action === "reject" ? "Reject image" : "Request changes"}
+            </DialogTitle>
+            <DialogDescription>
+              {commentDialog?.action === "reject"
+                ? "Explain why this image is being rejected. This will be sent to the creator."
+                : "Describe what changes are needed. This will be sent to the creator."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-2">
+            <Textarea
+              placeholder="Add a comment (required, min 10 characters)…"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              className="min-h-[120px]"
+              data-testid="comment-dialog-textarea"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCommentDialog(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant={commentDialog?.action === "reject" ? "destructive" : "default"}
+              disabled={commentText.trim().length < 10 || (commentDialog !== null && (actioning[commentDialog.jobId] ?? false))}
+              data-testid="comment-dialog-submit"
+              onClick={() => {
+                if (!commentDialog) return;
+                void act(commentDialog.jobId, commentDialog.action, commentText.trim()).then(() => {
+                  setCommentDialog(null);
+                });
+              }}
+            >
+              {commentDialog?.action === "reject" ? "Reject" : "Request changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
