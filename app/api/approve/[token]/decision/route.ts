@@ -7,6 +7,7 @@ import { dispatch } from "@/lib/platform/notifications";
 import { recordApprovalDecision } from "@/lib/platform/social/approvals";
 import { checkRateLimit, getClientIp, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
+import { onGatePass, onGateReject } from "@/lib/platform/workflow/image-gate";
 
 // ---------------------------------------------------------------------------
 // S1-7 — POST /api/approve/[token]/decision
@@ -21,6 +22,13 @@ import { getServiceRoleClient } from "@/lib/supabase";
 // State machine + finalisation happen atomically in the migration-0072
 // Postgres function. See lib/platform/social/approvals/decisions/record.ts
 // for the snapshot of guarantees.
+//
+// Extended in Phase 1 Step 3 to handle image_batch subject_type:
+// - On approved + finalised: calls onGatePass to mark batch approved and
+//   update draft workflow_state.
+// - On rejected/changes_requested: calls onGateReject with the comment.
+//   L17 enforcement: comment is REQUIRED (min 1 char) when decision is
+//   'rejected' or 'changes_requested'.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -28,10 +36,24 @@ export const dynamic = "force-dynamic";
 
 const TOKEN_RE = /^[0-9a-f]{64}$/i;
 
-const Schema = z.object({
-  decision: z.enum(["approved", "rejected", "changes_requested"]),
-  comment: z.string().max(2000).nullable().optional(),
-});
+// L17: comment is required for rejection decisions.
+const Schema = z
+  .object({
+    decision: z.enum(["approved", "rejected", "changes_requested"]),
+    comment: z.string().max(2000).nullable().optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (
+      (val.decision === "rejected" || val.decision === "changes_requested") &&
+      (!val.comment || val.comment.trim().length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["comment"],
+        message: "A comment is required when rejecting or requesting changes.",
+      });
+    }
+  });
 
 export async function POST(
   req: NextRequest,
@@ -49,7 +71,10 @@ export async function POST(
   if (body === undefined) return validationError("Request body must be valid JSON.");
   const parsed = Schema.safeParse(body);
   if (!parsed.success) {
-    return validationError("Body must be { decision: 'approved'|'rejected'|'changes_requested', comment?: string }.");
+    return validationError(
+      "Body must be { decision: 'approved'|'rejected'|'changes_requested', comment?: string }. " +
+        "comment is required for rejected/changes_requested decisions.",
+    );
   }
 
   // Best-effort capture of audit fields. Behind a proxy, x-forwarded-
@@ -72,71 +97,126 @@ export async function POST(
     return respond(result);
   }
 
-  // Notify the submitter + company admins when the decision finalises
-  // the request. For all_must partial approvals (finalised=false) we
-  // hold notifications until the rule is satisfied — the in-progress
-  // state isn't actionable and we'd otherwise spam the submitter on
-  // every reviewer's individual approval.
+  // ─── Post-decision side-effects (best-effort, fail-soft) ─────────────────
   //
-  // Best-effort: lookup + dispatch failures are logged but never
-  // propagate back into the response. The decision itself has
-  // already been committed and the recipient should see success.
+  // Two branches:
+  //   A. image_batch subject_type → call image-gate handlers (onGatePass /
+  //      onGateReject) to update batch + draft state.
+  //   B. social post (legacy) → notify submitter + admins via dispatch().
+  //
+  // Both branches run only when the decision has finalised the request.
+  // For all_must partial approvals (finalised=false) we hold side-effects
+  // until the rule is satisfied.
+
   if (result.data.finalised) {
     try {
       const svc = getServiceRoleClient();
 
-      // V2-first lookup: after backfill, active posts live in social_post_drafts.
-      // Fall back to social_post_master for tokens issued before backfill ran.
-      let companyId: string | null = null;
-      let createdBy: string | null = null;
-
-      const v2 = await svc
-        .from("social_post_drafts")
-        .select("company_id, created_by")
-        .eq("id", result.data.postId)
+      // Determine the subject type for this approval request.
+      // subject_type column is added by migration 0172; may be null for
+      // pre-migration rows (treat as social post).
+      const { data: requestRow } = await svc
+        .from("social_approval_requests")
+        .select("subject_type, subject_id, company_id, created_by")
+        .eq("id", result.data.requestId)
         .maybeSingle();
 
-      if (v2.data) {
-        companyId = v2.data.company_id as string;
-        createdBy = v2.data.created_by as string | null;
+      const subjectType = (requestRow as {
+        subject_type: string | null;
+        subject_id: string | null;
+        company_id: string;
+        created_by: string | null;
+      } | null)?.subject_type ?? null;
+
+      if (subjectType === "image_batch") {
+        // ── Branch A: image_batch gate ─────────────────────────────────────
+        const batchId = (requestRow as {
+          subject_id: string | null;
+        } | null)?.subject_id ?? null;
+        const companyId = (requestRow as {
+          company_id: string;
+        } | null)?.company_id ?? "";
+        const actorId = (requestRow as {
+          created_by: string | null;
+        } | null)?.created_by ?? "";
+
+        if (!batchId) {
+          logger.warn("social.approvals.decisions.image_gate.missing_subject_id", {
+            requestId: result.data.requestId,
+          });
+        } else if (parsed.data.decision === "approved") {
+          await onGatePass({
+            approvalRequestId: result.data.requestId,
+            batchId,
+            companyId,
+            actorId,
+            // autoSchedule comes from the gate config; for Phase 1 we always
+            // set ready_to_schedule — onGatePass handles both cases the same way.
+            autoSchedule: true,
+          });
+        } else {
+          // rejected or changes_requested
+          await onGateReject({
+            approvalRequestId: result.data.requestId,
+            batchId,
+            companyId,
+            comment: parsed.data.comment ?? "",
+            actorId,
+          });
+        }
       } else {
-        const v1 = await svc
-          .from("social_post_master")
+        // ── Branch B: social post notification (original behaviour) ───────
+        let companyId: string | null = null;
+        let createdBy: string | null = null;
+
+        const v2 = await svc
+          .from("social_post_drafts")
           .select("company_id, created_by")
           .eq("id", result.data.postId)
           .maybeSingle();
-        if (v1.error || !v1.data) {
-          logger.warn("social.approvals.decisions.notify.post_lookup_failed", {
-            err: v1.error?.message,
-            post_id: result.data.postId,
-          });
-        } else {
-          companyId = v1.data.company_id as string;
-          createdBy = v1.data.created_by as string | null;
-        }
-      }
 
-      if (companyId && createdBy) {
-        if (parsed.data.decision === "changes_requested") {
-          await dispatch({
-            event: "changes_requested",
-            companyId,
-            postMasterId: result.data.postId,
-            submitterUserId: createdBy,
-            comment: parsed.data.comment ?? "",
-          });
+        if (v2.data) {
+          companyId = v2.data.company_id as string;
+          createdBy = v2.data.created_by as string | null;
         } else {
-          await dispatch({
-            event: "approval_decided",
-            companyId,
-            postMasterId: result.data.postId,
-            submitterUserId: createdBy,
-            decision: parsed.data.decision,
-          });
+          const v1 = await svc
+            .from("social_post_master")
+            .select("company_id, created_by")
+            .eq("id", result.data.postId)
+            .maybeSingle();
+          if (v1.error || !v1.data) {
+            logger.warn("social.approvals.decisions.notify.post_lookup_failed", {
+              err: v1.error?.message,
+              post_id: result.data.postId,
+            });
+          } else {
+            companyId = v1.data.company_id as string;
+            createdBy = v1.data.created_by as string | null;
+          }
+        }
+
+        if (companyId && createdBy) {
+          if (parsed.data.decision === "changes_requested") {
+            await dispatch({
+              event: "changes_requested",
+              companyId,
+              postMasterId: result.data.postId,
+              submitterUserId: createdBy,
+              comment: parsed.data.comment ?? "",
+            });
+          } else {
+            await dispatch({
+              event: "approval_decided",
+              companyId,
+              postMasterId: result.data.postId,
+              submitterUserId: createdBy,
+              decision: parsed.data.decision,
+            });
+          }
         }
       }
     } catch (err) {
-      logger.warn("social.approvals.decisions.notify.dispatch_failed", {
+      logger.warn("social.approvals.decisions.post_decision_failed", {
         err: err instanceof Error ? err.message : String(err),
       });
     }
