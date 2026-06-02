@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 import {
@@ -30,16 +30,14 @@ async function seedCompany() {
   if (!verify) throw new Error(`seedCompany: company not found after insert`);
 }
 
-beforeAll(async () => {
+// _setup.ts truncateAll() runs before each test and wipes platform_companies.
+// Re-seed the company before each test.
+beforeEach(async () => {
   await seedCompany();
-  // Clean up any leftover steps from prior runs
-  const svc = getServiceRoleClient();
-  await svc.from("workflow_steps").delete().eq("company_id", COMPANY_ID);
 });
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
-  await svc.from("workflow_steps").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 });
 

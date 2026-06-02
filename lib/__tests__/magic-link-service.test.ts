@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 import {
@@ -67,16 +67,15 @@ async function seedApprovalRequest(companyId: string) {
   return { requestId: req.id, postId: post.id };
 }
 
-beforeAll(async () => {
+// _setup.ts's global beforeEach calls truncateAll() which wipes platform_companies.
+// Re-seed the company before EACH test so it exists regardless of truncation order.
+beforeEach(async () => {
   await seedCompany(COMPANY_ID);
 });
 
 afterAll(async () => {
+  // truncateAll() will have cleaned up most rows already; this is defensive cleanup.
   const svc = getServiceRoleClient();
-  await svc.from("magic_links").delete().eq("company_id", COMPANY_ID);
-  await svc.from("social_approval_recipients").delete().eq("email", "reviewer@ml-test.example.com");
-  await svc.from("social_approval_requests").delete().eq("company_id", COMPANY_ID);
-  await svc.from("social_post_master").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
 });
 

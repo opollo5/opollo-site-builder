@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, expect, it, beforeAll, beforeEach, afterAll } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { seedAuthUser } from "./_auth-helpers";
@@ -63,6 +64,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
         created_by: seededUserId,
         updated_by: seededUserId,
         link_url: "https://example.com/blog/post-1",
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       })
       .select("id, link_url")
       .single();
@@ -85,6 +88,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
           created_by: seededUserId,
           updated_by: seededUserId,
           source_type,
+          content_group_id: crypto.randomUUID(),
+          version_number: 1,
         })
         .select("id, source_type")
         .single();
@@ -107,6 +112,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
         created_by: seededUserId,
         updated_by: seededUserId,
         source_type: "unknown_value" as string,
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       })
       .select("id")
       .single();
@@ -123,6 +130,8 @@ describe("Migration 0155 — social_post_drafts schema gaps", () => {
         company_id: COMPANY_ID,
         created_by: seededUserId,
         updated_by: seededUserId,
+        content_group_id: crypto.randomUUID(),
+        version_number: 1,
       })
       .select("id, link_url, source_type")
       .single();

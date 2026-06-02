@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { getServiceRoleClient } from "@/lib/supabase";
 import { createProof, reviseProof, onProofPass, onProofReject } from "@/lib/platform/proofing";
@@ -52,15 +52,16 @@ async function seedDraft(overrides: Record<string, unknown> = {}) {
 
 beforeAll(async () => {
   submitterUser = await seedAuthUser({ role: "user" });
+});
+
+// _setup.ts truncateAll() runs before each test and wipes platform_companies.
+// Re-seed the company before each test.
+beforeEach(async () => {
   await seedCompany();
 });
 
 afterAll(async () => {
   const svc = getServiceRoleClient();
-  await svc.from("social_approval_recipients").delete().eq("email", "proof-reviewer@test.example.com");
-  await svc.from("social_approval_requests").delete().eq("company_id", COMPANY_ID);
-  await svc.from("social_post_drafts").delete().eq("company_id", COMPANY_ID);
-  await svc.from("magic_links").delete().eq("company_id", COMPANY_ID);
   await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
   await cleanupTrackedAuthUsers();
 });
