@@ -16,7 +16,12 @@ export type NotificationEvent =
   | "post_published"
   | "post_failed"
   | "changes_requested"
-  | "image_generation_failed";
+  | "image_generation_failed"
+  // B2 proof events
+  | "proof_created"
+  | "proof_approved"
+  | "proof_revision_requested"
+  | "new_version_created";
 
 export type NotificationChannel = "email" | "in_app";
 
@@ -110,6 +115,34 @@ export type DispatchPayload =
       compositionType: string;
       aspectRatio: string;
       attemptsCount: number;
+    }
+  // B2 proof events
+  | {
+      event: "proof_created";
+      companyId: string;
+      contentGroupId: string;
+      submitterUserId: string;
+      versionLabel: string;
+    }
+  | {
+      event: "proof_approved";
+      companyId: string;
+      contentGroupId: string;
+      submitterUserId: string;
+    }
+  | {
+      event: "proof_revision_requested";
+      companyId: string;
+      contentGroupId: string;
+      submitterUserId: string;
+      comment?: string | null;
+    }
+  | {
+      event: "new_version_created";
+      companyId: string;
+      contentGroupId: string;
+      submitterUserId: string;
+      versionLabel: string;
     };
 
 // The set of channels each event fires on. Mirrors the trigger table in
@@ -127,6 +160,10 @@ export const EVENT_CHANNELS: Record<NotificationEvent, readonly NotificationChan
   post_failed:              ["email", "in_app"],
   changes_requested:        ["email", "in_app"],
   image_generation_failed:  ["email"],
+  proof_created:            ["in_app"],
+  proof_approved:           ["email", "in_app"],
+  proof_revision_requested: ["email", "in_app"],
+  new_version_created:      ["email", "in_app"],
 };
 
 // Recipient kinds the dispatcher knows how to resolve. Each event maps

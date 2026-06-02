@@ -8,6 +8,7 @@ import { recordApprovalDecision } from "@/lib/platform/social/approvals";
 import { checkRateLimit, getClientIp, rateLimitExceeded } from "@/lib/rate-limit";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { onGatePass, onGateReject } from "@/lib/platform/workflow/image-gate";
+import { onProofPass, onProofReject } from "@/lib/platform/proofing";
 
 // ---------------------------------------------------------------------------
 // S1-7 — POST /api/approve/[token]/decision
@@ -162,6 +163,31 @@ export async function POST(
             companyId,
             comment: parsed.data.comment ?? "",
             actorId,
+          });
+        }
+      } else if (subjectType === "content_proof") {
+        // ── Branch C: content_proof proofing callbacks ─────────────────────
+        const contentGroupId = (requestRow as { subject_id: string | null } | null)?.subject_id ?? null;
+        const companyId = (requestRow as { company_id: string } | null)?.company_id ?? "";
+
+        if (!contentGroupId) {
+          logger.warn("social.approvals.decisions.content_proof.missing_subject_id", {
+            requestId: result.data.requestId,
+          });
+        } else if (parsed.data.decision === "approved") {
+          await onProofPass({
+            approvalRequestId: result.data.requestId,
+            contentGroupId,
+            companyId,
+            actorUserId: (requestRow as { created_by: string | null } | null)?.created_by ?? null,
+          });
+        } else {
+          // rejected or changes_requested
+          await onProofReject({
+            approvalRequestId: result.data.requestId,
+            contentGroupId,
+            companyId,
+            comment: parsed.data.comment ?? null,
           });
         }
       } else {

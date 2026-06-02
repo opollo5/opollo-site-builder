@@ -25,7 +25,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-type Snapshot = {
+// V1 social-post snapshot (legacy / existing approval flow).
+type V1Snapshot = {
   master_text?: string | null;
   link_url?: string | null;
   variants?: Array<{
@@ -35,6 +36,22 @@ type Snapshot = {
   }>;
   submitted_at?: string;
 };
+
+// V2 content-proof snapshot (B2 proofing flow).
+type V2Snapshot = {
+  content_group_id?: string;
+  draft_id?: string;
+  version_number?: number;
+  content?: string | null;
+  media_urls?: string[] | null;
+  submitted_at?: string;
+};
+
+type Snapshot = V1Snapshot | V2Snapshot;
+
+function isV2Snapshot(s: Snapshot): s is V2Snapshot {
+  return "content_group_id" in s || "version_number" in s || "media_urls" in s;
+}
 
 export default async function ApproveViewerPage({
   params,
@@ -69,24 +86,31 @@ export default async function ApproveViewerPage({
     return <ExpiredPanel companyName={company.name} />;
   }
 
+  // For V1 social posts, check V1 state. For V2 proofs, the request
+  // finalisation timestamps are the source of truth (proof_state is
+  // set by the application layer after the RPC, not by the RPC itself).
   const finalised =
     request.revoked_at !== null ||
     request.final_approved_at !== null ||
     request.final_rejected_at !== null ||
-    postState !== "pending_client_approval";
+    (postState !== "pending_client_approval" && postState !== null);
 
   const snapshot = (request.snapshot_payload ?? {}) as Snapshot;
+  const submittedAt = snapshot.submitted_at;
+  const versionLabel = isV2Snapshot(snapshot) && snapshot.version_number
+    ? `v${snapshot.version_number}`
+    : null;
 
   return (
     <main className="mx-auto max-w-2xl p-6">
       <PageHeader>
-        <PageHeader.Title>{company.name} — approval request</PageHeader.Title>
+        <PageHeader.Title>
+          {company.name} — review request{versionLabel ? ` (${versionLabel})` : ""}
+        </PageHeader.Title>
         <PageHeader.Subtitle>
           {recipient.name?.trim() ? `Hi ${recipient.name},` : "Hi,"}{" "}
-          {company.name} would like your decision on the social post
-          below. {snapshot.submitted_at
-            ? `Submitted ${formatTime(snapshot.submitted_at)}.`
-            : null}
+          {company.name} would like your decision on the content below.{" "}
+          {submittedAt ? `Submitted ${formatTime(submittedAt)}.` : null}
         </PageHeader.Subtitle>
       </PageHeader>
 
@@ -101,6 +125,57 @@ export default async function ApproveViewerPage({
 }
 
 function SnapshotReadOnly({ snapshot }: { snapshot: Snapshot }) {
+  if (isV2Snapshot(snapshot)) {
+    return <V2SnapshotReadOnly snapshot={snapshot} />;
+  }
+  return <V1SnapshotReadOnly snapshot={snapshot as V1Snapshot} />;
+}
+
+function V2SnapshotReadOnly({ snapshot }: { snapshot: V2Snapshot }) {
+  const mediaUrls = snapshot.media_urls ?? [];
+  return (
+    <article
+      className="mt-6 rounded-lg border bg-card p-4"
+      data-testid="approval-snapshot"
+    >
+      {snapshot.content ? (
+        <>
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Content
+          </h2>
+          <p className="mt-2 whitespace-pre-wrap text-base">{snapshot.content}</p>
+        </>
+      ) : null}
+
+      {mediaUrls.length > 0 ? (
+        <>
+          <h2 className="mt-6 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {mediaUrls.length === 1 ? "Image" : `Images (${mediaUrls.length})`}
+          </h2>
+          <div className="mt-3 grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))" }}>
+            {mediaUrls.map((url, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={i}
+                src={url}
+                alt={`Image ${i + 1}`}
+                className="rounded-md border object-contain bg-muted"
+                style={{ maxHeight: 300 }}
+                data-testid={`approval-media-${i}`}
+              />
+            ))}
+          </div>
+        </>
+      ) : null}
+
+      {!snapshot.content && mediaUrls.length === 0 ? (
+        <p className="text-muted-foreground text-sm">No content preview available.</p>
+      ) : null}
+    </article>
+  );
+}
+
+function V1SnapshotReadOnly({ snapshot }: { snapshot: V1Snapshot }) {
   return (
     <article
       className="mt-6 rounded-lg border bg-card p-4"
@@ -208,6 +283,12 @@ function SessionExpiredPanel() {
         Your review session has expired. Enter your email address to receive a
         fresh link and continue your review.
       </p>
+      <a
+        href="/proof/request"
+        className="mt-4 inline-block rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+      >
+        Get a fresh link
+      </a>
     </main>
   );
 }

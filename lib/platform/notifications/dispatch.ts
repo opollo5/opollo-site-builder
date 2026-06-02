@@ -132,6 +132,26 @@ async function resolveRecipients(
     case "image_generation_failed":
       // Platform admins of the company — same audience as connection_lost.
       return resolveCompanyAdmins(payload.companyId);
+
+    case "proof_created":
+    case "new_version_created": {
+      // Submitter + company admins.
+      const submitter = await resolveUserById(payload.submitterUserId);
+      const admins = await resolveCompanyAdmins(payload.companyId);
+      return submitter ? [submitter, ...admins] : admins;
+    }
+
+    case "proof_approved": {
+      const submitter = await resolveUserById(payload.submitterUserId);
+      const admins = await resolveCompanyAdmins(payload.companyId);
+      return submitter ? [submitter, ...admins] : admins;
+    }
+
+    case "proof_revision_requested": {
+      const submitter = await resolveUserById(payload.submitterUserId);
+      const admins = await resolveCompanyAdmins(payload.companyId);
+      return submitter ? [submitter, ...admins] : admins;
+    }
   }
 }
 
@@ -307,6 +327,31 @@ function renderInApp(
         body: "",
         actionUrl: null,
       };
+
+    case "proof_created":
+      return {
+        title: `Proof ${payload.versionLabel} created`,
+        body: "A new content proof has been opened for review.",
+        actionUrl: null,
+      };
+    case "proof_approved":
+      return {
+        title: "Proof approved",
+        body: "All required reviewers have approved. The content will be scheduled for publishing.",
+        actionUrl: null,
+      };
+    case "proof_revision_requested":
+      return {
+        title: "Changes requested on proof",
+        body: payload.comment ?? "A reviewer has requested changes. Create a new version to resubmit.",
+        actionUrl: null,
+      };
+    case "new_version_created":
+      return {
+        title: `New version ${payload.versionLabel} created`,
+        body: "A revised version has been submitted for re-review.",
+        actionUrl: null,
+      };
   }
 }
 
@@ -447,6 +492,33 @@ function renderEmailContent(
       return {
         subject: "Image generation failed — action may be required",
         lead: `All ${payload.attemptsCount} generation attempts for a ${payload.aspectRatio} image failed (style: ${payload.styleId}, composition: ${payload.compositionType}). The image was not produced. Check Ideogram API status or review the image_generation_log for details.`,
+        action: null,
+      };
+    // B2 proof events
+    case "proof_created":
+      return {
+        subject: `Proof ${payload.versionLabel} opened for review`,
+        lead: "A new content proof has been opened. Reviewers have been notified.",
+        action: null,
+      };
+    case "proof_approved":
+      return {
+        subject: "Proof approved — content will be published",
+        lead: "All required reviewers approved the proof. The content has been queued for publishing.",
+        action: null,
+      };
+    case "proof_revision_requested":
+      return {
+        subject: "Changes requested on proof",
+        lead: payload.comment
+          ? payload.comment
+          : "A reviewer has requested changes. Create a new version to resubmit for review.",
+        action: null,
+      };
+    case "new_version_created":
+      return {
+        subject: `New proof version ${payload.versionLabel} submitted for review`,
+        lead: "A revised version has been submitted. Reviewers have been notified.",
         action: null,
       };
   }
