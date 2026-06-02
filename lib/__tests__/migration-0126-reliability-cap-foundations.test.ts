@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import { describe, expect, it, beforeEach, afterAll } from "vitest";
 
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -109,6 +110,8 @@ describe("social_post_drafts idempotency", () => {
       updated_by: authUser.id,
       draft_data: {},
       idempotency_key: "cap-retry-key-abc",
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(error).toBeNull();
   });
@@ -125,6 +128,8 @@ describe("social_post_drafts idempotency", () => {
       updated_by: authUser.id,
       draft_data: {},
       idempotency_key: key,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
 
     const { error } = await svc.from("social_post_drafts").insert({
@@ -133,6 +138,8 @@ describe("social_post_drafts idempotency", () => {
       updated_by: authUser.id,
       draft_data: {},
       idempotency_key: key,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(error).not.toBeNull();
     expect(error!.code).toBe("23505"); // unique violation
@@ -150,6 +157,8 @@ describe("social_post_drafts idempotency", () => {
       updated_by: authUser.id,
       draft_data: {},
       idempotency_key: key,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     const { error: e2 } = await svc.from("social_post_drafts").insert({
       company_id: COMPANY_ID_2,
@@ -157,6 +166,8 @@ describe("social_post_drafts idempotency", () => {
       updated_by: authUser.id,
       draft_data: {},
       idempotency_key: key,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(e1).toBeNull();
     expect(e2).toBeNull();

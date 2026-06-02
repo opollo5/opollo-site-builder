@@ -17,9 +17,10 @@ const COMPANY_ID = "00001760-0000-0000-0000-000000000001";
 
 async function seedCompany() {
   const svc = getServiceRoleClient();
-  const { error } = await svc.from("platform_companies").upsert(
+  // Delete first to avoid slug UNIQUE conflict from prior runs, then insert.
+  await svc.from("platform_companies").delete().eq("id", COMPANY_ID);
+  const { error } = await svc.from("platform_companies").insert(
     { id: COMPANY_ID, name: "Workflow Steps Test Co", slug: `wf-steps-${COMPANY_ID.slice(-8)}` },
-    { onConflict: "id" },
   );
   if (error) throw new Error(`seedCompany failed: ${error.message}`);
 }

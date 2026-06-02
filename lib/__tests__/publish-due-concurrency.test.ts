@@ -76,6 +76,8 @@ describe("publish-due — concurrent ticks claim disjoint draft sets (TOCTOU reg
       platform_variants: {},
       scheduled_at: past,
       publish_attempts: 0,
+      content_group_id: `0a8a0aa0-0000-4000-8000-2${i.toString().padStart(11, "0")}`,
+      version_number: 1,
     }));
     draftIds = rows.map((r) => r.id);
 

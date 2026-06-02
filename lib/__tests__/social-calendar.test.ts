@@ -96,6 +96,8 @@ describe("lib/platform/social/scheduling/list-company", () => {
       media_urls: [],
       target_profiles: profiles,
       scheduled_at: options.scheduledAt ?? futureIso(7),
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     if (error) throw new Error(`createScheduledDraft: ${error.message}`);
     return draftId;

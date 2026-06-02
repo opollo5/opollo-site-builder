@@ -121,6 +121,8 @@ describe("calendar-view — scheduled draft appears immediately after insert (P0
       platform_variants: {},
       scheduled_at: "2026-05-29T09:00:00Z",
       approval_required: false,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(insertErr).toBeNull();
 
@@ -146,6 +148,8 @@ describe("calendar-view — scheduled draft appears immediately after insert (P0
       platform_variants: {},
       scheduled_at: "2026-05-15T10:00:00Z",
       approval_required: false,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(insertErr).toBeNull();
 
@@ -171,6 +175,8 @@ describe("calendar-view — scheduled draft appears immediately after insert (P0
       platform_variants: {},
       scheduled_at: "2026-07-01T09:00:00Z", // July — outside May range
       approval_required: false,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(insertErr).toBeNull();
 
@@ -196,6 +202,8 @@ describe("calendar-view — scheduled draft appears immediately after insert (P0
       scheduled_at: "2026-05-10T09:00:00Z",
       archived_at: "2026-05-10T08:00:00Z",
       approval_required: false,
+      content_group_id: crypto.randomUUID(),
+      version_number: 1,
     });
     expect(insertErr).toBeNull();
 
