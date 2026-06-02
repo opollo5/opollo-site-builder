@@ -5,6 +5,20 @@ export {
   onProofReject,
   getProofQueue,
 } from "./service";
+export {
+  createStepProof,
+  advanceToNextStep,
+  sendBackStep,
+  onStepProofPass,
+  getProofDashboard,
+  getVersionComparison,
+  getAuditTrail,
+} from "./engine";
+export type {
+  DashboardItem,
+  VersionSnapshot,
+  AuditEvent,
+} from "./engine";
 export type {
   ProofState,
   ProofSnapshot,

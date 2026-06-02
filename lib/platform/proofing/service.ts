@@ -5,6 +5,7 @@ import { issue, regenerateApprovalLink } from "@/lib/platform/magic-link";
 import { addRecipient } from "@/lib/platform/social/approvals/recipients/add";
 import { resolveRecipientByToken } from "@/lib/platform/social/approvals";
 import { enqueueApprovalCallbacks } from "@/lib/platform/workflow/approval-callbacks";
+import { onStepProofPass } from "@/lib/platform/proofing/engine";
 import { sendEmail } from "@/lib/email/sendgrid";
 import { renderSocialApprovalRequestEmail } from "@/lib/email/templates/social-approval-request";
 import { getServiceRoleClient } from "@/lib/supabase";
@@ -308,7 +309,23 @@ export async function reviseProof(
 // Advances proof_state → 'approved', then hands the draft to the V2 publish
 // path by setting state='scheduled'. The publish-due cron handles the rest.
 // ---------------------------------------------------------------------------
-export async function onProofPass(input: OnProofPassInput): Promise<void> {
+export async function onProofPass(input: OnProofPassInput & { origin?: string }): Promise<void> {
+  // B3 intercept: if this approval request belongs to a workflow step,
+  // delegate to the step engine (advance or final-schedule).
+  // Only fires for content_proof requests with a step_id.
+  const { wasIntercepted } = await onStepProofPass({
+    approvalRequestId: input.approvalRequestId,
+    contentGroupId: input.contentGroupId,
+    companyId: input.companyId,
+    origin: input.origin ?? (process.env.NEXTAUTH_URL ?? process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000"),
+  });
+
+  // Step engine handled it (either advanced or scheduled).
+  if (wasIntercepted) return;
+
+  // No step_id — simple B2 proof, schedule directly.
   const svc = getServiceRoleClient();
   const now = new Date().toISOString();
 

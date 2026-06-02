@@ -21,7 +21,10 @@ export type NotificationEvent =
   | "proof_created"
   | "proof_approved"
   | "proof_revision_requested"
-  | "new_version_created";
+  | "new_version_created"
+  // B3 step events
+  | "proof_step_advanced"
+  | "proof_sent_back";
 
 export type NotificationChannel = "email" | "in_app";
 
@@ -143,6 +146,22 @@ export type DispatchPayload =
       contentGroupId: string;
       submitterUserId: string;
       versionLabel: string;
+    }
+  // B3 step events
+  | {
+      event: "proof_step_advanced";
+      companyId: string;
+      contentGroupId: string;
+      submitterUserId: string;
+      stepName: string;
+    }
+  | {
+      event: "proof_sent_back";
+      companyId: string;
+      contentGroupId: string;
+      submitterUserId: string;
+      priorStepName: string;
+      comment?: string | null;
     };
 
 // The set of channels each event fires on. Mirrors the trigger table in
@@ -164,6 +183,8 @@ export const EVENT_CHANNELS: Record<NotificationEvent, readonly NotificationChan
   proof_approved:           ["email", "in_app"],
   proof_revision_requested: ["email", "in_app"],
   new_version_created:      ["email", "in_app"],
+  proof_step_advanced:      ["email", "in_app"],
+  proof_sent_back:          ["email", "in_app"],
 };
 
 // Recipient kinds the dispatcher knows how to resolve. Each event maps
