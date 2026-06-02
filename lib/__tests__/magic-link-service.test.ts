@@ -21,13 +21,21 @@ const COMPANY_ID = "00001740-0000-0000-0000-000000000001";
 
 async function seedCompany(id: string) {
   const svc = getServiceRoleClient();
-  // Use the last 8 chars for the slug to avoid UNIQUE collisions with other test
-  // suites. Fail loudly — silently swallowing the error leaves the FK dangling.
-  const { error } = await svc.from("platform_companies").upsert(
-    { id, name: "Magic Link Test Co", slug: `ml-test-${id.slice(-8)}` },
-    { onConflict: "id" },
-  );
+  // Delete any existing row with this ID before inserting to guarantee the row
+  // is fresh — avoids silent cascade-delete scenarios from prior test runs.
+  await svc.from("platform_companies").delete().eq("id", id);
+  const { error } = await svc.from("platform_companies").insert({
+    id,
+    name: "Magic Link Test Co",
+    // Include the first 8 chars of the UUID to make slug globally unique
+    // even across test files with the same trailing digits.
+    slug: `ml-${id.slice(0, 8)}-${id.slice(-4)}`,
+  });
   if (error) throw new Error(`seedCompany failed: ${error.message}`);
+  // Verify the company actually exists before tests run.
+  const { data: verify } = await svc.from("platform_companies")
+    .select("id").eq("id", id).maybeSingle();
+  if (!verify) throw new Error(`seedCompany: company ${id} not found after insert`);
 }
 
 async function seedApprovalRequest(companyId: string) {
