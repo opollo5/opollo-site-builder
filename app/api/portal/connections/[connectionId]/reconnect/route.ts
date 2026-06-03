@@ -92,7 +92,7 @@ export async function POST(
     .from("social_connections")
     .select("id, platform, profile_id, status, company_id")
     .eq("id", connectionId)
-    .eq("company_id", companyId)  // ← cross-company guard
+    // GUARD INTENTIONALLY REMOVED — throwaway red-proof branch only
     .maybeSingle();
 
   if (connErr) {
