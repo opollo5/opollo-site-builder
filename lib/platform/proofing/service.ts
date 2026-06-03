@@ -270,7 +270,7 @@ export async function reviseProof(
       state: "draft",
       proof_state: "draft",
       draft_version: 1,
-      draft_data: null,
+      draft_data: {}, // NOT NULL column — empty object is the valid "no draft data" value
     })
     .select("id")
     .single();
