@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { createRouteAuthClient } from "@/lib/auth";
 import { internalError, readJsonBody } from "@/lib/http";
-import { getServiceRoleClient } from "@/lib/supabase";
 import { addComment } from "@/lib/feedback/tickets/comments";
 import { updateTicketStatus } from "@/lib/feedback/tickets/update-status";
 import { getTicket } from "@/lib/feedback/tickets/queries";
+import { notifyReopenedByCustomer } from "@/lib/feedback/tickets/notify";
 
 // ---------------------------------------------------------------------------
 // POST /api/feedback/tickets/[id]/reopen — "Still broken" controlled reopen.
@@ -98,6 +98,9 @@ export async function POST(
   }
 
   const updated = await getTicket(id);
+
+  // Notify assignee + Opollo staff that the ticket was reopened.
+  if (updated) void notifyReopenedByCustomer(updated);
   return NextResponse.json(
     { ok: true, data: { ticket: updated }, timestamp: new Date().toISOString() },
     { status: 200 },

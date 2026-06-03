@@ -159,6 +159,48 @@ async function resolveRecipients(
       const admins = await resolveCompanyAdmins(payload.companyId);
       return submitter ? [submitter, ...admins] : admins;
     }
+
+    // Feedback events (§8 of feedback build spec)
+    case "ticket_created": {
+      // Notify all Opollo staff. Blocker severity has no additional
+      // recipient widening here — all staff is already the full set.
+      return resolveOpolloAdmins();
+    }
+
+    case "ticket_assigned": {
+      const assignee = await resolveUserById(payload.assigneeUserId);
+      return assignee ? [assignee] : [];
+    }
+
+    case "ticket_comment_added": {
+      if (payload.isStaffAuthor) {
+        // Staff replied → notify the reporter.
+        const reporter = await resolveUserById(payload.reporterUserId);
+        return reporter ? [reporter] : [];
+      } else {
+        // Reporter replied → notify the assignee (else Opollo staff).
+        if (payload.assigneeUserId) {
+          const assignee = await resolveUserById(payload.assigneeUserId);
+          return assignee ? [assignee] : resolveOpolloAdmins();
+        }
+        return resolveOpolloAdmins();
+      }
+    }
+
+    case "ticket_status_changed": {
+      const reporter = await resolveUserById(payload.reporterUserId);
+      return reporter ? [reporter] : [];
+    }
+
+    case "ticket_reopened_by_customer": {
+      const recipients: ResolvedRecipient[] = [];
+      if (payload.assigneeUserId) {
+        const assignee = await resolveUserById(payload.assigneeUserId);
+        if (assignee) recipients.push(assignee);
+      }
+      const staff = await resolveOpolloAdmins();
+      return [...recipients, ...staff];
+    }
   }
 }
 
@@ -372,6 +414,44 @@ function renderInApp(
         body: payload.comment ?? "A gatekeeper has requested re-review of a prior step.",
         actionUrl: null,
       };
+
+    // Feedback events
+    case "ticket_created":
+      return {
+        title: `New bug report: ${payload.ticketTitle}`,
+        body: `Severity: ${payload.severity}. Review it in the admin feedback board.`,
+        actionUrl: `/admin/feedback/${payload.ticketId}`,
+      };
+    case "ticket_assigned":
+      return {
+        title: `Bug assigned to you: ${payload.ticketTitle}`,
+        body: "A bug report has been assigned to you for investigation.",
+        actionUrl: `/admin/feedback/${payload.ticketId}`,
+      };
+    case "ticket_comment_added":
+      return {
+        title: payload.isStaffAuthor
+          ? `Opollo replied on: ${payload.ticketTitle}`
+          : `Reply on: ${payload.ticketTitle}`,
+        body: payload.isStaffAuthor
+          ? "The Opollo team replied to your bug report."
+          : "A user replied to a bug report.",
+        actionUrl: payload.isStaffAuthor
+          ? `/feedback/${payload.ticketId}`
+          : `/admin/feedback/${payload.ticketId}`,
+      };
+    case "ticket_status_changed":
+      return {
+        title: `Bug status updated: ${payload.ticketTitle}`,
+        body: `Status changed from ${payload.fromStatus} to ${payload.toStatus}.`,
+        actionUrl: `/feedback/${payload.ticketId}`,
+      };
+    case "ticket_reopened_by_customer":
+      return {
+        title: `Bug reopened: ${payload.ticketTitle}`,
+        body: "A customer reported this bug is still occurring.",
+        actionUrl: `/admin/feedback/${payload.ticketId}`,
+      };
   }
 }
 
@@ -387,19 +467,15 @@ function renderEmail(
     <p style="margin:0 0 12px 0;font-size:14px;line-height:1.5;color:#0f172a;">
       ${escapeHtml(lead)}
     </p>
-    ${
-      action
-        ? `<p style="margin:16px 0;"><a href="${escapeHtml(action.url)}" style="color:#0f172a;font-weight:600;text-decoration:underline;">${escapeHtml(action.label)}</a></p>`
-        : ""
-    }
   `;
 
-  const textBody = action ? `${lead}\n\n${action.label}: ${action.url}` : lead;
+  const textBody = lead;
 
   const { html, text } = renderBaseEmail({
     heading: subject,
     bodyHtml: htmlBody,
     bodyText: textBody,
+    cta: action ?? undefined,
     footerNote: "Sent automatically by Opollo.",
   });
 
@@ -555,6 +631,65 @@ function renderEmailContent(
           ? payload.comment
           : `A gatekeeper has sent the proof back to ${payload.priorStepName} for re-review.`,
         action: null,
+      };
+
+    // Feedback events
+    case "ticket_created": {
+      const isBlocker = payload.severity === "blocker";
+      return {
+        subject: isBlocker
+          ? `🚨 BLOCKER bug reported: ${payload.ticketTitle}`
+          : `New bug report: ${payload.ticketTitle}`,
+        lead: isBlocker
+          ? `A BLOCKER severity bug was just reported. Immediate attention required.`
+          : `A new bug report has been submitted. Review it in the admin feedback board.`,
+        action: {
+          label: "Review bug report",
+          url: `${siteUrl()}/admin/feedback/${payload.ticketId}`,
+        },
+      };
+    }
+    case "ticket_assigned":
+      return {
+        subject: `Bug assigned to you: ${payload.ticketTitle}`,
+        lead: "A bug report has been assigned to you for investigation.",
+        action: {
+          label: "View bug report",
+          url: `${siteUrl()}/admin/feedback/${payload.ticketId}`,
+        },
+      };
+    case "ticket_comment_added":
+      return {
+        subject: payload.isStaffAuthor
+          ? `Update on your bug report: ${payload.ticketTitle}`
+          : `New reply on bug: ${payload.ticketTitle}`,
+        lead: payload.isStaffAuthor
+          ? "The Opollo team has replied to your bug report."
+          : "A user has replied to a bug report you are following.",
+        action: {
+          label: "View conversation",
+          url: payload.isStaffAuthor
+            ? `${siteUrl()}/feedback/${payload.ticketId}`
+            : `${siteUrl()}/admin/feedback/${payload.ticketId}`,
+        },
+      };
+    case "ticket_status_changed":
+      return {
+        subject: `Bug update: ${payload.ticketTitle}`,
+        lead: `Your bug report status changed from "${payload.fromStatus}" to "${payload.toStatus}".`,
+        action: {
+          label: "View bug report",
+          url: `${siteUrl()}/feedback/${payload.ticketId}`,
+        },
+      };
+    case "ticket_reopened_by_customer":
+      return {
+        subject: `Bug reopened: ${payload.ticketTitle}`,
+        lead: "A customer has reported that this bug is still occurring after the fix.",
+        action: {
+          label: "Review bug report",
+          url: `${siteUrl()}/admin/feedback/${payload.ticketId}`,
+        },
       };
   }
 }

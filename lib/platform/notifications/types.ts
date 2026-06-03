@@ -24,7 +24,13 @@ export type NotificationEvent =
   | "new_version_created"
   // B3 step events
   | "proof_step_advanced"
-  | "proof_sent_back";
+  | "proof_sent_back"
+  // Feedback module (migration 0179)
+  | "ticket_created"
+  | "ticket_assigned"
+  | "ticket_comment_added"
+  | "ticket_status_changed"
+  | "ticket_reopened_by_customer";
 
 export type NotificationChannel = "email" | "in_app";
 
@@ -162,6 +168,49 @@ export type DispatchPayload =
       submitterUserId: string;
       priorStepName: string;
       comment?: string | null;
+    }
+  // Feedback events (migration 0179)
+  | {
+      event: "ticket_created";
+      companyId: string;
+      ticketId: string;
+      ticketTitle: string;
+      severity: string;
+      reporterUserId: string;
+    }
+  | {
+      event: "ticket_assigned";
+      companyId: string;
+      ticketId: string;
+      ticketTitle: string;
+      assigneeUserId: string;
+    }
+  | {
+      event: "ticket_comment_added";
+      companyId: string;
+      ticketId: string;
+      ticketTitle: string;
+      authorUserId: string;
+      isStaffAuthor: boolean;
+      assigneeUserId: string | null;
+      reporterUserId: string;
+    }
+  | {
+      event: "ticket_status_changed";
+      companyId: string;
+      ticketId: string;
+      ticketTitle: string;
+      fromStatus: string;
+      toStatus: string;
+      reporterUserId: string;
+    }
+  | {
+      event: "ticket_reopened_by_customer";
+      companyId: string;
+      ticketId: string;
+      ticketTitle: string;
+      reporterUserId: string;
+      assigneeUserId: string | null;
     };
 
 // The set of channels each event fires on. Mirrors the trigger table in
@@ -185,6 +234,13 @@ export const EVENT_CHANNELS: Record<NotificationEvent, readonly NotificationChan
   new_version_created:      ["email", "in_app"],
   proof_step_advanced:      ["email", "in_app"],
   proof_sent_back:          ["email", "in_app"],
+  // Feedback events: blocker tickets are always immediate; others follow
+  // the same in_app+email pattern but route through the cadence guard.
+  ticket_created:               ["email", "in_app"],
+  ticket_assigned:              ["in_app"],
+  ticket_comment_added:         ["email", "in_app"],
+  ticket_status_changed:        ["in_app"],
+  ticket_reopened_by_customer:  ["email", "in_app"],
 };
 
 // Recipient kinds the dispatcher knows how to resolve. Each event maps
