@@ -1,7 +1,8 @@
 # Known Issue: claimDueDrafts has no company-level guard
 
-**Status:** Pending Steven's decision — fix vs accept  
+**Status:** ACCEPTED / DEFERRED — do not build a cron guard  
 **Logged:** 2026-06-03  
+**Decision:** 2026-06-03 by Steven Morey  
 **Found during:** B3 verification (wrote test data to prod Supabase by mistake; test scheduled draft would have been claimed by cron)  
 **Owner:** Steven Morey
 
@@ -32,45 +33,50 @@ attempt is consumed and noise enters the logs and monitoring.
 
 ---
 
-## Why it isn't fixed yet
+## Decision: Accept the risk
 
-Fixing it requires either:
+**Steven's decision (2026-06-03):** Accept. Do NOT build a cron guard now.
 
-**Option A — Allowlist/denylist by company flag.**
-Add `is_test_company boolean DEFAULT false` to `platform_companies` and
-filter `WHERE NOT c.is_test_company`. Low schema cost but requires a join
-on every cron tick.
+**Mitigations already in place:**
 
-**Option B — Sentinel `company_id` range.**
-Reserve a UUID prefix or range for test companies and filter it out. Works
-without a schema change but is convention-only, not enforced.
+1. **Procedural guard (CLAUDE.md hard rule):** Verification scripts, seeding
+   scripts, and integration tests never use production credentials. If local
+   Supabase/Docker is unavailable, stop. This eliminates the root scenario
+   (test data reaching prod).
 
-**Option C — Accept the exposure.**
-All real scheduled drafts have non-empty `target_profiles`. The worst-case
-outcome of a test draft reaching the cron is a failed bundle.social call,
-not actual publishing. If local Supabase is always used for testing (per
-the CLAUDE.md hard rule), this scenario should never arise again. Accept
-the gap and rely on the procedural guard.
+2. **B4 scope protection:** B4 is reconnect + approval only. B4 has no write
+   path that sets `social_post_drafts.state = 'scheduled'`. The cron exposure
+   is moot for B4.
 
-**Option D — Rate-guard the cron entry.**
-The `claimDueDrafts` logic already checks `publish_attempts < maxAttempts`
-(currently capped at 3). A test draft with empty `target_profiles` would
-dead-letter after 3 attempts and stop. The blast radius is bounded.
+3. **Blast radius is bounded:** `claimDueDrafts` already caps at
+   `publish_attempts < maxAttempts` (3). A draft with empty `target_profiles`
+   dead-letters after 3 attempts. No actual publishing occurs.
 
----
-
-## B4 scope protection
-
-B4 (Client Portal) is reconnect + approval only — no scheduling. B4 must
-have **no write path that sets `social_post_drafts.state = 'scheduled'`**.
-If B4 never produces a scheduled draft, this cron exposure is moot for B4.
-Every B4 code path that touches draft state must be audited to confirm it
-cannot reach `state = 'scheduled'`.
+**Options A–D (evaluated but not selected):** Building Option A
+(`is_test_company` flag), B (sentinel UUIDs), or D (additional rate guard)
+adds schema or logic cost for a scenario that should not occur if the
+procedural guard holds.
 
 ---
 
-## Decision required from Steven
+## Revisit triggers
 
-1. Which option (A/B/C/D) — or a different approach?
-2. If fixing: is this a standalone migration PR or bundled with another?
-3. Priority relative to current workstream (B4)?
+Reopen and evaluate if:
+
+- More than one paying customer has connected publish accounts (at which
+  point blast radius of a hypothetical future test-data leak increases
+  meaningfully).
+- A "draft/test company" concept is introduced in production (e.g., a
+  sandbox or staging company that lives in the prod Supabase project).
+
+Neither condition is present today. Do not act before then.
+
+---
+
+## B4 scope protection (restated)
+
+B4 (Client Portal) is reconnect + approval only. B4 must have **no write
+path that sets `social_post_drafts.state = 'scheduled'`**. Every B4 code
+path that touches draft state must be audited to confirm it cannot reach
+`state = 'scheduled'`. This constraint is also documented in
+`docs/proposals/BUILD_BRIEF_4_CLIENT_PORTAL.md` § Known hazards.
