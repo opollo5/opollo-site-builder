@@ -3,7 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { createProof, reviseProof, onProofPass, onProofReject } from "@/lib/platform/proofing";
 import { resolveRecipientByToken } from "@/lib/platform/social/approvals";
-import { addRecipient } from "@/lib/platform/social/approvals/recipients/add";
+
 import { seedAuthUser } from "./_auth-helpers";
 import type { SeededAuthUser } from "./_auth-helpers";
 
@@ -298,36 +298,31 @@ describe("B1 hard rule: expired magic_links row is NOT resolvable via legacy fal
 
     expect(rec?.magic_link_id).not.toBeNull();
 
-    // Get the raw token indirectly — we can't recover it from the hash,
-    // so we use addRecipient to get a fresh one, then expire it.
-    const addResult = await addRecipient({
-      approvalRequestId: createResult.approvalRequestId,
-      companyId: COMPANY_ID,
-      email: "hard-rule-expired@test.example.com",
-    });
-    expect(addResult.ok).toBe(true);
-    if (!addResult.ok) return;
+    // Get a fresh raw token for the existing recipient via regenerateApprovalLink.
+    // This avoids a second addRecipient call (which can fail intermittently)
+    // and tests the regenerate path at the same time.
+    const { regenerateApprovalLink } = await import("@/lib/platform/magic-link");
+    const { rawToken } = await regenerateApprovalLink(rec!.id);
 
     // Verify the raw token works before expiry.
-    const beforeExpire = await resolveRecipientByToken(addResult.data.rawToken);
+    const beforeExpire = await resolveRecipientByToken(rawToken);
     expect(beforeExpire.ok).toBe(true);
 
-    // Now expire the magic_links row for this recipient.
-    const { data: expiredRec } = await svc
+    // Get the current magic_link_id for the regenerated token.
+    const { data: currentRec } = await svc
       .from("social_approval_recipients")
       .select("magic_link_id")
-      .eq("email", "hard-rule-expired@test.example.com")
-      .eq("approval_request_id", createResult.approvalRequestId)
+      .eq("id", rec!.id)
       .maybeSingle();
 
-    if (expiredRec?.magic_link_id) {
+    if (currentRec?.magic_link_id) {
       await svc
         .from("magic_links")
         .update({
           consumed_at: new Date(Date.now() - 2000).toISOString(),
           session_expires_at: new Date(Date.now() - 1000).toISOString(),
         })
-        .eq("id", expiredRec.magic_link_id);
+        .eq("id", currentRec.magic_link_id);
     }
 
     // Verify the parent request is still inside its 14-day window
@@ -342,7 +337,7 @@ describe("B1 hard rule: expired magic_links row is NOT resolvable via legacy fal
     expect(parentReq!.final_rejected_at).toBeNull();
 
     // THE HARD RULE: must be SESSION_EXPIRED, NOT resolved via legacy fallback.
-    const afterExpire = await resolveRecipientByToken(addResult.data.rawToken);
+    const afterExpire = await resolveRecipientByToken(rawToken);
     expect(afterExpire.ok).toBe(false);
     if (!afterExpire.ok) {
       // Must be a session error — NOT a successful resolution via the 14-day window.
