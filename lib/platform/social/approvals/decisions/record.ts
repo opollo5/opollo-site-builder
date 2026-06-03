@@ -37,8 +37,8 @@ export type RecordDecisionInput = {
 
 export type RecordDecisionResult = {
   requestId: string;
-  postId: string;
-  postState: string;
+  postId: string | null;      // null for content_proof (no V1 post)
+  postState: string | null;   // null for content_proof
   finalised: boolean;
   eventId: string;
 };
@@ -64,7 +64,7 @@ export async function resolveRecipientByToken(
       snapshot_payload: unknown;
     };
     company: { id: string; name: string };
-    postState: string;
+    postState: string | null;
   }>
 > {
   if (!rawToken || !/^[0-9a-f]{64}$/i.test(rawToken)) {
@@ -156,13 +156,20 @@ export async function resolveRecipientByToken(
     return internal("Company missing for this approval request.");
   }
 
-  const post = await svc
-    .from("social_post_master")
-    .select("state")
-    .eq("id", request.data.post_master_id as string)
-    .maybeSingle();
-  if (post.error || !post.data) {
-    return internal("Post missing for this approval request.");
+  // V2 content_proof subject_type: post_master_id is null — skip V1 post lookup.
+  // postState is returned as null; the approve page treats null as non-finalised
+  // (the finalisation check uses final_approved_at / final_rejected_at instead).
+  let postState: string | null = null;
+  if (request.data.post_master_id) {
+    const post = await svc
+      .from("social_post_master")
+      .select("state")
+      .eq("id", request.data.post_master_id as string)
+      .maybeSingle();
+    if (post.error || !post.data) {
+      return internal("Post missing for this approval request.");
+    }
+    postState = post.data.state as string;
   }
 
   return {
@@ -181,7 +188,7 @@ export async function resolveRecipientByToken(
         snapshot_payload: unknown;
       },
       company: company.data as { id: string; name: string },
-      postState: post.data.state as string,
+      postState,
     },
     timestamp: new Date().toISOString(),
   };
