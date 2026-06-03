@@ -222,7 +222,7 @@ export async function POST(
           }
         }
 
-        if (companyId && createdBy) {
+        if (companyId && createdBy && result.data.postId) {
           if (parsed.data.decision === "changes_requested") {
             await dispatch({
               event: "changes_requested",
