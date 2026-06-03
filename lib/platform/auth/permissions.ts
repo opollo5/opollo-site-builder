@@ -35,6 +35,8 @@ const ACTION_MIN_ROLE: Record<PermissionAction, CompanyRole> = {
   receive_connection_alerts: "admin",
   view_insights: "viewer",
   manage_insights: "admin",
+  create_feedback: "viewer",
+  view_feedback: "viewer",
 };
 
 export function minRoleFor(action: PermissionAction): CompanyRole {
