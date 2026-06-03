@@ -23,6 +23,9 @@ vi.mock("@/lib/supabase", () => ({
 vi.mock("@/lib/email/sendgrid", () => ({
   sendEmail: vi.fn(async () => ({ ok: true, messageId: "msg-1" })),
 }));
+vi.mock("@sentry/nextjs", () => ({
+  captureException: vi.fn(),
+}));
 
 // ---------------------------------------------------------------------------
 // DB mock helpers
@@ -196,7 +199,7 @@ describe("dispatch ticket_created (blocker) — >=1 recipient guarantee", () => 
     expect(result.errors).toHaveLength(0);
   });
 
-  it("records an error in the DispatchResult (not throws) when no staff exist", async () => {
+  it("records an error in the DispatchResult AND captures to Sentry when no staff exist", async () => {
     const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeStaffOnlyDbMock([]) as never,
@@ -207,9 +210,10 @@ describe("dispatch ticket_created (blocker) — >=1 recipient guarantee", () => 
       "@/lib/platform/notifications/dispatch"
     );
     const { sendEmail } = await import("@/lib/email/sendgrid");
+    const Sentry = await import("@sentry/nextjs");
 
     // dispatch must NOT throw — it should return a result with errors[]
-    const result = await expect(
+    await expect(
       dispatch({
         event: "ticket_created",
         companyId: "company-abc",
@@ -228,6 +232,18 @@ describe("dispatch ticket_created (blocker) — >=1 recipient guarantee", () => 
 
     // No email was sent.
     expect(vi.mocked(sendEmail)).not.toHaveBeenCalled();
+
+    // Sentry must have been notified so on-call is paged.
+    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        tags: expect.objectContaining({
+          component: "notifications.dispatch",
+          event: "ticket_created",
+        }),
+      }),
+    );
   });
 
   it("resolves to >=1 recipient even when no staff are company admins (company-agnostic lookup)", async () => {
