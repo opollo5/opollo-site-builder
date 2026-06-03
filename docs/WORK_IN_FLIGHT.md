@@ -6,29 +6,7 @@ Empty claim-block list means: no parallel work active; serial-single-session is 
 
 <!-- CLAIM BLOCKS BELOW THIS LINE — append on slice start, remove on slice merge -->
 
----
-## Session A
-- Started: 2026-06-03 UTC
-- Branch: feat/feedback-p1-foundation (stacked through feat/feedback-p8-rollout)
-- Slice: Feedback/Bug-Tracker v1 — P1 through P8 sequential PRs
-- Files claimed:
-  - lib/feedback/ (new module, all files)
-  - lib/platform/notifications/types.ts
-  - lib/platform/notifications/dispatch.ts
-  - lib/platform/auth/types.ts
-  - lib/platform/auth/permissions.ts
-  - lib/email/templates/base.ts
-  - app/(platform)/admin/feedback/ (new)
-  - app/(platform)/feedback/ (new)
-  - app/api/feedback/ (new)
-  - components/feedback/ (new)
-  - scripts/bugs-pull.ts (new)
-  - scripts/bugs-push.ts (new)
-  - supabase/migrations/0179_feedback_tracker.sql (new)
-  - tests/regressions/feedback-governance.test.ts (new)
-- Migration number reserved: 0179
-- Expected completion: same day
----
+<!-- Session A: feedback P1-P8 — PRs #1284–#1290 open; awaiting human review and merge -->
 
 ## Hot-shared files (always check before claiming)
 
