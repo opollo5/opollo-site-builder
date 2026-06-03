@@ -75,7 +75,7 @@ export async function getPlatformCompany(
     svc
       .from("platform_companies")
       .select(
-        "id, name, slug, domain, timezone, is_opollo_internal, approval_default_required, approval_default_rule, concurrent_publish_limit, created_at, updated_at",
+        "id, name, slug, domain, timezone, is_opollo_internal, approval_default_required, approval_default_rule, concurrent_publish_limit, portal_contact_email, portal_contact_name, created_at, updated_at",
       )
       .eq("id", id)
       .maybeSingle(),

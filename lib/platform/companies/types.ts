@@ -8,6 +8,9 @@ export type PlatformCompany = {
   approval_default_required: boolean;
   approval_default_rule: "any_one" | "all_must";
   concurrent_publish_limit: number;
+  // B4 portal contact (migration 0177)
+  portal_contact_email: string | null;
+  portal_contact_name: string | null;
   created_at: string;
   updated_at: string;
 };
