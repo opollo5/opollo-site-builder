@@ -231,6 +231,26 @@ function formatZodIssues(err: ZodError): Array<{
   }));
 }
 
+// ---------------------------------------------------------------------------
+// jsonHtml — HTML-safe JSON serialisation for embedding inside <script> tags.
+//
+// JSON.stringify does NOT escape <, >, or / by default in Node.js. A value
+// containing `</script>` would break out of a <script> context and enable
+// reflected XSS (CWE-79). Unicode-escaping those three characters makes the
+// output safe in any HTML embedding position.
+//
+// Used by the bundle.social OAuth popup-close handlers:
+//   - app/api/platform/social/connections/callback/route.ts
+//   - app/api/portal/connections/callback/route.ts
+// One canonical implementation — no drift between the two paths.
+// ---------------------------------------------------------------------------
+export function jsonHtml(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/\//g, "\\u002f");
+}
+
 // Race a promise against a timeout; rejects with "Request timed out after Xms"
 // if the promise doesn't settle first. Use for external calls (Anthropic, WP,
 // Cloudflare) where a hanging request would drain the serverless function pool.
