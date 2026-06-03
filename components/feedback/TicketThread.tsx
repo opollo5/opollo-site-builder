@@ -89,7 +89,7 @@ export function TicketThread({ ticketId, comments: initial, onCommentPosted }: P
             >
               <p className="whitespace-pre-wrap">{c.body}</p>
               <p
-                className={`mt-1 text-[10px] ${
+                className={`mt-1 text-xs ${
                   c.is_staff ? "text-emerald-100" : "text-gray-400"
                 }`}
               >
