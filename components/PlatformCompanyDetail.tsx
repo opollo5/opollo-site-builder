@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { NavIcon } from "@/components/ui/nav-icon";
 import { cn } from "@/lib/utils";
 import type { CompanyDetail, CompanyStats } from "@/lib/platform/companies";
+import { PortalContactForm } from "@/components/admin/PortalContactForm";
 
 // P3-3 — company detail. Tabs: Overview (default), Settings, Members.
 // Overview shows quick stats cards + key sections for staff operators.
@@ -284,6 +285,22 @@ function SettingsTab({ company }: { company: CompanyDetail["company"] }) {
           <dd>{formatDate(company.created_at)}</dd>
         </div>
       </dl>
+
+      {/* B4 — portal contact for pre-expiry and reconnect notifications */}
+      <div className="border-t px-4 py-4">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">
+          Portal contact
+        </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Who receives pre-expiry warnings and reconnect invites for social
+          connections. Leave blank to fall back to the company&apos;s primary admin.
+        </p>
+        <PortalContactForm
+          companyId={company.id}
+          initialEmail={company.portal_contact_email ?? ""}
+          initialName={company.portal_contact_name ?? ""}
+        />
+      </div>
     </section>
   );
 }
