@@ -66,12 +66,13 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // Redirect to the connections page for this company; the UI can
-  // surface the reconnect button for this specific connection.
-  // B4 will replace this with a sessionless client portal flow.
-  const connectionsUrl = new URL(
-    `/company/social/connections?reconnect=${link.subject_id}`,
+  // B4 client portal — redirect to the sessionless portal page.
+  // The raw token is passed so the portal can validate the magic_links session.
+  // company_id is derived SERVER-SIDE from the magic_links row in the portal page;
+  // it is not embedded in this redirect URL (client never supplies company_id).
+  const portalUrl = new URL(
+    `/portal?token=${rawToken}`,
     req.nextUrl.origin,
   );
-  return NextResponse.redirect(connectionsUrl);
+  return NextResponse.redirect(portalUrl);
 }
