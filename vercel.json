@@ -105,6 +105,10 @@
       "schedule": "0 3 * * *"
     },
     {
+      "path": "/api/cron/social-connections-pre-expiry",
+      "schedule": "30 8 * * *"
+    },
+    {
       "path": "/api/cron/social-analytics-refresh",
       "schedule": "0 4 * * *"
     },
