@@ -31,10 +31,10 @@ import { issue, validate } from "@/lib/platform/magic-link";
 import { POST } from "@/app/api/portal/connections/[connectionId]/reconnect/route";
 
 // Stable test IDs unique to this suite.
-const COMPANY_A = "b4bind0a-0000-4000-8000-000000000001";
-const COMPANY_B = "b4bind0b-0000-4000-8000-000000000002";
-const CONN_A_ID = "b4bind0a-0000-4000-8000-000000000011";
-const CONN_B_ID = "b4bind0b-0000-4000-8000-000000000012";
+const COMPANY_A = "b4b400aa-0000-4000-8000-000000000001";
+const COMPANY_B = "b4b400bb-0000-4000-8000-000000000002";
+const CONN_A_ID = "b4b400aa-0000-4000-8000-000000000011";
+const CONN_B_ID = "b4b400bb-0000-4000-8000-000000000012";
 
 async function seedEnv() {
   const svc = getServiceRoleClient();
