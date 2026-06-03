@@ -8,6 +8,7 @@ import { NavShell, type NavUserContext } from "@/components/nav/nav-shell";
 import { Toaster } from "@/components/ui/toaster";
 import { BreadcrumbProvider } from "@/components/error-reporting/BreadcrumbProvider";
 import { getCompanyTheme, buildThemeStyleBlock } from "@/lib/platform/theming";
+import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
 
 // ---------------------------------------------------------------------------
 // PlatformLayout — single shared authenticated layout that renders NavShell
@@ -78,6 +79,14 @@ export default async function PlatformLayout({
     companyName,
   };
 
+  // FeedbackWidget: mount once for authenticated company members when
+  // FEATURE_FEEDBACK_WIDGET is set. Never for logged-out users.
+  // Staff without a company assignment don't get the widget.
+  const feedbackCompanyId =
+    process.env.FEATURE_FEEDBACK_WIDGET === "1" && platformSession?.company?.companyId
+      ? platformSession.company.companyId
+      : null;
+
   return (
     <NavShell navContext={navContext}>
       {themeStyleBlock && (
@@ -88,6 +97,7 @@ export default async function PlatformLayout({
       <BreadcrumbProvider />
       {children}
       <Toaster />
+      {feedbackCompanyId && <FeedbackWidget companyId={feedbackCompanyId} />}
     </NavShell>
   );
 }
