@@ -157,6 +157,9 @@ function isPublicPath(pathname: string): boolean {
   // Does NOT match /portals, /portalnews, /portal-admin etc. because
   // those do not begin with "/portal/" and are not "/portal" exactly.
   if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
+  // /api/portal/* — B4 portal API (session validated via magic-link token,
+  // no Supabase cookie). Covers the reconnect initiation and OAuth callback.
+  if (pathname.startsWith("/api/portal/")) return true;
   // /api/platform/proofing/link-request — public re-request endpoint.
   if (pathname === "/api/platform/proofing/link-request") return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
