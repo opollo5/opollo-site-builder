@@ -788,8 +788,10 @@ function check7_unauthenticatedApi(): Issue[] {
     "/api/platform/invitations/accept", // P2-3 magic-link redemption (token-is-auth)
     "/api/optimiser/health",            // module liveness probe (middleware-gated, no user data)
     "/api/debug/env-check",             // staging/dev diagnostic; returns 404 in production (VERCEL_ENV guard)
-    "/api/platform/magic-link/login",       // B1 passwordless login issuance — intentionally public; rate-limited; no user data returned
-    "/api/platform/proofing/link-request",  // B2 self-serve re-request — intentionally public; rate-limited; returns ok:true regardless of match
+    "/api/platform/magic-link/login",         // B1 passwordless login issuance — intentionally public; rate-limited; no user data returned
+    "/api/platform/proofing/link-request",    // B2 self-serve re-request — intentionally public; rate-limited; returns ok:true regardless of match
+    "/api/portal/connections/:param/reconnect", // B4 portal reconnect initiation — token-is-auth; magic-link session validated server-side
+    "/api/portal/connections/callback",         // B4 portal OAuth callback — token-is-auth via portal_token query param
   ]);
 
   // Auth markers — any of these in the file body indicates the route gates itself.
