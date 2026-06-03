@@ -133,6 +133,32 @@ surface, no operator chrome. Transactional, idempotent, preserve audit, RLS (the
 binding is security-critical — a client must only ever touch their own company's
 connections), mirror route conventions.
 
+## Known hazards (builder must respect)
+
+1. **No scheduling write path.** B4 is reconnect + approval only. B4 must have NO write
+   path that sets `social_post_drafts.state = 'scheduled'`. The V2 publish-due cron
+   (`claimDueDrafts`) has no company-level guard — any draft that reaches
+   `state = 'scheduled'` enters the live publish path unconditionally. B4 never produces
+   a scheduled draft, keeping the cron exposure moot. If any B4 code path could
+   conceivably set `state = 'scheduled'`, flag it before merging. See
+   `docs/backlog/cron-guard-missing.md`.
+
+2. **Cross-tenant binding is the security keystone.** The LinkedIn cross-tenant leak
+   (2026-05-11) was fixed via `external_identity_hash`. Any OAuth round-trip in B4 must
+   honour that binding — a client must only ever touch their own company's connections.
+   The existing `checkCrossTenantConflict()` in `lib/platform/social/connections/identity.ts`
+   is the guard. Do not bypass or replicate it.
+
+3. **`platform_session_grants.user_id` is NOT NULL.** The stub table was designed for
+   authenticated-user reconnect sessions (a platform user getting a magic link to reconnect
+   their own account). An external client who has no platform account cannot be stored there
+   directly. B4 may need a nullable `user_id` migration on `platform_session_grants`, or a
+   separate binding mechanism. This is a hard stop — show Steven the migration shape before
+   running. See `docs/recon/CONNECTIONS_CLIENT_ACCESS_RECON.md` for the stub details.
+
+4. **No prod writes during verification.** B4 verification must run against local Supabase
+   only. See CLAUDE.md §"Production database is never a test environment".
+
 ## Report
 PRs, migration prod-verified, live verification (esp. the OAuth round-trip binds to the
 right company), and any drift.
