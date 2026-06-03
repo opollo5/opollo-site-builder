@@ -166,8 +166,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 }
 
 // ---------------------------------------------------------------------------
-// popupClose — same pattern as the operator callback.
-// Sends HTML that postMessages the result to window.opener and closes.
+// jsonHtml — produce HTML-safe JSON for embedding inside <script> tags.
+//
+// JSON.stringify does NOT escape <, >, or / by default in Node.js, so
+// a payload like {"reason":"</script><script>..."} would break out of
+// the <script> tag and enable reflected XSS. Unicode-escape those three
+// characters so the JSON is safe inside any HTML context.
+//
+// This is the standard fix for CWE-79 / OWASP A03 in <script> contexts.
+// ---------------------------------------------------------------------------
+function jsonHtml(data: unknown): string {
+  return JSON.stringify(data)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/\//g, "\\u002f");
+}
+
+// ---------------------------------------------------------------------------
+// popupClose — sends HTML that postMessages the result to window.opener.
+// Uses jsonHtml() to prevent the bundle.social error-code param from
+// breaking out of the <script> tag via reflected XSS.
 // ---------------------------------------------------------------------------
 function popupClose(
   req: NextRequest,
@@ -175,7 +193,7 @@ function popupClose(
   reason?: string,
 ): NextResponse {
   const origin = req.nextUrl.origin;
-  const payload = JSON.stringify({
+  const payload = jsonHtml({
     type: "bundle-connect-complete",
     connect,
     ...(reason ? { reason } : {}),
@@ -188,7 +206,7 @@ function popupClose(
 (function () {
   try {
     if (window.opener && !window.opener.closed) {
-      window.opener.postMessage(${payload}, ${JSON.stringify(origin)});
+      window.opener.postMessage(${payload}, ${jsonHtml(origin)});
     }
   } catch (e) {}
   window.close();
