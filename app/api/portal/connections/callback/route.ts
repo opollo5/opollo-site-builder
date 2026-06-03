@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { jsonHtml } from "@/lib/http";
 import { logger } from "@/lib/logger";
 import { validate } from "@/lib/platform/magic-link";
 import { syncBundlesocialConnections } from "@/lib/platform/social/connections";
@@ -166,26 +167,9 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 }
 
 // ---------------------------------------------------------------------------
-// jsonHtml — produce HTML-safe JSON for embedding inside <script> tags.
-//
-// JSON.stringify does NOT escape <, >, or / by default in Node.js, so
-// a payload like {"reason":"</script><script>..."} would break out of
-// the <script> tag and enable reflected XSS. Unicode-escape those three
-// characters so the JSON is safe inside any HTML context.
-//
-// This is the standard fix for CWE-79 / OWASP A03 in <script> contexts.
-// ---------------------------------------------------------------------------
-function jsonHtml(data: unknown): string {
-  return JSON.stringify(data)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/\//g, "\\u002f");
-}
-
-// ---------------------------------------------------------------------------
 // popupClose — sends HTML that postMessages the result to window.opener.
-// Uses jsonHtml() to prevent the bundle.social error-code param from
-// breaking out of the <script> tag via reflected XSS.
+// Uses jsonHtml() (from lib/http) to prevent the bundle.social error-code
+// param from breaking out of the <script> tag via reflected XSS (CWE-79).
 // ---------------------------------------------------------------------------
 function popupClose(
   req: NextRequest,

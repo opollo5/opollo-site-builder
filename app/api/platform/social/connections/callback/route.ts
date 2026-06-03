@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { jsonHtml } from "@/lib/http";
 import { enqueuePostHistoryImport } from "@/lib/platform/social/analytics-ingest";
 import { logger } from "@/lib/logger";
 import { requireCanDoForApi } from "@/lib/platform/auth/api-gate";
@@ -226,7 +227,7 @@ function popupCloseResponse(
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, "") ||
     new URL(req.url).origin;
 
-  const payload = JSON.stringify({
+  const payload = jsonHtml({
     type: "bundle-connect-complete",
     connect: connectParam,
     ...(reason ? { reason } : {}),
@@ -234,15 +235,13 @@ function popupCloseResponse(
     ...(attemptedPlatform ? { attempted_platform: attemptedPlatform } : {}),
   });
 
-  // Strict target origin — only our own origin accepts this message.
-  // No user-controlled data is embedded in the script.
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="utf-8"><title>Connecting…</title></head>
 <body>
 <script>
 (function () {
-  var targetOrigin = ${JSON.stringify(origin)};
+  var targetOrigin = ${jsonHtml(origin)};
   var payload = ${payload};
   try {
     if (window.opener && !window.opener.closed) {
