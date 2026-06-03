@@ -346,23 +346,30 @@ describe("B1 hard rule: expired magic_links row is NOT resolvable via legacy fal
     // Without the hard rule, the token_hash on social_approval_recipients
     // is still valid and the 14-day parent-request window is still open,
     // so the legacy path would admit the reviewer. It must not.
+    //
+    // IMPORTANT: do NOT call resolveRecipientByToken before expiry.
+    // resolveRecipientByToken calls consume() which sets consumed_at — after
+    // that the session governs, not expires_at. The link must stay unconsumed
+    // (consumed_at IS NULL) for this case to test the right code path.
     const { createResult, rec, svc } = await seedProofWithRecipient("hard-rule-link-expiry@test.example.com");
 
     const { regenerateApprovalLink } = await import("@/lib/platform/magic-link");
     const { rawToken } = await regenerateApprovalLink(rec.id);
 
-    // Verify works before manipulation.
-    expect((await resolveRecipientByToken(rawToken)).ok).toBe(true);
-
-    // Expire the LINK itself (never clicked — consumed_at stays NULL).
+    // Verify the magic_links row exists and is unconsumed (sanity, no consume side-effect).
     const { data: currentRec } = await svc.from("social_approval_recipients")
       .select("magic_link_id").eq("id", rec.id).maybeSingle();
-    if (currentRec?.magic_link_id) {
-      await svc.from("magic_links").update({
-        expires_at: new Date(Date.now() - 5000).toISOString(),
-        // consumed_at intentionally NOT set (stays NULL — link was never clicked)
-      }).eq("id", currentRec.magic_link_id);
-    }
+    expect(currentRec?.magic_link_id).not.toBeNull();
+
+    const { data: mlBefore } = await svc.from("magic_links")
+      .select("consumed_at, expires_at").eq("id", currentRec!.magic_link_id!).single();
+    expect(mlBefore?.consumed_at).toBeNull(); // not yet clicked
+    expect(new Date(mlBefore!.expires_at).getTime()).toBeGreaterThan(Date.now()); // not yet expired
+
+    // Expire the LINK itself (consumed_at stays NULL — link was never clicked).
+    await svc.from("magic_links").update({
+      expires_at: new Date(Date.now() - 5000).toISOString(),
+    }).eq("id", currentRec!.magic_link_id!);
 
     // Verify parent request is still within 14 days (the hole the rule closes).
     const { data: parentReq } = await svc.from("social_approval_requests")
@@ -372,15 +379,15 @@ describe("B1 hard rule: expired magic_links row is NOT resolvable via legacy fal
     expect(parentReq!.final_approved_at).toBeNull();
     expect(parentReq!.final_rejected_at).toBeNull();
 
-    // HARD RULE: magic_links row exists + is invalid → must reject.
+    // HARD RULE: magic_links row exists (expired, never consumed) → must reject.
     // Must NOT fall through to social_approval_recipients.token_hash lookup.
+    // If it fell through, the 14-day parent-request window would admit the token.
     const result = await resolveRecipientByToken(rawToken);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      // 'expired' (never consumed, link expiry passed) — not SESSION_EXPIRED
+      // 'expired' reason (consume() returns this when expires_at < now and consumed_at IS NULL)
+      // The function maps this to NOT_FOUND for the caller — the key point is ok=false.
       expect(result.error.code).not.toBe(undefined);
-      // The critical assertion: the result is NOT ok, proving the hard rule held.
-      // If the legacy path had fired, the 14-day window would have admitted the token.
     }
   });
 });
