@@ -43,7 +43,24 @@ export async function dispatch(
   const result: DispatchResult = { inApp: 0, emails: 0, errors: [] };
 
   const channels = EVENT_CHANNELS[payload.event];
-  const recipients = await resolveRecipients(payload);
+
+  // resolveRecipients may throw (e.g. resolveOpolloAdmins when no staff rows
+  // exist). Catch here to honour dispatch's "never throws" contract and surface
+  // the failure through the result envelope instead.
+  let recipients: ResolvedRecipient[];
+  try {
+    recipients = await resolveRecipients(payload);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("notifications.dispatch.resolve_recipients_failed", {
+      event: payload.event,
+      company_id: payload.companyId,
+      err: msg,
+    });
+    result.errors.push({ recipient: "resolve_recipients", reason: msg });
+    return result;
+  }
+
   const deduped = dedupeByEmail(recipients);
 
   if (deduped.length === 0) {
