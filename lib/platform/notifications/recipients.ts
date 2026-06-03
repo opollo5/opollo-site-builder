@@ -76,6 +76,9 @@ export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
     fullName: (u.full_name as string | null) ?? null,
   }));
 
+  // SEAM — future assigned-staff filter goes here (e.g. narrow to staff who
+  // manage this company). If narrowing to assigned staff ever yields empty,
+  // fall back to ALL staff — never throw.
   if (staff.length === 0) {
     logger.error("notifications.recipients.opollo_staff_empty", {
       message:
