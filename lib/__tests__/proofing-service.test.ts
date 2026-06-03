@@ -56,10 +56,18 @@ beforeAll(async () => {
   submitterUser = await seedAuthUser({ role: "user", persistent: true });
 });
 
-// _setup.ts truncateAll() runs before each test and wipes platform_companies.
-// Re-seed the company before each test.
+// _setup.ts truncateAll() runs before each test and wipes platform_companies
+// AND platform_users. Re-seed both before each test.
 beforeEach(async () => {
   await seedCompany();
+  // Re-create the platform_users row — truncateAll() wiped it but the auth user
+  // persists in auth.users (not truncated). social_approval_requests.created_by
+  // references platform_users(id) so this row is required.
+  const svc = getServiceRoleClient();
+  await svc.from("platform_users").upsert(
+    { id: submitterUser.id, email: submitterUser.email, is_opollo_staff: false },
+    { onConflict: "id" },
+  );
 });
 
 afterAll(async () => {
