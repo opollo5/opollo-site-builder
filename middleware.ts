@@ -152,6 +152,11 @@ function isPublicPath(pathname: string): boolean {
   // /proof/* — reviewer-facing queue, re-request, and proof pages.
   // All token-authenticated or public (no platform session required).
   if (pathname.startsWith("/proof/")) return true;
+  // /portal — B4 client portal (sessionless, magic-link session only).
+  // Two-condition pattern: exact /portal OR /portal/<child>.
+  // Does NOT match /portals, /portalnews, /portal-admin etc. because
+  // those do not begin with "/portal/" and are not "/portal" exactly.
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) return true;
   // /api/platform/proofing/link-request — public re-request endpoint.
   if (pathname === "/api/platform/proofing/link-request") return true;
   // All /api/auth/* endpoints (login, logout-not-applicable-here,
