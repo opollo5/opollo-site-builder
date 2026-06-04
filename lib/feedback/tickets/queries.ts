@@ -76,6 +76,23 @@ export async function listComments(ticketId: string): Promise<FeedbackTicketComm
   return (data ?? []) as FeedbackTicketComment[];
 }
 
+// All Opollo staff — used to populate the assignee picker on ticket detail.
+export async function listOpolloStaff(): Promise<
+  Array<{ id: string; fullName: string | null; email: string }>
+> {
+  const svc = getServiceRoleClient();
+  const { data } = await svc
+    .from("platform_users")
+    .select("id, full_name, email")
+    .eq("is_opollo_staff", true)
+    .order("full_name", { ascending: true });
+  return (data ?? []).map((u) => ({
+    id: u.id as string,
+    fullName: (u.full_name as string | null) ?? null,
+    email: u.email as string,
+  }));
+}
+
 // Resolve actor_id values to display names for the event timeline.
 // Goes through the platform layer (service-role client pattern) without
 // importing platform_users directly — consistent with the rest of lib/feedback.

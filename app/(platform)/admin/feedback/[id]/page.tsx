@@ -1,5 +1,4 @@
 import { redirect, notFound } from "next/navigation";
-import Link from "next/link";
 
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { isOpolloStaff } from "@/lib/platform/auth";
@@ -8,23 +7,27 @@ import {
   getTicket,
   listComments,
   listEvents,
+  listOpolloStaff,
   resolveActorNames,
 } from "@/lib/feedback/tickets/queries";
 import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
 import { BugReplayOverlay } from "@/components/feedback/BugReplayOverlay";
 import { TicketThread } from "@/components/feedback/TicketThread";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
-import { TicketTriageActions } from "@/components/feedback/TicketTriageActions";
+import { TicketTriagePanel } from "@/components/feedback/TicketTriagePanel";
 import type {
   FeedbackTicketEvent,
+  TicketPriority,
   TicketStatus,
 } from "@/lib/feedback/types";
 
 // ---------------------------------------------------------------------------
 // Admin ticket detail — /admin/feedback/[id]
 //
-// data-testid: bug-replay-marker (on BugReplayOverlay), ticket-thread,
-//              ticket-reply, ticket-event-timeline
+// §6 BUG fix: removed raw company_id from subtitle (was showing sentinel UUID).
+// §4: shows both "what happened" and "expected behavior" fields.
+// §7: full triage panel (status/assignee/priority/delete).
+// data-testid: bug-replay-marker, ticket-thread, ticket-reply, ticket-event-timeline
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
@@ -34,14 +37,12 @@ function eventLabel(
   e: FeedbackTicketEvent,
   actorNames: Map<string, string>,
 ): string {
-  // §2: resolve actor_id to a display name; fall back to "Opollo staff" for
-  // null actor (automation/system events) or unknown ids.
   const actor = e.actor_id
     ? (actorNames.get(e.actor_id) ?? "Opollo staff")
     : "system";
 
   switch (e.event_type) {
-    case "created": return `Reported`;
+    case "created": return "Reported";
     case "assigned": return `Assigned by ${actor}`;
     case "reassigned": return `Reassigned by ${actor}`;
     case "status_changed": return `Status: ${e.from_value} → ${e.to_value} by ${actor}`;
@@ -65,7 +66,7 @@ const STATUS_COLOURS: Record<TicketStatus, string> = {
   backlog: "bg-gray-100 text-gray-600",
   triaged: "bg-blue-100 text-blue-700",
   in_progress: "bg-yellow-100 text-yellow-700",
-  fixed: "bg-emerald-100 text-emerald-700",
+  fixed: "bg-[--color-success-bg] text-[--color-success-fg]",
   verified: "bg-green-100 text-green-700",
   wont_fix: "bg-gray-100 text-gray-400",
   closed: "bg-gray-50 text-gray-400",
@@ -84,15 +85,15 @@ export default async function AdminTicketDetailPage({
   const isStaff = await isOpolloStaff(supabase);
   if (!isStaff) redirect("/admin");
 
-  const [ticket, comments, events] = await Promise.all([
+  const [ticket, comments, events, staffList] = await Promise.all([
     getTicket(id),
     listComments(id),
     listEvents(id),
+    listOpolloStaff(),
   ]);
 
   if (!ticket) notFound();
 
-  // §2 — resolve all actor_ids in the event list to display names
   const actorIds = events.map((e) => e.actor_id);
   const actorNames = await resolveActorNames(actorIds);
 
@@ -102,7 +103,7 @@ export default async function AdminTicketDetailPage({
 
   return (
     <div className="mx-auto max-w-5xl p-6">
-      {/* §4 — Breadcrumb */}
+      {/* Breadcrumb */}
       <div className="mb-4">
         <Breadcrumbs
           crumbs={[
@@ -113,13 +114,14 @@ export default async function AdminTicketDetailPage({
         />
       </div>
 
-      {/* Header */}
-      <div className="mb-6">
+      {/* Header — §6 fix: no raw company_id UUID in subtitle */}
+      <div className="mb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-semibold text-gray-900">{ticket.title}</h1>
+            {/* §6: show short id + date only; company_id was the zero-UUID sentinel */}
             <p className="mt-1 text-sm text-gray-500">
-              #{id.slice(0, 8)} · {ticket.company_id} · {formatDate(ticket.created_at)}
+              #{id.slice(0, 8)} · {formatDate(ticket.created_at)}
             </p>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">
@@ -133,19 +135,36 @@ export default async function AdminTicketDetailPage({
             </span>
           </div>
         </div>
-        <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">{ticket.description}</p>
+
+        {/* §4 — What happened */}
+        <div className="mt-3">
+          <p className="mb-1 text-xs font-medium text-gray-500">What happened</p>
+          <p className="whitespace-pre-wrap text-sm text-gray-700">{ticket.description}</p>
+        </div>
+
+        {/* §4 — Expected behavior */}
+        {ticket.expected_behavior && (
+          <div className="mt-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+            <p className="mb-1 text-xs font-medium text-gray-500">Expected</p>
+            <p className="whitespace-pre-wrap text-sm text-gray-700">{ticket.expected_behavior}</p>
+          </div>
+        )}
       </div>
 
-      {/* §5 — Staff triage actions */}
-      <TicketTriageActions
-        ticketId={id}
-        currentStatus={ticket.status as TicketStatus}
-      />
+      {/* §7 — Full triage panel: status / priority / assignee / delete */}
+      <div className="mb-6">
+        <TicketTriagePanel
+          ticketId={id}
+          currentStatus={ticket.status as TicketStatus}
+          currentAssigneeId={ticket.assignee_id}
+          currentPriority={ticket.priority as TicketPriority}
+          staffList={staffList}
+        />
+      </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2">
         {/* Left: screenshot replay */}
         <div className="flex flex-col gap-4">
-          {/* §9 naming: "Bug Replay" → "Screenshot replay" */}
           <h2 className="text-sm font-semibold text-gray-700">Screenshot replay</h2>
           <BugReplayOverlay
             screenshotUrl={screenshotUrl}
@@ -178,7 +197,7 @@ export default async function AdminTicketDetailPage({
             </div>
           </details>
 
-          {/* §7 — Fix attempt panel */}
+          {/* Fix attempt panel */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <h3 className="mb-2 text-xs font-semibold text-gray-700">Fix attempt</h3>
             {ticket.linked_pr_url || ticket.resolution_notes ? (
@@ -206,7 +225,7 @@ export default async function AdminTicketDetailPage({
                 )}
               </div>
             ) : (
-              <p className="text-xs text-gray-400 italic">No fix attempt yet.</p>
+              <p className="text-xs italic text-gray-400">No fix attempt yet.</p>
             )}
           </div>
         </div>
@@ -218,13 +237,11 @@ export default async function AdminTicketDetailPage({
             <TicketThread ticketId={id} comments={comments} />
           </div>
 
-          {/* Event timeline */}
           <div>
             <h2 className="mb-3 text-sm font-semibold text-gray-700">Event Timeline</h2>
             <ol data-testid="ticket-event-timeline" className="border-l-2 border-gray-200 pl-4">
               {events.map((e) => (
                 <li key={e.id} className="mb-3 last:mb-0">
-                  {/* §2: shows resolved actor name, not actor_kind */}
                   <div className="text-xs font-medium text-gray-800">
                     {eventLabel(e, actorNames)}
                   </div>

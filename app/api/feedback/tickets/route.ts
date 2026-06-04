@@ -41,6 +41,7 @@ const CreateSchema = z.object({
   userAgent: z.string().nullable().optional(),
   consoleErrors: z.array(z.unknown()).nullable().optional(),
   screenshotObjectPath: z.string().nullable().optional(),
+  expectedBehavior: z.string().max(2000).nullable().optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

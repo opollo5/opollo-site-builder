@@ -26,6 +26,8 @@ type Props = {
   elementLabel: string | null;
 };
 
+// §7 — Larger, high-contrast pin marker so it pops on any screenshot.
+// Three layers: outer halo ring, inner pulsing ring, solid pin core.
 function Marker({ clickXPct, clickYPct }: { clickXPct: number; clickYPct: number }) {
   return (
     <div
@@ -37,9 +39,13 @@ function Marker({ clickXPct, clickYPct }: { clickXPct: number; clickYPct: number
         transform: "translate(-50%, -50%)",
       }}
     >
-      <div className="relative flex h-6 w-6 items-center justify-center">
-        <div className="absolute h-6 w-6 animate-ping rounded-full bg-emerald-500 opacity-75" />
-        <div className="relative h-4 w-4 rounded-full border-2 border-white bg-emerald-500 shadow-lg" />
+      {/* Outer halo — static translucent ring for contrast on any background */}
+      <div className="relative flex h-10 w-10 items-center justify-center">
+        <div className="absolute h-10 w-10 rounded-full bg-white opacity-30" />
+        {/* Pulsing ring */}
+        <div className="absolute h-8 w-8 animate-ping rounded-full bg-emerald-400 opacity-60" />
+        {/* Solid pin core */}
+        <div className="relative h-5 w-5 rounded-full border-[3px] border-white bg-emerald-500 shadow-xl" />
       </div>
     </div>
   );
