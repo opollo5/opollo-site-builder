@@ -7,6 +7,7 @@ import {
 } from "@/lib/optimiser/sync/cron-shared";
 import { getServiceRoleClient } from "@/lib/supabase";
 import { syncBundlesocialConnections } from "@/lib/platform/social/connections/sync";
+import { recordRecovery } from "@/lib/platform/service-health/record";
 
 // ---------------------------------------------------------------------------
 // F1 — GET /api/cron/social-connections-health
@@ -76,6 +77,25 @@ async function handle(req: NextRequest): Promise<NextResponse> {
 
   const data = { companies_synced, companies_failed, ...totals };
   logger.info("social.connections.health.cron_ok", data);
+
+  // Fix 3 — stale health event auto-clear.
+  //
+  // A successful sync proves bundle.social is reachable from Vercel. If a
+  // previous publish attempt created a connection_failure health event but
+  // there are no scheduled posts to publish (so withHealthMonitoring never
+  // fires on the success path), the event accumulates indefinitely.
+  //
+  // One successful company sync is enough evidence to resolve stale events.
+  // recordRecovery resolves ALL unresolved events for the service — if bundle.
+  // social is actually still down, the next sync (or next publish attempt)
+  // would re-raise immediately, so this is safe to call on partial success.
+  if (companies_synced > 0) {
+    void recordRecovery("bundle.social").catch((err) =>
+      logger.warn("social.connections.health.cron_recovery_failed", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
+    );
+  }
 
   return NextResponse.json(
     { ok: true, data, timestamp: new Date().toISOString() },
