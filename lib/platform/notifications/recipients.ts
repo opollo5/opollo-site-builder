@@ -38,20 +38,16 @@ export async function resolveCompanyAdmins(
 // ---------------------------------------------------------------------------
 // resolveOpolloAdmins — returns ALL platform_users where is_opollo_staff=true.
 //
-// Throws when the result would be empty rather than returning []. The caller
-// (dispatch.ts) catches the throw and records it in the DispatchResult error
-// list, honouring dispatch's "never throws" contract while making the failure
-// visible to callers like notifyTicketCreated.
+// Returns [] when no staff exist (graceful empty, not a throw). The empty
+// case is logged as an error so it surfaces in observability; the caller
+// (dispatch.ts) will see 0 recipients and the standard no_recipients log.
 //
-// Why throw, not return []:
-//   Returning [] silently drops blocker ticket notifications. An empty staff
-//   list means the platform is misconfigured (no one to alert), which is a
-//   loud, observable problem — not a graceful empty-set case.
+// DB errors throw — those are connection/permission failures, not a
+// misconfiguration, and should surface immediately.
 //
-// Why not env-var fallback:
-//   PLATFORM_ADMIN_ALERT_EMAILS is optional config; its absence silently
-//   reintroduces the empty-set problem. The DB is the authoritative source;
-//   if it is empty, the misconfiguration must surface as an error.
+// SEAM — future assigned-staff filter goes here (e.g. narrow to staff who
+// manage this company). If narrowing to assigned staff ever yields empty,
+// fall back to ALL staff — never throw.
 // ---------------------------------------------------------------------------
 export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
   const svc = getServiceRoleClient();
@@ -76,19 +72,13 @@ export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
     fullName: (u.full_name as string | null) ?? null,
   }));
 
-  // SEAM — future assigned-staff filter goes here (e.g. narrow to staff who
-  // manage this company). If narrowing to assigned staff ever yields empty,
-  // fall back to ALL staff — never throw.
   if (staff.length === 0) {
     logger.error("notifications.recipients.opollo_staff_empty", {
       message:
         "No is_opollo_staff=true rows in platform_users — " +
-        "blocker/admin notifications cannot fire. " +
+        "blocker/admin notifications will not fire. " +
         "Add at least one Opollo staff user to platform_users.",
     });
-    throw new Error(
-      "resolveOpolloAdmins: no Opollo staff in platform_users (misconfiguration)",
-    );
   }
 
   return staff;
