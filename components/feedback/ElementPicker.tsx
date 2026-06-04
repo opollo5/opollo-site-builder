@@ -22,13 +22,15 @@ type Props = {
 // ---------------------------------------------------------------------------
 // ElementPicker — crosshair overlay pick mode.
 //
-// Rules (§13 of spec):
+// Rules:
 //   - NEVER mutate page styles or capture events outside pick mode.
 //   - The highlight box is a single absolutely-positioned overlay div — it
 //     tracks getBoundingClientRect() on mousemove. No style is applied to
 //     the target element.
-//   - Click coords are stored as % of the element's bounding box so they
-//     survive viewport resize (§13 "percentage coords, not pixels").
+//   - Click coords are stored as % of the VIEWPORT (not the element box).
+//     The screenshot covers the full viewport; click_x_pct = e.clientX /
+//     window.innerWidth * 100 maps the click to the same position in the
+//     screenshot. Percentage coords survive replay on any screen size.
 // ---------------------------------------------------------------------------
 
 export function ElementPicker({ onPick, onCancel }: Props) {
@@ -57,9 +59,12 @@ export function ElementPicker({ onPick, onCancel }: Props) {
       const el = targetRef.current;
       if (!el) return;
 
-      const rect = el.getBoundingClientRect();
-      const clickXPct = ((e.clientX - rect.left) / rect.width) * 100;
-      const clickYPct = ((e.clientY - rect.top) / rect.height) * 100;
+      // Coords relative to VIEWPORT — the screenshot captures the full
+      // viewport, so (e.clientX / innerWidth) maps directly to the
+      // screenshot. Previously these were relative to the element box,
+      // which placed the marker at the wrong position in the replay.
+      const clickXPct = (e.clientX / window.innerWidth) * 100;
+      const clickYPct = (e.clientY / window.innerHeight) * 100;
 
       onPick({
         cssSelector: resolveSelector(el),
@@ -110,7 +115,7 @@ export function ElementPicker({ onPick, onCancel }: Props) {
 
       {/* Escape hint */}
       <div className="pointer-events-none fixed bottom-6 left-1/2 z-[10000] -translate-x-1/2 rounded-md bg-gray-900/90 px-4 py-2 text-sm text-white shadow-lg">
-        Click an element to report a bug — <kbd className="rounded bg-gray-700 px-1">Esc</kbd> to cancel
+        Click an element to send feedback — <kbd className="rounded bg-gray-700 px-1">Esc</kbd> to cancel
       </div>
     </>
   );

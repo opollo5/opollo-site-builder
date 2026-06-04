@@ -66,6 +66,7 @@ export type FeedbackTicket = {
   annotation: unknown | null;
   repo_ref: string | null;
   linked_pr_url: string | null;
+  resolution_notes: string | null;
   created_by: string;
   updated_by: string | null;
   created_at: string;

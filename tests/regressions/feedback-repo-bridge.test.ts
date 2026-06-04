@@ -138,3 +138,82 @@ describe("bugs:push — terminal state rejection guard (§1 governance)", () => 
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// §7 v1.1 — resolution_notes written by bugs:push, terminal guard still holds
+// ---------------------------------------------------------------------------
+describe("bugs:push §7 — resolution_notes support + terminal guard unchanged", () => {
+  it("writes resolution_notes alongside status=fixed", async () => {
+    process.env.SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const eqFn = vi.fn(() => ({ error: null }));
+    const updateFn = vi.fn(() => ({ eq: eqFn }));
+    vi.mocked(createClient).mockReturnValue({ from: () => ({ update: updateFn }) } as never);
+
+    const content = `---
+ticket_id: aaaaaaaa-0000-4000-8000-000000000001
+status: fixed
+linked_pr_url: https://github.com/org/repo/pull/99
+---
+
+## Report
+description
+
+## Resolution
+Working analog: lib/foo.ts:10 — pattern exists. Diff: old had X. Fix: replaced with Y.
+`;
+    vi.doMock("node:fs", () => ({
+      default: { existsSync: vi.fn(() => true), readdirSync: vi.fn(() => ["test.md"]), readFileSync: vi.fn(() => content), mkdirSync: vi.fn() },
+      existsSync: vi.fn(() => true), readdirSync: vi.fn(() => ["test.md"]), readFileSync: vi.fn(() => content), mkdirSync: vi.fn(),
+    }));
+    vi.resetModules();
+    const { pushBugs } = await import("@/lib/feedback/repo-bridge/push");
+    const result = await pushBugs();
+    expect(result.updated).toBe(1);
+    expect(result.rejected).toBe(0);
+    expect(updateFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "fixed",
+        linked_pr_url: "https://github.com/org/repo/pull/99",
+        resolution_notes: expect.stringContaining("Working analog"),
+      }),
+    );
+    vi.doUnmock("node:fs");
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  });
+
+  it("still rejects terminal state even when resolution_notes are present", async () => {
+    process.env.SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
+
+    const { createClient } = await import("@supabase/supabase-js");
+    const updateFn = vi.fn(() => ({ eq: vi.fn(() => ({ error: null })) }));
+    vi.mocked(createClient).mockReturnValue({ from: () => ({ update: updateFn }) } as never);
+
+    const content = `---
+ticket_id: aaaaaaaa-0000-4000-8000-000000000001
+status: verified
+linked_pr_url: https://github.com/org/repo/pull/99
+---
+
+## Resolution
+Good fix.
+`;
+    vi.doMock("node:fs", () => ({
+      default: { existsSync: vi.fn(() => true), readdirSync: vi.fn(() => ["test.md"]), readFileSync: vi.fn(() => content), mkdirSync: vi.fn() },
+      existsSync: vi.fn(() => true), readdirSync: vi.fn(() => ["test.md"]), readFileSync: vi.fn(() => content), mkdirSync: vi.fn(),
+    }));
+    vi.resetModules();
+    const { pushBugs } = await import("@/lib/feedback/repo-bridge/push");
+    const result = await pushBugs();
+    expect(result.rejected).toBe(1);
+    expect(result.updated).toBe(0);
+    expect(updateFn).not.toHaveBeenCalled();
+    vi.doUnmock("node:fs");
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+  });
+});

@@ -120,7 +120,7 @@ export function CreateTaskPopup({
     >
       {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <h2 className="text-sm font-semibold text-gray-900">Report a bug</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Send feedback</h2>
         <button
           onClick={onClose}
           className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"

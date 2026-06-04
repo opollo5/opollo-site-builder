@@ -24,15 +24,15 @@ const TERMINAL_STATUSES: TicketStatus[] = ["verified", "closed", "wont_fix"];
 // Spec (§7): backlog → triaged → in_progress → fixed → verified → closed
 //            any → wont_fix → closed
 //            fixed|verified → in_progress  (reopen)
-// Notably: only verified → closed and wont_fix → closed lead to closed.
-// "any → wont_fix" means: backlog, triaged, in_progress, fixed, verified.
+// v1.1 §5: human-staff may also move any non-closed ticket back to backlog
+//          or directly to wont_fix (triage actions on the detail page).
 const TRANSITIONS: Map<TicketStatus, TicketStatus[]> = new Map([
   ["backlog",     ["triaged", "in_progress", "wont_fix"]],
-  ["triaged",     ["in_progress", "wont_fix"]],
-  ["in_progress", ["fixed", "wont_fix"]],
-  ["fixed",       ["in_progress", "verified", "wont_fix"]],
-  ["verified",    ["in_progress", "closed", "wont_fix"]],
-  ["wont_fix",    ["closed"]],
+  ["triaged",     ["backlog", "in_progress", "wont_fix"]],
+  ["in_progress", ["backlog", "fixed", "wont_fix"]],
+  ["fixed",       ["backlog", "in_progress", "verified", "wont_fix"]],
+  ["verified",    ["backlog", "in_progress", "closed", "wont_fix"]],
+  ["wont_fix",    ["backlog", "closed"]],
   ["closed",      []],
 ]);
 

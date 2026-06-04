@@ -19,14 +19,16 @@ const logger = {
 };
 
 // ---------------------------------------------------------------------------
-// bugs:push — docs/bugs/<slug>.md status/PR → Supabase (impl status only).
+// bugs:push — docs/bugs/<slug>.md status/PR/resolution → Supabase.
 //
-// Reads all .md files in docs/bugs/, parses front-matter, and writes back:
+// Reads all .md files in docs/bugs/, parses front-matter + the
+// ## Resolution section body, and writes back:
 //   - status ∈ {in_progress, fixed}    (§10: no terminal states)
 //   - linked_pr_url
+//   - resolution_notes  (parsed from ## Resolution body)
 //
 // Terminal states (verified, closed, wont_fix) are REJECTED — the governance
-// contract (§1) requires humans to close tickets.
+// contract requires humans to close tickets.
 // ---------------------------------------------------------------------------
 
 const BUGS_DIR = path.join(process.cwd(), "docs", "bugs");
@@ -37,6 +39,17 @@ type ParsedFrontmatter = {
   status: string | null;
   linked_pr_url: string | null;
 };
+
+function parseResolutionNotes(content: string): string | null {
+  // Extract the ## Resolution section body (everything after the heading
+  // until the next ## heading or end of file), stripping <!-- --> comments.
+  const match = content.match(/^## Resolution\s*\n([\s\S]*?)(?=^## |\s*$)/m);
+  if (!match) return null;
+  const body = match[1]
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .trim();
+  return body.length > 0 ? body : null;
+}
 
 function parseFrontmatter(content: string): ParsedFrontmatter {
   const match = content.match(/^---\n([\s\S]*?)\n---/);
@@ -84,6 +97,7 @@ export async function pushBugs(): Promise<{
     }
 
     const { ticket_id, status, linked_pr_url } = parseFrontmatter(content);
+    const resolutionNotes = parseResolutionNotes(content);
 
     if (!ticket_id) {
       logger.warn("bugs.push.no_ticket_id", { file });
@@ -105,6 +119,7 @@ export async function pushBugs(): Promise<{
     const updates: Record<string, string | null> = {};
     if (status && ALLOWED_STATUSES.has(status)) updates.status = status;
     if (linked_pr_url) updates.linked_pr_url = linked_pr_url;
+    if (resolutionNotes) updates.resolution_notes = resolutionNotes;
 
     if (Object.keys(updates).length === 0) {
       skipped += 1;

@@ -248,3 +248,54 @@ describe("D. click-marker percentage coordinates", () => {
     expect(pxY).toBe(900);
   });
 });
+
+// ---------------------------------------------------------------------------
+// E. §5 v1.1 — backlog and wont_fix triage transitions (human-staff only)
+// ---------------------------------------------------------------------------
+describe("E. v1.1 triage transitions — human-staff only", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.clearAllMocks());
+
+  const STAFF: CallerContext = { kind: "human-staff", userId: ACTOR_ID };
+  const AUTOMATION: CallerContext = { kind: "automation" };
+  const REPORTER: CallerContext = { kind: "customer-reporter", userId: ACTOR_ID };
+
+  it("human-staff: triaged → backlog (re-open to backlog)", async () => {
+    const r = await callUpdateStatus("triaged", "backlog", STAFF);
+    expect(r.ok).toBe(true);
+  });
+
+  it("human-staff: in_progress → backlog", async () => {
+    const r = await callUpdateStatus("in_progress", "backlog", STAFF);
+    expect(r.ok).toBe(true);
+  });
+
+  it("human-staff: fixed → wont_fix (ignore after fix)", async () => {
+    const r = await callUpdateStatus("fixed", "wont_fix", STAFF);
+    expect(r.ok).toBe(true);
+  });
+
+  it("automation: cannot set backlog (only in_progress|fixed)", async () => {
+    await expect(
+      callUpdateStatus("triaged", "backlog", AUTOMATION),
+    ).rejects.toThrow(/Automation caller rejected/);
+  });
+
+  it("automation: cannot set wont_fix (terminal)", async () => {
+    await expect(
+      callUpdateStatus("in_progress", "wont_fix", AUTOMATION),
+    ).rejects.toThrow(/Automation caller rejected/);
+  });
+
+  it("customer-reporter: cannot set backlog", async () => {
+    await expect(
+      callUpdateStatus("triaged", "backlog", REPORTER),
+    ).rejects.toThrow(/Customer-reporter rejected/);
+  });
+
+  it("customer-reporter: cannot set wont_fix", async () => {
+    await expect(
+      callUpdateStatus("in_progress", "wont_fix", REPORTER),
+    ).rejects.toThrow(/Customer-reporter rejected/);
+  });
+});

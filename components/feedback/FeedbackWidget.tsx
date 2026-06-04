@@ -162,7 +162,7 @@ export function FeedbackWidget({ companyId }: Props) {
       >
         {/* Brand mark */}
         <div className="px-3 py-2 text-xs font-semibold tracking-widest text-gray-400">
-          BUGS
+          Feedback
         </div>
 
         {/* + button */}
@@ -200,10 +200,10 @@ export function FeedbackWidget({ companyId }: Props) {
       data-testid="feedback-tab"
       onClick={() => setMode("rail")}
       className="fixed right-0 bottom-12 z-[9997] flex h-10 w-8 items-center justify-center rounded-l-md border border-r-0 border-gray-200 bg-white shadow-md hover:bg-[--color-success-bg]"
-      title="Report a bug"
+      title="Send feedback"
       aria-label="Open bug reporter"
     >
-      <span className="rotate-90 text-xs font-semibold text-gray-500">BUG</span>
+      <span className="rotate-90 text-xs font-semibold text-gray-500">Feedback</span>
     </button>
   );
 }

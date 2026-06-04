@@ -76,6 +76,27 @@ export async function listComments(ticketId: string): Promise<FeedbackTicketComm
   return (data ?? []) as FeedbackTicketComment[];
 }
 
+// Resolve actor_id values to display names for the event timeline.
+// Goes through the platform layer (service-role client pattern) without
+// importing platform_users directly — consistent with the rest of lib/feedback.
+export async function resolveActorNames(
+  actorIds: (string | null)[],
+): Promise<Map<string, string>> {
+  const ids = actorIds.filter((id): id is string => id !== null);
+  if (ids.length === 0) return new Map();
+  const svc = getServiceRoleClient();
+  const { data } = await svc
+    .from("platform_users")
+    .select("id, full_name, email")
+    .in("id", ids);
+  const map = new Map<string, string>();
+  for (const u of data ?? []) {
+    const display = (u.full_name as string | null)?.trim() || (u.email as string);
+    map.set(u.id as string, display);
+  }
+  return map;
+}
+
 export async function listEvents(ticketId: string): Promise<FeedbackTicketEvent[]> {
   const svc = getServiceRoleClient();
   const { data, error } = await svc
