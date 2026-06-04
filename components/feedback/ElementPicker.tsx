@@ -25,18 +25,25 @@ type Props = {
 // Rules:
 //   - NEVER mutate page styles or capture events outside pick mode.
 //   - The highlight box is a single absolutely-positioned overlay div — it
-//     tracks getBoundingClientRect() on mousemove. No style is applied to
-//     the target element.
+//     tracks getBoundingClientRect() on mousemove. pointer-events-none
+//     ensures the highlight never blocks the click it's marking.
 //   - Click coords are stored as % of the VIEWPORT (not the element box).
-//     The screenshot covers the full viewport; click_x_pct = e.clientX /
-//     window.innerWidth * 100 maps the click to the same position in the
-//     screenshot. Percentage coords survive replay on any screen size.
+//   - Crosshair cursor is set on document.body for the pick session and
+//     restored on cleanup (the pointer-events-none overlay div approach
+//     doesn't propagate cursor to all browsers reliably).
 // ---------------------------------------------------------------------------
 
 export function ElementPicker({ onPick, onCancel }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
   const targetRef = useRef<Element | null>(null);
+
+  // Set crosshair cursor on the document body for the duration of pick mode.
+  useEffect(() => {
+    const prev = document.body.style.cursor;
+    document.body.style.cursor = "crosshair";
+    return () => { document.body.style.cursor = prev; };
+  }, []);
 
   const onMouseMove = useCallback((e: MouseEvent) => {
     const el = document.elementFromPoint(e.clientX, e.clientY);
@@ -59,10 +66,6 @@ export function ElementPicker({ onPick, onCancel }: Props) {
       const el = targetRef.current;
       if (!el) return;
 
-      // Coords relative to VIEWPORT — the screenshot captures the full
-      // viewport, so (e.clientX / innerWidth) maps directly to the
-      // screenshot. Previously these were relative to the element box,
-      // which placed the marker at the wrong position in the replay.
       const clickXPct = (e.clientX / window.innerWidth) * 100;
       const clickYPct = (e.clientY / window.innerHeight) * 100;
 
@@ -92,15 +95,16 @@ export function ElementPicker({ onPick, onCancel }: Props) {
 
   return (
     <>
-      {/* Full-screen transparent overlay — cursor only, no pointer-events capture */}
+      {/* Transparent overlay — identifies the picker layer for elementFromPoint
+          exclusion. No pointer-events so clicks pass through to page elements. */}
       <div
         ref={overlayRef}
         data-testid="feedback-picker"
         className="pointer-events-none fixed inset-0 z-[9998]"
-        style={{ cursor: "crosshair" }}
       />
 
-      {/* Highlight box tracking the hovered element */}
+      {/* Element highlight — 2px emerald outline + faint fill. pointer-events-none
+          so it never blocks the click it is showing. */}
       {highlightRect && (
         <div
           className="pointer-events-none fixed z-[9999] rounded-sm border-2 border-emerald-500 bg-emerald-500/10"
@@ -113,9 +117,15 @@ export function ElementPicker({ onPick, onCancel }: Props) {
         />
       )}
 
-      {/* Escape hint */}
-      <div className="pointer-events-none fixed bottom-6 left-1/2 z-[10000] -translate-x-1/2 rounded-md bg-gray-900/90 px-4 py-2 text-sm text-white shadow-lg">
-        Click an element to send feedback — <kbd className="rounded bg-gray-700 px-1">Esc</kbd> to cancel
+      {/* Persistent hint bar — emerald, bottom-center, high z-index, ≥14px text. */}
+      <div
+        data-testid="feedback-picker-hint"
+        className="pointer-events-none fixed bottom-0 left-0 right-0 z-[10000] flex items-center justify-center bg-emerald-600 px-4 py-3 text-sm font-medium text-white shadow-lg"
+      >
+        Click the part of the page that isn&apos;t working
+        <span className="mx-3 opacity-50">·</span>
+        <kbd className="rounded bg-emerald-800/60 px-1.5 py-0.5 text-xs font-mono">Esc</kbd>
+        <span className="ml-1">to cancel</span>
       </div>
     </>
   );

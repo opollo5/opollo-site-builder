@@ -3,29 +3,41 @@
 import html2canvas from "html2canvas";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { CreateTaskPopup } from "./CreateTaskPopup";
 import { ElementPicker, type PickResult } from "./ElementPicker";
 
-// §2: rail/tray mode removed — single click goes straight to picker.
-type Mode = "collapsed" | "picking" | "creating" | "submitted";
+// ---------------------------------------------------------------------------
+// FeedbackWidget — intro modal → picker → report popup flow.
+//
+// §1 Position: bottom-LEFT at left-20 bottom-4 (clears 64px nav rail).
+// §2 No intermediate tray: tab click → intro modal → picker → popup.
+// §4 Naming: "Report an issue" / "Send report".
+//
+// Flow:
+//   collapsed → [tab click] → intro → [Start picking] → picking →
+//   [element click] → creating → [submit] → submitted → collapsed
+//   Esc at intro or picking → collapsed
+//
+// Backlog: "don't show again" preference for the intro modal.
+//
+// data-testid: feedback-tab, feedback-intro-modal, feedback-picker,
+//              feedback-picker-hint, feedback-create-popup, feedback-submit
+// ---------------------------------------------------------------------------
+
+type Mode = "collapsed" | "intro" | "picking" | "creating" | "submitted";
 
 type Props = {
   companyId: string;
 };
-
-// ---------------------------------------------------------------------------
-// FeedbackWidget — pill → picker → create popup flow.
-//
-// §1 Position: bottom-LEFT at left-20 bottom-4 (80px from left edge clears
-//    the 64px collapsed primary nav rail + 16px buffer). Eliminates the
-//    bottom-right collision with DebugFooter (fixed bottom-2 right-2).
-// §2 No intermediate tray: pill click → picker immediately (one action).
-// §3 No count badge.
-// §4 Naming: "Report an issue" / "Send report".
-//
-// data-testid: feedback-tab, feedback-picker, feedback-create-popup,
-//              feedback-submit
-// ---------------------------------------------------------------------------
 
 const MAX_CONSOLE_ERRORS = 50;
 
@@ -69,7 +81,6 @@ export function FeedbackWidget({ companyId }: Props) {
     };
   }, []);
 
-  // §2: clicking the pill goes straight to picking — no intermediate tray.
   const startPicking = useCallback(() => {
     setPageUrl(window.location.href);
     setMode("picking");
@@ -109,11 +120,55 @@ export function FeedbackWidget({ companyId }: Props) {
     setTimeout(() => setMode("collapsed"), 2000);
   }, []);
 
+  if (mode === "intro") {
+    return (
+      // Dialog open state is controlled by mode — Esc handled by Radix.
+      <Dialog
+        open
+        onOpenChange={(open) => {
+          if (!open) setMode("collapsed");
+        }}
+      >
+        <DialogContent
+          data-testid="feedback-intro-modal"
+          // Override default z-50 to sit above all app chrome (DebugFooter z-50).
+          className="z-[10200] max-w-md"
+          // Esc key is handled by Radix (calls onOpenChange(false) → collapsed).
+        >
+          <DialogHeader>
+            <DialogTitle className="text-lg font-semibold">
+              Show us where it&apos;s not working
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-600 leading-relaxed">
+              Click anywhere on the page that&apos;s broken or wrong. We&apos;ll capture a
+              screenshot and pin the exact spot for our team.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="mt-2 flex gap-2 sm:flex-row-reverse">
+            <Button
+              onClick={startPicking}
+              className="min-h-[44px] bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              Start picking
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => setMode("collapsed")}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
   if (mode === "picking") {
     return (
       <ElementPicker
         onPick={onPick}
-        // §2: cancel returns to collapsed, not a now-deleted rail
         onCancel={() => setMode("collapsed")}
       />
     );
@@ -135,19 +190,17 @@ export function FeedbackWidget({ companyId }: Props) {
 
   if (mode === "submitted") {
     return (
-      // §1: submitted toast also moves to bottom-left
       <div className="fixed left-20 bottom-4 z-[10001] rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
         ✓ Report submitted
       </div>
     );
   }
 
-  // §1 — Collapsed pill: bottom-LEFT (left-20 = 80px, clears nav rail).
-  // §2 — Single click → picker immediately (no intermediate tray).
+  // Collapsed pill — tab click opens intro modal.
   return (
     <button
       data-testid="feedback-tab"
-      onClick={startPicking}
+      onClick={() => setMode("intro")}
       className="fixed left-20 bottom-4 z-[9997] flex min-h-[44px] items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-[0.98]"
       title="Report an issue"
       aria-label="Open issue reporter"
