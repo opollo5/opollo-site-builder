@@ -18,10 +18,12 @@ type Props = {
 };
 
 // ---------------------------------------------------------------------------
-// CreateTaskPopup — capture popup that appears after element pick.
+// CreateTaskPopup — capture popup.
 //
-// §4 two fields: "What happened?" (description) + "What did you expect?" (expectedBehavior)
-// §5 naming: "Report an issue" / "Send report"
+// §3 v1.3: Title field removed — callers no longer send a title. The server
+//   auto-generates the title from the first line of "What happened?".
+// §4 naming: "Report an issue" / "Send report".
+// §1 position: opens from bottom-left (left-20 bottom-16) to match the pill.
 // ---------------------------------------------------------------------------
 
 export function CreateTaskPopup({
@@ -33,22 +35,22 @@ export function CreateTaskPopup({
   onClose,
   onSubmitted,
 }: Props) {
-  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [expectedBehavior, setExpectedBehavior] = useState("");
   const [severity, setSeverity] = useState<TicketSeverity>("normal");
   const [tags, setTagsRaw] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    titleRef.current?.focus();
+    // Focus the first field on open
+    descRef.current?.focus();
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!title.trim() || !description.trim() || !expectedBehavior.trim()) {
-      setError("Title, what happened, and expected behavior are all required.");
+    if (!description.trim() || !expectedBehavior.trim()) {
+      setError("Both fields are required.");
       return;
     }
     setError(null);
@@ -73,7 +75,7 @@ export function CreateTaskPopup({
 
       const payload = {
         companyId,
-        title: title.trim(),
+        // §3: no title field — server generates from description
         description: description.trim(),
         expectedBehavior: expectedBehavior.trim(),
         severity,
@@ -110,14 +112,15 @@ export function CreateTaskPopup({
     } finally {
       setSubmitting(false);
     }
-  }, [companyId, consoleErrors, description, expectedBehavior, pageUrl, pick, screenshotDataUrl, severity, tags, title, onSubmitted]);
+  }, [companyId, consoleErrors, description, expectedBehavior, pageUrl, pick, screenshotDataUrl, severity, tags, onSubmitted]);
 
   return (
     <div
       data-testid="feedback-create-popup"
-      className="fixed right-16 bottom-16 z-[10001] flex w-[680px] flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
+      // §1: anchored to bottom-left to match the repositioned pill
+      className="fixed left-20 bottom-16 z-[10001] flex w-[680px] flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
     >
-      {/* Header — §5: "Report an issue" */}
+      {/* Header — §4: "Report an issue" */}
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <h2 className="text-sm font-semibold text-gray-900">Report an issue</h2>
         <button
@@ -131,28 +134,22 @@ export function CreateTaskPopup({
 
       {/* Body */}
       <div className="flex gap-4 p-4">
-        {/* Left: two-field description + screenshot */}
+        {/* Left: two description fields + screenshot */}
         <div className="flex flex-1 flex-col gap-3">
-          <input
-            ref={titleRef}
-            type="text"
-            placeholder="Title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
-          />
+          {/* §3: no Title field. First field gets auto-focus. */}
 
-          {/* §4 field 1: what happened */}
+          {/* What happened */}
           <div className="relative">
             <label className="mb-1 block text-xs font-medium text-gray-600">
               What happened?<span className="ml-0.5 text-red-500">*</span>
             </label>
             <Textarea
+              ref={descRef}
               placeholder="Describe what you did and what went wrong…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={2000}
-              rows={3}
+              rows={4}
               className="resize-none text-sm"
             />
             <span className="absolute right-2 bottom-2 text-xs text-gray-400">
@@ -160,7 +157,7 @@ export function CreateTaskPopup({
             </span>
           </div>
 
-          {/* §4 field 2: expected behavior */}
+          {/* Expected behavior */}
           <div className="relative">
             <label className="mb-1 block text-xs font-medium text-gray-600">
               What did you expect to happen?<span className="ml-0.5 text-red-500">*</span>
@@ -178,7 +175,7 @@ export function CreateTaskPopup({
             </span>
           </div>
 
-          {/* Screenshot thumbnail with click pin */}
+          {/* Screenshot thumbnail */}
           {screenshotDataUrl && (
             <div className="relative overflow-hidden rounded-md border border-gray-200">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -190,10 +187,7 @@ export function CreateTaskPopup({
               />
               <div
                 className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500 shadow"
-                style={{
-                  left: `${pick.clickXPct}%`,
-                  top: `${pick.clickYPct}%`,
-                }}
+                style={{ left: `${pick.clickXPct}%`, top: `${pick.clickYPct}%` }}
               />
             </div>
           )}
@@ -233,7 +227,7 @@ export function CreateTaskPopup({
         </div>
       </div>
 
-      {/* Footer — §5: "Send report" */}
+      {/* Footer — §4: "Send report" */}
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
         {error && <p className="flex-1 text-xs text-red-500">{error}</p>}
         <div className="ml-auto flex gap-2">

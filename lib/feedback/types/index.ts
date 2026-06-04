@@ -39,6 +39,7 @@ export type CallerContext =
 // ---------------------------------------------------------------------------
 export type FeedbackTicket = {
   id: string;
+  ticket_number: number | null;
   company_id: string;
   title: string;
   description: string;
@@ -102,7 +103,7 @@ export type FeedbackTicketEvent = {
 // ---------------------------------------------------------------------------
 export type CreateTicketInput = {
   companyId: string;
-  title: string;
+  // title is auto-generated server-side from description; not sent by callers.
   description: string;
   severity: TicketSeverity;
   tags: string[];

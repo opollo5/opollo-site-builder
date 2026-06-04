@@ -95,6 +95,7 @@ describe("EventActorKind", () => {
 describe("FeedbackTicket field shapes", () => {
   const stub: FeedbackTicket = {
     id: "uuid-1",
+    ticket_number: null,
     company_id: "company-uuid",
     title: "Test bug",
     description: "Something broke",

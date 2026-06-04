@@ -35,7 +35,9 @@ export async function createTicket(
     .from("feedback_tickets")
     .insert({
       company_id: input.companyId,
-      title: input.title,
+      // §3 v1.3: title is auto-generated from the first line of description.
+      // Callers no longer send a title; the DB column stays for existing rows.
+      title: input.description.split("\n")[0].slice(0, 120).trim(),
       description: input.description,
       severity: input.severity,
       priority: "medium",
