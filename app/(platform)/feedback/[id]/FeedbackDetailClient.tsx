@@ -117,8 +117,8 @@ export function FeedbackDetailClient({ ticket: initial, comments, events, screen
 
       {/* Still broken — only for fixed/verified tickets */}
       {canReopen && (
-        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
-          <p className="mb-2 text-sm font-medium text-amber-800">
+        <div className="mb-6 rounded-xl border border-[--color-warning-border] bg-[--color-warning-bg] p-4">
+          <p className="mb-2 text-sm font-medium text-[--color-warning-fg]">
             This ticket is marked as fixed. Is it still broken for you?
           </p>
           <button
@@ -148,7 +148,7 @@ export function FeedbackDetailClient({ ticket: initial, comments, events, screen
           {events.map((e) => (
             <li key={e.id} className="mb-3 last:mb-0">
               <div className="text-xs font-medium text-gray-700">{eventLabel(e)}</div>
-              <div className="text-[10px] text-gray-400">{formatDate(e.created_at)}</div>
+              <div className="text-xs text-gray-400">{formatDate(e.created_at)}</div>
             </li>
           ))}
         </ol>
