@@ -4,6 +4,7 @@ import { getServiceRoleClient } from "@/lib/supabase";
 import { logger } from "@/lib/logger";
 
 import type { CreateTicketInput, FeedbackTicket } from "../types";
+import { notifyTicketCreated } from "./notify";
 
 type CreateResult =
   | { ok: true; ticket: FeedbackTicket }
@@ -86,6 +87,9 @@ export async function createTicket(
     severity: input.severity,
     created_by: createdByUserId,
   });
+
+  // Fire-and-forget notification (blocker emails are immediate per §8).
+  void notifyTicketCreated(ticket);
 
   return { ok: true, ticket };
 }
