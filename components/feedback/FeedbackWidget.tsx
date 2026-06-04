@@ -37,14 +37,18 @@ type Mode = "collapsed" | "intro" | "picking" | "creating" | "submitted";
 
 type Props = {
   companyId: string;
+  /** Server-resolved from platform_users.preferences.feedback_skip_intro.
+   *  When true, tab click bypasses the intro modal and goes straight to picker. */
+  skipIntro?: boolean;
 };
 
 const MAX_CONSOLE_ERRORS = 50;
 
 type ConsoleLine = { level: "error" | "warn"; msg: string; at: string };
 
-export function FeedbackWidget({ companyId }: Props) {
+export function FeedbackWidget({ companyId, skipIntro = false }: Props) {
   const [mode, setMode] = useState<Mode>("collapsed");
+  const [dontShowAgain, setDontShowAgain] = useState(false);
   const [pick, setPick] = useState<PickResult | null>(null);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
   const [pageUrl, setPageUrl] = useState("");
@@ -120,9 +124,21 @@ export function FeedbackWidget({ companyId }: Props) {
     setTimeout(() => setMode("collapsed"), 2000);
   }, []);
 
+  // Save the "don't show again" preference then start picking.
+  const handleStartPicking = useCallback(async () => {
+    if (dontShowAgain) {
+      // Fire-and-forget — don't block the user interaction.
+      void fetch("/api/feedback/preferences", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ skip_intro: true }),
+      }).catch(() => {});
+    }
+    startPicking();
+  }, [dontShowAgain, startPicking]);
+
   if (mode === "intro") {
     return (
-      // Dialog open state is controlled by mode — Esc handled by Radix.
       <Dialog
         open
         onOpenChange={(open) => {
@@ -131,9 +147,7 @@ export function FeedbackWidget({ companyId }: Props) {
       >
         <DialogContent
           data-testid="feedback-intro-modal"
-          // Override default z-50 to sit above all app chrome (DebugFooter z-50).
           className="z-[10200] max-w-md"
-          // Esc key is handled by Radix (calls onOpenChange(false) → collapsed).
         >
           <DialogHeader>
             <DialogTitle className="text-lg font-semibold">
@@ -145,9 +159,21 @@ export function FeedbackWidget({ companyId }: Props) {
             </DialogDescription>
           </DialogHeader>
 
+          {/* "Don't show again" checkbox */}
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-gray-500">
+            <input
+              type="checkbox"
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 accent-emerald-600"
+              data-testid="feedback-intro-skip-checkbox"
+            />
+            Don&apos;t show this again
+          </label>
+
           <DialogFooter className="mt-2 flex gap-2 sm:flex-row-reverse">
             <Button
-              onClick={startPicking}
+              onClick={handleStartPicking}
               className="min-h-[44px] bg-emerald-600 text-white hover:bg-emerald-700"
             >
               Start picking
@@ -196,11 +222,12 @@ export function FeedbackWidget({ companyId }: Props) {
     );
   }
 
-  // Collapsed pill — tab click opens intro modal.
+  // Collapsed pill — tab click opens intro modal UNLESS the user has set
+  // "don't show again", in which case we go straight to picker.
   return (
     <button
       data-testid="feedback-tab"
-      onClick={() => setMode("intro")}
+      onClick={() => skipIntro ? startPicking() : setMode("intro")}
       className="fixed left-20 bottom-4 z-[9997] flex min-h-[44px] items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-[0.98]"
       title="Report an issue"
       aria-label="Open issue reporter"
