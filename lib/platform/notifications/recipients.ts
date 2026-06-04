@@ -35,13 +35,25 @@ export async function resolveCompanyAdmins(
   return resolveUsersByIds(userIds);
 }
 
+// ---------------------------------------------------------------------------
+// resolveOpolloAdmins — returns ALL platform_users where is_opollo_staff=true.
+//
+// Throws when the result would be empty rather than returning []. The caller
+// (dispatch.ts) catches the throw and records it in the DispatchResult error
+// list, honouring dispatch's "never throws" contract while making the failure
+// visible to callers like notifyTicketCreated.
+//
+// Why throw, not return []:
+//   Returning [] silently drops blocker ticket notifications. An empty staff
+//   list means the platform is misconfigured (no one to alert), which is a
+//   loud, observable problem — not a graceful empty-set case.
+//
+// Why not env-var fallback:
+//   PLATFORM_ADMIN_ALERT_EMAILS is optional config; its absence silently
+//   reintroduces the empty-set problem. The DB is the authoritative source;
+//   if it is empty, the misconfiguration must surface as an error.
+// ---------------------------------------------------------------------------
 export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
-  // Two ways an Opollo admin can be reachable:
-  //   1. PLATFORM_ADMIN_ALERT_EMAILS env (configurable list, used until V2
-  //      has a UI for it per the platform-customer-management skill).
-  //   2. platform_users where is_opollo_staff = true (in-platform users).
-  // The env list is authoritative for email; the in-platform users get
-  // in-app notifications via their user_id.
   const svc = getServiceRoleClient();
 
   const staffResult = await svc
@@ -50,10 +62,12 @@ export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
     .eq("is_opollo_staff", true);
 
   if (staffResult.error) {
-    logger.error("notifications.recipients.opollo_staff_failed", {
+    logger.error("notifications.recipients.opollo_staff_db_error", {
       err: staffResult.error.message,
     });
-    return [];
+    throw new Error(
+      `resolveOpolloAdmins: DB query failed — ${staffResult.error.message}`,
+    );
   }
 
   const staff: ResolvedRecipient[] = (staffResult.data ?? []).map((u) => ({
@@ -62,19 +76,22 @@ export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
     fullName: (u.full_name as string | null) ?? null,
   }));
 
-  // Env-configured email-only recipients (no userId — they're not
-  // platform users, just inboxes that should always be alerted).
-  const envEmails = (process.env.PLATFORM_ADMIN_ALERT_EMAILS ?? "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter((e) => e.length > 0 && e.includes("@"));
+  // SEAM — future assigned-staff filter goes here (e.g. narrow to staff who
+  // manage this company). If narrowing to assigned staff ever yields empty,
+  // fall back to ALL staff — never throw.
+  if (staff.length === 0) {
+    logger.error("notifications.recipients.opollo_staff_empty", {
+      message:
+        "No is_opollo_staff=true rows in platform_users — " +
+        "blocker/admin notifications cannot fire. " +
+        "Add at least one Opollo staff user to platform_users.",
+    });
+    throw new Error(
+      "resolveOpolloAdmins: no Opollo staff in platform_users (misconfiguration)",
+    );
+  }
 
-  const seen = new Set(staff.map((r) => r.email.toLowerCase()));
-  const envRecipients: ResolvedRecipient[] = envEmails
-    .filter((email) => !seen.has(email))
-    .map((email) => ({ userId: null, email, fullName: null }));
-
-  return [...staff, ...envRecipients];
+  return staff;
 }
 
 export async function resolveUserById(

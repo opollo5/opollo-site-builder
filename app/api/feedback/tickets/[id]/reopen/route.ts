@@ -52,11 +52,12 @@ export async function POST(
   }
 
   // Membership check: the caller must be a member of the ticket's company.
+  // Return 404 (not 403) so cross-company callers cannot infer the ticket exists.
   const { data: memberCheck } = await supabase.rpc("is_company_member", {
     company: ticket.company_id,
   });
   if (!memberCheck) {
-    return NextResponse.json({ ok: false, error: { code: "FORBIDDEN" } }, { status: 403 });
+    return NextResponse.json({ ok: false, error: { code: "NOT_FOUND" } }, { status: 404 });
   }
 
   // Status must be fixed or verified.
