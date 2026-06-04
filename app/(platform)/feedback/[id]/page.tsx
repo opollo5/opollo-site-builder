@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentPlatformSession } from "@/lib/platform/auth";
 import { isCompanyMember } from "@/lib/platform/auth";
 import { createRouteAuthClient } from "@/lib/auth";
-import { getTicket, listComments, listEvents } from "@/lib/feedback/tickets/queries";
+import { getTicket, listComments, listEvents, resolveActorNames } from "@/lib/feedback/tickets/queries";
 import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
 import { FeedbackDetailClient } from "./FeedbackDetailClient";
 
@@ -41,6 +41,14 @@ export default async function FeedbackDetailPage({
   const isStaff = session.isOpolloStaff;
   if (!isMember && !isStaff) notFound();
 
+  // Resolve actor display names for the event timeline and comment thread.
+  // Collect all user IDs: event actors + staff comment authors.
+  const actorIds = [
+    ...events.map((e) => e.actor_id),
+    ...comments.filter((c) => c.is_staff).map((c) => c.author_id),
+  ];
+  const actorNames = await resolveActorNames(actorIds);
+
   const screenshotUrl = ticket.screenshot_path
     ? await resolveSignedUrl(ticket.screenshot_path)
     : null;
@@ -51,6 +59,7 @@ export default async function FeedbackDetailPage({
       comments={comments}
       events={events}
       screenshotUrl={screenshotUrl}
+      actorNames={Object.fromEntries(actorNames)}
     />
   );
 }
