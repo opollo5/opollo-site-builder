@@ -1,5 +1,4 @@
-import "server-only";
-
+// No "server-only" import — this module is also used as a CLI script via tsx.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
