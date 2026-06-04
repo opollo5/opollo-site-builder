@@ -24,7 +24,8 @@ export const dynamic = "force-dynamic";
 
 const CreateSchema = z.object({
   companyId: dbUuid(),
-  title: z.string().min(1).max(200),
+  // title is no longer sent by callers (v1.3) — auto-generated from description.
+  title: z.string().max(200).optional(),
   description: z.string().min(1).max(2000),
   severity: z.enum(["low", "normal", "high", "blocker"]).default("normal"),
   tags: z.array(z.string()).default([]),

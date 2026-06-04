@@ -106,7 +106,9 @@ export async function pullBugs(): Promise<{ written: number; errors: number }> {
   );
 
   for (const ticket of sorted) {
-    const slug = slugify(ticket.title as string, ticket.id as string);
+    // §3 v1.3: use description first-line as slug base; ticket_number in frontmatter.
+    const descFirstLine = (ticket.description as string).split("\n")[0].slice(0, 60);
+    const slug = slugify(descFirstLine, ticket.id as string);
     const filePath = path.join(BUGS_DIR, `${slug}.md`);
     const isFirst = !(ticket.repo_ref as string | null);
 
@@ -127,8 +129,10 @@ export async function pullBugs(): Promise<{ written: number; errors: number }> {
       }>
     ) ?? [];
 
+    const ticketNum = (ticket.ticket_number as number | null) ?? null;
     const content = `---
 ticket_id: ${ticket.id}
+ticket_number: ${ticketNum !== null ? `#${ticketNum}` : "null"}
 slug: ${slug}
 status: ${ticket.status}
 severity: ${ticket.severity}

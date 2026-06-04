@@ -109,7 +109,7 @@ export default async function AdminTicketDetailPage({
           crumbs={[
             { label: "Admin", href: "/admin" },
             { label: "Feedback", href: "/admin/feedback" },
-            { label: `#${id.slice(0, 8)}` },
+            { label: ticket.ticket_number ? `#${ticket.ticket_number}` : `#${id.slice(0, 8)}` },
           ]}
         />
       </div>
@@ -118,10 +118,16 @@ export default async function AdminTicketDetailPage({
       <div className="mb-4">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <h1 className="text-xl font-semibold text-gray-900">{ticket.title}</h1>
-            {/* §6: show short id + date only; company_id was the zero-UUID sentinel */}
+            {/* §3: primary identifier is the ticket number */}
+            <h1 className="text-xl font-semibold text-gray-900">
+              {ticket.ticket_number ? `#${ticket.ticket_number}` : `#${id.slice(0, 8)}`}
+              {" "}
+              <span className="font-normal text-gray-600">
+                {ticket.description.split("\n")[0].slice(0, 80)}
+              </span>
+            </h1>
             <p className="mt-1 text-sm text-gray-500">
-              #{id.slice(0, 8)} · {formatDate(ticket.created_at)}
+              {formatDate(ticket.created_at)}
             </p>
           </div>
           <div className="flex flex-shrink-0 items-center gap-2">

@@ -155,11 +155,17 @@ export default async function AdminFeedbackPage() {
                       href={`/admin/feedback/${t.id}`}
                       className="block font-medium text-gray-900 group-hover:text-emerald-700"
                     >
-                      {t.title}
+                      {/* §3: show #n + first line of description as the label */}
+                      {(t as Record<string, unknown>).ticket_number
+                        ? `#${(t as Record<string, unknown>).ticket_number}`
+                        : `#${t.id.slice(0, 8)}`}
+                      {" "}
+                      <span className="font-normal text-gray-600">
+                        {t.description.split("\n")[0].slice(0, 60)}
+                      </span>
                     </Link>
-                    {/* §6 fix: show short id + date, NOT raw company_id UUID */}
                     <p className="text-xs text-gray-400">
-                      #{t.id.slice(0, 8)} · {new Date(t.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
+                      {new Date(t.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
                     </p>
                   </td>
 

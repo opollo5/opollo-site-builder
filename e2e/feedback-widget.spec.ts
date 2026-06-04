@@ -29,30 +29,29 @@ test.describe("feedback widget — data-testid smoke (§12 verification)", () =>
   );
 
   // -------------------------------------------------------------------------
-  // feedback-tab and feedback-rail
+  // feedback-tab (v1.3: single click → picker; rail removed)
   // -------------------------------------------------------------------------
 
   test("feedback-tab is visible on an authenticated company route", async ({ page }) => {
-    // Navigate to a company route (the widget is mounted in the platform layout).
-    // The test environment must have FEATURE_FEEDBACK_WIDGET=1 and a valid session.
     await page.goto("/company/social/calendar");
     await expect(page.getByTestId("feedback-tab")).toBeVisible({ timeout: 10000 });
   });
 
-  test("feedback-rail opens when the tab is clicked", async ({ page }) => {
+  test("feedback-tab click goes directly to picker (no intermediate rail)", async ({ page }) => {
+    // §2 v1.3: single tab click enters picker mode immediately.
+    // The intermediate rail/tray has been removed.
     await page.goto("/company/social/calendar");
     await page.getByTestId("feedback-tab").click();
-    await expect(page.getByTestId("feedback-rail")).toBeVisible();
+    await expect(page.getByTestId("feedback-picker")).toBeVisible({ timeout: 5000 });
   });
 
   // -------------------------------------------------------------------------
   // feedback-picker (element picker mode)
   // -------------------------------------------------------------------------
 
-  test("feedback-picker is shown after clicking + in the rail", async ({ page }) => {
+  test("feedback-picker is shown after clicking the tab", async ({ page }) => {
     await page.goto("/company/social/calendar");
     await page.getByTestId("feedback-tab").click();
-    await page.getByRole("button", { name: "Pick an element to report a bug" }).click();
     await expect(page.getByTestId("feedback-picker")).toBeVisible();
   });
 
@@ -63,8 +62,7 @@ test.describe("feedback widget — data-testid smoke (§12 verification)", () =>
   test("feedback-create-popup appears after picking an element", async ({ page }) => {
     await page.goto("/company/social/calendar");
     await page.getByTestId("feedback-tab").click();
-    await page.getByRole("button", { name: "Pick an element to report a bug" }).click();
-    await expect(page.getByTestId("feedback-picker")).toBeVisible();
+    await expect(page.getByTestId("feedback-picker")).toBeVisible({ timeout: 5000 });
 
     // Click anywhere on the page body to pick the element.
     await page.click("body", { position: { x: 200, y: 200 } });
