@@ -76,6 +76,29 @@ export async function listComments(ticketId: string): Promise<FeedbackTicketComm
   return (data ?? []) as FeedbackTicketComment[];
 }
 
+// The Opollo-internal company sentinel UUID (migration 0070).
+// Tickets from this company are filed by Opollo staff; no company label needed.
+const OPOLLO_INTERNAL_COMPANY_ID = "00000000-0000-0000-0000-000000000001";
+
+// Resolve company_ids to display names for the admin board.
+// Returns an empty string for the Opollo-internal sentinel (label not needed).
+export async function resolveCompanyNames(
+  companyIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(companyIds.filter((id) => id !== OPOLLO_INTERNAL_COMPANY_ID))];
+  if (unique.length === 0) return new Map();
+  const svc = getServiceRoleClient();
+  const { data } = await svc
+    .from("platform_companies")
+    .select("id, name")
+    .in("id", unique);
+  const map = new Map<string, string>();
+  for (const row of data ?? []) {
+    map.set(row.id as string, row.name as string);
+  }
+  return map;
+}
+
 // All Opollo staff — used to populate the assignee picker on ticket detail.
 export async function listOpolloStaff(): Promise<
   Array<{ id: string; fullName: string | null; email: string }>

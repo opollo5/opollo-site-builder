@@ -4,7 +4,7 @@ import Link from "next/link";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { isOpolloStaff } from "@/lib/platform/auth";
 import { createRouteAuthClient } from "@/lib/auth";
-import { listTickets } from "@/lib/feedback/tickets/queries";
+import { listTickets, resolveCompanyNames } from "@/lib/feedback/tickets/queries";
 import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
 import type { TicketPriority, TicketSeverity, TicketStatus } from "@/lib/feedback/types";
 
@@ -75,14 +75,17 @@ export default async function AdminFeedbackPage() {
       (PRIORITY_ORDER[a.priority as TicketPriority] ?? 0),
   );
 
-  // §6 — Resolve screenshot signed URLs for thumbnails (server-side, parallel).
-  const screenshotUrls = await Promise.all(
-    sorted.map((t) =>
-      t.screenshot_path
-        ? resolveSignedUrl(t.screenshot_path).catch(() => null)
-        : Promise.resolve(null),
+  // Resolve company names and screenshot URLs in parallel.
+  const [screenshotUrls, companyNamesMap] = await Promise.all([
+    Promise.all(
+      sorted.map((t) =>
+        t.screenshot_path
+          ? resolveSignedUrl(t.screenshot_path).catch(() => null)
+          : Promise.resolve(null),
+      ),
     ),
-  );
+    resolveCompanyNames(sorted.map((t) => t.company_id)),
+  ]);
 
   return (
     <div data-testid="admin-feedback-board" className="p-6">
@@ -155,7 +158,6 @@ export default async function AdminFeedbackPage() {
                       href={`/admin/feedback/${t.id}`}
                       className="block font-medium text-gray-900 group-hover:text-emerald-700"
                     >
-                      {/* §3: show #n + first line of description as the label */}
                       {(t as Record<string, unknown>).ticket_number
                         ? `#${(t as Record<string, unknown>).ticket_number}`
                         : `#${t.id.slice(0, 8)}`}
@@ -165,6 +167,11 @@ export default async function AdminFeedbackPage() {
                       </span>
                     </Link>
                     <p className="text-xs text-gray-400">
+                      {/* Show company name for external companies; nothing for Opollo-internal. */}
+                      {companyNamesMap.get(t.company_id)
+                        ? <span className="font-medium text-gray-500">{companyNamesMap.get(t.company_id)}</span>
+                        : null}
+                      {companyNamesMap.get(t.company_id) ? " · " : ""}
                       {new Date(t.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
                     </p>
                   </td>
