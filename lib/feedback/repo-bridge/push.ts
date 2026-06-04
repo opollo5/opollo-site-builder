@@ -1,9 +1,22 @@
-// No "server-only" import — this module is also used as a CLI script via tsx.
+// No "server-only" import — this module is used as a CLI script via tsx.
+// Uses createClient directly (not lib/supabase.ts) to avoid the server-only barrier.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { getServiceRoleClient } from "@/lib/supabase";
-import { logger } from "@/lib/logger";
+import { createClient } from "@supabase/supabase-js";
+
+function getSvc() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+const logger = {
+  info:  (msg: string, fields?: object) => console.log(JSON.stringify({ level: "info",  msg, ...fields })),
+  warn:  (msg: string, fields?: object) => console.warn(JSON.stringify({ level: "warn",  msg, ...fields })),
+  error: (msg: string, fields?: object) => console.error(JSON.stringify({ level: "error", msg, ...fields })),
+};
 
 // ---------------------------------------------------------------------------
 // bugs:push — docs/bugs/<slug>.md status/PR → Supabase (impl status only).
@@ -46,7 +59,7 @@ export async function pushBugs(): Promise<{
   rejected: number;
   errors: number;
 }> {
-  const svc = getServiceRoleClient();
+  const svc = getSvc();
   let updated = 0;
   let skipped = 0;
   let rejected = 0;

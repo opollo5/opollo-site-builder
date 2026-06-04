@@ -8,9 +8,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 // Mocks
 // ---------------------------------------------------------------------------
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/logger", () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+// push.ts now uses createClient from @supabase/supabase-js directly (not lib/supabase.ts).
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(),
 }));
+// Keep lib/supabase mock for any transitive imports that still use it.
 vi.mock("@/lib/supabase", () => ({
   getServiceRoleClient: vi.fn(),
 }));
@@ -55,9 +57,14 @@ describe("bugs:push — terminal state rejection guard (§1 governance)", () => 
 
   TERMINAL.forEach((status) => {
     it(`rejects status=${status} and does not call Supabase update`, async () => {
-      const { getServiceRoleClient } = await import("@/lib/supabase");
+      // push.ts now uses createClient() from @supabase/supabase-js directly.
+      // Set dummy env vars so getSvc() doesn't throw, then mock createClient.
+      process.env.SUPABASE_URL = "https://test.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
+
+      const { createClient } = await import("@supabase/supabase-js");
       const updateFn = vi.fn(() => ({ eq: vi.fn(() => ({ error: null })) }));
-      vi.mocked(getServiceRoleClient).mockReturnValue({
+      vi.mocked(createClient).mockReturnValue({
         from: () => ({ update: updateFn }),
       } as never);
 
@@ -85,15 +92,20 @@ describe("bugs:push — terminal state rejection guard (§1 governance)", () => 
       expect(updateFn).not.toHaveBeenCalled();
 
       vi.doUnmock("node:fs");
+      delete process.env.SUPABASE_URL;
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     });
   });
 
   ALLOWED.forEach((status) => {
     it(`allows status=${status} and calls Supabase update`, async () => {
-      const { getServiceRoleClient } = await import("@/lib/supabase");
+      process.env.SUPABASE_URL = "https://test.supabase.co";
+      process.env.SUPABASE_SERVICE_ROLE_KEY = "test-key";
+
+      const { createClient } = await import("@supabase/supabase-js");
       const eqFn = vi.fn(() => ({ error: null }));
       const updateFn = vi.fn(() => ({ eq: eqFn }));
-      vi.mocked(getServiceRoleClient).mockReturnValue({
+      vi.mocked(createClient).mockReturnValue({
         from: () => ({ update: updateFn }),
       } as never);
 
@@ -121,6 +133,8 @@ describe("bugs:push — terminal state rejection guard (§1 governance)", () => 
       );
 
       vi.doUnmock("node:fs");
+      delete process.env.SUPABASE_URL;
+      delete process.env.SUPABASE_SERVICE_ROLE_KEY;
     });
   });
 });

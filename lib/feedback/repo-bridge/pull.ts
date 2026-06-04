@@ -1,10 +1,29 @@
-// No "server-only" import — this module is also used as a CLI script via tsx.
+// No "server-only" import — this module is used as a CLI script via tsx.
+// Uses createClient directly (not lib/supabase.ts) to avoid the server-only barrier.
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import { getServiceRoleClient } from "@/lib/supabase";
-import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
-import { logger } from "@/lib/logger";
+import { createClient } from "@supabase/supabase-js";
+
+function getSvc() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) throw new Error("SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY required");
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+async function resolveSignedUrl(objectPath: string): Promise<string | null> {
+  const svc = getSvc();
+  const { data, error } = await svc.storage
+    .from("feedback-screenshots")
+    .createSignedUrl(objectPath, 3600);
+  return error ? null : (data?.signedUrl ?? null);
+}
+
+const logger = {
+  info: (msg: string, fields?: object) => console.log(JSON.stringify({ level: "info", msg, ...fields })),
+  error: (msg: string, fields?: object) => console.error(JSON.stringify({ level: "error", msg, ...fields })),
+};
 
 // ---------------------------------------------------------------------------
 // bugs:pull — Supabase → docs/bugs/<slug>.md
@@ -50,7 +69,7 @@ function formatComments(
 }
 
 export async function pullBugs(): Promise<{ written: number; errors: number }> {
-  const svc = getServiceRoleClient();
+  const svc = getSvc();
   let written = 0;
   let errors = 0;
 
