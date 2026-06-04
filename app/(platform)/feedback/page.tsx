@@ -68,7 +68,7 @@ export default async function FeedbackPage() {
           <Link
             key={t.id}
             href={`/feedback/${t.id}`}
-            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-emerald-50/30"
+            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-3 transition-colors hover:bg-gray-50"
           >
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-gray-900">{t.title}</p>

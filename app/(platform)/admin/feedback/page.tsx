@@ -98,7 +98,7 @@ export default async function AdminFeedbackPage() {
             {sorted.map((t) => (
               <tr
                 key={t.id}
-                className="group cursor-pointer transition-colors hover:bg-emerald-50/30"
+                className="group cursor-pointer transition-colors hover:bg-gray-50"
               >
                 <td className="max-w-xs px-4 py-3">
                   <Link

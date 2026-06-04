@@ -161,14 +161,14 @@ export function FeedbackWidget({ companyId }: Props) {
         className="fixed right-0 bottom-12 z-[9997] flex flex-col items-center rounded-l-xl border border-r-0 border-gray-200 bg-white shadow-xl"
       >
         {/* Brand mark */}
-        <div className="px-3 py-2 text-[10px] font-semibold tracking-widest text-gray-400">
+        <div className="px-3 py-2 text-xs font-semibold tracking-widest text-gray-400">
           BUGS
         </div>
 
         {/* + button */}
         <button
           onClick={startPicking}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-gray-600 hover:bg-emerald-50 hover:text-emerald-700"
+          className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-gray-600 hover:bg-[--color-success-bg] hover:text-[--color-success-fg]"
           title="Pick an element to report a bug"
         >
           +
@@ -176,7 +176,7 @@ export function FeedbackWidget({ companyId }: Props) {
 
         {/* Open count badge */}
         {openCount !== null && openCount > 0 && (
-          <div className="mb-1 h-5 w-5 rounded-full bg-emerald-600 text-center text-[10px] leading-5 text-white">
+          <div className="mb-1 h-5 w-5 rounded-full bg-emerald-600 text-center text-xs leading-5 text-white">
             {openCount > 99 ? "99+" : openCount}
           </div>
         )}
@@ -199,7 +199,7 @@ export function FeedbackWidget({ companyId }: Props) {
     <button
       data-testid="feedback-tab"
       onClick={() => setMode("rail")}
-      className="fixed right-0 bottom-12 z-[9997] flex h-10 w-8 items-center justify-center rounded-l-md border border-r-0 border-gray-200 bg-white shadow-md hover:bg-emerald-50"
+      className="fixed right-0 bottom-12 z-[9997] flex h-10 w-8 items-center justify-center rounded-l-md border border-r-0 border-gray-200 bg-white shadow-md hover:bg-[--color-success-bg]"
       title="Report a bug"
       aria-label="Open bug reporter"
     >

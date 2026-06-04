@@ -116,7 +116,7 @@ export default async function AdminTicketDetailPage({
               {ticket.console_errors != null && (
                 <div className="py-2">
                   <span className="font-medium">Console errors:</span>
-                  <pre className="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-[10px]">
+                  <pre className="mt-1 overflow-x-auto rounded bg-gray-100 p-2 text-xs">
                     {JSON.stringify(ticket.console_errors, null, 2)}
                   </pre>
                 </div>
@@ -139,7 +139,7 @@ export default async function AdminTicketDetailPage({
               {events.map((e) => (
                 <li key={e.id} className="mb-3 last:mb-0">
                   <div className="text-xs font-medium text-gray-800">{eventLabel(e)}</div>
-                  <div className="text-[10px] text-gray-400">
+                  <div className="text-xs text-gray-400">
                     {e.actor_kind} · {formatDate(e.created_at)}
                   </div>
                 </li>
