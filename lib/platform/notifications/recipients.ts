@@ -72,6 +72,10 @@ export async function resolveOpolloAdmins(): Promise<ResolvedRecipient[]> {
     fullName: (u.full_name as string | null) ?? null,
   }));
 
+  // KNOWN LIMITATION (v1.1 carry-forward): if staff.length === 0 the notification
+  // is silently dropped (logged only). A throw was tried but broke connection_lost
+  // via Promise.all — see PR #1292. A proper on-call pager integration is the
+  // right fix; leaving as-is while staff always exist in the live environment.
   if (staff.length === 0) {
     logger.error("notifications.recipients.opollo_staff_empty", {
       message:

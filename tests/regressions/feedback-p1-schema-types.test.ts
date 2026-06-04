@@ -127,6 +127,7 @@ describe("FeedbackTicket field shapes", () => {
     created_at: "2026-06-03T00:00:00Z",
     updated_at: "2026-06-03T00:00:00Z",
     deleted_at: null,
+    resolution_notes: null,
   };
 
   it("click_x_pct is a number between 0 and 100", () => {

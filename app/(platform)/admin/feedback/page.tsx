@@ -70,9 +70,23 @@ export default async function AdminFeedbackPage() {
     <div data-testid="admin-feedback-board" className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-gray-900">Bug Tracker</h1>
+          {/* §9 naming: "Bug Tracker" → "Feedback" */}
+          <h1 className="text-xl font-semibold text-gray-900">Feedback</h1>
           <p className="text-sm text-gray-500">{tickets.length} open tickets</p>
         </div>
+      </div>
+
+      {/* §8 — How fixes happen (pull-based explainer) */}
+      <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500">
+        <p className="font-medium text-gray-600">How fixes happen</p>
+        <p className="mt-1 leading-relaxed">
+          Open tickets are pulled into the repo with{" "}
+          <code className="rounded bg-gray-200 px-1">npm run bugs:pull</code>, which writes
+          each to <code className="rounded bg-gray-200 px-1">docs/bugs/</code>. In a Claude
+          Code session, point it at that folder and ask it to work the queue — it investigates,
+          prepares a fix, opens a pull request, and marks the ticket &ldquo;fixed.&rdquo;{" "}
+          A human reviews and merges the PR; verifying and closing the ticket stay with you.
+        </p>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">

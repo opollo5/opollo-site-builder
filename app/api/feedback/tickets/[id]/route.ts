@@ -12,8 +12,11 @@ import { logger } from "@/lib/logger";
 import type { TicketPriority, TicketSeverity, TicketStatus } from "@/lib/feedback/types";
 
 // ---------------------------------------------------------------------------
-// GET  /api/feedback/tickets/[id]  — get one ticket + comments + events
-// PATCH /api/feedback/tickets/[id] — update status/assignee/severity/priority (staff only)
+// GET    /api/feedback/tickets/[id]  — get one ticket + comments + events
+// PATCH  /api/feedback/tickets/[id]  — update (staff only)
+// DELETE /api/feedback/tickets/[id]  — soft delete (staff only): sets
+//   deleted_at + deleted_by and writes a feedback_ticket_events row.
+//   NEVER hard-deletes — the audit trail is the point.
 // ---------------------------------------------------------------------------
 
 export const runtime = "nodejs";
@@ -25,6 +28,8 @@ const PatchSchema = z.object({
   severity: z.enum(["low", "normal", "high", "blocker"]).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   tags: z.array(z.string()).optional(),
+  // §7: bugs:push can write the resolution summary; still staff-only here.
+  resolutionNotes: z.string().max(5000).nullable().optional(),
 }).strict();
 
 export async function GET(
@@ -161,9 +166,71 @@ export async function PATCH(
     }
   }
 
+  // §7 resolution_notes — staff may write the CC fix summary.
+  if (parsed.data.resolutionNotes !== undefined) {
+    const svc2 = getServiceRoleClient();
+    await svc2
+      .from("feedback_tickets")
+      .update({ resolution_notes: parsed.data.resolutionNotes, updated_by: userId })
+      .eq("id", id);
+  }
+
   const ticket = await getTicket(id);
   return NextResponse.json(
     { ok: true, data: { ticket }, timestamp: new Date().toISOString() },
     { status: 200 },
   );
+}
+
+// ---------------------------------------------------------------------------
+// §5 — Soft delete (human-staff only)
+// ---------------------------------------------------------------------------
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const { id } = await params;
+  const supabase = createRouteAuthClient();
+  const { data: userResp, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userResp?.user) {
+    return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
+  }
+  const userId = userResp.user.id;
+
+  const staff = await isOpolloStaff(supabase);
+  if (!staff) {
+    return NextResponse.json({ ok: false, error: { code: "FORBIDDEN" } }, { status: 403 });
+  }
+
+  const svc = getServiceRoleClient();
+
+  // Verify ticket exists and is not already deleted.
+  const ticket = await getTicket(id);
+  if (!ticket || ticket.deleted_at) {
+    return notFound("Ticket not found.");
+  }
+
+  const now = new Date().toISOString();
+  const { error: delErr } = await svc
+    .from("feedback_tickets")
+    .update({ deleted_at: now, deleted_by: userId, updated_by: userId })
+    .eq("id", id);
+
+  if (delErr) {
+    logger.error("feedback.delete.failed", { ticket_id: id, err: delErr.message });
+    return internalError(delErr.message);
+  }
+
+  // Append audit event.
+  await svc.from("feedback_ticket_events").insert({
+    ticket_id: id,
+    event_type: "closed",
+    from_value: ticket.status,
+    to_value: "deleted",
+    actor_id: userId,
+    actor_kind: "human-staff",
+  });
+
+  logger.info("feedback.delete.ok", { ticket_id: id, actor: userId });
+  return NextResponse.json({ ok: true, timestamp: now }, { status: 200 });
 }
