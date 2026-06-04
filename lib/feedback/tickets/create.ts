@@ -54,6 +54,7 @@ export async function createTicket(
       user_agent: input.userAgent ?? null,
       console_errors: input.consoleErrors ?? null,
       screenshot_path: input.screenshotObjectPath ?? null,
+      expected_behavior: input.expectedBehavior ?? null,
       created_by: createdByUserId,
       updated_by: createdByUserId,
     })

@@ -20,9 +20,8 @@ type Props = {
 // ---------------------------------------------------------------------------
 // CreateTaskPopup — capture popup that appears after element pick.
 //
-// Left: description textarea + screenshot thumbnail with click-pin.
-// Right: Severity selector, tags.
-// Submit → POST /api/feedback/tickets (screenshot already uploaded by parent).
+// §4 two fields: "What happened?" (description) + "What did you expect?" (expectedBehavior)
+// §5 naming: "Report an issue" / "Send report"
 // ---------------------------------------------------------------------------
 
 export function CreateTaskPopup({
@@ -36,6 +35,7 @@ export function CreateTaskPopup({
 }: Props) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [expectedBehavior, setExpectedBehavior] = useState("");
   const [severity, setSeverity] = useState<TicketSeverity>("normal");
   const [tags, setTagsRaw] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -47,15 +47,14 @@ export function CreateTaskPopup({
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!title.trim() || !description.trim()) {
-      setError("Title and description are required.");
+    if (!title.trim() || !description.trim() || !expectedBehavior.trim()) {
+      setError("Title, what happened, and expected behavior are all required.");
       return;
     }
     setError(null);
     setSubmitting(true);
 
     try {
-      // Upload screenshot if we have one.
       let screenshotObjectPath: string | null = null;
       if (screenshotDataUrl) {
         const urlResp = await fetch("/api/feedback/tickets/screenshot-url", {
@@ -65,7 +64,6 @@ export function CreateTaskPopup({
         });
         if (urlResp.ok) {
           const { data } = await urlResp.json();
-          // Convert data URL to blob.
           const res = await fetch(screenshotDataUrl);
           const blob = await res.blob();
           await fetch(data.uploadUrl, { method: "PUT", body: blob });
@@ -77,6 +75,7 @@ export function CreateTaskPopup({
         companyId,
         title: title.trim(),
         description: description.trim(),
+        expectedBehavior: expectedBehavior.trim(),
         severity,
         tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
         pageUrl,
@@ -100,30 +99,30 @@ export function CreateTaskPopup({
 
       if (!resp.ok) {
         const body = await resp.json().catch(() => ({}));
-        setError(body?.error?.message ?? "Failed to submit ticket.");
+        setError(body?.error?.message ?? "Failed to submit report.");
         return;
       }
 
       const { data } = await resp.json();
       onSubmitted(data.id);
-    } catch (err) {
+    } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
       setSubmitting(false);
     }
-  }, [companyId, consoleErrors, description, pageUrl, pick, screenshotDataUrl, severity, tags, title, onSubmitted]);
+  }, [companyId, consoleErrors, description, expectedBehavior, pageUrl, pick, screenshotDataUrl, severity, tags, title, onSubmitted]);
 
   return (
     <div
       data-testid="feedback-create-popup"
-      className="fixed right-16 bottom-16 z-[10001] flex w-[640px] flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
+      className="fixed right-16 bottom-16 z-[10001] flex w-[680px] flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
     >
-      {/* Header */}
+      {/* Header — §5: "Report an issue" */}
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <h2 className="text-sm font-semibold text-gray-900">Send feedback</h2>
+        <h2 className="text-sm font-semibold text-gray-900">Report an issue</h2>
         <button
           onClick={onClose}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="flex h-8 w-8 items-center justify-center rounded text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           aria-label="Close"
         >
           ✕
@@ -132,7 +131,7 @@ export function CreateTaskPopup({
 
       {/* Body */}
       <div className="flex gap-4 p-4">
-        {/* Left: description + screenshot */}
+        {/* Left: two-field description + screenshot */}
         <div className="flex flex-1 flex-col gap-3">
           <input
             ref={titleRef}
@@ -143,17 +142,39 @@ export function CreateTaskPopup({
             className="rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
           />
 
+          {/* §4 field 1: what happened */}
           <div className="relative">
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              What happened?<span className="ml-0.5 text-red-500">*</span>
+            </label>
             <Textarea
-              placeholder="Describe what you expected vs. what happened…"
+              placeholder="Describe what you did and what went wrong…"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               maxLength={2000}
-              rows={5}
+              rows={3}
               className="resize-none text-sm"
             />
             <span className="absolute right-2 bottom-2 text-xs text-gray-400">
               {description.length}/2000
+            </span>
+          </div>
+
+          {/* §4 field 2: expected behavior */}
+          <div className="relative">
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              What did you expect to happen?<span className="ml-0.5 text-red-500">*</span>
+            </label>
+            <Textarea
+              placeholder="Describe what you expected instead…"
+              value={expectedBehavior}
+              onChange={(e) => setExpectedBehavior(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              className="resize-none text-sm"
+            />
+            <span className="absolute right-2 bottom-2 text-xs text-gray-400">
+              {expectedBehavior.length}/2000
             </span>
           </div>
 
@@ -164,10 +185,9 @@ export function CreateTaskPopup({
               <img
                 src={screenshotDataUrl}
                 alt="Screenshot"
-                className="w-full object-contain"
-                style={{ maxHeight: 200 }}
+                className="w-full"
+                style={{ maxHeight: 180 }}
               />
-              {/* Click-position pin */}
               <div
                 className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-emerald-500 shadow"
                 style={{
@@ -180,13 +200,13 @@ export function CreateTaskPopup({
         </div>
 
         {/* Right: metadata */}
-        <div className="flex w-48 flex-col gap-3">
+        <div className="flex w-44 flex-col gap-3">
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Severity</label>
             <select
               value={severity}
               onChange={(e) => setSeverity(e.target.value as TicketSeverity)}
-              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <option value="low">Low</option>
               <option value="normal">Normal</option>
@@ -196,13 +216,13 @@ export function CreateTaskPopup({
           </div>
 
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Tags (comma-separated)</label>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Tags</label>
             <input
               type="text"
               value={tags}
               onChange={(e) => setTagsRaw(e.target.value)}
-              placeholder="ui, navigation…"
-              className="w-full rounded-md border border-gray-200 px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-emerald-500"
+              placeholder="ui, login…"
+              className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-emerald-500"
             />
           </div>
 
@@ -213,9 +233,9 @@ export function CreateTaskPopup({
         </div>
       </div>
 
-      {/* Footer */}
+      {/* Footer — §5: "Send report" */}
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="flex-1 text-xs text-red-500">{error}</p>}
         <div className="ml-auto flex gap-2">
           <Button variant="ghost" size="sm" onClick={onClose}>
             Cancel
@@ -227,7 +247,7 @@ export function CreateTaskPopup({
             disabled={submitting}
             className="bg-emerald-600 text-white hover:bg-emerald-700"
           >
-            {submitting ? "Submitting…" : "Submit bug report"}
+            {submitting ? "Sending…" : "Send report"}
           </Button>
         </div>
       </div>

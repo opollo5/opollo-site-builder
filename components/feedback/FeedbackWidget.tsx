@@ -13,19 +13,16 @@ type Props = {
 };
 
 // ---------------------------------------------------------------------------
-// FeedbackWidget — tab → rail → picker → create popup flow.
+// FeedbackWidget — pill → rail → picker → create popup flow.
 //
-// Mounted ONCE in the authenticated app shell. Not rendered:
-//   - before auth resolves
-//   - for logged-out users
-//   - on public/magic-link routes
+// §1 Collapsed tab: horizontal pill (emerald filled, floating bottom-right,
+//    "Report an issue" label + icon, depth shadow, ≥44px touch target).
+// §2 Rail: real Button primitive, "Report an issue" label, ≥44px.
+// §3 No count badge (removed entirely — admin info only).
+// §5 Naming: "Report an issue" everywhere customer-facing.
 //
-// The component installs a console ring buffer at mount time to capture
-// the last N console.error / console.warn / window.onerror events.
-//
-// data-testid surface:
-//   feedback-tab, feedback-rail, feedback-picker (on ElementPicker),
-//   feedback-create-popup, feedback-submit (on CreateTaskPopup)
+// data-testid: feedback-tab, feedback-rail, feedback-picker,
+//              feedback-create-popup, feedback-submit
 // ---------------------------------------------------------------------------
 
 const MAX_CONSOLE_ERRORS = 50;
@@ -34,7 +31,6 @@ type ConsoleLine = { level: "error" | "warn"; msg: string; at: string };
 
 export function FeedbackWidget({ companyId }: Props) {
   const [mode, setMode] = useState<Mode>("collapsed");
-  const [openCount, setOpenCount] = useState<number | null>(null);
   const [pick, setPick] = useState<PickResult | null>(null);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
   const [pageUrl, setPageUrl] = useState("");
@@ -71,17 +67,6 @@ export function FeedbackWidget({ companyId }: Props) {
     };
   }, []);
 
-  // Fetch open ticket count for this company when rail opens.
-  useEffect(() => {
-    if (mode !== "rail") return;
-    fetch(`/api/feedback/tickets?companyId=${companyId}&status=backlog`)
-      .then((r) => r.json())
-      .then((body) => {
-        if (body.ok) setOpenCount(body.data.tickets.length);
-      })
-      .catch(() => {});
-  }, [mode, companyId]);
-
   const startPicking = useCallback(() => {
     setPageUrl(window.location.href);
     setMode("picking");
@@ -91,7 +76,6 @@ export function FeedbackWidget({ companyId }: Props) {
     setMode("creating");
     setPick(result);
 
-    // Capture screenshot with html2canvas (best-effort; cross-origin iframes may fail).
     try {
       const canvas = await html2canvas(document.body, {
         useCORS: true,
@@ -99,7 +83,6 @@ export function FeedbackWidget({ companyId }: Props) {
         scale: 1,
         logging: false,
       });
-      // Draw the click pin.
       const ctx = canvas.getContext("2d");
       if (ctx) {
         const pinX = (result.clickXPct / 100) * canvas.width;
@@ -118,7 +101,7 @@ export function FeedbackWidget({ companyId }: Props) {
     }
   }, []);
 
-  const onSubmitted = useCallback((ticketId: string) => {
+  const onSubmitted = useCallback((_ticketId: string) => {
     setMode("submitted");
     setTimeout(() => setMode("collapsed"), 2000);
   }, []);
@@ -148,8 +131,8 @@ export function FeedbackWidget({ companyId }: Props) {
 
   if (mode === "submitted") {
     return (
-      <div className="fixed right-4 bottom-4 z-[10001] rounded-md bg-emerald-600 px-4 py-2 text-sm text-white shadow-lg">
-        ✓ Bug report submitted
+      <div className="fixed right-6 bottom-6 z-[10001] rounded-full bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg">
+        ✓ Report submitted
       </div>
     );
   }
@@ -158,52 +141,73 @@ export function FeedbackWidget({ companyId }: Props) {
     return (
       <div
         data-testid="feedback-rail"
-        className="fixed right-0 bottom-12 z-[9997] flex flex-col items-center rounded-l-xl border border-r-0 border-gray-200 bg-white shadow-xl"
+        className="fixed right-4 bottom-4 z-[9997] flex flex-col items-stretch gap-2 rounded-2xl border border-gray-200 bg-white p-3 shadow-xl"
+        style={{ minWidth: 180 }}
       >
-        {/* Brand mark */}
-        <div className="px-3 py-2 text-xs font-semibold tracking-widest text-gray-400">
-          Feedback
-        </div>
-
-        {/* + button */}
+        {/* §2 — Primary action: real filled button, ≥44px, labeled */}
         <button
           onClick={startPicking}
-          className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-gray-600 hover:bg-[--color-success-bg] hover:text-[--color-success-fg]"
-          title="Pick an element to report a bug"
+          className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md active:scale-[0.98]"
+          title="Pick an element to report an issue"
         >
-          +
+          {/* Bug/flag icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+            <line x1="4" y1="22" x2="4" y2="15" />
+          </svg>
+          Report an issue
         </button>
 
-        {/* Open count badge */}
-        {openCount !== null && openCount > 0 && (
-          <div className="mb-1 h-5 w-5 rounded-full bg-emerald-600 text-center text-xs leading-5 text-white">
-            {openCount > 99 ? "99+" : openCount}
-          </div>
-        )}
-
-        {/* Collapse chevron */}
+        {/* Collapse control — ≥44px hit area */}
         <button
           onClick={() => setMode("collapsed")}
-          className="px-3 py-2 text-xs text-gray-400 hover:text-gray-600"
+          className="flex min-h-[44px] items-center justify-center rounded-xl text-xs text-gray-400 transition-colors hover:bg-gray-50 hover:text-gray-600"
           title="Collapse"
-          aria-label="Collapse feedback rail"
+          aria-label="Collapse issue reporter"
         >
-          ›
+          Close ×
         </button>
       </div>
     );
   }
 
-  // Collapsed: small tab.
+  // §1 — Collapsed: horizontal pill, floating, emerald filled, depth shadow.
   return (
     <button
       data-testid="feedback-tab"
       onClick={() => setMode("rail")}
-      className="fixed right-0 bottom-12 z-[9997] flex h-10 w-8 items-center justify-center rounded-l-md border border-r-0 border-gray-200 bg-white shadow-md hover:bg-[--color-success-bg]"
-      title="Send feedback"
-      aria-label="Open bug reporter"
+      className="fixed right-4 bottom-4 z-[9997] flex min-h-[44px] items-center gap-2 rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white shadow-lg transition-all hover:bg-emerald-700 hover:shadow-xl active:scale-[0.98]"
+      title="Report an issue"
+      aria-label="Open issue reporter"
     >
-      <span className="rotate-90 text-xs font-semibold text-gray-500">Feedback</span>
+      {/* Bug/flag icon */}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1="4" y1="22" x2="4" y2="15" />
+      </svg>
+      Report an issue
     </button>
   );
 }

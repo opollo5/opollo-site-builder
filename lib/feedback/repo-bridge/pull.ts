@@ -146,9 +146,13 @@ reported_at: ${ticket.created_at}
 linked_pr_url: ${(ticket.linked_pr_url as string | null) ?? "null"}
 ---
 
-## Report
+## What happened
 
 ${ticket.description}
+
+## What was expected
+
+${(ticket.expected_behavior as string | null) ?? "_Not specified_"}
 
 ## Console errors
 

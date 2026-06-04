@@ -67,6 +67,7 @@ export type FeedbackTicket = {
   repo_ref: string | null;
   linked_pr_url: string | null;
   resolution_notes: string | null;
+  expected_behavior: string | null;
   created_by: string;
   updated_by: string | null;
   created_at: string;
@@ -118,6 +119,7 @@ export type CreateTicketInput = {
   userAgent?: string | null;
   consoleErrors?: unknown[] | null;
   screenshotObjectPath?: string | null;
+  expectedBehavior?: string | null;
 };
 
 export type UpdateTicketInput = {
