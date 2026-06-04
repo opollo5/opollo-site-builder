@@ -116,17 +116,24 @@ describe("resolveOpolloAdmins — empty-set guard", () => {
   beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.clearAllMocks());
 
-  it("throws when platform_users has no is_opollo_staff rows", async () => {
+  it("returns [] and logs error when platform_users has no is_opollo_staff rows", async () => {
+    // resolveOpolloAdmins must NOT throw on empty — throwing would break
+    // connection_lost and other events that call it inside Promise.all.
+    // Instead it returns [] (graceful) and logs an error for Axiom/Sentry alerting.
     const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeStaffOnlyDbMock([]) as never,
     );
+    const { logger } = await import("@/lib/logger");
 
     const { resolveOpolloAdmins } = await import(
       "@/lib/platform/notifications/recipients"
     );
-    await expect(resolveOpolloAdmins()).rejects.toThrow(
-      /no Opollo staff in platform_users/,
+    const result = await resolveOpolloAdmins();
+    expect(result).toHaveLength(0);
+    expect(vi.mocked(logger.error)).toHaveBeenCalledWith(
+      "notifications.recipients.opollo_staff_empty",
+      expect.objectContaining({ message: expect.stringContaining("No is_opollo_staff") }),
     );
   });
 
@@ -199,7 +206,11 @@ describe("dispatch ticket_created (blocker) — >=1 recipient guarantee", () => 
     expect(result.errors).toHaveLength(0);
   });
 
-  it("records an error in the DispatchResult AND captures to Sentry when no staff exist", async () => {
+  it("returns 0 emails and 0 errors (graceful) when no staff exist — empty-set is logged not thrown", async () => {
+    // resolveOpolloAdmins returns [] on empty rather than throwing, so dispatch
+    // sees 0 recipients, logs no_recipients, and returns cleanly with 0 inApp/emails
+    // and an empty errors[]. The misconfiguration is observable via the
+    // notifications.recipients.opollo_staff_empty log key (Axiom-alertable).
     const { getServiceRoleClient } = await import("@/lib/supabase");
     vi.mocked(getServiceRoleClient).mockReturnValue(
       makeStaffOnlyDbMock([]) as never,
@@ -212,38 +223,26 @@ describe("dispatch ticket_created (blocker) — >=1 recipient guarantee", () => 
     const { sendEmail } = await import("@/lib/email/sendgrid");
     const Sentry = await import("@sentry/nextjs");
 
-    // dispatch must NOT throw — it should return a result with errors[]
-    await expect(
-      dispatch({
-        event: "ticket_created",
-        companyId: "company-abc",
-        ticketId: "ticket-456",
-        ticketTitle: "Broken widget",
-        severity: "blocker",
-        reporterUserId: "user-2",
-      }),
-    ).resolves.toMatchObject({
-      emails: 0,
-      inApp: 0,
-      errors: expect.arrayContaining([
-        expect.objectContaining({ recipient: "resolve_recipients" }),
-      ]),
+    const result = await dispatch({
+      event: "ticket_created",
+      companyId: "company-abc",
+      ticketId: "ticket-456",
+      ticketTitle: "Broken widget",
+      severity: "blocker",
+      reporterUserId: "user-2",
     });
 
-    // No email was sent.
+    // Graceful: 0 emails, 0 in-app, no errors in result envelope.
+    expect(result.emails).toBe(0);
+    expect(result.inApp).toBe(0);
+    expect(result.errors).toHaveLength(0);
+
+    // No email sent (no recipients).
     expect(vi.mocked(sendEmail)).not.toHaveBeenCalled();
 
-    // Sentry must have been notified so on-call is paged.
-    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(Sentry.captureException)).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        tags: expect.objectContaining({
-          component: "notifications.dispatch",
-          event: "ticket_created",
-        }),
-      }),
-    );
+    // Sentry is NOT called here — the empty-set log is the observability path.
+    // Sentry fires on DB errors (the throw path), not on empty-set (graceful []).
+    expect(vi.mocked(Sentry.captureException)).not.toHaveBeenCalled();
   });
 
   it("resolves to >=1 recipient even when no staff are company admins (company-agnostic lookup)", async () => {
