@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize]
   push:
@@ -10,7 +11,7 @@ on:
 # safely (secrets would leak via workflow logs) and we have no integration
 # path for them yet.
 env:
-  RUN_CI: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+  RUN_CI: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
 
 jobs:
   # Fails when two files in supabase/migrations/ or supabase/rollbacks/ share
@@ -19,7 +20,7 @@ jobs:
   # files with the same prefix mean `supabase db push` silently skips one of
   # them — the missing-create_invite staging incident was a real instance.
   migration-versions:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
@@ -74,7 +75,7 @@ jobs:
           echo "OK — no duplicate version prefixes (or only allow-listed ones)."
 
   typecheck:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -93,7 +94,7 @@ jobs:
       - run: npm run typecheck
 
   lint:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -113,7 +114,7 @@ jobs:
       - run: npm run lint:css
 
   static-audit:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [lint, typecheck]
@@ -143,7 +144,7 @@ jobs:
           npm run audit:static 2>&1 | tee /tmp/audit.out
 
   build:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -162,7 +163,7 @@ jobs:
       - run: npm run build
 
   test-components:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -186,7 +187,7 @@ jobs:
   # immediately visible in PR checks without waiting for the 50-min
   # integration job.
   test-unit:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -206,7 +207,7 @@ jobs:
         run: npm run test:unit -- --reporter=verbose
 
   test:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -377,7 +378,7 @@ jobs:
   # Static guard: verifies the production-guard in the env-check endpoint
   # is present in source. Guards against accidentally removing the 404 gate.
   env-check-production-guard:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
