@@ -1,6 +1,7 @@
 name: Button Migration Gates
 
 on:
+  workflow_dispatch:
   push:
     branches: [refactor/button-migration-cleanup]
   pull_request:
