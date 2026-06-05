@@ -161,3 +161,81 @@ jobs:
             echo
             supabase migration list --linked 2>&1 | sed -e 's/\x1b\[[0-9;]*m//g'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # push-staging — applies the same migration set to the staging Supabase project.
+  #
+  # ISOLATION GUARANTEE: this job uses exclusively STAGING_* secrets and never
+  # reads SUPABASE_PROJECT_REF or PRODUCTION_SUPABASE_DB_PASSWORD. The two
+  # environments are referenced by distinct, non-overlapping secret names so
+  # they cannot be swapped or accidentally defaulted to each other.
+  #
+  # Required GitHub secrets (Settings → Secrets → Actions):
+  #   STAGING_SUPABASE_PROJECT_REF  — staging project ref (bjiiqnetaxoibhcaukqm)
+  #   STAGING_SUPABASE_DB_PASSWORD  — staging direct-connection DB password
+  #   SUPABASE_ACCESS_TOKEN         — shared account-level token (already set)
+  #
+  # If either STAGING_* secret is absent the job emits a clear warning and
+  # exits 0 — it never falls back to production values and never blocks the
+  # production push.
+  # ---------------------------------------------------------------------------
+  push-staging:
+    name: supabase db push (staging)
+    runs-on: ubuntu-latest
+    needs: push
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Check staging secrets — skip if either is missing
+        id: secrets-check
+        run: |
+          skip=false
+          if [ -z "${STAGING_PROJECT_REF:-}" ]; then
+            echo "::warning::STAGING_SUPABASE_PROJECT_REF is not set — skipping staging push."
+            skip=true
+          fi
+          if [ -z "${STAGING_DB_PASSWORD:-}" ]; then
+            echo "::warning::STAGING_SUPABASE_DB_PASSWORD is not set — skipping staging push."
+            skip=true
+          fi
+          # Hard guard: must not reference the production ref under any circumstance.
+          # SUPABASE_PROJECT_REF is intentionally NOT passed to this step so it
+          # cannot be read here even if the env block were changed accidentally.
+          echo "skip=${skip}" >> "$GITHUB_OUTPUT"
+        env:
+          STAGING_PROJECT_REF:  ${{ secrets.STAGING_SUPABASE_PROJECT_REF }}
+          STAGING_DB_PASSWORD:  ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+
+      - name: Link to staging project
+        if: steps.secrets-check.outputs.skip == 'false'
+        # References STAGING_SUPABASE_PROJECT_REF explicitly — never SUPABASE_PROJECT_REF.
+        run: supabase link --project-ref "${{ secrets.STAGING_SUPABASE_PROJECT_REF }}"
+
+      - name: Show pending migrations (diagnostic)
+        if: steps.secrets-check.outputs.skip == 'false'
+        run: supabase migration list --linked || true
+
+      - name: Push pending migrations to staging
+        if: steps.secrets-check.outputs.skip == 'false'
+        env:
+          # SUPABASE_DB_PASSWORD is set to the STAGING password only.
+          # The production password (PRODUCTION_SUPABASE_DB_PASSWORD) is
+          # never referenced in this job.
+          SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+        run: supabase db push --linked --include-all
+
+      - name: Summarise on success
+        if: steps.secrets-check.outputs.skip == 'false' && success()
+        run: |
+          {
+            echo '## Staging migrations pushed'
+            echo
+            supabase migration list --linked 2>&1 | sed -e 's/\x1b\[[0-9;]*m//g'
+          } >> "$GITHUB_STEP_SUMMARY"

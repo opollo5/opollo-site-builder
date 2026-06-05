@@ -1,7 +1,8 @@
 # Staging Environment Plan
 
-**Status:** Pending execution — read this document, complete the action items in
-order, then open a PR with the workflow and seed-script changes described below.
+**Status:** Code shipped in this PR (`deploy-migrations.yml` staging job +
+`scripts/seed-staging.ts`). Execute §10 once this PR is merged and the two
+GitHub secrets are set.
 
 **Written:** 2026-06-05 · **Author:** Claude Code (investigation session)
 
@@ -348,3 +349,68 @@ to the wrong project.
 - [ ] **Steven**: Verify migration list in the workflow summary shows all 184 applied
 - [ ] **Agent/Steven**: Run `scripts/seed-staging.ts` to seed test users
 - [ ] **Steven**: Log in to the preview deployment as `steven.m@opollo.com` and smoke-test
+
+---
+
+## 10. Runbook — exact execution order once this PR is merged
+
+Run these steps in order. Do not skip ahead; each step depends on the previous.
+
+### Step 1 — Reset the staging database
+
+In the Supabase dashboard → staging project (`bjiiqnetaxoibhcaukqm`) →
+**Project Settings → General → Danger Zone → Reset database**.
+
+Confirm the reset. Wait ~60 seconds for the database to return to empty.
+
+> This wipes the non-sequential schema drift described in §2. It does not
+> delete the project, change the project ref, or affect Vercel env vars.
+
+### Step 2 — Add GitHub Actions secrets
+
+In the GitHub repo → **Settings → Secrets and variables → Actions**:
+
+| Secret name | Value |
+|---|---|
+| `STAGING_SUPABASE_PROJECT_REF` | `bjiiqnetaxoibhcaukqm` |
+| `STAGING_SUPABASE_DB_PASSWORD` | (from Supabase dashboard → staging → Settings → Database) |
+
+`SUPABASE_ACCESS_TOKEN` is already set (shared account-level token).
+
+### Step 3 — Push all migrations to staging
+
+Trigger the `Deploy Supabase migrations` workflow with `workflow_dispatch`
+(GitHub → Actions → Deploy Supabase migrations → Run workflow → branch: main).
+
+The `push-staging` job will run after the `push` (production) job completes.
+Check the **Staging migrations pushed** summary in the workflow run to confirm
+all 184 migrations are listed as applied.
+
+If no migration files changed since the last run, trigger via `workflow_dispatch`
+rather than waiting for a push to main.
+
+### Step 4 — Seed test users and data
+
+From the repo root, with the staging service-role key in hand:
+
+```bash
+SUPABASE_URL=https://bjiiqnetaxoibhcaukqm.supabase.co \
+SUPABASE_SERVICE_ROLE_KEY=<staging-service-role-key> \
+  npx tsx scripts/seed-staging.ts
+```
+
+The script prints a table of emails and generated passwords for any new users.
+Store these in 1Password. Re-running the script after this is safe (idempotent).
+
+> The staging service-role key is in the Supabase dashboard → staging project →
+> Project Settings → API → `service_role` (secret).
+
+### Step 5 — Smoke test
+
+1. Open the latest Vercel preview deployment URL (or `opollo-site-builder-*.vercel.app`).
+2. Log in as `steven.m@opollo.com` with the password from Step 4.
+3. Navigate to `/admin/feedback` — the board should load (feedback_tickets table exists).
+4. Use the **Feedback** tab (right edge) to submit a test ticket — confirm it appears on the board.
+5. Navigate to `/company/<company-id>/social/posts` — confirm the social composer loads.
+
+Staging is considered healthy when all three above surfaces render without errors.
