@@ -4,7 +4,7 @@ import Link from "next/link";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { isOpolloStaff } from "@/lib/platform/auth";
 import { createRouteAuthClient } from "@/lib/auth";
-import { listTickets, type TicketFilterGroup } from "@/lib/feedback/tickets/queries";
+import { listTickets, resolveCompanyNames, type TicketFilterGroup } from "@/lib/feedback/tickets/queries";
 import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
 import type { TicketPriority, TicketSeverity, TicketStatus } from "@/lib/feedback/types";
 
@@ -93,13 +93,17 @@ export default async function AdminFeedbackPage({
       (PRIORITY_ORDER[a.priority as TicketPriority] ?? 0),
   );
 
-  const screenshotUrls = await Promise.all(
-    sorted.map((t) =>
-      t.screenshot_path
-        ? resolveSignedUrl(t.screenshot_path).catch(() => null)
-        : Promise.resolve(null),
+  // Resolve company names and screenshot URLs in parallel.
+  const [screenshotUrls, companyNamesMap] = await Promise.all([
+    Promise.all(
+      sorted.map((t) =>
+        t.screenshot_path
+          ? resolveSignedUrl(t.screenshot_path).catch(() => null)
+          : Promise.resolve(null),
+      ),
     ),
-  );
+    resolveCompanyNames(sorted.map((t) => t.company_id)),
+  ]);
 
   return (
     <div data-testid="admin-feedback-board" className="p-6">
@@ -210,6 +214,11 @@ export default async function AdminFeedbackPage({
                       </span>
                     </Link>
                     <p className="text-xs text-gray-400">
+                      {/* Show company name for external companies; nothing for Opollo-internal. */}
+                      {companyNamesMap.get(t.company_id)
+                        ? <span className="font-medium text-gray-500">{companyNamesMap.get(t.company_id)}</span>
+                        : null}
+                      {companyNamesMap.get(t.company_id) ? " · " : ""}
                       {new Date(t.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
                     </p>
                   </td>
