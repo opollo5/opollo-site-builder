@@ -511,14 +511,17 @@ function check4_migrationOrdering(): Issue[] {
   const createRe =
     /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
   const refRe =
-    /REFERENCES\s+(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
+    /\bREFERENCES\s+(?:public\.)?["']?([a-zA-Z_][a-zA-Z0-9_]*)["']?/gi;
 
   // Reserved SQL keywords / common prose words that follow "REFERENCES"
   // in comment text. Filtering by lowercase to catch any case mix.
+  // Also includes SQL type keywords that appear after column names containing
+  // "references" as a substring (e.g. "preferences JSONB" → false positive).
   const PROSE_TOKENS = new Set([
     "the", "this", "that", "these", "those", "it", "its",
     "resolve", "resolves", "table", "row", "column", "user",
     "users", "to", "above", "below", "earlier", "later",
+    "jsonb", "is", "not", "null", "default",
   ]);
 
   for (const f of files) {
