@@ -87,6 +87,21 @@ export default async function PlatformLayout({
       ? platformSession.company.companyId
       : null;
 
+  // Read the per-user "skip intro" preference from platform_users.preferences.
+  // Only fetched when the widget will actually be mounted (avoids an extra DB
+  // call for every authenticated page render when the feature is off).
+  let skipFeedbackIntro = false;
+  if (feedbackCompanyId && platformSession?.userId) {
+    const svc = getServiceRoleClient();
+    const { data: prefRow } = await svc
+      .from("platform_users")
+      .select("preferences")
+      .eq("id", platformSession.userId)
+      .maybeSingle();
+    const prefs = prefRow?.preferences as Record<string, unknown> | null;
+    skipFeedbackIntro = prefs?.feedback_skip_intro === true;
+  }
+
   return (
     <NavShell navContext={navContext}>
       {themeStyleBlock && (
@@ -97,7 +112,12 @@ export default async function PlatformLayout({
       <BreadcrumbProvider />
       {children}
       <Toaster />
-      {feedbackCompanyId && <FeedbackWidget companyId={feedbackCompanyId} />}
+      {feedbackCompanyId && (
+        <FeedbackWidget
+          companyId={feedbackCompanyId}
+          skipIntro={skipFeedbackIntro}
+        />
+      )}
     </NavShell>
   );
 }

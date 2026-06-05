@@ -12,6 +12,16 @@ import type { FeedbackTicket, FeedbackTicketComment, FeedbackTicketEvent } from 
 // is enforced at the API boundary; these functions are internal lib helpers.
 // ---------------------------------------------------------------------------
 
+// Filter groups for the admin board.
+// "open"     = active in-progress states (default)
+// "all"      = all non-deleted statuses
+// "closed"   = status closed
+// "wont_fix" = status wont_fix
+// "deleted"  = soft-deleted rows (deleted_at IS NOT NULL)
+export type TicketFilterGroup = "open" | "all" | "closed" | "wont_fix" | "deleted";
+
+const OPEN_STATUSES = ["backlog", "triaged", "in_progress"] as const;
+
 export type ListTicketsOptions = {
   companyId?: string;
   status?: string;
@@ -19,27 +29,46 @@ export type ListTicketsOptions = {
   priority?: string;
   assigneeId?: string;
   hasPr?: boolean;
+  filterGroup?: TicketFilterGroup;
 };
 
 export async function listTickets(
   opts: ListTicketsOptions,
 ): Promise<FeedbackTicket[]> {
   const svc = getServiceRoleClient();
-  let q = svc
-    .from("feedback_tickets")
-    .select("*")
-    .is("deleted_at", null)
-    .order("created_at", { ascending: false });
+  const group = opts.filterGroup ?? "open";
 
+  // Start the query without ordering — order() is terminal (last in chain).
+  let q = svc.from("feedback_tickets").select("*");
+
+  // Apply deleted_at filter based on the group.
+  if (group === "deleted") {
+    q = q.not("deleted_at", "is", null);
+  } else {
+    q = q.is("deleted_at", null);
+    // Apply status scoping for specific groups.
+    if (group === "open") {
+      q = q.in("status", OPEN_STATUSES as unknown as string[]);
+    } else if (group === "closed") {
+      q = q.eq("status", "closed");
+    } else if (group === "wont_fix") {
+      q = q.eq("status", "wont_fix");
+    }
+    // "all" → no status filter beyond deleted_at
+  }
+
+  // Additional caller-supplied filters.
   if (opts.companyId) q = q.eq("company_id", opts.companyId);
-  if (opts.status) q = q.eq("status", opts.status);
+  // opts.status is a legacy override used by the member list endpoint;
+  // filterGroup takes precedence for the admin board.
+  if (opts.status && !opts.filterGroup) q = q.eq("status", opts.status);
   if (opts.severity) q = q.eq("severity", opts.severity);
   if (opts.priority) q = q.eq("priority", opts.priority);
   if (opts.assigneeId) q = q.eq("assignee_id", opts.assigneeId);
   if (opts.hasPr === true) q = q.not("linked_pr_url", "is", null);
   if (opts.hasPr === false) q = q.is("linked_pr_url", null);
 
-  const { data, error } = await q;
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) {
     logger.error("feedback.queries.list_failed", { err: error.message, opts });
     return [];
@@ -74,6 +103,29 @@ export async function listComments(ticketId: string): Promise<FeedbackTicketComm
     return [];
   }
   return (data ?? []) as FeedbackTicketComment[];
+}
+
+// The Opollo-internal company sentinel UUID (migration 0070).
+// Tickets from this company are filed by Opollo staff; no company label needed.
+const OPOLLO_INTERNAL_COMPANY_ID = "00000000-0000-0000-0000-000000000001";
+
+// Resolve company_ids to display names for the admin board.
+// Returns an empty string for the Opollo-internal sentinel (label not needed).
+export async function resolveCompanyNames(
+  companyIds: string[],
+): Promise<Map<string, string>> {
+  const unique = [...new Set(companyIds.filter((id) => id !== OPOLLO_INTERNAL_COMPANY_ID))];
+  if (unique.length === 0) return new Map();
+  const svc = getServiceRoleClient();
+  const { data } = await svc
+    .from("platform_companies")
+    .select("id, name")
+    .in("id", unique);
+  const map = new Map<string, string>();
+  for (const row of data ?? []) {
+    map.set(row.id as string, row.name as string);
+  }
+  return map;
 }
 
 // All Opollo staff — used to populate the assignee picker on ticket detail.

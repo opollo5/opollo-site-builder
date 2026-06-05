@@ -9,6 +9,7 @@ import {
   listEvents,
   listOpolloStaff,
   resolveActorNames,
+  resolveCompanyNames,
 } from "@/lib/feedback/tickets/queries";
 import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
 import { BugReplayOverlay } from "@/components/feedback/BugReplayOverlay";
@@ -95,7 +96,11 @@ export default async function AdminTicketDetailPage({
   if (!ticket) notFound();
 
   const actorIds = events.map((e) => e.actor_id);
-  const actorNames = await resolveActorNames(actorIds);
+  const [actorNames, companyNamesMap] = await Promise.all([
+    resolveActorNames(actorIds),
+    resolveCompanyNames([ticket.company_id]),
+  ]);
+  const companyName = companyNamesMap.get(ticket.company_id) ?? null;
 
   const screenshotUrl = ticket.screenshot_path
     ? await resolveSignedUrl(ticket.screenshot_path)
@@ -127,6 +132,9 @@ export default async function AdminTicketDetailPage({
               </span>
             </h1>
             <p className="mt-1 text-sm text-gray-500">
+              {companyName && (
+                <span className="font-medium text-gray-700 mr-1">{companyName} ·</span>
+              )}
               {formatDate(ticket.created_at)}
             </p>
           </div>

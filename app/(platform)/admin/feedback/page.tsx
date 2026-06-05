@@ -4,7 +4,7 @@ import Link from "next/link";
 import { checkAdminAccess } from "@/lib/admin-gate";
 import { isOpolloStaff } from "@/lib/platform/auth";
 import { createRouteAuthClient } from "@/lib/auth";
-import { listTickets } from "@/lib/feedback/tickets/queries";
+import { listTickets, resolveCompanyNames, type TicketFilterGroup } from "@/lib/feedback/tickets/queries";
 import { resolveSignedUrl } from "@/lib/feedback/capture/screenshot";
 import type { TicketPriority, TicketSeverity, TicketStatus } from "@/lib/feedback/types";
 
@@ -12,18 +12,15 @@ import type { TicketPriority, TicketSeverity, TicketStatus } from "@/lib/feedbac
 // Admin feedback board — /admin/feedback
 // data-testid: admin-feedback-board
 //
-// §6 BUG fix: removed raw company_id (sentinel 00000000-…) from row subtitle.
-// §6 POLISH: screenshot thumbnails, route path column.
+// Backlog item 1: status filter via ?filter= search param.
+//   All / Open (default) / Closed / Won't-fix / Deleted
 // ---------------------------------------------------------------------------
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 const PRIORITY_ORDER: Record<TicketPriority, number> = {
-  urgent: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
+  urgent: 4, high: 3, medium: 2, low: 1,
 };
 
 const SEVERITY_COLOURS: Record<TicketSeverity, string> = {
@@ -33,7 +30,7 @@ const SEVERITY_COLOURS: Record<TicketSeverity, string> = {
   low: "bg-gray-50 text-gray-400",
 };
 
-const STATUS_COLOURS: Record<TicketStatus, string> = {
+const STATUS_COLOURS: Record<TicketStatus | "deleted", string> = {
   backlog: "bg-gray-100 text-gray-600",
   triaged: "bg-blue-100 text-blue-700",
   in_progress: "bg-yellow-100 text-yellow-700",
@@ -41,7 +38,16 @@ const STATUS_COLOURS: Record<TicketStatus, string> = {
   verified: "bg-green-100 text-green-700",
   wont_fix: "bg-gray-100 text-gray-400",
   closed: "bg-gray-50 text-gray-400",
+  deleted: "bg-red-50 text-red-400",
 };
+
+const FILTER_TABS: Array<{ key: TicketFilterGroup; label: string }> = [
+  { key: "open",     label: "Open" },
+  { key: "all",      label: "All" },
+  { key: "closed",   label: "Closed" },
+  { key: "wont_fix", label: "Won't fix" },
+  { key: "deleted",  label: "Deleted" },
+];
 
 function age(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -60,7 +66,15 @@ function routeDisplay(routePattern: string | null, pageUrl: string): { display: 
   }
 }
 
-export default async function AdminFeedbackPage() {
+function isValidFilterGroup(v: string | undefined): v is TicketFilterGroup {
+  return ["open", "all", "closed", "wont_fix", "deleted"].includes(v ?? "");
+}
+
+export default async function AdminFeedbackPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
   const access = await checkAdminAccess();
   if (access.kind === "redirect") redirect(access.to);
 
@@ -68,33 +82,40 @@ export default async function AdminFeedbackPage() {
   const isStaff = await isOpolloStaff(supabase);
   if (!isStaff) redirect("/admin");
 
-  const tickets = await listTickets({});
+  const params = await searchParams;
+  const rawFilter = params.filter;
+  const filterGroup: TicketFilterGroup = isValidFilterGroup(rawFilter) ? rawFilter : "open";
+
+  const tickets = await listTickets({ filterGroup });
   const sorted = [...tickets].sort(
     (a, b) =>
       (PRIORITY_ORDER[b.priority as TicketPriority] ?? 0) -
       (PRIORITY_ORDER[a.priority as TicketPriority] ?? 0),
   );
 
-  // §6 — Resolve screenshot signed URLs for thumbnails (server-side, parallel).
-  const screenshotUrls = await Promise.all(
-    sorted.map((t) =>
-      t.screenshot_path
-        ? resolveSignedUrl(t.screenshot_path).catch(() => null)
-        : Promise.resolve(null),
+  // Resolve company names and screenshot URLs in parallel.
+  const [screenshotUrls, companyNamesMap] = await Promise.all([
+    Promise.all(
+      sorted.map((t) =>
+        t.screenshot_path
+          ? resolveSignedUrl(t.screenshot_path).catch(() => null)
+          : Promise.resolve(null),
+      ),
     ),
-  );
+    resolveCompanyNames(sorted.map((t) => t.company_id)),
+  ]);
 
   return (
     <div data-testid="admin-feedback-board" className="p-6">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Feedback</h1>
-          <p className="text-sm text-gray-500">{tickets.length} open tickets</p>
+          <p className="text-sm text-gray-500">{tickets.length} ticket{tickets.length !== 1 ? "s" : ""}</p>
         </div>
       </div>
 
       {/* How fixes happen explainer */}
-      <div className="mb-6 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500">
+      <div className="mb-4 rounded-lg border border-gray-100 bg-gray-50 px-4 py-3 text-xs text-gray-500">
         <p className="font-medium text-gray-600">How fixes happen</p>
         <p className="mt-1 leading-relaxed">
           Open tickets are pulled into the repo with{" "}
@@ -106,12 +127,40 @@ export default async function AdminFeedbackPage() {
         </p>
       </div>
 
+      {/* Filter strip */}
+      <div
+        data-testid="feedback-filter-strip"
+        className="mb-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1"
+        role="tablist"
+        aria-label="Ticket filter"
+      >
+        {FILTER_TABS.map(({ key, label }) => {
+          const active = filterGroup === key;
+          return (
+            <Link
+              key={key}
+              href={`/admin/feedback?filter=${key}`}
+              role="tab"
+              aria-selected={active}
+              data-testid={`filter-tab-${key}`}
+              className={`flex-1 rounded-md px-3 py-1.5 text-center text-xs font-medium transition-colors ${
+                active
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {label}
+            </Link>
+          );
+        })}
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
         <table className="min-w-full divide-y divide-gray-100 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-medium uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-3 py-3 w-10" aria-label="Screenshot" />
-              <th className="px-4 py-3">Title</th>
+              <th className="px-4 py-3">Ticket</th>
               <th className="px-4 py-3">Severity</th>
               <th className="px-4 py-3">Priority</th>
               <th className="px-4 py-3">Status</th>
@@ -123,19 +172,20 @@ export default async function AdminFeedbackPage() {
             {sorted.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-8 text-center text-gray-400">
-                  No open tickets — nice work.
+                  No tickets in this view.
                 </td>
               </tr>
             )}
             {sorted.map((t, idx) => {
               const thumbUrl = screenshotUrls[idx];
+              const isDeleted = !!(t as Record<string, unknown>).deleted_at;
+              const effectiveStatus = isDeleted ? "deleted" : t.status;
               const { display: routeDisplay_, full: routeFull } = routeDisplay(t.route_pattern, t.page_url);
               return (
                 <tr
                   key={t.id}
-                  className="group cursor-pointer transition-colors hover:bg-gray-50"
+                  className={`group cursor-pointer transition-colors hover:bg-gray-50 ${isDeleted ? "opacity-60" : ""}`}
                 >
-                  {/* §6 — thumbnail */}
                   <td className="px-3 py-2">
                     {thumbUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -155,7 +205,6 @@ export default async function AdminFeedbackPage() {
                       href={`/admin/feedback/${t.id}`}
                       className="block font-medium text-gray-900 group-hover:text-emerald-700"
                     >
-                      {/* §3: show #n + first line of description as the label */}
                       {(t as Record<string, unknown>).ticket_number
                         ? `#${(t as Record<string, unknown>).ticket_number}`
                         : `#${t.id.slice(0, 8)}`}
@@ -165,14 +214,17 @@ export default async function AdminFeedbackPage() {
                       </span>
                     </Link>
                     <p className="text-xs text-gray-400">
+                      {/* Show company name for external companies; nothing for Opollo-internal. */}
+                      {companyNamesMap.get(t.company_id)
+                        ? <span className="font-medium text-gray-500">{companyNamesMap.get(t.company_id)}</span>
+                        : null}
+                      {companyNamesMap.get(t.company_id) ? " · " : ""}
                       {new Date(t.created_at).toLocaleDateString("en-AU", { day: "numeric", month: "short" })}
                     </p>
                   </td>
 
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_COLOURS[t.severity as TicketSeverity] ?? ""}`}
-                    >
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${SEVERITY_COLOURS[t.severity as TicketSeverity] ?? ""}`}>
                       {t.severity}
                     </span>
                   </td>
@@ -184,19 +236,13 @@ export default async function AdminFeedbackPage() {
                   </td>
 
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOURS[t.status as TicketStatus] ?? ""}`}
-                    >
-                      {t.status.replace(/_/g, " ")}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOURS[effectiveStatus as keyof typeof STATUS_COLOURS] ?? ""}`}>
+                      {isDeleted ? "deleted" : t.status.replace(/_/g, " ")}
                     </span>
                   </td>
 
-                  {/* §6 — show path only; title tooltip shows full URL */}
                   <td className="max-w-[180px] px-4 py-3">
-                    <span
-                      className="block truncate font-mono text-xs text-gray-500"
-                      title={routeFull}
-                    >
+                    <span className="block truncate font-mono text-xs text-gray-500" title={routeFull}>
                       {routeDisplay_}
                     </span>
                   </td>
