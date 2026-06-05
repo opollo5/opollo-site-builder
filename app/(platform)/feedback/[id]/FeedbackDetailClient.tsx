@@ -28,17 +28,23 @@ const STATUS_LABELS: Record<TicketStatus, string> = {
   closed: "Closed",
 };
 
-function eventLabel(e: FeedbackTicketEvent): string {
+function eventLabel(
+  e: FeedbackTicketEvent,
+  actorNames: Record<string, string>,
+): string {
+  // Resolve the actor's display name; fall back to "Opollo" for known staff
+  // events where actor_id is null (system/automation) or unknown.
+  const actor = e.actor_id ? (actorNames[e.actor_id] ?? "Opollo") : "Opollo";
   switch (e.event_type) {
     case "created": return "Reported";
-    case "assigned": return "Assigned to support team";
-    case "reassigned": return "Reassigned";
+    case "assigned": return `Assigned to ${actor}`;
+    case "reassigned": return `Reassigned to ${actor}`;
     case "status_changed": return `Status updated: ${e.from_value} → ${e.to_value}`;
     case "severity_changed": return `Severity updated: ${e.from_value} → ${e.to_value}`;
-    case "priority_changed": return "Priority updated";
+    case "priority_changed": return `Priority updated by ${actor}`;
     case "reopened_by_customer": return "You reported this is still broken";
-    case "verified": return "Marked as resolved by the team";
-    case "closed": return "Ticket closed";
+    case "verified": return `Marked as resolved by ${actor}`;
+    case "closed": return `Closed by ${actor}`;
     default: return e.event_type;
   }
 }
@@ -55,9 +61,11 @@ type Props = {
   comments: FeedbackTicketComment[];
   events: FeedbackTicketEvent[];
   screenshotUrl: string | null;
+  /** actor_id → display name for event timeline + staff comment authors. */
+  actorNames?: Record<string, string>;
 };
 
-export function FeedbackDetailClient({ ticket: initial, comments, events, screenshotUrl }: Props) {
+export function FeedbackDetailClient({ ticket: initial, comments, events, screenshotUrl, actorNames = {} }: Props) {
   const [ticket, setTicket] = useState(initial);
   const [stillBrokenPending, setStillBrokenPending] = useState(false);
   const [stillBrokenError, setStillBrokenError] = useState<string | null>(null);
@@ -138,7 +146,11 @@ export function FeedbackDetailClient({ ticket: initial, comments, events, screen
       {/* Thread */}
       <div className="mb-6">
         <h2 className="mb-3 text-sm font-semibold text-gray-700">Messages</h2>
-        <TicketThread ticketId={ticket.id} comments={comments} />
+        <TicketThread
+          ticketId={ticket.id}
+          comments={comments}
+          authorNames={actorNames}
+        />
       </div>
 
       {/* Event timeline (read-only for customers) */}
@@ -147,7 +159,7 @@ export function FeedbackDetailClient({ ticket: initial, comments, events, screen
         <ol data-testid="ticket-event-timeline" className="border-l-2 border-gray-200 pl-4">
           {events.map((e) => (
             <li key={e.id} className="mb-3 last:mb-0">
-              <div className="text-xs font-medium text-gray-700">{eventLabel(e)}</div>
+              <div className="text-xs font-medium text-gray-700">{eventLabel(e, actorNames)}</div>
               <div className="text-xs text-gray-400">{formatDate(e.created_at)}</div>
             </li>
           ))}

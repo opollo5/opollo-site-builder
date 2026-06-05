@@ -10,6 +10,8 @@ type Props = {
   ticketId: string;
   comments: FeedbackTicketComment[];
   onCommentPosted?: (comment: FeedbackTicketComment) => void;
+  /** author_id → display name for staff comments. Falls back to "Opollo". */
+  authorNames?: Record<string, string>;
 };
 
 // ---------------------------------------------------------------------------
@@ -32,7 +34,7 @@ function formatDate(iso: string): string {
   });
 }
 
-export function TicketThread({ ticketId, comments: initial, onCommentPosted }: Props) {
+export function TicketThread({ ticketId, comments: initial, onCommentPosted, authorNames = {} }: Props) {
   const [comments, setComments] = useState(initial);
   const [reply, setReply] = useState("");
   const [posting, setPosting] = useState(false);
@@ -93,7 +95,7 @@ export function TicketThread({ ticketId, comments: initial, onCommentPosted }: P
                   c.is_staff ? "text-emerald-100" : "text-gray-400"
                 }`}
               >
-                {c.is_staff ? "Opollo" : "Reporter"} · {formatDate(c.created_at)}
+                {c.is_staff ? (authorNames[c.author_id] ?? "Opollo") : "Reporter"} · {formatDate(c.created_at)}
               </p>
             </div>
           </div>
