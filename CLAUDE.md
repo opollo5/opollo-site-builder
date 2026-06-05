@@ -706,6 +706,49 @@ that touches draft state must be audited to confirm it cannot reach
 `state='scheduled'`. Fix vs accept decision deferred to Steven; tracked at
 `docs/backlog/cron-guard-missing.md`.
 
+## Migration deploy rules — staging + production parity
+
+Every migration merged to `main` **must land in both environments**. The
+`deploy-migrations.yml` workflow runs two jobs in sequence:
+
+1. `push` — production (`sazapxgmrdaewrkwoxby`)
+2. `push-staging` — staging (`bjiiqnetaxoibhcaukqm`), runs only after `push`
+   succeeds
+
+**Staging parity is part of the definition of done for any migration PR.**
+A migration is not deployed until the `push-staging` job has also succeeded.
+This is a hard rule, not advisory.
+
+### Why this rule exists — incident provenance
+
+In 2026 staging was never wired into `deploy-migrations.yml`. After ~60
+migrations accumulated without being applied, the staging Supabase project
+drifted so far from production that preview deployments were functionally
+broken — login failed because schema required by the auth path was missing.
+That drift took a full investigation session to diagnose and a separate PR
+to fix. The rule exists so it cannot happen again.
+
+### Agent responsibilities
+
+- **When opening a migration PR**, the pre-PR checklist item "Layer scripts run"
+  implicitly includes confirming both workflow jobs are configured to run. Do not
+  treat a migration as deployed until both `push` and `push-staging` appear green
+  in the "Deploy Supabase migrations" workflow run.
+- **If `push-staging` is red** while `push` (production) is green, that is a
+  staging incident — diagnose and fix before marking the task done, the same as
+  a production deploy failure. Do not skip it.
+- **If staging secrets are not yet set** (`STAGING_SUPABASE_PROJECT_REF`,
+  `STAGING_SUPABASE_DB_PASSWORD`), the `push-staging` job skips with a warning
+  rather than failing. A skip is acceptable only during the one-time setup window
+  described in `docs/environments-staging-plan.md §10`. After those secrets are
+  in place, a skip is a misconfiguration — surface it.
+- **Never apply migrations to staging out-of-band** (manual `supabase db push`
+  directly against the staging project). All migrations must flow through the
+  workflow so the `supabase_migrations.schema_migrations` tracking table stays
+  accurate. Out-of-band applies produce exactly the drift this rule prevents.
+
+Full setup: `docs/environments-staging-plan.md`.
+
 ## Pointers
 
 Architecture and historical detail moved out of this file to keep it
@@ -740,3 +783,4 @@ links here, it is the canonical reference.
 | UX debt (live items only) | `docs/backlog/ux-debt.md` |
 | Patterns playbook | `docs/patterns/` |
 | In-flight work claims | `docs/WORK_IN_FLIGHT.md` |
+| Staging environment setup + migration parity runbook | `docs/environments-staging-plan.md` |
