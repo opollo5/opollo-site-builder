@@ -130,6 +130,7 @@ describe("FeedbackTicket field shapes", () => {
     deleted_at: null,
     resolution_notes: null,
     expected_behavior: null,
+    debug_snapshot: null,
   };
 
   it("click_x_pct is a number between 0 and 100", () => {

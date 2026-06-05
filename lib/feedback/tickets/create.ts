@@ -57,6 +57,7 @@ export async function createTicket(
       console_errors: input.consoleErrors ?? null,
       screenshot_path: input.screenshotObjectPath ?? null,
       expected_behavior: input.expectedBehavior ?? null,
+      debug_snapshot: input.debugSnapshot ?? null,
       created_by: createdByUserId,
       updated_by: createdByUserId,
     })

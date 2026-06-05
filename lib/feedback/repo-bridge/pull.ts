@@ -56,6 +56,43 @@ function formatConsoleErrors(errors: unknown): string {
     .join("\n");
 }
 
+type DebugEvent = { ts: number; method: string; path: string; status: number; requestId?: string | null; durationMs: number };
+type DebugSnapshotRow = {
+  buildSha?: string | null;
+  route?: string;
+  vercelEnv?: string | null;
+  userEmail?: string | null;
+  userAgent?: string;
+  viewport?: { w: number; h: number; dpr: number };
+  apiEvents?: DebugEvent[];
+};
+
+function formatDebugSnapshot(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "_No debug snapshot_";
+  const snap = raw as DebugSnapshotRow;
+  const lines: string[] = [];
+  lines.push(`- build-sha: ${snap.buildSha ?? "(unset)"}`);
+  lines.push(`- route: ${snap.route ?? "(unknown)"}`);
+  lines.push(`- vercel-env: ${snap.vercelEnv ?? "(unset)"}`);
+  lines.push(`- user: ${snap.userEmail ?? "(unknown)"}`);
+  if (snap.userAgent) lines.push(`- ua: ${snap.userAgent}`);
+  if (snap.viewport) {
+    lines.push(`- viewport: ${snap.viewport.w}×${snap.viewport.h} dpr=${snap.viewport.dpr}`);
+  }
+  const events = snap.apiEvents ?? [];
+  if (events.length > 0) {
+    lines.push("");
+    lines.push(`Recent API events (${events.length}):`);
+    for (const e of events.slice(-10)) {
+      const age = Math.round((Date.now() - e.ts) / 1000);
+      lines.push(
+        `  ${e.method.padEnd(6)} ${String(e.status).padStart(3)} ${e.durationMs}ms ${e.path} (${age}s ago)`,
+      );
+    }
+  }
+  return lines.join("\n");
+}
+
 function formatComments(
   comments: Array<{ is_staff: boolean; body: string; created_at: string }>,
 ): string {
@@ -161,6 +198,10 @@ ${(ticket.expected_behavior as string | null) ?? "_Not specified_"}
 ## Console errors
 
 ${formatConsoleErrors(ticket.console_errors)}
+
+## Debug Snapshot
+
+${formatDebugSnapshot(ticket.debug_snapshot)}
 
 ## Thread (read-only mirror — reply in-app, not here)
 

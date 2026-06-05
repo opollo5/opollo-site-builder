@@ -17,6 +17,7 @@ import { TicketThread } from "@/components/feedback/TicketThread";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { TicketTriagePanel } from "@/components/feedback/TicketTriagePanel";
 import type {
+  DebugSnapshot,
   FeedbackTicketEvent,
   TicketPriority,
   TicketStatus,
@@ -211,6 +212,11 @@ export default async function AdminTicketDetailPage({
             </div>
           </details>
 
+          {/* Debug snapshot panel */}
+          {ticket.debug_snapshot && (
+            <DebugSnapshotPanel snapshot={ticket.debug_snapshot as DebugSnapshot} />
+          )}
+
           {/* Fix attempt panel */}
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
             <h3 className="mb-2 text-xs font-semibold text-gray-700">Fix attempt</h3>
@@ -269,5 +275,81 @@ export default async function AdminTicketDetailPage({
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// DebugSnapshotPanel — collapsible panel shown on admin ticket detail.
+// Renders the debug_snapshot JSONB column captured at submit time.
+// ---------------------------------------------------------------------------
+
+function DebugSnapshotPanel({ snapshot }: { snapshot: DebugSnapshot }) {
+  const events = snapshot.apiEvents ?? [];
+  return (
+    <details className="rounded-lg border border-blue-100 bg-blue-50">
+      <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-blue-700">
+        Debug snapshot
+      </summary>
+      <div className="divide-y divide-blue-100 px-4 pb-3 text-xs text-gray-600">
+        <div className="py-2 flex gap-2 flex-wrap">
+          <span className="font-medium text-gray-700">Build:</span>
+          <code className="font-mono">{snapshot.buildSha?.slice(0, 10) ?? "—"}</code>
+          <span className="font-medium text-gray-700">Env:</span>
+          <span>{snapshot.vercelEnv ?? "—"}</span>
+          <span className="font-medium text-gray-700">Route:</span>
+          <code className="font-mono">{snapshot.route}</code>
+        </div>
+        {snapshot.userEmail && (
+          <div className="py-2">
+            <span className="font-medium">User:</span> {snapshot.userEmail}
+          </div>
+        )}
+        <div className="py-2">
+          <span className="font-medium">Viewport:</span>{" "}
+          {snapshot.viewport.w}×{snapshot.viewport.h} @{snapshot.viewport.dpr}x
+        </div>
+        {snapshot.userAgent && (
+          <div className="py-2 break-all">
+            <span className="font-medium">UA:</span> {snapshot.userAgent}
+          </div>
+        )}
+        {events.length > 0 && (
+          <div className="py-2">
+            <p className="font-medium text-gray-700 mb-1">
+              Recent API events ({events.length})
+            </p>
+            <div className="overflow-x-auto">
+              <table className="min-w-full font-mono text-xs">
+                <thead>
+                  <tr className="text-gray-400">
+                    <th className="pr-2 text-left font-normal">method</th>
+                    <th className="pr-2 text-left font-normal">status</th>
+                    <th className="pr-2 text-left font-normal">ms</th>
+                    <th className="pr-2 text-left font-normal">path</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {events.slice(-20).map((e, i) => (
+                    <tr
+                      key={i}
+                      className={
+                        e.status === 0 || e.status >= 400
+                          ? "text-red-600"
+                          : "text-gray-700"
+                      }
+                    >
+                      <td className="pr-2">{e.method}</td>
+                      <td className="pr-2">{e.status || "err"}</td>
+                      <td className="pr-2">{e.durationMs}</td>
+                      <td className="break-all">{e.path}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
