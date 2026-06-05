@@ -2,6 +2,29 @@
 // These mirror the feedback_tickets / feedback_ticket_comments /
 // feedback_ticket_events DB schema. Keep aligned with the migration.
 
+// ---------------------------------------------------------------------------
+// Debug snapshot — client environment captured at submit time.
+// Stored as JSONB in feedback_tickets.debug_snapshot.
+// ---------------------------------------------------------------------------
+export type DebugApiEvent = {
+  ts: number;
+  method: string;
+  path: string;
+  status: number;
+  requestId: string | null;
+  durationMs: number;
+};
+
+export type DebugSnapshot = {
+  buildSha: string | null;
+  route: string;
+  vercelEnv: string | null;
+  userEmail: string | null;
+  userAgent: string;
+  viewport: { w: number; h: number; dpr: number };
+  apiEvents: DebugApiEvent[];
+};
+
 export type TicketStatus =
   | "backlog"
   | "triaged"
@@ -69,6 +92,7 @@ export type FeedbackTicket = {
   linked_pr_url: string | null;
   resolution_notes: string | null;
   expected_behavior: string | null;
+  debug_snapshot: DebugSnapshot | null;
   created_by: string;
   updated_by: string | null;
   created_at: string;
@@ -121,6 +145,7 @@ export type CreateTicketInput = {
   consoleErrors?: unknown[] | null;
   screenshotObjectPath?: string | null;
   expectedBehavior?: string | null;
+  debugSnapshot?: DebugSnapshot | null;
 };
 
 export type UpdateTicketInput = {

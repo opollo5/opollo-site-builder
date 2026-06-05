@@ -43,6 +43,27 @@ const CreateSchema = z.object({
   consoleErrors: z.array(z.unknown()).nullable().optional(),
   screenshotObjectPath: z.string().nullable().optional(),
   expectedBehavior: z.string().max(2000).nullable().optional(),
+  debugSnapshot: z
+    .object({
+      buildSha: z.string().nullable(),
+      route: z.string(),
+      vercelEnv: z.string().nullable(),
+      userEmail: z.string().nullable(),
+      userAgent: z.string(),
+      viewport: z.object({ w: z.number(), h: z.number(), dpr: z.number() }),
+      apiEvents: z.array(
+        z.object({
+          ts: z.number(),
+          method: z.string(),
+          path: z.string(),
+          status: z.number(),
+          requestId: z.string().nullable(),
+          durationMs: z.number(),
+        }),
+      ),
+    })
+    .nullable()
+    .optional(),
 });
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

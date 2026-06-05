@@ -116,6 +116,9 @@ export default async function PlatformLayout({
         <FeedbackWidget
           companyId={feedbackCompanyId}
           skipIntro={skipFeedbackIntro}
+          buildSha={process.env.VERCEL_GIT_COMMIT_SHA ?? null}
+          vercelEnv={process.env.VERCEL_ENV ?? null}
+          userEmail={platformSession?.email ?? adminUser?.email ?? null}
         />
       )}
     </NavShell>

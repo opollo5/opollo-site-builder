@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { PickResult } from "./ElementPicker";
-import type { TicketSeverity } from "@/lib/feedback/types";
+import type { DebugSnapshot, TicketSeverity } from "@/lib/feedback/types";
 
 type Props = {
   companyId: string;
@@ -13,6 +13,7 @@ type Props = {
   screenshotDataUrl: string | null;
   consoleErrors: unknown[];
   pageUrl: string;
+  debugSnapshot: DebugSnapshot | null;
   onClose: () => void;
   onSubmitted: (ticketId: string) => void;
 };
@@ -23,7 +24,8 @@ type Props = {
 // §3 v1.3: Title field removed — callers no longer send a title. The server
 //   auto-generates the title from the first line of "What happened?".
 // §4 naming: "Report an issue" / "Send report".
-// §1 position: opens from bottom-left (left-20 bottom-16) to match the pill.
+// §1 position: opens bottom-right (right-12 bottom-4), aligns with the
+//   middle-right launcher tab.
 // ---------------------------------------------------------------------------
 
 export function CreateTaskPopup({
@@ -32,6 +34,7 @@ export function CreateTaskPopup({
   screenshotDataUrl,
   consoleErrors,
   pageUrl,
+  debugSnapshot,
   onClose,
   onSubmitted,
 }: Props) {
@@ -91,6 +94,7 @@ export function CreateTaskPopup({
         userAgent: navigator.userAgent,
         consoleErrors,
         screenshotObjectPath,
+        debugSnapshot,
       };
 
       const resp = await fetch("/api/feedback/tickets", {
@@ -112,13 +116,13 @@ export function CreateTaskPopup({
     } finally {
       setSubmitting(false);
     }
-  }, [companyId, consoleErrors, description, expectedBehavior, pageUrl, pick, screenshotDataUrl, severity, tags, onSubmitted]);
+  }, [companyId, consoleErrors, debugSnapshot, description, expectedBehavior, pageUrl, pick, screenshotDataUrl, severity, tags, onSubmitted]);
 
   return (
     <div
       data-testid="feedback-create-popup"
-      // §1: anchored to bottom-left to match the repositioned pill
-      className="fixed left-20 bottom-16 z-[10001] flex w-[680px] flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
+      // Anchored to the right side, aligned with the launcher tab.
+      className="fixed right-12 bottom-4 z-[10001] flex w-[680px] flex-col rounded-xl border border-gray-200 bg-white shadow-2xl"
     >
       {/* Header — §4: "Report an issue" */}
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
