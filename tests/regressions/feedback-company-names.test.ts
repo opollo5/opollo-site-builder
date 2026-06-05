@@ -69,7 +69,7 @@ describe("resolveCompanyNames", () => {
   it("filters out the Opollo sentinel before querying the DB", async () => {
     const { result, inFn } = await callResolveCompanyNames([OPOLLO_SENTINEL, EXTERNAL_A]);
     // Sentinel must not appear in the DB query
-    const queriedIds = inFn.mock.calls[0]?.[1] as string[] ?? [];
+    const queriedIds = ((inFn.mock.calls[0] as unknown[])?.[1] ?? []) as string[];
     expect(queriedIds).not.toContain(OPOLLO_SENTINEL);
     expect(queriedIds).toContain(EXTERNAL_A);
     // Sentinel not in result
@@ -79,7 +79,7 @@ describe("resolveCompanyNames", () => {
 
   it("deduplicates repeated IDs before querying", async () => {
     const { inFn } = await callResolveCompanyNames([EXTERNAL_A, EXTERNAL_A, EXTERNAL_A]);
-    const queriedIds = inFn.mock.calls[0]?.[1] as string[] ?? [];
+    const queriedIds = ((inFn.mock.calls[0] as unknown[])?.[1] ?? []) as string[];
     // Should only appear once
     expect(queriedIds.filter((id) => id === EXTERNAL_A)).toHaveLength(1);
   });
