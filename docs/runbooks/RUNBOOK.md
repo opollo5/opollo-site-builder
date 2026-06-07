@@ -862,3 +862,22 @@ git push
 supabase gen types typescript --local > /tmp/supabase-check.ts
 diff types/supabase.ts /tmp/supabase-check.ts
 ```
+
+---
+
+## Live diagnostic protocol — required before any "third-party bug" claim
+
+**No agent may claim "third-party bug" for any external integration without
+completing all seven steps.** Attach evidence to
+`docs/incidents/<timestamp>-<integration>.md` using `docs/incidents/TEMPLATE.md`.
+
+0. **Confirm env vars are SET in the target deployment.** Use `vercel env ls` (production scope). A missing env var is a config issue, not a third-party bug.
+1. **Run the relevant probe script** in `scripts/probes/`. Capture full markdown output. Empty output = missing probe = step-1-failed.
+2. **Verify the deployed bundle matches source.** Use `vercel inspect <deploy-url>` to confirm the deployed commit SHA, then `git log <sha> -1` to confirm the commit content. The "fix wasn't pushed" failure mode (May 2026 incident) must be impossible to recreate.
+3. **Run the contract test against the live deployed environment.** Set `PROBE_BASE_URL=https://opollo-site-builder.vercel.app`. If the outgoing request payload differs from the contract snapshot — that's the bug. Investigate locally.
+4. **Capture full network trace and response bodies.** `curl -v` or Playwright trace export. All headers, body, status codes.
+5. **Decode any tokens, JWTs, or signed payloads** in the response. Check that claims match what was sent.
+6. **Document at `docs/incidents/<timestamp>-<integration>.md`.** Steps 0–5 are evidence rows.
+
+Only after all seven fail to find a code-side cause is escalation to "third-party
+issue" allowed.

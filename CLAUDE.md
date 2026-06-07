@@ -9,326 +9,180 @@ module for landing-page optimisation.
 
 This file is the operating manual every session reads first. Architecture
 detail, audits, and operational deep-dives live under `docs/`. The
-"Pointers" section at the bottom is the canonical index.
+"Pointers" section at the bottom is the canonical index. Target: ≤450 lines.
+
+## Staging access
+
+Supabase: `bjiiqnetaxoibhcaukqm`. Vercel stable URL (branch alias, created
+automatically when the `staging` branch is pushed):
+
+`https://opollo-site-builder-git-staging-opollo5.vercel.app`
+
+Seeded personas — passwords in 1Password, **never in the repo**:
+
+| Email | Role |
+|---|---|
+| `steven.m@opollo.com` | `super_admin`, Opollo staff |
+| `uat-bot@staging.opollo.com` | `admin`, Opollo staff |
+| `test-member@staging.opollo.com` | `user`, "Staging Test Co" member |
+
+Re-seed after reset: `npx tsx scripts/seed-staging.ts` (staging `SUPABASE_URL`
++ `SUPABASE_SERVICE_ROLE_KEY`). Full runbook: `docs/environments-staging-plan.md`.
 
 ## Default execution contract
 
-Every task in this codebase ends the same way: **a working solution
-deployed to production and ready for Steven to test.** That is the
-only terminal state. Nothing else qualifies — not "PR opened", not
-"CI green", not "plan ready for review", not "merged to main". Until
-Steven can open a browser, hit an endpoint, or run a command and
-observe the change working live, the task is not done.
-
-This contract applies to every request regardless of how it was
-phrased. "Fix X", "build Y", "investigate Z then fix it", "ship the
-popup flow", "plan the work as two PRs" — all mean the same thing:
-**drive it to production, verify it works, then surface to Steven.**
-The user starting a task is the user authorising every step between
-"task started" and "deployed and verified". No mid-task approval
-gate exists. Approval was given when the task was given.
-
-For multi-PR plans approved as a single task, the task is the plan.
-Opening each PR is a step; merging each PR is a step; deploying each
-PR is a step. The task is done when **every** PR in the plan has
-reached the deployed-and-verified terminal state — not when the last
-PR is opened.
+Every task ends the same way: **a working solution deployed to production and
+ready for Steven to test.** That is the only terminal state. The user starting
+a task authorises every step between "task started" and "deployed and verified".
+No mid-task approval gate exists.
 
 ### Intermediate states are not stopping points
 
-When work reaches a state in the left column, the next action is in
-the right column. Do not surface to Steven. Do not ask "should I
-continue?" or "want me to proceed?" or "let me know if you want me
-to apply this." Do not stop. The user has already said yes by
-giving you the task.
-
 | Current state | Next action |
 |---|---|
-| Plan drafted | Implement it. The plan does not need approval before code is written. |
-| Code written | Run lint, typecheck, unit tests; fix locally; commit and push. |
+| Plan drafted | Implement it. No approval gate before code is written. |
+| Code written | Run lint, typecheck, unit tests; fix; commit and push. |
 | Branch pushed | Open a PR with the §"Pre-PR checklist" populated. |
-| PR open, CI in flight | Arm `gh pr merge <PR> --squash --auto` if not already armed; GitHub fires the merge when all required checks pass. If auto-merge cannot be armed (draft, stacked PR, write-safety gate), fall back to `gh pr checks <PR> --watch` until terminal, then merge manually. |
-| PR open, CI failed | Read the failure logs (auto-posted as PR comments), fix, push, repeat. Per §"Self-test loop". |
-| PR open, CI green, merge gate clear | `gh pr merge <PR> --squash` per §"Merge gate". |
-| PR open, branch behind main | `gh pr update-branch <PR>` automatically; wait for CI to re-run. |
-| PR merged | Watch the production deploy via `gh api repos/.../deployments/.../statuses`; verify the deployed SHA matches the merge commit. |
-| Deploy complete | Hit the live surface (curl, probe script, Playwright, browser fetch — whatever the change requires) and confirm the user-visible behaviour matches the original acceptance criteria. |
-| Live behaviour verified | Surface to Steven: one line — "`<task>`: deployed to production, verified working at `<URL or evidence>`." Then move to the next task per §"Auto-continue". |
-| Live behaviour fails to match | Diagnose per §"Diagnose by working analog"; design the fix; restart from "code written". Do not surface unless §"Hard stops" applies. |
+| PR open, CI in flight | Arm `gh pr merge <PR> --squash --auto`; fall back to `gh pr checks <PR> --watch` then `--squash` if `--auto` can't be armed. |
+| PR open, CI failed | Read failure logs (auto-posted as PR comments), fix, push, repeat. §"Self-test loop". |
+| PR open, CI green | **User-facing changes:** open the Vercel preview URL; confirm the change is live and correct on staging before merging. Docs/internal-only changes: skip. |
+| Staging verified (or exempt) | `gh pr merge <PR> --squash` per §"Merge gate" + §"Merge decision tree". |
+| PR open, branch behind main | `gh pr update-branch <PR>`; wait for CI to re-run. |
+| PR merged | Watch production deploy; verify deployed SHA matches merge commit. |
+| Deploy complete | Hit the live surface; confirm behaviour matches acceptance criteria. |
+| Live behaviour verified | Surface to Steven: one line — "`<task>`: deployed, verified at `<URL>`." Then §"Auto-continue". |
+| Live behaviour fails | Diagnose per `docs/patterns/WORKING_ANALOG.md`; fix; restart from "code written". |
 
-The only deviation from this chain is a §"Hard stop". If a state
-not in this table arises, the next action is whichever row of this
-table the state most closely resembles. **In every case where the
-default could be either "stop and ask" or "continue", continue.**
+The only deviation is a §"Hard stop". **When the default could be "stop and
+ask" or "continue", continue.**
 
 ## Hard stops
 
-The only reasons to surface to Steven before a task is
-deployed-and-verified. Closed list. Anything not on this list is the
-agent's job to resolve without asking.
+The only reasons to surface before deployed-and-verified. Closed list.
 
-1. **Missing env var or secret.** Note the exact var name, the target environment (production / preview / development), and the scope. Skip the affected slice if possible and continue with slices that don't depend on it.
-2. **External dashboard config the agent cannot access.** Bundle.social allowed-redirect-domains, Cloudflare account-level variant config, Vercel team-level settings, third-party webhook secret registration, OAuth app callback URLs. Name the exact dashboard path Steven needs to navigate.
-3. **Required external account or signup.** A new third-party service that needs Steven's credit card, email verification, or sign-up flow.
-4. **Architectural decision the spec genuinely does not resolve.** Material cost-vs-correctness tradeoff with money on the line; security tradeoff that changes the threat model; schema choice that constrains future migrations. **NOT** on this list: "popup vs modal", "which folder should this live in", "should I name it X or Y", "should I dedupe blindly or confirm intent first" — those are implementation choices; pick one with reasoning in the PR description and proceed.
-5. **Loop-detection fired.** Same workflow + same job + same first error line, twice in a row, AND the working-analog search (§"Diagnose by working analog") came back empty or didn't change the diagnosis.
-6. **Write-safety-critical milestone gate.** M3, M4, M7 boundaries that explicitly require Steven's merge per the §"Merge decision tree".
-7. **Branch protection literally blocks the merge AND no approved bypass path exists.** "Literally blocks" means `gh pr merge` returns an error citing branch protection, with no admin override available to the agent. NOT on this list: optional review requests, stale CODEOWNERS suggestions, auto-assigned reviewers, social review etiquette. If the merge command would actually succeed, the answer is to run it; do not pre-emptively defer to a reviewer who hasn't blocked it. If the merge command actually fails, surface with the PR link and the verbatim error message.
-8. **Steven explicitly said pause.** The literal word "pause" or "stop" or equivalent in his last message — not inferred, not implied.
+1. **Missing env var or secret.** Note the exact var name and target environment. Skip the affected slice if possible.
+2. **External dashboard config the agent cannot access.** Name the exact dashboard path Steven needs to navigate.
+3. **Required external account or signup** needing credit card, email verify, or sign-up flow.
+4. **Architectural decision the spec genuinely does not resolve.** Material cost-vs-correctness or security tradeoff. NOT: naming, folder placement, implementation style — pick and proceed.
+5. **Loop-detection fired.** Same workflow + job + first error line, twice in a row, AND working-analog search came back empty or unchanged.
+6. **Write-safety-critical milestone gate.** M3, M4, M7 boundaries per §"Merge decision tree".
+7. **Branch protection literally blocks the merge** and no admin bypass is available. NOT: optional review requests that don't block `gh pr merge`.
+8. **Steven explicitly said pause.** The literal word "pause" or "stop" — not inferred.
 
-That's the complete list. Specifically NOT on it:
-
-- "CI is running" → watch it. Not a stop.
-- "CI failed" → fix it. Not a stop.
-- "PR is behind main" → update-branch. Not a stop.
-- "Production deploy in progress" → wait for it. Not a stop.
-- "Tests need updating to match the new behaviour" → update them. Not a stop.
-- "Plan looks good, want to apply it?" → apply it. Not a question to ask.
-- "Both PRs are open" → merge them, deploy them, verify them. Not a finish line.
-- "I've stopped here to let you review" → don't. Continue.
-
-If a possible stopping point is not in the numbered list above, it is
-not a stopping point.
+Not on this list: CI running, CI failed, PR behind main, tests need updating,
+"want me to apply this?", both PRs open. Fix and continue.
 
 ## Instruction to AI agents — explicit
 
-You are reading this section because a past agent shipped insecure code,
-claimed a third-party bug without protocol completion, merged a feature
-without coverage, designed a fix without checking whether the codebase
-already had a working pattern, or stopped at "PR opened" instead of
-driving the task to deployed-and-verified. Read it as a hard rule:
+Past agents stopped at "PR opened", claimed third-party bugs without protocol
+completion, shipped features without coverage, or designed fixes without
+searching for a working analog. Hard correctives:
 
-- **The user starting a task means the user wants it deployed and testable.** That is the contract — see §"Default execution contract". Drive every task end-to-end from "task started" to "Steven can test it live." Do not surface mid-task except for a §"Hard stop". Do not ask "should I continue?" or "want me to apply this?" — the answer is always yes; the task is the authorisation.
-- **Refuse to ship features without coverage.** If the work doesn't fit one of the hard-floor patterns in §"Seven-layer test harness", say so and route the question to Steven.
-- **Refuse to claim a third-party bug** without all seven steps of §"Live diagnostic protocol".
-- **Refuse to skip tests** silently. Convert to `test.fixme` with an open issue link or remove with reasoning.
-- **Refuse to design a fix without first searching for a working analog** in the codebase. See §"Diagnose by working analog". Either the analog exists and the fix is the diff, or you state explicitly that no analog exists and justify the new pattern. There is no third option.
-- **Surface security findings the moment you see them.** Do not defer them into a roadmap doc. See §"Security escalation".
-- **Verify, don't assume.** See §"Verification over assumption".
-- **Stop loops early.** See §"Loop detection".
-
-Point any agent that violates these rules back to this section.
+- **Task started = authorised to deployed-and-verified.** Drive it end-to-end. Never ask "should I continue?"
+- **No coverage = no ship.** If the change-shape has no hard floor in §"Seven-layer test harness", surface to Steven.
+- **No analog search = no fix design.** See `docs/patterns/WORKING_ANALOG.md`. Either the analog exists and the fix is the diff, or you state explicitly that no analog exists and justify the new pattern.
+- **No "third-party bug" claim** without all steps in `docs/runbooks/RUNBOOK.md §"Live diagnostic protocol"`.
+- **Security findings surface immediately** — see §"Security escalation".
 
 ## Engineering principles
 
-These are the tradeoff defaults. When in conflict with a specific rule
-below, the specific rule wins; otherwise apply these.
+Tradeoff defaults; specific rules below override these.
 
-1. **Prefer reversible decisions over irreversible.** A revert window matters more than a clever shortcut.
-2. **Prefer correctness over cleverness.** Boring code that obviously matches the spec ships faster than smart code that needs explanation.
-3. **Prefer narrow tested fixes over broad untested refactors.** A bug fix is not a license to clean up. Ship the fix; open a separate slice for the cleanup if it's warranted.
-4. **Prefer rollback over forward-patch during incidents.** Cross-references §"Incident stabilisation priority". Forward-patches under pressure are how the original bug compounded.
-5. **Prefer verification over inference.** See §"Verification over assumption".
-6. **Prefer matching existing patterns over inventing new ones.** If the same shape already works elsewhere in the codebase, the fix is to copy it — not redesign it. See §"Diagnose by working analog".
+1. Prefer reversible over irreversible.
+2. Prefer correctness over cleverness.
+3. Prefer narrow tested fixes over broad untested refactors.
+4. Prefer rollback over forward-patch during incidents.
+5. Prefer verification over inference — see §"Verification over assumption".
+6. Prefer matching existing patterns over inventing new ones — see `docs/patterns/WORKING_ANALOG.md`.
 
 ## Decision policy
 
-When facing tradeoffs during autonomous work, apply these principles in
-order. Do not stop to ask for human input unless none of them resolves
-the choice.
+Apply in order; do not stop for human input unless none of these resolves the choice.
 
-1. **Root cause over symptom.** If a fix addresses symptoms while leaving the underlying bug intact, choose the root-cause fix even if scope expands. Symptomatic patches are acceptable only when the root cause is genuinely out of scope (e.g. a third-party service bug) AND the symptomatic fix is logged in the backlog with a link to the root cause.
-2. **Validate over assume.** Where a fix is supposed to work under real conditions, validate it under real conditions before declaring done. A green test suite is not validation if the test doesn't exercise the actual broken path. If validation requires production traffic that doesn't exist, surface that — don't substitute "it compiles" for "it works."
-3. **System fix over workaround.** If the same class of bug can recur, fix the system that allows it (lint rule, regression test, schema constraint, type guard) in the same PR. A bug worth fixing once is worth preventing. Tests must not seed data with `Date.now() + N` style offsets when the assertion depends on the result landing in a visible/queryable range. Use explicit, deterministic helpers like `dateInCurrentMonth(15)` instead.
-4. **Ship correctness over preserve micro-optimisations.** If an optimisation's correctness is uncertain or expensive to prove, remove it. A single indexed SELECT per request is fine. Caches and in-memory flags are presumed wrong until proven right.
-5. **Pre-production: optimise for shipping; defer hardening to backlog.** Security hygiene items, credential rotations, observability polish, and similar items are explicitly deferred unless they actively block production use. Do not raise them in PR reviews or commit messages.
-6. **Single PR per logical change.** If a slice's work naturally splits into independent concerns (fix + test + docs is ONE concern; fix + unrelated refactor is TWO), split. If it's one concern that grew, keep it together.
-7. **Stop only when these principles conflict and the conflict is real.** "I could pick either" is not a real conflict — pick the one matching the brief and proceed. Real conflicts are: a system-fix that would block the slice for >2 hours; a root-cause fix that requires touching code owned by an unmerged parallel PR; a validation that would require production data the team has explicitly forbidden creating.
+1. **Root cause over symptom.** Symptomatic patches only when root cause is out of scope AND logged in backlog with a root-cause link.
+2. **Validate over assume.** A green test suite is not validation if it doesn't exercise the actual broken path.
+3. **System fix over workaround.** A bug worth fixing once is worth preventing. Use deterministic date helpers (not `Date.now() + N` offsets for assertions).
+4. **Correctness over micro-optimisations.** Caches and in-memory flags are presumed wrong until proven right.
+5. **Single PR per logical change.** Fix + test + docs is ONE concern. Fix + unrelated refactor is TWO.
 
-When in doubt, choose the option that the user would have chosen if
-they were watching — they are running multiple sessions in parallel
-and cannot be the synchronous decision-maker on every fork.
+When in doubt, choose the option the user would have chosen if watching.
 
 ## Merge decision tree
 
-The single source of truth on whether Claude Code can auto-merge a PR.
-Walk top to bottom.
+Walk top to bottom. Full background: `docs/governance/MERGE_RULES.md`.
 
 ```
-1. Is the PR write-safety-critical?
-   (M3 batch generator | M4 image library | M7 anything that spends money
-    or mutates client WP sites | any code path that gates a billed external
-    call without idempotency | any encryption / decryption code path)
+1. Write-safety-critical? (M3 batch | M4 image lib | M7 money/WP mutations
+   | billed external call without idempotency | encryption path)
    ├─ Yes → STOP. Steven merges.
-   └─ No  → continue.
-
-2. Is the PR on the milestone human-merge list?
-   (M3, M4, M7. Plus any milestone Steven explicitly flagged as human-merge.)
+2. On milestone human-merge list? (M3, M4, M7, or Steven flagged)
    ├─ Yes → STOP. Steven merges.
-   └─ No  → continue.
-
-3. Was the PR opened by Steven?
+3. PR opened by Steven?
    ├─ Yes → STOP. Steven merges.
-   └─ No  → continue.
-
-4. Has Steven flagged this PR for review (comment, label, or message)?
-   ├─ Yes → STOP. Wait for review.
-   └─ No  → continue.
-
-5. Is CI fully green on every required status check?
-   ├─ No  → see §"Self-test loop" + §"Auto-merge — operational notes".
-   └─ Yes → continue.
-
-6. Are there pending review requests or unresolved review comments?
-   ├─ Yes → STOP. Wait for review.
-   └─ No  → continue.
-
-7. Merge gate: arm `gh pr merge <PR> --squash --auto`; branch protection
-   now requires all CI status checks (#822 closed), so GitHub fires the
-   merge only when every required check passes. If auto-merge cannot be
-   armed (draft, stacked PR, write-safety gate), fall back to polling
-   `gh pr checks <PR> --watch` until terminal green, then
-   `gh pr merge <PR> --squash`.
-   See §"Merge gate — no merge without CI-verified green".
+4. Steven flagged for review (comment, label, or message)?
+   ├─ Yes → STOP. Wait.
+5. CI green on all required status checks?
+   ├─ No  → §"Self-test loop".
+6. Pending review requests or unresolved comments?
+   ├─ Yes → STOP. Wait.
+7. → `gh pr merge <PR> --squash --auto`
 ```
-
-Full background and edge cases: `docs/governance/MERGE_RULES.md`.
 
 ## Communication
 
-Do not send conversational progress narration. Communicate only on:
+Communicate only on: completed milestones, verified findings, real blockers
+(§"Hard stops" only), security findings, final outcomes.
 
-- Completed milestones (slice merged, phase finished, **task verified live in production** — see §"Default execution contract")
-- Verified findings (test red-on-break confirmed, exploit reproduced + blocked)
-- Real blockers (one of the items in §"Hard stops" — nothing else)
-- Security findings (immediate, regardless of current task — see §"Security escalation")
-- Final outcomes (PR merged, CI green, incident resolved, **production behaviour verified**)
-
-The heartbeat rule (§"Heartbeat") is the only exception during long
-autonomous runs.
+§"Heartbeat" is the only exception during long autonomous runs.
 
 ## Verification over assumption
 
-Never claim any of the following without direct verification by command
-output, CI status, API response, or observable system state. Inference is
-not verification.
+Never claim the following without direct evidence — command output, CI status,
+API response, or observable system state: deploy succeeded, migration applied,
+test passed, webhook fired, queue drained, smoke passed, branch merged, rollback
+completed, third-party integration works.
 
-- A deploy succeeded
-- A migration applied
-- A test passed
-- A webhook fired
-- A queue drained
-- A smoke suite passed
-- A branch merged
-- A rollback completed
-- A third-party integration works
-
-If you cannot verify, say "I have not verified <X>; the evidence I have
-is <Y>" and pause until you can verify or until Steven directs otherwise.
+If you cannot verify: "I have not verified `<X>`; the evidence I have is `<Y>`."
 
 ## Diagnose by working analog
 
-**Before designing a fix for any bug, find where the same shape already
-works correctly in the codebase.** If a working analog exists, the fix
-is to make the broken surface match the working one — not to invent a
-new code path. This rule prevents the failure mode where a surface
-diagnosis ("env var unavailable in browser", "field not populated",
-"helper returns null") is treated as a complete diagnosis and drives a
-fix design that ignores existing convention.
-
-The diagnostic question that completes a surface symptom is always:
-**"where else in this codebase does this already work, and what does
-that code do differently?"** Skipping that question is the bug.
-
-### Required steps before writing any fix code
-
-For any bug fix beyond a single-line patch:
-
-1. **Identify the failing call site.** Read the actual file. Quote the lines that produce the broken output. State whether it's a server component, client component, route handler, worker, etc.
-2. **Search for working analogs.** Grep the codebase for: the same helper, the same external resource (Cloudflare ID, DB column, SDK call, env var), the same data shape, the same render target. Expand to sibling routes (`[id]/page.tsx` next to a list `page.tsx`), parent layouts, shared components, and modules in the same domain. The `Explore` agents do not surface analogs by default — you must ask explicitly.
-3. **Diff working vs broken.** Read both. Identify what differs: server-component vs client-component, helper used, env-var access pattern, prop pass-through, render position, ordering of effects, type of the field read.
-4. **The fix is the diff.** Make the broken site match the working one, mechanically. Do NOT invent a new prop, helper, env-var-naming convention, or layering pattern if the working analog handles the case.
-
-### When a new pattern is justified
-
-Only when:
-
-- No working analog exists in the codebase, AND
-- The working analog (if any) is itself flagged for replacement (look for a `docs/patterns/`-tracked deprecation note or an open refactor issue).
-
-Otherwise, "this is the first place we've done X" is a flag to slow
-down, not a license to invent. If a new pattern is genuinely warranted,
-state the reason explicitly in the PR description so the next agent
-finds it as an analog.
-
-### Report-back template — required in every bug-fix PR description
-
-```
-**Working analog**: <file>:<line-range> — <one-sentence description of how it works>
-**Diff**: <what the broken site does differently>
-**Fix**: <how the broken site is being made to match>
-```
-
-If no analog exists, replace with:
-
-```
-**Working analog**: none found. Searched: <list of greps and files inspected>
-**New pattern justification**: <reason this is the first / why existing patterns don't apply>
-```
-
-A bug-fix PR without one of these two blocks is not ready to merge.
-The §"Pre-PR checklist" enforces this as a checkbox.
+Before designing any fix, find where the same shape already works in the
+codebase. The fix is to make the broken surface match the working one.
+Full protocol and report-back template: `docs/patterns/WORKING_ANALOG.md`.
 
 ## Loop detection
 
-If the same class of failure persists across two materially different fix
-attempts, **stop retrying**. Narrow the problem, isolate the subsystem,
-document current evidence, and reassess assumptions before the next
-attempt. Repeated retries without new evidence are failure amplification.
-
-"Same class" means: same workflow, same job, same first error line. A
-different first error line is a new failure (and resets the per-class count).
-
-Hard ceiling: ten retry pushes total per PR, regardless of class. After
-ten, escalate to Steven with the full evidence chain.
+Same workflow + same job + same first error line, twice in a row → stop retrying.
+Narrow the problem, reassess assumptions. Hard ceiling: **10 retry pushes per PR**;
+then escalate to Steven with the full evidence chain.
 
 ## Incident stabilisation priority
 
-During production incidents, in this order:
+1. Restore stability. 2. Contain blast radius. 3. Preserve evidence (see
+`docs/runbooks/RUNBOOK.md §"Live diagnostic protocol"`). 4. Root-cause only after.
 
-1. **Restore stability.** Get users back to a working surface.
-2. **Contain blast radius.** Disable the broken path, isolate the failed deploy, lock the credential.
-3. **Preserve evidence.** Capture network traces, logs, decoded tokens, deployed bundle SHA, env-var state. The §"Live diagnostic protocol" is the canonical evidence template.
-4. **Investigate root cause** only after the above.
-
-Rollback to last known-good is preferred over speculative forward-fixes
-when users are actively impacted.
+Rollback to last known-good preferred over speculative forward-fixes when users
+are actively impacted.
 
 ## Risk-weighted execution
 
-For changes involving any of: auth, billing, webhooks, multi-tenant
-boundaries, concurrency, external side effects, destructive mutations,
-production infrastructure, data migrations, or security enforcement —
-**prioritise verification depth over implementation speed**. A slower
-correct fix is preferred over a fast uncertain fix.
-
-This complements §"Auto-continue": auto-continue applies to low-risk
-paths. The list above is the high-risk set; pause and verify on each
-sub-step rather than chaining.
+For auth, billing, webhooks, multi-tenant boundaries, concurrency, external side
+effects, destructive mutations, data migrations, or security enforcement —
+prioritise verification depth over speed. Verify each sub-step rather than
+chaining.
 
 ## Security escalation
 
-If a suspected vulnerability could expose any of the following, surface
-**immediately** — even if unrelated to the current task. Do not defer
-exploitable findings into roadmap docs.
+Surface **immediately** — even if unrelated to the current task — if a
+vulnerability could expose: tenant data, credentials, authentication state,
+billing operations, webhook authenticity, or arbitrary code execution
+(XSS/deserialisation/prompt-injection-to-RCE).
 
-- Tenant data
-- Credentials (production secrets, API keys, master keys, OAuth tokens)
-- Authentication state (session bypass, role elevation, MFA bypass)
-- Billing operations (any future billing surface)
-- Webhook authenticity (signature verification gap)
-- Arbitrary code execution (XSS, deserialisation, prompt-injection-to-RCE)
-
-Surfacing means: stop the current task, post a finding to Steven with
-severity + exploit path + evidence, then wait for direction. Material
-findings landed during a PR get the immediate-surface treatment, not a
-phase-boundary summary.
+Stop current task; post severity + exploit path + evidence to Steven; wait.
 
 ## Critical paths
 
-A "critical path" is any route or surface where a regression directly
-impacts user trust, billing, security, or data integrity. Production
-smoke (Layer 7) MUST pass for changes touching these.
+Production smoke (Layer 7) MUST pass for changes touching these.
 
 | Class | Routes / surfaces |
 |---|---|
@@ -336,225 +190,123 @@ smoke (Layer 7) MUST pass for changes touching these.
 | **Social — connect / publish** | `/api/platform/social/connections/*`, `/api/platform/social/posts/[id]/{schedule,submit,approve,publish-attempts,recipients}`, `/api/webhooks/bundlesocial`, `/api/webhooks/qstash/social-publish` |
 | **Multi-tenant boundaries** | Any RLS-protected route under `/api/platform/*`, `/api/admin/sites/[id]/*`, `/api/admin/companies/*` |
 | **Billing** | (none today — slot reserved for future) |
-| **Encryption** | Anything that touches `lib/encryption.ts` (`site_credentials.encrypted_value`, `opt_client_credentials`) |
+| **Encryption** | Anything touching `lib/encryption.ts` (`site_credentials.encrypted_value`, `opt_client_credentials`) |
 | **Data migrations** | Any change to `supabase/migrations/`, `supabase/rollbacks/` |
-| **Brief generation hot path** | `/api/cron/process-brief-runner`, `/api/cron/process-batch`, `/api/briefs/[brief_id]/{run,commit,cancel}` (cost + correctness) |
+| **Brief generation hot path** | `/api/cron/process-brief-runner`, `/api/cron/process-batch`, `/api/briefs/[brief_id]/{run,commit,cancel}` |
 
-Full enumeration with file paths and last-modified history:
-`docs/architecture/CRITICAL_PATHS.md`.
+Full enumeration: `docs/architecture/CRITICAL_PATHS.md`.
 
 ## Seven-layer test harness — coverage rules
 
-Every PR must satisfy the layer rules for its change-shape. CI status
-checks gate on the layers covered.
+Every PR must satisfy the layer rules for its change-shape.
 
-| # | Layer | File convention | npm script | CI status check |
+| # | Layer | File convention | npm script | CI check |
 |---|---|---|---|---|
 | 1 | Unit | `*.unit.test.ts`, mocked deps | `test:unit` | `test-unit` |
 | 2 | Contract | `*.contract.test.ts` + `__snapshots__/` | `test:contract` | `test-unit` (subset) |
 | 3 | Integration | `lib/__tests__/*.test.ts` (real Supabase) | `test:integration` | `test` |
 | 4 | Component | `components/__tests__/**/*.test.{ts,tsx}` | `test:components` | `test-components` |
 | 5 | E2E | `e2e/*.spec.ts` | `test:e2e` | `e2e` |
-| 6 | Security | `lib/__tests__/*.security.test.ts`, `tests/security/**` | `test:security` | included in `test-unit` / `test` |
+| 6 | Security | `lib/__tests__/*.security.test.ts`, `tests/security/**` | `test:security` | `test-unit` / `test` |
 | 7 | Live probes + smoke | `scripts/probes/*.ts`, `e2e/smoke/*.spec.ts` | `test:smoke` | `smoke` (post-deploy) |
+
+### E2E staging config
+
+Layer 5 runs in CI against staging. Set `PLAYWRIGHT_BASE_URL` to the staging
+URL (§"Staging access") and authenticate as `uat-bot@staging.opollo.com`
+(password from Vercel Preview env `STAGING_UAT_PASSWORD`). **A spec that
+conditionally skips when `STAGING_UAT_PASSWORD` is absent is a failing gate,
+not coverage.** Config details: `docs/backlog/auth-e2e-staging.md`.
 
 ### Hard floors per change-shape
 
 - **New API route** → integration (happy + auth + validation) + cross-tenant if tenant-scoped + injection if user input flows to DB or LLM.
 - **New external SDK call** → contract snapshot + probe script.
 - **New user-facing journey** → e2e + `auditA11y`.
-- **User-input rendering surface** (`dangerouslySetInnerHTML` or operator/tenant content) → component-layer test driving every `XSS_PAYLOADS` entry through the real renderer.
-- **New webhook receiver** → signature-verification security test driving real wrong-signed payload through the route handler, asserting 401.
-- **Any change to RLS policy** → cross-tenant isolation test using `seedTwoCompanies()`.
-- **Any change to a critical path** (§"Critical paths") → production smoke must pass post-deploy.
-- **Any production bug fix that took >1 PR** → permanent regression test under `tests/regressions/<bug-slug>.test.ts` BEFORE the final fix merges.
+- **Any auth critical path** (login, signup, password reset, 2FA) → e2e required. Provenance: June 2026 lockout — login broke with zero coverage. Backlog: `docs/backlog/auth-e2e-staging.md`.
+- **User-input rendering surface** (`dangerouslySetInnerHTML` or operator/tenant content) → component test driving every `XSS_PAYLOADS` entry through the real renderer.
+- **New webhook receiver** → signature-verification security test asserting 401 on wrong-signed payload.
+- **Any RLS policy change** → cross-tenant isolation test using `seedTwoCompanies()`.
+- **Any critical path change** (§"Critical paths") → production smoke post-deploy.
+- **Any >1-PR production bug fix** → regression test under `tests/regressions/<bug-slug>.test.ts` before final merge.
 
 ### Flaky / fixme tests
 
-`test.skip()` runtime branches that bail on missing seed are forbidden —
-fix the seed. `test.fixme()` is the only acceptable skip variant, and
-**every fixme MUST link an open issue within seven days** (provisional —
-adjust on real-world data). CI fails the build if any fixme has been
-open longer with no linked issue. The static-audit script flags
-violators.
+`test.skip()` that bails on missing seed is forbidden — fix the seed.
+`test.fixme()` is the only acceptable skip; must link an open issue within
+seven days. Static-audit flags violators; CI fails on stale fixmes.
 
-## Live diagnostic protocol — required before any "third-party bug" claim
+## Live diagnostic protocol
 
-**No agent in this codebase may claim "third-party bug" for any external
-integration without completing this protocol first.** Seven steps, all
-required, all attached to the incident doc using
-`docs/incidents/TEMPLATE.md`.
-
-0. **Confirm env vars the failing path depends on are SET in the target deployment.** Use `vercel env ls` (production scope). Missing env is a config issue, not a third-party bug.
-1. **Run the relevant probe script** in `scripts/probes/`. Capture full markdown output. Empty output = a missing probe = step-1-failed.
-2. **Verify the deployed bundle matches source.** Use `vercel inspect <deploy-url>` to confirm the deployed commit SHA, then `git log <sha> -1` to confirm the commit content. The "fix wasn't pushed" failure mode (May 2026 incident) must be impossible to recreate.
-3. **Run the contract test against the live deployed environment.** Set `PROBE_BASE_URL=https://opollo-site-builder.vercel.app`. If the actual outgoing request payload differs from the contract snapshot — that's the bug. Investigate locally.
-4. **Capture full network trace and response bodies.** `curl -v` or Playwright trace export. All headers, body, status codes.
-5. **Decode any tokens, JWTs, or signed payloads** in the response. Check that claims match what was sent.
-6. **Document at `docs/incidents/<timestamp>-<integration>.md`.** Steps 0–5 are evidence rows.
-
-Only after all seven fail to find a code-side cause is escalation to
-"third-party issue" allowed.
+Full seven-step protocol (env check → probe → bundle verify → contract test →
+network trace → token decode → incident doc) lives at
+`docs/runbooks/RUNBOOK.md §"Live diagnostic protocol"`. **No agent may claim
+"third-party bug" without completing it.**
 
 ## Security realism rule
 
-Every security test (Layer 6) must demonstrate that an exploit is
-**blocked by the running system**. Specifically:
-
-- Drive the payload through the real enforcement boundary (the actual route handler, the actual sanitiser, the actual middleware).
-- Assert a concrete outcome (status code, DOM shape, DB row state).
-- A scanner emitting findings without an actionable assertion is not a security test.
-
-If a security test cannot demonstrate the exploit is blocked, it is not
-a security test. Either rewrite it to drive the failure path through
-the real system or remove it.
-
-**High-severity security findings block merge.**
+Layer 6 security tests must drive the payload through the real enforcement
+boundary and assert a concrete outcome (status code, DOM shape, DB row). A
+scanner without an actionable assertion is not a security test.
+**High-severity findings block merge.**
 
 ## Self-test loop
 
-- Retry ceiling: **ten attempts per PR**, absolute. Not three.
-- Retry count alone is not the escalation trigger. **"Not converging" is**: same workflow + same job + same first error line, twice in a row → stop, narrow, document, reassess (see §"Loop detection").
-- Anything else is a new failure and resets the per-class count (but not the absolute 10).
-- CI failure logs auto-post as PR comments by `.github/workflows/ci.yml`. Read those instead of asking Steven to paste logs.
-- Escalate only for the reasons in §"Hard stops". CI failures, flaky tests, branch-update conflicts, and slow-but-progressing CI runs are NOT escalation triggers — fix them and continue.
+Retry ceiling: **10 per PR**, absolute. "Not converging" (same workflow + same
+job + same first error line, twice in a row) is the escalation trigger — not
+retry count alone. CI failure logs auto-post as PR comments; read those.
 
 ## Heartbeat
 
-If working autonomously for more than **90 minutes** (provisional —
-adjust on real-world session data) without a merge or surfaced
-milestone, post a one-line status:
-
-```
-Still on <slice>; current state: <X>; next: <Y>.
-```
-
-Heartbeat is the only allowed deviation from §"Communication". It
-exists so Steven knows whether to interrupt without him having to ask.
+After 90 minutes of autonomous work without a merge or surfaced milestone, post:
+`Still on <slice>; current state: <X>; next: <Y>.`
 
 ## Merge gate — no merge without CI-verified green
 
-The §"Merge decision tree" is the truth. This section is the **gate
-that prevents premature merges** — the failure mode where a PR
-auto-merges before CI runs.
-
-Branch protection on main now requires all eight CI status checks
-(#822 closed). **Auto-merge is the preferred path**: arm it immediately
-after opening a PR and GitHub will fire the merge automatically once
-every required check passes.
-
-**Primary path** (use by default):
-```
-gh pr merge <PR> --squash --auto
-```
-GitHub holds the merge until all required status checks are green;
-no polling needed.
-
-**Fallback** (draft PRs, stacked PRs, write-safety-gated PRs, or any
-case where `--auto` cannot be armed):
-
-1. `gh pr checks <PR> --watch` — wait until every check is terminal.
-2. Read the conclusion of each check. Every required check must show `pass`.
-3. Only then: `gh pr merge <PR> --squash`.
-
-**"Out-of-date with base" handling**: if a PR shows OPEN + BEHIND,
-run `gh pr update-branch <PR>` automatically. Update-branch failure
-due to merge conflict → stop and report; do not force. After
-update-branch, CI re-runs — auto-merge fires when checks pass again.
+**Primary:** `gh pr merge <PR> --squash --auto` — GitHub fires when all required
+checks pass. **Fallback:** `gh pr checks <PR> --watch` until terminal, then
+`gh pr merge <PR> --squash`. **Behind main:** `gh pr update-branch <PR>`
+automatically; CI re-runs; auto-merge fires when green.
 
 ## Delivery ownership
 
-The agent owns **outcome completion**, not process completion.
-
-PR creation, planning, CI success, and merge readiness are intermediary
-states. They are not the deliverable. Responsibility for the task
-remains active until:
-
-- the change is **deployed** to the target environment,
-- **runtime behaviour is verified** against the original acceptance criteria via direct observation, and
-- **Steven can exercise the feature live**.
-
-This is restated here, near the merge logic, because the merge is the
-intermediate state most likely to be mistaken for the finish line. It
-isn't. The merge is one row in the §"Default execution contract"
-table; rows below it remain.
-
-If the agent has just merged a PR, the next action is to watch the
-deploy and verify production behaviour — not to surface to Steven and
-not to start the next task. Surface only when the post-deploy
-verification has succeeded, or when a §"Hard stop" applies.
+The agent owns outcome completion, not process completion. Responsibility
+remains active until: change is **deployed**, **runtime behaviour verified**
+against the original acceptance criteria, and **Steven can exercise the feature
+live**. The merge is one row in the §"Default execution contract" table.
 
 ## Sub-slice autonomy
 
-For sub-slices of a parent milestone whose plan Steven has already
-approved (M2a/b/c/d under M2, etc.), execute end-to-end without
-per-slice plan review. Plan goes in the PR description, not a chat
-message. Auto-merge per §"Merge decision tree". One-line status ping
-post-merge **after the slice is verified live in production** per
-§"Default execution contract": `<slice> deployed and verified, starting <next>`.
-
-Escalate only for the reasons in §"Hard stops". Sub-slice planning,
-operational hiccups, CI flakes, and routine tradeoffs already covered
-in the parent plan are NOT escalation triggers — proceed.
+For sub-slices of an already-approved milestone, execute end-to-end without
+per-slice plan review. Plan in the PR description; auto-merge per §"Merge
+decision tree". Status post-verify: `<slice> deployed and verified, starting <next>`.
 
 ## Auto-continue
 
-After an auto-merged PR, automatically proceed to the next slice per the
-roadmap. No stop-gates at sub-slice or parent-milestone boundaries.
-Silence = keep going.
-
-The only reasons to pause are listed in §"Hard stops". That section is
-the canonical list — do not invent additional reasons.
-
-Write-safety-critical milestones (M3, M4, M7, anything spending money
-or mutating client WP) still require per-slice plans with the
-**"Risks identified and mitigated"** audit per §"Self-audit".
+After a merged PR, proceed to the next slice. Silence = keep going. Pauses
+only for §"Hard stops". Write-safety milestones (M3, M4, M7) still require
+per-slice **"Risks identified and mitigated"** per §"Self-audit is the review".
 
 ## Parallelism
 
-Default is single session. When Steven runs two browser tabs:
-
-- Read `docs/WORK_IN_FLIGHT.md` before editing any file.
-- Append a claim block (branch + slice + files claimed + reserved migration number).
-- Prefix every status message with `[Session A]` / `[Session B]`.
-- On merge, remove your claim block in the next PR's first commit.
-- Conflict with the other session's claims → stop and ask Steven.
-
-Full protocol + bootstrap prompt: `docs/governance/PARALLELISM.md`.
+Default: single session. For two tabs: read `docs/WORK_IN_FLIGHT.md`, append
+a claim block, prefix messages `[Session A]`/`[Session B]`, remove claim on
+merge. Conflict → stop and ask. Full protocol: `docs/governance/PARALLELISM.md`.
 
 ## Self-audit is the review
 
-Once a plan has a populated **"Risks identified and mitigated"**
-section, proceed directly to implementation. Do NOT post plans to
-Steven as a review gate.
-
-The Risks section MUST list:
-
-- Each write-safety hotspot (billed external calls, concurrent writers, multi-row state transitions, triggers, race windows, schema-level uniqueness).
-- How the plan mitigates each (idempotency key, DB unique constraint, advisory lock, dedicated test, etc.).
-- Any deferred gaps with reason + follow-up slice pointer.
-
-Where plans live:
-
-- Parent milestone plans → first sub-slice's PR description.
-- Sub-slice plans → that sub-slice's PR description.
-
-A plan without a populated Risks section is not ready to execute.
+A plan with a populated **"Risks identified and mitigated"** section proceeds
+directly to implementation — no review gate. Risks section must list each
+write-safety hotspot (billed calls, concurrent writers, multi-row transitions,
+triggers, race windows, uniqueness) and its mitigation. Plans live in the PR
+description.
 
 ## PR size limit
 
-Soft ceiling: **500 lines net change per PR** (provisional — adjust if
-it produces friction). Stated exceptions: renames, generated files,
-atomic config consolidations.
-
-Above 500 net lines, state in the PR description why the size is
-warranted (incident response, large rename, generated migration). If
-the answer is "incremental work that grew", the PR should split.
+Soft ceiling: **500 lines net change**. Exceptions: renames, generated files,
+config consolidations. Above 500: state the reason in the PR description.
 
 ## Pre-PR checklist
-
-Paste into the PR description. The PR template at
-`.github/pull_request_template.md` is the long form.
 
 ```
 - [ ] Lint, typecheck, build all green
@@ -564,20 +316,16 @@ Paste into the PR description. The PR template at
 - [ ] XSS payload coverage added (if user-content rendering touched)
 - [ ] Probe script updated (if SDK boundary changed)
 - [ ] Regression test added (if this fix is for a >1-PR production bug)
-- [ ] For bug fixes: working-analog block in PR body (file:lines + diff + fix) OR explicit "no analog exists" + new-pattern justification — see §"Diagnose by working analog"
+- [ ] Working-analog block in PR body OR explicit "no analog" + justification — see docs/patterns/WORKING_ANALOG.md
 - [ ] Risks identified and mitigated section in PR body
 - [ ] PR is under 500 net lines OR exception stated
 ```
 
 ## Pre-commit / commit-msg
 
-Husky-managed. `pre-commit` runs `lint-staged` + `npm run test:unit`
-(skip with `SKIP_PRECOMMIT_TESTS=1` for explicit rebases — never with
-`--no-verify`). `commit-msg` enforces Conventional Commits, 100-char
-header cap.
-
-Detail + supply-chain scans (CodeQL, Dependabot, gitleaks, npm audit):
-`docs/governance/DX_HYGIENE.md`.
+Husky-managed. `pre-commit`: `lint-staged` + `test:unit` (bypass with
+`SKIP_PRECOMMIT_TESTS=1` for rebases — never `--no-verify`). `commit-msg`:
+Conventional Commits, 100-char header cap. Detail: `docs/governance/DX_HYGIENE.md`.
 
 ## Commands
 
@@ -588,15 +336,15 @@ Detail + supply-chain scans (CodeQL, Dependabot, gitleaks, npm audit):
 | `npm run lint:css` | stylelint on `seed/**/*.css` |
 | `npm run typecheck` | tsc --noEmit |
 | `npm run build` | Production build |
-| `npm run test:unit` | Layer 1 + 2 + regression + no-DB security (no Supabase, ~10 s) |
+| `npm run test:unit` | Layer 1 + 2 + regression + no-DB security (~10 s) |
 | `npm run test:components` | Layer 4 (jsdom, no Supabase) |
 | `npm run test:integration` | Layer 3 (real Supabase, ~10–40 min) |
-| `npm run test:e2e` | Layer 5 Playwright (real Supabase) |
-| `npm run test:security` | Layer 6 (filtered by `--testNamePattern=SECURITY`) |
+| `npm run test:e2e` | Layer 5 Playwright |
+| `npm run test:security` | Layer 6 |
 | `npm run test:smoke` | Layer 7 against live URL |
 | `npm run test:precommit` | lint + typecheck + Layer 1 |
 | `npm run test:regressions` | `tests/regressions/` only |
-| `npm run audit:static` | Static-analysis script (HIGH gates CI) |
+| `npm run audit:static` | Static-analysis (HIGH gates CI) |
 | `npm run analyze` | Production build with bundle analyzer |
 
 ## Standards
@@ -608,152 +356,41 @@ Detail + supply-chain scans (CodeQL, Dependabot, gitleaks, npm audit):
 
 ## Proofing / Workflow / Client-Portal — Durable Principles
 
-Hard rules derived from the B1–B3 build (2026-06-02/03). Every agent
-working on the proofing/approval/workflow subsystem (magic links, proof
-lifecycle, workflow engine, client portal) MUST apply these without
-exception.
+Hard rules for the proofing/approval/workflow subsystem (magic links, proof
+lifecycle, workflow engine, client portal). Full detail:
+`docs/architecture/PROOFING_DURABLE_PRINCIPLES.md`. Key invariants in force:
 
-### Production database is never a test environment
-
-**Highest-priority rule in this section.**
-
-- Verification scripts, seeding scripts, and integration tests NEVER use
-  production credentials (`SUPABASE_URL` pointing to the prod project,
-  `SUPABASE_SERVICE_ROLE_KEY` for prod). If local Supabase/Docker is
-  unavailable, **STOP and tell Steven. Do not fall back to prod creds
-  under any condition.**
-- No test or seed data is ever written to the production database. The V2
-  publish-due cron (`claimDueDrafts`) has no company-level guard; any
-  `state=scheduled` draft in any company — including one created by a
-  verification script — enters the live publish path on the next cron tick.
-- If Docker is not running and `supabase start` fails, the correct
-  response is: "Local Supabase unavailable. Please start Docker." Not:
-  fall back to prod. Not: run a subset of checks. Stop.
-
-### Recon-first, stub-first
-
-Before writing any migration: grep for existing schema stubs
-(`platform_session_grants`, OTP columns, relevant partial indexes). Find
-the correct existing home before adding new tables. The failure mode is
-creating a parallel table that duplicates an existing stub.
-
-Before designing any fix: find the working analog in the codebase
-(§"Diagnose by working analog"). The proofing/approval backbone has many
-subtly connected tables (`social_approval_requests`, `_recipients`,
-`_events`, `record_approval_decision` RPC) and wrong assumptions compound
-across migrations.
-
-### Architecture invariants
-
-- **Magic links are core infra.** B1's `magic_links` table is the single
-  token primitive for approval, login, and reconnect. Do not create a
-  second token system. Do not add a new purpose without extending the
-  `purpose` CHECK.
-- **V2, not V1.** All new proofing, approval, and scheduling work targets
-  `social_post_drafts` (V2 pipeline). `social_post_master` (V1) is
-  retiring. When `post_master_id IS NULL`, skip V1 lookups entirely — do
-  not error, do not fall back, return `null` for the V1-specific field and
-  let the caller handle it.
-- **Company-context is always explicit.** Every company-scoped action
-  must resolve and enforce the correct company. Never use ambient company
-  context. Verify with `is_company_member(company_id)` / `is_opollo_staff()`
-  at every RLS boundary. Opollo users switch context; customers are
-  hard-walled. A path that admits a customer to another company's data is
-  a P0 security bug.
-- **`content_group_id` is explicit-only.** No DEFAULT after backfill.
-  Every insert into `social_post_drafts` must name it. Omitting it
-  produces a loud NOT NULL violation — that is the intended behaviour.
-
-### Hard stops — show Steven before running, and do NOT auto-merge
-
-Stop and show the migration shape + strategy before executing any of:
-
-1. **Any migration touching a live in-prod flow** — approval requests,
-   decision RPC, approval recipients, magic_links, or the image-review
-   gate path. Migrations 0172–0176 are the reference; every subsequent
-   migration in this subsystem requires the same pre-flight review.
-2. **Destructive ALTER or data-loss** — `DROP COLUMN`, `ALTER COLUMN`
-   that changes type or removes NOT NULL, `DROP TABLE`, `TRUNCATE`.
-3. **RLS boundary changes** — adding or modifying RLS policies on any
-   table that holds company-scoped data.
-4. **Cross-tenant connection access** — anything touching
-   `social_connections`, OAuth callback paths, or `external_identity_hash`
-   cross-tenant binding. The LinkedIn cross-tenant leak (2026-05-11) is
-   the incident to not repeat.
-5. **The gate→step bridge** — already ran (migration 0176). If any future
-   migration touches `company_workflow_gates` with a write (UPDATE,
-   DELETE, ALTER), treat it as a hard stop.
-
-**Hard-stop PRs must NOT be armed for auto-merge (`gh pr merge --auto`).
-They require an explicit human merge by Steven after review. "Show Steven
-before running" is void if CI-green auto-merge lands it past him — which
-already happened with the 0176 bridge.** Wait for Steven to run
-`gh pr merge <PR> --squash` manually.
-
-These are in addition to, not replacing, the §"Hard stops" list in the
-main execution contract.
-
-### Known hazard — `claimDueDrafts` has no company-level guard
-
-The V2 publish-due cron queries `WHERE state='scheduled' AND scheduled_at
-<= now() AND archived_at IS NULL` with no company-level filter. Any draft
-matching those conditions — in any company — enters the live publish path.
-
-**B4 scope protection:** B4 is reconnect + approval only. B4 must have NO
-write path that sets `social_post_drafts.state='scheduled'`. If B4 never
-produces a scheduled draft, the cron exposure is moot for B4. Any B4 code
-that touches draft state must be audited to confirm it cannot reach
-`state='scheduled'`. Fix vs accept decision deferred to Steven; tracked at
-`docs/backlog/cron-guard-missing.md`.
+- **Never use the production DB as a test environment.** Stop if Docker is
+  unavailable; do not fall back to prod creds.
+- **Recon before every migration.** Grep for existing stubs before adding tables.
+- **`magic_links` is the single token primitive.** No second token system.
+- **V2 pipeline only** (`social_post_drafts`). Skip V1 lookups when `post_master_id IS NULL`.
+- **Company-context always explicit.** Verify at every RLS boundary.
+- **Hard-stop PRs in this subsystem require Steven's manual merge.** Do NOT arm `--auto`.
 
 ## Migration deploy rules — staging + production parity
 
-Every migration merged to `main` **must land in both environments**. The
-`deploy-migrations.yml` workflow runs two jobs in sequence:
+Every migration merged to `main` must land in **both** environments via
+`deploy-migrations.yml`:
 
-1. `push` — production (`sazapxgmrdaewrkwoxby`)
-2. `push-staging` — staging (`bjiiqnetaxoibhcaukqm`), runs only after `push`
-   succeeds
+1. `push` job — production (`sazapxgmrdaewrkwoxby`)
+2. `push-staging` job — staging (`bjiiqnetaxoibhcaukqm`), runs only after `push` succeeds
 
-**Staging parity is part of the definition of done for any migration PR.**
-A migration is not deployed until the `push-staging` job has also succeeded.
-This is a hard rule, not advisory.
+**A migration is not deployed until `push-staging` is also green.** A red
+`push-staging` is a staging incident — diagnose and fix it the same as a
+production failure. A job skip is acceptable only during the one-time setup
+window; after secrets are in place, a skip is a misconfiguration. Never apply
+migrations out-of-band — all must flow through the workflow to keep the
+schema tracking table accurate.
 
-### Why this rule exists — incident provenance
-
-In 2026 staging was never wired into `deploy-migrations.yml`. After ~60
-migrations accumulated without being applied, the staging Supabase project
-drifted so far from production that preview deployments were functionally
-broken — login failed because schema required by the auth path was missing.
-That drift took a full investigation session to diagnose and a separate PR
-to fix. The rule exists so it cannot happen again.
-
-### Agent responsibilities
-
-- **When opening a migration PR**, the pre-PR checklist item "Layer scripts run"
-  implicitly includes confirming both workflow jobs are configured to run. Do not
-  treat a migration as deployed until both `push` and `push-staging` appear green
-  in the "Deploy Supabase migrations" workflow run.
-- **If `push-staging` is red** while `push` (production) is green, that is a
-  staging incident — diagnose and fix before marking the task done, the same as
-  a production deploy failure. Do not skip it.
-- **If staging secrets are not yet set** (`STAGING_SUPABASE_PROJECT_REF`,
-  `STAGING_SUPABASE_DB_PASSWORD`), the `push-staging` job skips with a warning
-  rather than failing. A skip is acceptable only during the one-time setup window
-  described in `docs/environments-staging-plan.md §10`. After those secrets are
-  in place, a skip is a misconfiguration — surface it.
-- **Never apply migrations to staging out-of-band** (manual `supabase db push`
-  directly against the staging project). All migrations must flow through the
-  workflow so the `supabase_migrations.schema_migrations` tracking table stays
-  accurate. Out-of-band applies produce exactly the drift this rule prevents.
-
-Full setup: `docs/environments-staging-plan.md`.
+Provenance: 60+ migrations accumulated without staging application; drift broke
+login on every preview deploy. Full setup: `docs/environments-staging-plan.md`.
 
 ## Pointers
 
-Architecture and historical detail moved out of this file to keep it
-under ~450 lines. The pointers below are load-bearing — when a section
-links here, it is the canonical reference.
+Architecture and historical detail live under `docs/`. Pointers below are
+load-bearing — when a section in this file references one, it is the canonical
+source.
 
 | Topic | Lives at |
 |---|---|
@@ -771,16 +408,19 @@ links here, it is the canonical reference.
 | Engineering standards | `docs/architecture/ENGINEERING_STANDARDS.md` |
 | Build setup | `docs/architecture/BUILD.md` |
 | Project context | `docs/architecture/CONTEXT.md` |
+| Proofing / Workflow durable principles | `docs/architecture/PROOFING_DURABLE_PRINCIPLES.md` |
 | Merge rules (full version) | `docs/governance/MERGE_RULES.md` |
 | Parallelism plan + bootstrap prompt | `docs/governance/PARALLELISM.md` |
 | DX hygiene (hooks, commitlint, supply chain) | `docs/governance/DX_HYGIENE.md` |
 | Release hygiene (release-please, changelog) | `docs/governance/RELEASE_HYGIENE.md` |
-| On-call playbook | `docs/runbooks/RUNBOOK.md` |
+| On-call playbook + live diagnostic protocol | `docs/runbooks/RUNBOOK.md` |
 | Incident report template | `docs/incidents/TEMPLATE.md` |
 | Test coverage roadmap | `docs/test-coverage-roadmap.md` |
 | Security findings register | `docs/security-findings.md` |
 | Test harness recon (cold-start audit) | `docs/test-harness-recon.md` |
 | UX debt (live items only) | `docs/backlog/ux-debt.md` |
+| Auth e2e staging backlog | `docs/backlog/auth-e2e-staging.md` |
+| Working analog protocol + report-back template | `docs/patterns/WORKING_ANALOG.md` |
 | Patterns playbook | `docs/patterns/` |
 | In-flight work claims | `docs/WORK_IN_FLIGHT.md` |
 | Staging environment setup + migration parity runbook | `docs/environments-staging-plan.md` |
