@@ -201,7 +201,7 @@ async function main() {
   } else {
     const { data: newCo, error: coErr } = await supa
       .from("platform_companies")
-      .insert({ name: TEST_COMPANY_NAME })
+      .insert({ name: TEST_COMPANY_NAME, slug: "staging-test-co" })
       .select("id")
       .single();
     if (coErr) throw new Error(`insert platform_companies: ${coErr.message}`);
