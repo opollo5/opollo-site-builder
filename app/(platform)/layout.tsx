@@ -9,6 +9,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { BreadcrumbProvider } from "@/components/error-reporting/BreadcrumbProvider";
 import { getCompanyTheme, buildThemeStyleBlock } from "@/lib/platform/theming";
 import { FeedbackWidget } from "@/components/feedback/FeedbackWidget";
+import { resolveFeedbackCompanyId } from "@/lib/feedback/resolve-company-id";
 
 // ---------------------------------------------------------------------------
 // PlatformLayout — single shared authenticated layout that renders NavShell
@@ -79,13 +80,18 @@ export default async function PlatformLayout({
     companyName,
   };
 
-  // FeedbackWidget: mount once for authenticated company members when
-  // FEATURE_FEEDBACK_WIDGET is set. Never for logged-out users.
-  // Staff without a company assignment don't get the widget.
-  const feedbackCompanyId =
-    process.env.FEATURE_FEEDBACK_WIDGET === "1" && platformSession?.company?.companyId
-      ? platformSession.company.companyId
-      : null;
+  // FeedbackWidget: mount when FEATURE_FEEDBACK_WIDGET=1 for:
+  //   1. Company members on any route — their company scope.
+  //   2. Opollo staff on /admin/* — internal sentinel company so tickets land
+  //      on the staff board without a customer label. Enables staff to file
+  //      bugs found during staging-first verification of admin pages.
+  // Never for logged-out users. Feature flag gates both paths.
+  const feedbackCompanyId = resolveFeedbackCompanyId({
+    featureEnabled: process.env.FEATURE_FEEDBACK_WIDGET === "1",
+    companyId: platformSession?.company?.companyId,
+    isOpolloStaff,
+    pathname,
+  });
 
   // Read the per-user "skip intro" preference from platform_users.preferences.
   // Only fetched when the widget will actually be mounted (avoids an extra DB
