@@ -1,0 +1,45 @@
+name: Sync staging to main
+
+# Keeps the `staging` branch (and therefore the stable Vercel alias
+# opollo-site-builder-git-staging-opollo5.vercel.app) in sync with main
+# on every push. Without this, staging drifts exactly the way migration
+# parity drifted: silently, until the URL serves stale builds.
+#
+# Mechanism: on any push to main, force-push the new HEAD SHA directly to
+# staging. No checkout needed — cheaper and faster than a full clone.
+# The push triggers the Vercel git integration to redeploy the staging alias.
+#
+# If staging has independent commits (shouldn't happen under normal workflow),
+# this will overwrite them with main. That is intentional — staging is a
+# mirror, not a development branch.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: sync-staging
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Fast-forward staging → main
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Force-push staging to HEAD
+        run: git push origin HEAD:refs/heads/staging --force
+
+      - name: Step summary
+        run: |
+          echo "### \`staging\` synced to \`main\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: \`${{ github.sha }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Message: ${{ github.event.head_commit.message }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Vercel alias: https://opollo-site-builder-git-staging-opollo5.vercel.app" >> "$GITHUB_STEP_SUMMARY"
