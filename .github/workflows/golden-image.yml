@@ -47,7 +47,7 @@ jobs:
       #   UPDATE_GOLDEN=1 npm run test:golden   (on a Linux CI runner or Docker)
       - name: Upload golden snapshots for review
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golden-snapshots-${{ github.run_number }}
           path: tests/golden/snapshots/
